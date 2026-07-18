@@ -114,7 +114,7 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            port = relict.start(qemu="qemu")
+            port = relict.start(relict.MachineConfig(qemu="qemu"))
 
         self.assertEqual(port, 54321)
         self.assertEqual(lifecycle_module.read_vm_state(), {
@@ -140,7 +140,8 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            relict.start(qemu="qemu", **start_kwargs)
+            config = relict.MachineConfig(qemu="qemu", **start_kwargs)
+            relict.start(config)
 
         return image, popen.call_args.args[0]
 
@@ -156,8 +157,10 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            relict.start(qemu="qemu", drives=drives, machine=machine,
-                         memory=memory)
+            config = relict.MachineConfig(
+                qemu="qemu", drives=drives, machine=machine,
+                memory=memory)
+            relict.start(config)
         return popen.call_args.args[0]
 
     def test_start_boots_the_floppy_image_as_drive_a(self):
@@ -255,8 +258,8 @@ class LifecycleTests(unittest.TestCase):
 
     def test_start_rejects_configured_and_raw_memory(self):
         with self.assertRaisesRegex(ValueError, "conflicts"):
-            relict.start(qemu="qemu", memory=32,
-                         qemu_args=("-m", "64"))
+            relict.start(relict.MachineConfig(
+                qemu="qemu", memory=32, qemu_args=("-m", "64")))
 
     def test_start_mounts_configured_directory_as_vvfat(self):
         source = os.path.join(self.home, "external-drive")
@@ -325,7 +328,7 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc):
-            port = relict.start(qemu="qemu")
+            port = relict.start(relict.MachineConfig(qemu="qemu"))
 
         download.assert_called_once_with(
             os.path.join(self.home, "drives"), mock.ANY)
@@ -347,7 +350,8 @@ class LifecycleTests(unittest.TestCase):
         with mock.patch.object(lifecycle_module, "port_in_use",
                                return_value=True):
             with self.assertRaisesRegex(RuntimeError, "explicit"):
-                relict.start(qemu="qemu", port=54321)
+                relict.start(
+                    relict.MachineConfig(qemu="qemu"), port=54321)
 
         self.assertIsNone(lifecycle_module.read_vm_state())
 
@@ -367,7 +371,7 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
-                relict.start(qemu="qemu")
+                relict.start(relict.MachineConfig(qemu="qemu"))
 
         self.assertTrue(proc.terminated)
         self.assertIsNone(lifecycle_module.read_vm_state())

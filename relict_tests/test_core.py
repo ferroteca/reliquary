@@ -323,7 +323,9 @@ class GuestProgramTests(unittest.TestCase):
         path = os.path.join(self.tempdir.name, "TOO-LONG-NAME.EXE")
 
         with self.assertRaisesRegex(NotImplementedError, "win9x"):
-            relict.run_guest_program(path, platform="win9x")
+            relict.run_guest_program(
+                path, machine_config=relict.MachineConfig(
+                    platform="win9x"))
 
     def test_guest_program_stages_runs_stops_and_returns_log(self):
         guest = mock.Mock()
@@ -344,8 +346,9 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest) as adapter, \
                 mock.patch.object(workflows_module, "stop") as stop, \
                 mock.patch.object(workflows_module.time, "sleep"):
+            config = relict.MachineConfig(timeout=45, qemu="qemu")
             log = relict.run_guest_program(
-                self.exe, args="-v", timeout=45, qemu="qemu", port=54321)
+                self.exe, args="-v", machine_config=config, port=54321)
 
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
@@ -383,7 +386,9 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            log = relict.run_guest_program(self.exe, staged_drive="d")
+            config = relict.MachineConfig(staged_drive="d")
+            log = relict.run_guest_program(
+                self.exe, machine_config=config)
 
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         self.assertEqual(log, "guest output")
@@ -446,7 +451,9 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            log = relict.run_guest_program(self.exe, drives=specs)
+            config = relict.MachineConfig(drives=specs)
+            log = relict.run_guest_program(
+                self.exe, machine_config=config)
 
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         config = start.call_args.args[0]
@@ -460,7 +467,9 @@ class GuestProgramTests(unittest.TestCase):
         with mock.patch.object(workflows_module, "start_machine") \
                 as start:
             with self.assertRaisesRegex(ValueError, "claim C:"):
-                relict.run_guest_program(self.exe, staged_drive="C")
+                config = relict.MachineConfig(staged_drive="C")
+                relict.run_guest_program(
+                    self.exe, machine_config=config)
 
         start.assert_not_called()
 

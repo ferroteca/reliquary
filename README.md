@@ -424,6 +424,12 @@ config = relict.MachineConfig.from_file(
 field. Programmatic construction does not load `<home>/machine.json`
 implicitly.
 
+The module-level `start()`, `run_task()`, and `run_guest_program()` functions
+accept a `machine_config` containing a `MachineConfig`, versioned mapping, or
+machine-document path. Machine settings such as `qemu`, `timeout`, `memory`,
+and `drives` belong in that configuration; the functions expose only separate
+operational controls such as `display`, `port`, and `home`.
+
 Configured sources are mounted in place and must already exist. They conflict with a filesystem declaration for the
 same logical slot rather than overriding it. `run()` keeps present bootable media and, for an empty DOS home, installs
 the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle under the runner's home.

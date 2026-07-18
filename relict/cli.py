@@ -13,7 +13,7 @@ from .interaction_agentless import (AgentlessGuestExec, screen_text,
 from .lifecycle import stop
 from .machine import Machine, screenshot
 from .platform_dos import download
-from .workflows import start
+from .workflows import MachineConfig, start
 
 
 def main(argv=None):
@@ -81,8 +81,10 @@ def _dispatch(arguments):
                 "implemented")
         download()
     elif arguments.command == "start":
-        start(arguments.display, arguments.qemu, arguments.port,
-              arguments.qemu_args, platform=arguments.platform)
+        config = MachineConfig(
+            platform=arguments.platform, qemu=arguments.qemu,
+            qemu_args=arguments.qemu_args)
+        start(config, display=arguments.display, port=arguments.port)
     elif arguments.command == "stop":
         stop(arguments.port)
     elif arguments.command == "boot-to-dos":

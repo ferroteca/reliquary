@@ -17,10 +17,10 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   `cmd()` and `hmp()` access; interaction adapters now depend on `Machine`
   instead of opening QMP connections themselves.
 - One validated `MachineConfig` now threads through the workflow and
-  lifecycle layers: `start()`, `run_task()`, and `run_guest_program()`
-  normalize their individual parameters into a machine configuration up
-  front, `Runner.run()` passes its configuration through unchanged, and the
-  QEMU launcher consumes that configuration instead of loose hardware
+  lifecycle layers. `start()`, `run_task()`, and `run_guest_program()` take a
+  `MachineConfig`, versioned mapping, or JSON path as their sole machine
+  settings input; `Runner.run()` passes its configuration through unchanged,
+  and the QEMU launcher consumes that configuration instead of loose hardware
   arguments. The default QEMU argument vector is unchanged.
 
 ### Added

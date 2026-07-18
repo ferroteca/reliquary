@@ -162,6 +162,9 @@ option name. Construction and `Runner` do not implicitly load `<home>/machine.js
 the resolved inventory declares something bootable — keep present declared media or install the FreeDOS default;
 never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
 special boot-image fields: custom media is declared through the same drive inventory as every other image.
+The module-level `start()`, `run_task()`, and `run_guest_program()` functions accept one optional `machine_config`
+containing a `MachineConfig`, versioned mapping, or path. Machine settings have no parallel individual function
+parameters; only operational controls such as display, port, and home remain separate.
 There is no public provisioning step. An omitted home resolves the established process default once at construction.
 Invariants to preserve: all state for an instance lives under its resolved constructor home; concurrent runs use
 distinct `Runner` instances with distinct homes (per-home `vm.json` keeps VM ownership

@@ -369,6 +369,54 @@ class MachineConfigLoadingTests(unittest.TestCase):
             relict.MachineConfig.from_file(missing)
 
 
+class DirectMachineConfigTests(unittest.TestCase):
+    def test_start_accepts_a_machine_config_unchanged(self):
+        config = relict.MachineConfig(qemu="custom-qemu", memory=32)
+
+        with mock.patch.object(workflows_module, "_start_configured",
+                               return_value=54321) as start:
+            port = relict.start(machine_config=config)
+
+        self.assertEqual(port, 54321)
+        self.assertIs(start.call_args.args[0], config)
+
+    def test_run_task_accepts_a_versioned_mapping(self):
+        document = {
+            "version": 1,
+            "timeout": 45,
+            "machine": "pc",
+        }
+        task = mock.Mock(return_value="result")
+
+        with mock.patch.object(workflows_module, "_start_configured",
+                               return_value=54321) as start, \
+                mock.patch.object(workflows_module, "stop"):
+            result = relict.run_task(task, machine_config=document)
+
+        config = start.call_args.args[0]
+        self.assertEqual(config.timeout, 45.0)
+        self.assertEqual(dict(config.machine), {"type": "pc"})
+        self.assertEqual(result, "result")
+
+    def test_guest_program_accepts_a_machine_file(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, "machine.json")
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump({"version": 1, "timeout": 60}, handle)
+
+            with mock.patch.object(workflows_module, "_run_configured",
+                                   return_value="output") as run:
+                result = relict.run_guest_program(
+                    "TEST.EXE", machine_config=path)
+
+        self.assertEqual(run.call_args.args[0].timeout, 60.0)
+        self.assertEqual(result, "output")
+
+    def test_invalid_machine_config_type_is_rejected(self):
+        with self.assertRaisesRegex(TypeError, "MachineConfig"):
+            relict.start(machine_config=42)
+
+
 class ProvisionTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()

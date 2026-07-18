@@ -30,12 +30,24 @@ _CONFIG_FIELDS = frozenset({
 })
 
 
-def start(display=False, qemu=None, port=None, qemu_args=(), home=None,
-          platform="dos", drives=None, machine=None, memory=None):
+def _function_config(machine_config):
+    """Normalize a direct function's machine configuration."""
+    if machine_config is None:
+        return MachineConfig()
+
+    if isinstance(machine_config, MachineConfig):
+        return machine_config
+    if isinstance(machine_config, collections.abc.Mapping):
+        return MachineConfig.from_mapping(machine_config)
+    if isinstance(machine_config, (str, os.PathLike)):
+        return MachineConfig.from_file(machine_config)
+    raise TypeError(
+        "machine_config must be a MachineConfig, mapping, or path")
+
+
+def start(machine_config=None, *, display=False, port=None, home=None):
     """Start a relict-owned QEMU process and return its QMP port."""
-    config = MachineConfig(
-        platform=platform, memory=memory, qemu=qemu,
-        qemu_args=qemu_args, drives=drives, machine=machine)
+    config = _function_config(machine_config)
     return _start_configured(config, display, port, home)
 
 
@@ -46,15 +58,12 @@ def _start_configured(config, display=False, port=None, home=None):
                          prepare_drives=provision)
 
 
-def run_task(task, timeout=None, display=False, qemu=None, port=None,
-             qemu_args=(), home=None, platform="dos", drives=None,
-             machine=None, memory=None):
+def run_task(task, machine_config=None, *, display=False, port=None,
+             home=None):
     """Boot one VM, invoke ``task(machine)``, then stop the VM."""
     if not callable(task):
         raise TypeError("task must be callable as task(machine)")
-    config = MachineConfig(
-        platform=platform, timeout=timeout, memory=memory, qemu=qemu,
-        qemu_args=qemu_args, drives=drives, machine=machine)
+    config = _function_config(machine_config)
     base = effective_home(home)
     actual_port = _start_configured(config, display, port, base)
     deadline = (None if config.timeout is None
@@ -66,19 +75,10 @@ def run_task(task, timeout=None, display=False, qemu=None, port=None,
         stop(actual_port, base)
 
 
-def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
-                      qemu_args=(), qemu=None, port=None, home=None,
-                      platform="dos", drives=None, machine=None,
-                      memory=None):
+def run_guest_program(exe_path, args="", machine_config=None, *,
+                      port=None, home=None):
     """Stage, execute, and collect one agentless DOS program run."""
-    if platform != "dos":
-        raise NotImplementedError(
-            f"platform {platform!r} guest-program workflow is not "
-            "implemented")
-    config = MachineConfig(
-        platform=platform, staged_drive=staged_drive, timeout=timeout,
-        memory=memory, qemu=qemu, qemu_args=qemu_args, drives=drives,
-        machine=machine)
+    config = _function_config(machine_config)
     return _run_configured(config, exe_path, args, port=port, home=home)
 
 
