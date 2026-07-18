@@ -143,8 +143,12 @@ projects; relict stays ignorant of who builds on it.
 
 `Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a
 `Runner(home=None, config=None)` instance is a configured QEMU test machine bound to one absolute `home`, exposing
-`platform` (default "dos") and `config` (frozen dataclass: `platform`, `staged_drive`, `timeout`, `qemu`, `qemu_args`;
-every field has a working default), and `run(exe_path, args)`. `run()` privately ensures that `home/drives` declares
+`platform` (default "dos") and `config` (frozen dataclass: `platform`, `staged_drive`, `timeout`, `qemu`, `qemu_args`,
+`drives`; every field has a working default), and `run(exe_path, args)`. Configured drives use canonical keys
+`floppy_0..1`, `hdd_0..3`, and `cdrom_0..3`, with `floppy` and `hdd` accepted as slot-zero aliases. Each value is a
+source path or a mapping with `source` and `options`; values are normalized and deeply frozen. Files are images,
+floppy/hdd directories are vvfat, and cdrom directories fail validation. Configured sources compose with filesystem
+declarations by logical slot; two sources for one slot fail closed. `run()` privately ensures that the resolved inventory declares
 something bootable — keep present declared media or install the FreeDOS default; never overwrite — before invoking
 `run_guest_program()` with the runner's home explicit. Machine configuration has no special boot-image fields: custom
 media is declared through the same drive inventory as every other image.
@@ -262,7 +266,8 @@ because it assumes Espressif targets, serial output, and Unity result grammar.
 Milestone 1 is the permanent agentless base described above.
 
 The runner surface (see its section above) is implemented, and the machine's media — floppies, hard disks, and
-cdroms, images or virtual FAT directories — are declared by name under `drives/` (see "DOS boot and scripting");
+cdroms, images or virtual FAT directories — are declared by name under `drives/` or through `MachineConfig.drives`
+(see "DOS boot and scripting");
 further generalization (USB an open question) should extend the same declared-drive convention — a new medium
 name — without changing the rest of the surface.
 

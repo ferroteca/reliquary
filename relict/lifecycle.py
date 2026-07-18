@@ -16,7 +16,7 @@ import uuid
 from qemu.qmp import ConnectError, QMPClient
 
 from .home import drives_dir, effective_home
-from .media import boot_guess, drive_args, scan_drives
+from .media import boot_guess, drive_args, resolve_media
 
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
@@ -236,7 +236,8 @@ def _terminate_started_process(proc):
 
 
 def start_machine(display=False, qemu=None, port=None, qemu_args=(),
-                  home=None, prepare_drives=None, default_memory=None):
+                  home=None, prepare_drives=None, default_memory=None,
+                  drive_specs=None):
     """Start an owned QEMU process after optional drive preparation."""
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -263,10 +264,10 @@ def start_machine(display=False, qemu=None, port=None, qemu_args=(),
     qemu = qemu or find_qemu()
     print(f"using QEMU: {qemu}")
     drives = drives_dir(home)
-    media = scan_drives(drives)
+    media = resolve_media(drives, drive_specs)
     if boot_guess(media) is None and prepare_drives is not None:
-        prepare_drives(drives)
-        media = scan_drives(drives)
+        prepare_drives(drives, media)
+        media = resolve_media(drives, drive_specs)
     vm_name = f"relict-{uuid.uuid4().hex[:12]}"
     qemu_args = list(qemu_args)
     args = [qemu, "-name", vm_name]

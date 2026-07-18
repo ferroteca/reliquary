@@ -365,11 +365,11 @@ not depend on where a command happened to be launched.
 
 ## Python interface
 
-`MachineConfig` gains `qemu_machine`, `qemu_machine_options`, and `drives`
-fields. Its constructor accepts mappings for the two structured fields, copies
-and deeply normalizes them, expands drive-path shorthand, and retains
-immutable values. A runner binds the normalized configuration to one absolute
-home; all VM state remains under that home.
+`MachineConfig.drives` is implemented: its constructor copies and deeply
+normalizes the mapping, expands drive-path shorthand, and retains immutable
+values. `qemu_machine` and `qemu_machine_options` remain planned. A runner
+binds the normalized configuration to one absolute home; all VM state remains
+under that home.
 
 For example:
 
@@ -491,7 +491,7 @@ Implementation should proceed in independently verifiable steps:
 
 1. Add JSON loading, validation, immutable normalization, and path-resolution
    tests.
-2. Add configured-source and per-drive option composition tests, including
+2. **Implemented:** add configured-source and per-drive option composition tests, including
    external sources, same-path and different-path logical slot clashes,
    reserved keys, missing sources, staged directories, and read-only staging
    failures. Conflict tests must prove that no provisioning or process launch

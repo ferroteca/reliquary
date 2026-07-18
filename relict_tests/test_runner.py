@@ -75,6 +75,43 @@ class RunnerConstructionTests(unittest.TestCase):
         with self.assertRaises(dataclasses.FrozenInstanceError):
             machine.config.timeout = 60
 
+    def test_drive_specs_normalize_aliases_and_freeze_values(self):
+        with tempfile.TemporaryDirectory() as root:
+            floppy = os.path.join(root, "boot.img")
+            with open(floppy, "wb") as image:
+                image.write(b"dos")
+            staging = os.path.join(root, "staging")
+            os.makedirs(staging)
+
+            config = relict.MachineConfig(drives={
+                "floppy": floppy,
+                "hdd": {
+                    "source": staging,
+                    "options": {"snapshot": True},
+                },
+            })
+
+        self.assertEqual(set(config.drives), {"floppy_0", "hdd_0"})
+        self.assertEqual(config.drives["floppy_0"]["source"],
+                         os.path.abspath(floppy))
+        self.assertEqual(dict(config.drives["hdd_0"]["options"]),
+                         {"snapshot": True})
+        with self.assertRaises(TypeError):
+            config.drives["hdd_0"] = {}
+
+    def test_drive_alias_cannot_duplicate_canonical_slot(self):
+        with tempfile.NamedTemporaryFile() as image:
+            with self.assertRaisesRegex(ValueError, "both mean floppy_0"):
+                relict.MachineConfig(drives={
+                    "floppy": image.name,
+                    "floppy_0": image.name,
+                })
+
+    def test_cdrom_drive_source_cannot_be_a_directory(self):
+        with tempfile.TemporaryDirectory() as source:
+            with self.assertRaisesRegex(ValueError, "ISO9660"):
+                relict.MachineConfig(drives={"cdrom_0": source})
+
     def test_staged_drive_defaults_to_matching_the_boot_medium(self):
         # None: resolved per home against the boot image at run time
         self.assertIsNone(relict.MachineConfig().staged_drive)
@@ -128,18 +165,32 @@ class ProvisionTests(unittest.TestCase):
         machine = relict.Runner(self.tempdir.name)
 
         with mock.patch.object(workflows_module,
-                               "download_boot_image") as download:
+                               "prepare_drives") as prepare:
             self._run(machine)
 
-        download.assert_not_called()
+        prepare.assert_not_called()
         self.assertEqual(self._image_bytes(), b"existing dos")
 
     def test_empty_home_installs_the_freedos_fallback(self):
         with mock.patch.object(workflows_module,
-                               "download_boot_image") as download:
+                               "prepare_drives") as prepare:
             self._run(relict.Runner(self.tempdir.name))
 
-        download.assert_called_once_with(self.drives)
+        prepare.assert_called_once_with(self.drives, mock.ANY)
+
+    def test_configured_boot_source_suppresses_fallback(self):
+        source = os.path.join(self.tempdir.name, "boot.img")
+        with open(source, "wb") as image:
+            image.write(b"dos")
+        machine = relict.Runner(
+            self.tempdir.name,
+            relict.MachineConfig(drives={"floppy": source}))
+
+        with mock.patch.object(workflows_module,
+                               "prepare_drives") as prepare:
+            self._run(machine)
+
+        prepare.assert_not_called()
 
 
 class RunnerRunTests(unittest.TestCase):
@@ -171,7 +222,8 @@ class RunnerRunTests(unittest.TestCase):
         run.assert_called_once_with(
             self.exe, "-v", timeout=45, staged_drive=None,
             qemu_args=("-nodefaults",),
-            qemu="qemu", home=os.path.abspath(self.home))
+            qemu="qemu", home=os.path.abspath(self.home),
+            drives=machine.config.drives)
         self.assertEqual(log, "guest output")
 
     def test_run_defaults_the_timeout(self):

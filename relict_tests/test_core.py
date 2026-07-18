@@ -134,9 +134,15 @@ class HomeTests(unittest.TestCase):
 
         media = media_module.scan_drives(relict.drives_dir())
 
-        self.assertEqual(media["floppy"], {0: (floppy, False)})
-        self.assertEqual(media["hdd"], {1: (hdd, True)})
-        self.assertEqual(media["cdrom"], {0: (cdrom, False)})
+        self.assertEqual(media["floppy"], {
+            0: media_module.Drive(floppy, False),
+        })
+        self.assertEqual(media["hdd"], {
+            1: media_module.Drive(hdd, True),
+        })
+        self.assertEqual(media["cdrom"], {
+            0: media_module.Drive(cdrom, False),
+        })
 
     def test_unindexed_and_slot_0_names_clash(self):
         self._write_drive_file("hdd.qcow2")
@@ -343,7 +349,8 @@ class GuestProgramTests(unittest.TestCase):
 
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
-            qemu="qemu", port=54321, qemu_args=(), home=None)
+            qemu="qemu", port=54321, qemu_args=(), home=None,
+            drives=None)
         adapter.assert_called_once_with(machine_module.Machine(54321, None))
         guest.wait_ready.assert_called_once_with()
         self.assertEqual(guest.execute.call_args_list, [
@@ -411,6 +418,34 @@ class GuestProgramTests(unittest.TestCase):
             os.path.isdir(os.path.join(relict.drives_dir(),
                                        "hdd_1")))
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
+        self.assertEqual(log, "guest output")
+
+    def test_configured_hdd_source_claims_a_slot_before_staging(self):
+        source = os.path.join(self.tempdir.name, "boot.qcow2")
+        with open(source, "wb") as image:
+            image.write(b"hdd dos")
+        guest = mock.Mock()
+        log_path = os.path.join(relict.drives_dir(), "hdd_1",
+                                "SUITE.log")
+
+        def run_guest_command(command, *args):
+            if command != "d:":
+                with open(log_path, "w", encoding="utf-8") as log:
+                    log.write("guest output")
+
+        guest.execute.side_effect = run_guest_command
+        specs = {"hdd": source}
+        with mock.patch.object(workflows_module, "start",
+                               return_value=54321) as start, \
+                mock.patch.object(
+                    workflows_module, "AgentlessGuestExec",
+                    return_value=guest), \
+                mock.patch.object(workflows_module, "stop"), \
+                mock.patch.object(workflows_module.time, "sleep"):
+            log = relict.run_guest_program(self.exe, drives=specs)
+
+        self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
+        self.assertEqual(start.call_args.kwargs["drives"], specs)
         self.assertEqual(log, "guest output")
 
     def test_staged_drive_c_is_rejected_behind_a_hdd_boot_image(self):

@@ -11,28 +11,28 @@ from .home import drives_dir, effective_home
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import start_machine, stop
 from .machine import Machine
-from .media import (boot_guess, check_staged_drive, scan_drives,
-                    staged_hdd_plan)
-from .platform_dos import (download_boot_image, prepare_drives,
-                           program_name)
+from .media import (boot_guess, check_staged_drive, normalize_drive_specs,
+                    resolve_media, staged_hdd_plan)
+from .platform_dos import prepare_drives, program_name
 
 
 def start(display=False, qemu=None, port=None, qemu_args=(), home=None,
-          platform="dos"):
+          platform="dos", drives=None):
     """Start a relict-owned QEMU process and return its QMP port."""
     provision = prepare_drives if platform == "dos" else None
     memory = 16 if platform == "dos" else None
     return start_machine(display, qemu, port, qemu_args, home,
-                         provision, memory)
+                         provision, memory, drives)
 
 
 def run_task(task, timeout=None, display=False, qemu=None, port=None,
-             qemu_args=(), home=None, platform="dos"):
+             qemu_args=(), home=None, platform="dos", drives=None):
     """Boot one VM, invoke ``task(machine)``, then stop the VM."""
     if not callable(task):
         raise TypeError("task must be callable as task(machine)")
     base = effective_home(home)
-    actual_port = start(display, qemu, port, qemu_args, base, platform)
+    actual_port = start(display, qemu, port, qemu_args, base, platform,
+                        drives)
     deadline = (None if timeout is None
                 else time.monotonic() + timeout)
     machine = Machine(actual_port, base, deadline)
@@ -44,14 +44,15 @@ def run_task(task, timeout=None, display=False, qemu=None, port=None,
 
 def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
                       qemu_args=(), qemu=None, port=None, home=None,
-                      platform="dos"):
+                      platform="dos", drives=None):
     """Stage, execute, and collect one agentless DOS program run."""
     if platform != "dos":
         raise NotImplementedError(
             f"platform {platform!r} guest-program workflow is not "
             "implemented")
-    drives = drives_dir(home)
-    stage, default_letter = staged_hdd_plan(scan_drives(drives), drives)
+    declared_drives = drives_dir(home)
+    media = resolve_media(declared_drives, drives)
+    stage, default_letter = staged_hdd_plan(media, declared_drives)
     if staged_drive is None:
         staged_drive = default_letter
     else:
@@ -74,7 +75,8 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
     if os.path.exists(log_path):
         os.remove(log_path)
 
-    port = start(qemu=qemu, port=port, qemu_args=qemu_args, home=home)
+    port = start(qemu=qemu, port=port, qemu_args=qemu_args, home=home,
+                 drives=drives)
     try:
         guest = AgentlessGuestExec(Machine(port, home))
         guest.wait_ready()
@@ -100,6 +102,7 @@ class MachineConfig:
     timeout: "float | None" = None
     qemu: "str | None" = None
     qemu_args: "tuple" = ()
+    drives: "object" = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
         if not isinstance(self.platform, str) or not self.platform.strip():
@@ -111,6 +114,8 @@ class MachineConfig:
         if self.staged_drive is not None:
             object.__setattr__(self, "staged_drive",
                                check_staged_drive(self.staged_drive))
+        object.__setattr__(self, "drives",
+                           normalize_drive_specs(self.drives))
 
 
 class Runner:
@@ -127,10 +132,11 @@ class Runner:
     def _provision(self):
         """Ensure the declared machine has something bootable."""
         drives = os.path.join(self.home, "drives")
-        if boot_guess(scan_drives(drives)) is not None:
+        media = resolve_media(drives, self.config.drives)
+        if boot_guess(media) is not None:
             return
         if self.platform == "dos":
-            download_boot_image(drives)
+            prepare_drives(drives, media)
             return
         raise ValueError(
             f"no bootable drive is declared under {drives}")
@@ -148,4 +154,4 @@ class Runner:
             task, args, timeout=timeout,
             staged_drive=self.config.staged_drive,
             qemu_args=self.config.qemu_args, qemu=self.config.qemu,
-            home=self.home)
+            home=self.home, drives=self.config.drives)

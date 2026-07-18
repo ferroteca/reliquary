@@ -48,20 +48,20 @@ def download(home=None):
             f"nothing bootable is declared under {drives}, and the "
             "FreeDOS boot floppy cannot be installed: floppy slot 0 "
             f"is taken by the staged directory "
-            f"{media['floppy'][0][0]}")
+            f"{media['floppy'][0].path}")
     download_boot_image(drives)
 
 
-def prepare_drives(drives):
+def prepare_drives(drives, media=None):
     """Install the DOS fallback when a start has no bootable media."""
     print(f"nothing bootable under {drives}; fetching FreeDOS")
-    media = scan_drives(drives)
+    media = scan_drives(drives) if media is None else media
     if 0 in media["floppy"]:
         raise RuntimeError(
             f"nothing bootable is declared under {drives}, and the "
             "FreeDOS boot floppy cannot be installed: floppy slot 0 "
             f"is taken by the staged directory "
-            f"{media['floppy'][0][0]}")
+            f"{media['floppy'][0].path}")
     download_boot_image(drives)
 
 

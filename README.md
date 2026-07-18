@@ -382,16 +382,33 @@ machine = relict.Runner(
     relict.MachineConfig(
         platform="dos",
         timeout=120,
+        drives={"floppy": "images/msdos-boot.img"},
     ),
 )
 
 log = machine.run("TESTS.EXE", "-v")
 ```
 
-Media is declared by name under the runner's `drives/` directory; for example, place a custom boot floppy at
-`run-42/drives/floppy.img` before constructing or running the machine. `run()` keeps present bootable media and, for
-an empty DOS home, installs the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle
-under the runner's home. `staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
+Media can be declared by name under the runner's `drives/` directory or through `MachineConfig.drives`. Configured
+keys are `floppy_0` through `floppy_1`, `hdd_0` through `hdd_3`, and `cdrom_0` through `cdrom_3`; `floppy` and `hdd`
+are aliases for slot zero. A path value is shorthand for `{"source": path}`. A file source is mounted as an image,
+while a floppy or hard-disk directory is mounted as vvfat; a CD-ROM directory is rejected. The object form also
+accepts QEMU drive `options`, except for lifecycle-owned properties such as `file`, `if`, `index`, and `media`:
+
+```python
+config = relict.MachineConfig(drives={
+    "hdd": {
+        "source": "images/dos.qcow2",
+        "options": {"snapshot": True},
+    },
+    "hdd_1": "guest-files",
+})
+```
+
+Configured sources are mounted in place and must already exist. They conflict with a filesystem declaration for the
+same logical slot rather than overriding it. `run()` keeps present bootable media and, for an empty DOS home, installs
+the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle under the runner's home.
+`staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or
 `drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged
 drive, one letter later per hard-disk slot before it (lower letters are rejected). Every

@@ -35,6 +35,10 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   per-home `vm.json` keeps VM ownership sound.
 - Removed the `boot_floppy_image` and `boot_hdd_image` configuration shortcuts. Custom boot media uses the ordinary
   declared-drive inventory; an empty DOS home still receives the verified FreeDOS fallback automatically.
+- `MachineConfig.drives` adds immutable configured drive specs using canonical logical slots plus `floppy`/`hdd`
+  slot-zero aliases. A spec accepts a source path or `{source, options}` mapping; files mount as images, floppy and
+  hard-disk directories mount as vvfat, and CD-ROM directories fail validation. Configured and home-directory media
+  resolve into one inventory with slot conflicts rejected before launch.
 - The `drives/` directory under the home declares the whole machine by filename, with image content never
   interrogated. Image files `floppy[_<n>].<ext>` (slots 0–1, A: and B:), `hdd[_<n>].<ext>` (slots 0–3, the IDE bus),
   and `cdrom[_<n>].<ext>` (the IDE slots after the hard disks) mount as that medium; bare directories `floppy[_<n>]`

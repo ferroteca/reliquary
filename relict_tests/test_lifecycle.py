@@ -144,6 +144,21 @@ class LifecycleTests(unittest.TestCase):
 
         return image, popen.call_args.args[0]
 
+    def _start_configured_args(self, drives):
+        fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
+        proc = _FakeProcess()
+        with mock.patch.object(lifecycle_module, "available_port",
+                               return_value=54321), \
+                mock.patch.object(lifecycle_module, "port_in_use",
+                                  return_value=False), \
+                mock.patch.object(lifecycle_module.uuid, "uuid4",
+                                  return_value=fake_uuid), \
+                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
+                mock.patch.object(lifecycle_module.subprocess, "Popen",
+                                  return_value=proc) as popen:
+            relict.start(qemu="qemu", drives=drives)
+        return popen.call_args.args[0]
+
     def test_start_boots_the_floppy_image_as_drive_a(self):
         image, args = self._start_qemu_args("floppy.img")
 
@@ -195,6 +210,42 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn(f"file=fat:rw:{staged_hdd},format=raw,"
                       "if=ide,index=0", args)
 
+    def test_start_mounts_configured_file_source(self):
+        source = os.path.join(self.home, "external.img")
+        with open(source, "wb") as image:
+            image.write(b"dos")
+
+        args = self._start_configured_args({
+            "floppy": {
+                "source": source,
+                "options": {"snapshot": True},
+            },
+        })
+
+        self.assertIn(
+            f"file={source},format=raw,snapshot=on,"
+            "if=floppy,index=0", args)
+        self.assertEqual(args[args.index("-boot") + 1], "a")
+
+    def test_start_mounts_configured_directory_as_vvfat(self):
+        source = os.path.join(self.home, "external-drive")
+        os.makedirs(source)
+        self._write_boot_image("floppy.img")
+
+        args = self._start_configured_args({"hdd": source})
+
+        self.assertIn(
+            f"file=fat:rw:{source},format=raw,if=ide,index=0", args)
+
+    def test_configured_source_clashes_with_filesystem_drive(self):
+        self._write_boot_image("floppy.img")
+        source = os.path.join(self.home, "external.img")
+        with open(source, "wb") as image:
+            image.write(b"dos")
+
+        with self.assertRaisesRegex(RuntimeError, "slot clash"):
+            self._start_configured_args({"floppy_0": source})
+
     def test_start_rejects_a_drive_slot_clash(self):
         self._write_boot_image("floppy.img")
 
@@ -220,7 +271,7 @@ class LifecycleTests(unittest.TestCase):
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
         proc = _FakeProcess()
 
-        def fake_download(drives):
+        def fake_download(drives, media):
             self._write_boot_image(data=b"freedos")
 
         with mock.patch.object(workflows_module, "prepare_drives",
@@ -237,7 +288,7 @@ class LifecycleTests(unittest.TestCase):
             port = relict.start(qemu="qemu")
 
         download.assert_called_once_with(
-            os.path.join(self.home, "drives"))
+            os.path.join(self.home, "drives"), mock.ANY)
         self.assertEqual(port, 54321)
 
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
