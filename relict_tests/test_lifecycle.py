@@ -22,6 +22,8 @@ except ModuleNotFoundError:
     sys.modules["qemu.qmp"] = qmp
 
 import relict
+from relict import lifecycle as lifecycle_module
+from relict import workflows as workflows_module
 
 
 class _FakeProcess:
@@ -103,14 +105,14 @@ class LifecycleTests(unittest.TestCase):
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
         proc = _FakeProcess()
 
-        with mock.patch.object(relict, "_available_port",
+        with mock.patch.object(lifecycle_module, "available_port",
                                return_value=54321), \
-                mock.patch.object(relict, "_port_in_use",
+                mock.patch.object(lifecycle_module, "port_in_use",
                                   return_value=False), \
-                mock.patch.object(relict.uuid, "uuid4",
+                mock.patch.object(lifecycle_module.uuid, "uuid4",
                                   return_value=fake_uuid), \
-                mock.patch.object(relict, "Qmp", _FakeQmp), \
-                mock.patch.object(relict.subprocess, "Popen",
+                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
+                mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
             port = relict.start(qemu="qemu")
 
@@ -129,14 +131,14 @@ class LifecycleTests(unittest.TestCase):
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
         proc = _FakeProcess()
 
-        with mock.patch.object(relict, "_available_port",
+        with mock.patch.object(lifecycle_module, "available_port",
                                return_value=54321), \
-                mock.patch.object(relict, "_port_in_use",
+                mock.patch.object(lifecycle_module, "port_in_use",
                                   return_value=False), \
-                mock.patch.object(relict.uuid, "uuid4",
+                mock.patch.object(lifecycle_module.uuid, "uuid4",
                                   return_value=fake_uuid), \
-                mock.patch.object(relict, "Qmp", _FakeQmp), \
-                mock.patch.object(relict.subprocess, "Popen",
+                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
+                mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
             relict.start(qemu="qemu", **start_kwargs)
 
@@ -218,30 +220,31 @@ class LifecycleTests(unittest.TestCase):
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
         proc = _FakeProcess()
 
-        def fake_download(home=None):
+        def fake_download(drives):
             self._write_boot_image(data=b"freedos")
 
-        with mock.patch.object(relict, "download",
+        with mock.patch.object(workflows_module, "prepare_drives",
                                side_effect=fake_download) as download, \
-                mock.patch.object(relict, "_available_port",
+                mock.patch.object(lifecycle_module, "available_port",
                                   return_value=54321), \
-                mock.patch.object(relict, "_port_in_use",
+                mock.patch.object(lifecycle_module, "port_in_use",
                                   return_value=False), \
-                mock.patch.object(relict.uuid, "uuid4",
+                mock.patch.object(lifecycle_module.uuid, "uuid4",
                                   return_value=fake_uuid), \
-                mock.patch.object(relict, "Qmp", _FakeQmp), \
-                mock.patch.object(relict.subprocess, "Popen",
+                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
+                mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc):
             port = relict.start(qemu="qemu")
 
-        download.assert_called_once_with(None)
+        download.assert_called_once_with(
+            os.path.join(self.home, "drives"))
         self.assertEqual(port, 54321)
 
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
         relict._write_vm_state(54321, "relict-expected", 1234)
         _FakeQmp.name = "unrelated-vm"
 
-        with mock.patch.object(relict, "Qmp", _FakeQmp):
+        with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
                 relict.stop()
 
@@ -249,7 +252,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertIsNotNone(relict._read_vm_state())
 
     def test_start_rejects_explicit_occupied_port_before_launch(self):
-        with mock.patch.object(relict, "_port_in_use", return_value=True):
+        with mock.patch.object(lifecycle_module, "port_in_use",
+                               return_value=True):
             with self.assertRaisesRegex(RuntimeError, "explicit"):
                 relict.start(qemu="qemu", port=54321)
 
@@ -261,14 +265,14 @@ class LifecycleTests(unittest.TestCase):
         _FakeQmp.name = "unrelated-vm"
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
 
-        with mock.patch.object(relict, "_available_port",
+        with mock.patch.object(lifecycle_module, "available_port",
                                return_value=54321), \
-                mock.patch.object(relict, "_port_in_use",
+                mock.patch.object(lifecycle_module, "port_in_use",
                                   return_value=False), \
-                mock.patch.object(relict.uuid, "uuid4",
+                mock.patch.object(lifecycle_module.uuid, "uuid4",
                                   return_value=fake_uuid), \
-                mock.patch.object(relict, "Qmp", _FakeQmp), \
-                mock.patch.object(relict.subprocess, "Popen",
+                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
+                mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
                 relict.start(qemu="qemu")

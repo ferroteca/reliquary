@@ -6,18 +6,22 @@ maintenance context.
 
 ## Project state and layout
 
-relict is deliberately a small, single-module Python project. It is a generic QEMU runner with DOS as its default and
-currently only complete platform workflow:
+relict is deliberately a small Python package. It is a generic QEMU runner with DOS as its default and currently only
+complete platform workflow:
 
-- `relict.py` contains the library and CLI.
-- `pyproject.toml` packages that module as the `relict` command and includes the installable `relict_tests` test
+- `relict/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
+  containment, `media.py` parses declared drives, `lifecycle.py` owns QMP and QEMU processes, `machine.py` provides
+  platform-neutral agentless interaction, `platform_dos.py` implements DOS behavior, `workflows.py` orchestrates
+  configured runs, `cli.py` owns command parsing, and `__main__.py` preserves `python -m relict` execution.
+- `pyproject.toml` packages `relict` as the `relict` command and includes the installable `relict_tests` test
   package.
 - `relict_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, and lifecycle ownership.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 
-Do not introduce a package directory or split the module merely for organizational symmetry. Refactor when a real
-interface or maintenance seam justifies it.
+Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
+real interface or maintenance seam justifies it. The package root remains a compatibility facade, not an implementation
+module.
 
 ## Required invariants
 
@@ -189,8 +193,8 @@ frontend. Runtime dependencies remain under `[project].dependencies`.
 Run checks with the project virtual environment.
 
 ```powershell
-.venv\Scripts\python.exe -m py_compile relict.py `
-    relict_tests\test_core.py relict_tests\test_lifecycle.py
+$pythonFiles = (Get-ChildItem relict,relict_tests -Filter *.py).FullName
+.venv\Scripts\python.exe -m py_compile $pythonFiles
 .venv\Scripts\python.exe -m unittest -v relict_tests
 .venv\Scripts\python.exe -m build
 ```

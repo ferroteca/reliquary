@@ -41,7 +41,8 @@ Runtime code is standard-library-only except for `qemu.qmp`. Please discuss a ne
 Run the required checks from the project virtual environment:
 
 ```powershell
-.venv\Scripts\python.exe -m py_compile relict.py relict_tests\test_runner.py
+$pythonFiles = (Get-ChildItem relict,relict_tests -Filter *.py).FullName
+.venv\Scripts\python.exe -m py_compile $pythonFiles
 .venv\Scripts\python.exe -m unittest -v relict_tests
 .venv\Scripts\python.exe -m build
 git diff --check

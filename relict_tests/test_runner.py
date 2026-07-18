@@ -5,6 +5,7 @@ whose operations take the home directory explicitly, never touching
 the process-global home."""
 
 import dataclasses
+import importlib
 import os
 import sys
 import tempfile
@@ -25,6 +26,10 @@ except ModuleNotFoundError:
     sys.modules["qemu.qmp"] = qmp
 
 import relict
+from relict import lifecycle as lifecycle_module
+from relict import workflows as workflows_module
+
+home_module = importlib.import_module("relict.home")
 
 
 class _FakeQmp:
@@ -117,8 +122,8 @@ class ProvisionTests(unittest.TestCase):
         machine = relict.Runner(
             relict.RunnerConfig(boot_floppy_image=ready))
 
-        with mock.patch.object(relict,
-                               "_download_boot_image") as download:
+        with mock.patch.object(workflows_module,
+                               "download_boot_image") as download:
             machine.provision(self.drives)
 
         download.assert_not_called()
@@ -131,8 +136,8 @@ class ProvisionTests(unittest.TestCase):
         machine = relict.Runner(
             relict.RunnerConfig(boot_floppy_image=ready))
 
-        with mock.patch.object(relict,
-                               "_download_boot_image") as download:
+        with mock.patch.object(workflows_module,
+                               "download_boot_image") as download:
             machine.provision(self.drives)
 
         download.assert_not_called()
@@ -145,8 +150,8 @@ class ProvisionTests(unittest.TestCase):
         machine = relict.Runner(
             relict.RunnerConfig(boot_floppy_image=ready))
 
-        with mock.patch.object(relict,
-                               "_download_boot_image") as download:
+        with mock.patch.object(workflows_module,
+                               "download_boot_image") as download:
             machine.provision(self.drives)
 
         download.assert_not_called()
@@ -161,8 +166,8 @@ class ProvisionTests(unittest.TestCase):
         machine = relict.Runner(
             relict.RunnerConfig(boot_hdd_image=ready))
 
-        with mock.patch.object(relict,
-                               "_download_boot_image") as download:
+        with mock.patch.object(workflows_module,
+                               "download_boot_image") as download:
             machine.provision(self.drives)
 
         download.assert_not_called()
@@ -173,8 +178,8 @@ class ProvisionTests(unittest.TestCase):
             self.assertEqual(image.read(), b"custom hdd dos")
 
     def test_default_provision_installs_the_downloaded_image(self):
-        with mock.patch.object(relict,
-                               "_download_boot_image") as download:
+        with mock.patch.object(workflows_module,
+                               "download_boot_image") as download:
             relict.Runner().provision(self.drives)
 
         download.assert_called_once_with(self.drives)
@@ -202,7 +207,7 @@ class RunnerRunTests(unittest.TestCase):
         machine = relict.Runner(relict.RunnerConfig(
             timeout=45, qemu="qemu", qemu_args=("-nodefaults",)))
 
-        with mock.patch.object(relict, "run_guest_program",
+        with mock.patch.object(workflows_module, "run_guest_program",
                                return_value="guest output") as run:
             log = machine.run(self.exe, "-v", self.home)
 
@@ -215,7 +220,7 @@ class RunnerRunTests(unittest.TestCase):
     def test_run_defaults_the_timeout(self):
         self._stage_boot_image()
 
-        with mock.patch.object(relict, "run_guest_program",
+        with mock.patch.object(workflows_module, "run_guest_program",
                                return_value="") as run:
             relict.Runner().run(self.exe, "", self.home)
 
@@ -228,7 +233,7 @@ class RunnerRunTests(unittest.TestCase):
         machine = relict.Runner(
             relict.RunnerConfig(boot_floppy_image=ready))
 
-        with mock.patch.object(relict, "run_guest_program",
+        with mock.patch.object(workflows_module, "run_guest_program",
                                return_value=""):
             machine.run(self.exe, "", self.home)
 
@@ -252,17 +257,17 @@ class RunnerRunTests(unittest.TestCase):
                     log.write("guest output")
 
         with mock.patch.object(
-                relict, "home",
+                home_module, "home",
                 side_effect=AssertionError(
                     "process-global home was consulted")), \
-                mock.patch.object(relict, "start",
+                mock.patch.object(workflows_module, "start",
                                   return_value=54321) as start, \
-                mock.patch.object(relict, "Qmp", _FakeQmp), \
-                mock.patch.object(relict, "boot_to_dos"), \
-                mock.patch.object(relict, "run_command",
+                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
+                mock.patch.object(workflows_module, "boot_to_dos"), \
+                mock.patch.object(workflows_module, "run_command",
                                   side_effect=run_guest_command), \
-                mock.patch.object(relict, "stop") as stop, \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(workflows_module, "stop") as stop, \
+                mock.patch.object(workflows_module.time, "sleep"):
             log = relict.Runner().run(self.exe, "-v", self.home)
 
         self.assertEqual(log, "guest output")

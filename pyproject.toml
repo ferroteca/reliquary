@@ -33,5 +33,4 @@ dev = ["build"]
 relict = "relict:main"
 
 [tool.setuptools]
-py-modules = ["relict"]
-packages = ["relict_tests"]
+packages = ["relict", "relict_tests"]

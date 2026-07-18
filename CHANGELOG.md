@@ -8,6 +8,9 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ### Added
 
+- Package-based `relict/` source layout split into home containment, declared media, ownership-safe lifecycle, generic
+  machine interaction, DOS platform behavior, workflow orchestration, and CLI modules while preserving the existing
+  root import and command-line interfaces.
 - The complete DOS runner from the original implementation: DOS remains the default platform, while
   `RunnerConfig(platform=...)` and `--platform` make the platform choice explicit. The reusable QEMU machine layer is
   shared; unimplemented non-DOS platform workflows fail explicitly instead of borrowing DOS assumptions.

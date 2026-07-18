@@ -23,16 +23,20 @@ except ModuleNotFoundError:
     sys.modules["qemu.qmp"] = qmp
 
 import relict
+from relict import lifecycle as lifecycle_module
+from relict import machine as machine_module
+from relict import platform_dos as platform_dos_module
+from relict import workflows as workflows_module
 
 
 class HomeTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = relict._home
+        self.previous_home = relict.home()
         self.tempdir = tempfile.TemporaryDirectory()
         relict.set_home(self.tempdir.name)
 
     def tearDown(self):
-        relict._home = self.previous_home
+        relict.set_home(self.previous_home)
         self.tempdir.cleanup()
 
     def test_paths_are_contained_by_configured_home(self):
@@ -91,7 +95,7 @@ class HomeTests(unittest.TestCase):
     def test_download_keeps_existing_boot_floppy(self):
         floppy = self._write_drive_file("floppy.img", b"custom dos")
 
-        with mock.patch.object(relict.urllib.request,
+        with mock.patch.object(platform_dos_module.urllib.request,
                                "urlretrieve") as retrieve:
             relict.download()
 
@@ -102,7 +106,7 @@ class HomeTests(unittest.TestCase):
     def test_download_keeps_existing_bootable_hdd_image(self):
         self._write_drive_file("hdd.qcow2", b"custom hdd dos")
 
-        with mock.patch.object(relict.urllib.request,
+        with mock.patch.object(platform_dos_module.urllib.request,
                                "urlretrieve") as retrieve:
             relict.download()
 
@@ -168,7 +172,7 @@ class InputAndScreenTests(unittest.TestCase):
             relict._char_keys("\N{SNOWMAN}")
 
     def test_send_text_builds_qcode_combinations(self):
-        with mock.patch.object(relict, "send_keys") as send_keys:
+        with mock.patch.object(machine_module, "send_keys") as send_keys:
             relict.send_text("A:", port=54321)
 
         send_keys.assert_called_once_with(
@@ -187,7 +191,7 @@ class InputAndScreenTests(unittest.TestCase):
         qmp = mock.Mock()
         qmp.hmp.return_value = "\n".join(lines)
 
-        with mock.patch.object(relict, "_qmp") as connection:
+        with mock.patch.object(machine_module, "qmp_session") as connection:
             connection.return_value.__enter__.return_value = qmp
             rows = relict.screen_text()
 
@@ -199,12 +203,12 @@ class InputAndScreenTests(unittest.TestCase):
 
 class BootToDosTests(unittest.TestCase):
     def test_reaches_an_existing_prompt_without_typing(self):
-        with mock.patch.object(relict, "_qmp") as connection, \
+        with mock.patch.object(platform_dos_module, "qmp_session") as connection, \
                 mock.patch.object(
-                    relict, "screen_text",
+                    platform_dos_module, "screen_text",
                     return_value=["A:\\>"] + [""] * 24), \
-                mock.patch.object(relict, "send_keys") as send_keys, \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(machine_module, "send_keys") as send_keys, \
+                mock.patch.object(platform_dos_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
             relict.boot_to_dos()
 
@@ -219,19 +223,19 @@ class BootToDosTests(unittest.TestCase):
              "The installation of FreeDOS 1.4 has been aborted.",
              "A:\\>"],
         ]
-        with mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "screen_text",
+        with mock.patch.object(platform_dos_module, "qmp_session") as connection, \
+                mock.patch.object(platform_dos_module, "screen_text",
                                   side_effect=screens), \
-                mock.patch.object(relict, "send_text") as send_text, \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(platform_dos_module, "send_text") as send_text, \
+                mock.patch.object(platform_dos_module.time, "sleep"):
             connection.return_value.__enter__.return_value = qmp
             relict.boot_to_dos()
 
         send_text.assert_called_once_with("n", qmp)
 
     def test_times_out_without_a_prompt(self):
-        with mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict.time, "sleep"):
+        with mock.patch.object(platform_dos_module, "qmp_session") as connection, \
+                mock.patch.object(platform_dos_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
             with self.assertRaisesRegex(TimeoutError, "DOS prompt"):
                 relict.boot_to_dos(timeout=0)
@@ -239,7 +243,7 @@ class BootToDosTests(unittest.TestCase):
 
 class GuestProgramTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = relict._home
+        self.previous_home = relict.home()
         self.tempdir = tempfile.TemporaryDirectory()
         relict.set_home(self.tempdir.name)
         self.exe = os.path.join(self.tempdir.name, "SUITE.EXE")
@@ -247,7 +251,7 @@ class GuestProgramTests(unittest.TestCase):
             executable.write(b"test executable")
 
     def tearDown(self):
-        relict._home = self.previous_home
+        relict.set_home(self.previous_home)
         self.tempdir.cleanup()
 
     def test_program_requires_dos_83_executable_name(self):
@@ -266,15 +270,15 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
-        with mock.patch.object(relict, "start", return_value=54321) \
+        with mock.patch.object(workflows_module, "start", return_value=54321) \
                 as start, \
-                mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "boot_to_dos") as boot, \
+                mock.patch.object(workflows_module, "qmp_session") as connection, \
+                mock.patch.object(workflows_module, "boot_to_dos") as boot, \
                 mock.patch.object(
-                    relict, "run_command",
+                    workflows_module, "run_command",
                     side_effect=run_guest_command) as run, \
-                mock.patch.object(relict, "stop") as stop, \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(workflows_module, "stop") as stop, \
+                mock.patch.object(workflows_module.time, "sleep"):
             connection.return_value.__enter__.return_value = qmp
             log = relict.run_guest_program(
                 self.exe, args="-v", timeout=45, qemu="qemu", port=54321)
@@ -299,15 +303,15 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
-        with mock.patch.object(relict, "start", return_value=54321) \
+        with mock.patch.object(workflows_module, "start", return_value=54321) \
                 as start, \
-                mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "boot_to_dos"), \
+                mock.patch.object(workflows_module, "qmp_session") as connection, \
+                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    relict, "run_command",
+                    workflows_module, "run_command",
                     side_effect=run_guest_command) as run, \
-                mock.patch.object(relict, "stop"), \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(workflows_module, "stop"), \
+                mock.patch.object(workflows_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
             log = relict.run_guest_program(self.exe, staged_drive="d")
 
@@ -332,15 +336,15 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
-        with mock.patch.object(relict, "start", return_value=54321) \
+        with mock.patch.object(workflows_module, "start", return_value=54321) \
                 as start, \
-                mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "boot_to_dos"), \
+                mock.patch.object(workflows_module, "qmp_session") as connection, \
+                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    relict, "run_command",
+                    workflows_module, "run_command",
                     side_effect=run_guest_command) as run, \
-                mock.patch.object(relict, "stop"), \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(workflows_module, "stop"), \
+                mock.patch.object(workflows_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
             log = relict.run_guest_program(self.exe)
 
@@ -353,7 +357,7 @@ class GuestProgramTests(unittest.TestCase):
     def test_staged_drive_c_is_rejected_behind_a_hdd_boot_image(self):
         self._stage_hdd_boot_image()
 
-        with mock.patch.object(relict, "start") as start:
+        with mock.patch.object(workflows_module, "start") as start:
             with self.assertRaisesRegex(ValueError, "claim C:"):
                 relict.run_guest_program(self.exe, staged_drive="C")
 
@@ -370,14 +374,14 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
-        with mock.patch.object(relict, "start", return_value=54321), \
-                mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "boot_to_dos"), \
+        with mock.patch.object(workflows_module, "start", return_value=54321), \
+                mock.patch.object(workflows_module, "qmp_session") as connection, \
+                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    relict, "run_command",
+                    workflows_module, "run_command",
                     side_effect=run_guest_command) as run, \
-                mock.patch.object(relict, "stop"), \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(workflows_module, "stop"), \
+                mock.patch.object(workflows_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
             log = relict.run_guest_program(self.exe)
 
@@ -387,13 +391,13 @@ class GuestProgramTests(unittest.TestCase):
         self.assertEqual(log, "guest output")
 
     def test_guest_program_stops_when_guest_command_fails(self):
-        with mock.patch.object(relict, "start", return_value=54321), \
-                mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "boot_to_dos"), \
+        with mock.patch.object(workflows_module, "start", return_value=54321), \
+                mock.patch.object(workflows_module, "qmp_session") as connection, \
+                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    relict, "run_command",
+                    workflows_module, "run_command",
                     side_effect=RuntimeError("guest failed")), \
-                mock.patch.object(relict, "stop") as stop:
+                mock.patch.object(workflows_module, "stop") as stop:
             connection.return_value.__enter__.return_value = mock.Mock()
             with self.assertRaisesRegex(RuntimeError, "guest failed"):
                 relict.run_guest_program(self.exe)
@@ -403,19 +407,19 @@ class GuestProgramTests(unittest.TestCase):
 
 class ScreenshotTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = relict._home
+        self.previous_home = relict.home()
         self.tempdir = tempfile.TemporaryDirectory()
         relict.set_home(self.tempdir.name)
 
     def tearDown(self):
-        relict._home = self.previous_home
+        relict.set_home(self.previous_home)
         self.tempdir.cleanup()
 
     def test_screenshot_rejects_names_that_are_paths(self):
         invalid_names = ("", ".", "..", "../outside", "..\\outside",
                          "/outside", "C:\\outside")
 
-        with mock.patch.object(relict, "_qmp") as connection:
+        with mock.patch.object(machine_module, "qmp_session") as connection:
             for name in invalid_names:
                 with self.subTest(name=name):
                     with self.assertRaisesRegex(ValueError, "not a path"):
@@ -428,7 +432,7 @@ class ScreenshotTests(unittest.TestCase):
         expected = os.path.join(
             self.tempdir.name, "screenshots", "release-smoke.png")
 
-        with mock.patch.object(relict, "_qmp") as connection:
+        with mock.patch.object(machine_module, "qmp_session") as connection:
             connection.return_value.__enter__.return_value = qmp
             relict.screenshot("release-smoke")
 
@@ -453,10 +457,10 @@ class ScreenshotTests(unittest.TestCase):
                 image.write(b"P6\n1 1\n255\n\x01\x02\x03")
 
         qmp.cmd.side_effect = screendump
-        with mock.patch.object(relict, "_qmp") as connection, \
-                mock.patch.object(relict, "ExecuteError",
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
+                mock.patch.object(machine_module, "ExecuteError",
                                   UnsupportedPngError), \
-                mock.patch.object(relict.time, "sleep"):
+                mock.patch.object(machine_module.time, "sleep"):
             connection.return_value.__enter__.return_value = qmp
             relict.screenshot("legacy")
 
