@@ -75,6 +75,35 @@ class RunnerConstructionTests(unittest.TestCase):
         with self.assertRaises(dataclasses.FrozenInstanceError):
             machine.config.timeout = 60
 
+    def test_machine_string_is_normalized_to_immutable_mapping(self):
+        config = relict.MachineConfig(machine="pc-i440fx-9.2")
+
+        self.assertEqual(dict(config.machine), {
+            "type": "pc-i440fx-9.2",
+        })
+        with self.assertRaises(TypeError):
+            config.machine["type"] = "pc"
+
+    def test_machine_mapping_requires_type_and_normalizes_options(self):
+        config = relict.MachineConfig(machine={
+            "type": "pc",
+            "accel": "tcg",
+            "usb": False,
+        })
+
+        self.assertEqual(dict(config.machine), {
+            "type": "pc",
+            "accel": "tcg",
+            "usb": False,
+        })
+        with self.assertRaisesRegex(ValueError, "machine.type"):
+            relict.MachineConfig(machine={"accel": "tcg"})
+
+    def test_machine_conflicts_with_raw_machine_argument(self):
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            relict.MachineConfig(
+                machine="pc", qemu_args=("-machine", "q35"))
+
     def test_drive_specs_normalize_aliases_and_freeze_values(self):
         with tempfile.TemporaryDirectory() as root:
             floppy = os.path.join(root, "boot.img")
@@ -223,7 +252,7 @@ class RunnerRunTests(unittest.TestCase):
             self.exe, "-v", timeout=45, staged_drive=None,
             qemu_args=("-nodefaults",),
             qemu="qemu", home=os.path.abspath(self.home),
-            drives=machine.config.drives)
+            drives=machine.config.drives, machine=None)
         self.assertEqual(log, "guest output")
 
     def test_run_defaults_the_timeout(self):

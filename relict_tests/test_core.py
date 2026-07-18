@@ -350,7 +350,7 @@ class GuestProgramTests(unittest.TestCase):
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
             qemu="qemu", port=54321, qemu_args=(), home=None,
-            drives=None)
+            drives=None, machine=None)
         adapter.assert_called_once_with(machine_module.Machine(54321, None))
         guest.wait_ready.assert_called_once_with()
         self.assertEqual(guest.execute.call_args_list, [

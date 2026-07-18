@@ -144,7 +144,7 @@ class LifecycleTests(unittest.TestCase):
 
         return image, popen.call_args.args[0]
 
-    def _start_configured_args(self, drives):
+    def _start_configured_args(self, drives, machine=None):
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
         proc = _FakeProcess()
         with mock.patch.object(lifecycle_module, "available_port",
@@ -156,7 +156,7 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            relict.start(qemu="qemu", drives=drives)
+            relict.start(qemu="qemu", drives=drives, machine=machine)
         return popen.call_args.args[0]
 
     def test_start_boots_the_floppy_image_as_drive_a(self):
@@ -226,6 +226,20 @@ class LifecycleTests(unittest.TestCase):
             f"file={source},format=raw,snapshot=on,"
             "if=floppy,index=0", args)
         self.assertEqual(args[args.index("-boot") + 1], "a")
+
+    def test_start_renders_one_machine_argument(self):
+        source = os.path.join(self.home, "boot.img")
+        with open(source, "wb") as image:
+            image.write(b"dos")
+
+        args = self._start_configured_args(
+            {"floppy": source},
+            machine={"type": "pc", "accel": "tcg", "usb": False})
+
+        self.assertEqual(args.count("-machine"), 1)
+        self.assertEqual(
+            args[args.index("-machine") + 1],
+            "pc,accel=tcg,usb=off")
 
     def test_start_mounts_configured_directory_as_vvfat(self):
         source = os.path.join(self.home, "external-drive")

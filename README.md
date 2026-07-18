@@ -382,6 +382,7 @@ machine = relict.Runner(
     relict.MachineConfig(
         platform="dos",
         timeout=120,
+        machine={"type": "pc", "accel": "tcg"},
         drives={"floppy": "images/msdos-boot.img"},
     ),
 )
@@ -408,6 +409,9 @@ config = relict.MachineConfig(drives={
 Configured sources are mounted in place and must already exist. They conflict with a filesystem declaration for the
 same logical slot rather than overriding it. `run()` keeps present bootable media and, for an empty DOS home, installs
 the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle under the runner's home.
+`machine` maps directly to QEMU's `-machine`: a string selects only the type, while a mapping requires `type` and may
+add scalar machine properties. Booleans render as `on`/`off`; configuring both `machine` and `-machine` in
+`qemu_args` is an error.
 `staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or
 `drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged

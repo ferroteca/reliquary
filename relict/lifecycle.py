@@ -3,6 +3,7 @@
 """Ownership-safe QEMU process and QMP lifecycle."""
 
 import asyncio
+import collections.abc
 import contextlib
 import json
 import os
@@ -11,6 +12,7 @@ import socket
 import subprocess
 import sys
 import time
+import types
 import uuid
 
 from qemu.qmp import ConnectError, QMPClient
@@ -21,6 +23,45 @@ from .media import boot_guess, drive_args, resolve_media
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
 _VM_STATE_FILE = "vm.json"
+
+
+def normalize_machine(value):
+    """Normalize one QEMU ``-machine`` specification."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = {"type": value}
+    if not isinstance(value, collections.abc.Mapping):
+        raise TypeError("machine must be a string or mapping")
+    machine_type = value.get("type")
+    if not isinstance(machine_type, str) or not machine_type.strip():
+        raise ValueError("machine.type must be a non-empty string")
+    normalized = {"type": machine_type}
+    for name, option in value.items():
+        if name == "type":
+            continue
+        if not isinstance(name, str) or not name:
+            raise ValueError(
+                "machine option names must be non-empty strings")
+        if not isinstance(option, (str, int, float, bool)):
+            raise TypeError(
+                f"machine.{name} must be a scalar value")
+        normalized[name] = option
+    return types.MappingProxyType(normalized)
+
+
+def machine_argument(value):
+    """Render a normalized machine specification for QEMU."""
+    machine = normalize_machine(value)
+    if machine is None:
+        return None
+    parts = [machine["type"]]
+    for name in sorted(name for name in machine if name != "type"):
+        option = machine[name]
+        if isinstance(option, bool):
+            option = "on" if option else "off"
+        parts.append(f"{name}={option}")
+    return ",".join(parts)
 
 
 def _qemu_fallback_dirs():
@@ -237,7 +278,7 @@ def _terminate_started_process(proc):
 
 def start_machine(display=False, qemu=None, port=None, qemu_args=(),
                   home=None, prepare_drives=None, default_memory=None,
-                  drive_specs=None):
+                  drive_specs=None, machine=None):
     """Start an owned QEMU process after optional drive preparation."""
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -270,7 +311,16 @@ def start_machine(display=False, qemu=None, port=None, qemu_args=(),
         media = resolve_media(drives, drive_specs)
     vm_name = f"relict-{uuid.uuid4().hex[:12]}"
     qemu_args = list(qemu_args)
+    machine_value = machine_argument(machine)
+    if machine_value is not None and any(
+            argument in ("-machine", "-M") or
+            argument.startswith(("-machine=", "-M="))
+            for argument in qemu_args):
+        raise ValueError(
+            "machine configuration conflicts with -machine in qemu_args")
     args = [qemu, "-name", vm_name]
+    if machine_value is not None:
+        args += ["-machine", machine_value]
     if default_memory is not None and "-m" not in qemu_args:
         args += ["-m", str(default_memory)]
     args += drive_args(media)

@@ -79,7 +79,7 @@ one setting that differs from the platform defaults:
 ```json
 {
   "version": 1,
-  "qemu_machine": "pc-i440fx-2.12"
+  "machine": "pc-i440fx-2.12"
 }
 ```
 
@@ -176,8 +176,8 @@ The first file schema is:
   "timeout": 120,
   "staged_drive": "D",
   "qemu": "qemu-system-i386",
-  "qemu_machine": "pc-i440fx-9.2",
-  "qemu_machine_options": {
+  "machine": {
+    "type": "pc-i440fx-9.2",
     "accel": "tcg",
     "usb": false
   },
@@ -212,15 +212,14 @@ wrong type fail with an error that includes the configuration path, such as
 machine.
 
 The current `MachineConfig` fields retain their names and meanings:
-`platform`, `staged_drive`, `timeout`, `qemu`, and `qemu_args`. JSON arrays
-normalize to immutable tuples where appropriate.
+`platform`, `staged_drive`, `timeout`, `qemu`, `qemu_args`, `machine`, and
+`drives`. JSON arrays normalize to immutable tuples where appropriate.
 
-`qemu_machine` supplies the QEMU `-machine` type. The optional
-`qemu_machine_options` mapping contributes comma-separated properties to the
-same option. String, number, and Boolean property values are supported;
-Booleans normalize to QEMU's `on` and `off`. An absent machine type preserves
-QEMU's default. Options without an explicit type are invalid because their
-meaning can vary between QEMU's default machine types.
+`machine` supplies one QEMU `-machine` value. A string is shorthand for a
+mapping containing only `type`; the mapping form requires a non-empty `type`
+and may add string, number, or Boolean properties. Booleans normalize to
+QEMU's `on` and `off`. An absent field preserves QEMU's default. A raw
+`-machine` or `-M` in `qemu_args` conflicts with the structured field.
 
 `qemu_args` remains an array or tuple of complete command-line tokens, never
 one shell command string. relict passes the tokens directly to `subprocess`
@@ -365,18 +364,17 @@ not depend on where a command happened to be launched.
 
 ## Python interface
 
-`MachineConfig.drives` is implemented: its constructor copies and deeply
-normalizes the mapping, expands drive-path shorthand, and retains immutable
-values. `qemu_machine` and `qemu_machine_options` remain planned. A runner
-binds the normalized configuration to one absolute home; all VM state remains
-under that home.
+`MachineConfig.drives` and `MachineConfig.machine` are implemented. Their
+constructors copy and deeply normalize mappings, expand supported shorthand,
+and retain immutable values. A runner binds the normalized configuration to
+one absolute home; all VM state remains under that home.
 
 For example:
 
 ```python
 machine = relict.Runner("run-home", relict.MachineConfig(
     platform="dos",
-    qemu_machine="pc",
+    machine={"type": "pc", "accel": "tcg"},
     qemu_args=("-cpu", "486"),
     drives={
         "hdd_0": {
@@ -398,7 +396,7 @@ Layering is deterministic:
 - an explicitly supplied scalar replaces the file value, including an
   explicit `None` that clears an optional setting;
 - `qemu_args` replaces the complete file array rather than concatenating it;
-- `qemu_machine_options` merges by property name, with Python values winning;
+- `machine` replaces the complete file machine specification;
 - `drives` merges by logical slot and then by entry field, with Python values
   winning; and
 - per-drive `options` merges by option name, with Python values winning.
