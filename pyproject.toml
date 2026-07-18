@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "relict"
+version = "0.1.0.dev0"
+description = "Windows 9x-under-QEMU automation harness"
+readme = "README.md"
+authors = [{ name = "Paul Galbraith", email = "paul@galbraiths.ca" }]
+requires-python = ">=3.9"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+keywords = ["qemu", "windows 95", "windows 98", "win9x", "testing", "automation", "qmp"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Emulators",
+]
+dependencies = ["qemu.qmp"]
+
+[dependency-groups]
+dev = ["build"]
+
+[project.scripts]
+relict = "relict:main"
+
+[tool.setuptools]
+py-modules = ["relict"]
+packages = ["relict_tests"]

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+root = true
+
+[*.md]
+max_line_length = 120
+ij_markdown_wrap_text_if_long = true
+ij_markdown_keep_line_breaks_inside_text_blocks = false

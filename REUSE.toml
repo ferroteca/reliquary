@@ -1,0 +1,16 @@
+version = 1
+SPDX-PackageName = "relict"
+SPDX-PackageSupplier = "Paul Galbraith <paul@galbraiths.ca>"
+
+# Files that cannot (or should not) carry comment headers.
+[[annotations]]
+path = [
+    ".gitignore",
+    "README.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Paul Galbraith"
+SPDX-License-Identifier = "BSD-3-Clause"
