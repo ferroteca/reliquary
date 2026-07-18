@@ -63,6 +63,7 @@ Current home layout:
 
 - `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting") and
   download artifacts
+- `machine.json` — optional CLI machine configuration (not loaded by Python workflows)
 - `screenshots/` — screenshots
 - `qemu-stderr.log` — startup diagnostics
 - `vm.json` — active VM identity, port, and PID
@@ -160,7 +161,9 @@ from `base_dir` / the current directory via `from_mapping`. Explicit overrides w
 `None`), `qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field /
 option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. The CLI does load
 `<effective-home>/machine.json` when present, unless `--machine PATH` selects an explicit file; this is a CLI
-convenience and does not apply to Python workflows. `run()` privately ensures that
+convenience and does not apply to Python workflows. Explicit `--platform`, `--qemu`, and raw QEMU arguments
+override the loaded file; an omitted `--platform` must not clobber a file platform (so argparse must not
+default `--platform` to `"dos"`). `run()` privately ensures that
 the resolved inventory declares something bootable — keep present declared media or install the FreeDOS default;
 never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
 special boot-image fields: custom media is declared through the same drive inventory as every other image.
@@ -282,9 +285,14 @@ Milestone 1 is the permanent agentless base described above.
 
 The runner surface (see its section above) is implemented, and the machine's media — floppies, hard disks, and
 cdroms, images or virtual FAT directories — are declared by name under `drives/` or through `MachineConfig.drives`
-(see "DOS boot and scripting");
-further generalization (USB an open question) should extend the same declared-drive convention — a new medium
-name — without changing the rest of the surface.
+(see "DOS boot and scripting"). Further generalization (USB an open question) should extend the same declared-drive
+convention — a new medium name — without changing the rest of the surface. New media kinds, controllers, and USB
+devices must not first appear as opaque raw `-drive` arguments.
+
+Machine configuration is JSON-only for now. YAML may be added later through a justified parser dependency, but must
+normalize through exactly the same `MachineConfig` model and must not introduce YAML-only features. Named profiles,
+includes, inheritance, environment interpolation, and multi-file merging are deferred; they would enlarge the
+interface without helping describe one machine.
 
 A possible later milestone is an optional QEMU Guest Agent transport over the standard guest-agent protocol. It may
 provide `guest-exec` and

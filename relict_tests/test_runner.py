@@ -27,6 +27,7 @@ except ModuleNotFoundError:
     sys.modules["qemu.qmp"] = qmp
 
 import relict
+from relict import cli as cli_module
 from relict import lifecycle as lifecycle_module
 from relict import workflows as workflows_module
 
@@ -655,6 +656,18 @@ class CliMachineConfigTests(unittest.TestCase):
             config = workflows_module._cli_machine_config(None, home)
 
             self.assertEqual(config.platform, "win9x")
+
+    def test_omitted_platform_does_not_override_file(self):
+        arguments = types.SimpleNamespace(
+            platform=None, qemu=None, qemu_args=[])
+        self.assertEqual(cli_module._cli_start_overrides(arguments), {})
+
+    def test_explicit_platform_dos_overrides_file(self):
+        arguments = types.SimpleNamespace(
+            platform="dos", qemu=None, qemu_args=[])
+        self.assertEqual(
+            cli_module._cli_start_overrides(arguments),
+            {"platform": "dos"})
 
 
 if __name__ == "__main__":

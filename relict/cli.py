@@ -14,7 +14,19 @@ from .interaction_agentless import (AgentlessGuestExec, screen_text,
 from .lifecycle import stop
 from .machine import Machine, screenshot
 from .platform_dos import download
-from .workflows import MachineConfig, start
+from .workflows import start
+
+
+def _cli_start_overrides(arguments):
+    """CLI controls that override a loaded machine configuration."""
+    overrides = {}
+    if arguments.platform is not None:
+        overrides["platform"] = arguments.platform
+    if arguments.qemu is not None:
+        overrides["qemu"] = arguments.qemu
+    if arguments.qemu_args:
+        overrides["qemu_args"] = arguments.qemu_args
+    return overrides
 
 
 def main(argv=None):
@@ -30,7 +42,7 @@ def main(argv=None):
     parser.add_argument("--qemu", help="path to the QEMU binary (default: "
                         "$RELICT_QEMU_HOME, then $QEMU_HOME, then PATH, "
                         "then well-known install locations)")
-    parser.add_argument("--platform", default="dos",
+    parser.add_argument("--platform", default=None,
                         help="guest platform adapter (default: dos; other "
                              "platform workflows are not implemented yet)")
     parser.add_argument("--timeout", type=int, help="seconds to wait "
@@ -77,27 +89,22 @@ def main(argv=None):
 
 
 def _dispatch(arguments):
+    platform = arguments.platform or "dos"
     if arguments.command == "download":
-        if arguments.platform != "dos":
+        if platform != "dos":
             raise NotImplementedError(
-                f"platform {arguments.platform!r} provisioning is not "
+                f"platform {platform!r} provisioning is not "
                 "implemented")
         download()
     elif arguments.command == "start":
-        overrides = {}
-        if arguments.platform != "dos":
-            overrides["platform"] = arguments.platform
-        if arguments.qemu is not None:
-            overrides["qemu"] = arguments.qemu
-        if arguments.qemu_args:
-            overrides["qemu_args"] = arguments.qemu_args
         config = _cli_machine_config(
-            arguments.machine, arguments.home, **overrides)
+            arguments.machine, arguments.home,
+            **_cli_start_overrides(arguments))
         start(config, display=arguments.display, port=arguments.port)
     elif arguments.command == "stop":
         stop(arguments.port)
     elif arguments.command == "boot-to-dos":
-        if arguments.platform != "dos":
+        if platform != "dos":
             raise NotImplementedError(
                 "boot-to-dos requires platform='dos'")
         AgentlessGuestExec(Machine(arguments.port)).wait_ready(
@@ -105,7 +112,7 @@ def _dispatch(arguments):
     elif arguments.command == "type":
         send_text(arguments.text, arguments.port)
     elif arguments.command == "run":
-        if arguments.platform != "dos":
+        if platform != "dos":
             raise NotImplementedError("run requires platform='dos'")
         AgentlessGuestExec(Machine(arguments.port)).execute(
             arguments.dos_command, arguments.timeout or 120)

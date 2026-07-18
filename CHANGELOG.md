@@ -26,8 +26,9 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 ### Added
 
 - `--machine PATH` CLI argument for explicit machine configuration file selection; when omitted, the CLI automatically
-  loads `<effective-home>/machine.json` if present, otherwise uses the default `MachineConfig()`. CLI overrides
-  (`--platform`, `--qemu`, and raw QEMU arguments) apply on top of the loaded configuration.
+  loads `<effective-home>/machine.json` if present, otherwise uses the default `MachineConfig()`. Explicit CLI
+  overrides (`--platform`, `--qemu`, and raw QEMU arguments) apply on top of the loaded configuration; an omitted
+  `--platform` leaves the file's platform unchanged, while `--platform dos` still overrides a non-DOS file value.
 - `MachineConfig.from_file()` and `MachineConfig.from_mapping()` load a versioned JSON/mapping machine document
   (`version` must be `1`), normalize it immutably, resolve relative drive sources from the file directory or an
   explicit `base_dir`, and apply field overrides with deterministic merge rules for drives and options.

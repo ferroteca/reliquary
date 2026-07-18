@@ -116,6 +116,7 @@ Documents/relict/
 │   ├── floppy.img        a boot floppy image (slot 0 = A:)
 │   ├── hdd/              a folder exposed as a virtual FAT hard disk
 │   └── ...               hdd_1.qcow2, cdrom.iso, floppy_1/, ...
+├── machine.json          optional machine configuration (CLI only)
 ├── screenshots/          captured PNG files
 ├── qemu-stderr.log       diagnostics from the last QEMU start
 └── vm.json               identity and port of the active VM
@@ -273,12 +274,43 @@ relict boot-to-dos
 relict stop
 ```
 
-The `--machine PATH` option selects an explicit machine configuration file (a versioned JSON document). When omitted, the CLI automatically loads `<effective-home>/machine.json` if present, otherwise uses the default configuration. CLI flags such as `--platform`, `--qemu`, and raw QEMU arguments override the loaded configuration for that invocation.
+The CLI accepts an optional versioned JSON machine document. Put
+`machine.json` under the effective home and `relict start` loads it
+automatically; `--machine PATH` selects another file instead (relative
+paths resolve from the current directory). A missing explicit file is an
+error; a missing home file means the ordinary defaults.
+
+`version` is required and must be `1`. The document uses the same field
+names as `MachineConfig`: `platform`, `timeout`, `staged_drive`,
+`memory`, `qemu`, `machine`, `qemu_args`, and `drives`. Relative drive
+sources resolve from the file's directory. For example:
+
+```json
+{
+  "version": 1,
+  "memory": 32,
+  "machine": {
+    "type": "pc",
+    "accel": "tcg"
+  },
+  "drives": {
+    "hdd_0": {
+      "source": "../images/dos.qcow2",
+      "options": {"snapshot": true}
+    }
+  }
+}
+```
+
+Explicit CLI controls override the loaded file for that invocation:
+`--platform`, `--qemu`, and raw QEMU arguments after `--`. Omitting
+`--platform` leaves the file's platform (or the DOS default) unchanged;
+passing `--platform dos` overrides a non-DOS file value.
 
 Additional QEMU arguments can follow `--`:
 
 ```powershell
-relict start -- -m 64 -boot c -device virtio-rng-pci
+relict start -- -cpu 486 -device virtio-rng-pci
 ```
 
 ### Keyboard and command input
@@ -409,7 +441,7 @@ config = relict.MachineConfig(drives={
 })
 ```
 
-A versioned JSON machine document can be loaded explicitly and then overridden
+The same versioned JSON document can be loaded from Python and overridden
 field-by-field. Relative drive sources in the file resolve from the file's
 directory; Python overrides still resolve from the current directory:
 
@@ -423,8 +455,11 @@ config = relict.MachineConfig.from_file(
 
 `MachineConfig.from_mapping(...)` accepts the same document shape in memory.
 `version` is required in the document and must be `1`; it is not a constructor
-field. Programmatic construction does not load `<home>/machine.json`
-implicitly.
+field. Explicit overrides win: scalars replace (including `None`),
+`qemu_args` and `machine` replace wholesale, and `drives` merge by logical
+slot then by entry field / option name. Programmatic construction and
+`Runner` do not load `<home>/machine.json` implicitly — that discovery is
+CLI-only.
 
 The module-level `start()`, `run_task()`, and `run_guest_program()` functions
 accept a `machine_config` containing a `MachineConfig`, versioned mapping, or
