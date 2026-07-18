@@ -13,7 +13,7 @@ names reserve the generic QEMU lifecycle but their provisioning and guest-task s
 Omitting the platform selects DOS. This preserves a complete, immediately useful default:
 
 ```python
-machine = relict.Runner()  # equivalent to RunnerConfig(platform="dos")
+machine = relict.Runner()  # equivalent to MachineConfig(platform="dos")
 ```
 
 The CLI likewise defaults to `--platform dos`. Platform-specific behavior is never inferred from an image. Future
@@ -359,12 +359,12 @@ example, parsing test-framework results) is the caller's job.
 ### Embedding relict as a runner
 
 Callers that manage many isolated runs (test harnesses, CI drivers) can use the `Runner` surface instead of the
-module-level functions. A `Runner` constructed with a `RunnerConfig` is a configured DOS *test machine*: it carries
+module-level functions. A `Runner` constructed with a `MachineConfig` is a configured DOS *test machine*: it carries
 configuration only — never per-run state, which lives under a home directory passed explicitly to each operation — so
 one machine can serve concurrent runs in distinct homes, each with its own VM state and staging:
 
 ```python
-machine = relict.Runner(relict.RunnerConfig(
+machine = relict.Runner(relict.MachineConfig(
     platform="dos", boot_floppy_image="msdos-boot.img", timeout=120))
 
 machine.provision("cache/drives")                    # ensure something bootable is declared (never overwrites)
@@ -379,7 +379,7 @@ per the config first. `staged_drive` declares the guest drive letter where the s
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or
 `drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged
 drive, one letter later per hard-disk slot before it (lower letters are rejected). Every
-`RunnerConfig` field has a working default, so `relict.Runner()` alone is a complete FreeDOS
+`MachineConfig` field has a working default, so `relict.Runner()` alone is a complete FreeDOS
 machine. The same explicit `home=` keyword is available on the module-level functions (`download`, `start`, `stop`,
 `run_guest_program`, and the path helpers) and overrides the process-global home per call.
 

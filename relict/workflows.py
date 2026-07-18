@@ -94,7 +94,7 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
 
 
 @dataclasses.dataclass(frozen=True)
-class RunnerConfig:
+class MachineConfig:
     """Immutable configuration for a :class:`Runner`."""
 
     platform: "str" = "dos"
@@ -130,7 +130,7 @@ class Runner:
     """A configured QEMU runner with per-run state under an explicit home."""
 
     def __init__(self, config=None):
-        self.config = RunnerConfig() if config is None else config
+        self.config = MachineConfig() if config is None else config
 
     @property
     def platform(self):

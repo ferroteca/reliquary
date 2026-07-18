@@ -28,7 +28,7 @@ module.
 ### Platform selection
 
 DOS is the compatibility default when no platform is specified. Platform-specific behavior must be selected through
-`RunnerConfig.platform` or `--platform`, never inferred by inspecting an image or guest screen. The reusable machine
+`MachineConfig.platform` or `--platform`, never inferred by inspecting an image or guest screen. The reusable machine
 layer may remain platform-neutral, but provisioning, readiness, remote-task execution, and result collection belong to
 platform workflows. Until a non-DOS workflow is complete and tested, it must raise `NotImplementedError` rather than
 using DOS assumptions.
@@ -132,7 +132,7 @@ projects; relict stays ignorant of who builds on it.
 
 ## The runner surface
 
-`Runner`/`RunnerConfig` is the generic embedding surface (a soft contract with callers): a `Runner(config)` instance
+`Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a `Runner(config)` instance
 is a configured QEMU test machine exposing `platform` (default "dos"), `config` (frozen dataclass: `platform`, `boot_floppy_image`,
 `boot_hdd_image` (at most one — the field declares the media type), `staged_drive`, `timeout`, `qemu`, `qemu_args`;
 every field has a working default), `provision(drives_dir)` (ensure something bootable is declared under

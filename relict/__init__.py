@@ -12,7 +12,7 @@ from .lifecycle import Qmp, find_qemu, stop
 from .machine import (Machine, screenshot, screen_text, send_keys, send_text,
                       wait_screen)
 from .platform_dos import boot_to_dos, download, run_command
-from .workflows import (Runner, RunnerConfig, run_guest_program, run_task,
+from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
 # Private compatibility names retained for existing diagnostics and tests.
@@ -39,7 +39,7 @@ __all__ = [
     "Machine",
     "Qmp",
     "Runner",
-    "RunnerConfig",
+    "MachineConfig",
     "boot_to_dos",
     "download",
     "drives_dir",

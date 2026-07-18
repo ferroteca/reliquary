@@ -12,10 +12,10 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   machine interaction, DOS platform behavior, workflow orchestration, and CLI modules while preserving the existing
   root import and command-line interfaces.
 - The complete DOS runner from the original implementation: DOS remains the default platform, while
-  `RunnerConfig(platform=...)` and `--platform` make the platform choice explicit. The reusable QEMU machine layer is
+  `MachineConfig(platform=...)` and `--platform` make the platform choice explicit. The reusable QEMU machine layer is
   shared; unimplemented non-DOS platform workflows fail explicitly instead of borrowing DOS assumptions.
-- `Runner`/`RunnerConfig`: the generic embedding surface for callers driving relict as a runner. A
-  `Runner(RunnerConfig(...))` instance is a configured DOS test machine — configuration only, no per-run state — with
+- `Runner`/`MachineConfig`: the generic embedding surface for callers driving relict as a runner. A
+  `Runner(MachineConfig(...))` instance is a configured DOS test machine — configuration only, no per-run state — with
   `provision(drives_dir)` (ensure something bootable is declared under `drives_dir`: keep a present bootable image,
   copy the configured `boot_floppy_image` or `boot_hdd_image` to its media-typed stem keeping the image's own
   extension, or install the FreeDOS default; never overwrites) and `run(exe_path, args, home)` (the full
@@ -30,7 +30,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   `hdd.vmdk`, ...) is handed to QEMU to identify. Memory defaults to 16 MB and the boot order to a best guess from
   the declared media (slot-0 floppy image, else slot-0 hard-disk image, else cdrom); `-m` or `-boot` in the extra
   QEMU arguments overrides the corresponding default.
-- The staged guest hard drive's letter is explicit configuration: `staged_drive` on `RunnerConfig` and
+- The staged guest hard drive's letter is explicit configuration: `staged_drive` on `MachineConfig` and
   `run_guest_program()` (valid C–Z, normalized uppercase; default: match the declared machine, one letter per
   hard-disk slot before the staged drive, so C: on a floppy-boot machine and D: behind a slot-0 hard-disk image;
   letters below the default are rejected) declares where the staged vvfat hard disk appears in the guest — the drive

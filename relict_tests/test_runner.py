@@ -55,10 +55,10 @@ class RunnerConstructionTests(unittest.TestCase):
         machine = relict.Runner()
 
         self.assertEqual(machine.platform, "dos")
-        self.assertEqual(machine.config, relict.RunnerConfig())
+        self.assertEqual(machine.config, relict.MachineConfig())
 
     def test_machine_exposes_its_immutable_config(self):
-        config = relict.RunnerConfig(timeout=45)
+        config = relict.MachineConfig(timeout=45)
         machine = relict.Runner(config)
 
         self.assertIs(machine.config, config)
@@ -67,33 +67,33 @@ class RunnerConstructionTests(unittest.TestCase):
 
     def test_staged_drive_defaults_to_matching_the_boot_medium(self):
         # None: resolved per home against the boot image at run time
-        self.assertIsNone(relict.RunnerConfig().staged_drive)
+        self.assertIsNone(relict.MachineConfig().staged_drive)
         self.assertEqual(
-            relict.RunnerConfig(staged_drive="d").staged_drive, "D")
+            relict.MachineConfig(staged_drive="d").staged_drive, "D")
         with self.assertRaisesRegex(ValueError, "staged_drive"):
-            relict.RunnerConfig(staged_drive="A")
+            relict.MachineConfig(staged_drive="A")
 
     def test_boot_images_are_mutually_exclusive(self):
         with self.assertRaisesRegex(ValueError, "not both"):
-            relict.RunnerConfig(boot_floppy_image="floppy.img",
+            relict.MachineConfig(boot_floppy_image="floppy.img",
                                   boot_hdd_image="hdd.img")
 
     def test_staged_drive_c_is_rejected_with_a_hdd_boot_image(self):
         with self.assertRaisesRegex(ValueError, "claims C:"):
-            relict.RunnerConfig(boot_hdd_image="hdd.img",
+            relict.MachineConfig(boot_hdd_image="hdd.img",
                                   staged_drive="c")
 
     def test_platform_defaults_to_dos_and_normalizes(self):
-        self.assertEqual(relict.RunnerConfig().platform, "dos")
-        self.assertEqual(relict.RunnerConfig(platform="DOS").platform,
+        self.assertEqual(relict.MachineConfig().platform, "dos")
+        self.assertEqual(relict.MachineConfig(platform="DOS").platform,
                          "dos")
 
     def test_non_dos_platform_rejects_dos_drive_configuration(self):
         with self.assertRaisesRegex(ValueError, "DOS-specific"):
-            relict.RunnerConfig(platform="win9x", staged_drive="E")
+            relict.MachineConfig(platform="win9x", staged_drive="E")
 
     def test_non_dos_runner_workflow_is_an_explicit_stub(self):
-        machine = relict.Runner(relict.RunnerConfig(platform="win9x"))
+        machine = relict.Runner(relict.MachineConfig(platform="win9x"))
         with self.assertRaisesRegex(NotImplementedError, "win9x"):
             machine.run(lambda running: None, home="run-home")
 
@@ -120,7 +120,7 @@ class ProvisionTests(unittest.TestCase):
         with open(ready, "wb") as image:
             image.write(b"custom dos")
         machine = relict.Runner(
-            relict.RunnerConfig(boot_floppy_image=ready))
+            relict.MachineConfig(boot_floppy_image=ready))
 
         with mock.patch.object(workflows_module,
                                "download_boot_image") as download:
@@ -134,7 +134,7 @@ class ProvisionTests(unittest.TestCase):
         with open(ready, "wb") as image:
             image.write(b"custom dos")
         machine = relict.Runner(
-            relict.RunnerConfig(boot_floppy_image=ready))
+            relict.MachineConfig(boot_floppy_image=ready))
 
         with mock.patch.object(workflows_module,
                                "download_boot_image") as download:
@@ -148,7 +148,7 @@ class ProvisionTests(unittest.TestCase):
         with open(ready, "wb") as image:
             image.write(b"custom qcow2 floppy")
         machine = relict.Runner(
-            relict.RunnerConfig(boot_floppy_image=ready))
+            relict.MachineConfig(boot_floppy_image=ready))
 
         with mock.patch.object(workflows_module,
                                "download_boot_image") as download:
@@ -164,7 +164,7 @@ class ProvisionTests(unittest.TestCase):
         with open(ready, "wb") as image:
             image.write(b"custom hdd dos")
         machine = relict.Runner(
-            relict.RunnerConfig(boot_hdd_image=ready))
+            relict.MachineConfig(boot_hdd_image=ready))
 
         with mock.patch.object(workflows_module,
                                "download_boot_image") as download:
@@ -204,7 +204,7 @@ class RunnerRunTests(unittest.TestCase):
 
     def test_run_forwards_home_and_config(self):
         self._stage_boot_image()
-        machine = relict.Runner(relict.RunnerConfig(
+        machine = relict.Runner(relict.MachineConfig(
             timeout=45, qemu="qemu", qemu_args=("-nodefaults",)))
 
         with mock.patch.object(workflows_module, "run_guest_program",
@@ -231,7 +231,7 @@ class RunnerRunTests(unittest.TestCase):
         with open(ready, "wb") as image:
             image.write(b"custom dos")
         machine = relict.Runner(
-            relict.RunnerConfig(boot_floppy_image=ready))
+            relict.MachineConfig(boot_floppy_image=ready))
 
         with mock.patch.object(workflows_module, "run_guest_program",
                                return_value=""):
