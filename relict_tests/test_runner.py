@@ -587,5 +587,75 @@ class RunnerRunTests(unittest.TestCase):
         self.assertEqual(second["port"], 2222)
 
 
+
+class CliMachineConfigTests(unittest.TestCase):
+    def test_explicit_machine_path_loads_from_file(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, "custom.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "platform": "win9x"}, f)
+
+            config = workflows_module._cli_machine_config(path, None)
+
+            self.assertEqual(config.platform, "win9x")
+
+    def test_explicit_machine_path_applies_overrides(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, "custom.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "memory": 32}, f)
+
+            config = workflows_module._cli_machine_config(
+                path, None, platform="dos", memory=64)
+
+            self.assertEqual(config.platform, "dos")
+            self.assertEqual(config.memory, 64)
+
+    def test_missing_explicit_machine_path_raises_error(self):
+        missing = os.path.join("nonexistent", "machine.json")
+        with self.assertRaises(FileNotFoundError):
+            workflows_module._cli_machine_config(missing, None)
+
+    def test_implicit_home_machine_json_loads_when_present(self):
+        with tempfile.TemporaryDirectory() as home:
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "platform": "win9x"}, f)
+
+            config = workflows_module._cli_machine_config(None, home)
+
+            self.assertEqual(config.platform, "win9x")
+
+    def test_implicit_home_machine_json_uses_defaults_when_missing(self):
+        with tempfile.TemporaryDirectory() as home:
+            config = workflows_module._cli_machine_config(None, home)
+
+            self.assertEqual(config.platform, "dos")
+            self.assertIsNone(config.staged_drive)
+
+    def test_implicit_home_machine_json_applies_overrides(self):
+        with tempfile.TemporaryDirectory() as home:
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "memory": 32}, f)
+
+            config = workflows_module._cli_machine_config(
+                None, home, memory=64)
+
+            self.assertEqual(config.memory, 64)
+
+    def test_home_override_respects_effective_home(self):
+        with tempfile.TemporaryDirectory() as root:
+            home = os.path.join(root, "custom-home")
+            os.makedirs(home)
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "platform": "win9x"}, f)
+
+            config = workflows_module._cli_machine_config(None, home)
+
+            self.assertEqual(config.platform, "win9x")
+
+
 if __name__ == "__main__":
     unittest.main()

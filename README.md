@@ -268,10 +268,12 @@ and restart QEMU before using them in the guest.
 
 ```text
 relict download
-relict start [--display] [-- QEMU_ARGS...]
+relict start [--display] [--machine PATH] [-- QEMU_ARGS...]
 relict boot-to-dos
 relict stop
 ```
+
+The `--machine PATH` option selects an explicit machine configuration file (a versioned JSON document). When omitted, the CLI automatically loads `<effective-home>/machine.json` if present, otherwise uses the default configuration. CLI flags such as `--platform`, `--qemu`, and raw QEMU arguments override the loaded configuration for that invocation.
 
 Additional QEMU arguments can follow `--`:
 

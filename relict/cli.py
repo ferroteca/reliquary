@@ -8,6 +8,7 @@ import sys
 from qemu.qmp import ConnectError
 
 from .home import set_home
+from .workflows import _cli_machine_config
 from .interaction_agentless import (AgentlessGuestExec, screen_text,
                                     send_keys, send_text, wait_screen)
 from .lifecycle import stop
@@ -34,6 +35,8 @@ def main(argv=None):
                              "platform workflows are not implemented yet)")
     parser.add_argument("--timeout", type=int, help="seconds to wait "
                         "(defaults: boot-to-dos 90, run 120, wait 60)")
+    parser.add_argument("--machine", help="path to machine.json configuration "
+                        "file (default: <home>/machine.json if present)")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     subcommands.add_parser("download")
@@ -81,9 +84,15 @@ def _dispatch(arguments):
                 "implemented")
         download()
     elif arguments.command == "start":
-        config = MachineConfig(
-            platform=arguments.platform, qemu=arguments.qemu,
-            qemu_args=arguments.qemu_args)
+        overrides = {}
+        if arguments.platform != "dos":
+            overrides["platform"] = arguments.platform
+        if arguments.qemu is not None:
+            overrides["qemu"] = arguments.qemu
+        if arguments.qemu_args:
+            overrides["qemu_args"] = arguments.qemu_args
+        config = _cli_machine_config(
+            arguments.machine, arguments.home, **overrides)
         start(config, display=arguments.display, port=arguments.port)
     elif arguments.command == "stop":
         stop(arguments.port)

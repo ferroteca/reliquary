@@ -9,7 +9,7 @@ import os
 import shutil
 import time
 
-from .home import drives_dir, effective_home
+from .home import drives_dir, effective_home, home
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (normalize_machine, normalize_memory, start_machine,
                         stop)
@@ -43,6 +43,17 @@ def _function_config(machine_config):
         return MachineConfig.from_file(machine_config)
     raise TypeError(
         "machine_config must be a MachineConfig, mapping, or path")
+
+
+def _cli_machine_config(machine_path, home_override, **cli_overrides):
+    """Load machine config for CLI use: explicit path or home discovery."""
+    if machine_path is not None:
+        return MachineConfig.from_file(machine_path, **cli_overrides)
+    effective = effective_home(home_override)
+    implicit = os.path.join(effective, "machine.json")
+    if os.path.exists(implicit):
+        return MachineConfig.from_file(implicit, **cli_overrides)
+    return MachineConfig(**cli_overrides)
 
 
 def start(machine_config=None, *, display=False, port=None, home=None):

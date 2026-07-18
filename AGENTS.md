@@ -158,7 +158,9 @@ declarations by logical slot; two sources for one slot fail closed. `MachineConf
 must be `1`; not a constructor field). Relative drive sources resolve from the file directory via `from_file`, or
 from `base_dir` / the current directory via `from_mapping`. Explicit overrides win: scalars replace (including
 `None`), `qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field /
-option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. `run()` privately ensures that
+option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. The CLI does load
+`<effective-home>/machine.json` when present, unless `--machine PATH` selects an explicit file; this is a CLI
+convenience and does not apply to Python workflows. `run()` privately ensures that
 the resolved inventory declares something bootable — keep present declared media or install the FreeDOS default;
 never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
 special boot-image fields: custom media is declared through the same drive inventory as every other image.
