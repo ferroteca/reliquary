@@ -104,6 +104,24 @@ class RunnerConstructionTests(unittest.TestCase):
             relict.MachineConfig(
                 machine="pc", qemu_args=("-machine", "q35"))
 
+    def test_memory_is_a_positive_integer_mib_value(self):
+        self.assertEqual(relict.MachineConfig(memory=32).memory, 32)
+        for value in (True, 0, -1, 1.5, "32"):
+            with self.subTest(value=value):
+                with self.assertRaises((TypeError, ValueError)):
+                    relict.MachineConfig(memory=value)
+
+    def test_memory_default_depends_on_platform(self):
+        self.assertEqual(relict.MachineConfig().memory, 16)
+        self.assertEqual(
+            relict.MachineConfig(platform="win9x").memory, 64)
+        self.assertEqual(
+            relict.MachineConfig(platform="winnt").memory, 256)
+
+    def test_memory_conflicts_with_raw_memory_argument(self):
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            relict.MachineConfig(memory=32, qemu_args=("-m", "64"))
+
     def test_drive_specs_normalize_aliases_and_freeze_values(self):
         with tempfile.TemporaryDirectory() as root:
             floppy = os.path.join(root, "boot.img")
@@ -242,7 +260,8 @@ class RunnerRunTests(unittest.TestCase):
     def test_run_forwards_home_and_config(self):
         self._stage_boot_image()
         machine = relict.Runner(self.home, relict.MachineConfig(
-            timeout=45, qemu="qemu", qemu_args=("-nodefaults",)))
+            timeout=45, memory=32, qemu="qemu",
+            qemu_args=("-nodefaults",)))
 
         with mock.patch.object(workflows_module, "run_guest_program",
                                return_value="guest output") as run:
@@ -252,7 +271,7 @@ class RunnerRunTests(unittest.TestCase):
             self.exe, "-v", timeout=45, staged_drive=None,
             qemu_args=("-nodefaults",),
             qemu="qemu", home=os.path.abspath(self.home),
-            drives=machine.config.drives, machine=None)
+            drives=machine.config.drives, machine=None, memory=32)
         self.assertEqual(log, "guest output")
 
     def test_run_defaults_the_timeout(self):

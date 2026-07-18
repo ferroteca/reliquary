@@ -42,6 +42,8 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 - `MachineConfig.machine` maps directly to one QEMU `-machine` argument. A string selects the machine type; a mapping
   combines required `type` with immutable scalar properties and renders Boolean values as `on`/`off`. A raw
   `-machine` or `-M` in `qemu_args` conflicts with the structured field.
+- `MachineConfig.memory` configures guest memory as a positive integer number of MiB, defaulting to 16 for DOS, 64
+  for Win9x, and 256 for WinNT. It maps to one QEMU `-m` argument and conflicts with raw `-m` in `qemu_args`.
 - The `drives/` directory under the home declares the whole machine by filename, with image content never
   interrogated. Image files `floppy[_<n>].<ext>` (slots 0–1, A: and B:), `hdd[_<n>].<ext>` (slots 0–3, the IDE bus),
   and `cdrom[_<n>].<ext>` (the IDE slots after the hard disks) mount as that medium; bare directories `floppy[_<n>]`

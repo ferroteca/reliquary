@@ -382,6 +382,7 @@ machine = relict.Runner(
     relict.MachineConfig(
         platform="dos",
         timeout=120,
+        memory=32,
         machine={"type": "pc", "accel": "tcg"},
         drives={"floppy": "images/msdos-boot.img"},
     ),
@@ -411,6 +412,9 @@ same logical slot rather than overriding it. `run()` keeps present bootable medi
 the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle under the runner's home.
 `machine` maps directly to QEMU's `-machine`: a string selects only the type, while a mapping requires `type` and may
 add scalar machine properties. Booleans render as `on`/`off`; configuring both `machine` and `-machine` in
+`qemu_args` is an error.
+`memory` is a positive integer number of MiB. It defaults by platform: 16 for
+DOS, 64 for Win9x, and 256 for WinNT. Configuring both `memory` and `-m` in
 `qemu_args` is an error.
 `staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or

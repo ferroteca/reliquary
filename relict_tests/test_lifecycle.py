@@ -144,7 +144,7 @@ class LifecycleTests(unittest.TestCase):
 
         return image, popen.call_args.args[0]
 
-    def _start_configured_args(self, drives, machine=None):
+    def _start_configured_args(self, drives, machine=None, memory=None):
         fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
         proc = _FakeProcess()
         with mock.patch.object(lifecycle_module, "available_port",
@@ -156,7 +156,8 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            relict.start(qemu="qemu", drives=drives, machine=machine)
+            relict.start(qemu="qemu", drives=drives, machine=machine,
+                         memory=memory)
         return popen.call_args.args[0]
 
     def test_start_boots_the_floppy_image_as_drive_a(self):
@@ -241,6 +242,22 @@ class LifecycleTests(unittest.TestCase):
             args[args.index("-machine") + 1],
             "pc,accel=tcg,usb=off")
 
+    def test_start_renders_configured_memory(self):
+        source = os.path.join(self.home, "boot.img")
+        with open(source, "wb") as image:
+            image.write(b"dos")
+
+        args = self._start_configured_args(
+            {"floppy": source}, memory=32)
+
+        self.assertEqual(args.count("-m"), 1)
+        self.assertEqual(args[args.index("-m") + 1], "32")
+
+    def test_start_rejects_configured_and_raw_memory(self):
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            relict.start(qemu="qemu", memory=32,
+                         qemu_args=("-m", "64"))
+
     def test_start_mounts_configured_directory_as_vvfat(self):
         source = os.path.join(self.home, "external-drive")
         os.makedirs(source)
@@ -271,6 +288,15 @@ class LifecycleTests(unittest.TestCase):
 
         self.assertEqual(args[args.index("-m") + 1], "16")
         self.assertEqual(args[args.index("-boot") + 1], "a")
+
+    def test_start_uses_the_platform_memory_default(self):
+        for platform, expected in (("win9x", "64"),
+                                   ("winnt", "256")):
+            with self.subTest(platform=platform):
+                self._remove_generated_files()
+                _, args = self._start_qemu_args(
+                    "floppy.img", platform=platform)
+                self.assertEqual(args[args.index("-m") + 1], expected)
 
     def test_start_defers_to_user_memory_and_boot_order(self):
         _, args = self._start_qemu_args(

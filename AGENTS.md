@@ -143,10 +143,12 @@ projects; relict stays ignorant of who builds on it.
 
 `Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a
 `Runner(home=None, config=None)` instance is a configured QEMU test machine bound to one absolute `home`, exposing
-`platform` (default "dos") and `config` (frozen dataclass: `platform`, `staged_drive`, `timeout`, `qemu`, `qemu_args`,
-`drives`, `machine`; every field has a working default), and `run(exe_path, args)`. `machine` is either a non-empty
+`platform` (default "dos") and `config` (frozen dataclass: `platform`, `staged_drive`, `timeout`, `memory`, `qemu`,
+`qemu_args`, `drives`, `machine`; every field has a working default), and `run(exe_path, args)`. `machine` is either a non-empty
 QEMU machine-type string or an immutable mapping with required `type` and scalar properties; it renders as one
 `-machine` argument, with booleans normalized to `on`/`off`, and conflicts with raw `-machine`/`-M` in `qemu_args`.
+`memory` is either `None` or a positive integer MiB value. `None` resolves to the platform default: 16 MiB for DOS,
+64 MiB for Win9x, and 256 MiB for WinNT. An explicit value conflicts with raw `-m` in `qemu_args`.
 Configured drives use canonical keys
 `floppy_0..1`, `hdd_0..3`, and `cdrom_0..3`, with `floppy` and `hdd` accepted as slot-zero aliases. Each value is a
 source path or a mapping with `source` and `options`; values are normalized and deeply frozen. Files are images,

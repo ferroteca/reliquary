@@ -175,13 +175,14 @@ The first file schema is:
   "platform": "dos",
   "timeout": 120,
   "staged_drive": "D",
+  "memory": 32,
   "qemu": "qemu-system-i386",
   "machine": {
     "type": "pc-i440fx-9.2",
     "accel": "tcg",
     "usb": false
   },
-  "qemu_args": ["-cpu", "486", "-m", "32"],
+  "qemu_args": ["-cpu", "486"],
   "drives": {
     "hdd_0": {
       "source": "../images/dos.qcow2",
@@ -212,14 +213,19 @@ wrong type fail with an error that includes the configuration path, such as
 machine.
 
 The current `MachineConfig` fields retain their names and meanings:
-`platform`, `staged_drive`, `timeout`, `qemu`, `qemu_args`, `machine`, and
-`drives`. JSON arrays normalize to immutable tuples where appropriate.
+`platform`, `staged_drive`, `timeout`, `memory`, `qemu`, `qemu_args`,
+`machine`, and `drives`. JSON arrays normalize to immutable tuples where
+appropriate.
 
 `machine` supplies one QEMU `-machine` value. A string is shorthand for a
 mapping containing only `type`; the mapping form requires a non-empty `type`
 and may add string, number, or Boolean properties. Booleans normalize to
 QEMU's `on` and `off`. An absent field preserves QEMU's default. A raw
 `-machine` or `-M` in `qemu_args` conflicts with the structured field.
+
+`memory` is a positive integer number of MiB and supplies one QEMU `-m`
+value. It defaults by platform: 16 for DOS, 64 for Win9x, and 256 for WinNT.
+A raw `-m` in `qemu_args` conflicts with the structured field.
 
 `qemu_args` remains an array or tuple of complete command-line tokens, never
 one shell command string. relict passes the tokens directly to `subprocess`
@@ -364,16 +370,17 @@ not depend on where a command happened to be launched.
 
 ## Python interface
 
-`MachineConfig.drives` and `MachineConfig.machine` are implemented. Their
-constructors copy and deeply normalize mappings, expand supported shorthand,
-and retain immutable values. A runner binds the normalized configuration to
-one absolute home; all VM state remains under that home.
+`MachineConfig.drives`, `MachineConfig.machine`, and `MachineConfig.memory`
+are implemented. Their constructors normalize and validate their values and
+retain immutable configuration. A runner binds the normalized configuration
+to one absolute home; all VM state remains under that home.
 
 For example:
 
 ```python
 machine = relict.Runner("run-home", relict.MachineConfig(
     platform="dos",
+    memory=32,
     machine={"type": "pc", "accel": "tcg"},
     qemu_args=("-cpu", "486"),
     drives={

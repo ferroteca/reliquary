@@ -64,6 +64,17 @@ def machine_argument(value):
     return ",".join(parts)
 
 
+def normalize_memory(value):
+    """Normalize an optional guest-memory size in MiB."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError("memory must be a positive integer MiB value")
+    if value <= 0:
+        raise ValueError("memory must be a positive integer MiB value")
+    return value
+
+
 def _qemu_fallback_dirs():
     if os.name == "nt":
         pf = os.environ.get("ProgramFiles", r"C:\Program Files")
@@ -278,7 +289,7 @@ def _terminate_started_process(proc):
 
 def start_machine(display=False, qemu=None, port=None, qemu_args=(),
                   home=None, prepare_drives=None, default_memory=None,
-                  drive_specs=None, machine=None):
+                  drive_specs=None, machine=None, memory=None):
     """Start an owned QEMU process after optional drive preparation."""
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -318,11 +329,21 @@ def start_machine(display=False, qemu=None, port=None, qemu_args=(),
             for argument in qemu_args):
         raise ValueError(
             "machine configuration conflicts with -machine in qemu_args")
+    memory = normalize_memory(memory)
+    if memory is not None and any(
+            argument == "-m" or argument.startswith("-m=")
+            for argument in qemu_args):
+        raise ValueError(
+            "memory configuration conflicts with -m in qemu_args")
+    effective_memory = (normalize_memory(default_memory)
+                        if memory is None else memory)
     args = [qemu, "-name", vm_name]
     if machine_value is not None:
         args += ["-machine", machine_value]
-    if default_memory is not None and "-m" not in qemu_args:
-        args += ["-m", str(default_memory)]
+    if (effective_memory is not None
+            and not any(argument == "-m" or argument.startswith("-m=")
+                        for argument in qemu_args)):
+        args += ["-m", str(effective_memory)]
     args += drive_args(media)
     boot = boot_guess(media)
     if boot is not None and "-boot" not in qemu_args:
