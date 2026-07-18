@@ -4,18 +4,17 @@
 
 import dataclasses
 import os
-import re
 import shutil
 import time
 
 from .home import drives_dir, effective_home
+from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import start_machine, stop
 from .machine import Machine
 from .media import (boot_guess, check_staged_drive, scan_drives,
                     staged_hdd_plan)
-from .platform_dos import (boot_to_dos, download_boot_image,
-                           prepare_drives, run_command)
-from .lifecycle import qmp_session
+from .platform_dos import (download_boot_image, prepare_drives,
+                           program_name)
 
 
 def start(display=False, qemu=None, port=None, qemu_args=(), home=None,
@@ -48,8 +47,9 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
                       platform="dos"):
     """Stage, execute, and collect one agentless DOS program run."""
     if platform != "dos":
-        raise ValueError(
-            "run_guest_program() is DOS-specific; pass platform='dos'")
+        raise NotImplementedError(
+            f"platform {platform!r} guest-program workflow is not "
+            "implemented")
     drives = drives_dir(home)
     stage, default_letter = staged_hdd_plan(scan_drives(drives), drives)
     if staged_drive is None:
@@ -63,9 +63,7 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
                 f"staged_drive={staged_drive!r}: the hard disks "
                 f"before the staged drive already claim {claimed}; "
                 f"it appears at {default_letter}: or later")
-    exe_name = os.path.basename(exe_path)
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,8}\.[Ee][Xx][Ee]", exe_name):
-        raise ValueError(f"guest executable needs a DOS 8.3 name: {exe_name}")
+    exe_name = program_name(exe_path)
     base = os.path.splitext(exe_name)[0]
     log_name = base + ".log"
     command = f"{base} {args}".strip() + f" > {log_name}"
@@ -78,10 +76,10 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
 
     port = start(qemu=qemu, port=port, qemu_args=qemu_args, home=home)
     try:
-        with qmp_session(port, home) as qmp:
-            boot_to_dos(port=qmp)
-            run_command(f"{staged_drive.lower()}:", 15, qmp)
-            run_command(command, timeout, qmp)
+        guest = AgentlessGuestExec(Machine(port, home))
+        guest.wait_ready()
+        guest.execute(f"{staged_drive.lower()}:", 15)
+        guest.execute(command, timeout)
     finally:
         stop(port, home)
     time.sleep(2)
@@ -98,8 +96,6 @@ class MachineConfig:
     """Immutable configuration for a :class:`Runner`."""
 
     platform: "str" = "dos"
-    boot_floppy_image: "str | None" = None
-    boot_hdd_image: "str | None" = None
     staged_drive: "str | None" = None
     timeout: "float | None" = None
     qemu: "str | None" = None
@@ -112,64 +108,44 @@ class MachineConfig:
         if self.platform != "dos" and self.staged_drive is not None:
             raise ValueError(
                 "staged_drive is DOS-specific; use platform='dos'")
-        if self.boot_floppy_image and self.boot_hdd_image:
-            raise ValueError(
-                "configure either boot_floppy_image or "
-                "boot_hdd_image, not both")
         if self.staged_drive is not None:
             object.__setattr__(self, "staged_drive",
                                check_staged_drive(self.staged_drive))
-        if self.boot_hdd_image and self.staged_drive == "C":
-            raise ValueError(
-                "staged_drive='C': a hard-disk boot image claims C: "
-                "as the system drive; the staged vvfat drive "
-                "appears at D: or later")
 
 
 class Runner:
-    """A configured QEMU runner with per-run state under an explicit home."""
+    """A configured QEMU runner whose state lives under one home."""
 
-    def __init__(self, config=None):
+    def __init__(self, home=None, config=None):
+        self.home = os.path.abspath(effective_home(home))
         self.config = MachineConfig() if config is None else config
 
     @property
     def platform(self):
         return self.config.platform
 
-    def provision(self, drives):
+    def _provision(self):
         """Ensure the declared machine has something bootable."""
+        drives = os.path.join(self.home, "drives")
         if boot_guess(scan_drives(drives)) is not None:
             return
-        for image, stem in ((self.config.boot_hdd_image, "hdd"),
-                            (self.config.boot_floppy_image, "floppy")):
-            if image:
-                os.makedirs(drives, exist_ok=True)
-                extension = os.path.splitext(image)[1]
-                shutil.copy(image, os.path.join(drives, stem + extension))
-                return
         if self.platform == "dos":
             download_boot_image(drives)
             return
         raise ValueError(
-            "no bootable drive is configured; declare media under "
-            f"{drives} or configure a boot image")
+            f"no bootable drive is declared under {drives}")
 
-    def run(self, task, args="", home=None):
+    def run(self, task, args=""):
         """Run a DOS executable using this runner's configuration."""
-        if home is None:
-            raise ValueError("Runner.run() requires an explicit home")
         if self.platform != "dos":
             raise NotImplementedError(
                 f"platform {self.platform!r} task workflow is not "
                 "implemented; use run_task() with an explicit callable")
-        home = os.path.abspath(home)
-        drives = os.path.join(home, "drives")
-        if boot_guess(scan_drives(drives)) is None:
-            self.provision(drives)
+        self._provision()
         timeout = (180 if self.config.timeout is None
                    else self.config.timeout)
         return run_guest_program(
             task, args, timeout=timeout,
             staged_drive=self.config.staged_drive,
             qemu_args=self.config.qemu_args, qemu=self.config.qemu,
-            home=home)
+            home=self.home)

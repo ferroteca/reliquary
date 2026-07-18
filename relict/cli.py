@@ -8,9 +8,11 @@ import sys
 from qemu.qmp import ConnectError
 
 from .home import set_home
-from .lifecycle import qmp_session, stop
-from .machine import screenshot, screen_text, send_keys, send_text, wait_screen
-from .platform_dos import boot_to_dos, download, run_command
+from .interaction_agentless import (AgentlessGuestExec, screen_text,
+                                    send_keys, send_text, wait_screen)
+from .lifecycle import stop
+from .machine import Machine, screenshot
+from .platform_dos import download
 from .workflows import start
 
 
@@ -87,14 +89,15 @@ def _dispatch(arguments):
         if arguments.platform != "dos":
             raise NotImplementedError(
                 "boot-to-dos requires platform='dos'")
-        boot_to_dos(arguments.timeout or 90, arguments.port)
+        AgentlessGuestExec(Machine(arguments.port)).wait_ready(
+            arguments.timeout or 90)
     elif arguments.command == "type":
         send_text(arguments.text, arguments.port)
     elif arguments.command == "run":
         if arguments.platform != "dos":
             raise NotImplementedError("run requires platform='dos'")
-        run_command(arguments.dos_command, arguments.timeout or 120,
-                    arguments.port)
+        AgentlessGuestExec(Machine(arguments.port)).execute(
+            arguments.dos_command, arguments.timeout or 120)
     elif arguments.command == "keys":
         send_keys([[key] for key in arguments.names], arguments.port)
     elif arguments.command == "text":
@@ -106,6 +109,6 @@ def _dispatch(arguments):
     elif arguments.command == "screenshot":
         screenshot(arguments.name, arguments.port)
     elif arguments.command == "hmp":
-        with qmp_session(arguments.port) as qmp:
+        with Machine(arguments.port).qmp() as qmp:
             print(qmp.hmp(arguments.line))
     return 0

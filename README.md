@@ -13,7 +13,7 @@ names reserve the generic QEMU lifecycle but their provisioning and guest-task s
 Omitting the platform selects DOS. This preserves a complete, immediately useful default:
 
 ```python
-machine = relict.Runner()  # equivalent to MachineConfig(platform="dos")
+machine = relict.Runner()  # uses the established default home
 ```
 
 The CLI likewise defaults to `--platform dos`. Platform-specific behavior is never inferred from an image. Future
@@ -318,8 +318,9 @@ Run `relict --help` or `relict COMMAND --help` for the complete current syntax.
 
 ## Python usage
 
-The same operations are available as Python functions. `start()` always returns the selected QMP port; pass it to later
-calls so ownership is explicit in programmatic workflows:
+The Python interface exposes the selected interaction adapter directly.
+`start()` always returns the selected QMP port; construct the adapter with it
+so ownership is explicit in programmatic workflows:
 
 ```python
 import os
@@ -331,15 +332,27 @@ stage = os.path.join(relict.drives_dir(), "hdd")
 os.makedirs(stage, exist_ok=True)
 shutil.copy("MYPROG.EXE", stage)
 port = relict.start()
+machine = relict.Machine(port)
+guest = relict.AgentlessGuestExec(machine)
 
 try:
-    relict.boot_to_dos(port=port)
-    relict.run_command("c:", port=port)
-    relict.run_command("myprog.exe > result.log", port=port)
+    guest.wait_ready()
+    guest.execute("c:", timeout=15)
+    guest.execute("myprog.exe > result.log")
     print("\n".join(relict.screen_text(port=port)))
     relict.screenshot("after-test", port=port)
 finally:
     relict.stop(port=port)
+```
+
+`Machine.qmp()` exposes the identity-verified QMP session when a caller needs
+raw monitor access. The yielded QEMU session provides both `cmd()` for QMP and
+`hmp()` for human-monitor commands:
+
+```python
+with machine.qmp() as qmp:
+    status = qmp.cmd("query-status")
+    blocks = qmp.hmp("info block")
 ```
 
 ### Running a guest program end to end
@@ -353,34 +366,39 @@ log = relict.run_guest_program("TESTS.EXE", args="-v")
 print(log)
 ```
 
-The executable must have a DOS 8.3 `.EXE` filename. relict attaches no meaning to the output — interpreting it (for
+For the DOS platform, the executable must have an 8.3 `.EXE` filename. This is a DOS workflow policy, not a
+restriction on guest-program workflows for other platforms. relict attaches no meaning to the output — interpreting it (for
 example, parsing test-framework results) is the caller's job.
 
 ### Embedding relict as a runner
 
-Callers that manage many isolated runs (test harnesses, CI drivers) can use the `Runner` surface instead of the
-module-level functions. A `Runner` constructed with a `MachineConfig` is a configured DOS *test machine*: it carries
-configuration only — never per-run state, which lives under a home directory passed explicitly to each operation — so
-one machine can serve concurrent runs in distinct homes, each with its own VM state and staging:
+Callers that manage isolated runs (test harnesses, CI drivers) can use the `Runner` surface instead of the module-level
+functions. A `Runner` is a configured DOS *test machine* bound to one home directory, which contains its drives,
+staging, diagnostics, and VM identity:
 
 ```python
-machine = relict.Runner(relict.MachineConfig(
-    platform="dos", boot_floppy_image="msdos-boot.img", timeout=120))
+machine = relict.Runner(
+    "run-42",
+    relict.MachineConfig(
+        platform="dos",
+        timeout=120,
+    ),
+)
 
-machine.provision("cache/drives")                    # ensure something bootable is declared (never overwrites)
-log = machine.run("TESTS.EXE", "-v", home="run-42")  # boots the run-42/drives machine; state stays under run-42/
+log = machine.run("TESTS.EXE", "-v")
 ```
 
-`provision()` keeps a present bootable image, copies the configured `boot_floppy_image` or `boot_hdd_image` (at most
-one; the field declares the media type) to its media-typed stem — `floppy` or `hdd`, keeping the image's own
-extension — or installs the downloaded FreeDOS default.
-`run()` is `run_guest_program()` with the home explicit; when `home/drives` declares nothing bootable it provisions
-per the config first. `staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
+Media is declared by name under the runner's `drives/` directory; for example, place a custom boot floppy at
+`run-42/drives/floppy.img` before constructing or running the machine. `run()` keeps present bootable media and, for
+an empty DOS home, installs the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle
+under the runner's home. `staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or
 `drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged
 drive, one letter later per hard-disk slot before it (lower letters are rejected). Every
-`MachineConfig` field has a working default, so `relict.Runner()` alone is a complete FreeDOS
-machine. The same explicit `home=` keyword is available on the module-level functions (`download`, `start`, `stop`,
+`MachineConfig` field has a working default, so `relict.Runner()` is a complete FreeDOS machine using the established
+default home. Pass `home=` to select another one, and create separate runners with separate homes for concurrent runs.
+The same explicit `home=` keyword is available on the
+module-level functions (`download`, `start`, `stop`,
 `run_guest_program`, and the path helpers) and overrides the process-global home per call.
 
 ## Troubleshooting

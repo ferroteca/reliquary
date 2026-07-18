@@ -5,8 +5,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Guest communication design
 
-Status: bootstrap direction established; implementation details remain open.
-No implementation is implied by this document.
+Status: bootstrap direction established. The `GuestExec` protocol, isolated
+agentless adapter, and its use by the DOS workflow are implemented; later
+adapters and their implementation details remain open. This document does not
+by itself authorize further implementation.
 
 ## Purpose
 
@@ -232,9 +234,12 @@ carriers and endpoints around that shared implementation. The agentless
 adapter has a genuinely different implementation behind the same execution
 interface.
 
-The `GuestExec` interface must cover readiness and one execution's request,
-deadline, completion, and result semantics without exposing QGA transport
-objects. Its exact Python shape remains an implementation-design decision.
+`GuestExec` is currently a runtime-checkable `typing.Protocol` with
+`wait_ready(timeout)` and `execute(command, timeout)`. The first implementation
+models the readiness and command-completion semantics already available from
+the agentless DOS workflow. Before a QGA adapter is added, extend this narrow
+interface with deliberate request and result types covering deadlines,
+completion, output, and exit status without exposing QGA transport objects.
 Adapter-specific limitations, such as unavailable exit status or separate
 standard-error capture, must be explicit capabilities or result states rather
 than invented values.
@@ -317,10 +322,20 @@ The list is a design inventory, not a commitment to six public classes. Add a
 seam only when two real adapters need to satisfy the same workflow capability.
 Until then, keep adapter details private to their platform workflow.
 
-In particular, screenshots should remain available through the machine/QMP
-layer regardless of the selected guest interaction. File exchange should not
-be bundled into a console abstraction: vvfat and QGA file operations have
-different lifecycle and consistency rules.
+In particular, screenshots remain a machine-level QMP diagnostic regardless
+of the selected guest interaction. They are explicitly outside the
+`GuestExec` protocol: using QGA for execution does not affect screenshot
+availability, and an interaction adapter does not implement or advertise
+screenshots. Orchestration may capture them internally when useful, while the
+existing direct-use screenshot surface remains independent. File exchange
+should not be bundled into a console abstraction: vvfat and QGA file
+operations have different lifecycle and consistency rules.
+
+The generic `Machine` exposes its identity-verified QMP session through
+`Machine.qmp()`. Raw QMP `cmd()` and HMP `hmp()` operations remain available
+to embedding callers. Interaction adapters receive a `Machine` and use this
+public seam; they do not connect to QMP directly or duplicate monitor methods
+on their own interfaces.
 
 ## Configuration and lifecycle
 
@@ -372,21 +387,23 @@ The selected adapter and fallback decision should be visible in diagnostics.
 
 ## Recommended implementation sequence
 
-1. Name the existing keyboard/VGA composition as the agentless
-   display-console adapter internally, preserving all public functions and the
-   DOS default.
-2. Pass that adapter into the DOS workflow so DOS behavior stops importing
-   concrete keyboard and screen functions directly.
-3. Add the host QGA-profile client with explicit synchronization, readiness,
+1. **Implemented:** name the existing keyboard/VGA composition as the
+   agentless display-console adapter internally, preserving the DOS behavior
+   and default.
+2. **Implemented:** pass that adapter into the DOS workflow so DOS behavior
+   stops importing concrete keyboard and screen functions directly.
+3. **Implemented:** define the runtime-checkable `GuestExec` protocol in its
+   own module and isolate `AgentlessGuestExec` in its own source file.
+4. Add the host QGA-profile client with explicit synchronization, readiness,
    and supported-command checks.
-4. Build the minimal QGA-compatible serial listener and OS execution adapter;
+5. Build the minimal QGA-compatible serial listener and OS execution adapter;
    use the agentless workflow to stage, start, and test it.
-5. Implement the guest virtio-serial driver and move the unchanged profile
+6. Implement the guest virtio-serial driver and move the unchanged profile
    onto that carrier.
-6. Add bounded QGA file operations and further commands only as workflows
+7. Add bounded QGA file operations and further commands only as workflows
    require them.
-7. Generalize interfaces only from the adapters that now exist, keeping the
-   public runner surface additive and backward compatible.
+8. Generalize interfaces only from the adapters that now exist. The project is
+   pre-release, so prefer a coherent interface over compatibility shims.
 
 ## Decisions still needed
 

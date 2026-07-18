@@ -5,17 +5,13 @@
 import hashlib
 import os
 import re
-import time
 import urllib.request
 import zipfile
 
 from .home import drives_dir
-from .lifecycle import qmp_session
-from .machine import screen_text, send_text
 from .media import boot_guess, scan_drives
 
 
-_PROMPT_RE = re.compile(r"^[A-Z]:(\\[^>]*)?>$")
 _FREEDOS_ZIP_URL = (
     "https://download.freedos.org/1.4/FD14-FloppyEdition.zip")
 _FREEDOS_ZIP_SHA256 = (
@@ -24,41 +20,12 @@ _FREEDOS_ZIP_SHA256 = (
 _FREEDOS_BOOT_IMG = "144m/x86BOOT.img"
 
 
-def run_command(command, timeout=120, port=None, home=None):
-    """Type a DOS command and wait for the prompt to return."""
-    with qmp_session(port, home) as qmp:
-        send_text(command, qmp)
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            rows = [row for row in screen_text(qmp) if row]
-            if rows and _PROMPT_RE.match(rows[-1]):
-                return
-            time.sleep(2)
-    raise TimeoutError(
-        f"timed out after {timeout}s waiting for command to finish: "
-        f"{command}")
-
-
-def boot_to_dos(timeout=90, port=None, home=None):
-    """Wait for a DOS prompt, declining the FreeDOS installer."""
-    print("waiting for a DOS prompt...")
-    installer_seen = False
-    with qmp_session(port, home) as qmp:
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            rows = [row for row in screen_text(qmp) if row]
-            if rows and _PROMPT_RE.match(rows[-1]):
-                print(f"at DOS prompt: {rows[-1]}")
-                return
-            if (not installer_seen
-                    and any("Do you want to proceed" in row
-                            for row in rows)):
-                installer_seen = True
-                print("FreeDOS installer detected; declining the install...")
-                send_text("n", qmp)
-            time.sleep(2)
-    raise TimeoutError(
-        f"timed out after {timeout}s waiting for a DOS prompt")
+def program_name(path):
+    """Return the DOS command name for a supported executable path."""
+    name = os.path.basename(path)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,8}\.[Ee][Xx][Ee]", name):
+        raise ValueError(f"guest executable needs a DOS 8.3 name: {name}")
+    return name
 
 
 def _sha256(path):

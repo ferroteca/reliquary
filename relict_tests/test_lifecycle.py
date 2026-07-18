@@ -117,7 +117,7 @@ class LifecycleTests(unittest.TestCase):
             port = relict.start(qemu="qemu")
 
         self.assertEqual(port, 54321)
-        self.assertEqual(relict._read_vm_state(), {
+        self.assertEqual(lifecycle_module.read_vm_state(), {
             "port": 54321,
             "name": "relict-0123456789ab",
             "pid": 1234,
@@ -241,7 +241,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(port, 54321)
 
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
-        relict._write_vm_state(54321, "relict-expected", 1234)
+        lifecycle_module.write_vm_state(
+            54321, "relict-expected", 1234)
         _FakeQmp.name = "unrelated-vm"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
@@ -249,7 +250,7 @@ class LifecycleTests(unittest.TestCase):
                 relict.stop()
 
         self.assertEqual(_FakeQmp.commands, ["query-name"])
-        self.assertIsNotNone(relict._read_vm_state())
+        self.assertIsNotNone(lifecycle_module.read_vm_state())
 
     def test_start_rejects_explicit_occupied_port_before_launch(self):
         with mock.patch.object(lifecycle_module, "port_in_use",
@@ -257,7 +258,7 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "explicit"):
                 relict.start(qemu="qemu", port=54321)
 
-        self.assertIsNone(relict._read_vm_state())
+        self.assertIsNone(lifecycle_module.read_vm_state())
 
     def test_start_terminates_child_on_identity_mismatch(self):
         self._write_boot_image()
@@ -278,7 +279,7 @@ class LifecycleTests(unittest.TestCase):
                 relict.start(qemu="qemu")
 
         self.assertTrue(proc.terminated)
-        self.assertIsNone(relict._read_vm_state())
+        self.assertIsNone(lifecycle_module.read_vm_state())
 
 
 if __name__ == "__main__":

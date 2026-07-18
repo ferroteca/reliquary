@@ -22,7 +22,7 @@ YAML.
 Machine configuration includes the existing runner settings and the new
 hardware settings:
 
-- platform, workflow timeout, DOS staging letter, and provisioning images;
+- platform, workflow timeout, DOS staging letter, and drive sources;
 - QEMU executable, machine type, machine properties, and extra arguments; and
 - declared drive sources and per-drive mount options.
 
@@ -45,8 +45,8 @@ complete zero-configuration behavior:
 
 Thus `relict start` against an empty home still produces a bootable FreeDOS
 machine. Programmatic use has the equivalent baseline: `Runner()` carries
-`MachineConfig()` defaults and provisions the FreeDOS image under the explicit
-run home when no bootable drive is declared. Present drives are never
+`MachineConfig()` defaults, resolves the established default home, and provisions the FreeDOS image there
+when no bootable drive is declared. Present drives are never
 overwritten.
 
 ### Local command-line use
@@ -112,7 +112,7 @@ config = relict.MachineConfig(
     platform="win9x",
     drives={"hdd_0": "images/windows-98.qcow2"},
 )
-machine = relict.Runner(config)
+machine = relict.Runner("run-home", config)
 ```
 
 For any platform whose workflow is complete, a platform and one bootable
@@ -150,11 +150,11 @@ The configuration describes a machine, not behavior of the `Runner` object.
 The public name is `MachineConfig`; it should be extended with the hardware
 settings in this document.
 
-`Runner` continues to accept the configuration as its sole constructor
-argument:
+`Runner` accepts an optional persistent home followed by the optional configuration. An omitted home resolves the
+established process default once at construction:
 
 ```python
-machine = relict.Runner(relict.MachineConfig(...))
+machine = relict.Runner("run-home", relict.MachineConfig(...))
 ```
 
 There should not also be a public `MachineSpec`: two nearly synonymous values
@@ -184,7 +184,7 @@ The first file schema is:
   "qemu_args": ["-cpu", "486", "-m", "32"],
   "drives": {
     "hdd_0": {
-      "image": "../images/dos.qcow2",
+      "source": "../images/dos.qcow2",
       "options": {
         "snapshot": true,
         "cache": "writeback"
@@ -196,7 +196,7 @@ The first file schema is:
       }
     },
     "cdrom_0": {
-      "image": "../images/tools.iso",
+      "source": "../images/tools.iso",
       "options": {
         "readonly": true
       }
@@ -212,9 +212,8 @@ wrong type fail with an error that includes the configuration path, such as
 machine.
 
 The current `MachineConfig` fields retain their names and meanings:
-`platform`, `boot_floppy_image`, `boot_hdd_image`, `staged_drive`, `timeout`,
-`qemu`, and `qemu_args`. JSON arrays normalize to immutable tuples where
-appropriate.
+`platform`, `staged_drive`, `timeout`, `qemu`, and `qemu_args`. JSON arrays
+normalize to immutable tuples where appropriate.
 
 `qemu_machine` supplies the QEMU `-machine` type. The optional
 `qemu_machine_options` mapping contributes comma-separated properties to the
@@ -235,14 +234,14 @@ remain visible in the drive inventory described below.
 The effective drive inventory is the union of:
 
 - media declared by filename under `<home>/drives`; and
-- drives with an explicit `image` in `MachineConfig.drives`.
+- drives with an explicit `source` in `MachineConfig.drives`.
 
 The configuration uses logical slot names: `floppy_0` through `floppy_1`,
 `hdd_0` through `hdd_3`, and ordered `cdrom_0` through `cdrom_3`. The existing
 unindexed filesystem names still mean slot zero, so `drives/hdd.qcow2` and the
 configuration key `hdd_0` refer to the same logical slot.
 
-For the common case, a drive value may be an image path directly:
+For the common case, a drive value may be a source path directly:
 
 ```json
 {
@@ -254,13 +253,19 @@ For the common case, a drive value may be an image path directly:
 }
 ```
 
-This is shorthand for `{"image": "../images/windows-98.qcow2"}`. Python also
+This is shorthand for `{"source": "../images/windows-98.qcow2"}`. Python also
 accepts a path-like value. A drive uses the object form only when it needs
 mount options or future per-drive settings. Both forms normalize to the same
 immutable drive entry before validation.
 
+The resolved source path determines how it is attached. For a floppy or hard-
+disk slot, a regular file is a QEMU disk image and a directory is a vvfat
+staging drive. A CD-ROM source must be a regular image file; a directory is an
+error because vvfat does not provide ISO9660 CD-ROM semantics. Callers do not
+select vvfat with a separate option.
+
 A slot may have only one source. If a configuration supplies
-`drives.hdd_0.image` while `<home>/drives` contains `hdd.img`, `hdd_0.qcow2`,
+`drives.hdd_0.source` while `<home>/drives` contains `hdd.img`, `hdd_0.qcow2`,
 or another slot-zero hard disk, resolution fails before QEMU starts. relict
 never chooses one source by precedence.
 
@@ -271,13 +276,13 @@ staging directory, or launching QEMU. The conflict rules are:
 |---|---|---|
 | `drives/hdd.qcow2` | no `hdd_0` entry | mount the filesystem image |
 | `drives/hdd.qcow2` | `hdd_0` options only | mount it with those options |
-| `drives/hdd.qcow2` | `hdd_0.image` set | error: two sources claim `hdd_0` |
-| no slot-zero hard disk | `hdd_0.image` set | mount the configured image |
+| `drives/hdd.qcow2` | `hdd_0.source` set | error: two sources claim `hdd_0` |
+| no slot-zero hard disk | `hdd_0.source` set | mount the configured source |
 | no slot-zero hard disk | `hdd_0` options only | error: options have no source |
 
 Two source declarations are an error even if their normalized paths happen to
 be equal. A caller that wants to tune an image already declared under
-`drives/` must omit `image` from the configured entry. This keeps the source
+`drives/` must omit `source` from the configured entry. This keeps the source
 of every slot unambiguous and prevents precedence from changing after one path
 is edited.
 
@@ -286,36 +291,36 @@ This supports reusable images without copying them into every relict home:
 ```python
 config = relict.MachineConfig(drives={
     "hdd_0": {
-        "image": r"D:\vm-images\dos.qcow2",
+        "source": r"D:\vm-images\dos.qcow2",
         "options": {"snapshot": True},
     },
 })
 ```
 
-An explicit image is mounted in place. relict does not copy, overwrite,
-provision, truncate, or delete it. QEMU may write to it unless its options make
-the mount read-only or transient. Callers should use `snapshot: true` when
-several runs share a mutable base image, or `readonly: true` when no writes are
-needed. An explicitly writable external image is caller-owned persistent
-state; selecting it is an intentional exception to relict-created state being
-contained under the home.
+An explicit source is mounted in place. relict does not copy, overwrite,
+provision, truncate, or delete it. QEMU may write to an image source unless
+its options make the mount read-only or transient. Callers should use
+`snapshot: true` when several runs share a mutable base image, or
+`readonly: true` when no writes are needed. An explicitly writable external
+source is caller-owned persistent state; selecting it is an intentional
+exception to relict-created state being contained under the home.
 
-Relative image paths in `machine.json` are resolved from the directory
-containing that file. Relative image paths passed through a Python mapping are
+Relative source paths in `machine.json` are resolved from the directory
+containing that file. Relative source paths passed through a Python mapping are
 resolved from the current directory when the mapping is normalized. A
 constructed `MachineConfig` stores normalized absolute paths, so later runs do
 not reinterpret them relative to another working directory.
 
-The existing `boot_floppy_image` and `boot_hdd_image` fields retain their
-provisioning meaning: when no bootable source is declared, `provision()` copies
-one of those images into the target `drives/` directory. An image under the
-new `drives` mapping is different: it is already a declared machine drive and
-is mounted directly. This distinction preserves existing callers while
-allowing intentionally shared images.
+There are no special `boot_floppy_image` or `boot_hdd_image` shortcuts. A
+source under the `drives` mapping is a declared machine drive and is mounted
+directly, using the same inventory model as media declared under the home.
+Boot selection is derived from that inventory unless an explicit boot-order
+setting overrides it. When a DOS machine declares no bootable media, the
+verified FreeDOS fallback remains an automatic platform behavior.
 
 ## Per-drive mount options
 
-A configured drive entry may omit `image` and contain only `options`. It then
+A configured drive entry may omit `source` and contain only `options`. It then
 augments the filesystem declaration for that logical slot. If no source for
 that slot exists, an options-only entry is an error rather than a declaration
 of an empty drive.
@@ -363,19 +368,19 @@ not depend on where a command happened to be launched.
 `MachineConfig` gains `qemu_machine`, `qemu_machine_options`, and `drives`
 fields. Its constructor accepts mappings for the two structured fields, copies
 and deeply normalizes them, expands drive-path shorthand, and retains
-immutable values. Instances continue to carry configuration only; all per-run
-VM state remains under the explicit home.
+immutable values. A runner binds the normalized configuration to one absolute
+home; all VM state remains under that home.
 
 For example:
 
 ```python
-machine = relict.Runner(relict.MachineConfig(
+machine = relict.Runner("run-home", relict.MachineConfig(
     platform="dos",
     qemu_machine="pc",
     qemu_args=("-cpu", "486"),
     drives={
         "hdd_0": {
-            "image": "images/dos.qcow2",
+            "source": "images/dos.qcow2",
             "options": {"snapshot": True},
         },
     },
@@ -467,7 +472,7 @@ source, medium, or slot.
 
 Configuration is fully validated before a QEMU process is created. Errors
 identify the selected file when applicable and the failing configuration
-path. Missing external images, slot conflicts, forbidden properties, and
+path. Missing external sources, slot conflicts, forbidden properties, and
 invalid option types therefore fail before launch.
 
 The startup diagnostic retains the complete argument vector using safe
@@ -487,7 +492,7 @@ Implementation should proceed in independently verifiable steps:
 1. Add JSON loading, validation, immutable normalization, and path-resolution
    tests.
 2. Add configured-source and per-drive option composition tests, including
-   external images, same-path and different-path logical slot clashes,
+   external sources, same-path and different-path logical slot clashes,
    reserved keys, missing sources, staged directories, and read-only staging
    failures. Conflict tests must prove that no provisioning or process launch
    occurs after resolution fails.

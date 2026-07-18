@@ -6,6 +6,17 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ## [Unreleased]
 
+### Changed
+
+- Added an internal, runtime-checkable `GuestExec` protocol and isolated the
+  QMP keyboard/VGA implementation as `AgentlessGuestExec`, with the DOS
+  workflow and CLI consuming that adapter directly. The former
+  `boot_to_dos()` and `run_command()` Python facades were removed; use
+  `AgentlessGuestExec.wait_ready()` and `.execute()`.
+- Exposed the identity-verified QMP session through `Machine.qmp()` for raw
+  `cmd()` and `hmp()` access; interaction adapters now depend on `Machine`
+  instead of opening QMP connections themselves.
+
 ### Added
 
 - Package-based `relict/` source layout split into home containment, declared media, ownership-safe lifecycle, generic
@@ -14,13 +25,16 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 - The complete DOS runner from the original implementation: DOS remains the default platform, while
   `MachineConfig(platform=...)` and `--platform` make the platform choice explicit. The reusable QEMU machine layer is
   shared; unimplemented non-DOS platform workflows fail explicitly instead of borrowing DOS assumptions.
-- `Runner`/`MachineConfig`: the generic embedding surface for callers driving relict as a runner. A
-  `Runner(MachineConfig(...))` instance is a configured DOS test machine — configuration only, no per-run state — with
-  `provision(drives_dir)` (ensure something bootable is declared under `drives_dir`: keep a present bootable image,
-  copy the configured `boot_floppy_image` or `boot_hdd_image` to its media-typed stem keeping the image's own
-  extension, or install the FreeDOS default; never overwrites) and `run(exe_path, args, home)` (the full
-  `run_guest_program()` lifecycle with the home explicit). Concurrent runs in distinct homes are safe; per-home
-  `vm.json` keeps VM ownership sound.
+- DOS 8.3 executable-name validation now belongs to the DOS platform module rather than generic workflow
+  orchestration, so future guest-program workflows are not constrained by DOS naming rules.
+- `Runner`/`MachineConfig`: the generic embedding surface for callers driving relict as a runner.
+  `Runner(home=None, config=None)` is a configured DOS test machine bound to one absolute home (the established
+  process default when omitted), and
+  `run(exe_path, args)` automatically ensures bootable media before performing the full `run_guest_program()`
+  lifecycle. Provisioning is private; callers create distinct runners with distinct homes for concurrent runs, and
+  per-home `vm.json` keeps VM ownership sound.
+- Removed the `boot_floppy_image` and `boot_hdd_image` configuration shortcuts. Custom boot media uses the ordinary
+  declared-drive inventory; an empty DOS home still receives the verified FreeDOS fallback automatically.
 - The `drives/` directory under the home declares the whole machine by filename, with image content never
   interrogated. Image files `floppy[_<n>].<ext>` (slots 0–1, A: and B:), `hdd[_<n>].<ext>` (slots 0–3, the IDE bus),
   and `cdrom[_<n>].<ext>` (the IDE slots after the hard disks) mount as that medium; bare directories `floppy[_<n>]`
@@ -65,6 +79,6 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   `start()`, active-VM metadata under the relict home for separate CLI invocations, and unique-name verification
   before any VM is controlled.
 - DOS startup commands such as switching to C: use the ordinary
-  `run_command()` scripting interface rather than special boot options.
+  `AgentlessGuestExec.execute()` interface rather than special boot options.
 - Screenshot names are constrained to filenames so captured images cannot be written outside the relict home.
 - The installable test suite uses Python 3.9-compatible syntax, matching the package's declared minimum version.

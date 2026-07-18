@@ -10,18 +10,21 @@ relict is deliberately a small Python package. It is a generic QEMU runner with 
 complete platform workflow:
 
 - `relict/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
-  containment, `media.py` parses declared drives, `lifecycle.py` owns QMP and QEMU processes, `machine.py` provides
-  platform-neutral agentless interaction, `platform_dos.py` implements DOS behavior, `workflows.py` orchestrates
-  configured runs, `cli.py` owns command parsing, and `__main__.py` preserves `python -m relict` execution.
+  containment, `media.py` parses declared drives, `lifecycle.py` owns QMP and QEMU processes, `interaction.py` defines
+  capability protocols, `interaction_agentless.py` contains the concrete agentless DOS adapter, `machine.py` provides
+  platform-neutral QMP interaction and diagnostics, `platform_dos.py` owns DOS provisioning,
+  facades, `workflows.py` orchestrates configured runs, `cli.py` owns command parsing, and `__main__.py` preserves
+  `python -m relict` execution.
 - `pyproject.toml` packages `relict` as the `relict` command and includes the installable `relict_tests` test
   package.
 - `relict_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, and lifecycle ownership.
+- `design/` contains maintainer-facing design documents for planned interfaces and architecture.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
-real interface or maintenance seam justifies it. The package root remains a compatibility facade, not an implementation
-module.
+real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no
+implementation.
 
 ## Required invariants
 
@@ -73,6 +76,11 @@ Never send a control command to a QMP server until its identity is verified.
 against that record. Identity mismatches fail closed; in particular,
 `stop()` must never send `quit` to an unrelated VM.
 
+`Machine.qmp()` is the public raw-monitor seam. It yields the
+identity-verified QMP session, whose `cmd()` and `hmp()` methods remain
+available to callers. Interaction adapters receive a `Machine` and must use
+this seam rather than opening QMP connections directly.
+
 When `port=None`, `start()` selects an available local port. An explicit port must be free. Startup failure and timeout
 paths must terminate the child so they cannot leave an untracked QEMU process.
 
@@ -99,11 +107,11 @@ fetches the FreeDOS 1.4 FloppyEdition archive with SHA-256 verification, install
 The FreeDOS fallback floppy is minimal — kernel and FreeCOM only. Workflows may rely on shell built-ins, but external
 DOS utilities must be staged on drive C: like any other guest file.
 
-`boot_to_dos()` only waits out the boot process to a native DOS prompt, detected generically as a bare prompt on the
-bottom-most non-blank screen row. The one distribution-specific behavior is recognizing the FreeDOS 1.4 installer and
-declining the installation to reach `A:\>`; user-provided images must boot to a prompt unattended. Do not add special
-boot parameters for ordinary DOS commands. Drive changes, directory changes, environment variables, and program
-invocations belong in `run_command()` scripting.
+`AgentlessGuestExec.wait_ready()` only waits out the boot process to a native DOS prompt, detected generically as a
+bare prompt on the bottom-most non-blank screen row. The one distribution-specific behavior is recognizing the
+FreeDOS 1.4 installer and declining the installation to reach `A:\>`; user-provided images must boot to a prompt
+unattended. Do not add special boot parameters for ordinary DOS commands. Drive changes, directory changes,
+environment variables, and program invocations belong in `AgentlessGuestExec.execute()` scripting.
 
 Higher-level workflows may issue those ordinary commands internally. For example, `run_guest_program()` runs `c:` before
 invoking the staged executable.
@@ -118,13 +126,14 @@ Staged directories are declared under `drives/` like any other drive: `hdd[_<n>]
 
 ## Guest program runs
 
-`run_guest_program()` is the one-shot lifecycle: stage a DOS executable on the staged guest drive, boot, run it with
+`run_guest_program()` is the one-shot lifecycle: stage an executable on the staged guest drive, boot, run it with
 its output redirected to a log on that drive, stop, and return the log text. Staging targets the highest staged
 directory declared among the hard-disk slots, or `drives/hdd` (the first free slot) created on demand
 (`_staged_hdd_plan()`). The guest assigns drive letters by disk order, so `staged_drive` is the caller declaring
 where that drive appears; its default assumes one letter per hard-disk slot before the staged one (C: when none
 precede it), and letters below the default are rejected. relict uses the letter only for the drive-switch
-command. relict attaches no meaning to that output — test-framework semantics (
+command. The current DOS platform validates its own 8.3 `.EXE` naming requirement in `platform_dos.py`; generic
+workflow orchestration must not impose that rule on other platforms. relict attaches no meaning to that output — test-framework semantics (
 command-line flags, result parsing) belong to consuming projects. The CppUTest adapter that used to live here was
 removed to enforce that boundary; do not reintroduce framework-specific code. Refer to consumers only in the general
 instructional sense ("the caller", "consuming projects", generic usage examples) — never name specific downstream
@@ -132,18 +141,19 @@ projects; relict stays ignorant of who builds on it.
 
 ## The runner surface
 
-`Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a `Runner(config)` instance
-is a configured QEMU test machine exposing `platform` (default "dos"), `config` (frozen dataclass: `platform`, `boot_floppy_image`,
-`boot_hdd_image` (at most one — the field declares the media type), `staged_drive`, `timeout`, `qemu`, `qemu_args`;
-every field has a working default), `provision(drives_dir)` (ensure something bootable is declared under
-`drives_dir` — keep a present bootable image, copy the configured one to its media-typed well-known stem, or install
-the FreeDOS default; never overwrite), and
-`run(exe_path, args, home)` (`run_guest_program()` with the home explicit; provisions `home/drives` per the config
-when nothing bootable is declared). Invariants to preserve: instances carry configuration only — per-run state lives under the
-explicitly passed home, making concurrent runs in distinct homes safe (per-home `vm.json` keeps VM ownership sound);
-the explicit `home=` path must never fall back to the process-global home (`test_runner.py` guards this by making
-`home()` unreachable); the surface stays additive — the module-level functions and CLI remain the direct-use
-surface. Keep the signatures stable: callers rely on these exact names and parameters structurally.
+`Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a
+`Runner(home=None, config=None)` instance is a configured QEMU test machine bound to one absolute `home`, exposing
+`platform` (default "dos") and `config` (frozen dataclass: `platform`, `staged_drive`, `timeout`, `qemu`, `qemu_args`;
+every field has a working default), and `run(exe_path, args)`. `run()` privately ensures that `home/drives` declares
+something bootable — keep present declared media or install the FreeDOS default; never overwrite — before invoking
+`run_guest_program()` with the runner's home explicit. Machine configuration has no special boot-image fields: custom
+media is declared through the same drive inventory as every other image.
+There is no public provisioning step. An omitted home resolves the established process default once at construction.
+Invariants to preserve: all state for an instance lives under its resolved constructor home; concurrent runs use
+distinct `Runner` instances with distinct homes (per-home `vm.json` keeps VM ownership
+sound); the stored home must never fall back to the process-global home (`test_runner.py` guards this by making
+`home()` unreachable). The project is pre-release; prefer a coherent interface over compatibility shims when its
+architecture changes.
 
 ## Dependencies and style
 

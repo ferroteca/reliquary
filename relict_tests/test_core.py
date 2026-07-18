@@ -23,8 +23,11 @@ except ModuleNotFoundError:
     sys.modules["qemu.qmp"] = qmp
 
 import relict
+from relict import interaction as interaction_module
+from relict import interaction_agentless as agentless_module
 from relict import lifecycle as lifecycle_module
 from relict import machine as machine_module
+from relict import media as media_module
 from relict import platform_dos as platform_dos_module
 from relict import workflows as workflows_module
 
@@ -47,38 +50,40 @@ class HomeTests(unittest.TestCase):
         for letter in ("A", "B", "CC", "1", ""):
             with self.assertRaisesRegex(ValueError, "staged_drive",
                                         msg=letter):
-                relict._check_staged_drive(letter)
+                media_module.check_staged_drive(letter)
 
     def test_vm_state_round_trip(self):
-        relict._write_vm_state(54321, "relict-test", 1234)
+        lifecycle_module.write_vm_state(54321, "relict-test", 1234)
 
-        self.assertEqual(relict._read_vm_state(), {
+        self.assertEqual(lifecycle_module.read_vm_state(), {
             "port": 54321,
             "name": "relict-test",
             "pid": 1234,
         })
-        self.assertFalse(os.path.exists(relict._state_path() + ".part"))
+        self.assertFalse(os.path.exists(
+            lifecycle_module.state_path() + ".part"))
 
     def test_invalid_vm_state_is_rejected(self):
         os.makedirs(self.tempdir.name, exist_ok=True)
-        with open(relict._state_path(), "w", encoding="utf-8") as state:
+        with open(lifecycle_module.state_path(), "w",
+                  encoding="utf-8") as state:
             json.dump({"port": True, "name": "relict-test"}, state)
 
         with self.assertRaisesRegex(RuntimeError, "invalid relict VM state"):
-            relict._read_vm_state()
+            lifecycle_module.read_vm_state()
 
     def test_remove_vm_state_requires_matching_identity(self):
-        relict._write_vm_state(54321, "relict-test", 1234)
+        lifecycle_module.write_vm_state(54321, "relict-test", 1234)
 
-        relict._remove_vm_state(54321, "another-vm")
-        self.assertIsNotNone(relict._read_vm_state())
+        lifecycle_module.remove_vm_state(54321, "another-vm")
+        self.assertIsNotNone(lifecycle_module.read_vm_state())
 
-        relict._remove_vm_state(54321, "relict-test")
-        self.assertIsNone(relict._read_vm_state())
+        lifecycle_module.remove_vm_state(54321, "relict-test")
+        self.assertIsNone(lifecycle_module.read_vm_state())
 
     def test_resolve_vm_rejects_unrecorded_explicit_port(self):
         with self.assertRaisesRegex(RuntimeError, "not the recorded"):
-            relict._resolve_vm(54321)
+            lifecycle_module.resolve_vm(54321)
 
     def _write_drive_file(self, name, data=b"dos"):
         os.makedirs(relict.drives_dir(), exist_ok=True)
@@ -127,7 +132,7 @@ class HomeTests(unittest.TestCase):
         self._write_drive_file("FD14-FloppyEdition.zip")
         self._write_drive_file("other.img")
 
-        media = relict._scan_drives(relict.drives_dir())
+        media = media_module.scan_drives(relict.drives_dir())
 
         self.assertEqual(media["floppy"], {0: (floppy, False)})
         self.assertEqual(media["hdd"], {1: (hdd, True)})
@@ -138,46 +143,47 @@ class HomeTests(unittest.TestCase):
         self._write_drive_file("hdd_0.vmdk")
 
         with self.assertRaisesRegex(RuntimeError, "slot clash"):
-            relict._scan_drives(relict.drives_dir())
+            media_module.scan_drives(relict.drives_dir())
 
     def test_an_image_and_a_directory_clash_on_the_same_slot(self):
         self._write_drive_file("floppy.img")
         self._make_drive_dir("floppy_0")
 
         with self.assertRaisesRegex(RuntimeError, "slot clash"):
-            relict._scan_drives(relict.drives_dir())
+            media_module.scan_drives(relict.drives_dir())
 
     def test_cdrom_directories_are_rejected(self):
         self._make_drive_dir("cdrom")
 
         with self.assertRaisesRegex(RuntimeError, "ISO9660"):
-            relict._scan_drives(relict.drives_dir())
+            media_module.scan_drives(relict.drives_dir())
 
     def test_out_of_range_slots_are_rejected(self):
         self._write_drive_file("floppy_2.img")
 
         with self.assertRaisesRegex(RuntimeError, "slots run"):
-            relict._scan_drives(relict.drives_dir())
+            media_module.scan_drives(relict.drives_dir())
 
 
 class InputAndScreenTests(unittest.TestCase):
     def test_character_key_mappings(self):
-        self.assertEqual(relict._char_keys("a"), ["a"])
-        self.assertEqual(relict._char_keys("A"), ["shift", "a"])
-        self.assertEqual(relict._char_keys(":"), ["shift", "semicolon"])
-        self.assertEqual(relict._char_keys(" "), ["spc"])
+        self.assertEqual(agentless_module.char_keys("a"), ["a"])
+        self.assertEqual(agentless_module.char_keys("A"), ["shift", "a"])
+        self.assertEqual(agentless_module.char_keys(":"),
+                         ["shift", "semicolon"])
+        self.assertEqual(agentless_module.char_keys(" "), ["spc"])
 
     def test_unmapped_character_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "no key mapping"):
-            relict._char_keys("\N{SNOWMAN}")
+            agentless_module.char_keys("\N{SNOWMAN}")
 
     def test_send_text_builds_qcode_combinations(self):
-        with mock.patch.object(machine_module, "send_keys") as send_keys:
-            relict.send_text("A:", port=54321)
+        console = agentless_module._DisplayConsole(54321)
+        with mock.patch.object(console, "send_keys") as send_keys:
+            console.send_text("A:")
 
         send_keys.assert_called_once_with(
-            [["shift", "a"], ["shift", "semicolon"], ["ret"]],
-            54321)
+            [["shift", "a"], ["shift", "semicolon"], ["ret"]])
 
     def test_screen_text_extracts_characters_and_ignores_attributes(self):
         cells = []
@@ -203,16 +209,18 @@ class InputAndScreenTests(unittest.TestCase):
 
 class BootToDosTests(unittest.TestCase):
     def test_reaches_an_existing_prompt_without_typing(self):
-        with mock.patch.object(platform_dos_module, "qmp_session") as connection, \
+        console = mock.Mock()
+        console.screen_text.return_value = ["A:\\>"] + [""] * 24
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
                 mock.patch.object(
-                    platform_dos_module, "screen_text",
-                    return_value=["A:\\>"] + [""] * 24), \
-                mock.patch.object(machine_module, "send_keys") as send_keys, \
-                mock.patch.object(platform_dos_module.time, "sleep"):
+                    agentless_module, "_DisplayConsole",
+                    return_value=console), \
+                mock.patch.object(agentless_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
-            relict.boot_to_dos()
+            agentless_module.AgentlessGuestExec(
+                machine_module.Machine()).wait_ready()
 
-        send_keys.assert_not_called()
+        console.send_text.assert_not_called()
 
     def test_declines_the_freedos_installer(self):
         qmp = mock.Mock()
@@ -223,22 +231,67 @@ class BootToDosTests(unittest.TestCase):
              "The installation of FreeDOS 1.4 has been aborted.",
              "A:\\>"],
         ]
-        with mock.patch.object(platform_dos_module, "qmp_session") as connection, \
-                mock.patch.object(platform_dos_module, "screen_text",
-                                  side_effect=screens), \
-                mock.patch.object(platform_dos_module, "send_text") as send_text, \
-                mock.patch.object(platform_dos_module.time, "sleep"):
+        console = mock.Mock()
+        console.screen_text.side_effect = screens
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
+                mock.patch.object(
+                    agentless_module, "_DisplayConsole",
+                    return_value=console), \
+                mock.patch.object(agentless_module.time, "sleep"):
             connection.return_value.__enter__.return_value = qmp
-            relict.boot_to_dos()
+            agentless_module.AgentlessGuestExec(
+                machine_module.Machine()).wait_ready()
 
-        send_text.assert_called_once_with("n", qmp)
+        console.send_text.assert_called_once_with("n")
 
     def test_times_out_without_a_prompt(self):
-        with mock.patch.object(platform_dos_module, "qmp_session") as connection, \
-                mock.patch.object(platform_dos_module.time, "sleep"):
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
+                mock.patch.object(agentless_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
             with self.assertRaisesRegex(TimeoutError, "DOS prompt"):
-                relict.boot_to_dos(timeout=0)
+                agentless_module.AgentlessGuestExec(
+                    machine_module.Machine()).wait_ready(timeout=0)
+
+
+class InteractionAdapterTests(unittest.TestCase):
+    def test_machine_exposes_an_identity_verified_qmp_session(self):
+        qmp = mock.Mock()
+        machine = machine_module.Machine(54321, "run-home")
+        with mock.patch.object(machine_module, "qmp_session") as connection:
+            connection.return_value.__enter__.return_value = qmp
+
+            with machine.qmp() as session:
+                self.assertIs(session, qmp)
+
+        connection.assert_called_once_with(54321, "run-home")
+
+    def test_package_exposes_the_protocol_and_agentless_adapter(self):
+        self.assertIs(relict.GuestExec, interaction_module.GuestExec)
+        self.assertIs(relict.AgentlessGuestExec,
+                      agentless_module.AgentlessGuestExec)
+
+    def test_agentless_adapter_satisfies_guest_exec_protocol(self):
+        adapter = agentless_module.AgentlessGuestExec(
+            machine_module.Machine())
+
+        self.assertIsInstance(adapter, interaction_module.GuestExec)
+
+
+class RunCommandTests(unittest.TestCase):
+    def test_agentless_adapter_executes_through_display_console(self):
+        qmp = mock.Mock()
+        console = mock.Mock()
+        console.screen_text.return_value = ["C:\\>"] + [""] * 24
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
+                mock.patch.object(
+                    agentless_module, "_DisplayConsole",
+                    return_value=console), \
+                mock.patch.object(agentless_module.time, "sleep"):
+            connection.return_value.__enter__.return_value = qmp
+            agentless_module.AgentlessGuestExec(
+                machine_module.Machine()).execute("dir")
+
+        console.send_text.assert_called_once_with("dir")
 
 
 class GuestProgramTests(unittest.TestCase):
@@ -254,14 +307,20 @@ class GuestProgramTests(unittest.TestCase):
         relict.set_home(self.previous_home)
         self.tempdir.cleanup()
 
-    def test_program_requires_dos_83_executable_name(self):
+    def test_dos_program_requires_dos_83_executable_name(self):
         path = os.path.join(self.tempdir.name, "TOO-LONG-NAME.EXE")
 
         with self.assertRaisesRegex(ValueError, "DOS 8.3"):
             relict.run_guest_program(path)
 
+    def test_unimplemented_platform_does_not_apply_dos_name_policy(self):
+        path = os.path.join(self.tempdir.name, "TOO-LONG-NAME.EXE")
+
+        with self.assertRaisesRegex(NotImplementedError, "win9x"):
+            relict.run_guest_program(path, platform="win9x")
+
     def test_guest_program_stages_runs_stops_and_returns_log(self):
-        qmp = mock.Mock()
+        guest = mock.Mock()
         stage = os.path.join(relict.drives_dir(), "hdd")
         log_path = os.path.join(stage, "SUITE.log")
 
@@ -270,31 +329,32 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
+        guest.execute.side_effect = run_guest_command
+
         with mock.patch.object(workflows_module, "start", return_value=54321) \
                 as start, \
-                mock.patch.object(workflows_module, "qmp_session") as connection, \
-                mock.patch.object(workflows_module, "boot_to_dos") as boot, \
                 mock.patch.object(
-                    workflows_module, "run_command",
-                    side_effect=run_guest_command) as run, \
+                    workflows_module, "AgentlessGuestExec",
+                    return_value=guest) as adapter, \
                 mock.patch.object(workflows_module, "stop") as stop, \
                 mock.patch.object(workflows_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = qmp
             log = relict.run_guest_program(
                 self.exe, args="-v", timeout=45, qemu="qemu", port=54321)
 
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
             qemu="qemu", port=54321, qemu_args=(), home=None)
-        boot.assert_called_once_with(port=qmp)
-        self.assertEqual(run.call_args_list, [
-            mock.call("c:", 15, qmp),
-            mock.call("SUITE -v > SUITE.log", 45, qmp),
+        adapter.assert_called_once_with(machine_module.Machine(54321, None))
+        guest.wait_ready.assert_called_once_with()
+        self.assertEqual(guest.execute.call_args_list, [
+            mock.call("c:", 15),
+            mock.call("SUITE -v > SUITE.log", 45),
         ])
         stop.assert_called_once_with(54321, None)
         self.assertEqual(log, "guest output")
 
     def test_guest_program_switches_to_the_declared_staged_drive(self):
+        guest = mock.Mock()
         log_path = os.path.join(relict.drives_dir(), "hdd",
                                 "SUITE.log")
 
@@ -303,19 +363,18 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
+        guest.execute.side_effect = run_guest_command
+
         with mock.patch.object(workflows_module, "start", return_value=54321) \
                 as start, \
-                mock.patch.object(workflows_module, "qmp_session") as connection, \
-                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    workflows_module, "run_command",
-                    side_effect=run_guest_command) as run, \
+                    workflows_module, "AgentlessGuestExec",
+                    return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
             log = relict.run_guest_program(self.exe, staged_drive="d")
 
-        self.assertEqual(run.call_args_list[0].args[0], "d:")
+        self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         self.assertEqual(log, "guest output")
 
     def _stage_hdd_boot_image(self):
@@ -328,6 +387,7 @@ class GuestProgramTests(unittest.TestCase):
         # the hard-disk image claims slot 0, so staging goes to the
         # next free slot (drives/hdd_1) and defaults one letter on
         self._stage_hdd_boot_image()
+        guest = mock.Mock()
         log_path = os.path.join(relict.drives_dir(), "hdd_1",
                                 "SUITE.log")
 
@@ -336,22 +396,21 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
+        guest.execute.side_effect = run_guest_command
+
         with mock.patch.object(workflows_module, "start", return_value=54321) \
                 as start, \
-                mock.patch.object(workflows_module, "qmp_session") as connection, \
-                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    workflows_module, "run_command",
-                    side_effect=run_guest_command) as run, \
+                    workflows_module, "AgentlessGuestExec",
+                    return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
             log = relict.run_guest_program(self.exe)
 
         self.assertTrue(
             os.path.isdir(os.path.join(relict.drives_dir(),
                                        "hdd_1")))
-        self.assertEqual(run.call_args_list[0].args[0], "d:")
+        self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         self.assertEqual(log, "guest output")
 
     def test_staged_drive_c_is_rejected_behind_a_hdd_boot_image(self):
@@ -367,6 +426,7 @@ class GuestProgramTests(unittest.TestCase):
         staged = os.path.join(relict.drives_dir(), "hdd_2")
         os.makedirs(staged)
         self._stage_hdd_boot_image()
+        guest = mock.Mock()
         log_path = os.path.join(staged, "SUITE.log")
 
         def run_guest_command(command, *args):
@@ -374,31 +434,29 @@ class GuestProgramTests(unittest.TestCase):
                 with open(log_path, "w", encoding="utf-8") as log:
                     log.write("guest output")
 
+        guest.execute.side_effect = run_guest_command
+
         with mock.patch.object(workflows_module, "start", return_value=54321), \
-                mock.patch.object(workflows_module, "qmp_session") as connection, \
-                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    workflows_module, "run_command",
-                    side_effect=run_guest_command) as run, \
+                    workflows_module, "AgentlessGuestExec",
+                    return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
             log = relict.run_guest_program(self.exe)
 
         # only the slot-0 image precedes the staged slot 2 (slot 1
         # is undeclared and claims no letter), so the default is D:
-        self.assertEqual(run.call_args_list[0].args[0], "d:")
+        self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         self.assertEqual(log, "guest output")
 
     def test_guest_program_stops_when_guest_command_fails(self):
+        guest = mock.Mock()
+        guest.execute.side_effect = RuntimeError("guest failed")
         with mock.patch.object(workflows_module, "start", return_value=54321), \
-                mock.patch.object(workflows_module, "qmp_session") as connection, \
-                mock.patch.object(workflows_module, "boot_to_dos"), \
                 mock.patch.object(
-                    workflows_module, "run_command",
-                    side_effect=RuntimeError("guest failed")), \
+                    workflows_module, "AgentlessGuestExec",
+                    return_value=guest), \
                 mock.patch.object(workflows_module, "stop") as stop:
-            connection.return_value.__enter__.return_value = mock.Mock()
             with self.assertRaisesRegex(RuntimeError, "guest failed"):
                 relict.run_guest_program(self.exe)
 
