@@ -3,14 +3,16 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Guest communication design
+# Roadmap
+
+## Guest communication design
 
 Status: bootstrap direction established. The `GuestExec` protocol, isolated
 agentless adapter, and its use by the DOS workflow are implemented; later
 adapters and their implementation details remain open. This document does not
 by itself authorize further implementation.
 
-## Purpose
+### Purpose
 
 relict needs to support modern guests without weakening its permanent
 agentless DOS path. The current DOS interaction combines QMP keyboard events
@@ -31,7 +33,7 @@ false "channel" interface. They differ in both shape and capability:
 QMP remains relict's VM control plane. Some communication adapters use QMP
 operations, but QMP itself is not a guest communication strategy.
 
-### Limits of QMP-only automation
+#### Limits of QMP-only automation
 
 QMP-only interaction is not a useful general automation path for Win9x,
 Windows NT, Linux, or BSD guests. QMP can still provide lifecycle control,
@@ -54,7 +56,7 @@ interaction for the agentless DOS workflow and bounded machine-level
 automation; it should not treat it as the general fallback for modern platform
 workflows.
 
-## Vocabulary
+### Vocabulary
 
 Keep three layers distinct:
 
@@ -73,9 +75,9 @@ presents useful capabilities to a platform workflow. Configuration should
 select an interaction adapter, not merely a device type such as
 `virtio-serial`.
 
-## Initial adapter families
+### Initial adapter families
 
-### Agentless display console
+#### Agentless display console
 
 The existing DOS path is the first real adapter. It combines:
 
@@ -88,7 +90,7 @@ It has no guest prerequisite and remains the DOS default and fallback. It is
 not accurately modeled as a stream: output is a sequence of screen snapshots,
 and keyboard input is independent of that output.
 
-### Serial console
+#### Serial console
 
 An emulated UART connected to a host chardev supplies a duplex byte stream.
 Many operating systems already contain UART drivers, so a custom driver is not
@@ -100,7 +102,7 @@ prompt-based completion. It does not inherently provide structured command
 results or file transfer. A custom listener could add those operations, but
 that would be a separate protocol carried over serial.
 
-### Virtio-serial automation
+#### Virtio-serial automation
 
 A virtio-serial port supplies a duplex byte stream. It normally requires the
 guest's virtio driver and a guest-side listener. Framing, readiness, commands,
@@ -112,7 +114,7 @@ only when a concrete guest listener and wire contract exist. The planned use
 is to carry the same QGA-compatible profile first proven over an emulated
 UART.
 
-### QEMU Guest Agent
+#### QEMU Guest Agent
 
 QGA is a structured guest protocol, usually transported over a named
 virtio-serial port. Its adapter may expose command execution and file
@@ -123,7 +125,7 @@ protocol, never on a particular downstream agent project.
 QGA should be named as the selected interaction adapter; its underlying
 virtio-serial carrier is an implementation and launch-configuration detail.
 
-## A portable automation agent
+### A portable automation agent
 
 A host controller paired with guest-resident agents would provide substantial
 automation value, particularly for Win9x, old Windows NT, DOS, and other
@@ -147,7 +149,7 @@ long-running host agent. QEMU already owns the carrier endpoint and relict owns
 the VM lifecycle. The guest side is the resident agent or listener that turns
 protocol requests into native OS operations.
 
-### Chosen target: a QGA-compatible execution profile
+#### Chosen target: a QGA-compatible execution profile
 
 The gold-standard execution interface is QGA `guest-exec`. The first guest
 implementations should provide a small, portable profile of the published QGA
@@ -180,7 +182,7 @@ virtio support and over virtio-serial on systems that provide it. QGA itself
 already supports both virtio-serial and ISA serial carriers, so this does not
 require transport-specific protocol semantics.
 
-### Serial-to-virtio bootstrap
+#### Serial-to-virtio bootstrap
 
 The development sequence deliberately bootstraps richer guest integration
 from the permanent agentless base:
@@ -209,7 +211,7 @@ while lifecycle configuration owns the host chardev and selected UART or
 virtio-serial device. Platform workflows consume execution results and do not
 need to know which carrier delivered them.
 
-#### Provider topology
+##### Provider topology
 
 At relict's guest-execution seam, the waterfall consists of four adapters
 satisfying the same `GuestExec` interface:
@@ -301,7 +303,7 @@ Never retry an execution request automatically unless the protocol can prove
 that the guest did not begin it. At-most-once execution and reconnect behavior
 are part of the protocol interface, not incidental host-client details.
 
-## Capability-oriented platform workflows
+### Capability-oriented platform workflows
 
 Platform workflows own OS meaning: provisioning, readiness, command syntax,
 completion, and result collection. Interaction adapters own communication
@@ -337,7 +339,7 @@ to embedding callers. Interaction adapters receive a `Machine` and use this
 public seam; they do not connect to QMP directly or duplicate monitor methods
 on their own interfaces.
 
-## Configuration and lifecycle
+### Configuration and lifecycle
 
 Platform selection and the allowed interaction policy must be explicit through
 runner or per-invocation configuration. Relict must never infer the platform
@@ -385,7 +387,7 @@ adapter only before a guest command has been dispatched. Retrying through a
 fallback after an ambiguous transport failure could execute a command twice.
 The selected adapter and fallback decision should be visible in diagnostics.
 
-## Recommended implementation sequence
+### Recommended implementation sequence
 
 1. **Implemented:** name the existing keyboard/VGA composition as the
    agentless display-console adapter internally, preserving the DOS behavior
@@ -405,7 +407,7 @@ The selected adapter and fallback decision should be visible in diagnostics.
 8. Generalize interfaces only from the adapters that now exist. The project is
    pre-release, so prefer a coherent interface over compatibility shims.
 
-## Decisions still needed
+### Decisions still needed
 
 - Whether one invocation may configure an ordered adapter preference or only
   one adapter plus the permanent DOS fallback.
@@ -417,3 +419,26 @@ The selected adapter and fallback decision should be visible in diagnostics.
   QGA-compatible serial listener exists.
 - Which bounded `guest-file-*` operations follow execution, including file
   consistency and atomic replacement semantics.
+
+## Roadmap constraints
+
+Milestone 1 is the permanent agentless base described in AGENTS.md.
+
+The runner surface (see AGENTS.md) is implemented, and the machine's media — floppies, hard disks, and
+cdroms, images or virtual FAT directories — are declared by name under `drives/` or through `MachineConfig.drives`
+(see "DOS boot and scripting" in AGENTS.md). Further generalization (USB an open question) should extend the same declared-drive
+convention — a new medium name — without changing the rest of the surface. New media kinds, controllers, and USB
+devices must not first appear as opaque raw `-drive` arguments.
+
+Machine configuration is JSON-only for now. YAML may be added later through a justified parser dependency, but must
+normalize through exactly the same `MachineConfig` model and must not introduce YAML-only features. Named profiles,
+includes, inheritance, environment interpolation, and multi-file merging are deferred; they would enlarge the
+interface without helping describe one machine.
+
+A possible later milestone is an optional QEMU Guest Agent transport over the standard guest-agent protocol. It may
+provide `guest-exec` and `guest-file-*` when a DOS guest agent exists, but it must be selectable per invocation and fall back to agentless
+behavior. relict must depend only on the QEMU-owned protocol, never on a particular downstream agent project.
+
+The bootstrap direction is important: agentless relict is the rig used to test the DOS drivers and agent before those
+components exist. Once available, the same suites should validate agentless and guest-agent transports with equivalent
+results.

@@ -18,9 +18,9 @@ complete platform workflow:
 - `pyproject.toml` packages `relict` as the `relict` command and includes the installable `relict_tests` test
   package.
 - `relict_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, and lifecycle ownership.
-- `design/` contains maintainer-facing design documents for planned interfaces and architecture.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
+- `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no
@@ -278,27 +278,3 @@ completion, and vvfat staging.
 Espressif's `pytest-embedded-qemu` is useful prior art for a future
 `pytest-relict` plugin: host pytest orchestration around a native guest test framework. It is not directly reusable
 because it assumes Espressif targets, serial output, and Unity result grammar.
-
-## Roadmap constraints
-
-Milestone 1 is the permanent agentless base described above.
-
-The runner surface (see its section above) is implemented, and the machine's media — floppies, hard disks, and
-cdroms, images or virtual FAT directories — are declared by name under `drives/` or through `MachineConfig.drives`
-(see "DOS boot and scripting"). Further generalization (USB an open question) should extend the same declared-drive
-convention — a new medium name — without changing the rest of the surface. New media kinds, controllers, and USB
-devices must not first appear as opaque raw `-drive` arguments.
-
-Machine configuration is JSON-only for now. YAML may be added later through a justified parser dependency, but must
-normalize through exactly the same `MachineConfig` model and must not introduce YAML-only features. Named profiles,
-includes, inheritance, environment interpolation, and multi-file merging are deferred; they would enlarge the
-interface without helping describe one machine.
-
-A possible later milestone is an optional QEMU Guest Agent transport over the standard guest-agent protocol. It may
-provide `guest-exec` and
-`guest-file-*` when a DOS guest agent exists, but it must be selectable per invocation and fall back to agentless
-behavior. relict must depend only on the QEMU-owned protocol, never on a particular downstream agent project.
-
-The bootstrap direction is important: agentless relict is the rig used to test the DOS drivers and agent before those
-components exist. Once available, the same suites should validate agentless and guest-agent transports with equivalent
-results.
