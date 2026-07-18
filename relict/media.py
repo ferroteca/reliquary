@@ -23,7 +23,8 @@ class Drive:
     options: tuple = ()
 
 
-def _drive_key(name):
+def drive_key(name):
+    """Return ``(kind, slot, canonical_key)`` for a drive name."""
     match = _DRIVE_KEY_RE.fullmatch(str(name))
     if not match:
         raise ValueError(
@@ -84,7 +85,7 @@ def normalize_drive_specs(value):
     normalized = {}
     claimed = {}
     for name, declaration in value.items():
-        kind, slot, key = _drive_key(name)
+        kind, slot, key = drive_key(name)
         if key in claimed:
             raise ValueError(
                 f"drive key clash: {claimed[key]!r} and {name!r} "
@@ -199,7 +200,7 @@ def resolve_media(drives, specs=None):
     media = scan_drives(drives)
     specs = normalize_drive_specs(specs)
     for key, declaration in specs.items():
-        kind, slot, _ = _drive_key(key)
+        kind, slot, _ = drive_key(key)
         source = declaration["source"]
         options = tuple(declaration["options"].items())
         existing = media[kind].get(slot)

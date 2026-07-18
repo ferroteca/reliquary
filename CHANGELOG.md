@@ -19,6 +19,9 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ### Added
 
+- `MachineConfig.from_file()` and `MachineConfig.from_mapping()` load a versioned JSON/mapping machine document
+  (`version` must be `1`), normalize it immutably, resolve relative drive sources from the file directory or an
+  explicit `base_dir`, and apply field overrides with deterministic merge rules for drives and options.
 - Package-based `relict/` source layout split into home containment, declared media, ownership-safe lifecycle, generic
   machine interaction, DOS platform behavior, workflow orchestration, and CLI modules while preserving the existing
   root import and command-line interfaces.

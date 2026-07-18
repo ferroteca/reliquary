@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Configured and one-shot QEMU workflow orchestration."""
 
+import collections.abc
 import dataclasses
+import json
 import os
 import shutil
 import time
@@ -12,8 +14,8 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (normalize_machine, normalize_memory, start_machine,
                         stop)
 from .machine import Machine
-from .media import (boot_guess, check_staged_drive, normalize_drive_specs,
-                    resolve_media, staged_hdd_plan)
+from .media import (boot_guess, check_staged_drive, drive_key,
+                    normalize_drive_specs, resolve_media, staged_hdd_plan)
 from .platform_dos import prepare_drives, program_name
 
 
@@ -22,6 +24,10 @@ _PLATFORM_MEMORY = {
     "win9x": 64,
     "winnt": 256,
 }
+_CONFIG_FIELDS = frozenset({
+    "platform", "staged_drive", "timeout", "memory", "qemu",
+    "qemu_args", "drives", "machine",
+})
 
 
 def start(display=False, qemu=None, port=None, qemu_args=(), home=None,
@@ -110,6 +116,92 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
         return log_file.read()
 
 
+def _resolve_path(path, base_dir):
+    path = os.fspath(path)
+    if not os.path.isabs(path) and base_dir is not None:
+        path = os.path.join(base_dir, path)
+    return os.path.abspath(path)
+
+
+def _drive_parts(declaration, base_dir, key):
+    if isinstance(declaration, (str, os.PathLike)):
+        return _resolve_path(declaration, base_dir), {}
+    if not isinstance(declaration, collections.abc.Mapping):
+        raise TypeError(f"drives.{key} must be a path or drive mapping")
+    unknown = set(declaration) - {"source", "options"}
+    if unknown:
+        field = sorted(unknown)[0]
+        raise ValueError(f"unknown drive field: drives.{key}.{field}")
+    source = declaration.get("source")
+    if source is not None:
+        if not isinstance(source, (str, os.PathLike)):
+            raise TypeError(f"drives.{key}.source must be a path")
+        source = _resolve_path(source, base_dir)
+    options = declaration.get("options")
+    if options is None:
+        options = {}
+    elif not isinstance(options, collections.abc.Mapping):
+        raise TypeError(f"drives.{key}.options must be a mapping")
+    else:
+        options = dict(options)
+    return source, options
+
+
+def _drive_entries(drives, base_dir):
+    if drives is None:
+        return {}
+    if not isinstance(drives, collections.abc.Mapping):
+        raise TypeError("drives must be a mapping")
+    entries = {}
+    claimed = {}
+    for name, declaration in drives.items():
+        _, _, key = drive_key(name)
+        if key in claimed:
+            raise ValueError(
+                f"drive key clash: {claimed[key]!r} and {name!r} "
+                f"both mean {key}")
+        claimed[key] = name
+        source, options = _drive_parts(declaration, base_dir, key)
+        entries[key] = {"source": source, "options": options}
+    return entries
+
+
+def _merge_drives(base, override, base_dir):
+    merged = _drive_entries(base, base_dir)
+    for key, declaration in _drive_entries(override, None).items():
+        if key not in merged:
+            merged[key] = declaration
+            continue
+        current = merged[key]
+        if declaration["source"] is not None:
+            current["source"] = declaration["source"]
+        current["options"] = {
+            **current["options"],
+            **declaration["options"],
+        }
+    return merged
+
+
+def _mapping_timeout(value):
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("timeout must be a number")
+    return float(value)
+
+
+def _mapping_qemu_args(value):
+    if isinstance(value, (str, bytes)) or not isinstance(
+            value, collections.abc.Sequence):
+        raise TypeError("qemu_args must be a sequence of tokens")
+    args = tuple(value)
+    for index, token in enumerate(args):
+        if not isinstance(token, str):
+            raise TypeError(
+                f"qemu_args[{index}] must be a string")
+    return args
+
+
 @dataclasses.dataclass(frozen=True)
 class MachineConfig:
     """Immutable configuration for a :class:`Runner`."""
@@ -137,6 +229,10 @@ class MachineConfig:
         if memory is None:
             memory = _PLATFORM_MEMORY.get(self.platform)
         object.__setattr__(self, "memory", memory)
+        if isinstance(self.qemu_args, (str, bytes)):
+            raise TypeError(
+                "qemu_args must be a sequence of tokens, not a string")
+        object.__setattr__(self, "qemu_args", tuple(self.qemu_args))
         object.__setattr__(self, "drives",
                            normalize_drive_specs(self.drives))
         object.__setattr__(self, "machine",
@@ -153,6 +249,74 @@ class MachineConfig:
                 for argument in self.qemu_args):
             raise ValueError(
                 "memory configuration conflicts with -m in qemu_args")
+
+    @classmethod
+    def from_file(cls, path, **overrides):
+        """Load a versioned machine document and apply overrides."""
+        path = os.path.abspath(os.fspath(path))
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        return cls.from_mapping(
+            data, base_dir=os.path.dirname(path), **overrides)
+
+    @classmethod
+    def from_mapping(cls, value, base_dir=None, **overrides):
+        """Normalize a machine mapping and apply overrides."""
+        if not isinstance(value, collections.abc.Mapping):
+            raise TypeError("machine configuration must be a mapping")
+        unknown = set(value) - _CONFIG_FIELDS - {"version"}
+        if unknown:
+            raise ValueError(
+                f"unknown field: {sorted(unknown)[0]}")
+        if "version" not in value:
+            raise ValueError("version is required")
+        if value["version"] != 1:
+            raise ValueError("version must be 1")
+        unknown_overrides = set(overrides) - _CONFIG_FIELDS
+        if unknown_overrides:
+            raise ValueError(
+                f"unknown field: {sorted(unknown_overrides)[0]}")
+
+        fields = {}
+        if "platform" in value:
+            platform = value["platform"]
+            if not isinstance(platform, str):
+                raise TypeError("platform must be a string")
+            fields["platform"] = platform
+        if "staged_drive" in value:
+            staged = value["staged_drive"]
+            if staged is not None and not isinstance(staged, str):
+                raise TypeError("staged_drive must be a string")
+            fields["staged_drive"] = staged
+        if "timeout" in value:
+            fields["timeout"] = _mapping_timeout(value["timeout"])
+        if "memory" in value:
+            fields["memory"] = value["memory"]
+        if "qemu" in value:
+            qemu = value["qemu"]
+            if qemu is not None and not isinstance(qemu, str):
+                raise TypeError("qemu must be a string")
+            fields["qemu"] = qemu
+        if "qemu_args" in value:
+            fields["qemu_args"] = _mapping_qemu_args(
+                value["qemu_args"])
+        if "machine" in value:
+            fields["machine"] = value["machine"]
+        if "drives" in value or "drives" in overrides:
+            fields["drives"] = _merge_drives(
+                value.get("drives"), overrides.get("drives"),
+                base_dir)
+
+        for name, override in overrides.items():
+            if name == "drives":
+                continue
+            if name == "timeout":
+                fields[name] = _mapping_timeout(override)
+            elif name == "qemu_args":
+                fields[name] = _mapping_qemu_args(override)
+            else:
+                fields[name] = override
+        return cls(**fields)
 
 
 class Runner:

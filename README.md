@@ -407,6 +407,23 @@ config = relict.MachineConfig(drives={
 })
 ```
 
+A versioned JSON machine document can be loaded explicitly and then overridden
+field-by-field. Relative drive sources in the file resolve from the file's
+directory; Python overrides still resolve from the current directory:
+
+```python
+config = relict.MachineConfig.from_file(
+    "machines/dos.json",
+    timeout=90,
+    qemu_args=("-cpu", "pentium"),
+)
+```
+
+`MachineConfig.from_mapping(...)` accepts the same document shape in memory.
+`version` is required in the document and must be `1`; it is not a constructor
+field. Programmatic construction does not load `<home>/machine.json`
+implicitly.
+
 Configured sources are mounted in place and must already exist. They conflict with a filesystem declaration for the
 same logical slot rather than overriding it. `run()` keeps present bootable media and, for an empty DOS home, installs
 the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle under the runner's home.

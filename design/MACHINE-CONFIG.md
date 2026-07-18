@@ -494,8 +494,8 @@ direct-use functions remain supported.
 
 Implementation should proceed in independently verifiable steps:
 
-1. Add JSON loading, validation, immutable normalization, and path-resolution
-   tests.
+1. **Implemented:** add JSON loading, validation, immutable normalization, and
+   path-resolution tests.
 2. **Implemented:** add configured-source and per-drive option composition tests, including
    external sources, same-path and different-path logical slot clashes,
    reserved keys, missing sources, staged directories, and read-only staging

@@ -6,6 +6,7 @@ the process-global home."""
 
 import dataclasses
 import importlib
+import json
 import os
 import sys
 import tempfile
@@ -184,6 +185,181 @@ class RunnerConstructionTests(unittest.TestCase):
 
     def test_provisioning_is_not_public(self):
         self.assertFalse(hasattr(relict.Runner("run-home"), "provision"))
+
+
+class MachineConfigLoadingTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = self.tempdir.name
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def _write_json(self, relative, payload):
+        path = os.path.join(self.root, relative)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+        return path
+
+    def _touch(self, relative):
+        path = os.path.join(self.root, relative)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(b"image")
+        return path
+
+    def test_from_file_loads_a_versioned_machine_document(self):
+        path = self._write_json("machine.json", {
+            "version": 1,
+            "platform": "win9x",
+            "timeout": 90,
+            "memory": 32,
+            "qemu": "qemu-system-i386",
+            "machine": {"type": "pc", "accel": "tcg"},
+            "qemu_args": ["-cpu", "pentium"],
+        })
+
+        config = relict.MachineConfig.from_file(path)
+
+        self.assertEqual(config.platform, "win9x")
+        self.assertEqual(config.timeout, 90)
+        self.assertEqual(config.memory, 32)
+        self.assertEqual(config.qemu, "qemu-system-i386")
+        self.assertEqual(dict(config.machine), {
+            "type": "pc",
+            "accel": "tcg",
+        })
+        self.assertEqual(config.qemu_args, ("-cpu", "pentium"))
+        self.assertFalse(hasattr(config, "version"))
+
+    def test_from_file_requires_version_one(self):
+        path = self._write_json("machine.json", {"platform": "dos"})
+        with self.assertRaisesRegex(ValueError, r"version"):
+            relict.MachineConfig.from_file(path)
+
+        path = self._write_json("machine.json", {"version": 2})
+        with self.assertRaisesRegex(ValueError, r"version"):
+            relict.MachineConfig.from_file(path)
+
+    def test_from_mapping_rejects_unknown_fields_with_paths(self):
+        with self.assertRaisesRegex(ValueError, r"unknown field: boot"):
+            relict.MachineConfig.from_mapping({
+                "version": 1,
+                "boot": "a",
+            })
+
+    def test_from_file_resolves_relative_drive_sources_from_file_dir(self):
+        image = self._touch("images/dos.img")
+        path = self._write_json("machines/dos.json", {
+            "version": 1,
+            "drives": {
+                "hdd_0": {
+                    "source": "../images/dos.img",
+                    "options": {"snapshot": True},
+                },
+            },
+        })
+
+        config = relict.MachineConfig.from_file(path)
+
+        self.assertEqual(config.drives["hdd_0"]["source"],
+                         os.path.abspath(image))
+        self.assertEqual(dict(config.drives["hdd_0"]["options"]),
+                         {"snapshot": True})
+
+    def test_from_mapping_resolves_relative_sources_from_base_dir(self):
+        image = self._touch("media/boot.img")
+        base = os.path.join(self.root, "cfg")
+        os.makedirs(base)
+
+        config = relict.MachineConfig.from_mapping({
+            "version": 1,
+            "drives": {"floppy_0": "../media/boot.img"},
+        }, base_dir=base)
+
+        self.assertEqual(config.drives["floppy_0"]["source"],
+                         os.path.abspath(image))
+
+    def test_from_mapping_without_base_dir_uses_the_current_directory(self):
+        image = self._touch("cwd-boot.img")
+        previous = os.getcwd()
+        try:
+            os.chdir(self.root)
+            config = relict.MachineConfig.from_mapping({
+                "version": 1,
+                "drives": {"floppy_0": "cwd-boot.img"},
+            })
+        finally:
+            os.chdir(previous)
+
+        self.assertEqual(config.drives["floppy_0"]["source"],
+                         os.path.abspath(image))
+
+    def test_explicit_overrides_replace_scalars_and_qemu_args(self):
+        path = self._write_json("machine.json", {
+            "version": 1,
+            "platform": "win9x",
+            "timeout": 30,
+            "qemu_args": ["-cpu", "486"],
+            "machine": "pc-i440fx-2.12",
+        })
+
+        config = relict.MachineConfig.from_file(
+            path,
+            platform="dos",
+            timeout=None,
+            qemu_args=("-cpu", "pentium"),
+            machine={"type": "pc", "accel": "tcg"},
+        )
+
+        self.assertEqual(config.platform, "dos")
+        self.assertIsNone(config.timeout)
+        self.assertEqual(config.qemu_args, ("-cpu", "pentium"))
+        self.assertEqual(dict(config.machine), {
+            "type": "pc",
+            "accel": "tcg",
+        })
+
+    def test_drive_overrides_merge_by_slot_and_option_name(self):
+        image = self._touch("images/base.img")
+        path = self._write_json("machines/base.json", {
+            "version": 1,
+            "drives": {
+                "hdd_0": {
+                    "source": "../images/base.img",
+                    "options": {
+                        "snapshot": True,
+                        "cache": "writeback",
+                    },
+                },
+            },
+        })
+        override_image = self._touch("override.img")
+
+        config = relict.MachineConfig.from_file(
+            path,
+            drives={
+                "hdd_0": {
+                    "options": {"cache": "unsafe"},
+                },
+                "floppy_0": override_image,
+            },
+        )
+
+        self.assertEqual(config.drives["hdd_0"]["source"],
+                         os.path.abspath(image))
+        self.assertEqual(dict(config.drives["hdd_0"]["options"]), {
+            "snapshot": True,
+            "cache": "unsafe",
+        })
+        self.assertEqual(config.drives["floppy_0"]["source"],
+                         os.path.abspath(override_image))
+
+    def test_missing_explicit_machine_file_is_an_error(self):
+        missing = os.path.join(self.root, "missing.json")
+        with self.assertRaises(FileNotFoundError):
+            relict.MachineConfig.from_file(missing)
 
 
 class ProvisionTests(unittest.TestCase):

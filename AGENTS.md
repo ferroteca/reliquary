@@ -153,10 +153,15 @@ Configured drives use canonical keys
 `floppy_0..1`, `hdd_0..3`, and `cdrom_0..3`, with `floppy` and `hdd` accepted as slot-zero aliases. Each value is a
 source path or a mapping with `source` and `options`; values are normalized and deeply frozen. Files are images,
 floppy/hdd directories are vvfat, and cdrom directories fail validation. Configured sources compose with filesystem
-declarations by logical slot; two sources for one slot fail closed. `run()` privately ensures that the resolved inventory declares
-something bootable — keep present declared media or install the FreeDOS default; never overwrite — before invoking
-`run_guest_program()` with the runner's home explicit. Machine configuration has no special boot-image fields: custom
-media is declared through the same drive inventory as every other image.
+declarations by logical slot; two sources for one slot fail closed. `MachineConfig.from_file(path, **overrides)` and
+`from_mapping(value, base_dir=None, **overrides)` load the same versioned document shape (`version` required and
+must be `1`; not a constructor field). Relative drive sources resolve from the file directory via `from_file`, or
+from `base_dir` / the current directory via `from_mapping`. Explicit overrides win: scalars replace (including
+`None`), `qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field /
+option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. `run()` privately ensures that
+the resolved inventory declares something bootable — keep present declared media or install the FreeDOS default;
+never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
+special boot-image fields: custom media is declared through the same drive inventory as every other image.
 There is no public provisioning step. An omitted home resolves the established process default once at construction.
 Invariants to preserve: all state for an instance lives under its resolved constructor home; concurrent runs use
 distinct `Runner` instances with distinct homes (per-home `vm.json` keeps VM ownership
