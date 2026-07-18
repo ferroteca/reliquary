@@ -337,8 +337,8 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start", return_value=54321) \
-                as start, \
+        with mock.patch.object(workflows_module, "start_machine",
+                               return_value=54321) as start, \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
                     return_value=guest) as adapter, \
@@ -349,8 +349,12 @@ class GuestProgramTests(unittest.TestCase):
 
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
-            qemu="qemu", port=54321, qemu_args=(), home=None,
-            drives=None, machine=None, memory=None)
+            mock.ANY, display=False, port=54321, home=None,
+            prepare_drives=workflows_module.prepare_drives)
+        config = start.call_args.args[0]
+        self.assertIsInstance(config, relict.MachineConfig)
+        self.assertEqual(config.qemu, "qemu")
+        self.assertEqual(config.timeout, 45)
         adapter.assert_called_once_with(machine_module.Machine(54321, None))
         guest.wait_ready.assert_called_once_with()
         self.assertEqual(guest.execute.call_args_list, [
@@ -372,8 +376,8 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start", return_value=54321) \
-                as start, \
+        with mock.patch.object(workflows_module, "start_machine",
+                               return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
                     return_value=guest), \
@@ -405,8 +409,8 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start", return_value=54321) \
-                as start, \
+        with mock.patch.object(workflows_module, "start_machine",
+                               return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
                     return_value=guest), \
@@ -435,7 +439,7 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
         specs = {"hdd": source}
-        with mock.patch.object(workflows_module, "start",
+        with mock.patch.object(workflows_module, "start_machine",
                                return_value=54321) as start, \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
@@ -445,13 +449,16 @@ class GuestProgramTests(unittest.TestCase):
             log = relict.run_guest_program(self.exe, drives=specs)
 
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
-        self.assertEqual(start.call_args.kwargs["drives"], specs)
+        config = start.call_args.args[0]
+        self.assertEqual(config.drives["hdd_0"]["source"],
+                         os.path.abspath(source))
         self.assertEqual(log, "guest output")
 
     def test_staged_drive_c_is_rejected_behind_a_hdd_boot_image(self):
         self._stage_hdd_boot_image()
 
-        with mock.patch.object(workflows_module, "start") as start:
+        with mock.patch.object(workflows_module, "start_machine") \
+                as start:
             with self.assertRaisesRegex(ValueError, "claim C:"):
                 relict.run_guest_program(self.exe, staged_drive="C")
 
@@ -471,7 +478,8 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start", return_value=54321), \
+        with mock.patch.object(workflows_module, "start_machine",
+                               return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
                     return_value=guest), \
@@ -487,7 +495,8 @@ class GuestProgramTests(unittest.TestCase):
     def test_guest_program_stops_when_guest_command_fails(self):
         guest = mock.Mock()
         guest.execute.side_effect = RuntimeError("guest failed")
-        with mock.patch.object(workflows_module, "start", return_value=54321), \
+        with mock.patch.object(workflows_module, "start_machine",
+                               return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
                     return_value=guest), \

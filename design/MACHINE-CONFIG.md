@@ -501,8 +501,8 @@ Implementation should proceed in independently verifiable steps:
    reserved keys, missing sources, staged directories, and read-only staging
    failures. Conflict tests must prove that no provisioning or process launch
    occurs after resolution fails.
-3. Thread `MachineConfig` through lifecycle and workflow calls without
-   changing the default argument vector.
+3. **Implemented:** thread `MachineConfig` through lifecycle and workflow
+   calls without changing the default argument vector.
 4. Add the new fields and direct-function `machine_config` keyword.
 5. Add CLI selection and implicit home discovery.
 6. Document the file and Python forms in `README.md`, update `CHANGELOG.md` and

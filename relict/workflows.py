@@ -33,17 +33,17 @@ _CONFIG_FIELDS = frozenset({
 def start(display=False, qemu=None, port=None, qemu_args=(), home=None,
           platform="dos", drives=None, machine=None, memory=None):
     """Start a relict-owned QEMU process and return its QMP port."""
-    memory = normalize_memory(memory)
-    if memory is not None and any(
-            argument == "-m" or str(argument).startswith("-m=")
-            for argument in qemu_args):
-        raise ValueError(
-            "memory configuration conflicts with -m in qemu_args")
-    provision = prepare_drives if platform == "dos" else None
-    default_memory = _PLATFORM_MEMORY.get(platform.lower())
-    return start_machine(
-        display, qemu, port, qemu_args, home, provision, default_memory,
-        drives, machine, memory)
+    config = MachineConfig(
+        platform=platform, memory=memory, qemu=qemu,
+        qemu_args=qemu_args, drives=drives, machine=machine)
+    return _start_configured(config, display, port, home)
+
+
+def _start_configured(config, display=False, port=None, home=None):
+    """Launch one validated machine configuration."""
+    provision = prepare_drives if config.platform == "dos" else None
+    return start_machine(config, display=display, port=port, home=home,
+                         prepare_drives=provision)
 
 
 def run_task(task, timeout=None, display=False, qemu=None, port=None,
@@ -52,11 +52,13 @@ def run_task(task, timeout=None, display=False, qemu=None, port=None,
     """Boot one VM, invoke ``task(machine)``, then stop the VM."""
     if not callable(task):
         raise TypeError("task must be callable as task(machine)")
+    config = MachineConfig(
+        platform=platform, timeout=timeout, memory=memory, qemu=qemu,
+        qemu_args=qemu_args, drives=drives, machine=machine)
     base = effective_home(home)
-    actual_port = start(display, qemu, port, qemu_args, base, platform,
-                        drives, machine, memory)
-    deadline = (None if timeout is None
-                else time.monotonic() + timeout)
+    actual_port = _start_configured(config, display, port, base)
+    deadline = (None if config.timeout is None
+                else time.monotonic() + config.timeout)
     machine = Machine(actual_port, base, deadline)
     try:
         return task(machine)
@@ -73,20 +75,32 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
         raise NotImplementedError(
             f"platform {platform!r} guest-program workflow is not "
             "implemented")
+    config = MachineConfig(
+        platform=platform, staged_drive=staged_drive, timeout=timeout,
+        memory=memory, qemu=qemu, qemu_args=qemu_args, drives=drives,
+        machine=machine)
+    return _run_configured(config, exe_path, args, port=port, home=home)
+
+
+def _run_configured(config, exe_path, args="", port=None, home=None):
+    """Run one staged guest program from a validated configuration."""
+    if config.platform != "dos":
+        raise NotImplementedError(
+            f"platform {config.platform!r} guest-program workflow is "
+            "not implemented")
     declared_drives = drives_dir(home)
-    media = resolve_media(declared_drives, drives)
+    media = resolve_media(declared_drives, config.drives)
     stage, default_letter = staged_hdd_plan(media, declared_drives)
+    staged_drive = config.staged_drive
     if staged_drive is None:
         staged_drive = default_letter
-    else:
-        staged_drive = check_staged_drive(staged_drive)
-        if staged_drive < default_letter:
-            claimed = ("C:" if default_letter == "D" else
-                       f"C: to {chr(ord(default_letter) - 1)}:")
-            raise ValueError(
-                f"staged_drive={staged_drive!r}: the hard disks "
-                f"before the staged drive already claim {claimed}; "
-                f"it appears at {default_letter}: or later")
+    elif staged_drive < default_letter:
+        claimed = ("C:" if default_letter == "D" else
+                   f"C: to {chr(ord(default_letter) - 1)}:")
+        raise ValueError(
+            f"staged_drive={staged_drive!r}: the hard disks "
+            f"before the staged drive already claim {claimed}; "
+            f"it appears at {default_letter}: or later")
     exe_name = program_name(exe_path)
     base = os.path.splitext(exe_name)[0]
     log_name = base + ".log"
@@ -98,15 +112,15 @@ def run_guest_program(exe_path, args="", timeout=180, staged_drive=None,
     if os.path.exists(log_path):
         os.remove(log_path)
 
-    port = start(qemu=qemu, port=port, qemu_args=qemu_args, home=home,
-                 drives=drives, machine=machine, memory=memory)
+    timeout = 180 if config.timeout is None else config.timeout
+    actual_port = _start_configured(config, port=port, home=home)
     try:
-        guest = AgentlessGuestExec(Machine(port, home))
+        guest = AgentlessGuestExec(Machine(actual_port, home))
         guest.wait_ready()
         guest.execute(f"{staged_drive.lower()}:", 15)
         guest.execute(command, timeout)
     finally:
-        stop(port, home)
+        stop(actual_port, home)
     time.sleep(2)
 
     if not os.path.exists(log_path):
@@ -225,10 +239,6 @@ class MachineConfig:
         if self.staged_drive is not None:
             object.__setattr__(self, "staged_drive",
                                check_staged_drive(self.staged_drive))
-        memory = normalize_memory(self.memory)
-        if memory is None:
-            memory = _PLATFORM_MEMORY.get(self.platform)
-        object.__setattr__(self, "memory", memory)
         if isinstance(self.qemu_args, (str, bytes)):
             raise TypeError(
                 "qemu_args must be a sequence of tokens, not a string")
@@ -244,11 +254,15 @@ class MachineConfig:
             raise ValueError(
                 "machine configuration conflicts with -machine "
                 "in qemu_args")
-        if self.memory is not None and any(
+        memory = normalize_memory(self.memory)
+        if memory is not None and any(
                 argument == "-m" or str(argument).startswith("-m=")
                 for argument in self.qemu_args):
             raise ValueError(
                 "memory configuration conflicts with -m in qemu_args")
+        if memory is None:
+            memory = _PLATFORM_MEMORY.get(self.platform)
+        object.__setattr__(self, "memory", memory)
 
     @classmethod
     def from_file(cls, path, **overrides):
@@ -349,11 +363,4 @@ class Runner:
                 f"platform {self.platform!r} task workflow is not "
                 "implemented; use run_task() with an explicit callable")
         self._provision()
-        timeout = (180 if self.config.timeout is None
-                   else self.config.timeout)
-        return run_guest_program(
-            task, args, timeout=timeout,
-            staged_drive=self.config.staged_drive,
-            qemu_args=self.config.qemu_args, qemu=self.config.qemu,
-            home=self.home, drives=self.config.drives,
-            machine=self.config.machine, memory=self.config.memory)
+        return _run_configured(self.config, task, args, home=self.home)

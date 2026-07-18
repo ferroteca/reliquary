@@ -123,6 +123,13 @@ class RunnerConstructionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conflicts"):
             relict.MachineConfig(memory=32, qemu_args=("-m", "64"))
 
+    def test_platform_memory_default_defers_to_raw_memory(self):
+        # only an explicit memory value conflicts with a raw -m; the
+        # platform default is suppressed by it at launch instead
+        config = relict.MachineConfig(qemu_args=("-m", "64"))
+
+        self.assertEqual(config.memory, 16)
+
     def test_drive_specs_normalize_aliases_and_freeze_values(self):
         with tempfile.TemporaryDirectory() as root:
             floppy = os.path.join(root, "boot.img")
@@ -376,7 +383,7 @@ class ProvisionTests(unittest.TestCase):
             return image.read()
 
     def _run(self, machine):
-        with mock.patch.object(workflows_module, "run_guest_program",
+        with mock.patch.object(workflows_module, "_run_configured",
                                return_value=""):
             machine.run("SUITE.EXE")
 
@@ -433,31 +440,53 @@ class RunnerRunTests(unittest.TestCase):
         with open(os.path.join(drives, "floppy.img"), "wb") as image:
             image.write(b"staged dos")
 
-    def test_run_forwards_home_and_config(self):
+    def _run_with_lifecycle_mocks(self, machine, args=""):
+        """Run through the real workflow with the lifecycle mocked."""
+        staging = os.path.join(machine.home, "drives", "hdd")
+        log_path = os.path.join(staging, "SUITE.log")
+
+        def run_guest_command(command, *guest_args):
+            if command != "c:":
+                with open(log_path, "w", encoding="utf-8") as log:
+                    log.write("guest output")
+
+        guest = mock.Mock()
+        guest.execute.side_effect = run_guest_command
+        with mock.patch.object(workflows_module, "start_machine",
+                               return_value=54321) as start, \
+                mock.patch.object(workflows_module, "AgentlessGuestExec",
+                                  return_value=guest), \
+                mock.patch.object(workflows_module, "stop") as stop, \
+                mock.patch.object(workflows_module.time, "sleep"):
+            log = machine.run(self.exe, args)
+        return types.SimpleNamespace(log=log, start=start, guest=guest,
+                                     stop=stop)
+
+    def test_run_threads_its_config_to_the_lifecycle(self):
         self._stage_boot_image()
-        machine = relict.Runner(self.home, relict.MachineConfig(
+        config = relict.MachineConfig(
             timeout=45, memory=32, qemu="qemu",
-            qemu_args=("-nodefaults",)))
+            qemu_args=("-nodefaults",))
+        machine = relict.Runner(self.home, config)
 
-        with mock.patch.object(workflows_module, "run_guest_program",
-                               return_value="guest output") as run:
-            log = machine.run(self.exe, "-v")
+        run = self._run_with_lifecycle_mocks(machine, "-v")
 
-        run.assert_called_once_with(
-            self.exe, "-v", timeout=45, staged_drive=None,
-            qemu_args=("-nodefaults",),
-            qemu="qemu", home=os.path.abspath(self.home),
-            drives=machine.config.drives, machine=None, memory=32)
-        self.assertEqual(log, "guest output")
+        self.assertIs(run.start.call_args.args[0], config)
+        self.assertEqual(run.start.call_args.kwargs["home"],
+                         os.path.abspath(self.home))
+        self.assertEqual(run.guest.execute.call_args_list, [
+            mock.call("c:", 15),
+            mock.call("SUITE -v > SUITE.log", 45),
+        ])
+        self.assertEqual(run.log, "guest output")
 
     def test_run_defaults_the_timeout(self):
         self._stage_boot_image()
 
-        with mock.patch.object(workflows_module, "run_guest_program",
-                               return_value="") as run:
-            relict.Runner(self.home).run(self.exe)
+        run = self._run_with_lifecycle_mocks(relict.Runner(self.home))
 
-        self.assertEqual(run.call_args.kwargs["timeout"], 180)
+        self.assertEqual(run.guest.execute.call_args_list[1],
+                         mock.call("SUITE > SUITE.log", 180))
 
     def test_explicit_home_run_never_consults_the_global_home(self):
         # the concurrency guarantee: with home explicit end to end,
@@ -481,7 +510,7 @@ class RunnerRunTests(unittest.TestCase):
                 home_module, "home",
                 side_effect=AssertionError(
                     "process-global home was consulted")), \
-                mock.patch.object(workflows_module, "start",
+                mock.patch.object(workflows_module, "start_machine",
                                   return_value=54321) as start, \
                 mock.patch.object(workflows_module, "AgentlessGuestExec",
                                   return_value=guest), \

@@ -287,10 +287,14 @@ def _terminate_started_process(proc):
             proc.kill()
 
 
-def start_machine(display=False, qemu=None, port=None, qemu_args=(),
-                  home=None, prepare_drives=None, default_memory=None,
-                  drive_specs=None, machine=None, memory=None):
-    """Start an owned QEMU process after optional drive preparation."""
+def start_machine(config, display=False, port=None, home=None,
+                  prepare_drives=None):
+    """Start an owned QEMU process described by one machine config.
+
+    ``config`` is a validated machine configuration (the workflow
+    layer's ``MachineConfig``); this function does not know whether it
+    came from JSON, a Python mapping, or direct construction.
+    """
     automatic_port = port is None
     port = available_port() if automatic_port else port
     if not 1 <= port <= 65535:
@@ -313,37 +317,23 @@ def start_machine(display=False, qemu=None, port=None, qemu_args=(),
                 f"  name: {old_state['name']}\n"
                 f"  QMP port: 127.0.0.1:{old_state['port']}\n"
                 "stop it before starting another VM in this home")
-    qemu = qemu or find_qemu()
+    qemu = config.qemu or find_qemu()
     print(f"using QEMU: {qemu}")
     drives = drives_dir(home)
-    media = resolve_media(drives, drive_specs)
+    media = resolve_media(drives, config.drives)
     if boot_guess(media) is None and prepare_drives is not None:
         prepare_drives(drives, media)
-        media = resolve_media(drives, drive_specs)
+        media = resolve_media(drives, config.drives)
     vm_name = f"relict-{uuid.uuid4().hex[:12]}"
-    qemu_args = list(qemu_args)
-    machine_value = machine_argument(machine)
-    if machine_value is not None and any(
-            argument in ("-machine", "-M") or
-            argument.startswith(("-machine=", "-M="))
-            for argument in qemu_args):
-        raise ValueError(
-            "machine configuration conflicts with -machine in qemu_args")
-    memory = normalize_memory(memory)
-    if memory is not None and any(
-            argument == "-m" or argument.startswith("-m=")
-            for argument in qemu_args):
-        raise ValueError(
-            "memory configuration conflicts with -m in qemu_args")
-    effective_memory = (normalize_memory(default_memory)
-                        if memory is None else memory)
+    qemu_args = list(config.qemu_args)
+    machine_value = machine_argument(config.machine)
     args = [qemu, "-name", vm_name]
     if machine_value is not None:
         args += ["-machine", machine_value]
-    if (effective_memory is not None
+    if (config.memory is not None
             and not any(argument == "-m" or argument.startswith("-m=")
                         for argument in qemu_args)):
-        args += ["-m", str(effective_memory)]
+        args += ["-m", str(config.memory)]
     args += drive_args(media)
     boot = boot_guess(media)
     if boot is not None and "-boot" not in qemu_args:

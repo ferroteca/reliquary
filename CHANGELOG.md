@@ -16,6 +16,12 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 - Exposed the identity-verified QMP session through `Machine.qmp()` for raw
   `cmd()` and `hmp()` access; interaction adapters now depend on `Machine`
   instead of opening QMP connections themselves.
+- One validated `MachineConfig` now threads through the workflow and
+  lifecycle layers: `start()`, `run_task()`, and `run_guest_program()`
+  normalize their individual parameters into a machine configuration up
+  front, `Runner.run()` passes its configuration through unchanged, and the
+  QEMU launcher consumes that configuration instead of loose hardware
+  arguments. The default QEMU argument vector is unchanged.
 
 ### Added
 
@@ -46,7 +52,8 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   combines required `type` with immutable scalar properties and renders Boolean values as `on`/`off`. A raw
   `-machine` or `-M` in `qemu_args` conflicts with the structured field.
 - `MachineConfig.memory` configures guest memory as a positive integer number of MiB, defaulting to 16 for DOS, 64
-  for Win9x, and 256 for WinNT. It maps to one QEMU `-m` argument and conflicts with raw `-m` in `qemu_args`.
+  for Win9x, and 256 for WinNT. It maps to one QEMU `-m` argument; an explicit value conflicts with raw `-m` in
+  `qemu_args`, while a raw `-m` alone suppresses the platform default.
 - The `drives/` directory under the home declares the whole machine by filename, with image content never
   interrogated. Image files `floppy[_<n>].<ext>` (slots 0–1, A: and B:), `hdd[_<n>].<ext>` (slots 0–3, the IDE bus),
   and `cdrom[_<n>].<ext>` (the IDE slots after the hard disks) mount as that medium; bare directories `floppy[_<n>]`

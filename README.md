@@ -432,7 +432,8 @@ add scalar machine properties. Booleans render as `on`/`off`; configuring both `
 `qemu_args` is an error.
 `memory` is a positive integer number of MiB. It defaults by platform: 16 for
 DOS, 64 for Win9x, and 256 for WinNT. Configuring both `memory` and `-m` in
-`qemu_args` is an error.
+`qemu_args` is an error, while a raw `-m` alone suppresses the platform
+default.
 `staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or
 `drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged
