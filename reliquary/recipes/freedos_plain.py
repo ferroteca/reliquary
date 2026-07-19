@@ -87,7 +87,7 @@ def install(display=False):
     if not os.path.exists(hdd_image):
         create_hdd_image(hdd_image, HDD_SIZE_MB)
     config = MachineConfig(drives={"cdrom_0": iso},
-                           qemu_args=("-boot", "d"))
+                           qemu_args=("-boot", "order=cd"))
     port = start(config, display=display, home=machine_home)
     try:
         machine = Machine(port, machine_home)
@@ -104,6 +104,20 @@ def install(display=False):
         machine.cursor_menu_select("Yes")
         machine.wait_text(r"You must reboot your computer")
         machine.cursor_menu_select("Yes")
+        machine.wait_text(
+            r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
+        machine.cursor_menu_select("Install to harddisk")
+        machine.wait_text(r"What is your preferred language\?", delay=0.1)
+        machine.send_keys([["ret"]])
+        machine.wait_text(
+            r"Welcome to the FreeDOS 1\.4 installation program")
+        machine.send_keys([["ret"]])
+        machine.wait_text(
+            r"Drive C: does not appear to be formatted\.")
+        machine.cursor_menu_select("Yes")
+        machine.wait_text(
+            r"Press a key\.\.\.")
+        machine.send_keys([["ret"]])
         machine.wait_text(r"Please select your keyboard layout")
         machine.send_keys([["ret"]])
         machine.wait_text(
@@ -112,9 +126,17 @@ def install(display=False):
             "Plain DOS system", exclude="with sources")
         machine.wait_text(
             r"We are now ready to install FreeDOS 1\.4\.")
+        machine.cursor_menu_select("Yes", timeout=600)
+        machine.wait_text(
+            r"Installation of FreeDOS 1\.4 is now complete\.")
         machine.cursor_menu_select("Yes")
+        machine.wait_text(
+            r"Load FreeDOS with JEMMEX \(more compatible\)")
+        machine.send_keys([["ret"]])
+        machine.wait_text(r"C:\\>")
         print("machine running; press Ctrl-C to shut it down",
               file=sys.stderr)
+        machine.send_text("fdapm poweroff")
         _wait_for_exit(port)
     finally:
         _shutdown(port, machine_home)
