@@ -12,8 +12,9 @@ complete platform workflow:
 - `relict/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
   containment, `media.py` parses declared drives, `lifecycle.py` owns QMP, QEMU
   processes, and host-side `qemu-img` helpers, `interaction.py` defines
-  capability protocols, `interaction_agentless.py` contains the concrete agentless DOS adapter, `machine.py` provides
-  platform-neutral QMP interaction and diagnostics, `platform_dos.py` owns DOS provisioning,
+  capability protocols, `interaction_agentless.py` contains the concrete agentless DOS adapter (prompt-based readiness
+  and command completion), `machine.py` provides platform-neutral QMP interaction and diagnostics — keyboard input,
+  VGA text/attribute scraping, cursor-menu selection, and screenshots, `platform_dos.py` owns DOS provisioning,
   facades, `workflows.py` orchestrates configured runs, `cli.py` owns command parsing, and `__main__.py` preserves
   `python -m relict` execution.
 - `pyproject.toml` packages `relict` as the `relict` command and includes the installable `relict_tests` test

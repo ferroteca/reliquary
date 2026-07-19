@@ -14,8 +14,9 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   relict presses the up/down cursor keys, follows the selection
   highlight through the VGA attribute bytes, and presses Enter only
   once the highlight sits on the single screen row matching the given
-  text (case-insensitively). `machine.vga_screen(qmp)` newly exposes
-  the attribute bytes alongside the text rows.
+  text (case-insensitively). Also available as
+  `Machine.cursor_menu_select()`; `machine.vga_screen(qmp)` newly
+  exposes the attribute bytes alongside the text rows.
 - `create_hdd_image(filename, capacity)` creates a sparse qcow2 v3
   (`compat=1.1`, no preallocation) hard-disk image at the given path.
   Capacity accepts a qemu-img size string (`"2G"`, `"512M"`) or a
@@ -38,6 +39,14 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ### Changed
 
+- Keyboard input and screen interaction moved to the platform-neutral
+  machine layer, since they need only QMP and VGA text mode, not DOS:
+  `char_keys()`, `send_keys()`, `send_text()`, `cursor_menu_select()`,
+  `screen_text()`, and `wait_text()` now live in `relict.machine`, and
+  `Machine` gains `send_keys()`, `send_text()`, and
+  `cursor_menu_select()` methods. `interaction_agentless` retains only
+  the DOS prompt-driven `AgentlessGuestExec` adapter. Package-level
+  imports (`relict.send_text`, ...) are unchanged.
 - Added an internal, runtime-checkable `GuestExec` protocol and isolated the
   QMP keyboard/VGA implementation as `AgentlessGuestExec`, with the DOS
   workflow and CLI consuming that adapter directly. The former

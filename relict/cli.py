@@ -9,11 +9,10 @@ from qemu.qmp import ConnectError
 
 from .home import set_home
 from .workflows import _cli_machine_config
-from .interaction_agentless import (AgentlessGuestExec,
-                                    cursor_menu_select, screen_text,
-                                    send_keys, send_text, wait_text)
+from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import stop
-from .machine import Machine, screenshot
+from .machine import (Machine, cursor_menu_select, screen_text,
+                      screenshot, send_keys, send_text, wait_text)
 from .workflows import start
 
 

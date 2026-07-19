@@ -152,18 +152,18 @@ class HomeTests(unittest.TestCase):
 
 class InputAndScreenTests(unittest.TestCase):
     def test_character_key_mappings(self):
-        self.assertEqual(agentless_module.char_keys("a"), ["a"])
-        self.assertEqual(agentless_module.char_keys("A"), ["shift", "a"])
-        self.assertEqual(agentless_module.char_keys(":"),
+        self.assertEqual(machine_module.char_keys("a"), ["a"])
+        self.assertEqual(machine_module.char_keys("A"), ["shift", "a"])
+        self.assertEqual(machine_module.char_keys(":"),
                          ["shift", "semicolon"])
-        self.assertEqual(agentless_module.char_keys(" "), ["spc"])
+        self.assertEqual(machine_module.char_keys(" "), ["spc"])
 
     def test_unmapped_character_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "no key mapping"):
-            agentless_module.char_keys("\N{SNOWMAN}")
+            machine_module.char_keys("\N{SNOWMAN}")
 
     def test_send_text_builds_qcode_combinations(self):
-        console = agentless_module._DisplayConsole(54321)
+        console = machine_module._DisplayConsole(54321)
         with mock.patch.object(console, "send_keys") as send_keys:
             console.send_text("A:")
 
@@ -274,14 +274,14 @@ class _FakeMenu:
 
 class CursorMenuTests(unittest.TestCase):
     def _select(self, menu, item, timeout=30):
-        console = agentless_module._DisplayConsole(None)
+        console = machine_module._DisplayConsole(None)
         console.screen = menu.screen
         console.send_keys = lambda combos, delay=0.06: [
             menu.press(combo[0]) for combo in combos]
         clock = _MenuClock()
-        with mock.patch.object(agentless_module.time, "monotonic",
+        with mock.patch.object(machine_module.time, "monotonic",
                                clock.monotonic), \
-                mock.patch.object(agentless_module.time, "sleep",
+                mock.patch.object(machine_module.time, "sleep",
                                   clock.sleep):
             return console.cursor_menu_select(item, timeout)
 
@@ -381,7 +381,7 @@ class InteractionAdapterTests(unittest.TestCase):
         self.assertIs(relict.AgentlessGuestExec,
                       agentless_module.AgentlessGuestExec)
         self.assertIs(relict.cursor_menu_select,
-                      agentless_module.cursor_menu_select)
+                      machine_module.cursor_menu_select)
 
     def test_agentless_adapter_satisfies_guest_exec_protocol(self):
         adapter = agentless_module.AgentlessGuestExec(

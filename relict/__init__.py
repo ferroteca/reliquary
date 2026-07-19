@@ -5,12 +5,11 @@
 from .cli import main
 from .home import documents_dir, drives_dir, home, set_home
 from .interaction import GuestExec
-from .interaction_agentless import (AgentlessGuestExec,
-                                    cursor_menu_select, screen_text,
-                                    send_keys, send_text, wait_text)
+from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
                         stop)
-from .machine import Machine, screenshot
+from .machine import (Machine, cursor_menu_select, screen_text,
+                      screenshot, send_keys, send_text, wait_text)
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 

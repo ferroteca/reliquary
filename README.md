@@ -404,17 +404,22 @@ boot menu:
 machine.wait_text(r"Welcome to FreeDOS")
 ```
 
-Once a cursor-key menu is displayed, `cursor_menu_select()` navigates it
-by feedback: it presses up/down, follows the selection highlight through
-the VGA attribute bytes, and presses Enter only after the highlight sits
-on the row matching the given text (case-insensitive, must match exactly
-one screen row). It returns the selected row's text:
+Once a cursor-key menu is displayed, `machine.cursor_menu_select()`
+navigates it by feedback: it presses up/down, follows the selection
+highlight through the VGA attribute bytes, and presses Enter only after
+the highlight sits on the row matching the given text (case-insensitive,
+must match exactly one screen row). It returns the selected row's text:
 
 ```python
 machine.wait_text(r"Welcome to FreeDOS")
-relict.cursor_menu_select(
-    "Use FreeDOS 1.4 in Live Environment mode", port=port)
+machine.cursor_menu_select("Use FreeDOS 1.4 in Live Environment mode")
 ```
+
+These screen and keyboard operations live on the platform-neutral
+`Machine`, so they work on any guest displaying through VGA text mode —
+boot menus and loaders included, before any operating system is up.
+Module-level conveniences (`relict.cursor_menu_select(item, port=port)`,
+`relict.screen_text(port=port)`, ...) wrap the same methods.
 
 `Machine.qmp()` exposes the identity-verified QMP session when a caller needs
 raw monitor access. The yielded QEMU session provides both `cmd()` for QMP and
