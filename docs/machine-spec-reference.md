@@ -161,19 +161,21 @@ Virtual CPU count. Default `1`.
 **declaration (optional) · object**
 
 The machine's drive inventory. Keys declare a medium and slot; each
-value declares the drive's source and options.
+value declares where the drive's content comes from, and options.
 
 ### Keys: medium and slot
 
 | medium   | slots         | keys                      |
 |----------|---------------|---------------------------|
-| `floppy` | 0–1           | `floppy_0`, `floppy_1`    |
-| `hdd`    | 0–3           | `hdd_0` ... `hdd_3`       |
-| `cdrom`  | 0–3           | `cdrom_0` ... `cdrom_3`   |
+| `floppy` | 0–1           | `floppy0`, `floppy1`      |
+| `hdd`    | 0–3           | `hdd0` ... `hdd3`         |
+| `cdrom`  | 0–3           | `cdrom0` ... `cdrom3`     |
 
 In a declaration, the bare medium name is accepted as an alias for
-slot 0 (`"hdd"` ≡ `"hdd_0"`); the state always uses the canonical
-indexed form. Declaring both an alias and its indexed form in one
+slot 0 (`"hdd"` ≡ `"hdd0"`); the state always uses the canonical
+indexed form. The canonical key is also the name of the drive's
+image file in the cached instantiation, when it has one (see
+[image naming](#image-naming-and-formats) below). Declaring both an alias and its indexed form in one
 document is a slot clash and fails validation, as do slots outside
 the table's ranges.
 
@@ -193,111 +195,120 @@ dropped.
 
 ### Values
 
-A value is either a source string (shorthand):
+A value is either a media-name string (shorthand):
 
 ```json
-{"drives": {"cdrom": "media:freedos-14-livecd"}}
+{"drives": {"cdrom": "freedos-1.4-livecd"}}
 ```
 
-or an object with these fields:
+or an object. **Exactly one** of three fields — `media`, `size`,
+or `base` — declares where the drive's content comes from; a
+drive object with none of them, or more than one, fails
+validation.
 
-#### `source` — required · string
+There are no image paths anywhere in the spec. A drive that has
+its own image file (declared with `size` or `base`) gets it
+materialized by reliquary inside the cached instantiation, named
+canonically after the drive key —
+`cache/machines/<name>/drives/hdd0.qcow2` for `hdd0` on QEMU —
+with the extension of the format reliquary chose (see
+[image naming](#image-naming-and-formats)). You never name,
+place, or reference these files; the drive key is the only handle.
 
-One of two forms:
+#### `media` — optional · string
 
-1. **A relative path to the machine's own image file**, inside
-   its cached instantiation, conventionally under `drives/`:
+The name of an item in the shared media library
+`<reliquary_home>/media`:
 
-   ```json
-   {"source": "drives/hdd.qcow2"}
-   ```
+```json
+{"media": "freedos-1.4-livecd"}
+```
 
-   Paths resolve from `cache/machines/<name>/` and must stay
-   inside it: no absolute paths, no `..` traversal above it.
-   These images are materialized by reliquary — created blank
-   from [`size`](#size--optional--string) or from a
-   [`base`](#base--optional--string) starting-point image; there
-   is no dropping of pre-created files into the cache.
-
-2. **A `media:` reference** — `media:<name>` names an item in the
-   shared media library `<reliquary_home>/media`:
-
-   ```json
-   {"source": "media:freedos-14-livecd"}
-   ```
-
-   The name resolves to a [defined media item](media-spec.md),
-   fetched and hash-verified on demand; every media item has a
-   definition under `media/`, and a name no definition provides
-   is an error. Use this for machine-independent, read-only-use
-   media: installer ISOs, boot floppies, driver disks. (To boot
-   or modify a copy of a media image, make it a drive `base`
-   instead.) `media:` is the *only* cross-boundary reference a
-   declaration may make.
+The name resolves to a [defined media item](media-spec.md),
+fetched and hash-verified on demand; every media item has a
+definition under `media/`, and a name no definition provides is
+an error. The drive attaches the media payload itself — use this
+for machine-independent, read-only-use media: installer ISOs,
+boot floppies, driver disks. (To boot or modify a copy of a media
+image, make it a drive [`base`](#base--optional--string-or-object)
+instead.) Media names are the *only* cross-boundary reference a
+declaration may make.
 
 #### `size` — optional · string
 
-Image-creation size, meaningful only for `hdd` and `floppy` image
-sources:
+Start the drive as a blank image of this size — meaningful for
+`hdd` and `floppy` drives:
 
 ```json
-{"source": "drives/hdd.qcow2", "size": "20M"}
+{"size": "20M"}
 ```
 
-- If the source file **does not exist**, reliquary creates it at
-  this size — at `create`, or at the first `start` — as a
-  dynamically-allocated image in the backend's preferred format.
-- If the source file **exists**, `size` is validated against it
-  and a mismatch is an error. `size` never resizes or overwrites an
-  existing image.
+reliquary creates the image — at `create`, or at the first
+`start` — dynamically allocated, in the backend's preferred
+format, at the drive's canonical path. Once the image exists,
+`size` is validated against it and a mismatch is an error;
+`size` never resizes or overwrites an existing image
+(`recreate` is how a drive starts over).
 
 Grammar: a positive integer immediately followed by a binary unit
 suffix — `K`, `M`, `G`, or `T` (powers of 1024) — case-insensitive.
 `"20M"`, `"2G"`, `"720k"`.
 
-`size` and `base` are mutually exclusive: a drive starts blank at
-a size, or starts from an image, never both.
+#### `base` — optional · string or object
 
-#### `base` — optional · string
-
-A **starting-point image** for the drive: a `media:` reference
-(the usual case) or a relative path to another image in the
-cached instantiation. When the drive's `source` image does not
-exist, reliquary materializes it from the base — at `create`, or
-at the first `start` — in one of two modes:
+A **starting-point image** for the drive: a media item the
+drive's own image is materialized from — at `create`, or at the
+first `start`. As an object it has two fields — `media` (required)
+and `type` (how to materialize, optional). `base.media` names an
+item in the shared media library, exactly like the
+[`media` field](#media--optional--string): the name must resolve
+to a [media definition](media-spec.md) under
+`<reliquary_home>/media`, and the item is fetched and
+hash-verified on demand. The difference is what happens next —
+`media` attaches the payload itself, `base` materializes the
+drive's own image from it:
 
 ```json
-{"drives": {"hdd_0": {
-  "source": "drives/hdd.qcow2",
-  "base": "media:dos622-installed",
-  "base-mode": "differencing"
-}}}
+{"drives": {"hdd0": {"base": {"media": "dos622-installed", "type": "duplicate"}}}}
 ```
 
-The base itself is never written to. This is how pre-existing
-content enters a machine: there is no dropping of files into the
-cache — a drive that should start with content declares where
-that content comes from, and `recreate` can regenerate it at any
-time.
+A bare string is shorthand for the object with only `media` set:
 
-#### `base-mode` — optional · string
+```json
+{"drives": {"hdd0": {"base": "dos622-installed"}}}
+```
 
-How the drive is materialized from `base`:
+The state always carries the resolved object form, `type`
+explicit.
 
-| mode           | meaning                                       |
-|----------------|-----------------------------------------------|
-| `copy`         | the base image is copied (default)            |
-| `differencing` | the drive is a differencing disk backed by the base; writes land in the difference, the base stays pristine |
+The base itself is never written to; it is the fixed external
+image the drive starts from. This is how pre-existing content
+enters a machine: there is no dropping of files into the cache —
+a drive that should start with content declares where that
+content comes from, and `recreate` can regenerate it at any time.
 
-`copy` works everywhere (converted to the backend's preferred
-format when needed). `differencing` maps to the backend's native
-mechanism — qcow2 backing files, VHDX differencing disks, VMDK
-linked clones, VDI differencing — and is a backend/format
-capability: a backend that cannot difference against the base
-fails the capability check rather than silently copying.
-Differencing keeps large bases cheap to fan out: many machines
-can difference against one installed base image, each paying only
-for its own writes.
+`type` selects one of two materializations, defaulting to
+`difference`:
+
+| type         | meaning                                         |
+|--------------|-------------------------------------------------|
+| `difference` | the drive is a differencing disk backed by the base; writes land in the difference, the base stays pristine (default) |
+| `duplicate`  | the base image is copied in full                |
+
+`difference` maps to the backend's native mechanism — qcow2
+backing files, VHDX differencing disks, VMDK linked clones, VDI
+differencing — and is a backend/format capability: a backend that
+cannot difference against the base fails the capability check
+rather than silently copying (declare `"type": "duplicate"` to
+copy instead). It is the default because it matches what based drives
+are for: differencing keeps large bases cheap to fan out — many
+machines can difference against one installed base image, each
+paying only for its own writes — and a fresh difference is the
+cheapest possible `recreate`.
+
+`duplicate` works everywhere (converted to the backend's
+preferred format when needed) and makes the drive fully
+independent of backing-file support.
 
 #### `controller` — optional · string
 
@@ -319,7 +330,7 @@ for all current platforms is `ide`, resolved into the state at
 creation.
 
 ```json
-{"drives": {"hdd_0": {"source": "drives/nt.vhdx", "controller": "scsi"}}}
+{"drives": {"hdd0": {"size": "4G", "controller": "scsi"}}}
 ```
 
 What the spec deliberately does **not** say:
@@ -354,31 +365,41 @@ from the machine — useful for installer media you'll re-enable later, or for
 switching between configurations without deleting entries:
 
 ```json
-{"drives": {"cdrom_0": {"source": "media:freedos-14-livecd", "enabled": false}}}
+{"drives": {"cdrom0": {"media": "freedos-1.4-livecd", "enabled": false}}}
 ```
 
-### Image formats
+### Image naming and formats
 
-The file extension declares the image format; content is never
-probed. Keep extensions idiomatic: `.img` and `.iso` are raw,
-`.qcow2`, `.vdi`, `.vmdk`, `.vhdx` name their formats.
+A drive's own image file (from `size` or `base`) lives at the
+canonical path `cache/machines/<name>/drives/<key>.<ext>` — the
+drive key names the file, and the extension follows the image
+format. There are no other image names, ever: the spec has no
+image-path field, and nothing is hand-placed in the cache.
 
-Each backend attaches its native format set; declaring an image the
-machine's backend cannot attach is a capability error. When
-reliquary creates an image from `size`, it uses the backend's
-preferred dynamically-allocated format and names the file
-accordingly:
+The format is reliquary's choice, made per backend. An image
+created blank from `size`, or duplicated from a `base`
+(`"type": "duplicate"`, converting when needed), uses the
+backend's preferred dynamically-allocated format; a `difference`
+drive uses the backend-native differencing format:
 
-| backend      | created format |
-|--------------|----------------|
-| `qemu`       | qcow2 (v3)     |
-| `virtualbox` | VDI            |
-| `vmware`     | VMDK           |
-| `hyperv`     | VHDX           |
+| backend      | image format |
+|--------------|--------------|
+| `qemu`       | qcow2 (v3)   |
+| `virtualbox` | VDI          |
+| `vmware`     | VMDK         |
+| `hyperv`     | VHDX         |
 
-Letting reliquary create images (rather than declaring
-pre-existing ones) keeps a declaration fully portable: the right
-format arrives on whatever backend is assigned.
+Because reliquary owns image creation and naming, every
+declaration is format-portable by construction: the right format
+arrives on whatever backend is assigned, and `recreate` onto a
+different backend regenerates the images in the new backend's
+format.
+
+`media` drives attach the media payload file itself, whose format
+is declared by its
+[cached file name's extension](media-spec.md) in the media
+library. A media payload in a format the machine's backend cannot
+attach is a capability error naming both.
 
 ---
 
@@ -390,7 +411,7 @@ The boot order: drive keys (canonical or alias form) tried in
 order.
 
 ```json
-{"boot": ["cdrom_0", "hdd_0"]}
+{"boot": ["cdrom0", "hdd0"]}
 ```
 
 Every entry must reference a declared, enabled drive. When omitted,
@@ -476,8 +497,9 @@ Format checks (reject the document):
 - state-only fields (`backend-id`, `created`, `installed`) in a
   declaration;
 - `boot` entries naming undeclared or disabled drives;
-- `source` or `base` paths escaping the cached instantiation;
-- `size` and `base` on the same drive;
+- drive objects declaring none, or more than one, of `media`,
+  `size`, and `base`;
+- `media` or `base.media` names no media definition provides;
 - `backend-settings` sections overlapping reliquary-owned fields.
 
 Capability checks (reject the declaration for *this* backend,
@@ -487,7 +509,7 @@ naming backend and capability):
   slots);
 - controller types the backend cannot provide (e.g. anything but
   `scsi` on Hyper-V Generation 2);
-- `differencing` bases the backend/format pair cannot express;
+- `difference` bases the backend/format pair cannot express;
 - image formats the backend cannot attach;
 - control planes the backend cannot offer;
 - boot orders the backend cannot honor.

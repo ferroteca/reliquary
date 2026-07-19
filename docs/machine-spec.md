@@ -55,9 +55,10 @@ declarations, media definitions, scripts — small, shareable, and
 worth versioning; everything under `cache/` is reliquary's and
 reconstructible. There is no dropping of pre-created files into
 cache directories; inputs enter machines through the declaration —
-`media:` references and [starting-point
-images](machine-spec-reference.md#base--optional--string) that are
-copied or used as bases of differencing disks.
+[`media` references](machine-spec-reference.md#media--optional--string)
+and [starting-point
+images](machine-spec-reference.md#base--optional--string-or-object)
+that machine drives are differenced from, or copies of.
 
 This page explains the format and how the two documents behave
 through a machine's life. Companion pages:
@@ -67,7 +68,7 @@ through a machine's life. Companion pages:
 - **[Cookbook](machine-spec-cookbook.md)** — complete worked
   examples.
 - **[The media spec](media-spec.md)** — the shared media library
-  that `media:` drive sources reference.
+  that `media` drive fields reference.
 
 ## What the spec format is
 
@@ -101,7 +102,7 @@ A minimal declaration that boots a DOS floppy image:
 {
   "platform": "dos",
   "drives": {
-    "floppy": {"source": "media:msdos622-boot"}
+    "floppy": "msdos622-boot"
   }
 }
 ```
@@ -133,7 +134,7 @@ little as possible and let resolution fill in the rest:
 - Omit `backend` and reliquary picks the best available one.
 - Omit `memory`, `cpus`, or `control-planes` and the platform's
   defaults apply.
-- Use shorthand: `"hdd"` instead of `"hdd_0"`, a bare source
+- Use shorthand: `"hdd"` instead of `"hdd0"`, a bare media-name
   string instead of an object.
 
 Omissions are preserved, not baked in: a declaration that omits
@@ -162,7 +163,8 @@ resolve.
 
 The state is fully resolved:
 
-- shorthand keys are canonicalized (`"hdd"` → `"hdd_0"`);
+- shorthand keys and values are canonicalized (`"hdd"` → `"hdd0"`,
+  a bare media name → a `media` object);
 - platform defaults are materialized into explicit values;
 - the assigned `backend` is recorded, along with the state-only
   fields: `backend-id`, `created`, `installed`.
@@ -179,9 +181,9 @@ produces, on a host where QEMU was selected:
   "memory": 16,
   "cpus": 1,
   "drives": {
-    "floppy_0": {"source": "media:msdos622-boot"}
+    "floppy0": {"media": "msdos622-boot"}
   },
-  "boot": ["floppy_0"],
+  "boot": ["floppy0"],
   "control-planes": ["agentless-display"]
 }
 ```
@@ -204,7 +206,7 @@ Every `start` brings the three parties — declaration, state,
 backend — back into line:
 
 1. The declaration is validated and resolved.
-2. Every `media:` item the machine references is hash-verified
+2. Every media item the machine references is hash-verified
    (and fetched if missing or stale — see
    [the media spec](media-spec.md)); the machine never boots
    against silently changed media.
@@ -246,9 +248,9 @@ never touches the declaration; an uninstantiated declaration is
 just a file, ready for a later `create`. `recreate` is exactly
 `destroy` + `create`. Drives
 regenerate the way they were declared: `size` drives come back
-blank, [`base` drives](machine-spec-reference.md#base--optional--string)
-come back as fresh copies (or fresh differencing disks) of their
-starting-point images. An installed system that only lives in the
+blank, [`base` drives](machine-spec-reference.md#base--optional--string-or-object)
+come back as fresh differencing disks (or fresh copies) of their
+base images. An installed system that only lives in the
 cached drive image is gone after `recreate` — which is the point;
 if it should survive, `export` it first or produce it with an
 install script that can simply run again.
@@ -289,7 +291,8 @@ it produces a *spec* from a native backend VM — a declaration
 synthesized from the backend's machine configuration, with the
 VM's disks preserved as media items (copied, never moving or
 modifying the source; each gets a generated definition with a
-computed hash) that the declaration's drives `base` on. Import stops
+computed hash) that the declaration's drives take as `base`.
+Import stops
 at the spec — it never instantiates; run `create` when you want
 the machine materialized. An imported machine recreates like any
 other: from its bases. Translating backend config — memory, drives, controllers —

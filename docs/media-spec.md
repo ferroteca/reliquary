@@ -12,18 +12,18 @@ SPDX-License-Identifier: BSD-3-Clause
 The media library, `<reliquary_home>/media`, holds
 machine-independent media: installer ISOs, boot floppies, driver
 disks. Machines reference media by name (the
-[`media:` source form](machine-spec-reference.md#source--required--string)),
+[`media` drive field](machine-spec-reference.md#media--optional--string)),
 and every media item is described by a **definition** stating
 where its file comes from and how it is verified.
 
 ```text
 <reliquary_home>/media/
-└── freedos-14-livecd.json       a media definition
+└── freedos-1.4-livecd.json       a media definition
 <reliquary_home>/cache/
 ├── downloads/
 │   └── FD14-LiveCD.zip          a cached source archive
 └── media/
-    └── freedos-14-livecd.iso    a cached payload file
+    └── freedos-1.4-livecd.iso    a cached payload file
 ```
 
 The layout separates what is worth keeping from what is
@@ -49,7 +49,7 @@ cannot be downloaded still gets a definition (with no `url`, or
 with a [`local-path`](#item-fields) pointing at the file where it
 lives); the definition is what names and verifies it.
 
-A `media:<name>` reference in a machine declaration resolves to
+A media name referenced from a machine declaration resolves to
 the defined item of that name. A name no definition provides is
 an error, and a resolved item whose payload is missing or fails
 verification is fetched when its definition allows, and is
@@ -82,9 +82,9 @@ either
 }
 ```
 
-Every item has a `name` — the string `media:` references use.
+Every item has a `name` — the string machine drives reference.
 When `name` is not given explicitly, it is the item's file name
-without its extension (`media:msdos622-boot` above, even had
+without its extension (`msdos622-boot` above, even had
 `name` been omitted). The definition's own file name is only a
 label for organizing `media/`; it carries no meaning.
 
@@ -100,7 +100,7 @@ archive contributes only one item.
 
 When a source archive contains several files worth naming, one
 definition describes the archive once and itemizes them.
-`media/freedos-14-livecd.json`:
+`media/freedos-1.4-livecd.json`:
 
 ```json
 {
@@ -109,7 +109,7 @@ definition describes the archive once and itemizes them.
   "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
   "items": [
     {
-      "name": "freedos-14-livecd",
+      "name": "freedos-1.4-livecd",
       "file": "FD14LIVE.iso",
       "sha256": "6d3b1b4b6b9c4dbd1bcd8e0d640d29aa22a5a04f2a4b0a6a49b1e0f56a5b1c9e"
     },
@@ -122,9 +122,9 @@ definition describes the archive once and itemizes them.
 }
 ```
 
-The first item is referenced as `media:freedos-14-livecd`; the
+The first item is referenced as `freedos-1.4-livecd`; the
 second declares no `name`, so its name is its file name without
-the extension — `media:FD14BOOT`.
+the extension — `FD14BOOT`.
 
 `sha256` appears at two levels with sibling-scoped meaning: next
 to `archive` it verifies the archive; inside an item it verifies
@@ -180,8 +180,8 @@ The top level of the archive form:
 Valid per item — at the top level of the item form, or inside
 each `items` entry of the archive form:
 
-- **`name`** — optional. The item's name, the string `media:`
-  references use. Defaults to the item's file name with its
+- **`name`** — optional. The item's name, the string machine
+  drives reference. Defaults to the item's file name with its
   extension dropped (`FD14BOOT.img` → `FD14BOOT`). Must be
   unique across all definitions.
 - **`file`** — the payload's original file name — what the
@@ -193,9 +193,9 @@ each `items` entry of the archive form:
   explicit. Required otherwise (always, in `items` entries
   without `local-path`). In the cache the payload is saved
   as **`<name>` plus `file`'s extension**, preserving the
-  type-identifying extension: the `freedos-14-livecd` item with
+  type-identifying extension: the `freedos-1.4-livecd` item with
   `"file": "FD14LIVE.iso"` is cached as
-  `cache/media/freedos-14-livecd.iso`. (With a defaulted name the
+  `cache/media/freedos-1.4-livecd.iso`. (With a defaulted name the
   two coincide: `FD14BOOT.img` caches as `FD14BOOT.img`.) Because
   item names are library-unique, naming cache files by item makes
   a filename clash in `cache/media/` impossible — two items may
@@ -257,7 +257,7 @@ A minimal item form — only a hash and a URL:
   `cache/media/msdos622-boot.img`
 
 So this two-field definition is referenced as
-`media:msdos622-boot` — identical to the fully spelled-out item
+`msdos622-boot` — identical to the fully spelled-out item
 form example above.
 
 A minimal local item — a hash and a local path:
@@ -317,7 +317,7 @@ reliquary fetch <media_name>
 
 fetches a defined item explicitly: downloads (if missing or failing
 verification), extracts, verifies, reports. Machine operations that
-resolve a `media:` reference to a fetchable definition do the same
+resolve a media reference to a fetchable definition do the same
 implicitly, so `fetch` is a convenience for warming the library —
 an install script's media is fetched before the machine boots
 either way.

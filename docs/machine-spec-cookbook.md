@@ -34,7 +34,7 @@ library. One required field plus one drive:
 {
   "platform": "dos",
   "drives": {
-    "floppy": {"source": "media:msdos622-boot"}
+    "floppy": "msdos622-boot"
   }
 }
 ```
@@ -54,15 +54,16 @@ The state after `create` on a host where QEMU was selected:
   "memory": 16,
   "cpus": 1,
   "drives": {
-    "floppy_0": {"source": "media:msdos622-boot"}
+    "floppy0": {"media": "msdos622-boot"}
   },
-  "boot": ["floppy_0"],
+  "boot": ["floppy0"],
   "control-planes": ["agentless-display"]
 }
 ```
 
-Note what resolution did: `floppy` became `floppy_0`, defaults
-became explicit values, and the three state-only fields appeared.
+Note what resolution did: `floppy` became `floppy0`, the bare
+media name became a `media` object, defaults became explicit
+values, and the state-only fields appeared.
 
 ---
 
@@ -78,15 +79,17 @@ the extra memory avoids the FreeDOS LiveCD's low-RAM warning:
   "platform": "dos",
   "memory": 32,
   "drives": {
-    "hdd": {"source": "drives/hdd.qcow2", "size": "20M"},
-    "cdrom": {"source": "media:freedos-14-livecd"}
+    "hdd": {"size": "20M"},
+    "cdrom": "freedos-1.4-livecd"
   },
   "boot": ["cdrom", "hdd"]
 }
 ```
 
-Because `drives/hdd.qcow2` doesn't exist, reliquary creates a
-20 MiB dynamically-allocated image there. After installation
+reliquary creates the hard disk as a 20 MiB dynamically-allocated
+image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
+the [naming and format](machine-spec-reference.md#image-naming-and-formats)
+are reliquary's choice, not yours). After installation
 completes (via an install script), the machine's state
 additionally carries:
 
@@ -101,26 +104,18 @@ disk; the next `start` applies it:
 ```json
 {
   "drives": {
-    "cdrom_0": {"source": "media:freedos-14-livecd", "enabled": false}
+    "cdrom0": {"media": "freedos-1.4-livecd", "enabled": false}
   },
-  "boot": ["hdd_0"]
+  "boot": ["hdd0"]
 }
 ```
 
 *(Fragment shown; the rest of the declaration is unchanged.)*
 
-> **Portability note:** this declaration pins the image name
-> `hdd.qcow2`, which only QEMU can attach. To keep an input fully
-> portable, let the extension follow the backend by omitting it
-> from your plans entirely — declare the drive only in a spec you
-> create per backend, or accept the pin. Images reliquary creates
-> get the backend's preferred format automatically
-> ([formats table](machine-spec-reference.md#image-formats)).
-
-> **Media note:** `media:freedos-14-livecd` names a
+> **Media note:** `freedos-1.4-livecd` names a
 > [media definition](media-spec.md)
-> (`media/freedos-14-livecd.json` with the LiveCD's download
-> URL, archive details, and hashes) — every `media:` reference
+> (`media/freedos-1.4-livecd.json` with the LiveCD's download
+> URL, archive details, and hashes) — every media reference
 > resolves through a definition, fetched and verified on demand.
 
 ---
@@ -128,53 +123,59 @@ disk; the next `start` applies it:
 ## 3. A machine from a starting-point image
 
 Pre-existing content enters a machine as a drive `base` — a
-starting-point image the drive is materialized from. A test rig
-booting a writable copy of an installed DOS base:
+fixed starting-point image the drive's own image is materialized
+from. A test rig booting a writable instance of an installed DOS
+image:
 
 ```json
 {
   "platform": "dos",
   "drives": {
-    "hdd": {"source": "drives/hdd.img", "base": "media:dos622-installed"}
+    "hdd": {"base": "dos622-installed"}
   }
 }
 ```
 
-At `create` (or first `start`), `drives/hdd.img` is created as a
-copy of the `dos622-installed` media item; the base itself is
-never written to. `recreate` throws the copy away and materializes
-a fresh one — every run of the rig starts from the same known
+At `create` (or first `start`), the drive is materialized as a
+**differencing disk** backed by the `dos622-installed` media item
+— the default base `type` — so writes land in the difference
+and the base is never written to. `recreate` throws the
+difference away and starts a fresh one, which is as cheap as disk
+creation gets: every run of the rig starts from the same known
 content. There is no way to drop pre-created files into a
 machine's cache directory; a drive that should start with content
 declares where the content comes from.
 
+Because every machine's difference is private, many machines can
+share one large installed base, each paying only for its own
+writes — the fan-out pattern differencing exists for.
+
 ---
 
-## 4. Fan-out with differencing disks
+## 4. Duplicating a base instead
 
-When many machines share one large base, `"base-mode":
-"differencing"` materializes each drive as a differencing disk
-backed by the base — writes land in the difference, the base
-stays pristine, and each machine pays only for its own changes:
+Differencing is a backend/format capability (qcow2 backing files,
+VHDX differencing disks, VMDK linked clones, VDI differencing); a
+backend that cannot difference against the base fails the
+capability check rather than silently copying. The `base` object
+form's `type` field selects a full independent duplicate instead
+— it works everywhere, converting to the backend's preferred
+format when needed:
 
 ```json
 {
   "platform": "winnt",
   "drives": {
     "hdd": {
-      "source": "drives/hdd.vhdx",
-      "base": "media:nt4-installed",
-      "base-mode": "differencing"
+      "base": {"media": "nt4-installed", "type": "duplicate"}
     }
   }
 }
 ```
 
-Differencing is a backend/format capability (qcow2 backing files,
-VHDX differencing disks, VMDK linked clones, VDI differencing); a
-backend that cannot difference against the base fails the
-capability check rather than silently copying. The default
-`base-mode` is `copy`, which works everywhere.
+A duplicated drive has no runtime dependency on its base image —
+worth the disk space when the machine's image should stand alone
+(say, ahead of an `export`).
 
 ---
 
@@ -189,7 +190,7 @@ type — settings no other backend understands, so they live under
   "platform": "dos",
   "backend": "qemu",
   "drives": {
-    "hdd": {"source": "drives/hdd.qcow2", "size": "100M"}
+    "hdd": {"size": "100M"}
   },
   "backend-settings": {
     "qemu": {
@@ -219,8 +220,8 @@ defaults do the right thing (64 MiB memory), and the explicit
   "platform": "win9x",
   "memory": 128,
   "drives": {
-    "hdd": {"source": "drives/hdd.img", "size": "2G"},
-    "cdrom": {"source": "media:win98se"}
+    "hdd": {"size": "2G"},
+    "cdrom": "win98se"
   },
   "boot": ["cdrom", "hdd"]
 }
@@ -242,10 +243,10 @@ floppy, a driver floppy, and two mounted ISOs:
 {
   "platform": "dos",
   "drives": {
-    "floppy_0": {"source": "media:boot-floppy"},
-    "floppy_1": {"source": "media:driver-floppy"},
-    "cdrom_0": {"source": "media:apps-cd"},
-    "cdrom_1": {"source": "media:games-cd"}
+    "floppy0": "boot-floppy",
+    "floppy1": "driver-floppy",
+    "cdrom0": "apps-cd",
+    "cdrom1": "games-cd"
   }
 }
 ```
@@ -267,8 +268,8 @@ with its system disk on SCSI and the installer CD on IDE:
 {
   "platform": "winnt",
   "drives": {
-    "hdd": {"source": "drives/nt.img", "size": "4G", "controller": "scsi"},
-    "cdrom": {"source": "media:nt4-install"}
+    "hdd": {"size": "4G", "controller": "scsi"},
+    "cdrom": "nt4-install"
   },
   "boot": ["cdrom", "hdd"]
 }
