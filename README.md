@@ -23,9 +23,13 @@ reliquary install freedos-plain
 
 `install` runs the whole recipe in the foreground: it fetches and
 verifies the vendor media, prepares the target disk, boots the
-installation machine through relict, and waits for the first install
-menu before blocking until the machine exits. Interrupting reliquary
-(Ctrl-C) shuts the machine down rather than leaving it running. Pass
+installation machine through relict, waits for the first install
+menu, selects "Install to harddisk", accepts the defaults for
+language and the welcome screen, confirms partitioning drive C: and
+the required reboot, accepts the default keyboard layout, chooses the
+"Plain DOS system" package set, and confirms the install before
+blocking until the machine exits. Interrupting reliquary (Ctrl-C)
+shuts the machine down rather than leaving it running. Pass
 `--display` to show the QEMU window instead of running headless —
 helpful when debugging a recipe.
 

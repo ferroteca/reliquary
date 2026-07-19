@@ -21,7 +21,13 @@ window for a recipe's guest steps.
 The recipe now extracts the LiveCD ISO and boots the installation
 machine through relict with the ISO and target disk mounted, booting
 from the CD. After start it waits for the LiveCD's first install menu
-(`Welcome to FreeDOS 1.4 (LiveCD)`). `install` then blocks while the
-machine runs and always shuts it down when it ends — including on
-Ctrl-C, which the CLI reports as an interruption instead of a
-traceback. Further installer scripting is not yet implemented.
+(`Welcome to FreeDOS 1.4 (LiveCD)`), selects "Install to harddisk",
+accepts the defaults for preferred language and the installer welcome
+screen with Enter, confirms partitioning drive C: and the required
+reboot with Yes, accepts the default keyboard layout with Enter,
+chooses the "Plain DOS system" package set (excluding the "with
+sources" sibling), and confirms with Yes on the ready-to-install
+prompt. `install` then blocks while the machine runs and always shuts
+it down when it ends — including on Ctrl-C, which the CLI reports as
+an interruption instead of a traceback. Further installer scripting
+is not yet implemented.

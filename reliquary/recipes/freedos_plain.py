@@ -5,7 +5,11 @@
 Installs FreeDOS 1.4 from the LiveCD distribution onto a hard-disk
 image, taking the installer's "Plain DOS system" option. The current
 implementation covers media acquisition, target disk creation, and
-waiting for the LiveCD's first install menu; further installer
+waiting for the LiveCD's first install menu, selecting "Install to
+harddisk", accepting the default language and welcome screen,
+confirming an unpartitioned drive C:, accepting the reboot prompt,
+accepting the default keyboard layout, choosing the "Plain DOS
+system" package set, and confirming the install; further installer
 scripting lands in a later milestone.
 """
 
@@ -57,12 +61,18 @@ def install(display=False):
     transient download and is deleted after extracting the ISO),
     ensures the recipe's target disk exists, and boots the machine
     through relict with the ISO and disk mounted, booting from the CD.
-    After start, waits for the LiveCD's first install menu. The call
-    then blocks while the machine runs (further installer scripting
-    lands in a later milestone; for now the guest runs until it exits
-    or reliquary is interrupted) and the machine is shut down when
-    install ends for any reason, including Ctrl-C. ``display`` shows
-    the QEMU window instead of running headless.
+    After start, waits for the LiveCD's first install menu, selects
+    "Install to harddisk", accepts the defaults for preferred
+    language and the installer welcome screen, confirms partitioning
+    drive C: and the required reboot, accepts the default keyboard
+    layout, chooses the "Plain DOS system" package set (excluding the
+    "with sources" sibling), and confirms with Yes on the ready-to-
+    install prompt.
+    The call then blocks while the machine runs (further installer
+    scripting lands in a later milestone; for now the guest runs
+    until it exits or reliquary is interrupted) and the machine is
+    shut down when install ends for any reason, including Ctrl-C.
+    ``display`` shows the QEMU window instead of running headless.
 
     Returns a mapping with the ``iso`` path and the ``hdd_image``
     path.
@@ -83,6 +93,26 @@ def install(display=False):
         machine = Machine(port, machine_home)
         machine.wait_text(
             r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
+        machine.cursor_menu_select("Install to harddisk")
+        machine.wait_text(r"What is your preferred language")
+        machine.send_keys([["ret"]])
+        machine.wait_text(
+            r"Welcome to the FreeDOS 1\.4 installation program")
+        machine.send_keys([["ret"]])
+        machine.wait_text(
+            r"Drive C: does not appear to be partitioned\.")
+        machine.cursor_menu_select("Yes")
+        machine.wait_text(r"You must reboot your computer")
+        machine.cursor_menu_select("Yes")
+        machine.wait_text(r"Please select your keyboard layout")
+        machine.send_keys([["ret"]])
+        machine.wait_text(
+            r"What FreeDOS packages do you want to install\?")
+        machine.cursor_menu_select(
+            "Plain DOS system", exclude="with sources")
+        machine.wait_text(
+            r"We are now ready to install FreeDOS 1\.4\.")
+        machine.cursor_menu_select("Yes")
         print("machine running; press Ctrl-C to shut it down",
               file=sys.stderr)
         _wait_for_exit(port)

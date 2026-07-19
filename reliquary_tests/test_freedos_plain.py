@@ -105,8 +105,34 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
         self.assertEqual(config.qemu_args, ("-boot", "d"))
         self.assertEqual(config.platform, "dos")
         self.Machine.assert_called_once_with(4242, self.machine_home)
-        self.machine.wait_text.assert_called_once_with(
-            r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
+        self.assertEqual(self.machine.wait_text.call_args_list, [
+            mock.call(r"Welcome to FreeDOS 1\.4 \(LiveCD\)"),
+            mock.call(r"What is your preferred language"),
+            mock.call(
+                r"Welcome to the FreeDOS 1\.4 installation program"),
+            mock.call(
+                r"Drive C: does not appear to be partitioned\."),
+            mock.call(r"You must reboot your computer"),
+            mock.call(r"Please select your keyboard layout"),
+            mock.call(
+                r"What FreeDOS packages do you want to install\?"),
+            mock.call(
+                r"We are now ready to install FreeDOS 1\.4\."),
+        ])
+        self.assertEqual(
+            self.machine.cursor_menu_select.call_args_list, [
+                mock.call("Install to harddisk"),
+                mock.call("Yes"),
+                mock.call("Yes"),
+                mock.call("Plain DOS system",
+                          exclude="with sources"),
+                mock.call("Yes"),
+            ])
+        self.assertEqual(self.machine.send_keys.call_args_list, [
+            mock.call([["ret"]]),
+            mock.call([["ret"]]),
+            mock.call([["ret"]]),
+        ])
 
     def test_install_display_mode_is_forwarded(self):
         """display=True reaches relict's start()."""
