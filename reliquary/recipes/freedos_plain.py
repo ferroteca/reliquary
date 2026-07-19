@@ -4,8 +4,9 @@
 
 Installs FreeDOS 1.4 from the LiveCD distribution onto a hard-disk
 image, taking the installer's "Plain DOS system" option. The current
-implementation covers media acquisition and target disk creation; the
-scripted installer run lands in a later milestone.
+implementation covers media acquisition, target disk creation, and
+waiting for the LiveCD's first install menu; further installer
+scripting lands in a later milestone.
 """
 
 import os
@@ -13,7 +14,7 @@ import socket
 import sys
 import time
 
-from relict import MachineConfig, create_hdd_image, start, stop
+from relict import Machine, MachineConfig, create_hdd_image, start, stop
 
 from ..home import install_media_dir, machine_dir
 from ..media import ensure_media
@@ -56,9 +57,10 @@ def install(display=False):
     transient download and is deleted after extracting the ISO),
     ensures the recipe's target disk exists, and boots the machine
     through relict with the ISO and disk mounted, booting from the CD.
-    The call blocks while the machine runs (installer scripting is a
-    later milestone; for now the guest runs until it exits or
-    reliquary is interrupted) and the machine is shut down when
+    After start, waits for the LiveCD's first install menu. The call
+    then blocks while the machine runs (further installer scripting
+    lands in a later milestone; for now the guest runs until it exits
+    or reliquary is interrupted) and the machine is shut down when
     install ends for any reason, including Ctrl-C. ``display`` shows
     the QEMU window instead of running headless.
 
@@ -78,6 +80,9 @@ def install(display=False):
                            qemu_args=("-boot", "d"))
     port = start(config, display=display, home=machine_home)
     try:
+        machine = Machine(port, machine_home)
+        machine.wait_screen(
+            r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
         print("machine running; press Ctrl-C to shut it down",
               file=sys.stderr)
         _wait_for_exit(port)

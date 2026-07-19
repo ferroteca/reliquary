@@ -60,18 +60,25 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
             "FD14LIVE.iso")
 
     def _install(self, create_hdd_image, start, stop,
-                 vm_exited=mock.Mock(side_effect=OSError), **kwargs):
+                 vm_exited=mock.Mock(side_effect=OSError),
+                 machine=None, **kwargs):
         digest = hashlib.sha256(b"live cd iso").hexdigest()
+        if machine is None:
+            machine = mock.Mock()
+        self.machine = machine
         with mock.patch("reliquary.media.urlopen",
                         return_value=io.BytesIO(PAYLOAD)), \
                 mock.patch.object(freedos_plain, "create_hdd_image",
                                   create_hdd_image), \
                 mock.patch.object(freedos_plain, "start", start), \
                 mock.patch.object(freedos_plain, "stop", stop), \
+                mock.patch.object(freedos_plain, "Machine",
+                                  return_value=machine) as Machine, \
                 mock.patch("reliquary.recipes.freedos_plain.socket."
                            "create_connection", vm_exited), \
                 mock.patch.object(freedos_plain, "ISO_SHA256",
                                   digest):
+            self.Machine = Machine
             return freedos_plain.install(**kwargs)
 
     def test_install_prepares_artifacts_and_boots_from_cd(self):
@@ -97,6 +104,9 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
                          self.expected_iso)
         self.assertEqual(config.qemu_args, ("-boot", "d"))
         self.assertEqual(config.platform, "dos")
+        self.Machine.assert_called_once_with(4242, self.machine_home)
+        self.machine.wait_screen.assert_called_once_with(
+            r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
 
     def test_install_display_mode_is_forwarded(self):
         """display=True reaches relict's start()."""

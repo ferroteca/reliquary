@@ -22,11 +22,12 @@ reliquary install freedos-plain
 ```
 
 `install` runs the whole recipe in the foreground: it fetches and
-verifies the vendor media, prepares the target disk, and boots the
-installation machine through relict, blocking until the machine
-exits. Interrupting reliquary (Ctrl-C) shuts the machine down rather
-than leaving it running. Pass `--display` to show the QEMU window
-instead of running headless — helpful when debugging a recipe.
+verifies the vendor media, prepares the target disk, boots the
+installation machine through relict, and waits for the first install
+menu before blocking until the machine exits. Interrupting reliquary
+(Ctrl-C) shuts the machine down rather than leaving it running. Pass
+`--display` to show the QEMU window instead of running headless —
+helpful when debugging a recipe.
 
 Recipes fetch their vendor installation media automatically and cache
 it under the reliquary home; the cached media (e.g. an installer ISO

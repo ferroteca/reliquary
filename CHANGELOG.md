@@ -20,7 +20,8 @@ window for a recipe's guest steps.
 
 The recipe now extracts the LiveCD ISO and boots the installation
 machine through relict with the ISO and target disk mounted, booting
-from the CD. `install` blocks while the machine runs and always shuts
-it down when it ends — including on Ctrl-C, which the CLI reports as
-an interruption instead of a traceback. Scripting the installer
-itself is not yet implemented.
+from the CD. After start it waits for the LiveCD's first install menu
+(`Welcome to FreeDOS 1.4 (LiveCD)`). `install` then blocks while the
+machine runs and always shuts it down when it ends — including on
+Ctrl-C, which the CLI reports as an interruption instead of a
+traceback. Further installer scripting is not yet implemented.
