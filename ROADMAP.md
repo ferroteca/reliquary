@@ -126,9 +126,9 @@ declaration plus a cached instantiation:
 Everything under `cache/machines/<name>/` is reliquary's and
 regenerates from the declaration (plus media definitions and
 scripts); nothing is ever hand-placed there. Pre-existing content
-enters a machine through the declaration: `media:` references,
-and starting-point images (`base`) that are copied or used as
-bases of differencing disks.
+enters a machine through the declaration: `media` references,
+and starting-point images (`base`) that machine drives are
+differenced from, or copies of.
 
 ### The machine spec — declaration and state
 
@@ -159,9 +159,9 @@ Core fields: `platform` (required, never inferred), `backend`
 list when not declared; permanent once assigned), `backend-id`/
 `created`/`installed` (state-only), `memory`, `cpus`, `drives`
 (the declared-media slot convention, per-drive `controller`
-types, `media:` references into the shared library, `size`-based
-image creation, and `base` starting-point images — copied or the
-backing of a differencing disk), `boot`, `control-planes` (the ordered waterfall
+types, `media` references into the shared library, `size`-based
+image creation, and `base` starting-point images — the backing
+of a differencing disk by default, or copied), `boot`, `control-planes` (the ordered waterfall
 policy), and `backend-settings` (the scoped non-portable escape
 hatch — a declaration without it is portable by construction).
 Validation and capability mismatches fail closed, naming the
@@ -243,7 +243,7 @@ Lifecycle semantics:
 - `script` starts the machine if it is not already running.
 - `fetch` downloads, extracts, and hash-verifies a defined media
   item (see docs/media-spec.md). It is a convenience: machine
-  operations resolving a `media:` reference to a fetchable
+  operations resolving a `media` reference to a fetchable
   definition fetch implicitly. Source archives are cached under
   `cache/downloads/`, separate from the payloads in
   `cache/media/`.
@@ -252,7 +252,7 @@ Lifecycle semantics:
   again. Nothing irreplaceable (definitions, `local-path` files,
   payloads without a download source) is cleanable.
 - `recreate` is exactly `destroy` + `create`: drives regenerate
-  as declared (`size` blank, `base` copied or differenced
+  as declared (`size` blank, `base` differenced or copied
   afresh). Since backend assignment re-runs, a recreated machine
   may land on a different backend — `recreate` is the sanctioned
   way to move a machine between backends, and regenerated drives
@@ -277,7 +277,7 @@ Lifecycle semantics:
   backend config, not guest inference), preserving the VM's
   disks as media items — copied (never moved; the source is not
   touched) with generated definitions (computed hashes, no URL),
-  the declaration's drives `base`d on them. An imported machine
+  the declaration's drives taking them as `base`. An imported machine
   recreates like any other: from its bases. `platform` is not
   knowable from any backend configuration, so `import` requires
   `--platform` explicitly; the never-infer rule holds. `import`
@@ -285,9 +285,9 @@ Lifecycle semantics:
   afterward is an ordinary `create`. Drive preservation is
   entirely the spec's job, through the drive materialization
   triad: `size` (always a fresh blank disk at `create`), `base`
-  with `copy` (materialized as a copy of the source image), and
-  `base` with `differencing` (a differencing disk backed by the
-  source).
+  with type `difference` (the default — a differencing disk
+  backed by the base image), and `base` with type `duplicate`
+  (materialized as a full copy).
 - Machines **stay running** until explicitly stopped — by a script
   step or by `stop`. No command implicitly tears the machine down.
 - `--display` shows the backend's console window instead of running
@@ -310,6 +310,59 @@ registry, no regeneration, no linkage back to the scaffolder.
 reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
 `reliquary script <name> <script_name>`.
+
+**Decided shape: a line-oriented step language.** A script is a
+text file (`scripts/<name>.rqs`): header directives, then one
+step per line — a verb, its arguments, then comma-separated
+`key: value` modifier clauses (one rule reads the syntax: a colon
+binds a name to a value, a comma separates clauses) — with `#`
+comments and C-style brace blocks for the
+two structural constructs (`state`, `expect`). Text is just
+text: watch patterns are literal screen text by default (regex
+is the opt-in `regex "…"` keyword form), and strings have
+exactly three escapes (`\"`, `\<`, `\\`) — every other character,
+backslashes included, is itself — plus a Python-style raw form,
+`r"…"`, with no escapes and no tokens for the harder cases.
+`type` strings embed `<key>`
+tokens (`<enter>`, `<ctrl+c>`; unrecognized tokens are parse
+errors). Scripts are
+sequential prose, so they get a prose syntax; machine
+declarations and media definitions are data and stay JSON. The
+parser is small and fail-closed (errors name the line). It is
+deliberately not an expression
+syntax (computation is explicitly Python's job). A script is the
+guest's **state machine written down**. In ordered sequences,
+watching and inputting are separate statements (`wait "…"` then
+`select "…"`); in reactive contexts they fuse into the
+**condition–action pair** `on "…": action`. A `state <name> { … }`
+block holds an ordered body (run afresh at each entry) plus
+`on` handlers, each armed when execution reaches its line and
+active until the state ends (armed handlers are checked before
+the body's current watch point, and fire however often their
+screens appear); `->` transitions move between named states —
+on a handler (answer the screen, leave) or as a body statement —
+including backward, so a guest loop (a mid-install reboot
+replaying menus) is drawn as a transition, not duplicated. A
+state with no transition handlers exits when its body completes;
+one with them idles after its body until one fires. Shared
+screens are factored with `handlers <name> { … }` — a named
+top-level block of reactive pairs — spliced into any state with
+`use <name>` (splicing, not calling: no arguments, no nesting).
+`expect` covers small in-sequence forks; the machine event
+`shutdown` is a watch condition like screen text — `wait
+shutdown` ends a clean shutdown (the causing command is typed
+explicitly; a machine ceasing to run is observable on every
+backend). A guest reboot is deliberately not an event (most
+hypervisors do not surface guest resets); scripts watch for the
+post-reboot screen. Timing is first-class and scoped: `timeout`
+(observation bounds) and `delay` (observation/input pacing —
+never a gate) apply at script, block, and statement scope,
+innermost wins, with a block's own `timeout` trailing its
+closing brace and bounding the block itself. There are
+deliberately no retries and no loops (re-running the script is the
+retry; feedback-driven verbs like menu selection iterate
+internally). User documentation (planned format, written ahead
+of implementation): [docs/script-spec.md](docs/script-spec.md).
 
 The primitive vocabulary already exists in today's CLI and Python
 surface — it is the proven instruction set the language must cover:
@@ -334,6 +387,19 @@ Language design goals:
   to be a general-purpose programming language. Anything
   computational belongs in Python via the embedding API, which
   remains a first-class surface.
+- **Grows additively — a very high design priority.** The GUI era
+  (image matching, pointer input) must arrive without a breaking
+  redesign of the language. Every language decision is checked
+  against the growth rules in docs/script-spec.md ("How the
+  vocabulary grows"): quoted forms are frozen at their original
+  meaning (a bare quoted watch pattern is literal screen text
+  forever, `regex "…"` a regular expression; image matching
+  takes the reserved `wait image` keyword form), new behavior
+  arrives only as new verbs and new optional modifiers, and every
+  verb stays capability-gated so cross-era script/machine
+  mismatches fail closed by name. A proposed language feature
+  that cannot satisfy these rules is wrong, whatever else it has
+  going for it.
 
 OS installation recipes become install scripts: the current
 `recipes/` Python package retires once the language can express the
@@ -890,9 +956,20 @@ agentless and guest-agent control planes with equivalent results.
 - **Backend priority order** for default assignment when a spec
   names no backend (proposed: QEMU, VirtualBox, VMware Workstation,
   Hyper-V — best scriptability first).
-- **Scripting language shape**: line-oriented imperative DSL,
-  structured step documents, or a constrained expression syntax —
-  and how timeouts, retries, and conditionals are written.
+- **Script spec details** (the shape itself is decided — see "The
+  scripting language" and docs/script-spec.md): the portable key
+  name vocabulary for `press`/`<key>` tokens, and the exact `stage`/`collect`
+  semantics per control plane (agentless staging's
+  snapshot-at-start / read-after-stop rules vs. live guest-agent
+  file operations).
+- **`state` construct details** (the construct itself is decided
+  — ordered body plus ambient handlers plus `->` transitions; see
+  docs/script-spec.md): whether a handler can be marked
+  fire-at-most-once (for inputs that must not repeat, like
+  destructive confirmations); and
+  whether *scripts* can share a named `handlers` block (within
+  one script, `handlers`/`use` is decided) without a general
+  include mechanism.
 - **Spec details**: whether per-drive backend settings are ever
   needed beyond the top-level `backend-settings` scope, and how
   running-machine reconfiguration (hot media changes vs.
@@ -913,7 +990,7 @@ agentless and guest-agent control planes with equivalent results.
   Hyper-V import/export format, `.vmx` directory for VMware,
   bare image + launch config for QEMU). Open: the exact CLI
   shape for the two, whether export offers format conversion,
-  and whether a `media:`-referenced drive blocks whole-machine
+  and whether a `media`-referenced drive blocks whole-machine
   export or is materialized into it.
 - **`import` scope**: which backend config translates into the
   synthesized declaration (memory, drives, controllers are clear;
@@ -930,7 +1007,40 @@ agentless and guest-agent control planes with equivalent results.
   multi-device controllers (additive change), and how Hyper-V
   generations surface (a backend setting vs. inferred from
   declared capabilities).
-- **Media commands beyond `fetch`**: whether the CLI grows media
+- **GUI installer scripting** (an explicit goal: win9x/winnt setup
+  GUIs and beyond). Text scraping ends at text mode; GUI guests
+  need screenshot-based matching, for which os-autoinst's needle
+  design is the reference (see AGENTS.md prior art): a reference
+  image plus a JSON sidecar of areas — fuzzy `match` with a
+  similarity threshold, `ocr` for text regions, `exclude` masks
+  for dynamic content — selected by tag, optionally carrying a
+  click point. Open: the needle-like asset format and where the
+  assets live (beside scripts, shared like media definitions?);
+  pointer input, which reliquary currently lacks end to end
+  (machine spec pointing-device field, a control-plane input
+  capability, and script verbs — match-and-click with the click
+  point in the asset, following os-autoinst). The input seam
+  should follow os-autoinst's two-layer event model: three
+  portable primitives — pointer move (x, y), button press/release,
+  key press/release — with clicks, drags, chords, and paced typing
+  composed above them, and event pacing owned by the control
+  plane. The primitives are exactly VNC's RFB input vocabulary
+  (PointerEvent, KeyEvent), so a VNC control plane implements them
+  with no translation, and QMP/VBoxManage/WMI input paths reduce
+  to the same three. Synchronization concepts to adopt with them:
+  act-then-confirm (an input step optionally asserting the screen
+  changed), screen-stillness waits, and pointer hygiene (parking
+  or restoring the cursor after clicks so it never perturbs
+  matching). Also open: how `wait` grows an
+  image-match form without weakening the text-first DOS path, and
+  a host-side needle-cropping convenience (a CLI subcommand, never
+  a service). Era note: DOS/9x-era setup GUIs are fixed-mode,
+  fixed-font, animation-free — needle churn should be far below
+  openQA's — and NT-era setup is largely keyboard-drivable, so
+  keyboard-first remains the preferred path where it works.
+  Throughout, os-autoinst is a **concept reference only** — its
+  designs are studied and reimplemented, never its code (see
+  AGENTS.md prior art for the licensing boundary). whether the CLI grows media
   verbs like list/verify/remove.
 - **Hyper-V agentless screen strategy**: whether WMI thumbnail/
   keyboard automation is good enough for installer scripting or

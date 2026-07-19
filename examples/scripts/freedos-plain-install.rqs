@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+description: FreeDOS 1.4 plain install from LiveCD
+platform: dos
+timeout: 30
+
+state cd-boot {
+    wait "Welcome to FreeDOS 1.4 (LiveCD)"
+    select "Install to harddisk"
+    wait "What is your preferred language"
+    select "English (United States)"
+    wait "Welcome to the FreeDOS 1.4 installation program"
+    press enter
+    on "Drive C: does not appear to be partitioned.": select "Yes" -> partitioning
+    on "Drive C: does not appear to be formatted.": select "Yes" -> formatting
+}
+
+state partitioning {
+    wait "You must reboot your computer"
+    select "Yes" -> cd-boot
+}
+
+state formatting, timeout: 600 {
+    wait "Press a key..."
+    press enter
+    wait "Please select your keyboard layout"
+    press enter
+    wait "What FreeDOS packages do you want to install?"
+    select "Plain DOS system", exclude: "with sources"
+    wait "We are now ready to install FreeDOS 1.4."
+    select "Yes"
+    wait "Installation of FreeDOS 1.4 is now complete.", timeout: 600
+    select "Yes"
+    wait "Load FreeDOS with JEMMEX (more compatible)"
+    press enter
+    wait "C:\>"
+    screenshot
+    enter "fdapm poweroff"
+    wait shutdown
+}

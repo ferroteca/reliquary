@@ -10,6 +10,7 @@ path = [
     "AGENTS.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "examples/**/*.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Paul Galbraith"

@@ -1,0 +1,8 @@
+{
+  "platform": "dos",
+  "drives": {
+    "hdd": {"size": "20M"},
+    "cdrom": "freedos-1.4-livecd"
+  },
+  "boot": ["cdrom", "hdd"]
+}
