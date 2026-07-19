@@ -94,19 +94,20 @@ def normalize_drive_specs(value):
         if isinstance(declaration, (str, os.PathLike)):
             source = declaration
             options = ()
+            enabled = True
         elif isinstance(declaration, collections.abc.Mapping):
-            unknown = set(declaration) - {"source", "options"}
+            unknown = set(declaration) - {"source", "options", "enabled"}
             if unknown:
                 field = sorted(unknown)[0]
                 raise ValueError(f"unknown drive field: drives.{key}.{field}")
             source = declaration.get("source")
             options = _options(declaration.get("options"), key)
+            enabled = declaration.get("enabled", True)
+            if not isinstance(enabled, bool):
+                raise TypeError(f"drives.{key}.enabled must be a boolean")
         else:
             raise TypeError(
                 f"drives.{key} must be a path or drive mapping")
-        if source is None and not options:
-            raise ValueError(
-                f"drives.{key} must declare source or options")
         if source is not None:
             source = os.path.abspath(os.fspath(source))
             if not os.path.exists(source):
@@ -123,6 +124,7 @@ def normalize_drive_specs(value):
         normalized[key] = types.MappingProxyType({
             "source": source,
             "options": types.MappingProxyType(dict(options)),
+            "enabled": enabled,
         })
     return types.MappingProxyType(normalized)
 
@@ -200,6 +202,12 @@ def resolve_media(drives, specs=None):
     media = scan_drives(drives)
     specs = normalize_drive_specs(specs)
     for key, declaration in specs.items():
+        enabled = declaration.get("enabled", True)
+        if not enabled:
+            kind, slot, _ = drive_key(key)
+            if slot in media.get(kind, {}):
+                del media[kind][slot]
+            continue
         kind, slot, _ = drive_key(key)
         source = declaration["source"]
         options = tuple(declaration["options"].items())

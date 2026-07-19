@@ -149,6 +149,48 @@ class HomeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "slots run"):
             media_module.scan_drives(relict.drives_dir())
 
+    def test_enabled_false_disables_autodiscovered_drive(self):
+        self._write_drive_file("hdd_0.qcow2")
+        self._make_drive_dir("hdd_1")
+
+        media = media_module.resolve_media(
+            relict.drives_dir(),
+            {"hdd_1": {"enabled": False}})
+
+        self.assertEqual(media["hdd"], {
+            0: media_module.Drive(
+                os.path.join(relict.drives_dir(), "hdd_0.qcow2"), False),
+        })
+        self.assertNotIn(1, media["hdd"])
+
+    def test_enabled_true_allows_configured_drive_override(self):
+        self._write_drive_file("hdd_0.qcow2")
+        override = os.path.join(self.tempdir.name, "override.qcow2")
+        with open(override, "wb") as f:
+            f.write(b"override")
+
+        media = media_module.resolve_media(
+            relict.drives_dir(),
+            {"hdd_0": {"source": override, "enabled": True}})
+
+        self.assertEqual(media["hdd"], {
+            0: media_module.Drive(override, False),
+        })
+
+    def test_options_without_source_uses_autodiscovered_drive(self):
+        self._write_drive_file("hdd_0.qcow2")
+
+        media = media_module.resolve_media(
+            relict.drives_dir(),
+            {"hdd_0": {"options": {"cache": "writeback"}}})
+
+        self.assertEqual(media["hdd"], {
+            0: media_module.Drive(
+                os.path.join(relict.drives_dir(), "hdd_0.qcow2"),
+                False,
+                (("cache", "writeback"),)),
+        })
+
 
 class InputAndScreenTests(unittest.TestCase):
     def test_character_key_mappings(self):

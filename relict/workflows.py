@@ -160,10 +160,10 @@ def _resolve_path(path, base_dir):
 
 def _drive_parts(declaration, base_dir, key):
     if isinstance(declaration, (str, os.PathLike)):
-        return _resolve_path(declaration, base_dir), {}
+        return _resolve_path(declaration, base_dir), {}, True
     if not isinstance(declaration, collections.abc.Mapping):
         raise TypeError(f"drives.{key} must be a path or drive mapping")
-    unknown = set(declaration) - {"source", "options"}
+    unknown = set(declaration) - {"source", "options", "enabled"}
     if unknown:
         field = sorted(unknown)[0]
         raise ValueError(f"unknown drive field: drives.{key}.{field}")
@@ -179,7 +179,10 @@ def _drive_parts(declaration, base_dir, key):
         raise TypeError(f"drives.{key}.options must be a mapping")
     else:
         options = dict(options)
-    return source, options
+    enabled = declaration.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise TypeError(f"drives.{key}.enabled must be a boolean")
+    return source, options, enabled
 
 
 def _drive_entries(drives, base_dir):
@@ -196,8 +199,8 @@ def _drive_entries(drives, base_dir):
                 f"drive key clash: {claimed[key]!r} and {name!r} "
                 f"both mean {key}")
         claimed[key] = name
-        source, options = _drive_parts(declaration, base_dir, key)
-        entries[key] = {"source": source, "options": options}
+        source, options, enabled = _drive_parts(declaration, base_dir, key)
+        entries[key] = {"source": source, "options": options, "enabled": enabled}
     return entries
 
 
@@ -214,6 +217,8 @@ def _merge_drives(base, override, base_dir):
             **current["options"],
             **declaration["options"],
         }
+        if "enabled" in declaration:
+            current["enabled"] = declaration["enabled"]
     return merged
 
 
