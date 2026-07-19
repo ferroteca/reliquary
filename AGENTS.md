@@ -27,6 +27,9 @@ as the default and currently only complete platform workflow:
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 - `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
+- `examples/` contains complete example documents in the planned formats (media definition, machine declaration,
+  and scripts for the FreeDOS plain install), mirroring the reliquary home layout; its README carries the status
+  note. Keep them synchronized with `docs/` when the formats change.
 - `docs/` contains detailed user documentation, currently for planned interfaces written ahead of
   implementation (e.g. the machine spec: `docs/machine-spec.md` guide, `-reference.md`, `-cookbook.md`,
   each carrying a status note until implemented). ROADMAP.md holds the architectural context and open
@@ -294,6 +297,17 @@ maintenance without weakening ownership checks or the public interface.
 QEMU's own functional tests validate the broad model of scripting a guest over QMP and asserting on observable state.
 reliquary adds the DOS-specific layer: keyboard conventions, VGA text scraping, prompt
 completion, and vvfat staging.
+
+SUSE's os-autoinst (the engine under openQA) is the closest prior art to reliquary as a whole: it drives OS
+installers by screen matching and key injection over QMP/VNC, with per-operation "consoles" (VNC, serial,
+virtio-terminal, ssh) mirroring reliquary's control planes, multiple backends (qemu, svirt, bare metal) mirroring the
+adapter seam, command completion over serial via echoed marker strings, per-step screenshot records, and snapshot
+"milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend implementations — reliquary learns from its
+designs (the input event model, needle area types, console seams), never from its code: it is GPL-2.0-or-later, so no
+code, needles, or test modules may ever be ported or closely translated into this BSD-3-Clause project. Study the
+documentation and the ideas; reimplement from scratch. Deliberate divergences to preserve: VGA text scraping instead of image needles for
+text-mode guests, authored step documents instead of Perl test modules, and a local ephemeral-machine tool instead of
+a testing service (scheduler, workers, and web UI are permanently out of scope).
 
 Espressif's `pytest-embedded-qemu` is useful prior art for a future
 `pytest-reliquary` plugin: host pytest orchestration around a native guest test framework. It is not directly reusable
