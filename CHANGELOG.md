@@ -13,6 +13,10 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   Capacity accepts a qemu-img size string (`"2G"`, `"512M"`) or a
   positive integer MiB value. `find_qemu_img()` resolves `qemu-img`
   with the same search order as `find_qemu()`.
+- `documents_dir()` publicly resolves the user's platform Documents
+  folder (or `None` when it cannot be determined), so embedding
+  projects can anchor their own state directories the same way relict
+  anchors its home.
 
 ### Removed
 

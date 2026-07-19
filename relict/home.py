@@ -17,7 +17,7 @@ def set_home(path):
     _home = os.path.abspath(path)
 
 
-def _documents_dir():
+def documents_dir():
     """The user's Documents folder, or None if it cannot be determined."""
     if sys.platform == "win32":
         import ctypes
@@ -57,7 +57,7 @@ def _documents_dir():
 def home():
     global _home, _home_announced
     if not _home:
-        base = _documents_dir() or os.path.expanduser("~")
+        base = documents_dir() or os.path.expanduser("~")
         _home = os.path.join(base, "relict")
     if not _home_announced:
         _home_announced = True

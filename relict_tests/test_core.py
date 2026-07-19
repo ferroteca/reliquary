@@ -46,6 +46,12 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(relict.drives_dir(),
                          os.path.join(self.tempdir.name, "drives"))
 
+    def test_documents_dir_is_public_and_absolute_or_none(self):
+        """documents_dir() reports the platform Documents folder."""
+        documents = relict.documents_dir()
+        if documents is not None:
+            self.assertTrue(os.path.isabs(documents))
+
     def test_staged_drive_letters_are_validated(self):
         for letter in ("A", "B", "CC", "1", ""):
             with self.assertRaisesRegex(ValueError, "staged_drive",

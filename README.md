@@ -115,6 +115,11 @@ Choose a different home with any of these methods:
 2. The `RELICT_HOME` environment variable
 3. The Python `relict.set_home()` function
 
+The platform Documents lookup itself is available as
+`relict.documents_dir()`, returning the folder path or `None` when it
+cannot be determined, for callers that want to anchor their own
+directories the same way.
+
 The layout is:
 
 ```text

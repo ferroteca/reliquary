@@ -3,7 +3,7 @@
 """Generic QEMU guest automation with an agentless DOS workflow."""
 
 from .cli import main
-from .home import drives_dir, home, set_home
+from .home import documents_dir, drives_dir, home, set_home
 from .interaction import GuestExec
 from .interaction_agentless import (AgentlessGuestExec, screen_text,
                                     send_keys, send_text, wait_screen)
@@ -21,6 +21,7 @@ __all__ = [
     "AgentlessGuestExec",
     "GuestExec",
     "create_hdd_image",
+    "documents_dir",
     "drives_dir",
     "find_qemu",
     "find_qemu_img",
