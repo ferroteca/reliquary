@@ -32,6 +32,10 @@ def main(args=None):
         "recipe", help="recipe name, e.g. freedos-plain")
     install.add_argument(
         "--home", help="override the reliquary home directory")
+    install.add_argument(
+        "--display", action="store_true",
+        help="show the QEMU window during guest steps (for "
+             "debugging recipes)")
     options = parser.parse_args(args)
 
     if options.home:
@@ -41,7 +45,11 @@ def main(args=None):
     except ValueError as error:
         print(f"reliquary: {error}", file=sys.stderr)
         return 2
-    artifacts = recipe.install()
+    try:
+        artifacts = recipe.install(display=options.display)
+    except KeyboardInterrupt:
+        print("reliquary: interrupted", file=sys.stderr)
+        return 130
     for name, path in artifacts.items():
         print(f"{name}: {path}")
     return 0

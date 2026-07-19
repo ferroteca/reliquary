@@ -10,7 +10,17 @@ SPDX-License-Identifier: BSD-3-Clause
 Initial scaffold: package structure, CLI stub, and recipe module convention.
 
 Added the `freedos-plain` recipe's preparation steps: the FreeDOS 1.4
-LiveCD is downloaded and SHA-256 verified into the reliquary home, and
+LiveCD ISO is downloaded into the reliquary home (the distribution
+zip is deleted after extraction) and SHA-256 verified on every run,
+and
 a 20 MiB dynamically allocated qcow2 (v3) target disk is created. The
-`reliquary install <recipe>` CLI command runs a recipe by name. The
-scripted installer run is not yet implemented.
+`reliquary install <recipe>` CLI command runs a recipe by name, and
+`--display` (the `display` recipe parameter) requests a visible QEMU
+window for a recipe's guest steps.
+
+The recipe now extracts the LiveCD ISO and boots the installation
+machine through relict with the ISO and target disk mounted, booting
+from the CD. `install` blocks while the machine runs and always shuts
+it down when it ends — including on Ctrl-C, which the CLI reports as
+an interruption instead of a traceback. Scripting the installer
+itself is not yet implemented.

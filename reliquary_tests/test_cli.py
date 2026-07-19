@@ -27,9 +27,20 @@ class CliInstallTests(unittest.TestCase):
                 return_value=artifacts) as install:
             with contextlib.redirect_stdout(stdout):
                 result = cli.main(["install", "freedos-plain"])
-        install.assert_called_once_with()
+        install.assert_called_once_with(display=False)
         self.assertEqual(result, 0)
         self.assertIn("hdd.qcow2", stdout.getvalue())
+
+    def test_install_display_flag_is_forwarded(self):
+        """--display asks the recipe for a visible QEMU window."""
+        with mock.patch(
+                "reliquary.recipes.freedos_plain.install",
+                return_value={}) as install:
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = cli.main(["install", "freedos-plain",
+                                   "--display"])
+        install.assert_called_once_with(display=True)
+        self.assertEqual(result, 0)
 
     def test_install_unknown_recipe_fails_cleanly(self):
         """An unknown recipe name reports an error without a traceback."""
@@ -38,6 +49,16 @@ class CliInstallTests(unittest.TestCase):
             result = cli.main(["install", "no-such-os"])
         self.assertEqual(result, 2)
         self.assertIn("no-such-os", stderr.getvalue())
+
+    def test_interrupt_exits_cleanly(self):
+        """Ctrl-C reports interruption instead of a traceback."""
+        stderr = io.StringIO()
+        with mock.patch("reliquary.recipes.freedos_plain.install",
+                        side_effect=KeyboardInterrupt):
+            with contextlib.redirect_stderr(stderr):
+                result = cli.main(["install", "freedos-plain"])
+        self.assertEqual(result, 130)
+        self.assertIn("interrupted", stderr.getvalue())
 
     def test_install_home_flag_overrides_home(self):
         """--home relocates the reliquary home for the run."""

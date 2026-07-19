@@ -16,9 +16,10 @@ through relict.
 ### Input
 
 The [FreeDOS 1.4 LiveCD](https://freedos.org/download/) provides the
-raw material. The recipe downloads `FD14-LiveCD.zip` into the
-reliquary home (`<home>/install-media/freedos/`) and verifies it
-against the SHA-256 published in the release's `verify.txt`; a cached
+raw material. The recipe downloads `FD14-LiveCD.zip`, extracts
+`FD14LIVE.iso` into the reliquary home
+(`<home>/install-media/freedos/`), and deletes the zip; only the ISO
+is kept, verified against a pinned SHA-256 on every run. A cached
 copy that fails verification is erased and downloaded again.
 
 ### Output
@@ -31,7 +32,8 @@ native DOS prompt.
 ### Recipe contract
 
 Each recipe is a module under `reliquary/recipes/`. A recipe module
-exports an `install()` function that resolves its inputs and outputs
+exports an `install(display=False)` function that resolves its inputs
+and outputs
 under the reliquary home (see `reliquary/home.py`) and returns a
 mapping of the artifacts it produced. Recipe machine directories are
 relict homes, so relict can boot the declared drives directly.
@@ -47,9 +49,15 @@ The recipe is responsible for:
 
 1. ~~Acquire and hash-verify the LiveCD media; create the blank 20 MiB
    qcow2 target disk; expose `reliquary install freedos-plain`.~~ Done.
-2. Boot the LiveCD through relict and script the installer's "Plain
-   DOS system" path onto the target disk.
-3. Add a verification pass that boots the installed disk and confirms
+2. ~~Extract the LiveCD ISO and boot the machine through relict with
+   the ISO and target disk mounted, booting from the CD; block while
+   the machine runs and shut it down on any exit, including
+   Ctrl-C.~~ Done.
+3. Script the installer's "Plain DOS system" path onto the target
+   disk (the LiveCD boots to a live `D:\>` prompt; `SETUP.BAT` starts
+   the installer). Watch the guest memory size: the LiveCD warns
+   about limited RAM at relict's 16 MiB DOS default.
+4. Add a verification pass that boots the installed disk and confirms
    a DOS prompt.
 
 ### Decisions still needed
