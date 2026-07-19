@@ -30,14 +30,26 @@ _CONFIG_FIELDS = frozenset({
 })
 
 
-def _function_config(machine_config):
-    """Normalize a direct function's machine configuration."""
+def _function_config(machine_config, home=None):
+    """Normalize a direct function's machine configuration.
+    
+    When machine_config is None, discover <home>/machine.json if present.
+    Explicit machine_config values override the discovered file.
+    """
     if machine_config is None:
+        effective = effective_home(home)
+        implicit = os.path.join(effective, "machine.json")
+        if os.path.exists(implicit):
+            return MachineConfig.from_file(implicit)
         return MachineConfig()
 
     if isinstance(machine_config, MachineConfig):
         return machine_config
     if isinstance(machine_config, collections.abc.Mapping):
+        effective = effective_home(home)
+        implicit = os.path.join(effective, "machine.json")
+        if os.path.exists(implicit):
+            return MachineConfig.from_file(implicit, **machine_config)
         return MachineConfig.from_mapping(machine_config)
     if isinstance(machine_config, (str, os.PathLike)):
         return MachineConfig.from_file(machine_config)
@@ -58,7 +70,7 @@ def _cli_machine_config(machine_path, home_override, **cli_overrides):
 
 def start(machine_config=None, *, display=False, port=None, home=None):
     """Start a relict-owned QEMU process and return its QMP port."""
-    config = _function_config(machine_config)
+    config = _function_config(machine_config, home)
     return _start_configured(config, display, port, home)
 
 
@@ -74,7 +86,7 @@ def run_task(task, machine_config=None, *, display=False, port=None,
     """Boot one VM, invoke ``task(machine)``, then stop the VM."""
     if not callable(task):
         raise TypeError("task must be callable as task(machine)")
-    config = _function_config(machine_config)
+    config = _function_config(machine_config, home)
     base = effective_home(home)
     actual_port = _start_configured(config, display, port, base)
     deadline = (None if config.timeout is None
@@ -89,7 +101,7 @@ def run_task(task, machine_config=None, *, display=False, port=None,
 def run_guest_program(exe_path, args="", machine_config=None, *,
                       port=None, home=None):
     """Stage, execute, and collect one agentless DOS program run."""
-    config = _function_config(machine_config)
+    config = _function_config(machine_config, home)
     return _run_configured(config, exe_path, args, port=port, home=home)
 
 
@@ -349,7 +361,14 @@ class Runner:
 
     def __init__(self, home=None, config=None):
         self.home = os.path.abspath(effective_home(home))
-        self.config = MachineConfig() if config is None else config
+        if config is None:
+            implicit = os.path.join(self.home, "machine.json")
+            if os.path.exists(implicit):
+                self.config = MachineConfig.from_file(implicit)
+            else:
+                self.config = MachineConfig()
+        else:
+            self.config = config
 
     @property
     def platform(self):

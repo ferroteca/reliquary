@@ -116,7 +116,7 @@ Documents/relict/
 │   ├── floppy.img        a boot floppy image (slot 0 = A:)
 │   ├── hdd/              a folder exposed as a virtual FAT hard disk
 │   └── ...               hdd_1.qcow2, cdrom.iso, floppy_1/, ...
-├── machine.json          optional machine configuration (CLI only)
+├── machine.json          optional machine configuration (CLI and API)
 ├── screenshots/          captured PNG files
 ├── qemu-stderr.log       diagnostics from the last QEMU start
 └── vm.json               identity and port of the active VM
@@ -457,9 +457,9 @@ config = relict.MachineConfig.from_file(
 `version` is required in the document and must be `1`; it is not a constructor
 field. Explicit overrides win: scalars replace (including `None`),
 `qemu_args` and `machine` replace wholesale, and `drives` merge by logical
-slot then by entry field / option name. Programmatic construction and
-`Runner` do not load `<home>/machine.json` implicitly — that discovery is
-CLI-only.
+slot then by entry field / option name. When no configuration is provided,
+the API automatically discovers and loads `<home>/machine.json` if present;
+explicit API values override the file values.
 
 The module-level `start()`, `run_task()`, and `run_guest_program()` functions
 accept a `machine_config` containing a `MachineConfig`, versioned mapping, or

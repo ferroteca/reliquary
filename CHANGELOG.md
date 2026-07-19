@@ -22,6 +22,10 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   settings input; `Runner.run()` passes its configuration through unchanged,
   and the QEMU launcher consumes that configuration instead of loose hardware
   arguments. The default QEMU argument vector is unchanged.
+- The Python API now automatically discovers and loads `<home>/machine.json`
+  when no explicit configuration is provided, matching CLI behavior. Explicit
+  API values (passed as `MachineConfig`, mapping, or path) override the file
+  values; `Runner` likewise loads the file when `config=None`.
 
 ### Added
 

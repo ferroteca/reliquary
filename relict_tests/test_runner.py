@@ -417,6 +417,80 @@ class DirectMachineConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "MachineConfig"):
             relict.start(machine_config=42)
 
+    def test_api_functions_load_machine_json_from_home_when_present(self):
+        with tempfile.TemporaryDirectory() as home:
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "platform": "win9x", "timeout": 90}, f)
+
+            with mock.patch.object(workflows_module, "_start_configured",
+                                   return_value=54321) as start:
+                port = relict.start(home=home)
+                self.assertEqual(start.call_args.args[0].platform, "win9x")
+                self.assertEqual(start.call_args.args[0].timeout, 90)
+
+            with mock.patch.object(workflows_module, "_start_configured",
+                                   return_value=54321) as start, \
+                    mock.patch.object(workflows_module, "stop"):
+                task = mock.Mock(return_value="result")
+                result = relict.run_task(task, home=home)
+                self.assertEqual(start.call_args.args[0].platform, "win9x")
+
+            with mock.patch.object(workflows_module, "_run_configured",
+                                   return_value="output") as run:
+                result = relict.run_guest_program("TEST.EXE", home=home)
+                self.assertEqual(run.call_args.args[0].platform, "win9x")
+
+    def test_api_functions_use_defaults_when_machine_json_missing(self):
+        with tempfile.TemporaryDirectory() as home:
+            with mock.patch.object(workflows_module, "_start_configured",
+                                   return_value=54321) as start:
+                port = relict.start(home=home)
+                self.assertEqual(start.call_args.args[0].platform, "dos")
+                self.assertIsNone(start.call_args.args[0].timeout)
+
+    def test_api_mapping_overrides_merge_with_machine_json(self):
+        with tempfile.TemporaryDirectory() as home:
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "memory": 32, "platform": "win9x"}, f)
+
+            with mock.patch.object(workflows_module, "_start_configured",
+                                   return_value=54321) as start:
+                port = relict.start(machine_config={"timeout": 60}, home=home)
+                config = start.call_args.args[0]
+                self.assertEqual(config.platform, "win9x")
+                self.assertEqual(config.memory, 32)
+                self.assertEqual(config.timeout, 60)
+
+    def test_runner_loads_machine_json_from_home_when_present(self):
+        with tempfile.TemporaryDirectory() as home:
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "platform": "win9x", "timeout": 90}, f)
+
+            runner = relict.Runner(home)
+            self.assertEqual(runner.config.platform, "win9x")
+            self.assertEqual(runner.config.timeout, 90)
+
+    def test_runner_uses_defaults_when_machine_json_missing(self):
+        with tempfile.TemporaryDirectory() as home:
+            runner = relict.Runner(home)
+            self.assertEqual(runner.config.platform, "dos")
+            self.assertIsNone(runner.config.timeout)
+
+    def test_runner_explicit_config_overrides_machine_json(self):
+        with tempfile.TemporaryDirectory() as home:
+            machine_path = os.path.join(home, "machine.json")
+            with open(machine_path, "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "platform": "win9x"}, f)
+
+            config = relict.MachineConfig(platform="dos", timeout=45)
+            runner = relict.Runner(home, config)
+            self.assertIs(runner.config, config)
+            self.assertEqual(runner.config.platform, "dos")
+            self.assertEqual(runner.config.timeout, 45)
+
 
 class ProvisionTests(unittest.TestCase):
     def setUp(self):
