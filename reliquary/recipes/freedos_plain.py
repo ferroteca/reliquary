@@ -81,7 +81,7 @@ def install(display=False):
     port = start(config, display=display, home=machine_home)
     try:
         machine = Machine(port, machine_home)
-        machine.wait_screen(
+        machine.wait_text(
             r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
         print("machine running; press Ctrl-C to shut it down",
               file=sys.stderr)

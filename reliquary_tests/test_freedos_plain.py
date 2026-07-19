@@ -105,7 +105,7 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
         self.assertEqual(config.qemu_args, ("-boot", "d"))
         self.assertEqual(config.platform, "dos")
         self.Machine.assert_called_once_with(4242, self.machine_home)
-        self.machine.wait_screen.assert_called_once_with(
+        self.machine.wait_text.assert_called_once_with(
             r"Welcome to FreeDOS 1\.4 \(LiveCD\)")
 
     def test_install_display_mode_is_forwarded(self):

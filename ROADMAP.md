@@ -63,7 +63,7 @@ The recipe is responsible for:
 ### Decisions still needed
 
 - How the installer's interactive prompts are scripted beyond the
-  first-menu `wait_screen` already in place (further screen waits vs.
+  first-menu `wait_text` already in place (further screen waits vs.
   fixed key scripts).
 - Whether the CLI supports a `--verify` flag that boots the result
   through relict after installation.
