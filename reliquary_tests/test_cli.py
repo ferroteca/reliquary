@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+"""Tests for the reliquary command-line interface."""
+
+import contextlib
+import io
+import os
+import unittest
+from unittest import mock
+
+from reliquary import cli, home
+
+
+class CliInstallTests(unittest.TestCase):
+    """Behavior of the install subcommand."""
+
+    def setUp(self):
+        saved = home._home
+        self.addCleanup(setattr, home, "_home", saved)
+
+    def test_install_runs_named_recipe(self):
+        """install <recipe> invokes the recipe module's install()."""
+        artifacts = {"media": "m.zip", "hdd_image": "hdd.qcow2"}
+        stdout = io.StringIO()
+        with mock.patch(
+                "reliquary.recipes.freedos_plain.install",
+                return_value=artifacts) as install:
+            with contextlib.redirect_stdout(stdout):
+                result = cli.main(["install", "freedos-plain"])
+        install.assert_called_once_with()
+        self.assertEqual(result, 0)
+        self.assertIn("hdd.qcow2", stdout.getvalue())
+
+    def test_install_unknown_recipe_fails_cleanly(self):
+        """An unknown recipe name reports an error without a traceback."""
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = cli.main(["install", "no-such-os"])
+        self.assertEqual(result, 2)
+        self.assertIn("no-such-os", stderr.getvalue())
+
+    def test_install_home_flag_overrides_home(self):
+        """--home relocates the reliquary home for the run."""
+        with mock.patch("reliquary.recipes.freedos_plain.install",
+                        return_value={}):
+            with contextlib.redirect_stdout(io.StringIO()):
+                cli.main(["install", "freedos-plain",
+                          "--home", "elsewhere"])
+        self.assertEqual(home.home(), os.path.abspath("elsewhere"))
+
+
+if __name__ == "__main__":
+    unittest.main()

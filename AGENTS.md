@@ -69,7 +69,7 @@ frontend. Runtime dependencies remain under `[project].dependencies`.
 Run checks with the project virtual environment.
 
 ```powershell
-$pythonFiles = (Get-ChildItem reliquary,reliquary_tests -Filter *.py).FullName
+$pythonFiles = (Get-ChildItem reliquary,reliquary\recipes,reliquary_tests -Filter *.py).FullName
 .venv\Scripts\python.exe -m py_compile $pythonFiles
 .venv\Scripts\python.exe -m unittest -v reliquary_tests
 .venv\Scripts\python.exe -m build

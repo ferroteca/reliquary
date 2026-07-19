@@ -5,65 +5,59 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Roadmap
 
-## Milestone 1 — minimal FreeDOS bootable floppy
+## Milestone 1 — FreeDOS plain install to hard disk
 
-Build a minimal, self-contained FreeDOS bootable floppy image from the
-FreeDOS 1.4 FloppyEdition distribution. The goal is a working DOS boot
-that demonstrates the full pipeline: download handling, media extraction,
-and image construction through relict.
+Script the FreeDOS 1.4 installer's "Plain DOS system" option from the
+LiveCD distribution onto a hard-disk image. The goal is a working DOS
+boot that demonstrates the full pipeline: media download and
+verification, disk image creation, and a scripted installer run
+through relict.
 
 ### Input
 
-The [FreeDOS 1.4 FloppyEdition](https://freedos.org/download/)
-download provides the raw material. The distribution includes a bootable
-floppy image and packaged utilities; the first milestone will extract only
-the kernel, command interpreter, and boot files needed for a minimal
-bootable floppy.
+The [FreeDOS 1.4 LiveCD](https://freedos.org/download/) provides the
+raw material. The recipe downloads `FD14-LiveCD.zip` into the
+reliquary home (`<home>/install-media/freedos/`) and verifies it
+against the SHA-256 published in the release's `verify.txt`; a cached
+copy that fails verification is erased and downloaded again.
 
 ### Output
 
-A 1.44 MB raw floppy image (`freedos_min.floppy.img`) that boots FreeDOS in
-QEMU through relict and reaches a native DOS prompt.
+A 20 MiB dynamically allocated qcow2 (v3) hard-disk image at
+`<home>/machines/freedos-plain/drives/hdd.qcow2` holding an installed
+plain FreeDOS system that boots in QEMU through relict and reaches a
+native DOS prompt.
 
 ### Recipe contract
 
-Each recipe is a module under `reliquary/recipes/`. A recipe module exports
-an `install(media_dir, output_dir, runner)` function (or similar shape,
-to be finalized during milestone 1 implementation). The function receives
-the path to the extracted or mounted installation media, a directory for
-output artifacts, and a relict `Runner` instance preconfigured for the
-target environment.
+Each recipe is a module under `reliquary/recipes/`. A recipe module
+exports an `install()` function that resolves its inputs and outputs
+under the reliquary home (see `reliquary/home.py`) and returns a
+mapping of the artifacts it produced. Recipe machine directories are
+relict homes, so relict can boot the declared drives directly.
 
 The recipe is responsible for:
 
-1. Validating that the supplied media contains the expected files.
-2. Constructing a bootable disk image in `output_dir`.
-3. Optionally scripting relict to verify the image boots, though a
-   standalone disk image is sufficient for milestone 1 completion.
+1. Acquiring and verifying its vendor installation media.
+2. Creating the target disk image.
+3. Scripting relict to run the vendor installer against the target
+   disk (not yet implemented).
 
 ### Implementation steps
 
-1. Design and stabilize the recipe module contract (function signature,
-   return type, error conditions).
-2. Implement `reliquary/recipes/freedos.py`:
-   - Parse the FloppyEdition media directory to locate the kernel
-     (`KERNEL.SYS`), command interpreter (`COMMAND.COM`), and boot files.
-   - Construct a minimal FAT12 filesystem with a boot sector.
-   - Write the output floppy image.
-3. Implement the CLI `install freedos` subcommand using the recipe.
-4. Add a smoke test that verifies the recipe can be imported and produces
-   a predictable empty-floppy image, plus a manual integration test that
-   boots the result through relict.
+1. ~~Acquire and hash-verify the LiveCD media; create the blank 20 MiB
+   qcow2 target disk; expose `reliquary install freedos-plain`.~~ Done.
+2. Boot the LiveCD through relict and script the installer's "Plain
+   DOS system" path onto the target disk.
+3. Add a verification pass that boots the installed disk and confirms
+   a DOS prompt.
 
 ### Decisions still needed
 
-- Whether reliquary includes its own FAT12 filesystem builder or delegates
-  to an external tool (mtools, a pure-Python FAT library, etc.).
-- The exact recipe function signature and return type.
-- How media directories are declared: local paths, downloaded archives,
-  or both.
-- Whether the CLI supports a `--verify` flag that boots the result through
-  relict after construction.
+- How the installer's interactive prompts are scripted and synchronized
+  (relict screen-text waits vs. fixed key scripts).
+- Whether the CLI supports a `--verify` flag that boots the result
+  through relict after installation.
 
 ## Design principles
 

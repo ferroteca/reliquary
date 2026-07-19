@@ -18,8 +18,14 @@ reliquary depends on relict, which must be installed alongside it.
 
 ```powershell
 reliquary --help
-reliquary install freedos --media <path-to-floppy-edition>
+reliquary install freedos-plain
 ```
+
+Recipes fetch their vendor installation media automatically, verify it
+against a pinned SHA-256, and cache it under the reliquary home
+(`Documents\reliquary` by default; override with `--home` or the
+`RELIQUARY_HOME` environment variable). Disk images are created under
+`<home>\machines\<recipe>\drives`.
 
 ## License
 
