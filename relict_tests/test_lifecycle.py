@@ -353,5 +353,69 @@ class LifecycleTests(unittest.TestCase):
         self.assertIsNone(lifecycle_module.read_vm_state())
 
 
+class CreateHddImageTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = self.tempdir.name
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def _run_create(self, filename, capacity, *, returncode=0,
+                    stderr=""):
+        completed = mock.Mock(
+            returncode=returncode, stdout="", stderr=stderr)
+        with mock.patch.object(lifecycle_module, "find_qemu_img",
+                               return_value="qemu-img"), \
+                mock.patch.object(lifecycle_module.subprocess, "run",
+                                  return_value=completed) as run:
+            path = relict.create_hdd_image(filename, capacity)
+        return path, run
+
+    def test_creates_sparse_qcow2_v3_image(self):
+        filename = os.path.join(self.root, "drives", "hdd.qcow2")
+
+        path, run = self._run_create(filename, "2G")
+
+        self.assertEqual(path, os.path.abspath(filename))
+        self.assertEqual(
+            run.call_args.args[0],
+            ["qemu-img", "create", "-f", "qcow2",
+             "-o", "compat=1.1,preallocation=off",
+             os.path.abspath(filename), "2G"])
+        self.assertTrue(os.path.isdir(os.path.dirname(path)))
+
+    def test_integer_capacity_is_mib(self):
+        filename = os.path.join(self.root, "disk.qcow2")
+
+        _, run = self._run_create(filename, 512)
+
+        self.assertEqual(run.call_args.args[0][-1], "512M")
+
+    def test_rejects_non_qcow2_filename(self):
+        with self.assertRaisesRegex(ValueError, r"\.qcow2"):
+            relict.create_hdd_image(
+                os.path.join(self.root, "hdd.img"), "1G")
+
+    def test_rejects_existing_image(self):
+        filename = os.path.join(self.root, "hdd.qcow2")
+        with open(filename, "wb") as handle:
+            handle.write(b"x")
+
+        with self.assertRaises(FileExistsError):
+            relict.create_hdd_image(filename, "1G")
+
+    def test_rejects_non_positive_mib_capacity(self):
+        filename = os.path.join(self.root, "hdd.qcow2")
+        with self.assertRaisesRegex(ValueError, "positive"):
+            relict.create_hdd_image(filename, 0)
+
+    def test_surfaces_qemu_img_failure(self):
+        filename = os.path.join(self.root, "hdd.qcow2")
+        with self.assertRaisesRegex(RuntimeError, "qemu-img failed"):
+            self._run_create(filename, "1G", returncode=1,
+                             stderr="boom")
+
+
 if __name__ == "__main__":
     unittest.main()

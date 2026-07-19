@@ -46,7 +46,16 @@ relict hands back a guest program's raw output, and interpreting it is left to t
 ## The workflow
 
 1. **Provide the guest.** Place the bootable DOS image of your choice under `<relict_home>/drives` — a floppy image
-   as `floppy.<ext>` (typically `floppy.img`), or a hard-disk image as `hdd.<ext>` (e.g. `hdd.qcow2`).
+   as `floppy.<ext>` (typically `floppy.img`), or a hard-disk image as `hdd.<ext>` (e.g. `hdd.qcow2`). To create an
+   empty sparse qcow2 v3 hard disk for later partitioning or imaging:
+
+   ```python
+   relict.create_hdd_image(
+       os.path.join(relict.drives_dir(), "hdd.qcow2"),
+       "2G",
+   )
+   ```
+
 2. **Stage the files.** Collect everything the guest should work with — your programs, test executables, data files, and
    any DOS utilities they depend on — place them in a `<relict_home>/drives/hdd` folder (or `hdd_1` behind a
    hard-disk boot image, which claims slot 0). relict attaches the folder as a virtual FAT hard disk — `C:` when it
@@ -62,7 +71,7 @@ relict hands back a guest program's raw output, and interpreting it is left to t
 relict requires:
 
 - Python 3.9 or newer
-- QEMU with `qemu-system-i386`
+- QEMU with `qemu-system-i386` (and `qemu-img` to create hard-disk images)
 
 The Python package installs QEMU's official `qemu.qmp` library. QEMU itself is a separate application and must be
 installed on the host.

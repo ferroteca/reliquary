@@ -6,6 +6,14 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ## [Unreleased]
 
+### Added
+
+- `create_hdd_image(filename, capacity)` creates a sparse qcow2 v3
+  (`compat=1.1`, no preallocation) hard-disk image at the given path.
+  Capacity accepts a qemu-img size string (`"2G"`, `"512M"`) or a
+  positive integer MiB value. `find_qemu_img()` resolves `qemu-img`
+  with the same search order as `find_qemu()`.
+
 ### Removed
 
 - The `boot-to-dos` CLI command. Wait for a prompt with `relict wait`.

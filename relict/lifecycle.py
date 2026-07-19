@@ -22,6 +22,7 @@ from .media import boot_guess, drive_args, resolve_media
 
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
+_QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
 _VM_STATE_FILE = "vm.json"
 
 
@@ -97,28 +98,87 @@ def _qemu_fallback_dirs():
     return dirs
 
 
-def find_qemu():
-    """Locate the QEMU binary from configuration and common paths."""
+def _find_qemu_tool(binary):
+    """Locate a QEMU tool from configuration and common paths."""
     for variable in ("RELICT_QEMU_HOME", "QEMU_HOME"):
         qemu_home = os.environ.get(variable)
         if not qemu_home:
             continue
         for directory in (qemu_home, os.path.join(qemu_home, "bin")):
-            candidate = os.path.join(directory, _QEMU_BIN)
+            candidate = os.path.join(directory, binary)
             if os.path.isfile(candidate):
                 return candidate
         raise FileNotFoundError(
-            f"{_QEMU_BIN} not found under {variable}={qemu_home}")
-    found = shutil.which(_QEMU_BIN)
+            f"{binary} not found under {variable}={qemu_home}")
+    found = shutil.which(binary)
     if found:
         return found
     for directory in _qemu_fallback_dirs():
-        candidate = os.path.join(directory, _QEMU_BIN)
+        candidate = os.path.join(directory, binary)
         if os.path.isfile(candidate):
             return candidate
     raise FileNotFoundError(
-        f"{_QEMU_BIN} not found: install QEMU, add it to PATH, or set "
+        f"{binary} not found: install QEMU, add it to PATH, or set "
         "RELICT_QEMU_HOME to its install directory")
+
+
+def find_qemu():
+    """Locate the QEMU system binary from configuration and common paths."""
+    return _find_qemu_tool(_QEMU_BIN)
+
+
+def find_qemu_img():
+    """Locate ``qemu-img`` from configuration and common paths."""
+    return _find_qemu_tool(_QEMU_IMG_BIN)
+
+
+def create_hdd_image(filename, capacity):
+    """Create a sparse qcow2 v3 hard-disk image at ``filename``.
+
+    ``capacity`` is a qemu-img size string such as ``"512M"`` or ``"2G"``,
+    or a positive integer MiB value. The image uses ``compat=1.1``
+    (qcow2 v3) with no preallocation. Existing files are not overwritten.
+    Returns the absolute path of the created image.
+    """
+    if not isinstance(filename, str) or not filename.strip():
+        raise ValueError("filename must be a non-empty path")
+    path = os.path.abspath(filename)
+    if not path.lower().endswith(".qcow2"):
+        raise ValueError(
+            f"hdd image filename must end with .qcow2: {filename}")
+    if isinstance(capacity, bool) or not isinstance(capacity, (int, str)):
+        raise TypeError(
+            "capacity must be a qemu-img size string or positive "
+            "integer MiB value")
+    if isinstance(capacity, int):
+        if capacity <= 0:
+            raise ValueError(
+                "capacity must be a positive integer MiB value")
+        size = f"{capacity}M"
+    else:
+        size = capacity.strip()
+        if not size:
+            raise ValueError("capacity must be a non-empty size")
+    if os.path.exists(path):
+        raise FileExistsError(f"image already exists: {path}")
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    qemu_img = find_qemu_img()
+    command = [
+        qemu_img, "create", "-f", "qcow2",
+        "-o", "compat=1.1,preallocation=off",
+        path, size,
+    ]
+    print(f"creating qcow2 image: {path} ({size})")
+    completed = subprocess.run(
+        command, capture_output=True, text=True, check=False)
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        raise RuntimeError(
+            f"qemu-img failed creating {path}"
+            + (f": {detail}" if detail else ""))
+    return path
 
 
 class Qmp:

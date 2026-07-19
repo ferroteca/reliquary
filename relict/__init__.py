@@ -7,7 +7,8 @@ from .home import drives_dir, home, set_home
 from .interaction import GuestExec
 from .interaction_agentless import (AgentlessGuestExec, screen_text,
                                     send_keys, send_text, wait_screen)
-from .lifecycle import Qmp, find_qemu, stop
+from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
+                        stop)
 from .machine import Machine, screenshot
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
@@ -19,8 +20,10 @@ __all__ = [
     "MachineConfig",
     "AgentlessGuestExec",
     "GuestExec",
+    "create_hdd_image",
     "drives_dir",
     "find_qemu",
+    "find_qemu_img",
     "home",
     "main",
     "run_guest_program",
