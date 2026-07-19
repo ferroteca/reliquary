@@ -8,11 +8,24 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ### Added
 
+- `cursor_menu_select(item, timeout=30, port=None, home=None)` and the
+  `relict menu ITEM` CLI command select an entry in a cursor-key driven
+  text menu (for example a boot menu). Navigation is feedback-driven:
+  relict presses the up/down cursor keys, follows the selection
+  highlight through the VGA attribute bytes, and presses Enter only
+  once the highlight sits on the single screen row matching the given
+  text (case-insensitively). `machine.vga_screen(qmp)` newly exposes
+  the attribute bytes alongside the text rows.
 - `create_hdd_image(filename, capacity)` creates a sparse qcow2 v3
   (`compat=1.1`, no preallocation) hard-disk image at the given path.
   Capacity accepts a qemu-img size string (`"2G"`, `"512M"`) or a
   positive integer MiB value. `find_qemu_img()` resolves `qemu-img`
   with the same search order as `find_qemu()`.
+- `Machine.screen_text()` and `Machine.wait_text(pattern, timeout=60)`
+  read and wait on the guest's VGA text screen directly from a `Machine`,
+  so tasks and adapters can block until specific output (for example a
+  boot menu) is displayed. The module-level `screen_text()` and
+  `wait_text()` now delegate to these methods.
 - `documents_dir()` publicly resolves the user's platform Documents
   folder (or `None` when it cannot be determined), so embedding
   projects can anchor their own state directories the same way relict

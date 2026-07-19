@@ -191,6 +191,154 @@ class InputAndScreenTests(unittest.TestCase):
         self.assertTrue(all(row == "" for row in rows[1:]))
         qmp.hmp.assert_called_once_with("xp /4000bx 0xb8000")
 
+    def test_vga_screen_exposes_attribute_bytes(self):
+        cells = []
+        for index, char in enumerate("A:\\>" + " " * (80 * 25 - 4)):
+            cells.extend((ord(char), 0x70 if index < 4 else 0x07))
+        lines = []
+        for offset in range(0, len(cells), 16):
+            payload = " ".join(f"0x{value:02x}" for value in
+                               cells[offset:offset + 16])
+            lines.append(f"00000000000b{offset:04x}: {payload}")
+        qmp = mock.Mock()
+        qmp.hmp.return_value = "\n".join(lines)
+
+        rows, attributes = machine_module.vga_screen(qmp)
+
+        self.assertEqual(rows[0], "A:\\>")
+        self.assertEqual(attributes[0][:5], [0x70] * 4 + [0x07])
+        self.assertEqual(len(attributes), 25)
+        self.assertTrue(all(len(row) == 80 for row in attributes))
+
+    def test_wait_text_returns_the_matching_screen(self):
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
+                mock.patch.object(
+                    machine_module, "vga_text",
+                    return_value=["Welcome to FreeDOS 1.4 (LiveCD)"]), \
+                mock.patch.object(machine_module.time, "sleep"):
+            connection.return_value.__enter__.return_value = mock.Mock()
+            screen = machine_module.Machine().wait_text(
+                r"Welcome to FreeDOS")
+
+        self.assertIn("FreeDOS 1.4", screen)
+
+    def test_wait_text_times_out_without_a_match(self):
+        with mock.patch.object(machine_module, "qmp_session") as connection, \
+                mock.patch.object(
+                    machine_module, "vga_text", return_value=[""]), \
+                mock.patch.object(machine_module.time, "sleep"):
+            connection.return_value.__enter__.return_value = mock.Mock()
+            with self.assertRaisesRegex(TimeoutError, "FreeDOS"):
+                machine_module.Machine().wait_text("FreeDOS", timeout=0)
+
+
+class _MenuClock:
+    """A deterministic monotonic clock advanced by sleeping."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+class _FakeMenu:
+    """A cursor-key menu rendered as VGA text and attribute rows."""
+
+    def __init__(self, items, cursor=0, stuck=False):
+        self.items = items
+        self.cursor = cursor
+        self.stuck = stuck
+        self.selected = None
+
+    def screen(self):
+        rows = ["Welcome menu", ""] + list(self.items)
+        rows += [""] * (25 - len(rows))
+        attributes = [[0x1B] * 80 for _ in range(25)]
+        attributes[2 + self.cursor] = [0x70] * 80
+        return rows, attributes
+
+    def press(self, key):
+        if key == "ret":
+            self.selected = self.cursor
+        elif self.stuck:
+            pass
+        elif key == "down" and self.cursor + 1 < len(self.items):
+            self.cursor += 1
+        elif key == "up" and self.cursor > 0:
+            self.cursor -= 1
+
+
+class CursorMenuTests(unittest.TestCase):
+    def _select(self, menu, item, timeout=30):
+        console = agentless_module._DisplayConsole(None)
+        console.screen = menu.screen
+        console.send_keys = lambda combos, delay=0.06: [
+            menu.press(combo[0]) for combo in combos]
+        clock = _MenuClock()
+        with mock.patch.object(agentless_module.time, "monotonic",
+                               clock.monotonic), \
+                mock.patch.object(agentless_module.time, "sleep",
+                                  clock.sleep):
+            return console.cursor_menu_select(item, timeout)
+
+    def test_select_moves_down_to_the_matching_item(self):
+        menu = _FakeMenu(["Use FreeDOS 1.4 in Live Environment mode",
+                          "Boot from system harddisk",
+                          "Install to harddisk"])
+
+        selected = self._select(menu, "install TO harddisk")
+
+        self.assertEqual(menu.selected, 2)
+        self.assertEqual(selected, "Install to harddisk")
+
+    def test_select_probes_upward_from_the_bottom_of_the_menu(self):
+        menu = _FakeMenu(["First item", "Second item", "Third item"],
+                         cursor=2)
+
+        selected = self._select(menu, "First item")
+
+        self.assertEqual(menu.selected, 0)
+        self.assertEqual(selected, "First item")
+
+    def test_missing_item_is_rejected_before_any_keypress(self):
+        menu = _FakeMenu(["Boot from system harddisk"])
+
+        with self.assertRaisesRegex(ValueError, "not on screen"):
+            self._select(menu, "Boot from floppy")
+
+        self.assertEqual(menu.cursor, 0)
+        self.assertIsNone(menu.selected)
+
+    def test_ambiguous_item_is_rejected(self):
+        menu = _FakeMenu(["Install to harddisk",
+                          "Install using Floppy Edition"])
+
+        with self.assertRaisesRegex(ValueError, "multiple rows"):
+            self._select(menu, "Install")
+
+        self.assertIsNone(menu.selected)
+
+    def test_unresponsive_menu_raises(self):
+        menu = _FakeMenu(["First item", "Second item"], stuck=True)
+
+        with self.assertRaisesRegex(RuntimeError,
+                                    "no menu highlight responded"):
+            self._select(menu, "Second item")
+
+        self.assertIsNone(menu.selected)
+
+    def test_unselectable_row_raises_when_the_cursor_cannot_reach_it(self):
+        menu = _FakeMenu(["First item", "Second item"])
+
+        with self.assertRaisesRegex(RuntimeError, "stopped responding"):
+            self._select(menu, "Welcome menu")
+
+        self.assertIsNone(menu.selected)
+
 
 class BootToDosTests(unittest.TestCase):
     def test_reaches_an_existing_prompt_without_typing(self):
@@ -232,6 +380,8 @@ class InteractionAdapterTests(unittest.TestCase):
         self.assertIs(relict.GuestExec, interaction_module.GuestExec)
         self.assertIs(relict.AgentlessGuestExec,
                       agentless_module.AgentlessGuestExec)
+        self.assertIs(relict.cursor_menu_select,
+                      agentless_module.cursor_menu_select)
 
     def test_agentless_adapter_satisfies_guest_exec_protocol(self):
         adapter = agentless_module.AgentlessGuestExec(

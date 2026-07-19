@@ -9,8 +9,9 @@ from qemu.qmp import ConnectError
 
 from .home import set_home
 from .workflows import _cli_machine_config
-from .interaction_agentless import (AgentlessGuestExec, screen_text,
-                                    send_keys, send_text, wait_screen)
+from .interaction_agentless import (AgentlessGuestExec,
+                                    cursor_menu_select, screen_text,
+                                    send_keys, send_text, wait_text)
 from .lifecycle import stop
 from .machine import Machine, screenshot
 from .workflows import start
@@ -60,6 +61,8 @@ def main(argv=None):
     command.add_argument("dos_command")
     command = subcommands.add_parser("keys")
     command.add_argument("names", nargs="+")
+    command = subcommands.add_parser("menu")
+    command.add_argument("item")
     subcommands.add_parser("text")
     command = subcommands.add_parser("wait")
     command.add_argument("pattern")
@@ -103,11 +106,15 @@ def _dispatch(arguments):
             arguments.dos_command, arguments.timeout or 120)
     elif arguments.command == "keys":
         send_keys([[key] for key in arguments.names], arguments.port)
+    elif arguments.command == "menu":
+        selected = cursor_menu_select(
+            arguments.item, arguments.timeout or 30, arguments.port)
+        print(f"selected: {selected}")
     elif arguments.command == "text":
         print("\n".join(screen_text(arguments.port)))
     elif arguments.command == "wait":
-        wait_screen(arguments.pattern, arguments.timeout or 60,
-                    arguments.port)
+        wait_text(arguments.pattern, arguments.timeout or 60,
+                  arguments.port)
         print("matched.")
     elif arguments.command == "screenshot":
         screenshot(arguments.name, arguments.port)

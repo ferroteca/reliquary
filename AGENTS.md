@@ -172,8 +172,11 @@ architecture changes.
 
 ## Dependencies and style
 
-- Runtime code is stdlib-only except for `qemu.qmp`.
-- Do not add dependencies casually. The hand-written PNG fallback exists to avoid an image-library dependency.
+- Runtime dependencies are welcome when they pull their weight; declare
+  them under `[project].dependencies` in `pyproject.toml`. Prefer the
+  stdlib only when it serves the need equally well.
+- The hand-written PNG fallback predates this policy; replacing it with
+  a maintained image library is acceptable if that simplifies the code.
 - Support Python 3.9 and newer.
 - Keep lines near 79 columns and match existing formatting.
 - Prefer small public interfaces with lifecycle complexity kept behind them.

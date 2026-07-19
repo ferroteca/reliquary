@@ -320,6 +320,7 @@ relict start -- -cpu 486 -device virtio-rng-pci
 relict type TEXT
 relict run COMMAND
 relict keys KEY [KEY ...]
+relict menu ITEM
 ```
 
 `type` types text followed by Enter. `run` additionally waits for the prompt to return. `keys` accepts raw QEMU key
@@ -328,6 +329,19 @@ names, such as:
 ```powershell
 relict keys down ret
 ```
+
+`menu` selects an entry in a cursor-key driven text menu, such as a boot
+menu. It presses the up/down cursor keys and follows the selection
+highlight through the VGA attribute bytes, so the entry is confirmed by
+what the guest actually displays before Enter is pressed:
+
+```powershell
+relict menu "Use FreeDOS 1.4 in Live Environment mode"
+```
+
+The item text is matched case-insensitively against the visible screen
+rows and must match exactly one row. Use the global `--timeout SECONDS`
+option to change the 30-second navigation timeout.
 
 ### Reading the guest
 
@@ -378,6 +392,28 @@ try:
     relict.screenshot("after-test", port=port)
 finally:
     relict.stop(port=port)
+```
+
+`Machine` also exposes the VGA text screen directly: `machine.screen_text()`
+returns the 80x25 rows, and `machine.wait_text(pattern, timeout=60)` polls
+until the screen matches a regular expression (returning the matching screen)
+or raises `TimeoutError`. This is how to block on specific output, such as a
+boot menu:
+
+```python
+machine.wait_text(r"Welcome to FreeDOS")
+```
+
+Once a cursor-key menu is displayed, `cursor_menu_select()` navigates it
+by feedback: it presses up/down, follows the selection highlight through
+the VGA attribute bytes, and presses Enter only after the highlight sits
+on the row matching the given text (case-insensitive, must match exactly
+one screen row). It returns the selected row's text:
+
+```python
+machine.wait_text(r"Welcome to FreeDOS")
+relict.cursor_menu_select(
+    "Use FreeDOS 1.4 in Live Environment mode", port=port)
 ```
 
 `Machine.qmp()` exposes the identity-verified QMP session when a caller needs
