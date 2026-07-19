@@ -6,6 +6,12 @@ its own agentless QEMU guest automation layer (formerly the separate relict
 project), which owns QEMU lifecycle, media, QMP identity checks, keyboard
 input, screen access, screenshots, and per-run state.
 
+reliquary machines are ephemeral: disposable rigs for scripted installs and
+automated guest tasks, cheap to recreate and delete. The durable artifact is
+the output — above all the installed disk image, which you copy to a
+platform built for long-lived machines when it should live on. reliquary is
+not a VM manager for machines you keep.
+
 ## Installation
 
 ```powershell

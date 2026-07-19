@@ -12,6 +12,14 @@ vendor media, booting them, and scripting them — across multiple
 virtualization backends, driven by named machines and a reliquary
 scripting language.
 
+reliquary manages **ephemeral machines**. A reliquary machine is a
+disposable rig: created to run a scripted install or an automated
+task, then recreated or deleted. The durable artifact is the
+output — above all the installed disk image, which is copied to a
+platform built for long-lived machines when it should live on.
+reliquary is not a VM manager for machines you keep; every design
+choice may assume machines are cheap to destroy and rebuild.
+
 The unit of design is the **operation** performed against a
 machine: start it, stop it, attach media, send input, run a guest
 command, read the screen, transfer a file, take a screenshot. Two
@@ -28,7 +36,7 @@ meaning:
    (run a command by agentless typing, over a serial console, or
    through a guest agent), each way is a control plane, and
    choosing among them is explicit policy. Lifecycle operations
-   (create, start, stop, delete) always have exactly one way per
+   (create, start, stop, destroy) always have exactly one way per
    backend — the hypervisor's **management interface** (QMP,
    `VBoxManage`, `vmrun`, WMI), a private tool of the adapter — so
    no control-plane choice applies to them. Control planes exist
@@ -72,7 +80,7 @@ adapters sharing a common API:
 Design rules:
 
 - **One API, four adapters.** The adapter API covers machine
-  lifecycle (create, start, stop, delete), media attachment, input,
+  lifecycle (create, start, stop, destroy), media attachment, input,
   screen access, and control plane endpoints. Capabilities differ per
   backend; the API reports capabilities honestly rather than
   emulating missing ones.
@@ -83,11 +91,13 @@ Design rules:
 - **Default backend assignment.** When a machine spec does not name
   a backend, reliquary assigns one from an internal prioritized list
   of the backends actually available, and records the assignment in
-  the spec so the machine stays on that backend thereafter.
-- **Backend state stays in the machine home.** Each backend is
-  instructed to keep its machine files (disk images, `.vbox`,
-  `.vmx`, Hyper-V VM/VHD paths) inside the reliquary machine home,
-  so a machine directory is the whole machine.
+  the machine state so the machine stays on that backend
+  thereafter.
+- **Backend state stays in the cached instantiation.** Each
+  backend is instructed to keep its machine files (disk images,
+  `.vbox`, `.vmx`, Hyper-V VM/VHD paths) inside
+  `cache/machines/<name>/`, so a machine's cache directory is the
+  whole instantiation.
 - **The serial-carried reliquary guest agent is backend-portable.**
   Every backend can expose an emulated UART, so the QGA-profile
   agent described below is the one guest-side investment that pays
@@ -95,190 +105,207 @@ Design rules:
 
 ## The machine model
 
-Machines are referenced by name everywhere. A machine lives in its
-machine home:
+Machines are referenced by name everywhere. A machine is a
+declaration plus a cached instantiation:
 
 ```text
-<reliquary_home>/machines/<name>/
-├── reliquary-machine.json   the machine spec
-├── drives/                  machine-owned disk/floppy images
-├── screenshots/             captured screens
-└── ...                      backend state, logs, VM identity
+<reliquary_home>/machines/
+└── <name>.json              the declaration (user-owned)
+<reliquary_home>/cache/machines/<name>/
+├── reliquary.json           the state (reliquary-owned)
+├── drives/                  the machine's disk/floppy images
+├── screenshots/             captured screens (transient — grab
+│                            them or lose them)
+└── ...                      backend files and logs
 ```
 
-### The machine spec — `reliquary-machine.json`
+Everything under `cache/machines/<name>/` is reliquary's and
+regenerates from the declaration (plus media definitions and
+scripts); nothing is ever hand-placed there. Pre-existing content
+enters a machine through the declaration: `media:` references,
+and starting-point images (`base`) that are copied or used as
+bases of differencing disks.
 
-The spec is reliquary's own backend-agnostic format; it must never
-be a thin veneer over one backend's configuration. The machine's
-name is its directory name; the spec does not repeat it.
+### The machine spec — declaration and state
 
-The spec is the machine's **single source of truth**, with two
-phases of ownership:
+User documentation (planned format, written ahead of
+implementation): [docs/machine-spec.md](docs/machine-spec.md) with
+its [field reference](docs/machine-spec-reference.md) and
+[cookbook](docs/machine-spec-cookbook.md).
 
-1. **Before `create`**, a spec is user-authored input — a file or
-   raw JSON handed to `create` describing the intended machine.
-   Optional fields may be omitted; `create` resolves them.
-2. **After `create`**, the copy in the machine home is reliquary's
-   record of the machine, and reliquary maintains it: assigning the
-   backend, recording backend identifiers, and updating it whenever
-   reliquary reconfigures the machine — mounting drives or media,
-   changing memory, reordering boot devices. There is no separate
-   "learned" section; resolved facts are written into the same
-   fields a user would have declared. The spec always describes the
-   machine as it now is.
+The spec is reliquary's own backend-agnostic format — never a thin
+veneer over one backend's configuration. Two documents share it,
+with one owner each: the **declaration**
+(`machines/<name>.json`) is the machine as the user defined it —
+authored at `machines/<name>.json` (by hand, `init`, or
+`import`), instantiated by `create`, and edited (while stopped)
+to reconfigure the machine; reliquary reads it and never writes
+it. The **state** (`cache/machines/<name>/reliquary.json`) is the machine as it
+actually is — fully resolved (aliases canonicalized, defaults
+materialized), extended with state-only fields, and rewritten by
+reliquary in the same operation as every machine change. Every
+`start` reconciles declaration, state, and backend: applicable
+differences are applied to the backend, contradictions fail
+closed naming both sides. Runtime reconfiguration (script steps,
+CLI) updates the state only; permanence belongs in the
+declaration.
 
-Hand edits after creation are discouraged, and strongly discouraged
-while the machine is running (reliquary rewrites the file as it
-manipulates the machine, and the backend will not reflect edits
-until a restart at best). The supported way to change a machine is
-through reliquary — CLI commands and script steps.
-
-An example spec after `create` has resolved a FreeDOS installation
-machine onto QEMU:
-
-```json
-{
-  "version": 1,
-  "platform": "dos",
-  "backend": "qemu",
-  "backend-id": "reliquary-freedos-plain-5f2c",
-  "created": "2026-07-19T18:20:11Z",
-  "memory": 32,
-  "drives": {
-    "hdd_0": {"source": "drives/hdd.qcow2", "size": "20M"},
-    "cdrom_0": {"source": "media:FD14LIVE.iso"}
-  },
-  "boot": ["cdrom_0", "hdd_0"]
-}
-```
-
-#### Fields
-
-- `version` — required, `1`.
-- `platform` — required guest platform: `dos`, `win9x`, `winnt`,
-  extended deliberately. Never inferred.
-- `backend` — `qemu`, `virtualbox`, `vmware`, `hyperv`. Optional in
-  a `create` input: when omitted, `create` assigns one from the
-  prioritized list of available backends and writes it into the
-  spec. Always present after creation. Changing it afterward is not
-  supported — backend state (identifiers, disk formats, VM
-  registration) is not portable, so moving a machine to another
-  backend means creating a new machine.
-- `backend-id` — written by `create`: the backend's identifier for
-  the machine (QEMU instance name, VirtualBox UUID, VMware `.vmx`
-  path, Hyper-V VM id), the anchor for ownership verification.
-  Never valid in a `create` input.
-- `created` — creation timestamp, written by `create`.
-- `memory` — MiB, defaulting by platform as today (the resolved
-  default is written into the spec at creation).
-- `cpus` — virtual CPU count, default 1.
-- `drives` — the declared-media convention, carried over: keys
-  `floppy_0..1`, `hdd_0..3`, `cdrom_0..3` (`floppy`/`hdd`/`cdrom`
-  alias slot 0). Each value is a source string or an object:
-  - `source` — a path relative to the machine home (images the
-    machine owns, conventionally under `drives/`), or a `media:`
-    reference naming a file in `<reliquary_home>/media` (shared,
-    machine-independent media). Relative paths may not escape the
-    machine home; `media:` is the only cross-boundary reference.
-  - `size` — optional; when the source file does not exist,
-    `create` (or first `start`) creates it at this size in the
-    backend's preferred dynamically-allocated format. A `size` on
-    an existing image is validated, never applied destructively.
-  - `enabled` — optional bool, as today, to disable an entry
-    without deleting it.
-  - Directory sources (today's vvfat staging) remain declarable but
-    are a capability: backends that cannot mount a host directory
-    as a drive reject the spec with a capability error rather than
-    emulating it.
-- `boot` — ordered list of drive keys to try; defaults to the
-  current best-guess rule (slot-0 floppy, else slot-0 hdd, else
-  cdrom).
-- `control-planes` — optional ordered control plane policy for the guest-
-  communication waterfall (names per the control plane families below);
-  defaults per platform (DOS: agentless display), the resolved
-  default written at creation.
-- `installed` — whether an install script has completed against
-  this machine; written by reliquary, never valid in a `create`
-  input.
-- `backend-settings` — the explicitly scoped, explicitly
-  non-portable escape hatch: one object per backend name (e.g.
-  `"backend-settings": {"qemu": {"machine": "pc", "args": [...]}}`).
-  Only the section matching the machine's backend applies. This
-  replaces today's raw `qemu_args`; it is the only place
-  backend-specific configuration may appear, so a spec with no
-  `backend-settings` is portable by construction.
-
-#### Rewrite discipline
-
-Reliquary rewrites the spec whenever it changes the machine, in
-canonical JSON formatting, atomically (write-temp-and-replace).
-Because the file is the single source of truth, reliquary must
-update it in the same operation that changes the backend — a spec
-that disagrees with the hypervisor's actual configuration is a bug.
-On `start`, reliquary verifies the backend machine against the spec
-(via `backend-id` and the declared hardware) and fails closed on
-drift it cannot reconcile, rather than silently adopting either
-side.
-
-#### Validation
-
-Specs fail closed: unknown top-level keys, unknown drive keys, slot
-clashes, out-of-range slots, and `backend-settings` for the active
-backend containing keys reliquary owns (memory, drives, boot
-devices) are errors. Capability mismatches (a directory drive on
-Hyper-V, VNC on Hyper-V) are reported as capability errors naming
-the backend, not silently degraded.
-
-JSON only for now, as before. YAML may be added later through a
-justified parser dependency, must normalize through exactly the same
-model, and must not introduce YAML-only features.
+Core fields: `platform` (required, never inferred), `backend`
+(assigned into the state from the availability-filtered priority
+list when not declared; permanent once assigned), `backend-id`/
+`created`/`installed` (state-only), `memory`, `cpus`, `drives`
+(the declared-media slot convention, per-drive `controller`
+types, `media:` references into the shared library, `size`-based
+image creation, and `base` starting-point images — copied or the
+backing of a differencing disk), `boot`, `control-planes` (the ordered waterfall
+policy), and `backend-settings` (the scoped non-portable escape
+hatch — a declaration without it is portable by construction).
+Validation and capability mismatches fail closed, naming the
+backend and missing capability.
 
 ### Home layout
 
 ```text
 <reliquary_home>/
-├── machines/<name>/     machine homes (above)
+├── machines/            machine declarations, <name>.json (above)
 ├── scripts/             reliquary automation scripts
-└── media/               machine-independent media: ISOs, floppy
-                         images, cached+hash-verified vendor
-                         installation media
+├── media/               media definitions (mirror URLs, archive
+│                        and payload SHA-256; one definition per
+│                        source archive can itemize several named
+│                        files) — see docs/media-spec.md
+└── cache/               fetched/cached files (clean commands
+                         only ever delete what reliquary can
+                         restore)
+    ├── downloads/        cached source archives (redownloadable;
+    │                    reclaimed by `clean downloads`)
+    └── media/           the named payload files machines mount,
+                         fetched/extracted/verified on demand
 ```
 
-The current `install-media/` cache folds into `media/`. The current
-root-level `drives/`, `machine.json`, and `vm.json` layout is
-superseded by machine homes; the project is pre-release, so this is
-a replacement, not a migration.
+The current `install-media/` cache folds into `cache/`. The
+current root-level `drives/`, `machine.json`, and `vm.json`
+layout is superseded by the declaration/cache split; the project
+is pre-release, so this is a replacement, not a migration.
+
+Cached instantiations live under `cache/machines/<name>/` (see
+"The machine model" above).
 
 ## The CLI
 
-Machine-scoped commands take the machine by name:
+Every command applies to a named machine or named media, so the
+name needs no flag: it is the second command word
+(`reliquary <command> <name> ...`).
+
+The lifecycle vocabulary is two-layered. Spec-level verbs act on
+the declaration (`machines/<name>.json`): `init` scaffolds one,
+`delete` removes one — and authoring the file directly in an
+editor is always equally valid. Instance-level verbs act on
+the cached instantiation: `create` instantiates the spec,
+`start`/`stop` run it, `destroy` discards the instantiation
+(never the spec), and `recreate` is `destroy` + `create`.
+`import` synthesizes a spec from a native VM — spec-level only;
+instantiating it afterward is an ordinary `create`.
 
 ```text
-reliquary --machine <name> create <machine_spec>
-    (machine_spec: path to a spec JSON file, or a raw JSON string)
-reliquary --machine <name> start [--display]
-reliquary --machine <name> stop
-reliquary --machine <name> delete
-reliquary --machine <name> script <script_name> [--display]
+reliquary create <name>
+    (instantiates the existing spec machines/<name>.json)
+reliquary start <name> [--display]
+reliquary stop <name>
+reliquary destroy <name>
+reliquary recreate <name>
+reliquary delete <name>
+reliquary clone <name> <new_name>
+reliquary export <name> [<destination>]
+reliquary import <name> <source> --platform <platform>
+reliquary script <name> <script_name> [--display]
+reliquary fetch <media_name>
+reliquary clean downloads
+reliquary clean media
 ```
 
 Lifecycle semantics:
 
+- `create` takes no spec argument: it resolves the declaration
+  already at `machines/<name>.json` — written by hand, by
+  `init`, or by `import` — and materializes the cached
+  instantiation. Specs reach `machines/` the way media
+  definitions reach `media/`: they are authored documents.
+- `destroy` discards the machine's cached instantiation — state,
+  backend machine, drive images — and never touches the spec. An
+  uninstantiated spec is just a file.
+- `delete` removes the spec, destroying the instantiation first
+  if one exists. The machine is gone entirely.
+
 - `script` starts the machine if it is not already running.
+- `fetch` downloads, extracts, and hash-verifies a defined media
+  item (see docs/media-spec.md). It is a convenience: machine
+  operations resolving a `media:` reference to a fetchable
+  definition fetch implicitly. Source archives are cached under
+  `cache/downloads/`, separate from the payloads in
+  `cache/media/`.
+- `clean downloads` / `clean media` reclaim the two caches:
+  cached source archives, and payload files reliquary can fetch
+  again. Nothing irreplaceable (definitions, `local-path` files,
+  payloads without a download source) is cleanable.
+- `recreate` is exactly `destroy` + `create`: drives regenerate
+  as declared (`size` blank, `base` copied or differenced
+  afresh). Since backend assignment re-runs, a recreated machine
+  may land on a different backend — `recreate` is the sanctioned
+  way to move a machine between backends, and regenerated drives
+  arrive in the new backend's formats.
+- `clone` duplicates a stopped machine: it copies the declaration
+  to the new name and the source's cached drive images into the
+  clone's instantiation, then runs `create` resolution fresh —
+  the clone gets its own backend assignment and `backend-id`.
+  State and backend registration are never copied; a clone shares
+  ancestry, nothing else.
+
+- `export` copies a stopped machine out to the backend's native
+  management — registered in the backend's own machine location
+  (or an explicit destination) with disks in its native format.
+  The exported VM is independent and permanently outside
+  reliquary's purview: this is the first-class form of "copy the
+  result to a platform built for long-lived machines," and
+  ownership verification guarantees reliquary can never touch it
+  afterward.
+- `import` synthesizes a declaration from a native backend VM's
+  configuration (memory, drives, controllers — translation of
+  backend config, not guest inference), preserving the VM's
+  disks as media items — copied (never moved; the source is not
+  touched) with generated definitions (computed hashes, no URL),
+  the declaration's drives `base`d on them. An imported machine
+  recreates like any other: from its bases. `platform` is not
+  knowable from any backend configuration, so `import` requires
+  `--platform` explicitly; the never-infer rule holds. `import`
+  stops at the spec: it never instantiates — running the machine
+  afterward is an ordinary `create`. Drive preservation is
+  entirely the spec's job, through the drive materialization
+  triad: `size` (always a fresh blank disk at `create`), `base`
+  with `copy` (materialized as a copy of the source image), and
+  `base` with `differencing` (a differencing disk backed by the
+  source).
 - Machines **stay running** until explicitly stopped — by a script
   step or by `stop`. No command implicitly tears the machine down.
 - `--display` shows the backend's console window instead of running
   headless.
 - Ownership verification generalizes: no adapter sends a control
   command to a hypervisor object until it has verified that the
-  object is the one recorded in the machine home (the QMP identity
-  check is the QEMU instance of this rule).
+  object is the one recorded in the machine's state (the QMP
+  identity check is the QEMU instance of this rule).
+
+A future milestone adds `init`, the spec-scaffolding
+convenience: a simple CLI command that writes a minimal starter
+declaration from a few answers or flags (platform, disk size,
+installer media), so new machines don't begin from a blank
+editor. One-shot, fire-and-forget scaffolding only — it emits an
+ordinary declaration file the user owns from then on; no template
+registry, no regeneration, no linkage back to the scaffolder.
 
 ## The scripting language
 
 reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
-`reliquary --machine <name> script <script_name>`.
+`reliquary script <name> <script_name>`.
 
 The primitive vocabulary already exists in today's CLI and Python
 surface — it is the proven instruction set the language must cover:
@@ -330,13 +357,13 @@ The recipe's current shape (Python module under `recipes/`,
 
 ### Milestone 2 — The machine model
 
-Machine homes under `machines/<name>`, the `reliquary-machine.json`
-spec (declared + learned sections), the `media/` and `scripts/`
-home layout, and the machine-scoped CLI grammar (`create`, `start`,
-`stop`, `delete`). The QEMU machine layer is re-anchored on machine
-homes; `MachineConfig`/root-home `machine.json` are absorbed into
-the spec (single source of truth, maintained by reliquary after
-creation).
+Declarations under `machines/<name>.json`, cached instantiations
+under `cache/machines/<name>/`, the `media/` and `scripts/` home
+layout, and the machine-scoped CLI grammar (`create`, `start`,
+`stop`, `destroy`, `delete`). The QEMU machine layer is re-anchored on
+cached instantiations; `MachineConfig`/root-home `machine.json`
+are absorbed into the declaration (user-owned) and state
+(reliquary-owned, reconciled at every `start`).
 
 ### Milestone 3 — The backend adapter seam
 
@@ -369,6 +396,11 @@ now explicitly backend-portable over serial.
 
 ## Design principles
 
+- **Machines are ephemeral.** A machine exists to run its scripted
+  task; disk images are the durable artifact. Prefer designs that
+  make machines cheap to recreate over designs that make them
+  precious — no feature should exist solely to nurse a long-lived
+  machine.
 - **One script, one target.** Each OS version and edition gets one
   install script. Avoid parameterized mega-scripts that mutate
   behavior based on flags.
@@ -816,7 +848,8 @@ A control plane may need two lifecycle phases:
    startup.
 
 Endpoint paths and other persistent artifacts must remain under the
-machine home. Ownership verification remains mandatory for every
+machine's cached instantiation. Ownership verification remains
+mandatory for every
 management-interface operation, including operations used by the agentless
 control plane.
 
@@ -828,11 +861,17 @@ decision should be visible in diagnostics.
 
 ## Roadmap constraints
 
+No backward compatibility before beta (see AGENTS.md): no format
+versioning or migration, no API aliasing, no compatibility shims.
+Every milestone may reshape interfaces freely and completely until
+at least a beta-quality release exists.
+
 Agentless DOS operation on QEMU is the permanent base described in
 AGENTS.md; no milestone may weaken it.
 
 The declared-media convention (drives named by medium, slot, and
-format) carries over into machine homes and machine specs. New
+format) carries over into machine declarations and cached
+instantiations. New
 media kinds, controllers, and USB devices must extend the same
 convention — a new medium name — not appear as opaque raw backend
 arguments.
@@ -855,13 +894,45 @@ agentless and guest-agent control planes with equivalent results.
   running-machine reconfiguration (hot media changes vs.
   stopped-only changes like memory) is surfaced in the CLI and
   script language.
+- **Promoting runtime changes**: whether a convenience command
+  copies a state-side runtime change (e.g. attached media) back
+  into the declaration, or users always edit the declaration by
+  hand.
+- **Machine cache cleaning**: whether a `clean machines` command
+  reclaims cached instantiations of stopped machines wholesale
+  (they regenerate like everything else under `cache/`), or
+  whether `recreate`/`delete` per machine is enough.
+- **`export` mechanics per backend**: what "the backend's native
+  management" concretely means for each backend (VirtualBox
+  machine folder + registration, Hyper-V import/export format,
+  `.vmx` directory for VMware, bare image + launch config for
+  QEMU), whether export offers format conversion, and whether a
+  `media:`-referenced drive blocks export or is materialized
+  into it.
+- **`import` scope**: which backend config translates into the
+  synthesized declaration (memory, drives, controllers are clear;
+  what of NICs and other devices the spec doesn't model yet), and
+  whether untranslatable configuration fails the import or lands
+  in `backend-settings`.
+- **Spec device growth**: firmware/boot semantics (BIOS vs UEFI)
+  for post-DOS platforms, and when network, display adapter,
+  audio, and USB become first-class spec fields (each following
+  the drives pattern: agnostic vocabulary, capability-checked per
+  backend). Storage controller *types* are already spec vocabulary
+  (per-drive `controller`); still open are per-platform controller
+  defaults beyond `ide`, whether slot ranges widen for
+  multi-device controllers (additive change), and how Hyper-V
+  generations surface (a backend setting vs. inferred from
+  declared capabilities).
+- **Media commands beyond `fetch`**: whether the CLI grows media
+  verbs like list/verify/remove.
 - **Hyper-V agentless screen strategy**: whether WMI thumbnail/
   keyboard automation is good enough for installer scripting or
   Hyper-V machines require the serial/agent control planes from day one.
 - **Media catalog shape** under `media/`: whether pinned hashes and
   download URLs live beside install scripts, in a manifest per
   media item, or both.
-- **Concurrent machines**: locking per machine home, and whether
+- **Concurrent machines**: locking per machine, and whether
   several named machines may run at once from one reliquary home
   (the per-home identity model suggests yes, per-machine).
 - The exact initial `guest-exec` subset, including argument and
