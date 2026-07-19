@@ -443,6 +443,7 @@ def start_machine(config, display=False, port=None, home=None):
             f"  state file: {state_path(home)}\n"
             f"  error: {error}") from error
     print(f"QEMU started: {vm_name} (QMP on 127.0.0.1:{port})")
+    print(f"command line: {subprocess.list2cmdline(args)}")
     return port
 
 

@@ -320,7 +320,7 @@ relict start -- -cpu 486 -device virtio-rng-pci
 relict type TEXT
 relict run COMMAND
 relict keys KEY [KEY ...]
-relict menu ITEM
+relict menu ITEM [--exclude TEXT]
 ```
 
 `type` types text followed by Enter. `run` additionally waits for the prompt to return. `keys` accepts raw QEMU key
@@ -340,8 +340,19 @@ relict menu "Use FreeDOS 1.4 in Live Environment mode"
 ```
 
 The item text is matched case-insensitively against the visible screen
-rows and must match exactly one row. Use the global `--timeout SECONDS`
-option to change the 30-second navigation timeout.
+rows. A row exactly equal to the item wins over rows merely containing
+it (so `"Plain DOS system"` is selectable beside
+`"Plain DOS system, with sources"`); otherwise the item must be
+contained in exactly one row. `--exclude TEXT` (repeatable) rules rows
+out instead: rows containing an excluded text are never selected, which
+is another way to disambiguate:
+
+```powershell
+relict menu "Full installation" --exclude "with sources"
+```
+
+Use the global `--timeout SECONDS` option to change the 30-second
+navigation timeout.
 
 ### Reading the guest
 
@@ -407,8 +418,15 @@ machine.wait_text(r"Welcome to FreeDOS")
 Once a cursor-key menu is displayed, `machine.cursor_menu_select()`
 navigates it by feedback: it presses up/down, follows the selection
 highlight through the VGA attribute bytes, and presses Enter only after
-the highlight sits on the row matching the given text (case-insensitive,
-must match exactly one screen row). It returns the selected row's text:
+the highlight sits on the row matching the given text (case-insensitive; an exact row
+match wins over rows merely containing the item, which otherwise must
+be unique). `exclude=` takes text snippets whose rows are never
+selected, as another way to disambiguate. The item must match when
+navigation starts; a menu that rewrites its rows as the highlight
+moves (the FreeDOS installer's language chooser translates every entry
+into the newly highlighted language) is then navigated by row, and the
+returned text is what the selected row displayed when Enter was
+pressed:
 
 ```python
 machine.wait_text(r"Welcome to FreeDOS")

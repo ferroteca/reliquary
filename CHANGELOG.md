@@ -8,13 +8,19 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ### Added
 
-- `cursor_menu_select(item, timeout=30, port=None, home=None)` and the
-  `relict menu ITEM` CLI command select an entry in a cursor-key driven
-  text menu (for example a boot menu). Navigation is feedback-driven:
+- `cursor_menu_select(item, timeout=30, exclude=(), port=None,
+  home=None)` and the `relict menu ITEM [--exclude TEXT]` CLI command
+  select an entry in a cursor-key driven text menu (for example a boot
+  menu). Rows containing an `exclude` text are never selected. Menus
+  that rewrite their rows as the highlight moves (the FreeDOS
+  installer's language chooser) are navigated by the row where the
+  item last matched. Navigation is feedback-driven:
   relict presses the up/down cursor keys, follows the selection
   highlight through the VGA attribute bytes, and presses Enter only
   once the highlight sits on the single screen row matching the given
-  text (case-insensitively). Also available as
+  text (case-insensitively; an exact row match wins over rows merely
+  containing the item, which otherwise must be unique). Also available
+  as
   `Machine.cursor_menu_select()`; `machine.vga_screen(qmp)` newly
   exposes the attribute bytes alongside the text rows.
 - `create_hdd_image(filename, capacity)` creates a sparse qcow2 v3

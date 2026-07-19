@@ -204,10 +204,6 @@ def resolve_media(drives, specs=None):
         source = declaration["source"]
         options = tuple(declaration["options"].items())
         existing = media[kind].get(slot)
-        if source is not None and existing is not None:
-            raise RuntimeError(
-                f"drive slot clash: {existing.path} and "
-                f"drives.{key}.source={source} both claim {key}")
         if source is None:
             if existing is None:
                 raise ValueError(

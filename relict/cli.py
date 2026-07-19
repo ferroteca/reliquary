@@ -62,6 +62,10 @@ def main(argv=None):
     command.add_argument("names", nargs="+")
     command = subcommands.add_parser("menu")
     command.add_argument("item")
+    command.add_argument("--exclude", action="append", default=[],
+                         metavar="TEXT",
+                         help="never select rows containing TEXT "
+                              "(repeatable)")
     subcommands.add_parser("text")
     command = subcommands.add_parser("wait")
     command.add_argument("pattern")
@@ -107,7 +111,8 @@ def _dispatch(arguments):
         send_keys([[key] for key in arguments.names], arguments.port)
     elif arguments.command == "menu":
         selected = cursor_menu_select(
-            arguments.item, arguments.timeout or 30, arguments.port)
+            arguments.item, arguments.timeout or 30,
+            arguments.exclude, arguments.port)
         print(f"selected: {selected}")
     elif arguments.command == "text":
         print("\n".join(screen_text(arguments.port)))

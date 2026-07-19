@@ -272,8 +272,20 @@ class _FakeMenu:
             self.cursor -= 1
 
 
+class _FakeLanguageMenu(_FakeMenu):
+    """Rewrites every row in the newly highlighted language."""
+
+    def __init__(self, rendered):
+        self._rendered = rendered
+        super().__init__(rendered[0])
+
+    def screen(self):
+        self.items = self._rendered[self.cursor]
+        return super().screen()
+
+
 class CursorMenuTests(unittest.TestCase):
-    def _select(self, menu, item, timeout=30):
+    def _select(self, menu, item, timeout=30, exclude=()):
         console = machine_module._DisplayConsole(None)
         console.screen = menu.screen
         console.send_keys = lambda combos, delay=0.06: [
@@ -283,7 +295,7 @@ class CursorMenuTests(unittest.TestCase):
                                clock.monotonic), \
                 mock.patch.object(machine_module.time, "sleep",
                                   clock.sleep):
-            return console.cursor_menu_select(item, timeout)
+            return console.cursor_menu_select(item, timeout, exclude)
 
     def test_select_moves_down_to_the_matching_item(self):
         menu = _FakeMenu(["Use FreeDOS 1.4 in Live Environment mode",
@@ -311,6 +323,72 @@ class CursorMenuTests(unittest.TestCase):
             self._select(menu, "Boot from floppy")
 
         self.assertEqual(menu.cursor, 0)
+        self.assertIsNone(menu.selected)
+
+    def test_exact_item_beats_rows_that_merely_contain_it(self):
+        menu = _FakeMenu([
+            "Plain DOS system",
+            "Plain DOS system, with sources",
+            "Full installation including applications and games",
+            "Full installation with sources",
+        ], cursor=2)
+
+        selected = self._select(menu, "plain dos system")
+
+        self.assertEqual(menu.selected, 0)
+        self.assertEqual(selected, "Plain DOS system")
+
+    def test_the_longer_sibling_row_stays_selectable(self):
+        menu = _FakeMenu(["Plain DOS system",
+                          "Plain DOS system, with sources"])
+
+        selected = self._select(menu, "Plain DOS system, with sources")
+
+        self.assertEqual(menu.selected, 1)
+        self.assertEqual(selected, "Plain DOS system, with sources")
+
+    def test_rows_rewritten_per_highlight_navigate_by_row(self):
+        menu = _FakeLanguageMenu([
+            ["English", "German", "Spanish"],
+            ["Englisch", "Deutsch", "Spanisch"],
+            ["Inglés", "Alemán", "Español"],
+        ])
+
+        selected = self._select(menu, "Spanish")
+
+        self.assertEqual(menu.selected, 2)
+        self.assertEqual(selected, "Español")
+
+    def test_a_neighbor_rewritten_by_the_probe_is_still_selected(self):
+        # moving off "English" rewrites the list in French, and the
+        # accented "Français" renders through VGA text as "Fran ais"
+        menu = _FakeLanguageMenu([
+            ["English", "French"],
+            ["Anglais", "Fran ais"],
+        ])
+
+        selected = self._select(menu, "French")
+
+        self.assertEqual(menu.selected, 1)
+        self.assertEqual(selected, "Fran ais")
+
+    def test_excluded_text_resolves_an_ambiguous_item(self):
+        menu = _FakeMenu(["Install to harddisk",
+                          "Install using Floppy Edition"])
+
+        selected = self._select(menu, "Install", exclude="Floppy")
+
+        self.assertEqual(menu.selected, 0)
+        self.assertEqual(selected, "Install to harddisk")
+
+    def test_an_item_matching_only_excluded_rows_is_rejected(self):
+        menu = _FakeMenu(["Plain DOS system, with sources",
+                          "Full installation with sources"])
+
+        with self.assertRaisesRegex(ValueError, "excluded rows"):
+            self._select(menu, "Plain DOS system",
+                         exclude=["sources"])
+
         self.assertIsNone(menu.selected)
 
     def test_ambiguous_item_is_rejected(self):

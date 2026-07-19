@@ -144,19 +144,45 @@ def _normalize(text):
     return " ".join(text.split()).casefold()
 
 
-def _match_menu_row(rows, item):
-    """Return the single screen row whose text contains the item."""
+def _match_menu_row(rows, item, exclude=()):
+    """Return the single screen row showing the item.
+
+    A row equal to the item (case- and whitespace-folded) wins over
+    rows merely containing it, so an item that is a prefix of a longer
+    sibling ("Plain DOS system" beside "Plain DOS system, with
+    sources") stays selectable. Otherwise the item must be contained
+    in exactly one row. Rows containing any of the exclude texts are
+    never selected.
+    """
     target = _normalize(item)
-    matches = [row for row, text in enumerate(rows)
-               if target in _normalize(text)]
+    if isinstance(exclude, str):
+        exclude = (exclude,)
+    banned = [text for text in map(_normalize, exclude) if text]
+    folded_rows = [_normalize(text) for text in rows]
+
+    def allowed(folded):
+        return not any(marker in folded for marker in banned)
+
+    matches = [row for row, folded in enumerate(folded_rows)
+               if folded == target and allowed(folded)]
+    if not matches:
+        matches = [row for row, folded in enumerate(folded_rows)
+                   if target in folded and allowed(folded)]
     if len(matches) == 1:
         return matches[0]
     if matches:
         listed = ", ".join(repr(rows[row].strip()) for row in matches)
         raise ValueError(
             f"menu item {item!r} matches multiple rows: {listed}")
-    candidates = {_normalize(text): text.strip()
-                  for text in rows if text.strip()}
+    excluded = [row for row, folded in enumerate(folded_rows)
+                if target in folded and not allowed(folded)]
+    if excluded:
+        listed = ", ".join(repr(rows[row].strip()) for row in excluded)
+        raise ValueError(
+            f"menu item {item!r} only matches excluded rows: {listed}")
+    candidates = {folded: text.strip()
+                  for folded, text in zip(folded_rows, rows)
+                  if text.strip() and allowed(folded)}
     close = difflib.get_close_matches(target, candidates, n=3,
                                       cutoff=0.5)
     hint = ("; closest rows: "
@@ -226,19 +252,23 @@ class _DisplayConsole:
         """Return the VGA screen as (text rows, attribute rows)."""
         return vga_screen(self._qmp)
 
-    def cursor_menu_select(self, item, timeout=30):
+    def cursor_menu_select(self, item, timeout=30, exclude=()):
         """Steer a cursor-key menu onto a matching item and press ENTER.
 
         Presses up/down and observes the VGA attribute bytes to follow
         the selection highlight, so the choice is confirmed by what the
-        guest displays rather than by counting keystrokes. Returns the
-        selected row's text.
+        guest displays rather than by counting keystrokes. Rows
+        containing any of the exclude texts are never selected. The
+        item must match when navigation starts; if a redraw later
+        rewrites the rows (a language chooser translating itself as
+        the highlight moves), the target keeps its last matched row.
+        Returns the selected row's text as displayed at selection.
         """
         if not _normalize(item):
             raise ValueError("menu item text must be non-empty")
         deadline = time.monotonic() + timeout
         rows, attributes = self.screen()
-        target_row = _match_menu_row(rows, item)
+        target_row = _match_menu_row(rows, item, exclude)
         current = None
         for key in ("down", "up"):
             self.send_keys([[key]])
@@ -269,7 +299,13 @@ class _DisplayConsole:
             attributes = changed
             if moved is not None:
                 current = moved
-            target_row = _match_menu_row(rows, item)
+            try:
+                target_row = _match_menu_row(rows, item, exclude)
+            except ValueError:
+                # Menus like the FreeDOS language chooser rewrite every
+                # row as the highlight moves; the target keeps its row
+                # from the screen where it was last matched.
+                pass
         selected = rows[target_row].strip()
         self.send_keys([["ret"]])
         return selected
@@ -313,10 +349,11 @@ class Machine:
         with self.qmp() as qmp:
             return _DisplayConsole(qmp).send_text(text, enter)
 
-    def cursor_menu_select(self, item, timeout=30):
+    def cursor_menu_select(self, item, timeout=30, exclude=()):
         """Select a matching item in a cursor-key menu and press ENTER."""
         with self.qmp() as qmp:
-            return _DisplayConsole(qmp).cursor_menu_select(item, timeout)
+            return _DisplayConsole(qmp).cursor_menu_select(
+                item, timeout, exclude)
 
     def screen_text(self):
         """Return the guest's 80x25 VGA text screen."""
@@ -350,9 +387,10 @@ def send_text(text, port=None, enter=True, home=None):
     return Machine(port, home).send_text(text, enter)
 
 
-def cursor_menu_select(item, timeout=30, port=None, home=None):
+def cursor_menu_select(item, timeout=30, exclude=(), port=None,
+                       home=None):
     """Select a matching item in a cursor-key menu and press ENTER."""
-    return Machine(port, home).cursor_menu_select(item, timeout)
+    return Machine(port, home).cursor_menu_select(item, timeout, exclude)
 
 
 def screen_text(port=None, home=None):
