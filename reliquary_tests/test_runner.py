@@ -26,16 +26,16 @@ except ModuleNotFoundError:
     sys.modules["qemu"] = qemu
     sys.modules["qemu.qmp"] = qmp
 
-import relict
-from relict import cli as cli_module
-from relict import lifecycle as lifecycle_module
-from relict import workflows as workflows_module
+import reliquary
+from reliquary import cli as cli_module
+from reliquary import lifecycle as lifecycle_module
+from reliquary import workflows as workflows_module
 
-home_module = importlib.import_module("relict.home")
+home_module = importlib.import_module("reliquary.home")
 
 
 class _FakeQmp:
-    name = "relict-0123456789ab"
+    name = "reliquary-0123456789ab"
 
     def __init__(self, port):
         self.port = port
@@ -54,31 +54,31 @@ class _FakeQmp:
 
 class RunnerConstructionTests(unittest.TestCase):
     def test_default_machine_targets_dos_with_default_config(self):
-        machine = relict.Runner("run-home")
+        machine = reliquary.Runner("run-home")
 
         self.assertEqual(machine.platform, "dos")
-        self.assertEqual(machine.config, relict.MachineConfig())
+        self.assertEqual(machine.config, reliquary.MachineConfig())
         self.assertEqual(machine.home, os.path.abspath("run-home"))
 
     def test_omitted_home_uses_the_established_default(self):
         expected = os.path.abspath("default-home")
         with mock.patch.object(workflows_module, "effective_home",
                                return_value=expected) as resolve:
-            machine = relict.Runner()
+            machine = reliquary.Runner()
 
         resolve.assert_called_once_with(None)
         self.assertEqual(machine.home, expected)
 
     def test_machine_exposes_its_immutable_config(self):
-        config = relict.MachineConfig(timeout=45)
-        machine = relict.Runner("run-home", config)
+        config = reliquary.MachineConfig(timeout=45)
+        machine = reliquary.Runner("run-home", config)
 
         self.assertIs(machine.config, config)
         with self.assertRaises(dataclasses.FrozenInstanceError):
             machine.config.timeout = 60
 
     def test_machine_string_is_normalized_to_immutable_mapping(self):
-        config = relict.MachineConfig(machine="pc-i440fx-9.2")
+        config = reliquary.MachineConfig(machine="pc-i440fx-9.2")
 
         self.assertEqual(dict(config.machine), {
             "type": "pc-i440fx-9.2",
@@ -87,7 +87,7 @@ class RunnerConstructionTests(unittest.TestCase):
             config.machine["type"] = "pc"
 
     def test_machine_mapping_requires_type_and_normalizes_options(self):
-        config = relict.MachineConfig(machine={
+        config = reliquary.MachineConfig(machine={
             "type": "pc",
             "accel": "tcg",
             "usb": False,
@@ -99,35 +99,35 @@ class RunnerConstructionTests(unittest.TestCase):
             "usb": False,
         })
         with self.assertRaisesRegex(ValueError, "machine.type"):
-            relict.MachineConfig(machine={"accel": "tcg"})
+            reliquary.MachineConfig(machine={"accel": "tcg"})
 
     def test_machine_conflicts_with_raw_machine_argument(self):
         with self.assertRaisesRegex(ValueError, "conflicts"):
-            relict.MachineConfig(
+            reliquary.MachineConfig(
                 machine="pc", qemu_args=("-machine", "q35"))
 
     def test_memory_is_a_positive_integer_mib_value(self):
-        self.assertEqual(relict.MachineConfig(memory=32).memory, 32)
+        self.assertEqual(reliquary.MachineConfig(memory=32).memory, 32)
         for value in (True, 0, -1, 1.5, "32"):
             with self.subTest(value=value):
                 with self.assertRaises((TypeError, ValueError)):
-                    relict.MachineConfig(memory=value)
+                    reliquary.MachineConfig(memory=value)
 
     def test_memory_default_depends_on_platform(self):
-        self.assertEqual(relict.MachineConfig().memory, 16)
+        self.assertEqual(reliquary.MachineConfig().memory, 16)
         self.assertEqual(
-            relict.MachineConfig(platform="win9x").memory, 64)
+            reliquary.MachineConfig(platform="win9x").memory, 64)
         self.assertEqual(
-            relict.MachineConfig(platform="winnt").memory, 256)
+            reliquary.MachineConfig(platform="winnt").memory, 256)
 
     def test_memory_conflicts_with_raw_memory_argument(self):
         with self.assertRaisesRegex(ValueError, "conflicts"):
-            relict.MachineConfig(memory=32, qemu_args=("-m", "64"))
+            reliquary.MachineConfig(memory=32, qemu_args=("-m", "64"))
 
     def test_platform_memory_default_defers_to_raw_memory(self):
         # only an explicit memory value conflicts with a raw -m; the
         # platform default is suppressed by it at launch instead
-        config = relict.MachineConfig(qemu_args=("-m", "64"))
+        config = reliquary.MachineConfig(qemu_args=("-m", "64"))
 
         self.assertEqual(config.memory, 16)
 
@@ -139,7 +139,7 @@ class RunnerConstructionTests(unittest.TestCase):
             staging = os.path.join(root, "staging")
             os.makedirs(staging)
 
-            config = relict.MachineConfig(drives={
+            config = reliquary.MachineConfig(drives={
                 "floppy": floppy,
                 "hdd": {
                     "source": staging,
@@ -158,7 +158,7 @@ class RunnerConstructionTests(unittest.TestCase):
     def test_drive_alias_cannot_duplicate_canonical_slot(self):
         with tempfile.NamedTemporaryFile() as image:
             with self.assertRaisesRegex(ValueError, "both mean floppy_0"):
-                relict.MachineConfig(drives={
+                reliquary.MachineConfig(drives={
                     "floppy": image.name,
                     "floppy_0": image.name,
                 })
@@ -166,33 +166,33 @@ class RunnerConstructionTests(unittest.TestCase):
     def test_cdrom_drive_source_cannot_be_a_directory(self):
         with tempfile.TemporaryDirectory() as source:
             with self.assertRaisesRegex(ValueError, "ISO9660"):
-                relict.MachineConfig(drives={"cdrom_0": source})
+                reliquary.MachineConfig(drives={"cdrom_0": source})
 
     def test_staged_drive_defaults_to_matching_the_boot_medium(self):
         # None: resolved per home against the boot image at run time
-        self.assertIsNone(relict.MachineConfig().staged_drive)
+        self.assertIsNone(reliquary.MachineConfig().staged_drive)
         self.assertEqual(
-            relict.MachineConfig(staged_drive="d").staged_drive, "D")
+            reliquary.MachineConfig(staged_drive="d").staged_drive, "D")
         with self.assertRaisesRegex(ValueError, "staged_drive"):
-            relict.MachineConfig(staged_drive="A")
+            reliquary.MachineConfig(staged_drive="A")
 
     def test_platform_defaults_to_dos_and_normalizes(self):
-        self.assertEqual(relict.MachineConfig().platform, "dos")
-        self.assertEqual(relict.MachineConfig(platform="DOS").platform,
+        self.assertEqual(reliquary.MachineConfig().platform, "dos")
+        self.assertEqual(reliquary.MachineConfig(platform="DOS").platform,
                          "dos")
 
     def test_non_dos_platform_rejects_dos_drive_configuration(self):
         with self.assertRaisesRegex(ValueError, "DOS-specific"):
-            relict.MachineConfig(platform="win9x", staged_drive="E")
+            reliquary.MachineConfig(platform="win9x", staged_drive="E")
 
     def test_non_dos_runner_workflow_is_an_explicit_stub(self):
-        machine = relict.Runner(
-            "run-home", relict.MachineConfig(platform="win9x"))
+        machine = reliquary.Runner(
+            "run-home", reliquary.MachineConfig(platform="win9x"))
         with self.assertRaisesRegex(NotImplementedError, "win9x"):
             machine.run(lambda running: None)
 
     def test_provisioning_is_not_public(self):
-        self.assertFalse(hasattr(relict.Runner("run-home"), "provision"))
+        self.assertFalse(hasattr(reliquary.Runner("run-home"), "provision"))
 
 
 class MachineConfigLoadingTests(unittest.TestCase):
@@ -228,7 +228,7 @@ class MachineConfigLoadingTests(unittest.TestCase):
             "qemu_args": ["-cpu", "pentium"],
         })
 
-        config = relict.MachineConfig.from_file(path)
+        config = reliquary.MachineConfig.from_file(path)
 
         self.assertEqual(config.platform, "win9x")
         self.assertEqual(config.timeout, 90)
@@ -244,15 +244,15 @@ class MachineConfigLoadingTests(unittest.TestCase):
     def test_from_file_requires_version_one(self):
         path = self._write_json("machine.json", {"platform": "dos"})
         with self.assertRaisesRegex(ValueError, r"version"):
-            relict.MachineConfig.from_file(path)
+            reliquary.MachineConfig.from_file(path)
 
         path = self._write_json("machine.json", {"version": 2})
         with self.assertRaisesRegex(ValueError, r"version"):
-            relict.MachineConfig.from_file(path)
+            reliquary.MachineConfig.from_file(path)
 
     def test_from_mapping_rejects_unknown_fields_with_paths(self):
         with self.assertRaisesRegex(ValueError, r"unknown field: boot"):
-            relict.MachineConfig.from_mapping({
+            reliquary.MachineConfig.from_mapping({
                 "version": 1,
                 "boot": "a",
             })
@@ -269,7 +269,7 @@ class MachineConfigLoadingTests(unittest.TestCase):
             },
         })
 
-        config = relict.MachineConfig.from_file(path)
+        config = reliquary.MachineConfig.from_file(path)
 
         self.assertEqual(config.drives["hdd_0"]["source"],
                          os.path.abspath(image))
@@ -281,7 +281,7 @@ class MachineConfigLoadingTests(unittest.TestCase):
         base = os.path.join(self.root, "cfg")
         os.makedirs(base)
 
-        config = relict.MachineConfig.from_mapping({
+        config = reliquary.MachineConfig.from_mapping({
             "version": 1,
             "drives": {"floppy_0": "../media/boot.img"},
         }, base_dir=base)
@@ -294,7 +294,7 @@ class MachineConfigLoadingTests(unittest.TestCase):
         previous = os.getcwd()
         try:
             os.chdir(self.root)
-            config = relict.MachineConfig.from_mapping({
+            config = reliquary.MachineConfig.from_mapping({
                 "version": 1,
                 "drives": {"floppy_0": "cwd-boot.img"},
             })
@@ -313,7 +313,7 @@ class MachineConfigLoadingTests(unittest.TestCase):
             "machine": "pc-i440fx-2.12",
         })
 
-        config = relict.MachineConfig.from_file(
+        config = reliquary.MachineConfig.from_file(
             path,
             platform="dos",
             timeout=None,
@@ -345,7 +345,7 @@ class MachineConfigLoadingTests(unittest.TestCase):
         })
         override_image = self._touch("override.img")
 
-        config = relict.MachineConfig.from_file(
+        config = reliquary.MachineConfig.from_file(
             path,
             drives={
                 "hdd_0": {
@@ -367,16 +367,16 @@ class MachineConfigLoadingTests(unittest.TestCase):
     def test_missing_explicit_machine_file_is_an_error(self):
         missing = os.path.join(self.root, "missing.json")
         with self.assertRaises(FileNotFoundError):
-            relict.MachineConfig.from_file(missing)
+            reliquary.MachineConfig.from_file(missing)
 
 
 class DirectMachineConfigTests(unittest.TestCase):
     def test_start_accepts_a_machine_config_unchanged(self):
-        config = relict.MachineConfig(qemu="custom-qemu", memory=32)
+        config = reliquary.MachineConfig(qemu="custom-qemu", memory=32)
 
         with mock.patch.object(workflows_module, "_start_configured",
                                return_value=54321) as start:
-            port = relict.start(machine_config=config)
+            port = reliquary.start(machine_config=config)
 
         self.assertEqual(port, 54321)
         self.assertIs(start.call_args.args[0], config)
@@ -392,7 +392,7 @@ class DirectMachineConfigTests(unittest.TestCase):
         with mock.patch.object(workflows_module, "_start_configured",
                                return_value=54321) as start, \
                 mock.patch.object(workflows_module, "stop"):
-            result = relict.run_task(task, machine_config=document)
+            result = reliquary.run_task(task, machine_config=document)
 
         config = start.call_args.args[0]
         self.assertEqual(config.timeout, 45.0)
@@ -407,7 +407,7 @@ class DirectMachineConfigTests(unittest.TestCase):
 
             with mock.patch.object(workflows_module, "_run_configured",
                                    return_value="output") as run:
-                result = relict.run_guest_program(
+                result = reliquary.run_guest_program(
                     "TEST.EXE", machine_config=path)
 
         self.assertEqual(run.call_args.args[0].timeout, 60.0)
@@ -415,7 +415,7 @@ class DirectMachineConfigTests(unittest.TestCase):
 
     def test_invalid_machine_config_type_is_rejected(self):
         with self.assertRaisesRegex(TypeError, "MachineConfig"):
-            relict.start(machine_config=42)
+            reliquary.start(machine_config=42)
 
     def test_api_functions_load_machine_json_from_home_when_present(self):
         with tempfile.TemporaryDirectory() as home:
@@ -425,7 +425,7 @@ class DirectMachineConfigTests(unittest.TestCase):
 
             with mock.patch.object(workflows_module, "_start_configured",
                                    return_value=54321) as start:
-                port = relict.start(home=home)
+                port = reliquary.start(home=home)
                 self.assertEqual(start.call_args.args[0].platform, "win9x")
                 self.assertEqual(start.call_args.args[0].timeout, 90)
 
@@ -433,19 +433,19 @@ class DirectMachineConfigTests(unittest.TestCase):
                                    return_value=54321) as start, \
                     mock.patch.object(workflows_module, "stop"):
                 task = mock.Mock(return_value="result")
-                result = relict.run_task(task, home=home)
+                result = reliquary.run_task(task, home=home)
                 self.assertEqual(start.call_args.args[0].platform, "win9x")
 
             with mock.patch.object(workflows_module, "_run_configured",
                                    return_value="output") as run:
-                result = relict.run_guest_program("TEST.EXE", home=home)
+                result = reliquary.run_guest_program("TEST.EXE", home=home)
                 self.assertEqual(run.call_args.args[0].platform, "win9x")
 
     def test_api_functions_use_defaults_when_machine_json_missing(self):
         with tempfile.TemporaryDirectory() as home:
             with mock.patch.object(workflows_module, "_start_configured",
                                    return_value=54321) as start:
-                port = relict.start(home=home)
+                port = reliquary.start(home=home)
                 self.assertEqual(start.call_args.args[0].platform, "dos")
                 self.assertIsNone(start.call_args.args[0].timeout)
 
@@ -457,7 +457,7 @@ class DirectMachineConfigTests(unittest.TestCase):
 
             with mock.patch.object(workflows_module, "_start_configured",
                                    return_value=54321) as start:
-                port = relict.start(machine_config={"timeout": 60}, home=home)
+                port = reliquary.start(machine_config={"timeout": 60}, home=home)
                 config = start.call_args.args[0]
                 self.assertEqual(config.platform, "win9x")
                 self.assertEqual(config.memory, 32)
@@ -469,13 +469,13 @@ class DirectMachineConfigTests(unittest.TestCase):
             with open(machine_path, "w", encoding="utf-8") as f:
                 json.dump({"version": 1, "platform": "win9x", "timeout": 90}, f)
 
-            runner = relict.Runner(home)
+            runner = reliquary.Runner(home)
             self.assertEqual(runner.config.platform, "win9x")
             self.assertEqual(runner.config.timeout, 90)
 
     def test_runner_uses_defaults_when_machine_json_missing(self):
         with tempfile.TemporaryDirectory() as home:
-            runner = relict.Runner(home)
+            runner = reliquary.Runner(home)
             self.assertEqual(runner.config.platform, "dos")
             self.assertIsNone(runner.config.timeout)
 
@@ -485,8 +485,8 @@ class DirectMachineConfigTests(unittest.TestCase):
             with open(machine_path, "w", encoding="utf-8") as f:
                 json.dump({"version": 1, "platform": "win9x"}, f)
 
-            config = relict.MachineConfig(platform="dos", timeout=45)
-            runner = relict.Runner(home, config)
+            config = reliquary.MachineConfig(platform="dos", timeout=45)
+            runner = reliquary.Runner(home, config)
             self.assertIs(runner.config, config)
             self.assertEqual(runner.config.platform, "dos")
             self.assertEqual(runner.config.timeout, 45)
@@ -533,10 +533,10 @@ class RunnerRunTests(unittest.TestCase):
 
     def test_run_threads_its_config_to_the_lifecycle(self):
         self._stage_boot_image()
-        config = relict.MachineConfig(
+        config = reliquary.MachineConfig(
             timeout=45, memory=32, qemu="qemu",
             qemu_args=("-nodefaults",))
-        machine = relict.Runner(self.home, config)
+        machine = reliquary.Runner(self.home, config)
 
         run = self._run_with_lifecycle_mocks(machine, "-v")
 
@@ -552,7 +552,7 @@ class RunnerRunTests(unittest.TestCase):
     def test_run_defaults_the_timeout(self):
         self._stage_boot_image()
 
-        run = self._run_with_lifecycle_mocks(relict.Runner(self.home))
+        run = self._run_with_lifecycle_mocks(reliquary.Runner(self.home))
 
         self.assertEqual(run.guest.execute.call_args_list[1],
                          mock.call("SUITE > SUITE.log", 180))
@@ -563,7 +563,7 @@ class RunnerRunTests(unittest.TestCase):
         self._stage_boot_image()
         lifecycle_module.write_vm_state(
             54321, _FakeQmp.name, 1234, home=self.home)
-        staging = os.path.join(relict.drives_dir(home=self.home),
+        staging = os.path.join(reliquary.drives_dir(home=self.home),
                                "hdd")
         log_path = os.path.join(staging, "SUITE.log")
 
@@ -585,7 +585,7 @@ class RunnerRunTests(unittest.TestCase):
                                   return_value=guest), \
                 mock.patch.object(workflows_module, "stop") as stop, \
                 mock.patch.object(workflows_module.time, "sleep"):
-            log = relict.Runner(self.home).run(self.exe, "-v")
+            log = reliquary.Runner(self.home).run(self.exe, "-v")
 
         self.assertEqual(log, "guest output")
         expected_home = os.path.abspath(self.home)
@@ -594,12 +594,12 @@ class RunnerRunTests(unittest.TestCase):
 
     def test_machines_with_distinct_homes_keep_separate_vm_state(self):
         with tempfile.TemporaryDirectory() as other:
-            first_runner = relict.Runner(self.home)
-            second_runner = relict.Runner(other)
+            first_runner = reliquary.Runner(self.home)
+            second_runner = reliquary.Runner(other)
             lifecycle_module.write_vm_state(
-                1111, "relict-first", 1, home=first_runner.home)
+                1111, "reliquary-first", 1, home=first_runner.home)
             lifecycle_module.write_vm_state(
-                2222, "relict-second", 2, home=second_runner.home)
+                2222, "reliquary-second", 2, home=second_runner.home)
 
             first = lifecycle_module.read_vm_state(first_runner.home)
             second = lifecycle_module.read_vm_state(second_runner.home)

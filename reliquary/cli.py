@@ -1,12 +1,31 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Command-line interface for reliquary."""
+"""Command-line parsing and dispatch."""
 
 import argparse
 import importlib
 import sys
 
+from qemu.qmp import ConnectError
+
 from .home import set_home
+from .interaction_agentless import AgentlessGuestExec
+from .lifecycle import stop
+from .machine import (Machine, cursor_menu_select, screen_text,
+                      screenshot, send_keys, send_text, wait_text)
+from .workflows import _cli_machine_config, start
+
+
+def _cli_start_overrides(arguments):
+    """CLI controls that override a loaded machine configuration."""
+    overrides = {}
+    if arguments.platform is not None:
+        overrides["platform"] = arguments.platform
+    if arguments.qemu is not None:
+        overrides["qemu"] = arguments.qemu
+    if arguments.qemu_args:
+        overrides["qemu_args"] = arguments.qemu_args
+    return overrides
 
 
 def _load_recipe(name):
@@ -20,36 +39,129 @@ def _load_recipe(name):
         raise ValueError(f"unknown recipe: {name}") from error
 
 
-def main(args=None):
-    """Entry point for the reliquary CLI."""
+def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="reliquary",
-        description="Script OS installations onto disk images.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    install = subparsers.add_parser(
+        description="OS installation scripting over QEMU guest "
+                    "automation (DOS by default)")
+    parser.add_argument("--home", help="reliquary home directory (drives/, "
+                        "screenshots/); default: $RELIQUARY_HOME, then "
+                        "Documents/reliquary")
+    parser.add_argument("--port", type=int,
+                        help="QMP port (start: choose one automatically; "
+                             "other commands: use the active VM)")
+    parser.add_argument("--qemu", help="path to the QEMU binary (default: "
+                        "$RELIQUARY_QEMU_HOME, then $QEMU_HOME, then PATH, "
+                        "then well-known install locations)")
+    parser.add_argument("--platform", default=None,
+                        help="guest platform adapter (default: dos; other "
+                             "platform workflows are not implemented yet)")
+    parser.add_argument("--timeout", type=int, help="seconds to wait "
+                        "(defaults: run 120, wait 60)")
+    parser.add_argument("--machine", help="path to machine.json configuration "
+                        "file (default: <home>/machine.json if present)")
+    subcommands = parser.add_subparsers(dest="command", required=True)
+
+    command = subcommands.add_parser(
         "install", help="run an OS installation recipe")
-    install.add_argument(
+    command.add_argument(
         "recipe", help="recipe name, e.g. freedos-plain")
-    install.add_argument(
-        "--home", help="override the reliquary home directory")
-    install.add_argument(
+    command.add_argument(
         "--display", action="store_true",
         help="show the QEMU window during guest steps (for "
              "debugging recipes)")
-    options = parser.parse_args(args)
+    command = subcommands.add_parser("start")
+    command.add_argument("--display", action="store_true")
+    command.add_argument("qemu_args", nargs="*")
+    subcommands.add_parser("stop")
+    command = subcommands.add_parser("type")
+    command.add_argument("text")
+    command = subcommands.add_parser("run")
+    command.add_argument("dos_command")
+    command = subcommands.add_parser("keys")
+    command.add_argument("names", nargs="+")
+    command = subcommands.add_parser("menu")
+    command.add_argument("item")
+    command.add_argument("--exclude", action="append", default=[],
+                         metavar="TEXT",
+                         help="never select rows containing TEXT "
+                              "(repeatable)")
+    subcommands.add_parser("text")
+    command = subcommands.add_parser("wait")
+    command.add_argument("pattern")
+    command = subcommands.add_parser("screenshot")
+    command.add_argument("name", nargs="?", default="screen")
+    command = subcommands.add_parser("hmp")
+    command.add_argument("line")
 
-    if options.home:
-        set_home(options.home)
+    arguments = parser.parse_args(argv)
+    if arguments.home:
+        set_home(arguments.home)
     try:
-        recipe = _load_recipe(options.recipe)
+        return _dispatch(arguments)
+    except (ConnectError, ConnectionError) as error:
+        target = (f"127.0.0.1:{arguments.port}"
+                  if arguments.port else "the active VM")
+        print(f"reliquary: cannot reach QMP on {target}: {error}\n"
+              "is the VM running? (reliquary start)", file=sys.stderr)
+        return 1
+    except (RuntimeError, TimeoutError, FileNotFoundError,
+            NotImplementedError, ValueError, OSError) as error:
+        print(f"reliquary: error: {error}", file=sys.stderr)
+        return 1
+
+
+def _install(arguments):
+    """Run one OS installation recipe."""
+    try:
+        recipe = _load_recipe(arguments.recipe)
     except ValueError as error:
         print(f"reliquary: {error}", file=sys.stderr)
         return 2
     try:
-        artifacts = recipe.install(display=options.display)
+        artifacts = recipe.install(display=arguments.display)
     except KeyboardInterrupt:
         print("reliquary: interrupted", file=sys.stderr)
         return 130
     for name, path in artifacts.items():
         print(f"{name}: {path}")
+    return 0
+
+
+def _dispatch(arguments):
+    platform = arguments.platform or "dos"
+    if arguments.command == "install":
+        return _install(arguments)
+    if arguments.command == "start":
+        config = _cli_machine_config(
+            arguments.machine, arguments.home,
+            **_cli_start_overrides(arguments))
+        start(config, display=arguments.display, port=arguments.port)
+    elif arguments.command == "stop":
+        stop(arguments.port)
+    elif arguments.command == "type":
+        send_text(arguments.text, arguments.port)
+    elif arguments.command == "run":
+        if platform != "dos":
+            raise NotImplementedError("run requires platform='dos'")
+        AgentlessGuestExec(Machine(arguments.port)).execute(
+            arguments.dos_command, arguments.timeout or 120)
+    elif arguments.command == "keys":
+        send_keys([[key] for key in arguments.names], arguments.port)
+    elif arguments.command == "menu":
+        selected = cursor_menu_select(
+            arguments.item, arguments.timeout or 30,
+            arguments.exclude, arguments.port)
+        print(f"selected: {selected}")
+    elif arguments.command == "text":
+        print("\n".join(screen_text(arguments.port)))
+    elif arguments.command == "wait":
+        wait_text(arguments.pattern, arguments.timeout or 60,
+                  arguments.port)
+        print("matched.")
+    elif arguments.command == "screenshot":
+        screenshot(arguments.name, arguments.port)
+    elif arguments.command == "hmp":
+        with Machine(arguments.port).qmp() as qmp:
+            print(qmp.hmp(arguments.line))
     return 0

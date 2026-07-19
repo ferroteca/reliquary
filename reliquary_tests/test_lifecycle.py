@@ -21,9 +21,9 @@ except ModuleNotFoundError:
     sys.modules["qemu"] = qemu
     sys.modules["qemu.qmp"] = qmp
 
-import relict
-from relict import lifecycle as lifecycle_module
-from relict import workflows as workflows_module
+import reliquary
+from reliquary import lifecycle as lifecycle_module
+from reliquary import workflows as workflows_module
 
 
 class _FakeProcess:
@@ -49,7 +49,7 @@ class _FakeProcess:
 
 class _FakeQmp:
     commands = []
-    name = "relict-0123456789ab"
+    name = "reliquary-0123456789ab"
 
     def __init__(self, port):
         self.port = port
@@ -71,9 +71,9 @@ class LifecycleTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.home = self.tempdir.name
-        relict.set_home(self.home)
+        reliquary.set_home(self.home)
         _FakeQmp.commands = []
-        _FakeQmp.name = "relict-0123456789ab"
+        _FakeQmp.name = "reliquary-0123456789ab"
         self._remove_generated_files()
 
     def tearDown(self):
@@ -114,17 +114,17 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            port = relict.start(relict.MachineConfig(qemu="qemu"))
+            port = reliquary.start(reliquary.MachineConfig(qemu="qemu"))
 
         self.assertEqual(port, 54321)
         self.assertEqual(lifecycle_module.read_vm_state(), {
             "port": 54321,
-            "name": "relict-0123456789ab",
+            "name": "reliquary-0123456789ab",
             "pid": 1234,
         })
         args = popen.call_args.args[0]
         self.assertEqual(args[args.index("-name") + 1],
-                         "relict-0123456789ab")
+                         "reliquary-0123456789ab")
 
     def _start_qemu_args(self, image_name, **start_kwargs):
         image = self._write_boot_image(image_name)
@@ -140,8 +140,8 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            config = relict.MachineConfig(qemu="qemu", **start_kwargs)
-            relict.start(config)
+            config = reliquary.MachineConfig(qemu="qemu", **start_kwargs)
+            reliquary.start(config)
 
         return image, popen.call_args.args[0]
 
@@ -157,10 +157,10 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            config = relict.MachineConfig(
+            config = reliquary.MachineConfig(
                 qemu="qemu", drives=drives, machine=machine,
                 memory=memory)
-            relict.start(config)
+            reliquary.start(config)
         return popen.call_args.args[0]
 
     def test_start_boots_the_floppy_image_as_drive_a(self):
@@ -258,7 +258,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_start_rejects_configured_and_raw_memory(self):
         with self.assertRaisesRegex(ValueError, "conflicts"):
-            relict.start(relict.MachineConfig(
+            reliquary.start(reliquary.MachineConfig(
                 qemu="qemu", memory=32, qemu_args=("-m", "64")))
 
     def test_start_mounts_configured_directory_as_vvfat(self):
@@ -312,12 +312,12 @@ class LifecycleTests(unittest.TestCase):
 
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
         lifecycle_module.write_vm_state(
-            54321, "relict-expected", 1234)
+            54321, "reliquary-expected", 1234)
         _FakeQmp.name = "unrelated-vm"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
-                relict.stop()
+                reliquary.stop()
 
         self.assertEqual(_FakeQmp.commands, ["query-name"])
         self.assertIsNotNone(lifecycle_module.read_vm_state())
@@ -326,8 +326,8 @@ class LifecycleTests(unittest.TestCase):
         with mock.patch.object(lifecycle_module, "port_in_use",
                                return_value=True):
             with self.assertRaisesRegex(RuntimeError, "explicit"):
-                relict.start(
-                    relict.MachineConfig(qemu="qemu"), port=54321)
+                reliquary.start(
+                    reliquary.MachineConfig(qemu="qemu"), port=54321)
 
         self.assertIsNone(lifecycle_module.read_vm_state())
 
@@ -347,7 +347,7 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
-                relict.start(relict.MachineConfig(qemu="qemu"))
+                reliquary.start(reliquary.MachineConfig(qemu="qemu"))
 
         self.assertTrue(proc.terminated)
         self.assertIsNone(lifecycle_module.read_vm_state())
@@ -369,7 +369,7 @@ class CreateHddImageTests(unittest.TestCase):
                                return_value="qemu-img"), \
                 mock.patch.object(lifecycle_module.subprocess, "run",
                                   return_value=completed) as run:
-            path = relict.create_hdd_image(filename, capacity)
+            path = reliquary.create_hdd_image(filename, capacity)
         return path, run
 
     def test_creates_sparse_qcow2_v3_image(self):
@@ -394,7 +394,7 @@ class CreateHddImageTests(unittest.TestCase):
 
     def test_rejects_non_qcow2_filename(self):
         with self.assertRaisesRegex(ValueError, r"\.qcow2"):
-            relict.create_hdd_image(
+            reliquary.create_hdd_image(
                 os.path.join(self.root, "hdd.img"), "1G")
 
     def test_rejects_existing_image(self):
@@ -403,12 +403,12 @@ class CreateHddImageTests(unittest.TestCase):
             handle.write(b"x")
 
         with self.assertRaises(FileExistsError):
-            relict.create_hdd_image(filename, "1G")
+            reliquary.create_hdd_image(filename, "1G")
 
     def test_rejects_non_positive_mib_capacity(self):
         filename = os.path.join(self.root, "hdd.qcow2")
         with self.assertRaisesRegex(ValueError, "positive"):
-            relict.create_hdd_image(filename, 0)
+            reliquary.create_hdd_image(filename, 0)
 
     def test_surfaces_qemu_img_failure(self):
         filename = os.path.join(self.root, "hdd.qcow2")

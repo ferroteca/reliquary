@@ -5,7 +5,9 @@
 import os
 import unittest
 
-from reliquary import home
+import importlib
+
+home = importlib.import_module("reliquary.home")
 
 
 class HomeTests(unittest.TestCase):

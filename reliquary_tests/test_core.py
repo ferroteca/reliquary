@@ -22,33 +22,33 @@ except ModuleNotFoundError:
     sys.modules["qemu"] = qemu
     sys.modules["qemu.qmp"] = qmp
 
-import relict
-from relict import interaction as interaction_module
-from relict import interaction_agentless as agentless_module
-from relict import lifecycle as lifecycle_module
-from relict import machine as machine_module
-from relict import media as media_module
-from relict import platform_dos as platform_dos_module
-from relict import workflows as workflows_module
+import reliquary
+from reliquary import interaction as interaction_module
+from reliquary import interaction_agentless as agentless_module
+from reliquary import lifecycle as lifecycle_module
+from reliquary import machine as machine_module
+from reliquary import drives as media_module
+from reliquary import platform_dos as platform_dos_module
+from reliquary import workflows as workflows_module
 
 
 class HomeTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = relict.home()
+        self.previous_home = reliquary.home()
         self.tempdir = tempfile.TemporaryDirectory()
-        relict.set_home(self.tempdir.name)
+        reliquary.set_home(self.tempdir.name)
 
     def tearDown(self):
-        relict.set_home(self.previous_home)
+        reliquary.set_home(self.previous_home)
         self.tempdir.cleanup()
 
     def test_paths_are_contained_by_configured_home(self):
-        self.assertEqual(relict.drives_dir(),
+        self.assertEqual(reliquary.drives_dir(),
                          os.path.join(self.tempdir.name, "drives"))
 
     def test_documents_dir_is_public_and_absolute_or_none(self):
         """documents_dir() reports the platform Documents folder."""
-        documents = relict.documents_dir()
+        documents = reliquary.documents_dir()
         if documents is not None:
             self.assertTrue(os.path.isabs(documents))
 
@@ -59,11 +59,11 @@ class HomeTests(unittest.TestCase):
                 media_module.check_staged_drive(letter)
 
     def test_vm_state_round_trip(self):
-        lifecycle_module.write_vm_state(54321, "relict-test", 1234)
+        lifecycle_module.write_vm_state(54321, "reliquary-test", 1234)
 
         self.assertEqual(lifecycle_module.read_vm_state(), {
             "port": 54321,
-            "name": "relict-test",
+            "name": "reliquary-test",
             "pid": 1234,
         })
         self.assertFalse(os.path.exists(
@@ -73,18 +73,18 @@ class HomeTests(unittest.TestCase):
         os.makedirs(self.tempdir.name, exist_ok=True)
         with open(lifecycle_module.state_path(), "w",
                   encoding="utf-8") as state:
-            json.dump({"port": True, "name": "relict-test"}, state)
+            json.dump({"port": True, "name": "reliquary-test"}, state)
 
-        with self.assertRaisesRegex(RuntimeError, "invalid relict VM state"):
+        with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
             lifecycle_module.read_vm_state()
 
     def test_remove_vm_state_requires_matching_identity(self):
-        lifecycle_module.write_vm_state(54321, "relict-test", 1234)
+        lifecycle_module.write_vm_state(54321, "reliquary-test", 1234)
 
         lifecycle_module.remove_vm_state(54321, "another-vm")
         self.assertIsNotNone(lifecycle_module.read_vm_state())
 
-        lifecycle_module.remove_vm_state(54321, "relict-test")
+        lifecycle_module.remove_vm_state(54321, "reliquary-test")
         self.assertIsNone(lifecycle_module.read_vm_state())
 
     def test_resolve_vm_rejects_unrecorded_explicit_port(self):
@@ -92,14 +92,14 @@ class HomeTests(unittest.TestCase):
             lifecycle_module.resolve_vm(54321)
 
     def _write_drive_file(self, name, data=b"dos"):
-        os.makedirs(relict.drives_dir(), exist_ok=True)
-        path = os.path.join(relict.drives_dir(), name)
+        os.makedirs(reliquary.drives_dir(), exist_ok=True)
+        path = os.path.join(reliquary.drives_dir(), name)
         with open(path, "wb") as f:
             f.write(data)
         return path
 
     def _make_drive_dir(self, name):
-        path = os.path.join(relict.drives_dir(), name)
+        path = os.path.join(reliquary.drives_dir(), name)
         os.makedirs(path)
         return path
 
@@ -111,7 +111,7 @@ class HomeTests(unittest.TestCase):
         self._write_drive_file("floppy.img.part")
         self._write_drive_file("other.img")
 
-        media = media_module.scan_drives(relict.drives_dir())
+        media = media_module.scan_drives(reliquary.drives_dir())
 
         self.assertEqual(media["floppy"], {
             0: media_module.Drive(floppy, False),
@@ -128,38 +128,38 @@ class HomeTests(unittest.TestCase):
         self._write_drive_file("hdd_0.vmdk")
 
         with self.assertRaisesRegex(RuntimeError, "slot clash"):
-            media_module.scan_drives(relict.drives_dir())
+            media_module.scan_drives(reliquary.drives_dir())
 
     def test_an_image_and_a_directory_clash_on_the_same_slot(self):
         self._write_drive_file("floppy.img")
         self._make_drive_dir("floppy_0")
 
         with self.assertRaisesRegex(RuntimeError, "slot clash"):
-            media_module.scan_drives(relict.drives_dir())
+            media_module.scan_drives(reliquary.drives_dir())
 
     def test_cdrom_directories_are_rejected(self):
         self._make_drive_dir("cdrom")
 
         with self.assertRaisesRegex(RuntimeError, "ISO9660"):
-            media_module.scan_drives(relict.drives_dir())
+            media_module.scan_drives(reliquary.drives_dir())
 
     def test_out_of_range_slots_are_rejected(self):
         self._write_drive_file("floppy_2.img")
 
         with self.assertRaisesRegex(RuntimeError, "slots run"):
-            media_module.scan_drives(relict.drives_dir())
+            media_module.scan_drives(reliquary.drives_dir())
 
     def test_enabled_false_disables_autodiscovered_drive(self):
         self._write_drive_file("hdd_0.qcow2")
         self._make_drive_dir("hdd_1")
 
         media = media_module.resolve_media(
-            relict.drives_dir(),
+            reliquary.drives_dir(),
             {"hdd_1": {"enabled": False}})
 
         self.assertEqual(media["hdd"], {
             0: media_module.Drive(
-                os.path.join(relict.drives_dir(), "hdd_0.qcow2"), False),
+                os.path.join(reliquary.drives_dir(), "hdd_0.qcow2"), False),
         })
         self.assertNotIn(1, media["hdd"])
 
@@ -170,7 +170,7 @@ class HomeTests(unittest.TestCase):
             f.write(b"override")
 
         media = media_module.resolve_media(
-            relict.drives_dir(),
+            reliquary.drives_dir(),
             {"hdd_0": {"source": override, "enabled": True}})
 
         self.assertEqual(media["hdd"], {
@@ -181,12 +181,12 @@ class HomeTests(unittest.TestCase):
         self._write_drive_file("hdd_0.qcow2")
 
         media = media_module.resolve_media(
-            relict.drives_dir(),
+            reliquary.drives_dir(),
             {"hdd_0": {"options": {"cache": "writeback"}}})
 
         self.assertEqual(media["hdd"], {
             0: media_module.Drive(
-                os.path.join(relict.drives_dir(), "hdd_0.qcow2"),
+                os.path.join(reliquary.drives_dir(), "hdd_0.qcow2"),
                 False,
                 (("cache", "writeback"),)),
         })
@@ -226,7 +226,7 @@ class InputAndScreenTests(unittest.TestCase):
 
         with mock.patch.object(machine_module, "qmp_session") as connection:
             connection.return_value.__enter__.return_value = qmp
-            rows = relict.screen_text()
+            rows = reliquary.screen_text()
 
         self.assertEqual(len(rows), 25)
         self.assertEqual(rows[0], "A:\\>")
@@ -497,10 +497,10 @@ class InteractionAdapterTests(unittest.TestCase):
         connection.assert_called_once_with(54321, "run-home")
 
     def test_package_exposes_the_protocol_and_agentless_adapter(self):
-        self.assertIs(relict.GuestExec, interaction_module.GuestExec)
-        self.assertIs(relict.AgentlessGuestExec,
+        self.assertIs(reliquary.GuestExec, interaction_module.GuestExec)
+        self.assertIs(reliquary.AgentlessGuestExec,
                       agentless_module.AgentlessGuestExec)
-        self.assertIs(relict.cursor_menu_select,
+        self.assertIs(reliquary.cursor_menu_select,
                       machine_module.cursor_menu_select)
 
     def test_agentless_adapter_satisfies_guest_exec_protocol(self):
@@ -529,34 +529,34 @@ class RunCommandTests(unittest.TestCase):
 
 class GuestProgramTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = relict.home()
+        self.previous_home = reliquary.home()
         self.tempdir = tempfile.TemporaryDirectory()
-        relict.set_home(self.tempdir.name)
+        reliquary.set_home(self.tempdir.name)
         self.exe = os.path.join(self.tempdir.name, "SUITE.EXE")
         with open(self.exe, "wb") as executable:
             executable.write(b"test executable")
 
     def tearDown(self):
-        relict.set_home(self.previous_home)
+        reliquary.set_home(self.previous_home)
         self.tempdir.cleanup()
 
     def test_dos_program_requires_dos_83_executable_name(self):
         path = os.path.join(self.tempdir.name, "TOO-LONG-NAME.EXE")
 
         with self.assertRaisesRegex(ValueError, "DOS 8.3"):
-            relict.run_guest_program(path)
+            reliquary.run_guest_program(path)
 
     def test_unimplemented_platform_does_not_apply_dos_name_policy(self):
         path = os.path.join(self.tempdir.name, "TOO-LONG-NAME.EXE")
 
         with self.assertRaisesRegex(NotImplementedError, "win9x"):
-            relict.run_guest_program(
-                path, machine_config=relict.MachineConfig(
+            reliquary.run_guest_program(
+                path, machine_config=reliquary.MachineConfig(
                     platform="win9x"))
 
     def test_guest_program_stages_runs_stops_and_returns_log(self):
         guest = mock.Mock()
-        stage = os.path.join(relict.drives_dir(), "hdd")
+        stage = os.path.join(reliquary.drives_dir(), "hdd")
         log_path = os.path.join(stage, "SUITE.log")
 
         def run_guest_command(command, *args):
@@ -573,15 +573,15 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest) as adapter, \
                 mock.patch.object(workflows_module, "stop") as stop, \
                 mock.patch.object(workflows_module.time, "sleep"):
-            config = relict.MachineConfig(timeout=45, qemu="qemu")
-            log = relict.run_guest_program(
+            config = reliquary.MachineConfig(timeout=45, qemu="qemu")
+            log = reliquary.run_guest_program(
                 self.exe, args="-v", machine_config=config, port=54321)
 
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
             mock.ANY, display=False, port=54321, home=None)
         config = start.call_args.args[0]
-        self.assertIsInstance(config, relict.MachineConfig)
+        self.assertIsInstance(config, reliquary.MachineConfig)
         self.assertEqual(config.qemu, "qemu")
         self.assertEqual(config.timeout, 45)
         adapter.assert_called_once_with(machine_module.Machine(54321, None))
@@ -595,7 +595,7 @@ class GuestProgramTests(unittest.TestCase):
 
     def test_guest_program_switches_to_the_declared_staged_drive(self):
         guest = mock.Mock()
-        log_path = os.path.join(relict.drives_dir(), "hdd",
+        log_path = os.path.join(reliquary.drives_dir(), "hdd",
                                 "SUITE.log")
 
         def run_guest_command(command, *args):
@@ -612,16 +612,16 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            config = relict.MachineConfig(staged_drive="d")
-            log = relict.run_guest_program(
+            config = reliquary.MachineConfig(staged_drive="d")
+            log = reliquary.run_guest_program(
                 self.exe, machine_config=config)
 
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         self.assertEqual(log, "guest output")
 
     def _stage_hdd_boot_image(self):
-        os.makedirs(relict.drives_dir(), exist_ok=True)
-        path = os.path.join(relict.drives_dir(), "hdd.qcow2")
+        os.makedirs(reliquary.drives_dir(), exist_ok=True)
+        path = os.path.join(reliquary.drives_dir(), "hdd.qcow2")
         with open(path, "wb") as image:
             image.write(b"hdd dos")
 
@@ -630,7 +630,7 @@ class GuestProgramTests(unittest.TestCase):
         # next free slot (drives/hdd_1) and defaults one letter on
         self._stage_hdd_boot_image()
         guest = mock.Mock()
-        log_path = os.path.join(relict.drives_dir(), "hdd_1",
+        log_path = os.path.join(reliquary.drives_dir(), "hdd_1",
                                 "SUITE.log")
 
         def run_guest_command(command, *args):
@@ -647,10 +647,10 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            log = relict.run_guest_program(self.exe)
+            log = reliquary.run_guest_program(self.exe)
 
         self.assertTrue(
-            os.path.isdir(os.path.join(relict.drives_dir(),
+            os.path.isdir(os.path.join(reliquary.drives_dir(),
                                        "hdd_1")))
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
         self.assertEqual(log, "guest output")
@@ -660,7 +660,7 @@ class GuestProgramTests(unittest.TestCase):
         with open(source, "wb") as image:
             image.write(b"hdd dos")
         guest = mock.Mock()
-        log_path = os.path.join(relict.drives_dir(), "hdd_1",
+        log_path = os.path.join(reliquary.drives_dir(), "hdd_1",
                                 "SUITE.log")
 
         def run_guest_command(command, *args):
@@ -677,8 +677,8 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            config = relict.MachineConfig(drives=specs)
-            log = relict.run_guest_program(
+            config = reliquary.MachineConfig(drives=specs)
+            log = reliquary.run_guest_program(
                 self.exe, machine_config=config)
 
         self.assertEqual(guest.execute.call_args_list[0].args[0], "d:")
@@ -693,14 +693,14 @@ class GuestProgramTests(unittest.TestCase):
         with mock.patch.object(workflows_module, "start_machine") \
                 as start:
             with self.assertRaisesRegex(ValueError, "claim C:"):
-                config = relict.MachineConfig(staged_drive="C")
-                relict.run_guest_program(
+                config = reliquary.MachineConfig(staged_drive="C")
+                reliquary.run_guest_program(
                     self.exe, machine_config=config)
 
         start.assert_not_called()
 
     def test_staging_reuses_a_declared_staged_directory(self):
-        staged = os.path.join(relict.drives_dir(), "hdd_2")
+        staged = os.path.join(reliquary.drives_dir(), "hdd_2")
         os.makedirs(staged)
         self._stage_hdd_boot_image()
         guest = mock.Mock()
@@ -720,7 +720,7 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop"), \
                 mock.patch.object(workflows_module.time, "sleep"):
-            log = relict.run_guest_program(self.exe)
+            log = reliquary.run_guest_program(self.exe)
 
         # only the slot-0 image precedes the staged slot 2 (slot 1
         # is undeclared and claims no letter), so the default is D:
@@ -737,19 +737,19 @@ class GuestProgramTests(unittest.TestCase):
                     return_value=guest), \
                 mock.patch.object(workflows_module, "stop") as stop:
             with self.assertRaisesRegex(RuntimeError, "guest failed"):
-                relict.run_guest_program(self.exe)
+                reliquary.run_guest_program(self.exe)
 
         stop.assert_called_once_with(54321, None)
 
 
 class ScreenshotTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = relict.home()
+        self.previous_home = reliquary.home()
         self.tempdir = tempfile.TemporaryDirectory()
-        relict.set_home(self.tempdir.name)
+        reliquary.set_home(self.tempdir.name)
 
     def tearDown(self):
-        relict.set_home(self.previous_home)
+        reliquary.set_home(self.previous_home)
         self.tempdir.cleanup()
 
     def test_screenshot_rejects_names_that_are_paths(self):
@@ -760,7 +760,7 @@ class ScreenshotTests(unittest.TestCase):
             for name in invalid_names:
                 with self.subTest(name=name):
                     with self.assertRaisesRegex(ValueError, "not a path"):
-                        relict.screenshot(name)
+                        reliquary.screenshot(name)
 
         connection.assert_not_called()
 
@@ -771,7 +771,7 @@ class ScreenshotTests(unittest.TestCase):
 
         with mock.patch.object(machine_module, "qmp_session") as connection:
             connection.return_value.__enter__.return_value = qmp
-            relict.screenshot("release-smoke")
+            reliquary.screenshot("release-smoke")
 
         qmp.cmd.assert_called_once_with(
             "screendump", filename=expected.replace("\\", "/"),
@@ -799,7 +799,7 @@ class ScreenshotTests(unittest.TestCase):
                                   UnsupportedPngError), \
                 mock.patch.object(machine_module.time, "sleep"):
             connection.return_value.__enter__.return_value = qmp
-            relict.screenshot("legacy")
+            reliquary.screenshot("legacy")
 
         self.assertFalse(os.path.exists(ppm))
         with open(png, "rb") as image:

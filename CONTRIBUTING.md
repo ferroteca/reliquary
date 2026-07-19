@@ -2,11 +2,12 @@
 
 Thank you for helping improve reliquary. Bug reports, documentation fixes,
 tests, and code changes are welcome when they preserve the project's BSD
-licensing and its role as a relict-based OS installation scripter.
+licensing and its role as a self-contained OS installation scripter
+with an agentless QEMU guest automation layer.
 
-reliquary is currently scaffolding: the public surface is stubbed and no
-recipes are implemented. Contributions that implement a recipe should follow
-the recipe module convention documented in ROADMAP.md.
+reliquary is pre-release. Contributions that implement a recipe should follow
+the recipe module convention documented in ROADMAP.md; the engineering
+constraints and invariants for the machine layer are in AGENTS.md.
 
 ## Before you start
 
@@ -29,7 +30,7 @@ python -m pip install --group dev
 python -m pip install -e .
 ```
 
-Runtime code is standard-library-only except for `relict`. Please discuss a
+Runtime code is standard-library-only except for `qemu.qmp`. Please discuss a
 new dependency before adding it.
 
 ## Make and verify a change

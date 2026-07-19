@@ -324,7 +324,7 @@ class _DisplayConsole:
 
 @dataclasses.dataclass(frozen=True)
 class Machine:
-    """A running, relict-owned VM passed to generic remote tasks."""
+    """A running, reliquary-owned VM passed to generic remote tasks."""
 
     port: "int | None" = None
     home: "str | None" = None

@@ -18,7 +18,7 @@ import uuid
 from qemu.qmp import ConnectError, QMPClient
 
 from .home import drives_dir, effective_home
-from .media import boot_guess, drive_args, resolve_media
+from .drives import boot_guess, drive_args, resolve_media
 
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
@@ -100,7 +100,7 @@ def _qemu_fallback_dirs():
 
 def _find_qemu_tool(binary):
     """Locate a QEMU tool from configuration and common paths."""
-    for variable in ("RELICT_QEMU_HOME", "QEMU_HOME"):
+    for variable in ("RELIQUARY_QEMU_HOME", "QEMU_HOME"):
         qemu_home = os.environ.get(variable)
         if not qemu_home:
             continue
@@ -119,7 +119,7 @@ def _find_qemu_tool(binary):
             return candidate
     raise FileNotFoundError(
         f"{binary} not found: install QEMU, add it to PATH, or set "
-        "RELICT_QEMU_HOME to its install directory")
+        "RELIQUARY_QEMU_HOME to its install directory")
 
 
 def find_qemu():
@@ -186,7 +186,7 @@ class Qmp:
 
     def __init__(self, port):
         self._loop = asyncio.new_event_loop()
-        self._client = QMPClient("relict")
+        self._client = QMPClient("reliquary")
         self._loop.run_until_complete(
             self._client.connect(("127.0.0.1", port)))
 
@@ -232,7 +232,7 @@ def read_vm_state(home=None):
         return None
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise RuntimeError(
-            f"invalid relict VM state file: {path}: {error}") from error
+            f"invalid reliquary VM state file: {path}: {error}") from error
 
 
 def write_vm_state(port, name, pid, home=None):
@@ -265,14 +265,14 @@ def resolve_vm(port=None, home=None):
     if port is None:
         if not state:
             raise RuntimeError(
-                "no active relict VM is recorded; run: relict start")
+                "no active reliquary VM is recorded; run: reliquary start")
         return state["port"], state["name"]
     if not 1 <= port <= 65535:
         raise ValueError(f"QMP port must be between 1 and 65535: {port}")
     if not state or state["port"] != port:
         raise RuntimeError(
-            f"QMP port {port} is not the recorded relict VM; "
-            "start it with relict or omit --port to use the active VM")
+            f"QMP port {port} is not the recorded reliquary VM; "
+            "start it with reliquary or omit --port to use the active VM")
     return port, state["name"]
 
 
@@ -300,7 +300,7 @@ def qmp_session(port=None, home=None):
         except (OSError, ConnectError) as error:
             remove_vm_state(actual_port, expected_name, home)
             raise RuntimeError(
-                "the recorded relict VM is no longer reachable\n"
+                "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {expected_name} on "
                 f"127.0.0.1:{actual_port}\n"
                 "  stale VM state was removed") from error
@@ -372,7 +372,7 @@ def start_machine(config, display=False, port=None, home=None):
             remove_vm_state(old_state["port"], old_state["name"], home)
         else:
             raise RuntimeError(
-                "a relict VM is already active\n"
+                "a reliquary VM is already active\n"
                 f"  name: {old_state['name']}\n"
                 f"  QMP port: 127.0.0.1:{old_state['port']}\n"
                 "stop it before starting another VM in this home")
@@ -380,7 +380,7 @@ def start_machine(config, display=False, port=None, home=None):
     print(f"using QEMU: {qemu}")
     drives = drives_dir(home)
     media = resolve_media(drives, config.drives)
-    vm_name = f"relict-{uuid.uuid4().hex[:12]}"
+    vm_name = f"reliquary-{uuid.uuid4().hex[:12]}"
     qemu_args = list(config.qemu_args)
     machine_value = machine_argument(config.machine)
     args = [qemu, "-name", vm_name]
@@ -459,7 +459,7 @@ def stop(port=None, home=None):
     except (OSError, ConnectError):
         remove_vm_state(port, expected_name, home)
         raise RuntimeError(
-            "the recorded relict VM is no longer reachable\n"
+            "the recorded reliquary VM is no longer reachable\n"
             f"  expected: {expected_name} on 127.0.0.1:{port}\n"
             "  stale VM state was removed")
     deadline = time.monotonic() + 15

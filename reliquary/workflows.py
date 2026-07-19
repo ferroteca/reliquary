@@ -14,7 +14,7 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (normalize_machine, normalize_memory, start_machine,
                         stop)
 from .machine import Machine
-from .media import (boot_guess, check_staged_drive, drive_key,
+from .drives import (boot_guess, check_staged_drive, drive_key,
                     normalize_drive_specs, resolve_media, staged_hdd_plan)
 from .platform_dos import program_name
 
@@ -69,7 +69,7 @@ def _cli_machine_config(machine_path, home_override, **cli_overrides):
 
 
 def start(machine_config=None, *, display=False, port=None, home=None):
-    """Start a relict-owned QEMU process and return its QMP port."""
+    """Start a reliquary-owned QEMU process and return its QMP port."""
     config = _function_config(machine_config, home)
     return _start_configured(config, display, port, home)
 
@@ -160,7 +160,7 @@ def _resolve_path(path, base_dir):
 
 def _drive_parts(declaration, base_dir, key):
     if isinstance(declaration, (str, os.PathLike)):
-        return _resolve_path(declaration, base_dir), {}, True
+        return _resolve_path(declaration, base_dir), {}, None
     if not isinstance(declaration, collections.abc.Mapping):
         raise TypeError(f"drives.{key} must be a path or drive mapping")
     unknown = set(declaration) - {"source", "options", "enabled"}
@@ -179,8 +179,8 @@ def _drive_parts(declaration, base_dir, key):
         raise TypeError(f"drives.{key}.options must be a mapping")
     else:
         options = dict(options)
-    enabled = declaration.get("enabled", True)
-    if not isinstance(enabled, bool):
+    enabled = declaration.get("enabled")
+    if enabled is not None and not isinstance(enabled, bool):
         raise TypeError(f"drives.{key}.enabled must be a boolean")
     return source, options, enabled
 
@@ -217,7 +217,7 @@ def _merge_drives(base, override, base_dir):
             **current["options"],
             **declaration["options"],
         }
-        if "enabled" in declaration:
+        if declaration["enabled"] is not None:
             current["enabled"] = declaration["enabled"]
     return merged
 

@@ -18,7 +18,9 @@ import socket
 import sys
 import time
 
-from relict import Machine, MachineConfig, create_hdd_image, start, stop
+from ..lifecycle import create_hdd_image, stop
+from ..machine import Machine
+from ..workflows import MachineConfig, start
 
 from ..home import install_media_dir, machine_dir
 from ..media import ensure_media
@@ -50,7 +52,7 @@ def _shutdown(port, machine_home):
     try:
         stop(port, machine_home)
     except RuntimeError:
-        pass  # already gone; relict cleaned up its recorded state
+        pass  # already gone; reliquary cleaned up its recorded state
 
 
 def install(display=False):
@@ -60,7 +62,7 @@ def install(display=False):
     verified by SHA-256 on every run (the distribution zip is only a
     transient download and is deleted after extracting the ISO),
     ensures the recipe's target disk exists, and boots the machine
-    through relict with the ISO and disk mounted, booting from the CD.
+    through the machine layer with the ISO and disk mounted, booting from the CD.
     After start, waits for the LiveCD's first install menu, selects
     "Install to harddisk", accepts the defaults for preferred
     language and the installer welcome screen, confirms partitioning

@@ -56,7 +56,7 @@ def _options(value, key):
                 f"drives.{key}.options keys must be non-empty strings")
         if name in _RESERVED_OPTIONS:
             raise ValueError(
-                f"drives.{key}.options.{name} is owned by relict")
+                f"drives.{key}.options.{name} is owned by reliquary")
         if not isinstance(option, (str, int, float, bool)):
             raise TypeError(
                 f"drives.{key}.options.{name} must be a scalar value")
@@ -94,7 +94,7 @@ def normalize_drive_specs(value):
         if isinstance(declaration, (str, os.PathLike)):
             source = declaration
             options = ()
-            enabled = True
+            enabled = None
         elif isinstance(declaration, collections.abc.Mapping):
             unknown = set(declaration) - {"source", "options", "enabled"}
             if unknown:
@@ -102,8 +102,8 @@ def normalize_drive_specs(value):
                 raise ValueError(f"unknown drive field: drives.{key}.{field}")
             source = declaration.get("source")
             options = _options(declaration.get("options"), key)
-            enabled = declaration.get("enabled", True)
-            if not isinstance(enabled, bool):
+            enabled = declaration.get("enabled")
+            if enabled is not None and not isinstance(enabled, bool):
                 raise TypeError(f"drives.{key}.enabled must be a boolean")
         else:
             raise TypeError(
@@ -202,8 +202,8 @@ def resolve_media(drives, specs=None):
     media = scan_drives(drives)
     specs = normalize_drive_specs(specs)
     for key, declaration in specs.items():
-        enabled = declaration.get("enabled", True)
-        if not enabled:
+        enabled = declaration.get("enabled")
+        if enabled is False:
             kind, slot, _ = drive_key(key)
             if slot in media.get(kind, {}):
                 del media[kind][slot]
@@ -221,6 +221,13 @@ def resolve_media(drives, specs=None):
             media[kind][slot] = Drive(
                 existing.path, existing.is_dir, options)
         else:
+            # An explicit ``enabled: True`` deliberately replaces the
+            # filesystem-declared drive; a bare source fails closed.
+            if existing is not None and enabled is not True:
+                raise RuntimeError(
+                    f"drive slot clash: {existing.path} under {drives} "
+                    f"and drives.{key}.source={source} both claim "
+                    f"{kind} slot {slot}")
             media[kind][slot] = Drive(
                 source, os.path.isdir(source), options)
     return media

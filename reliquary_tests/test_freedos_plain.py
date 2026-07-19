@@ -10,7 +10,9 @@ import unittest
 import zipfile
 from unittest import mock
 
-from reliquary import home
+import importlib
+
+home = importlib.import_module("reliquary.home")
 from reliquary.recipes import freedos_plain
 
 
@@ -102,7 +104,7 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
             "display": False, "home": self.machine_home})
         self.assertEqual(config.drives["cdrom_0"]["source"],
                          self.expected_iso)
-        self.assertEqual(config.qemu_args, ("-boot", "d"))
+        self.assertEqual(config.qemu_args, ("-boot", "order=cd"))
         self.assertEqual(config.platform, "dos")
         self.Machine.assert_called_once_with(4242, self.machine_home)
         self.assertEqual(self.machine.wait_text.call_args_list, [
@@ -113,29 +115,49 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
             mock.call(
                 r"Drive C: does not appear to be partitioned\."),
             mock.call(r"You must reboot your computer"),
+            mock.call(r"Welcome to FreeDOS 1\.4 \(LiveCD\)"),
+            mock.call(r"What is your preferred language\?",
+                      delay=0.1),
+            mock.call(
+                r"Welcome to the FreeDOS 1\.4 installation program"),
+            mock.call(
+                r"Drive C: does not appear to be formatted\."),
+            mock.call(r"Press a key\.\.\."),
             mock.call(r"Please select your keyboard layout"),
             mock.call(
                 r"What FreeDOS packages do you want to install\?"),
             mock.call(
                 r"We are now ready to install FreeDOS 1\.4\."),
+            mock.call(
+                r"Installation of FreeDOS 1\.4 is now complete\."),
+            mock.call(
+                r"Load FreeDOS with JEMMEX \(more compatible\)"),
+            mock.call(r"C:\\>"),
         ])
         self.assertEqual(
             self.machine.cursor_menu_select.call_args_list, [
                 mock.call("Install to harddisk"),
                 mock.call("Yes"),
                 mock.call("Yes"),
+                mock.call("Install to harddisk"),
+                mock.call("Yes"),
                 mock.call("Plain DOS system",
                           exclude="with sources"),
+                mock.call("Yes", timeout=600),
                 mock.call("Yes"),
             ])
         self.assertEqual(self.machine.send_keys.call_args_list, [
             mock.call([["ret"]]),
             mock.call([["ret"]]),
             mock.call([["ret"]]),
+            mock.call([["ret"]]),
+            mock.call([["ret"]]),
+            mock.call([["ret"]]),
+            mock.call([["ret"]]),
         ])
 
     def test_install_display_mode_is_forwarded(self):
-        """display=True reaches relict's start()."""
+        """display=True reaches the machine start()."""
         create_hdd_image = mock.Mock(return_value=self.expected_hdd)
         start = mock.Mock(return_value=4242)
         self._install(create_hdd_image, start, mock.Mock(),
@@ -162,7 +184,7 @@ class FreeDOSPlainInstallTests(unittest.TestCase):
     def test_vanished_machine_is_tolerated_at_shutdown(self):
         """A machine that already exited does not fail install()."""
         stop = mock.Mock(side_effect=RuntimeError(
-            "the recorded relict VM is no longer reachable"))
+            "the recorded reliquary VM is no longer reachable"))
         artifacts = self._install(
             mock.Mock(return_value=self.expected_hdd),
             mock.Mock(return_value=4242), stop)

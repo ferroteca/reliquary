@@ -8,7 +8,10 @@ import os
 import unittest
 from unittest import mock
 
-from reliquary import cli, home
+import importlib
+
+home = importlib.import_module("reliquary.home")
+from reliquary import cli
 
 
 class CliInstallTests(unittest.TestCase):
@@ -65,8 +68,8 @@ class CliInstallTests(unittest.TestCase):
         with mock.patch("reliquary.recipes.freedos_plain.install",
                         return_value={}):
             with contextlib.redirect_stdout(io.StringIO()):
-                cli.main(["install", "freedos-plain",
-                          "--home", "elsewhere"])
+                cli.main(["--home", "elsewhere",
+                          "install", "freedos-plain"])
         self.assertEqual(home.home(), os.path.abspath("elsewhere"))
 
 
