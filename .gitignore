@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
