@@ -41,10 +41,13 @@ scripted OS install or an automated task, recreated freely, and
 deleted when done. The declaration makes rebuilding cheap; the
 entire cached instantiation is safe to throw away, because
 everything in it regenerates from declarations, media definitions,
-and scripts. What lasts is the output, above all the installed
-disk image: `export` it to a platform built for long-lived
-machines when it should live on. reliquary is not the place to
-keep a machine you care about.
+and scripts. The machine is never the product — often nothing
+durable comes out at all (the point was to run some tests); when
+there is interest in something more durable, `export` it — either
+a media image (a disk image taken out of the machine) or the
+entire machine, handed to a hypervisor built for long-lived
+machines. reliquary is not the place to keep a machine you care
+about.
 
 The same line runs through the whole reliquary home: everything
 outside `cache/` is a document you authored — machine
@@ -270,12 +273,14 @@ gets its own backend assignment and `backend-id`. State and
 backend registration are never copied; a clone shares ancestry,
 nothing else.
 
-**`export`** copies a machine out to its backend's native
-management — registered where that backend normally keeps VMs,
-with disks in its native format. This is the first-class form of
-the intended endgame: reliquary machines are ephemeral, and when
-an installed system should live on, you export it to a platform
-built for long-lived machines. The exported VM is independent and
+**`export`** takes something durable out of an ephemeral machine.
+It has two targets: a **media image** — a single drive taken out
+of the machine as a standalone image file — or the **entire
+machine**, copied to its backend's native management, registered
+where that backend normally keeps VMs with disks in its native
+format. This is the first-class form of the intended endgame:
+reliquary machines are ephemeral, and when something should live
+on, you export it. An exported machine is independent and
 permanently outside reliquary's purview — reliquary will never
 touch it again.
 

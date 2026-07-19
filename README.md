@@ -7,10 +7,12 @@ project), which owns QEMU lifecycle, media, QMP identity checks, keyboard
 input, screen access, screenshots, and per-run state.
 
 reliquary machines are ephemeral: disposable rigs for scripted installs and
-automated guest tasks, cheap to recreate and delete. The durable artifact is
-the output — above all the installed disk image, which you copy to a
-platform built for long-lived machines when it should live on. reliquary is
-not a VM manager for machines you keep.
+automated guest tasks, cheap to recreate and delete. The machine is never
+the product — often nothing durable comes out at all (the point was to run
+some tests); when there is interest in something more durable, it is
+exported — either a media image or an entire machine bound for a platform
+built for long-lived machines. reliquary is not a VM manager for machines
+you keep.
 
 ## Installation
 

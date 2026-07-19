@@ -14,11 +14,15 @@ scripting language.
 
 reliquary manages **ephemeral machines**. A reliquary machine is a
 disposable rig: created to run a scripted install or an automated
-task, then recreated or deleted. The durable artifact is the
-output — above all the installed disk image, which is copied to a
-platform built for long-lived machines when it should live on.
-reliquary is not a VM manager for machines you keep; every design
-choice may assume machines are cheap to destroy and rebuild.
+task, then recreated or deleted. The machine itself is never the
+product. Often there is no durable artifact at all — the whole
+point was to run some tests and observe the results. When there
+is interest in something more durable, it is **exported** —
+either a media image (a disk image taken out of the machine) or
+an entire machine (handed to a hypervisor built for long-lived
+machines). reliquary is not a VM manager for machines you keep;
+every design choice may assume machines are cheap to destroy and
+rebuild.
 
 The unit of design is the **operation** performed against a
 machine: start it, stop it, attach media, send input, run a guest
@@ -902,13 +906,15 @@ agentless and guest-agent control planes with equivalent results.
   reclaims cached instantiations of stopped machines wholesale
   (they regenerate like everything else under `cache/`), or
   whether `recreate`/`delete` per machine is enough.
-- **`export` mechanics per backend**: what "the backend's native
-  management" concretely means for each backend (VirtualBox
-  machine folder + registration, Hyper-V import/export format,
-  `.vmx` directory for VMware, bare image + launch config for
-  QEMU), whether export offers format conversion, and whether a
-  `media:`-referenced drive blocks export or is materialized
-  into it.
+- **`export` mechanics**: export has two targets — a media image
+  (a single drive taken out of the machine as a standalone image
+  file) and an entire machine (registered with the backend's
+  native management: VirtualBox machine folder + registration,
+  Hyper-V import/export format, `.vmx` directory for VMware,
+  bare image + launch config for QEMU). Open: the exact CLI
+  shape for the two, whether export offers format conversion,
+  and whether a `media:`-referenced drive blocks whole-machine
+  export or is materialized into it.
 - **`import` scope**: which backend config translates into the
   synthesized declaration (memory, drives, controllers are clear;
   what of NICs and other devices the spec doesn't model yet), and
