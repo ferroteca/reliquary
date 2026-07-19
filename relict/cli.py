@@ -46,7 +46,7 @@ def main(argv=None):
                         help="guest platform adapter (default: dos; other "
                              "platform workflows are not implemented yet)")
     parser.add_argument("--timeout", type=int, help="seconds to wait "
-                        "(defaults: boot-to-dos 90, run 120, wait 60)")
+                        "(defaults: run 120, wait 60)")
     parser.add_argument("--machine", help="path to machine.json configuration "
                         "file (default: <home>/machine.json if present)")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -56,7 +56,6 @@ def main(argv=None):
     command.add_argument("--display", action="store_true")
     command.add_argument("qemu_args", nargs="*")
     subcommands.add_parser("stop")
-    subcommands.add_parser("boot-to-dos")
     command = subcommands.add_parser("type")
     command.add_argument("text")
     command = subcommands.add_parser("run")
@@ -103,12 +102,6 @@ def _dispatch(arguments):
         start(config, display=arguments.display, port=arguments.port)
     elif arguments.command == "stop":
         stop(arguments.port)
-    elif arguments.command == "boot-to-dos":
-        if platform != "dos":
-            raise NotImplementedError(
-                "boot-to-dos requires platform='dos'")
-        AgentlessGuestExec(Machine(arguments.port)).wait_ready(
-            arguments.timeout or 90)
     elif arguments.command == "type":
         send_text(arguments.text, arguments.port)
     elif arguments.command == "run":

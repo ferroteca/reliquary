@@ -205,17 +205,27 @@ identity does not match its state file.
 
 ### 4. Reach the DOS prompt
 
+`start` returns when QEMU is ready, not when DOS is. Wait for a prompt before running commands:
+
 ```powershell
-relict boot-to-dos
+relict wait "A:\\\\>"
 ```
 
-This waits until the guest shows a DOS prompt. If the FreeDOS installer appears on the way, relict declines the
-installation and returns to DOS, stopping at the `A:\>` prompt. A user-provided boot image must reach its prompt on its
-own, without interactive menus. Switch to the staged drive using an ordinary DOS command:
+If the FreeDOS installer asks whether to proceed, decline it first:
+
+```powershell
+relict type n
+```
+
+A user-provided boot image must reach its prompt on its own, without interactive menus. Switch to the staged drive
+using an ordinary DOS command:
 
 ```powershell
 relict run "c:"
 ```
+
+Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which declines the FreeDOS installer and waits for a
+prompt in one step.
 
 ### 5. Run DOS commands
 
@@ -270,7 +280,6 @@ and restart QEMU before using them in the guest.
 ```text
 relict download
 relict start [--display] [--machine PATH] [-- QEMU_ARGS...]
-relict boot-to-dos
 relict stop
 ```
 
@@ -337,7 +346,7 @@ relict screenshot [NAME]
 ```
 
 Use the global `--timeout SECONDS` option to change the timeout for
-`boot-to-dos`, `run`, or `wait`.
+`run` or `wait`.
 
 ### QEMU monitor access
 

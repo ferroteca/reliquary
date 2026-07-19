@@ -6,6 +6,12 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ## [Unreleased]
 
+### Removed
+
+- The `boot-to-dos` CLI command. Wait for a prompt with `relict wait`, and
+  decline the FreeDOS installer with `relict type n` when needed.
+  Programmatic boot readiness remains `AgentlessGuestExec.wait_ready()`.
+
 ### Changed
 
 - Added an internal, runtime-checkable `GuestExec` protocol and isolated the
