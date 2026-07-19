@@ -37,18 +37,16 @@ relict therefore works **agentlessly**:
 The guest needs no relict software, network driver, serial driver, or background service. This makes the harness
 useful even while the guest is partially configured or broken.
 
-Any DOS (e.g. MS-DOS or FreeDOS) with a bootable image works. The `<relict_home>/drives` directory declares the
+Any DOS with a bootable image works. The `<relict_home>/drives` directory declares the
 whole machine: image files named `floppy[_<n>].<ext>`, `hdd[_<n>].<ext>`, and `cdrom[_<n>].<ext>` mount as that
 medium and slot, and bare directories named `floppy[_<n>]` and `hdd[_<n>]` mount as virtual FAT drives. Any
-QEMU-supported image format works — the extension declares the format, with `*.img` and `*.iso` taken as raw. When
-nothing bootable is declared, the freely distributable FreeDOS 1.4 boot floppy is downloaded automatically and used
-as the default. relict hands back a guest program's raw output, and interpreting it is left to the caller.
+QEMU-supported image format works — the extension declares the format, with `*.img` and `*.iso` taken as raw.
+relict hands back a guest program's raw output, and interpreting it is left to the caller.
 
 ## The workflow
 
 1. **Provide the guest.** Place the bootable DOS image of your choice under `<relict_home>/drives` — a floppy image
-   as `floppy.<ext>` (typically `floppy.img`), or a hard-disk image as `hdd.<ext>` (e.g. `hdd.qcow2`) — or skip this
-   step and let relict download a minimal FreeDOS system.
+   as `floppy.<ext>` (typically `floppy.img`), or a hard-disk image as `hdd.<ext>` (e.g. `hdd.qcow2`).
 2. **Stage the files.** Collect everything the guest should work with — your programs, test executables, data files, and
    any DOS utilities they depend on — place them in a `<relict_home>/drives/hdd` folder (or `hdd_1` behind a
    hard-disk boot image, which claims slot 0). relict attaches the folder as a virtual FAT hard disk — `C:` when it
@@ -137,10 +135,8 @@ QEMU-supported image format works: the idiomatic extension declares the format �
 (so `floppy.img` and `cdrom.iso` mount without QEMU's format-probing warning), and any other extension (`hdd.qcow2`,
 `hdd.vmdk`, ...) is handed to QEMU to identify.
 
-To use a particular DOS — MS-DOS, DR-DOS, a customized FreeDOS — copy its bootable image in as, say,
-`drives/floppy.img` or `drives/hdd.qcow2`. When nothing bootable is declared, relict downloads the FreeDOS 1.4
-FloppyEdition archive (roughly 23 MB), verifies its SHA-256 digest, extracts the 1.44M boot floppy as
-`drives/floppy.img`, and discards the archive.
+To use a particular DOS — MS-DOS, DR-DOS, or another distribution — copy its bootable image in as, say,
+`drives/floppy.img` or `drives/hdd.qcow2`.
 
 The boot order defaults to a best guess — the slot-0 floppy image, else the slot-0 hard-disk image, else the
 cdrom — and memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `relict start` to override either.
@@ -148,17 +144,6 @@ cdrom — and memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `reli
 Guest drive letters follow disk order, so a hard-disk boot image at slot 0 claims `C:` and pushes a staged virtual
 FAT drive to `D:`; relict defaults the staged drive letter accordingly, and `staged_drive` overrides it (for
 example when a multi-partition hard-disk image pushes the drive further down the alphabet).
-
-The FreeDOS boot floppy is a minimal system: the kernel, the FreeCOM command shell, and little else. Commands built into
-the shell (`dir`, `copy`, `del`, `type`, `set`, ...) work, but external DOS utilities such as `xcopy`, `find`, or
-`edit` are not included. If your workflow needs them, stage them on drive C: alongside your own files, or build a
-custom boot image.
-
-The download happens automatically on the first `relict start`; to fetch it ahead of time instead, run:
-
-```powershell
-relict download
-```
 
 ### 2. Prepare the staged drive
 
@@ -211,12 +196,6 @@ identity does not match its state file.
 relict wait "A:\\\\>"
 ```
 
-If the FreeDOS installer asks whether to proceed, decline it first:
-
-```powershell
-relict type n
-```
-
 A user-provided boot image must reach its prompt on its own, without interactive menus. Switch to the staged drive
 using an ordinary DOS command:
 
@@ -224,8 +203,8 @@ using an ordinary DOS command:
 relict run "c:"
 ```
 
-Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which declines the FreeDOS installer and waits for a
-prompt in one step.
+Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which waits for a
+prompt.
 
 ### 5. Run DOS commands
 
@@ -278,7 +257,6 @@ and restart QEMU before using them in the guest.
 ### Managing the VM
 
 ```text
-relict download
 relict start [--display] [--machine PATH] [-- QEMU_ARGS...]
 relict stop
 ```
@@ -477,8 +455,7 @@ and `drives` belong in that configuration; the functions expose only separate
 operational controls such as `display`, `port`, and `home`.
 
 Configured sources are mounted in place and must already exist. They conflict with a filesystem declaration for the
-same logical slot rather than overriding it. `run()` keeps present bootable media and, for an empty DOS home, installs
-the downloaded FreeDOS default. It then performs the `run_guest_program()` lifecycle under the runner's home.
+same logical slot rather than overriding it. `run()` keeps present bootable media. It then performs the `run_guest_program()` lifecycle under the runner's home.
 `machine` maps directly to QEMU's `-machine`: a string selects only the type, while a mapping requires `type` and may
 add scalar machine properties. Booleans render as `on`/`off`; configuring both `machine` and `-machine` in
 `qemu_args` is an error.
@@ -490,10 +467,10 @@ default.
 drive `run()` switches to and stages under (the highest staged directory declared among the hard-disk slots, or
 `drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged
 drive, one letter later per hard-disk slot before it (lower letters are rejected). Every
-`MachineConfig` field has a working default, so `relict.Runner()` is a complete FreeDOS machine using the established
+`MachineConfig` field has a working default, so `relict.Runner()` is a complete DOS machine using the established
 default home. Pass `home=` to select another one, and create separate runners with separate homes for concurrent runs.
 The same explicit `home=` keyword is available on the
-module-level functions (`download`, `start`, `stop`,
+module-level functions (`start`, `stop`,
 `run_guest_program`, and the path helpers) and overrides the process-global home per call.
 
 ## Troubleshooting

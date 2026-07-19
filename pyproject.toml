@@ -14,7 +14,7 @@ authors = [{ name = "Paul Galbraith", email = "paul@galbraiths.ca" }]
 requires-python = ">=3.9"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
-keywords = ["qemu", "dos", "freedos", "testing", "automation", "qmp"]
+keywords = ["qemu", "dos", "testing", "automation", "qmp"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

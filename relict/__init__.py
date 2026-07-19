@@ -9,7 +9,6 @@ from .interaction_agentless import (AgentlessGuestExec, screen_text,
                                     send_keys, send_text, wait_screen)
 from .lifecycle import Qmp, find_qemu, stop
 from .machine import Machine, screenshot
-from .platform_dos import download
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
@@ -20,7 +19,6 @@ __all__ = [
     "MachineConfig",
     "AgentlessGuestExec",
     "GuestExec",
-    "download",
     "drives_dir",
     "find_qemu",
     "home",

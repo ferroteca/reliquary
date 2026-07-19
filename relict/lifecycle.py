@@ -287,8 +287,7 @@ def _terminate_started_process(proc):
             proc.kill()
 
 
-def start_machine(config, display=False, port=None, home=None,
-                  prepare_drives=None):
+def start_machine(config, display=False, port=None, home=None):
     """Start an owned QEMU process described by one machine config.
 
     ``config`` is a validated machine configuration (the workflow
@@ -321,9 +320,6 @@ def start_machine(config, display=False, port=None, home=None,
     print(f"using QEMU: {qemu}")
     drives = drives_dir(home)
     media = resolve_media(drives, config.drives)
-    if boot_guess(media) is None and prepare_drives is not None:
-        prepare_drives(drives, media)
-        media = resolve_media(drives, config.drives)
     vm_name = f"relict-{uuid.uuid4().hex[:12]}"
     qemu_args = list(config.qemu_args)
     machine_value = machine_argument(config.machine)

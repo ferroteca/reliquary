@@ -310,30 +310,6 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(args.count("-boot"), 1)
         self.assertEqual(args[args.index("-boot") + 1], "c")
 
-    def test_start_downloads_missing_boot_image(self):
-        fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
-        proc = _FakeProcess()
-
-        def fake_download(drives, media):
-            self._write_boot_image(data=b"freedos")
-
-        with mock.patch.object(workflows_module, "prepare_drives",
-                               side_effect=fake_download) as download, \
-                mock.patch.object(lifecycle_module, "available_port",
-                                  return_value=54321), \
-                mock.patch.object(lifecycle_module, "port_in_use",
-                                  return_value=False), \
-                mock.patch.object(lifecycle_module.uuid, "uuid4",
-                                  return_value=fake_uuid), \
-                mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
-                mock.patch.object(lifecycle_module.subprocess, "Popen",
-                                  return_value=proc):
-            port = relict.start(relict.MachineConfig(qemu="qemu"))
-
-        download.assert_called_once_with(
-            os.path.join(self.home, "drives"), mock.ANY)
-        self.assertEqual(port, 54321)
-
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
         lifecycle_module.write_vm_state(
             54321, "relict-expected", 1234)

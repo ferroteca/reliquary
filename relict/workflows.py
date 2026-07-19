@@ -16,7 +16,7 @@ from .lifecycle import (normalize_machine, normalize_memory, start_machine,
 from .machine import Machine
 from .media import (boot_guess, check_staged_drive, drive_key,
                     normalize_drive_specs, resolve_media, staged_hdd_plan)
-from .platform_dos import prepare_drives, program_name
+from .platform_dos import program_name
 
 
 _PLATFORM_MEMORY = {
@@ -76,9 +76,7 @@ def start(machine_config=None, *, display=False, port=None, home=None):
 
 def _start_configured(config, display=False, port=None, home=None):
     """Launch one validated machine configuration."""
-    provision = prepare_drives if config.platform == "dos" else None
-    return start_machine(config, display=display, port=port, home=home,
-                         prepare_drives=provision)
+    return start_machine(config, display=display, port=port, home=home)
 
 
 def run_task(task, machine_config=None, *, display=False, port=None,
@@ -374,23 +372,10 @@ class Runner:
     def platform(self):
         return self.config.platform
 
-    def _provision(self):
-        """Ensure the declared machine has something bootable."""
-        drives = os.path.join(self.home, "drives")
-        media = resolve_media(drives, self.config.drives)
-        if boot_guess(media) is not None:
-            return
-        if self.platform == "dos":
-            prepare_drives(drives, media)
-            return
-        raise ValueError(
-            f"no bootable drive is declared under {drives}")
-
     def run(self, task, args=""):
         """Run a DOS executable using this runner's configuration."""
         if self.platform != "dos":
             raise NotImplementedError(
                 f"platform {self.platform!r} task workflow is not "
                 "implemented; use run_task() with an explicit callable")
-        self._provision()
         return _run_configured(self.config, task, args, home=self.home)

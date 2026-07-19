@@ -82,9 +82,8 @@ class AgentlessGuestExec:
         self._machine = machine
 
     def wait_ready(self, timeout: float = 90) -> None:
-        """Wait for a DOS prompt, declining the FreeDOS installer."""
+        """Wait for a DOS prompt."""
         print("waiting for a DOS prompt...")
-        installer_seen = False
         with self._machine.qmp() as qmp:
             console = _DisplayConsole(qmp)
             deadline = time.monotonic() + timeout
@@ -93,13 +92,6 @@ class AgentlessGuestExec:
                 if rows and _PROMPT_RE.match(rows[-1]):
                     print(f"at DOS prompt: {rows[-1]}")
                     return
-                if (not installer_seen
-                        and any("Do you want to proceed" in row
-                                for row in rows)):
-                    installer_seen = True
-                    print("FreeDOS installer detected; "
-                          "declining the install...")
-                    console.send_text("n")
                 time.sleep(2)
         raise TimeoutError(
             f"timed out after {timeout}s waiting for a DOS prompt")

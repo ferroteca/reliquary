@@ -492,60 +492,6 @@ class DirectMachineConfigTests(unittest.TestCase):
             self.assertEqual(runner.config.timeout, 45)
 
 
-class ProvisionTests(unittest.TestCase):
-    def setUp(self):
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.drives = os.path.join(self.tempdir.name, "drives")
-
-    def tearDown(self):
-        self.tempdir.cleanup()
-
-    def _image_bytes(self):
-        with open(os.path.join(self.drives, "floppy.img"),
-                  "rb") as image:
-            return image.read()
-
-    def _run(self, machine):
-        with mock.patch.object(workflows_module, "_run_configured",
-                               return_value=""):
-            machine.run("SUITE.EXE")
-
-    def test_present_image_is_never_overwritten(self):
-        os.makedirs(self.drives)
-        with open(os.path.join(self.drives, "floppy.img"),
-                  "wb") as image:
-            image.write(b"existing dos")
-        machine = relict.Runner(self.tempdir.name)
-
-        with mock.patch.object(workflows_module,
-                               "prepare_drives") as prepare:
-            self._run(machine)
-
-        prepare.assert_not_called()
-        self.assertEqual(self._image_bytes(), b"existing dos")
-
-    def test_empty_home_installs_the_freedos_fallback(self):
-        with mock.patch.object(workflows_module,
-                               "prepare_drives") as prepare:
-            self._run(relict.Runner(self.tempdir.name))
-
-        prepare.assert_called_once_with(self.drives, mock.ANY)
-
-    def test_configured_boot_source_suppresses_fallback(self):
-        source = os.path.join(self.tempdir.name, "boot.img")
-        with open(source, "wb") as image:
-            image.write(b"dos")
-        machine = relict.Runner(
-            self.tempdir.name,
-            relict.MachineConfig(drives={"floppy": source}))
-
-        with mock.patch.object(workflows_module,
-                               "prepare_drives") as prepare:
-            self._run(machine)
-
-        prepare.assert_not_called()
-
-
 class RunnerRunTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()

@@ -61,8 +61,7 @@ seam). Never write beside the module or into the source repository during normal
 
 Current home layout:
 
-- `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting") and
-  download artifacts
+- `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting")
 - `machine.json` — optional CLI machine configuration (not loaded by Python workflows)
 - `screenshots/` — screenshots
 - `qemu-stderr.log` — startup diagnostics
@@ -101,17 +100,10 @@ declares the format (`_format_options()`): any QEMU-supported image format works
 
 Memory defaults to 16 MB and the boot order to a best guess from the declared media — the slot-0 floppy image, else
 the slot-0 hard-disk image, else any cdrom (`_boot_guess()`); a `-m` or `-boot` in `qemu_args` suppresses the
-corresponding default. When nothing bootable is declared, `download()` (also invoked automatically by `start()`)
-fetches the FreeDOS 1.4 FloppyEdition archive with SHA-256 verification, installs its 1.44M boot floppy as
-`drives/floppy.img`, and deletes the archive. Present drives are never overwritten.
-
-The FreeDOS fallback floppy is minimal — kernel and FreeCOM only. Workflows may rely on shell built-ins, but external
-DOS utilities must be staged on drive C: like any other guest file.
+corresponding default.
 
 `AgentlessGuestExec.wait_ready()` only waits out the boot process to a native DOS prompt, detected generically as a
-bare prompt on the bottom-most non-blank screen row. The one distribution-specific behavior is recognizing the
-FreeDOS 1.4 installer and declining the installation to reach `A:\>`; user-provided images must boot to a prompt
-unattended. Do not add special boot parameters for ordinary DOS commands. Drive changes, directory changes,
+bare prompt on the bottom-most non-blank screen row. Do not add special boot parameters for ordinary DOS commands. Drive changes, directory changes,
 environment variables, and program invocations belong in `AgentlessGuestExec.execute()` scripting.
 
 Higher-level workflows may issue those ordinary commands internally. For example, `run_guest_program()` runs `c:` before
@@ -164,7 +156,7 @@ option name. Construction and `Runner` do not implicitly load `<home>/machine.js
 convenience and does not apply to Python workflows. Explicit `--platform`, `--qemu`, and raw QEMU arguments
 override the loaded file; an omitted `--platform` must not clobber a file platform (so argparse must not
 default `--platform` to `"dos"`). `run()` privately ensures that
-the resolved inventory declares something bootable — keep present declared media or install the FreeDOS default;
+the resolved inventory declares something bootable — keep present declared media;
 never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
 special boot-image fields: custom media is declared through the same drive inventory as every other image.
 The module-level `start()`, `run_task()`, and `run_guest_program()` functions accept one optional `machine_config`
@@ -241,7 +233,7 @@ unpacked source package and installed artifact.
 Run `git diff --check` before handing work back.
 
 Hands-on tests require QEMU. Use `--home` with a scratch or deliberately reused test home rather than polluting the
-default per-user home. The FreeDOS download is roughly 23 MB; reuse an existing `drives/floppy.img` when available.
+default per-user home.
 
 ## Test expectations
 
@@ -272,7 +264,7 @@ is not published independently; if that changes, reassess whether replacing loca
 maintenance without weakening ownership checks or the public interface.
 
 QEMU's own functional tests validate the broad model of scripting a guest over QMP and asserting on observable state.
-relict adds the DOS-specific layer: keyboard conventions, VGA text scraping, FreeDOS menu navigation, prompt
+relict adds the DOS-specific layer: keyboard conventions, VGA text scraping, prompt
 completion, and vvfat staging.
 
 Espressif's `pytest-embedded-qemu` is useful prior art for a future

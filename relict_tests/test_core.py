@@ -97,39 +97,12 @@ class HomeTests(unittest.TestCase):
         os.makedirs(path)
         return path
 
-    def test_download_keeps_existing_boot_floppy(self):
-        floppy = self._write_drive_file("floppy.img", b"custom dos")
-
-        with mock.patch.object(platform_dos_module.urllib.request,
-                               "urlretrieve") as retrieve:
-            relict.download()
-
-        retrieve.assert_not_called()
-        with open(floppy, "rb") as image:
-            self.assertEqual(image.read(), b"custom dos")
-
-    def test_download_keeps_existing_bootable_hdd_image(self):
-        self._write_drive_file("hdd.qcow2", b"custom hdd dos")
-
-        with mock.patch.object(platform_dos_module.urllib.request,
-                               "urlretrieve") as retrieve:
-            relict.download()
-
-        retrieve.assert_not_called()
-
-    def test_download_refuses_a_staged_directory_on_floppy_slot_0(self):
-        self._make_drive_dir("floppy")
-
-        with self.assertRaisesRegex(RuntimeError, "floppy slot 0"):
-            relict.download()
-
     def test_scan_recognizes_media_by_stem_and_slot(self):
         floppy = self._write_drive_file("floppy.qcow2")
         hdd = self._make_drive_dir("hdd_1")
         cdrom = self._write_drive_file("cdrom.iso")
-        # download leftovers and unrelated names never count
+        # leftover temp files and unrelated names never count
         self._write_drive_file("floppy.img.part")
-        self._write_drive_file("FD14-FloppyEdition.zip")
         self._write_drive_file("other.img")
 
         media = media_module.scan_drives(relict.drives_dir())
@@ -227,28 +200,6 @@ class BootToDosTests(unittest.TestCase):
                 machine_module.Machine()).wait_ready()
 
         console.send_text.assert_not_called()
-
-    def test_declines_the_freedos_installer(self):
-        qmp = mock.Mock()
-        screens = [
-            ["Welcome to the FreeDOS 1.4 installation program.",
-             "Do you want to proceed [Y,N]?"],
-            ["Do you want to proceed [Y,N]?N",
-             "The installation of FreeDOS 1.4 has been aborted.",
-             "A:\\>"],
-        ]
-        console = mock.Mock()
-        console.screen_text.side_effect = screens
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
-                mock.patch.object(
-                    agentless_module, "_DisplayConsole",
-                    return_value=console), \
-                mock.patch.object(agentless_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = qmp
-            agentless_module.AgentlessGuestExec(
-                machine_module.Machine()).wait_ready()
-
-        console.send_text.assert_called_once_with("n")
 
     def test_times_out_without_a_prompt(self):
         with mock.patch.object(machine_module, "qmp_session") as connection, \
@@ -352,8 +303,7 @@ class GuestProgramTests(unittest.TestCase):
 
         self.assertTrue(os.path.isdir(stage))
         start.assert_called_once_with(
-            mock.ANY, display=False, port=54321, home=None,
-            prepare_drives=workflows_module.prepare_drives)
+            mock.ANY, display=False, port=54321, home=None)
         config = start.call_args.args[0]
         self.assertIsInstance(config, relict.MachineConfig)
         self.assertEqual(config.qemu, "qemu")

@@ -8,8 +8,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
 
 ### Removed
 
-- The `boot-to-dos` CLI command. Wait for a prompt with `relict wait`, and
-  decline the FreeDOS installer with `relict type n` when needed.
+- The `boot-to-dos` CLI command. Wait for a prompt with `relict wait`.
   Programmatic boot readiness remains `AgentlessGuestExec.wait_ready()`.
 
 ### Changed
@@ -57,7 +56,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   lifecycle. Provisioning is private; callers create distinct runners with distinct homes for concurrent runs, and
   per-home `vm.json` keeps VM ownership sound.
 - Removed the `boot_floppy_image` and `boot_hdd_image` configuration shortcuts. Custom boot media uses the ordinary
-  declared-drive inventory; an empty DOS home still receives the verified FreeDOS fallback automatically.
+  declared-drive inventory.
 - `MachineConfig.drives` adds immutable configured drive specs using canonical logical slots plus `floppy`/`hdd`
   slot-zero aliases. A spec accepts a source path or `{source, options}` mapping; files mount as images, floppy and
   hard-disk directories mount as vvfat, and CD-ROM directories fail validation. Configured and home-directory media
@@ -96,9 +95,7 @@ on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adh
   (`run_guest_program`, returning the program's redirected output).
 - Visible manual VM sessions with `relict start --display`: the command returns once QEMU is ready, leaves the DOS VM
   running for direct interaction, and `relict stop` closes it through the same ownership-verified lifecycle.
-- Bring-your-own boot image: relict boots whatever the user declares under `drives/`; when nothing bootable is
-  declared, the FreeDOS 1.4 boot floppy is installed automatically as `drives/floppy.img` from the ~23 MB
-  FloppyEdition archive with SHA-256 verification (the archive itself is not kept).
+- Bring-your-own boot image: relict boots whatever the user declares under `drives/`.
 - Test-framework result parsing is out of scope: relict hands back raw guest output, and interpreting it belongs to
   the caller.
 - QEMU binary discovery: `RELICT_QEMU_HOME` / `QEMU_HOME`, then PATH, then well-known install locations; `--qemu`

@@ -13,7 +13,6 @@ from .interaction_agentless import (AgentlessGuestExec, screen_text,
                                     send_keys, send_text, wait_screen)
 from .lifecycle import stop
 from .machine import Machine, screenshot
-from .platform_dos import download
 from .workflows import start
 
 
@@ -51,7 +50,6 @@ def main(argv=None):
                         "file (default: <home>/machine.json if present)")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
-    subcommands.add_parser("download")
     command = subcommands.add_parser("start")
     command.add_argument("--display", action="store_true")
     command.add_argument("qemu_args", nargs="*")
@@ -89,13 +87,7 @@ def main(argv=None):
 
 def _dispatch(arguments):
     platform = arguments.platform or "dos"
-    if arguments.command == "download":
-        if platform != "dos":
-            raise NotImplementedError(
-                f"platform {platform!r} provisioning is not "
-                "implemented")
-        download()
-    elif arguments.command == "start":
+    if arguments.command == "start":
         config = _cli_machine_config(
             arguments.machine, arguments.home,
             **_cli_start_overrides(arguments))
