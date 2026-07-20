@@ -28,7 +28,7 @@ as the default and currently only complete platform workflow:
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
   `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `script.py`
-  parses the milestone-1 `.rqs` subset (including the `machine: running|stopped` header and
+  parses the milestone-1 `.rlqs` subset (including the `machine: running|stopped` header and
   `insert`/`eject`/`boot`), `script_runner.py` executes scripts against cached machines and
   wires `script <label>` (resolve via blueprint map, create-if-none, the machine-state header, static
   preflight of insert/eject/boot drive keys, run records under

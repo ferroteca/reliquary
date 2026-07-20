@@ -34,12 +34,12 @@ dev = ["build"]
 rlq = "reliquary:main"
 reliquary = "reliquary:main"
 
-[tool.setuptools]
-packages = ["reliquary", "reliquary_tests"]
+[tool.setuptools.packages.find]
+include = ["reliquary*", "reliquary_tests"]
 
 [tool.setuptools.package-data]
 reliquary = [
     "builtins/blueprints/*.json",
     "builtins/media/*.json",
-    "builtins/scripts/*.rqs",
+    "builtins/scripts/*.rlqs",
 ]

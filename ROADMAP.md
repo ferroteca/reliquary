@@ -204,7 +204,7 @@ policy), and `backend-settings` (the scoped non-portable escape
 hatch — a blueprint without it is portable by construction).
 Discovery and scripting fields: optional `name` and `description`
 (indexed by `search`), and the `scripts` map — short labels naming
-`.rqs` files, the verbs used with `script`
+`.rlqs` files, the verbs used with `script`
 (`rlq --blueprint freedos-1.4-plain script install`).
 Validation and capability mismatches fail closed, naming the
 backend and missing capability.
@@ -463,7 +463,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 `--machine <id>` or `--blueprint <name>`.
 
 **Decided shape: a line-oriented, constrained DSL.** A script is
-a UTF-8 text file (`scripts/<name>.rqs`): header directives, then
+a UTF-8 text file (`scripts/<name>.rlqs`): header directives, then
 one statement per line — a verb, arguments, and comma-separated
 `key: value` modifiers — with `#` comments and brace blocks. It
 is a domain-specific programming language with sequencing,
@@ -639,7 +639,7 @@ Deliverables:
    `list machines`; selection by `--blueprint` (sole machine) and
    `--machine` (git-style prefix).
 3. **Scripting core** (of docs/script-spec.md): enough of the
-   `.rqs` language to express the FreeDOS plain install and
+   `.rlqs` language to express the FreeDOS plain install and
    verification — parsing, `wait`/`expect` on normalized screen
    text, `enter`/`type`/`press`, `select`, `screenshot`,
    `start`/`stop` — and `script <label>` resolution through the
@@ -700,7 +700,7 @@ semantics reach into `start` reconciliation).
    `--blueprint freedos-1.4-plain` seeds home files once;
    second call leaves them alone. Out: `pull`, provenance
    columns, full index/`search`.
-8. **`.rqs` parse (FreeDOS shape; complete)** — header + state-machine +
+8. **`.rlqs` parse (FreeDOS shape; complete)** — header + state-machine +
    the verbs that example uses. Exit: parse the documented
    install script; useful parse errors. Out: linear-only path,
    `on`/reactive, `insert`/`stage`/`collect`, inputs/properties.

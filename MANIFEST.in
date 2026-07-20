@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+include reliquary/builtins/blueprints/*.json
+include reliquary/builtins/media/*.json
+include reliquary/builtins/scripts/*.rlqs
