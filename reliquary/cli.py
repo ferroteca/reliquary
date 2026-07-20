@@ -14,7 +14,7 @@ except importlib.metadata.PackageNotFoundError:
 
 from qemu.qmp import ConnectError
 
-from .home import set_home
+from .home import blueprints_dir, set_home
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
@@ -118,6 +118,8 @@ def main(argv=None):
     list_command = subcommands.add_parser(
         "list", help="list blueprints or machines")
     list_sub = list_command.add_subparsers(dest="list_what", required=True)
+    list_sub.add_parser(
+        "blueprints", help="list available blueprints")
     list_machines_parser = list_sub.add_parser(
         "machines", help="list materialized machines")
     list_machines_parser.add_argument(
@@ -199,6 +201,16 @@ def _script(arguments):
     return 0
 
 
+def _list_blueprints(arguments):
+    blueprints_path = blueprints_dir(arguments.home)
+    if not os.path.exists(blueprints_path):
+        return 0
+    for entry in sorted(os.listdir(blueprints_path)):
+        if entry.endswith(".json"):
+            print(entry[:-5])
+    return 0
+
+
 def _list_machines(arguments):
     filter_blueprint = (
         getattr(arguments, "filter_blueprint", None)
@@ -222,6 +234,8 @@ def _dispatch(arguments):
     if arguments.command == "script":
         return _script(arguments)
     if arguments.command == "list":
+        if arguments.list_what == "blueprints":
+            return _list_blueprints(arguments)
         if arguments.list_what == "machines":
             return _list_machines(arguments)
         raise ValueError(f"unknown list target: {arguments.list_what}")
