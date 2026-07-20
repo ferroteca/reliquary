@@ -3,6 +3,7 @@
 """Command-line parsing and dispatch."""
 
 import argparse
+import importlib.metadata
 import os
 import sys
 
@@ -49,6 +50,9 @@ def main(argv=None):
         prog="rlq",
         description="OS installation scripting over QEMU guest "
                     "automation (DOS by default)")
+    parser.add_argument(
+        "--version", action="version",
+        version=f"%(prog)s {importlib.metadata.version('reliquary')}")
     parser.add_argument("--home", help="reliquary home directory (drives/, "
                         "screenshots/); default: $RELIQUARY_HOME, then "
                         "Documents/reliquary")
