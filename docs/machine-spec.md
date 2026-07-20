@@ -9,26 +9,30 @@ SPDX-License-Identifier: BSD-3-Clause
 > machine model is not implemented yet; details may still change
 > before first release.
 
-Every reliquary machine is described by two documents in the
-**same format** serving different purposes — a declaration you
-write, and a state document reliquary derives from it:
+Every reliquary machine begins with a reusable JSON **spec** and is
+realized as a separately named **machine**. One spec can create many
+machines. The detailed ownership, state, locking, and recovery model
+is in [Machine specs and machines](instance-model.md).
 
 ```text
+<reliquary_home>/specs/
+└── msdos.json               reusable spec — yours
 <reliquary_home>/machines/
-└── msdos.json               the declaration — yours
-<reliquary_home>/cache/machines/msdos/
-├── reliquary.json           the state — reliquary's
+└── test-msdos.json          durable machine record — reliquary's
+<reliquary_home>/cache/machines/<uuid>/
+├── state.json               resolved state — reliquary's
 ├── drives/                  the machine's disk and floppy images
 ├── screenshots/             captured screens (transient)
 └── ...                      backend files and logs
 ```
 
-- The **declaration** (`machines/<name>.json`) is the machine as
-  you defined it. You own it: reliquary reads it and never writes
-  it.
-- The **state** (`cache/machines/<name>/reliquary.json`) is the
-  machine as it actually is right now, at the root of the
-  machine's **cached instantiation** — the directory holding
+- The **spec** (`specs/<name>.json`) is the reusable machine shape
+  you defined. You own it: reliquary reads it and never writes it.
+- The **machine record** (`machines/<name>.json`) identifies one
+  realization of a spec. Its UUID locates the machine's cache.
+- The **state** (`cache/machines/<uuid>/state.json`) describes the
+  resolved configuration and lifecycle of that machine, at the root
+  of its **cached materialization** — the directory holding
   everything reliquary materialized for the machine: state, disk
   images, screenshots, backend files. reliquary owns all of it;
   you never need to touch it. Screenshots in particular are
@@ -87,18 +91,15 @@ one deliberate exception is the
 field, an explicitly scoped escape hatch; a declaration that
 doesn't use it is portable by construction.
 
-**Declaration and state are the same format.** Every field valid
-in a declaration is valid in the state document, with the same
-meaning. The state is simply a fully resolved instance — plus a
-few [state-only fields](machine-spec-reference.md#state-only-fields)
-(the assigned backend identity, timestamps) that never appear in a
-declaration.
+**A spec and its state are not the same format.** The spec is the
+portable JSON declaration. The reliquary-owned machine record and
+cache state wrap its resolved form with identity, lifecycle, and
+backend facts. See [the instance model](instance-model.md).
 
-**The machine's name is its declaration's file name** (without
-`.json`). Neither document contains a name field. Renaming a
-machine is renaming the declaration file — and, to keep the
-instantiation, its `cache/machines/<name>` directory — while the
-machine is stopped.
+**A spec name and machine name are distinct.** Both come from file
+names, but only a machine name identifies a runnable machine.
+Machines also have stable UUIDs. Rename a machine through
+`reliquary rename`; manual cache renames are unsupported.
 
 ## A first example
 
@@ -113,21 +114,19 @@ A minimal declaration that boots a DOS floppy image:
 }
 ```
 
-Save it as `machines/msdos.json` — declarations are authored
-directly into `machines/`, by hand, by the (future) `init`
-scaffolding command, or by `import` — then instantiate and run
-it:
+Save it as `specs/msdos.json` — specs are authored directly into
+`specs/`, by hand, by the future `init` scaffolding command, or by
+`import` — then instantiate a named machine and run it:
 
 ```powershell
-reliquary create msdos
-reliquary start msdos --display
-reliquary stop msdos
+reliquary create test-msdos --spec msdos
+reliquary start test-msdos --display
+reliquary stop test-msdos
 ```
 
-`create` resolves the declaration against an assigned backend and
-materializes the cached instantiation under
-`cache/machines/msdos/`; `start` and `stop` operate the machine by
-name.
+`create` resolves the spec against an assigned backend and
+materializes the named machine under its UUID cache; `start` and
+`stop` operate that machine by name.
 
 ## Declaration and state
 
