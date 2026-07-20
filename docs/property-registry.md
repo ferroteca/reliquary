@@ -71,11 +71,11 @@ rewritten.
 Ordinary values may be edited directly or maintained through the CLI:
 
 ```text
-reliquary property list [<prefix>]
-reliquary property get <key>
-reliquary property set <key> <value>
-reliquary property set <key> --secret
-reliquary property unset <key>
+rlq property list [<prefix>]
+rlq property get <key>
+rlq property set <key> <value>
+rlq property set <key> --secret
+rlq property unset <key>
 ```
 
 `list` sorts keys and shows whether each is ordinary, a present secret, or a

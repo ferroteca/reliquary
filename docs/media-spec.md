@@ -11,7 +11,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 The media catalog holds machine-independent media: installer ISOs,
 boot floppies, and driver disks. Definitions normally live in the
-shared `<reliquary_home>/media` library; a reliquary script may also
+shared `<reliquary_home>/media` library; a rlq script may also
 embed definitions that are installed into that library when the
 script first runs. Machines reference media by name (the
 [`media` drive field](machine-blueprint-reference.md#media--optional--string)),
@@ -341,7 +341,7 @@ either exists and verifies, or it doesn't.
 ## Fetching
 
 ```text
-reliquary fetch <media_name> [--script <script_name>]
+rlq fetch <media_name> [--script <script_name>]
 ```
 
 fetches a defined item explicitly: downloads (if missing or failing
@@ -374,8 +374,8 @@ definition can be rebuilt from its mirrors — and each has its own
 clean command:
 
 ```text
-reliquary clean downloads
-reliquary clean media
+rlq clean downloads
+rlq clean media
 ```
 
 - `clean downloads` deletes cached source archives. Always safe:

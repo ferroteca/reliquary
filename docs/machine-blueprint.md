@@ -187,9 +187,9 @@ Save it as `blueprints/msdos.json` — blueprints are authored directly into
 `import` — then create a machine from it and run it:
 
 ```powershell
-reliquary create --blueprint msdos
-reliquary start --blueprint msdos --display
-reliquary stop --blueprint msdos
+rlq create --blueprint msdos
+rlq start --blueprint msdos --display
+rlq stop --blueprint msdos
 ```
 
 `create` resolves the blueprint against an assigned backend,
@@ -314,7 +314,7 @@ backend back into line:
 ### Applying blueprint edits
 
 ```powershell
-reliquary apply --blueprint msdos
+rlq apply --blueprint msdos
 ```
 
 `apply` adopts the current blueprint into an existing, stopped
@@ -346,8 +346,8 @@ Because the blueprint lives outside the cache, a machine is
 always disposable:
 
 ```powershell
-reliquary destroy --blueprint msdos
-reliquary recreate --blueprint msdos
+rlq destroy --blueprint msdos
+rlq recreate --blueprint msdos
 ```
 
 `destroy` deletes the machine entirely — its directory (state,

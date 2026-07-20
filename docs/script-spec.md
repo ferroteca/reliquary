@@ -17,7 +17,7 @@ run against a machine selected with `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:
 
 ```powershell
-reliquary script freedos-plain-install --blueprint msdos
+rlq script freedos-plain-install --blueprint msdos
 ```
 
 After preflight, `script` installs embedded media definitions,
@@ -299,7 +299,7 @@ Values can be supplied explicitly in a JSON response file:
 ```
 
 ```powershell
-reliquary script freedos-plain-install --blueprint freedos --responses answers.json
+rlq script freedos-plain-install --blueprint freedos --responses answers.json
 ```
 
 Before the machine starts, reliquary validates the response file,
@@ -795,7 +795,7 @@ capability; a script never runs halfway before discovering that a
 later statement is impossible.
 
 ```text
-reliquary check-script <script_name>
+rlq check-script <script_name>
     [--machine <id> | --blueprint <name>] [--responses <path>]
 ```
 

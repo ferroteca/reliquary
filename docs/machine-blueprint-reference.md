@@ -20,7 +20,7 @@ Each field is marked with where it may appear:
 
 - **blueprint** — valid in a blueprint (the document you author at
   `blueprints/<name>.json` and realize as a machine with
-  `reliquary create --blueprint <name>`). Every blueprint field is also
+  `rlq create --blueprint <name>`). Every blueprint field is also
   valid in the state, where it always appears fully resolved.
 - **state-only** — written by reliquary into the state; rejected
   in a blueprint.
@@ -70,12 +70,21 @@ The virtualization backend hosting the machine:
 | `vmware`     | VMware Workstation |
 | `hyperv`     | Hyper-V            |
 
-Omitted from the blueprint, the backend is assigned
-automatically: the first entry in reliquary's backend priority
-order that is available on the host and capable of everything the
-blueprint asks for. Declared explicitly, it pins the choice —
-`create` fails if that backend is unavailable or incapable, rather
-than falling back.
+Omitted from the blueprint, the backend is assigned when the
+machine is materialized (`create` or `recreate`): reliquary walks
+its backend priority order one by one, probing each for
+availability on the host, and assigns the first entry that is
+available and capable of everything the blueprint asks for.
+Capability is judged against the whole blueprint — referenced
+media and image types the backend must be able to attach,
+required [`control-planes`](#control-planes), and
+[`backend-settings`](#backend-settings) — so a blueprint can
+dictate its backend without declaring one: a `backend-settings`
+section for exactly one backend, or a media type only one backend
+can consume, narrows the walk to that backend. Declared
+explicitly, `backend` pins the choice — only that backend is
+probed, and `create` fails if it is unavailable or incapable,
+rather than falling back.
 
 Either way the resolved value is recorded in the state (an omitted
 blueprint stays portable), and the assignment holds for the
@@ -89,6 +98,51 @@ backend machine and resolves the blueprint afresh (see
 ```json
 {"backend": "virtualbox"}
 ```
+
+---
+
+## `name` and `description`
+
+**blueprint (optional) · string**
+
+Human-readable discovery metadata: a one-line display `name` and a
+longer `description`. Neither affects machine behavior; both feed
+`search`, which matches terms against filename, `name`,
+`description`, and platform. Built-in library blueprints carry
+them through the library index; user blueprints are indexed by
+reading the fields from the file (see
+[the built-in library](builtin-library.md)).
+
+```json
+{
+  "name": "FreeDOS 1.4 — Plain DOS system",
+  "description": "Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set."
+}
+```
+
+---
+
+## `scripts`
+
+**blueprint (optional) · object**
+
+A map of short labels to script file names (the stem of
+`scripts/<name>.rqs`). Labels are the verbs used with the `script`
+command: `rlq --blueprint freedos-1.4-plain script install`
+looks up `scripts.install` and runs the script it names. Labels
+take priority over bare script filenames.
+
+```json
+{
+  "scripts": {
+    "install": "freedos-1.4-plain-install",
+    "verify": "freedos-1.4-plain-verify"
+  }
+}
+```
+
+Labels are conventionally short verbs — `install`, `verify`,
+`test`, `configure`.
 
 ---
 
@@ -253,7 +307,7 @@ Start the drive as a blank image of this size — meaningful for
 {"size": "20M"}
 ```
 
-reliquary creates the image — at `create`, or at the first
+rlq creates the image — at `create`, or at the first
 `start` — dynamically allocated, in the backend's preferred
 format, at the drive's canonical path. Once the image exists,
 `size` is validated against it and a mismatch is an error;
@@ -472,7 +526,10 @@ Hyper-V).
 The escape hatch for backend-specific configuration — explicitly
 scoped and explicitly non-portable. One object per backend name;
 only the section matching the machine's `backend` applies, other
-sections are inert but preserved:
+sections are inert but preserved. When the blueprint does not
+declare [`backend`](#backend), the sections present also steer
+default assignment: settings for exactly one backend narrow the
+assignment walk to that backend. For example:
 
 ```json
 {

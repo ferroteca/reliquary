@@ -1,0 +1,141 @@
+<!--
+SPDX-FileCopyrightText: 2026 Paul Galbraith
+SPDX-License-Identifier: BSD-3-Clause
+-->
+
+# The built-in library
+
+> **Status:** this documents the planned built-in library. It is
+> not implemented yet; details may still change before first
+> release.
+
+reliquary ships a library of blueprints, media definitions, and
+scripts for popular open source operating systems, so the common
+case is one command from a clean home:
+
+```powershell
+rlq --blueprint freedos-1.4-plain script install
+```
+
+That single command extracts the blueprint, its media definitions,
+and its scripts from the library, creates a machine, fetches and
+verifies the installation media, and runs the scripted install.
+
+## A seed, not a resolution tier
+
+In a source checkout the library lives as ordinary files under
+`builtins/blueprints/`, `builtins/media/`, and `builtins/scripts/`;
+packaged for distribution, the same files are bundled in a zip
+archive inside the reliquary package. Either way the library is
+never consulted at run time as a fallback layer. Instead, when you
+reference a built-in artifact that does not yet exist in your home,
+reliquary **copies it out**. From that point on it is an ordinary
+user-owned file — edit it, delete it, version it.
+
+Two rules carry the model:
+
+- **A file already present in your home is never overwritten.**
+  There is no shadowing, no precedence order, and no "library
+  update changed my machine" surprise: what your home contains is
+  what runs, always.
+- **Deleting your copy is how you refresh it.** Once you delete a
+  file yourself, the next reference (or an explicit `pull`)
+  extracts the current built-in again. Orphaned references — a
+  blueprint naming a media definition or script you removed —
+  re-seed the same way.
+
+## The index and provenance
+
+The library carries an index mapping every built-in artifact to
+its `name`, `description`, and relationships (which media
+definitions and scripts a blueprint references). User-owned files
+are indexed by reading the same optional fields from the file.
+`search` queries both.
+
+Listings report provenance by name:
+
+| BUILT-IN | meaning |
+|---|---|
+| `yes` | a library entry not yet extracted into your home |
+| `seeded` | a user file whose name also exists in the library |
+| (blank) | a purely user-authored file |
+
+## Extraction
+
+Extraction happens two ways:
+
+- **Implicitly, on first reference.** Any operation that resolves
+  a blueprint, media definition, or script name checks the home
+  first, then the library; a library hit is copied out (a
+  blueprint brings its referenced media definitions and scripts
+  with it) and resolution proceeds against the new user file.
+- **Explicitly, with `pull`.** `pull blueprint <name>` extracts
+  the blueprint and everything it references — the one-stop bridge
+  from "just use the built-in" to "I want to tweak it"
+  (`--only` restricts it to the blueprint file itself);
+  `pull media <name>` and `pull script <name>` extract single
+  artifacts.
+
+Both paths obey the never-overwrite rule.
+
+## Non-redistributable media
+
+**Top-priority rule: a built-in media definition may carry a
+`url` only when it also carries an explicit assertion that the
+media's own licensing permits redistribution** (naming the
+license — e.g. FreeDOS's GPL). The assertion lives in the
+definition itself, so the claim travels with the URL it
+justifies. No change adding or altering a URL in a built-in
+media definition is accepted without it; absent the assertion, a
+built-in definition ships hashes only. This is what keeps the
+library shippable: reliquary never points at — or fetches —
+media it has no right to distribute or induce the download of.
+
+The library deliberately includes blueprints for operating systems
+whose installation media cannot be distributed — Windows and other
+commercial systems. Their built-in media definitions ship **with
+hashes but without URLs**: the definition pins exactly which build
+and edition the blueprint's scripts were written against, and the
+user supplies the media themselves.
+
+Materializing such a machine before the media is supplied **fast
+fails by design**: resolution finds a definition with no download
+source and no payload on disk, and stops before anything is
+created, naming the missing media. That failure is the prompt —
+the user pulls (or lets reliquary seed) the definition, then
+either adds their own `url` or `local-path` to it, or places the
+payload file where the definition expects it. The SHA-256 hash
+then verifies that what they supplied is the exact media the
+scripts were built for (see
+[media-spec.md](media-spec.md) for URL-less definitions and
+`local-path`).
+
+## Naming conventions
+
+Built-in artifacts follow a convention that ties them together by
+blueprint and script:
+
+| artifact | pattern | example |
+|---|---|---|
+| blueprint | `<name>.json` | `freedos-1.4-plain.json` |
+| script | `<blueprint>-<script-id>.rqs` | `freedos-1.4-plain-install.rqs` |
+| script-aligned media | `<blueprint>-<script-id>-<drive>.json` | `freedos-1.4-plain-install-cdrom.json` |
+| shared media | `<name>.json` | `freedos-1.4-livecd.json` |
+
+A media definition specific to one script's step — the installer
+CD that script attaches, a driver disk it stages — uses the
+script-aligned pattern. A media definition shared across scripts
+or blueprints uses a standalone name. Both resolve through the
+same media library; the naming convention identifies ownership,
+not a namespace.
+
+## Named scripts on blueprints
+
+A blueprint may declare a `scripts` map — short labels naming
+`.rqs` script files — plus optional `name` and `description`
+fields for discovery (see the
+[field reference](machine-blueprint-reference.md)). The labels are
+the verbs you use with `script`:
+`rlq --blueprint freedos-1.4-plain script install` looks up
+`scripts.install` and runs the script it names, creating a machine
+first when the blueprint has none.

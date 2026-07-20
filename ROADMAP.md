@@ -93,10 +93,20 @@ Design rules:
   the Hyper-V service/module). Discovery only establishes
   availability; it never changes a machine's recorded backend.
 - **Default backend assignment.** When a machine blueprint does not name
-  a backend, reliquary assigns one from an internal prioritized list
-  of the backends actually available, and records the assignment in
-  the machine state so the machine stays on that backend
-  thereafter.
+  a backend, assignment happens at materialization (`create` /
+  `recreate`): reliquary walks its internal backend priority list
+  one by one, probing each for availability, and picks the first
+  available (and capable) backend. Capability is judged against
+  the whole blueprint: referenced media and image types the
+  backend must be able to attach, required control planes, and
+  backend-specific options. A blueprint can therefore dictate the
+  backend without declaring `backend` — a `backend-settings`
+  section for exactly one backend, or a media type only one
+  backend can consume, narrows the walk to that backend. The
+  assignment is recorded in the machine state so the machine
+  stays on that backend thereafter. A blueprint that does declare `backend` skips the
+  walk entirely — that backend is probed alone and `create` fails
+  closed if it is unavailable or incapable.
 - **Backend state stays in the cached materialization.** Each
   backend is instructed to keep its machine files (disk images,
   `.vbox`, `.vmx`, Hyper-V VM/VHD paths) inside
@@ -186,6 +196,10 @@ image creation, and `base` starting-point images — the backing
 of a differencing disk by default, or copied), `boot`, `control-planes` (the ordered waterfall
 policy), and `backend-settings` (the scoped non-portable escape
 hatch — a blueprint without it is portable by construction).
+Discovery and scripting fields: optional `name` and `description`
+(indexed by `search`), and the `scripts` map — short labels naming
+`.rqs` files, the verbs used with `script`
+(`rlq --blueprint freedos-1.4-plain script install`).
 Validation and capability mismatches fail closed, naming the
 backend and missing capability.
 
@@ -216,7 +230,45 @@ current root-level `drives/`, `machine.json`, and `vm.json`
 layout is superseded by the blueprint/cache split; the project
 is pre-release, so this is a replacement, not a migration.
 
+### The built-in library
+
+reliquary ships blueprints, media definitions, and scripts for
+popular open source operating systems — see
+[docs/builtin-library.md](docs/builtin-library.md). The library is
+a **seed, not a resolution tier**: referencing a built-in artifact
+that doesn't yet exist in the home copies it out as an ordinary
+user-owned file; a file already present in the home is never
+overwritten, and deleting a copy is how it is refreshed. An index
+maps every built-in artifact to its name, description, and
+relationships; `search` queries the index and user files together,
+and listings report provenance (`yes` / `seeded` / user-authored).
+`pull` is the explicit extraction command; implicit extraction on
+first reference makes the common case one command from a clean
+home. A top-priority licensing rule governs the library's media
+definitions: a built-in definition may carry a `url` only
+alongside an explicit assertion that the media's licensing
+permits redistribution, and no change adding a URL is accepted
+without it. The library deliberately covers non-redistributable
+operating systems too: those blueprints ship media definitions
+with hashes but no URLs, and materialization fast-fails naming
+the missing media until the user supplies it (adding their own
+`url` or `local-path`, or placing the payload file), with the
+hash verifying it is the exact build the scripts target. For
+open source systems the lazy path is:
+
+```powershell
+rlq --blueprint freedos-1.4-plain script install
+```
+
 ## The CLI
+
+The command-line structure is being worked out in
+[docs/cli.md](docs/cli.md) (a working document; this section
+carries the settled decisions and outlives it).
+
+The command is installed under two names: `rlq`, the short form
+used in documentation and examples, and `reliquary`, an alias
+matching the project name. They are the same entry point.
 
 The CLI is a thin veneer over the embedding API, which remains a
 first-class surface: every command maps one-to-one onto a public
@@ -242,8 +294,9 @@ Property-registry commands put an operation (`list`, `get`,
 
 The lifecycle vocabulary is two-layered. Blueprints are plain files
 under `blueprints/`: authored, renamed, and removed directly in an
-editor, with `init` and `import` as authoring conveniences and
-`delete --blueprint` as the managed removal. Machine-level verbs act
+editor, with `create blueprint` and `import` as authoring
+conveniences, `pull` as extraction from the built-in library, and
+`delete blueprint` as the managed removal. Machine-level verbs act
 on machines: `create` materializes a blueprint as a new machine
 under a new id, `start`/`stop` run it, `destroy` deletes it
 entirely (a machine is nothing but its cache directory), and
@@ -251,31 +304,39 @@ entirely (a machine is nothing but its cache directory), and
 id. `import` synthesizes a blueprint from a native VM — blueprint
 authoring only; realizing it afterward is an ordinary `create`.
 
+`--blueprint` and `--machine` are global selectors, given before
+the verb; there is no bare-script shorthand — an unrecognized
+command word is an error, never a script lookup (`script <label>`
+is the tightest form).
+
 ```text
-reliquary list blueprints
-reliquary list machines [--blueprint <name>]
-reliquary create --blueprint <name>
-reliquary start (--machine <id> | --blueprint <name>) [--display]
-reliquary stop (--machine <id> | --blueprint <name>)
-reliquary apply (--machine <id> | --blueprint <name>)
-reliquary destroy (--machine <id> | --blueprint <name>)
-reliquary recreate (--machine <id> | --blueprint <name>)
-reliquary delete --blueprint <name>
-reliquary clone (--machine <id> | --blueprint <name>)
-reliquary export (--machine <id> | --blueprint <name>) [<destination>]
-reliquary import <source> --blueprint <name> --platform <platform>
-reliquary script <script_name> (--machine <id> | --blueprint <name>)
+rlq list (blueprints | machines [--blueprint <name>] | scripts | media)
+rlq search (blueprints | scripts | media) <term>... [--verbose]
+rlq create blueprint <name> [flags]
+rlq pull (blueprint | media | script) <name> [--only]
+rlq --blueprint <name> create
+reliquary (--blueprint <name> | --machine <id>) start [--display]
+reliquary (--blueprint <name> | --machine <id>) stop
+reliquary (--blueprint <name> | --machine <id>) apply
+reliquary (--blueprint <name> | --machine <id>) destroy
+reliquary (--blueprint <name> | --machine <id>) recreate
+rlq delete blueprint <name>
+reliquary (--blueprint <name> | --machine <id>) clone
+reliquary (--blueprint <name> | --machine <id>) export
+    [--drive <key>] [<destination>]
+rlq import <source> --blueprint <name> --platform <platform>
+reliquary (--blueprint <name> | --machine <id>) script <label>
     [--responses <path>] [--display]
-reliquary check-script <script_name> [--machine <id> | --blueprint <name>]
+rlq check-script <script_name> [--blueprint <name> | --machine <id>]
     [--responses <path>]
-reliquary fetch <media_name> [--script <script_name>]
-reliquary property list [<prefix>]
-reliquary property get <key>
-reliquary property set <key> <value>
-reliquary property set <key> --secret
-reliquary property unset <key>
-reliquary clean downloads
-reliquary clean media
+rlq fetch <media_name> [--script <script_name>]
+rlq property list [<prefix>]
+rlq property get <key>
+rlq property set <key> <value>
+rlq property set <key> --secret
+rlq property unset <key>
+rlq clean downloads
+rlq clean media
 ```
 
 Lifecycle semantics:
@@ -301,11 +362,10 @@ Lifecycle semantics:
   drive images, run records) and the backend's machine. The
   blueprint is never touched; `create` makes a fresh machine
   whenever one is wanted again.
-- `delete` takes only `--blueprint`: it removes the blueprint
-  file itself and fails closed while any machine of it exists,
-  naming the machine ids — `destroy` them first. (On this verb,
-  `--blueprint` is the blueprint itself, never a machine
-  selector; removing a machine is `destroy`'s job.)
+- `delete blueprint <name>` removes the blueprint file itself and
+  fails closed while any machine of it exists, naming the machine
+  ids — `destroy` them first. (Removing a machine is `destroy`'s
+  job.)
 
 - `script` completes preflight, installs missing embedded media
   definitions, resolves its machine (creating one when `--blueprint`
@@ -377,19 +437,22 @@ Lifecycle semantics:
   object is the one recorded in the machine's state (the QMP
   identity check is the QEMU instance of this rule).
 
-A future milestone adds `init`, the blueprint-scaffolding
-convenience: a simple CLI command that writes a minimal starter
-blueprint from a few answers or flags (platform, disk size,
-installer media), so new machines don't begin from a blank
-editor. One-shot, fire-and-forget scaffolding only — it emits an
-ordinary blueprint file the user owns from then on; no template
-registry, no regeneration, no linkage back to the scaffolder.
+`create blueprint <name>` is the blueprint-scaffolding
+convenience (supersedes the earlier `init` idea): it writes a
+minimal starter blueprint from CLI flags (platform, memory, a
+blank hard disk by size, CD/floppy media, boot order), so new
+machines don't begin from a blank editor. One-shot,
+fire-and-forget scaffolding only — it emits an ordinary blueprint
+file the user owns from then on; no template registry, no
+regeneration, no linkage back to the scaffolder. Anything the
+flags don't cover is edited into the JSON directly, or starts
+from a built-in blueprint.
 
 ## The scripting language
 
 reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
-`reliquary script <script_name>` against a machine selected with
+`rlq script <script_name>` against a machine selected with
 `--machine <id>` or `--blueprint <name>`.
 
 **Decided shape: a line-oriented, constrained DSL.** A script is
@@ -510,58 +573,91 @@ Language design goals:
   meanings and new capabilities stay explicit and preflightable.
 
 OS installation recipes become install scripts: the current
-`recipes/` Python package retires once the language can express the
-FreeDOS plain install end to end. Media acquisition (download,
+`recipes/` Python package retires in milestone 1, as soon as the
+language core can express the FreeDOS plain install end to end. Media acquisition (download,
 hash-verify, cache under `cache/media/`) stays a host-side capability
 the language can invoke, with pinned hashes kept in shared
 definitions or directly inside the script.
 
 ## Milestones
 
-**DOS under QEMU is the top priority.** Milestones 1–5 deliver
-the complete documented design — the media library, the instance
-model and machine blueprint, the property registry, and the scripting
-language, i.e. everything in `docs/` — for the DOS platform on
-the QEMU backend alone. Only then does the design generalize:
-the adapter seam is extracted from working code (6), proven by a
-second backend (7), and extended with machine mobility (8), guest
-agents (9), and the VNC control plane (10).
+**DOS under QEMU is the top priority, and blueprints are the
+extremely high priority within it.** Milestone 1 is a vertical
+slice: the north-star command working end to end from a clean
+home. Milestones 2–5 then complete the documented design — the
+media library, the instance model and machine blueprint, the
+property registry, and the scripting language, i.e. everything in
+`docs/` — for the DOS platform on the QEMU backend alone. Only
+then does the design generalize: the adapter seam is extracted
+from working code (6), proven by a second backend (7), and
+extended with machine mobility (8), guest agents (9), and the VNC
+control plane (10).
 
 Each milestone is independently shippable: the tree builds, the
 test suite passes, and the FreeDOS install keeps working end to
-end on whichever surface that milestone provides. Within 1–5 the
-order is dependency-driven — the media library before blueprints can
-reference it, the machine model before scripts can drive it, the
-property registry before script inputs can bind to it. Within a
-milestone the listed deliverables are ordered but may land in
-separate commits.
+end on whichever surface that milestone provides. Within 2–5 the
+order is dependency-driven — the media library before blueprints
+fully exploit it, the machine model before scripts fully drive
+it, the property registry before script inputs can bind to it.
+Within a milestone the listed deliverables are ordered but may
+land in separate commits.
 
-### Milestone 1 — FreeDOS plain install to hard disk (finish as-is)
+### Milestone 1 — The north-star command
 
-The proving ground for scripted installation, nearly done on the
-current stack. The recipe's shape (Python module under `recipes/`,
-`reliquary install freedos-plain`) is acknowledged as transitional
-and retires in milestone 5.
+```powershell
+rlq --blueprint freedos-1.4-plain script install
+```
+
+From a clean home, that one command must end with a fully
+installed FreeDOS machine that can then be started and stopped
+from the reliquary command line. Everything in this milestone is
+the minimum vertical slice of the documented design needed to get
+there — each piece grows to its full spec in milestones 2–5. The
+current recipe stack (`recipes/`, `reliquary install`) is
+subsumed and deleted here.
 
 Deliverables:
 
-1. Script the installer's "Plain DOS system" path onto the target
-   disk (the LiveCD boots to a live `D:\>` prompt; `SETUP.BAT`
-   starts the installer). Watch guest memory: the LiveCD warns
-   about limited RAM at the 16 MiB DOS default.
-2. A verification pass that boots the installed disk and confirms
-   a DOS prompt.
+1. **Media library core** (of docs/media-spec.md): definitions as
+   user-owned documents under `media/`, fetch/extract/SHA-256
+   verify on demand, the two-cache split (`cache/downloads/`,
+   `cache/media/`) — enough to feed the FreeDOS LiveCD.
+2. **Blueprint and machine core** (of docs/machine-blueprint.md
+   and docs/instance-model.md, QEMU-only): parse and validate the
+   blueprint shape the built-in library needs (`platform`,
+   `memory`, `drives` with `size` and `media`, `boot`, `name`,
+   `description`, `scripts`); machines wholly under
+   `cache/machines/<id>/` with `reliquary-machine.json` and
+   qcow2 materialization; `create`, `start`, `stop`, `destroy`,
+   `list machines`; selection by `--blueprint` (sole machine) and
+   `--machine` (git-style prefix).
+3. **Scripting core** (of docs/script-spec.md): enough of the
+   `.rqs` language to express the FreeDOS plain install and
+   verification — parsing, `wait`/`expect` on normalized screen
+   text, `enter`/`type`/`press`, `select`, `screenshot`,
+   `start`/`stop` — and `script <label>` resolution through the
+   blueprint's `scripts` map, creating a machine when the
+   blueprint has none.
+4. **The built-in library** (docs/builtin-library.md): the
+   `builtins/` tree (zip-bundled when packaged), copy-out on
+   first reference, the never-overwrite rule, and
+   `freedos-1.4-plain` — blueprint, media definitions, and
+   install/verify scripts — as its first entries.
+5. `recipes/` and the `install` command deleted; the old
+   root-home `drives/`/`machine.json`/`vm.json` layout replaced
+   (pre-release: no migration).
 
-Done when: `reliquary install freedos-plain` runs unattended from
-a clean home to a bootable hard-disk image, and the verification
-pass confirms the installed disk boots to a prompt.
+Done when: `rlq --blueprint freedos-1.4-plain script
+install` runs unattended from a clean home to an installed
+machine; `rlq --blueprint freedos-1.4-plain script verify`
+confirms the installed disk boots to a DOS prompt; and `start` /
+`stop` control the machine from the CLI.
 
-### Milestone 2 — Media library and caches
+### Milestone 2 — Media library and caches (complete)
 
-All of [docs/media-spec.md](docs/media-spec.md), implemented
-before the machine model so blueprints can reference media by name.
-`media.py`'s recipe-scoped acquisition is reshaped into the
-library; the `install-media/` cache folds into `cache/`.
+The remainder of [docs/media-spec.md](docs/media-spec.md) beyond
+milestone 1's core, plus the media-facing CLI (`list media`,
+`search media`, `pull media`, `clean`).
 
 Deliverables:
 
@@ -580,32 +676,32 @@ Deliverables:
    then mirrors). Verification on every use: a payload that fails
    its hash is treated as absent and refetched when a source
    exists — the cache heals itself.
-4. `reliquary fetch <media_name>` and `reliquary clean
+4. `rlq fetch <media_name>` and `reliquary clean
    downloads` / `clean media` (nothing irreplaceable —
    definitions, `local-path` files, sourceless payloads — is
    cleanable). `fetch --script` follows in milestone 5 with
    script parsing.
-5. The FreeDOS recipe consumes its media through the library
-   instead of its private `install-media/` path.
+5. `list media` and `search media` over the built-in index and
+   user definitions, with the `yes`/`seeded` provenance column;
+   `pull media <name>`.
 
 Done when: the FreeDOS media flows through a definition end to
 end; a deliberately corrupted cached payload heals on next use;
-`clean` reclaims only restorable files; the recipe passes on the
-new layer.
+`clean` reclaims only restorable files; the install script passes
+on the completed layer.
 
-### Milestone 3 — The instance model and machine blueprints (QEMU-only)
+### Milestone 3 — The instance model and machine blueprints (complete)
 
-The whole machine model — [docs/instance-model.md](docs/instance-model.md)
+The whole machine model beyond milestone 1's core —
+[docs/instance-model.md](docs/instance-model.md)
 plus the [machine blueprint](docs/machine-blueprint.md) with its
 [field reference](docs/machine-blueprint-reference.md) and
-[cookbook](docs/machine-blueprint-cookbook.md) — scoped to one
-backend. The `backend` field is parsed and validated in full, but
-with QEMU the only implementation, assignment is trivial; the
+[cookbook](docs/machine-blueprint-cookbook.md) — still scoped to
+one backend. The `backend` field is parsed and validated in full,
+but with QEMU the only implementation, assignment is trivial; the
 adapter seam that makes it real is milestone 6. Capability checks
 are real from the start, derived from what the QEMU
-implementation can actually do. This replaces the root-home
-`drives/`, `machine.json`, and `vm.json` layout wholesale —
-pre-release, so no migration.
+implementation can actually do.
 
 Deliverables:
 
@@ -628,19 +724,17 @@ Deliverables:
    generations, exclusive per-machine locks, atomic JSON
    replacement, and startup detection of interrupted phases with
    safe rollback or explicit recovery instructions.
-4. The lifecycle CLI with explicit flag-based selection —
-   `--machine <id>` (full id or unambiguous git-style prefix)
-   and `--blueprint <name>` (the blueprint's sole machine, failing with
-   candidate ids when several exist): `list blueprints`,
-   `list machines`, `create --blueprint`, `start` (full
-   reconciliation — baseline, state, backend identity, and
-   re-verification of every referenced media hash), `stop`,
-   `apply` (adopt blueprint edits into the baseline; drive-regenerating
-   changes fail closed), `destroy` (deletes the machine
-   entirely), `recreate` (same id), and `delete --blueprint`
-   (machineless blueprint files only).
-   Runtime changes update the state only; machines stay running
-   until explicitly stopped.
+4. The lifecycle CLI completed on top of milestone 1's verbs:
+   `start` grown to full reconciliation — baseline, state,
+   backend identity, and re-verification of every referenced
+   media hash — plus `apply` (adopt blueprint edits into the
+   baseline; drive-regenerating changes fail closed), `recreate`
+   (same id), `delete blueprint` (machineless blueprint files
+   only), `list blueprints`, `search blueprints` (built-in index
+   plus user files, with provenance), `pull blueprint` (closure
+   by default, `--only` for the single file), and the
+   `create blueprint` scaffolder. Runtime changes update the
+   state only; machines stay running until explicitly stopped.
 5. Existing single-machine commands (`type`, `run`, `keys`,
    `menu`, `wait`, `text`, `screenshot`, `hmp`) take the same
    `--machine`/`--blueprint` selection and resolve ownership through
@@ -652,12 +746,12 @@ Deliverables:
    README) — or the docs corrected where implementation proves
    the planned format wrong.
 
-Done when: the FreeDOS install (still recipe-driven) runs against
-a machine created from the example blueprint in a clean home;
-`destroy` + `create` regenerates the materialization from blueprint
-and media alone; a process killed mid-operation is detected and
-recovered per the instance model; the old layout is gone from
-code, tests, and docs.
+Done when: the FreeDOS install script runs against a machine
+created from the example blueprint in a clean home; `destroy` +
+`create` regenerates the materialization from blueprint and media
+alone; a process killed mid-operation is detected and recovered
+per the instance model; blueprint edits round-trip through
+`apply` with drive-regenerating changes failing closed.
 
 ### Milestone 4 — The property registry
 
@@ -670,7 +764,7 @@ Deliverables:
 1. `properties.json` as a flat user-owned map of dotted names to
    strings or `{"secret": true}` markers, with name validation
    and canonical atomic writes.
-2. `reliquary property list/get/set/unset`: secret values held
+2. `rlq property list/get/set/unset`: secret values held
    only in the host's protected credential store (scoped by home
    and property name), set via no-echo prompt, never revealed by
    `list`/`get`; kind changes require `unset` first.
@@ -683,12 +777,11 @@ CLI with no secret material ever in the file, and interrupting an
 update cannot produce a plaintext value or a marker whose
 credential was reported bound but is absent.
 
-### Milestone 5 — The scripting language
+### Milestone 5 — The scripting language (complete)
 
-All of [docs/script-spec.md](docs/script-spec.md), completing the
-documented design for DOS on QEMU: the FreeDOS install and
-verification as `.rqs` scripts, and the retirement of `recipes/`
-and the `install` command.
+The remainder of [docs/script-spec.md](docs/script-spec.md)
+beyond milestone 1's core, completing the documented design for
+DOS on QEMU.
 
 Deliverables:
 
@@ -720,17 +813,17 @@ Deliverables:
    (lines, states, observations, input provenance, installed
    definitions, selected control plane, artifacts), failure
    capture, and no automatic retry.
-7. `reliquary script <script_name> --machine/--blueprint` (preflight,
+7. `rlq script <script_name> --machine/--blueprint` (preflight,
    embedded
    media installation, implicit create/start) and
-   `reliquary check-script` (read-only, with optional machine
+   `rlq check-script` (read-only, with optional machine
    and response binding for capability preflight).
-8. `examples/scripts/freedos-plain-install.rqs` and `-verify.rqs`
-   run end to end; `recipes/` and `install` are deleted.
+8. `list scripts`, `search scripts` (built-in index plus user
+   files, with provenance), and `pull script <name>`.
 
-Done when: the FreeDOS plain install and verification pass as
-`.rqs` scripts from a clean home with no Python recipe left in
-the tree, and transcripts honor the provenance and
+Done when: the FreeDOS plain install and verification scripts
+exercise the full language (states, inputs, embedded media
+blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `docs/`
 documents is implemented for DOS on QEMU.
 
@@ -871,8 +964,8 @@ the VGA-scraping results on the same screens.
 
 ### Horizon (sequenced later, not yet scheduled)
 
-- `init` blueprint scaffolding and `fork-blueprint` (both fire-and-forget
-  authoring conveniences).
+- `fork-blueprint` (a fire-and-forget authoring convenience;
+  `create blueprint` scaffolding lands in milestone 3).
 - The virtio-serial carrier for the DOS agent and bounded
   `guest-file-*` operations (serial-to-virtio bootstrap,
   steps 3–5).
@@ -1458,6 +1551,11 @@ agentless and guest-agent control planes with equivalent results.
   Throughout, os-autoinst is a **concept reference only** — its
   designs are studied and reimplemented, never its code (see
   AGENTS.md prior art for the licensing boundary).
+- **Distribution-assertion field shape**: the exact field(s) in a
+  media definition that assert redistribution licensing for
+  built-in URLs (an SPDX identifier? free text naming the
+  license? both?), and whether user-owned definitions may carry
+  the same field inertly.
 - **Media commands beyond `fetch`**: whether the CLI grows verbs
   such as list, verify, and remove, and whether each can select
   embedded definitions through `--script` when needed.

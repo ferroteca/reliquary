@@ -72,17 +72,17 @@ transitional phase and completes a safe rollback or fails with
 recovery instructions (see below).
 
 ```text
-reliquary list blueprints
-reliquary list machines [--blueprint <name>]
-reliquary create --blueprint <name>
-reliquary start (--machine <id> | --blueprint <name>) [--display]
-reliquary stop (--machine <id> | --blueprint <name>)
-reliquary apply (--machine <id> | --blueprint <name>)
-reliquary destroy (--machine <id> | --blueprint <name>)
-reliquary recreate (--machine <id> | --blueprint <name>)
-reliquary delete --blueprint <name>
-reliquary clone (--machine <id> | --blueprint <name>)
-reliquary export (--machine <id> | --blueprint <name>) [<destination>]
+rlq list blueprints
+rlq list machines [--blueprint <name>]
+rlq create --blueprint <name>
+rlq start (--machine <id> | --blueprint <name>) [--display]
+rlq stop (--machine <id> | --blueprint <name>)
+rlq apply (--machine <id> | --blueprint <name>)
+rlq destroy (--machine <id> | --blueprint <name>)
+rlq recreate (--machine <id> | --blueprint <name>)
+rlq delete --blueprint <name>
+rlq clone (--machine <id> | --blueprint <name>)
+rlq export (--machine <id> | --blueprint <name>) [<destination>]
 ```
 
 `list blueprints` shows each blueprint and its machine count; `list machines`

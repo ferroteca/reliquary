@@ -20,7 +20,7 @@ Throughout, save the blueprint as `blueprints/<name>.json` and create a
 machine from it:
 
 ```powershell
-reliquary create --blueprint <name>
+rlq create --blueprint <name>
 ```
 
 ---
@@ -89,7 +89,7 @@ the extra memory avoids the FreeDOS LiveCD's low-RAM warning:
 }
 ```
 
-reliquary creates the hard disk as a 20 MiB dynamically-allocated
+rlq creates the hard disk as a 20 MiB dynamically-allocated
 image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
 the [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
 are reliquary's choice, not yours). Installation itself is an

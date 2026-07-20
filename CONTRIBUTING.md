@@ -62,6 +62,14 @@ holder and identifying third-party material and its license. Contributions
 that would prevent reliquary from being used or distributed under its existing
 BSD-3-Clause license cannot be accepted.
 
+Built-in library media definitions follow an additional
+top-priority rule: a definition may include a download `url` only
+together with an explicit assertion that the media's own
+licensing permits redistribution (see docs/builtin-library.md).
+Changes that add or alter URLs in built-in media definitions
+without that assertion cannot be accepted; definitions for
+non-redistributable media ship hashes only.
+
 Use accurate SPDX copyright information in each new file:
 
 ```text
