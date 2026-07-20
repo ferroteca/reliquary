@@ -17,7 +17,7 @@ state cd-boot {
     wait "Welcome to FreeDOS 1.4 (LiveCD)"
     select "Install to harddisk"
     wait "What is your preferred language"
-    select "English (United States)"
+    select "English"
     wait "Welcome to the FreeDOS 1.4 installation program"
     press enter
 
