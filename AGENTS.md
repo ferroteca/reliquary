@@ -11,8 +11,9 @@ runner (the machine layer, formerly the separate relict project), with DOS
 as the default and currently only complete platform workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
-  resolution, layout, and containment, `drives.py` parses declared drives, `media.py` acquires and hash-verifies OS
-  installation media, `lifecycle.py` owns QMP, QEMU
+  resolution, layout, and containment, `drives.py` parses declared drives, `media.py` owns media definitions
+  (parsing, name resolution) and hash-verified acquisition of OS installation media into the
+  `cache/downloads/` and `cache/media/` caches, `lifecycle.py` owns QMP, QEMU
   processes, and host-side `qemu-img` helpers, `interaction.py` defines
   capability protocols, `interaction_agentless.py` contains the concrete agentless DOS adapter (prompt-based readiness
   and command completion), `machine.py` provides platform-neutral QMP interaction and diagnostics — keyboard input,

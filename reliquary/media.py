@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Hash-verified acquisition of OS installation media."""
+"""Media definitions and hash-verified acquisition of OS media."""
 
 import hashlib
 import json
@@ -9,10 +9,12 @@ import re
 import shutil
 import sys
 import zipfile
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 from urllib.request import urlopen
 from urllib.parse import urlparse
+
+from .home import downloads_cache_dir, media_cache_dir, media_dir
 
 _CHUNK = 1024 * 1024
 _SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
@@ -104,196 +106,328 @@ def _download(url, destination):
 
 
 @dataclass(frozen=True)
-class MediaDefinition:
-    """A parsed and validated media definition (item form only).
-    
-    This represents the item form from docs/media-spec.md: a single
-    media item with optional url, name, file, and required sha256.
-    Archive form is not yet implemented (milestone 2).
-    """
+class MediaItem:
+    """One named, hash-verified payload file machines can mount."""
     name: str
     file: str
     sha256: str
-    url: Optional[str] = None
-    local_path: Optional[str] = None
+    path: Optional[str] = None
     file_extension: Optional[str] = None
+    local_path: Optional[str] = None
 
 
-def _validate_sha256(hash_value: str) -> None:
-    """Raise ValueError if hash_value is not a valid hex SHA-256."""
-    if not isinstance(hash_value, str):
-        raise ValueError(f"sha256 must be a string, got {type(hash_value).__name__}")
-    if not _SHA256_PATTERN.match(hash_value):
-        raise ValueError(f"sha256 must be a 64-character hex string, got: {hash_value}")
+@dataclass(frozen=True)
+class MediaDefinition:
+    """A parsed and validated media definition (docs/media-spec.md).
+
+    The item form downloads its single payload directly and carries
+    no archive fields; the archive form names a source archive whose
+    entries its items are extracted from. Mirror URL lists and
+    several definitions sharing one archive are milestone 2.
+    """
+    items: Tuple[MediaItem, ...]
+    url: Optional[str] = None
+    archive: Optional[str] = None
+    archive_sha256: Optional[str] = None
 
 
-def _derive_file_from_url(url: str) -> str:
-    """Extract the filename component from a URL."""
-    parsed = urlparse(url)
-    path = parsed.path
-    filename = os.path.basename(path)
+@dataclass(frozen=True)
+class ResolvedMedia:
+    """A media item resolved by name, with its owning definition."""
+    definition: MediaDefinition
+    item: MediaItem
+
+
+def _validate_sha256(value):
+    """Raise ValueError unless value is a hex SHA-256 string."""
+    if not isinstance(value, str):
+        raise ValueError(
+            f"sha256 must be a string, got {type(value).__name__}")
+    if not _SHA256_PATTERN.match(value):
+        raise ValueError(
+            f"sha256 must be a 64-character hex string, got: {value}")
+
+
+def _optional_string(data, key):
+    """Return data[key] as a non-empty string, or None when absent."""
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError(
+            f"{key} must be a non-empty string, got: {value!r}")
+    return value
+
+
+def _parse_url(data):
+    """Return the definition's single url, or None when absent."""
+    value = data.get("url")
+    if isinstance(value, list):
+        raise ValueError("mirror url lists are not yet implemented")
+    return _optional_string(data, "url")
+
+
+def _derive_file_from_url(url):
+    """Extract the file-name component from a URL."""
+    filename = os.path.basename(urlparse(url).path)
     if not filename:
         raise ValueError(f"URL has no filename component: {url}")
     return filename
 
 
-def _derive_name_from_file(file: str) -> str:
-    """Extract the name from a file by removing its extension."""
-    # Split on the last dot; if no dot, the whole thing is the name
-    name, ext = os.path.splitext(file)
+def _derive_name_from_file(file):
+    """Default an item name: its file name with the extension dropped."""
+    name, _ = os.path.splitext(file)
     return name if name else file
 
 
-def parse_definition(data: dict) -> MediaDefinition:
-    """Parse and validate a media definition dictionary (item form).
-    
-    Args:
-        data: A dictionary containing the media definition fields.
-        
-    Returns:
-        A MediaDefinition with all fields resolved.
-        
-    Raises:
-        ValueError: If required fields are missing or invalid.
-        KeyError: If required fields are missing.
-    """
-    # Validate required sha256
+def _parse_item(data, url=None, archived=False):
+    """Parse one item — a whole item form, or one `items` entry."""
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"items entries must be objects, got {type(data).__name__}")
     if "sha256" not in data:
         raise KeyError("sha256 is required")
-    sha256 = data["sha256"]
-    _validate_sha256(sha256)
-    
-    # Determine file: explicit, from local-path, or from url
-    file = None
-    if "file" in data:
-        file = data["file"]
-        if not isinstance(file, str) or not file:
-            raise ValueError(f"file must be a non-empty string, got: {file}")
-    elif "local-path" in data:
-        local_path = data["local-path"]
-        if not isinstance(local_path, str) or not local_path:
-            raise ValueError(f"local-path must be a non-empty string, got: {local_path}")
-        file = os.path.basename(local_path)
-    elif "url" in data:
-        url = data["url"]
-        if not isinstance(url, str) or not url:
-            raise ValueError(f"url must be a non-empty string, got: {url}")
-        file = _derive_file_from_url(url)
-    else:
-        raise ValueError("One of file, local-path, or url is required")
-    
-    # Determine name: explicit or derived from file
-    name = None
-    if "name" in data:
-        name = data["name"]
-        if not isinstance(name, str) or not name:
-            raise ValueError(f"name must be a non-empty string, got: {name}")
-    else:
+    _validate_sha256(data["sha256"])
+    local_path = _optional_string(data, "local-path")
+    file = _optional_string(data, "file")
+    if file is None:
+        if local_path is not None:
+            file = os.path.basename(local_path)
+        elif url is not None:
+            file = _derive_file_from_url(url)
+        elif archived:
+            raise ValueError("file is required in items entries")
+        else:
+            raise ValueError("One of file, local-path, or url is required")
+    name = _optional_string(data, "name")
+    if name is None:
         name = _derive_name_from_file(file)
-    
-    # Validate optional fields
-    url = data.get("url")
-    if url is not None and (not isinstance(url, str) or not url):
-        raise ValueError(f"url must be a non-empty string or null, got: {url}")
-    
-    local_path = data.get("local-path")
-    if local_path is not None and (not isinstance(local_path, str) or not local_path):
-        raise ValueError(f"local-path must be a non-empty string or null, got: {local_path}")
-    
-    file_extension = data.get("file-extension")
-    if file_extension is not None and (not isinstance(file_extension, str) or not file_extension):
-        raise ValueError(f"file-extension must be a non-empty string or null, got: {file_extension}")
-    
-    # Reject archive form (items key) - not implemented in spike #2
-    if "items" in data:
-        raise ValueError("Archive form (items key) is not yet implemented")
-    if "archive" in data:
-        raise ValueError("Archive form (archive key) is not yet implemented")
-    
-    return MediaDefinition(
+    path = _optional_string(data, "path")
+    if path is not None and not archived:
+        raise ValueError("path is only valid inside archive items")
+    if archived and path is None:
+        path = file
+    return MediaItem(
         name=name,
         file=file,
-        sha256=sha256,
-        url=url,
+        sha256=data["sha256"],
+        path=path,
+        file_extension=_optional_string(data, "file-extension"),
         local_path=local_path,
-        file_extension=file_extension,
     )
 
 
-def load_definition(path: str) -> MediaDefinition:
-    """Load and parse a media definition from a JSON file.
-    
-    Args:
-        path: Path to the JSON file containing the media definition.
-        
-    Returns:
-        A MediaDefinition parsed from the file.
-        
-    Raises:
-        FileNotFoundError: If the file does not exist.
-        json.JSONDecodeError: If the file is not valid JSON.
-        ValueError: If the definition is invalid.
+def parse_definition(data):
+    """Parse and validate one media definition object.
+
+    The `items` key selects the archive form; anything else is the
+    item form. Raises KeyError for missing required fields and
+    ValueError for invalid ones, naming the field.
     """
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Media definition must be a JSON object, "
+            f"got {type(data).__name__}")
+    if "items" in data:
+        return _parse_archive_definition(data)
+    if "archive" in data:
+        raise ValueError(
+            "archive is only valid in the archive form (with items)")
+    url = _parse_url(data)
+    return MediaDefinition(items=(_parse_item(data, url=url),), url=url)
+
+
+def _parse_archive_definition(data):
+    """Parse the archive form: one source archive, itemized payloads."""
+    if "sha256" not in data:
+        raise KeyError("sha256 is required")
+    _validate_sha256(data["sha256"])
+    url = _parse_url(data)
+    archive = _optional_string(data, "archive")
+    if archive is None:
+        if url is None:
+            raise ValueError(
+                "archive is required when the definition has no url")
+        archive = _derive_file_from_url(url)
+    entries = data["items"]
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("items must be a non-empty list")
+    items = tuple(_parse_item(entry, archived=True) for entry in entries)
+    seen = set()
+    for item in items:
+        if item.name in seen:
+            raise ValueError(
+                f"duplicate item name in definition: {item.name}")
+        seen.add(item.name)
+    return MediaDefinition(items=items, url=url, archive=archive,
+                           archive_sha256=data["sha256"])
+
+
+def load_definition(path):
+    """Load and parse one media definition JSON file."""
     if not os.path.exists(path):
         raise FileNotFoundError(f"Media definition not found: {path}")
-    
     with open(path, "r", encoding="utf-8") as handle:
         data = json.load(handle)
-    
-    if not isinstance(data, dict):
-        raise ValueError(f"Media definition must be a JSON object, got {type(data).__name__}")
-    
     return parse_definition(data)
 
 
-def resolve_media(name: str, home=None) -> MediaDefinition:
-    """Resolve a media definition by name from the media/ directory.
-    
-    Scans all JSON files in the media directory and returns the definition
-    whose parsed name matches the requested name.
-    
-    Args:
-        name: The media item name to resolve.
-        home: Optional explicit home path; uses process-global home if None.
-        
-    Returns:
-        A MediaDefinition with the matching name.
-        
-    Raises:
-        FileNotFoundError: If the media directory does not exist or contains
-            no definition with the given name.
-        ValueError: If multiple definitions have the same name (duplicate error).
+def resolve_media(name, home=None):
+    """Resolve a defined media item by name from the media library.
+
+    Scans every definition under `media/` and returns a
+    ResolvedMedia for the item whose name matches. A name defined
+    more than once is an error naming the definition files.
     """
-    from reliquary.home import media_dir
-    
-    media_path = media_dir(home)
-    
-    if not os.path.exists(media_path):
-        raise FileNotFoundError(f"Media directory does not exist: {media_path}")
-    
-    if not os.path.isdir(media_path):
-        raise ValueError(f"Media path is not a directory: {media_path}")
-    
+    library = media_dir(home)
+    if not os.path.exists(library):
+        raise FileNotFoundError(
+            f"Media directory does not exist: {library}")
+    if not os.path.isdir(library):
+        raise ValueError(f"Media path is not a directory: {library}")
     matches = []
-    
-    for filename in os.listdir(media_path):
+    for filename in sorted(os.listdir(library)):
         if not filename.endswith(".json"):
             continue
-        
-        filepath = os.path.join(media_path, filename)
+        filepath = os.path.join(library, filename)
         try:
             definition = load_definition(filepath)
-            if definition.name == name:
-                matches.append((filepath, definition))
         except (json.JSONDecodeError, ValueError, KeyError):
-            # Skip invalid files; they'll be caught by explicit operations
+            # Skip invalid files; they'll be caught by explicit
+            # operations on them.
             continue
-    
+        for item in definition.items:
+            if item.name == name:
+                matches.append((filepath, definition, item))
     if not matches:
-        raise FileNotFoundError(f"No media definition found with name: {name}")
-    
+        raise FileNotFoundError(
+            f"No media definition found with name: {name}")
     if len(matches) > 1:
-        paths = ", ".join(m[0] for m in matches)
-        raise ValueError(f"Multiple media definitions have the same name '{name}': {paths}")
-    
-    return matches[0][1]
+        paths = ", ".join(match[0] for match in matches)
+        raise ValueError(
+            f"Multiple media definitions have the same name "
+            f"'{name}': {paths}")
+    _, definition, item = matches[0]
+    return ResolvedMedia(definition=definition, item=item)
+
+
+def _payload_path(item, home=None):
+    """Return where the item's payload file lives (or will land).
+
+    A `local-path` item lives at that path; otherwise the payload is
+    cached as `<name>` plus the file's extension (or the
+    `file-extension` override) under `cache/media/`.
+    """
+    if item.local_path:
+        return item.local_path
+    extension = item.file_extension
+    if extension is None:
+        extension = os.path.splitext(item.file)[1].lstrip(".")
+    cached = item.name + ("." + extension if extension else "")
+    return os.path.join(media_cache_dir(home), cached)
+
+
+def fetch_media(name, home=None):
+    """Return the named item's verified payload path, fetching it on
+    demand.
+
+    Sources are tried cheapest first (docs/media-spec.md): an
+    existing payload that verifies is returned untouched; otherwise a
+    cached source archive that verifies is re-extracted; only then is
+    the definition's url downloaded. Archives land in
+    `cache/downloads/` and stay there; payloads land in
+    `cache/media/`. Every file is SHA-256-verified before use. A
+    payload failing verification is treated as absent and refetched;
+    without a source, that is an error naming the item, the file, and
+    both hashes.
+    """
+    resolved = resolve_media(name, home)
+    definition, item = resolved.definition, resolved.item
+    destination = _payload_path(item, home)
+    actual = _sha256(destination) if os.path.exists(destination) else None
+    if actual == item.sha256:
+        return destination
+    if actual is not None:
+        print(f"cached media failed verification: {destination}",
+              file=sys.stderr)
+    if definition.archive is not None:
+        archive = _ensure_archive(definition, home)
+        _extract_item(archive, item, destination)
+        return destination
+    if definition.url is not None:
+        _download(definition.url, destination)
+        downloaded = _sha256(destination)
+        if downloaded != item.sha256:
+            os.remove(destination)
+            raise RuntimeError(
+                f"downloaded media failed verification: "
+                f"{definition.url} has SHA-256 {downloaded}, "
+                f"expected {item.sha256}")
+        return destination
+    if actual is None:
+        raise RuntimeError(
+            f"media {item.name} ({item.file}) is missing at "
+            f"{destination} (expected SHA-256 {item.sha256}) and its "
+            f"definition names no source to fetch it from")
+    raise RuntimeError(
+        f"media {item.name} ({item.file}) at {destination} has "
+        f"SHA-256 {actual}, expected {item.sha256}, and its "
+        f"definition names no source to refetch it from")
+
+
+def _ensure_archive(definition, home):
+    """Return the definition's verified source archive in the cache.
+
+    A cached archive that verifies is reused; one that fails
+    verification is discarded and downloaded again when the
+    definition has a url, and is otherwise an error.
+    """
+    archive = os.path.join(downloads_cache_dir(home), definition.archive)
+    if os.path.exists(archive):
+        if _sha256(archive) == definition.archive_sha256:
+            return archive
+        print(f"cached archive failed verification, discarding: "
+              f"{archive}", file=sys.stderr)
+        os.remove(archive)
+    if definition.url is None:
+        raise RuntimeError(
+            f"source archive {definition.archive} is missing at "
+            f"{archive} (expected SHA-256 "
+            f"{definition.archive_sha256}) and its definition names "
+            f"no url to fetch it from")
+    _download(definition.url, archive)
+    actual = _sha256(archive)
+    if actual != definition.archive_sha256:
+        os.remove(archive)
+        raise RuntimeError(
+            f"downloaded archive failed verification: "
+            f"{definition.url} has SHA-256 {actual}, expected "
+            f"{definition.archive_sha256}")
+    return archive
+
+
+def _extract_item(archive, item, destination):
+    """Extract and verify one item out of a cached zip archive.
+
+    The member streams to a partial file that replaces the
+    destination only after its SHA-256 verifies; the archive stays in
+    the downloads cache for later re-extraction.
+    """
+    print(f"extracting {item.path} from {os.path.basename(archive)}",
+          file=sys.stderr)
+    os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
+    partial = destination + ".part"
+    with zipfile.ZipFile(archive) as bundle:
+        with bundle.open(item.path) as source, \
+                open(partial, "wb") as handle:
+            shutil.copyfileobj(source, handle, _CHUNK)
+    actual = _sha256(partial)
+    if actual != item.sha256:
+        os.remove(partial)
+        raise RuntimeError(
+            f"extracted media failed verification: {item.name} "
+            f"({item.path} in {os.path.basename(archive)}) has "
+            f"SHA-256 {actual}, expected {item.sha256}")
+    os.replace(partial, destination)
+    return destination

@@ -77,6 +77,22 @@ is not yet implemented.
 
 ### Added
 
+- Media definitions per docs/media-spec.md: `parse_definition` /
+  `load_definition` validate both the item (direct-download) form and
+  the archive form (one source archive itemizing payloads, single
+  URL), and `resolve_media(name, home=None)` resolves an item by name
+  across the `media/` library, failing on duplicates. Mirror URL
+  lists and several definitions sharing one archive remain
+  unimplemented (milestone 2).
+- `fetch_media(name, home=None)` returns a defined item's verified
+  payload on demand, trying the cheapest source first: an existing
+  payload that verifies is returned untouched, a cached source
+  archive that verifies is re-extracted, and only then is the
+  definition's URL downloaded. Source archives are cached under
+  `cache/downloads/` and payloads under `cache/media/`; every file is
+  SHA-256-verified before use, a payload or archive failing
+  verification is refetched when a source exists, and a missing
+  source is an error naming the item, file, and hashes.
 - Path helpers for the planned blueprint home layout:
   `blueprints_dir`, `media_dir`, `scripts_dir`, `cache_dir`,
   `downloads_cache_dir`, `media_cache_dir`, and `machines_cache_dir`

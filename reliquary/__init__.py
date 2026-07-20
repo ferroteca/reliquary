@@ -12,6 +12,8 @@ from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
                         stop)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
+from .media import (MediaDefinition, MediaItem, ResolvedMedia,
+                    fetch_media, resolve_media)
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
@@ -24,6 +26,9 @@ __all__ = [
     "GuestExec",
     "create_hdd_image",
     "cursor_menu_select",
+    "MediaDefinition",
+    "MediaItem",
+    "ResolvedMedia",
     "blueprints_dir",
     "cache_dir",
     "documents_dir",
