@@ -9,8 +9,10 @@ import unittest
 from unittest import mock
 
 from reliquary.blueprint import parse_blueprint
-from reliquary.machines import (create, load_machine_state,
-                                machine_dir_path, machine_drive_args)
+from reliquary.machines import (create, create_from_blueprint, destroy,
+                                list_machines, load_machine_state,
+                                machine_dir_path, machine_drive_args,
+                                resolve_machine, short_id, start, stop)
 
 
 SHA256 = "1" * 64
@@ -81,6 +83,7 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertEqual(state["blueprint"], "freedos-plain")
         self.assertIn("created", state)
         self.assertEqual(state["phase"], "ready")
+        self.assertEqual(state["backend"], "qemu")
         self.assertEqual(state["platform"], "dos")
         self.assertIsNone(state["memory"])
         self.assertEqual(state["name"], "Test Machine")
@@ -260,10 +263,203 @@ class MachineMaterializationTests(unittest.TestCase):
     def test_create_exposes_public_surface(self):
         """The module's public functions are importable and callable."""
         import reliquary.machines as machines_module
-        self.assertTrue(hasattr(machines_module, "create"))
-        self.assertTrue(hasattr(machines_module, "load_machine_state"))
-        self.assertTrue(hasattr(machines_module, "machine_dir_path"))
-        self.assertTrue(hasattr(machines_module, "machine_drive_args"))
+        for name in ("create", "create_from_blueprint", "destroy",
+                     "list_machines", "load_machine_state",
+                     "machine_dir_path", "machine_drive_args",
+                     "resolve_machine", "short_id", "start", "stop"):
+            self.assertTrue(hasattr(machines_module, name), name)
+
+    def _create_ready(self, blueprint_name="test-bp", **fields):
+        value = {"platform": "dos", "drives": {"hdd": {"size": "20M"}}}
+        value.update(fields)
+        blueprint = self._blueprint(value)
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            return create(blueprint, home=self.home,
+                          blueprint_name=blueprint_name)
+
+    def test_list_machines_returns_created_states(self):
+        """list_machines scans the cache and returns state dicts."""
+        first = self._create_ready("alpha")
+        second = self._create_ready("beta")
+
+        listed = list_machines(home=self.home)
+        ids = {state["id"] for state in listed}
+        self.assertEqual(ids, {first, second})
+
+        filtered = list_machines(home=self.home, blueprint="alpha")
+        self.assertEqual([state["id"] for state in filtered], [first])
+
+    def test_resolve_machine_by_blueprint_sole_match(self):
+        """--blueprint selects the sole machine of that blueprint."""
+        machine_id = self._create_ready("freedos")
+        self.assertEqual(
+            resolve_machine(blueprint="freedos", home=self.home),
+            machine_id)
+
+    def test_resolve_machine_by_blueprint_none_suggests_create(self):
+        """No machine for a blueprint names create in the error."""
+        with self.assertRaises(ValueError) as caught:
+            resolve_machine(blueprint="missing", home=self.home)
+        message = str(caught.exception)
+        self.assertIn("no machine exists", message)
+        self.assertIn("rlq --blueprint missing create", message)
+
+    def test_resolve_machine_by_blueprint_ambiguous(self):
+        """Several machines of one blueprint require --machine."""
+        self._create_ready("freedos")
+        self._create_ready("freedos")
+        with self.assertRaises(ValueError) as caught:
+            resolve_machine(blueprint="freedos", home=self.home)
+        message = str(caught.exception)
+        self.assertIn("has 2 machines", message)
+        self.assertIn("--machine", message)
+
+    def test_resolve_machine_by_prefix(self):
+        """--machine accepts a unique hex prefix of at least four chars."""
+        machine_id = self._create_ready("freedos")
+        self.assertEqual(
+            resolve_machine(machine=machine_id[:4], home=self.home),
+            machine_id)
+
+    def test_resolve_machine_prefix_too_short(self):
+        """Prefixes shorter than four hex characters are rejected."""
+        with self.assertRaises(ValueError) as caught:
+            resolve_machine(machine="abc", home=self.home)
+        self.assertIn("at least 4", str(caught.exception))
+
+    def test_resolve_machine_prefix_ambiguous(self):
+        """An ambiguous prefix lists candidate machines."""
+        with mock.patch("reliquary.machines.uuid.uuid4") as uuid4:
+            uuid4.side_effect = [
+                mock.Mock(hex="aaaa1111" + "0" * 24),
+                mock.Mock(hex="aaaa2222" + "0" * 24),
+            ]
+            self._create_ready("one")
+            self._create_ready("two")
+        with self.assertRaises(ValueError) as caught:
+            resolve_machine(machine="aaaa", home=self.home)
+        self.assertIn("matches 2 machines", str(caught.exception))
+
+    def test_short_id_is_unambiguous(self):
+        """short_id lengthens past four characters when needed."""
+        with mock.patch("reliquary.machines.uuid.uuid4") as uuid4:
+            uuid4.side_effect = [
+                mock.Mock(hex="abcd1111" + "0" * 24),
+                mock.Mock(hex="abcd2222" + "0" * 24),
+            ]
+            first = self._create_ready("one")
+            second = self._create_ready("two")
+        self.assertEqual(short_id(first, self.home), "abcd1")
+        self.assertEqual(short_id(second, self.home), "abcd2")
+
+    def test_start_launches_qemu_and_sets_running(self):
+        """start re-verifies media, launches QEMU, and sets phase."""
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {
+                "hdd": {"size": "20M"},
+                "cdrom": "freedos-1.4-livecd",
+            },
+            "boot": ["cdrom", "hdd"],
+        })
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                mock.patch("reliquary.machines.fetch_media",
+                           return_value=self.iso_path):
+            machine_id = create(blueprint, home=self.home,
+                                blueprint_name="bootable")
+
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu-system-i386"), \
+                mock.patch("reliquary.machines.fetch_media",
+                           return_value=self.iso_path) as fetch, \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=4444) as launch:
+            port = start(machine_id, home=self.home)
+
+        self.assertEqual(port, 4444)
+        fetch.assert_called_with("freedos-1.4-livecd", home=self.home)
+        launch.assert_called_once()
+        args = launch.call_args.args[0]
+        self.assertEqual(args[0], "qemu-system-i386")
+        self.assertIn("-m", args)
+        self.assertIn("16", args)
+        self.assertIn("-boot", args)
+        self.assertIn("order=dc", args)
+        self.assertEqual(
+            launch.call_args.kwargs["home"],
+            machine_dir_path(machine_id, self.home))
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"],
+            "running")
+
+    def test_start_rejects_already_running(self):
+        """Starting a running machine fails closed."""
+        machine_id = self._create_ready()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        with open(os.path.join(machine_dir_path(machine_id, self.home),
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+        with self.assertRaises(RuntimeError) as caught:
+            start(machine_id, home=self.home)
+        self.assertIn("already running", str(caught.exception))
+
+    def test_stop_returns_phase_to_ready(self):
+        """stop powers off the owned QEMU and sets phase ready."""
+        machine_id = self._create_ready()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        with open(os.path.join(machine_dir_path(machine_id, self.home),
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+
+        with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
+            stop(machine_id, home=self.home)
+
+        stop_qemu.assert_called_once_with(
+            home=machine_dir_path(machine_id, self.home))
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"],
+            "ready")
+
+    def test_destroy_removes_machine_directory(self):
+        """destroy deletes a ready machine's cache directory."""
+        machine_id = self._create_ready()
+        root = machine_dir_path(machine_id, self.home)
+        self.assertTrue(os.path.isdir(root))
+        destroy(machine_id, home=self.home)
+        self.assertFalse(os.path.exists(root))
+        self.assertEqual(list_machines(home=self.home), [])
+
+    def test_destroy_rejects_running_machine(self):
+        """A running machine must be stopped before destroy."""
+        machine_id = self._create_ready()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        with open(os.path.join(machine_dir_path(machine_id, self.home),
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+        with self.assertRaises(RuntimeError) as caught:
+            destroy(machine_id, home=self.home)
+        self.assertIn("stop it before destroy", str(caught.exception))
+
+    def test_create_from_blueprint_loads_blueprints_dir(self):
+        """create_from_blueprint reads blueprints/<name>.json."""
+        blueprints = os.path.join(self.home, "blueprints")
+        os.makedirs(blueprints)
+        with open(os.path.join(blueprints, "plain.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({
+                "platform": "dos",
+                "drives": {"hdd": {"size": "20M"}},
+            }, handle)
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_from_blueprint("plain", home=self.home)
+        state = load_machine_state(machine_id, self.home)
+        self.assertEqual(state["blueprint"], "plain")
 
 
 if __name__ == "__main__":

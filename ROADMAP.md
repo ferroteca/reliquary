@@ -677,12 +677,12 @@ boot/media change the M1 CLI list does not name — decide a thin
    `scripts`. Exit: reject unknown/invalid; resolve media names
    against spike 2. Out: controllers, `base`,
    `backend-settings`, `apply`, full cookbook.
-5. **Machine materialize** — `create` → `cache/machines/<id>/`
+5. **Machine materialize (complete)** — `create` → `cache/machines/<id>/`
    + `reliquary-machine.json` + qcow2 from `size`; attach
    cached media. Exit: `create` then inspect state/drives; QEMU
    can see the ISO. Out: locking/recovery polish, `recreate`,
    clone/export.
-6. **Lifecycle CLI** — `start` / `stop` / `destroy` /
+6. **Lifecycle CLI (complete)** — `start` / `stop` / `destroy` /
    `list machines`; `--blueprint` (sole machine) /
    `--machine` prefix. Exit: start/stop a created
    FreeDOS-shaped machine from the CLI. Out: `apply`,

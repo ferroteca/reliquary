@@ -5,9 +5,12 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Machine blueprints and machines
 
-> **Status:** this documents the planned machine model. It replaces
-> the earlier one-declaration/one-machine model and is not implemented
-> yet.
+> **Status:** milestone 1 spikes 5–6 implement materialization and the
+> lifecycle CLI (`create` / `start` / `stop` / `destroy` /
+> `list machines`, `--blueprint` / `--machine` selection) for the
+> QEMU-only subset. Locking, recovery, `apply`, `recreate`, clone /
+> export, and absorbing the legacy root-home model remain later
+> milestones.
 
 A **blueprint** is a reusable, user-owned JSON description of a kind of
 machine. A **machine** is one realization of that blueprint: its

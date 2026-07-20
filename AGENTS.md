@@ -14,14 +14,15 @@ as the default and currently only complete platform workflow:
   resolution, layout, and containment, `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
   its media references, `drives.py` parses declared drives, `media.py` owns media definitions
   (parsing, name resolution) and hash-verified acquisition of OS installation media into the
-  `cache/downloads/` and `cache/media/` caches, `lifecycle.py` owns QMP, QEMU
-  processes, and host-side `qemu-img` helpers, `interaction.py` defines
-  capability protocols, `interaction_agentless.py` contains the concrete agentless DOS adapter (prompt-based readiness
-  and command completion), `machine.py` provides platform-neutral QMP interaction and diagnostics — keyboard input,
-  VGA text/attribute scraping, cursor-menu selection, and screenshots, `platform_dos.py` owns DOS provisioning,
-  facades, `workflows.py` orchestrates configured runs, `recipes/` contains OS installation recipes (one module per
-  target OS), `cli.py` owns command parsing, and `__main__.py` preserves
-  `python -m reliquary` execution.
+  `cache/downloads/` and `cache/media/` caches, `machines.py` owns machine materialization under
+  `cache/machines/<id>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
+  `resolve_machine`), `lifecycle.py` owns QMP, QEMU processes, and host-side `qemu-img` helpers,
+  `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
+  adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
+  and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
+  `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `recipes/`
+  contains OS installation recipes (one module per target OS), `cli.py` owns command parsing, and `__main__.py`
+  preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.
 - `reliquary_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
@@ -86,25 +87,25 @@ seam). Never write beside the module or into the source repository during normal
 Current home layout (still the active machine model):
 
 - `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting")
-- `machine.json` — optional CLI machine configuration (not loaded by Python workflows)
+- `machine.json` — optional legacy CLI machine configuration for bare
+  `rlq start` without `--blueprint` / `--machine` (not loaded by Python
+  workflows)
 - `screenshots/` — screenshots
 - `qemu-stderr.log` — startup diagnostics
-- `vm.json` — active VM identity, port, and PID
+- `vm.json` — active VM identity, port, and PID (legacy root-home path;
+  cached machines keep theirs under `cache/machines/<id>/vm.json`)
 - `install-media/<os>/` — cached, hash-verified OS installation media
   (recipe layer)
 - `machines/<recipe>/` — per-recipe machine homes; each is itself a full
   machine home with the layout above (recipe layer)
-
-Planned home layout path helpers (additive; not yet the active model —
-see milestone 1 in ROADMAP.md):
-
 - `blueprints/` — machine blueprints (`blueprints_dir`)
 - `media/` — shared media definitions (`media_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
 - `cache/downloads/` — cached source archives (`downloads_cache_dir`)
 - `cache/media/` — cached media payloads (`media_cache_dir`)
 - `cache/machines/<id>/` — machine materializations (`machines_cache_dir`;
-  parent via `cache_dir`)
+  parent via `cache_dir`), each with `reliquary-machine.json`, `drives/`,
+  and when running `vm.json` / `qemu-stderr.log`
 
 ### VM ownership
 
@@ -192,11 +193,13 @@ floppy/hdd directories are vvfat, and cdrom directories fail validation. Configu
 must be `1`; not a constructor field). Relative drive sources resolve from the file directory via `from_file`, or
 from `base_dir` / the current directory via `from_mapping`. Explicit overrides win: scalars replace (including
 `None`), `qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field /
-option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. The CLI does load
-`<effective-home>/machine.json` when present, unless `--machine PATH` selects an explicit file; this is a CLI
-convenience and does not apply to Python workflows. Explicit `--platform`, `--qemu`, and raw QEMU arguments
-override the loaded file; an omitted `--platform` must not clobber a file platform (so argparse must not
-default `--platform` to `"dos"`). `run()` privately ensures that
+option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. The CLI loads
+`<effective-home>/machine.json` for bare `rlq start` (no `--blueprint` / `--machine`
+selector); this is a transitional convenience and does not apply to Python workflows or to
+the cached-machine lifecycle (`rlq --blueprint NAME create|start|stop|destroy`,
+`rlq list machines`). Explicit `--platform`, `--qemu`, and raw QEMU arguments
+override the loaded file on that legacy path; an omitted `--platform` must not clobber a
+file platform (so argparse must not default `--platform` to `"dos"`). `run()` privately ensures that
 the resolved inventory declares something bootable — keep present declared media;
 never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
 special boot-image fields: custom media is declared through the same drive inventory as every other image.
@@ -261,7 +264,8 @@ frontend. Runtime dependencies remain under `[project].dependencies`.
 Run checks with the project virtual environment.
 
 ```powershell
-$pythonFiles = (Get-ChildItem reliquary,reliquaryecipes,reliquary_tests -Filter *.py).FullName
+$pythonFiles = (Get-ChildItem reliquary,reliquary
+ecipes,reliquary_tests -Filter *.py).FullName
 .venv\Scripts\python.exe -m py_compile $pythonFiles
 .venv\Scripts\python.exe -m unittest -v reliquary_tests
 .venv\Scripts\python.exe -m build

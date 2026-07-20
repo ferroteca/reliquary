@@ -347,12 +347,14 @@ def _terminate_started_process(proc):
             proc.kill()
 
 
-def start_machine(config, display=False, port=None, home=None):
-    """Start an owned QEMU process described by one machine config.
+def launch_owned_qemu(args, *, vm_name, display=False, port=None,
+                      home=None):
+    """Launch an owned QEMU process under ``home``.
 
-    ``config`` is a validated machine configuration (the workflow
-    layer's ``MachineConfig``); this function does not know whether it
-    came from JSON, a Python mapping, or direct construction.
+    ``args`` is the command line including the QEMU binary and
+    ``-name``, but excluding ``-qmp`` and ``-display`` (added here).
+    Returns the QMP port after identity verification and ``vm.json``
+    recording.
     """
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -376,6 +378,66 @@ def start_machine(config, display=False, port=None, home=None):
                 f"  name: {old_state['name']}\n"
                 f"  QMP port: 127.0.0.1:{old_state['port']}\n"
                 "stop it before starting another VM in this home")
+    command = list(args)
+    command += ["-qmp", f"tcp:127.0.0.1:{port},server,nowait"]
+    if not display:
+        command += ["-display", "none"]
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = (subprocess.DETACHED_PROCESS
+                                   | subprocess.CREATE_NEW_PROCESS_GROUP)
+    base = effective_home(home)
+    os.makedirs(base, exist_ok=True)
+    stderr_log = os.path.join(base, "qemu-stderr.log")
+    with open(stderr_log, "wb") as error_file:
+        proc = subprocess.Popen(command, stderr=error_file, **kwargs)
+    deadline = time.monotonic() + 15
+    while True:
+        if proc.poll() is not None:
+            raise _startup_error(
+                proc, stderr_log, port, automatic_port,
+                "QEMU exited during startup", command)
+        try:
+            with Qmp(port) as qmp:
+                verify_vm(qmp, port, vm_name)
+            if proc.poll() is not None:
+                raise _startup_error(
+                    proc, stderr_log, port, automatic_port,
+                    "QEMU exited while establishing its QMP connection",
+                    command)
+            break
+        except (OSError, ConnectError):
+            if time.monotonic() > deadline:
+                _terminate_started_process(proc)
+                raise _startup_error(
+                    proc, stderr_log, port, automatic_port,
+                    "QEMU did not come up; QMP was unreachable after 15s",
+                    command)
+            time.sleep(0.5)
+        except RuntimeError:
+            _terminate_started_process(proc)
+            raise
+    try:
+        write_vm_state(port, vm_name, proc.pid, home)
+    except OSError as error:
+        _terminate_started_process(proc)
+        raise RuntimeError(
+            "QEMU started but its identity could not be recorded; "
+            "the new QEMU process was terminated\n"
+            f"  state file: {state_path(home)}\n"
+            f"  error: {error}") from error
+    print(f"QEMU started: {vm_name} (QMP on 127.0.0.1:{port})")
+    print(f"command line: {subprocess.list2cmdline(command)}")
+    return port
+
+
+def start_machine(config, display=False, port=None, home=None):
+    """Start an owned QEMU process described by one machine config.
+
+    ``config`` is a validated machine configuration (the workflow
+    layer's ``MachineConfig``); this function does not know whether it
+    came from JSON, a Python mapping, or direct construction.
+    """
     qemu = config.qemu or find_qemu()
     print(f"using QEMU: {qemu}")
     drives = drives_dir(home)
@@ -394,57 +456,9 @@ def start_machine(config, display=False, port=None, home=None):
     boot = boot_guess(media)
     if boot is not None and "-boot" not in qemu_args:
         args += ["-boot", boot]
-    args += ["-qmp", f"tcp:127.0.0.1:{port},server,nowait"]
-    if not display:
-        args += ["-display", "none"]
     args += qemu_args
-    kwargs = {}
-    if os.name == "nt":
-        kwargs["creationflags"] = (subprocess.DETACHED_PROCESS
-                                   | subprocess.CREATE_NEW_PROCESS_GROUP)
-    base = effective_home(home)
-    os.makedirs(base, exist_ok=True)
-    stderr_log = os.path.join(base, "qemu-stderr.log")
-    with open(stderr_log, "wb") as error_file:
-        proc = subprocess.Popen(args, stderr=error_file, **kwargs)
-    deadline = time.monotonic() + 15
-    while True:
-        if proc.poll() is not None:
-            raise _startup_error(
-                proc, stderr_log, port, automatic_port,
-                "QEMU exited during startup", args)
-        try:
-            with Qmp(port) as qmp:
-                verify_vm(qmp, port, vm_name)
-            if proc.poll() is not None:
-                raise _startup_error(
-                    proc, stderr_log, port, automatic_port,
-                    "QEMU exited while establishing its QMP connection",
-                    args)
-            break
-        except (OSError, ConnectError):
-            if time.monotonic() > deadline:
-                _terminate_started_process(proc)
-                raise _startup_error(
-                    proc, stderr_log, port, automatic_port,
-                    "QEMU did not come up; QMP was unreachable after 15s",
-                    args)
-            time.sleep(0.5)
-        except RuntimeError:
-            _terminate_started_process(proc)
-            raise
-    try:
-        write_vm_state(port, vm_name, proc.pid, home)
-    except OSError as error:
-        _terminate_started_process(proc)
-        raise RuntimeError(
-            "QEMU started but its identity could not be recorded; "
-            "the new QEMU process was terminated\n"
-            f"  state file: {state_path(home)}\n"
-            f"  error: {error}") from error
-    print(f"QEMU started: {vm_name} (QMP on 127.0.0.1:{port})")
-    print(f"command line: {subprocess.list2cmdline(args)}")
-    return port
+    return launch_owned_qemu(
+        args, vm_name=vm_name, display=display, port=port, home=home)
 
 
 def stop(port=None, home=None):

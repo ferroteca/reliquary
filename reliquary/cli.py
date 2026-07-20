@@ -10,10 +10,13 @@ from qemu.qmp import ConnectError
 
 from .home import set_home
 from .interaction_agentless import AgentlessGuestExec
-from .lifecycle import stop
+from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .workflows import _cli_machine_config, start
+from .machines import (create_from_blueprint, destroy, list_machines,
+                       resolve_machine, short_id, start as start_machine,
+                       stop as stop_machine)
+from .workflows import _cli_machine_config, start as start_legacy
 
 
 def _cli_start_overrides(arguments):
@@ -23,7 +26,7 @@ def _cli_start_overrides(arguments):
         overrides["platform"] = arguments.platform
     if arguments.qemu is not None:
         overrides["qemu"] = arguments.qemu
-    if arguments.qemu_args:
+    if getattr(arguments, "qemu_args", None):
         overrides["qemu_args"] = arguments.qemu_args
     return overrides
 
@@ -39,6 +42,18 @@ def _load_recipe(name):
         raise ValueError(f"unknown recipe: {name}") from error
 
 
+def _require_machine_selector(arguments):
+    """Return a resolved machine id from global selectors."""
+    if arguments.blueprint and arguments.machine:
+        raise ValueError(
+            "--blueprint and --machine are mutually exclusive")
+    return resolve_machine(
+        machine=arguments.machine,
+        blueprint=arguments.blueprint,
+        home=arguments.home,
+    )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="rlq",
@@ -47,9 +62,17 @@ def main(argv=None):
     parser.add_argument("--home", help="reliquary home directory (drives/, "
                         "screenshots/); default: $RELIQUARY_HOME, then "
                         "Documents/reliquary")
+    parser.add_argument(
+        "--blueprint",
+        help="select a blueprint's sole machine "
+             "(or name the blueprint for create / list filter)")
+    parser.add_argument(
+        "--machine",
+        help="select a machine by full id or unambiguous hex prefix "
+             "(minimum four characters)")
     parser.add_argument("--port", type=int,
-                        help="QMP port (start: choose one automatically; "
-                             "other commands: use the active VM)")
+                        help="QMP port (legacy interaction commands; "
+                             "new lifecycle stores port per machine)")
     parser.add_argument("--qemu", help="path to the QEMU binary (default: "
                         "$RELIQUARY_QEMU_HOME, then $QEMU_HOME, then PATH, "
                         "then well-known install locations)")
@@ -58,8 +81,6 @@ def main(argv=None):
                              "platform workflows are not implemented yet)")
     parser.add_argument("--timeout", type=int, help="seconds to wait "
                         "(defaults: run 120, wait 60)")
-    parser.add_argument("--machine", help="path to machine.json configuration "
-                        "file (default: <home>/machine.json if present)")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     command = subcommands.add_parser(
@@ -70,10 +91,38 @@ def main(argv=None):
         "--display", action="store_true",
         help="show the QEMU window during guest steps (for "
              "debugging recipes)")
-    command = subcommands.add_parser("start")
+
+    command = subcommands.add_parser(
+        "create",
+        help="materialize a machine from a blueprint")
+
+    command = subcommands.add_parser(
+        "start",
+        help="start a machine (--blueprint/--machine, or legacy "
+             "root-home machine.json)")
     command.add_argument("--display", action="store_true")
-    command.add_argument("qemu_args", nargs="*")
-    subcommands.add_parser("stop")
+    command.add_argument(
+        "qemu_args", nargs="*",
+        help=argparse.SUPPRESS)
+
+    subcommands.add_parser(
+        "stop",
+        help="stop a machine (--blueprint/--machine, or legacy "
+             "root-home vm.json)")
+    subcommands.add_parser(
+        "destroy",
+        help="delete a stopped machine "
+             "(requires --blueprint or --machine)")
+
+    list_command = subcommands.add_parser(
+        "list", help="list blueprints or machines")
+    list_sub = list_command.add_subparsers(dest="list_what", required=True)
+    list_machines_parser = list_sub.add_parser(
+        "machines", help="list materialized machines")
+    list_machines_parser.add_argument(
+        "--blueprint", dest="filter_blueprint",
+        help="show only machines of this blueprint")
+
     command = subcommands.add_parser("type")
     command.add_argument("text")
     command = subcommands.add_parser("run")
@@ -103,7 +152,8 @@ def main(argv=None):
         target = (f"127.0.0.1:{arguments.port}"
                   if arguments.port else "the active VM")
         print(f"reliquary: cannot reach QMP on {target}: {error}\n"
-              "is the VM running? (reliquary start)", file=sys.stderr)
+              "is the VM running? (rlq --blueprint NAME start)",
+              file=sys.stderr)
         return 1
     except (RuntimeError, TimeoutError, FileNotFoundError,
             NotImplementedError, ValueError, OSError) as error:
@@ -128,18 +178,71 @@ def _install(arguments):
     return 0
 
 
+def _create(arguments):
+    if not arguments.blueprint:
+        raise ValueError("create requires --blueprint")
+    if arguments.machine:
+        raise ValueError(
+            "--blueprint and --machine are mutually exclusive")
+    machine_id = create_from_blueprint(
+        arguments.blueprint, home=arguments.home)
+    print(f"created machine {machine_id}")
+    return 0
+
+
+def _list_machines(arguments):
+    filter_blueprint = (
+        getattr(arguments, "filter_blueprint", None)
+        or arguments.blueprint)
+    machines = list_machines(
+        home=arguments.home, blueprint=filter_blueprint)
+    print(f"{'ID':<8} {'BLUEPRINT':<18} {'PHASE':<8} BACKEND")
+    for state in machines:
+        sid = short_id(state["id"], arguments.home)
+        blueprint = state.get("blueprint") or "-"
+        phase = state.get("phase") or "?"
+        backend = state.get("backend") or "qemu"
+        print(f"{sid:<8} {blueprint:<18} {phase:<8} {backend}")
+    return 0
+
+
 def _dispatch(arguments):
     platform = arguments.platform or "dos"
     if arguments.command == "install":
         return _install(arguments)
+    if arguments.command == "create":
+        return _create(arguments)
+    if arguments.command == "list":
+        if arguments.list_what == "machines":
+            return _list_machines(arguments)
+        raise ValueError(f"unknown list target: {arguments.list_what}")
     if arguments.command == "start":
+        if arguments.blueprint or arguments.machine:
+            machine_id = _require_machine_selector(arguments)
+            start_machine(
+                machine_id, display=arguments.display,
+                home=arguments.home)
+            return 0
+        # Legacy root-home start (MachineConfig / machine.json).
         config = _cli_machine_config(
-            arguments.machine, arguments.home,
+            None, arguments.home,
             **_cli_start_overrides(arguments))
-        start(config, display=arguments.display, port=arguments.port)
-    elif arguments.command == "stop":
-        stop(arguments.port)
-    elif arguments.command == "type":
+        start_legacy(
+            config, display=arguments.display, port=arguments.port)
+        return 0
+    if arguments.command == "stop":
+        if arguments.blueprint or arguments.machine:
+            machine_id = _require_machine_selector(arguments)
+            stop_machine(machine_id, home=arguments.home)
+            return 0
+        stop_legacy(arguments.port)
+        return 0
+    if arguments.command == "destroy":
+        machine_id = _require_machine_selector(arguments)
+        destroy(machine_id, home=arguments.home)
+        print(f"destroyed machine {machine_id}")
+        return 0
+    if arguments.command == "type":
         send_text(arguments.text, arguments.port)
     elif arguments.command == "run":
         if platform != "dos":

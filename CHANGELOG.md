@@ -77,14 +77,29 @@ is not yet implemented.
 
 ### Added
 
+- Machine lifecycle CLI and API for cached machines: `create`
+  / `start` / `stop` / `destroy` / `list machines`, with global
+  `--blueprint` (sole machine of that blueprint) and `--machine`
+  (full id or unambiguous hex prefix, minimum four characters).
+  `create_from_blueprint()`, `list_machines()`, `resolve_machine()`,
+  and `machines.start` / `machines.stop` / `destroy` operate on
+  `cache/machines/<id>/`; QEMU ownership (`vm.json`) lives under
+  the machine directory. Bare `rlq start` / `rlq stop` without a
+  selector still use the transitional root-home `MachineConfig`
+  path. `apply`, interaction-via-selector, and multi-backend remain
+  later spikes.
 - Immutable machine-blueprint parsing for the milestone 1 subset:
   `parse_blueprint()` / `load_blueprint()` accept `platform`, `memory`,
   `drives` (`size` or `media`), `boot`, `name`, `description`, and
   `scripts`; canonicalize drive aliases, sizes, memory, and boot keys;
   resolve media names through the shared media library; and reject
   unknown fields, slot clashes, invalid sources, and undeclared boot
-  targets. Machine materialization and CLI blueprint selection remain
-  later milestone 1 spikes.
+  targets.
+- Machine materialization: `create(blueprint)` writes
+  `cache/machines/<id>/reliquary-machine.json`, qcow2 images for
+  `size` drives, and media payload paths for `media` drives;
+  `machine_drive_args()` renders QEMU `-drive` tokens from that
+  state.
 - Media definitions per docs/media-spec.md: `parse_definition` /
   `load_definition` validate both the item (direct-download) form and
   the archive form (one source archive itemizing payloads, single

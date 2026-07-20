@@ -196,7 +196,7 @@ Documents/reliquary/
 │   ├── floppy.img        a boot floppy image (slot 0 = A:)
 │   ├── hdd/              a folder exposed as a virtual FAT hard disk
 │   └── ...               hdd_1.qcow2, cdrom.iso, floppy_1/, ...
-├── machine.json          optional machine configuration (CLI and API)
+├── machine.json          optional legacy CLI config for bare `rlq start`
 ├── screenshots/          captured PNG files
 ├── qemu-stderr.log       diagnostics from the last QEMU start
 └── vm.json               identity and port of the active VM
@@ -336,18 +336,38 @@ and restart QEMU before using them in the guest.
 
 ## Command guide
 
-### Managing the VM
+### Managing machines (blueprint lifecycle)
 
 ```text
-rlq start [--display] [--machine PATH] [-- QEMU_ARGS...]
+rlq --blueprint NAME create
+rlq --blueprint NAME start [--display]
+rlq --blueprint NAME stop
+rlq --machine ID destroy
+rlq list machines [--blueprint NAME]
+```
+
+`--blueprint` selects that blueprint's sole machine (or names the
+blueprint for `create`). `--machine` accepts the full id or any
+unambiguous hex prefix (minimum four characters). Machines live under
+`cache/machines/<id>/`.
+
+```powershell
+rlq --home $scratch --blueprint plain create
+rlq --home $scratch --blueprint plain start --display
+rlq --home $scratch --blueprint plain stop
+rlq --home $scratch list machines
+```
+
+### Managing the VM (legacy root-home path)
+
+```text
+rlq start [--display] [-- QEMU_ARGS...]
 rlq stop
 ```
 
-The CLI accepts an optional versioned JSON machine document. Put
-`machine.json` under the effective home and `rlq start` loads it
-automatically; `--machine PATH` selects another file instead (relative
-paths resolve from the current directory). A missing explicit file is an
-error; a missing home file means the ordinary defaults.
+Without `--blueprint` / `--machine`, bare `rlq start` still loads an
+optional versioned JSON machine document from `<home>/machine.json`.
+A missing home file means the ordinary defaults.
 
 `version` is required and must be `1`. The document uses the same field
 names as `MachineConfig`: `platform`, `timeout`, `staged_drive`,
