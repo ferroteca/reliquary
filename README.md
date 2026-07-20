@@ -53,9 +53,12 @@ python -m pip install -e .
 
 ## Scripting OS installations
 
+Installing registers two equivalent commands: `rlq` (the short
+form used throughout the docs) and `reliquary`.
+
 ```powershell
-reliquary --help
-reliquary install freedos-plain
+rlq --help
+rlq install freedos-plain
 ```
 
 `install` runs the whole recipe in the foreground: it fetches and
@@ -216,7 +219,7 @@ To use a particular DOS — MS-DOS, DR-DOS, or another distribution — copy its
 `drives/floppy.img` or `drives/hdd.qcow2`.
 
 The boot order defaults to a best guess — the slot-0 floppy image, else the slot-0 hard-disk image, else the
-cdrom — and memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `reliquary start` to override either.
+cdrom — and memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `rlq start` to override either.
 
 Guest drive letters follow disk order, so a hard-disk boot image at slot 0 claims `C:` and pushes a staged virtual
 FAT drive to `D:`; reliquary defaults the staged drive letter accordingly, and `staged_drive` overrides it (for
@@ -239,7 +242,7 @@ already claims slot 0 / drive `A:`).
 ### 3. Start QEMU
 
 ```powershell
-reliquary start
+rlq start
 ```
 
 Everything declared under `drives/` is mounted. reliquary chooses an available local QMP port, starts QEMU,
@@ -249,7 +252,7 @@ file, so the port normally does not need to be copied manually.
 For a visible, manually interactive DOS session, start QEMU with its display enabled:
 
 ```powershell
-reliquary start --display
+rlq start --display
 ```
 
 The command returns once QEMU is ready, while the VM and its display remain open. Give the QEMU window focus and use
@@ -257,7 +260,7 @@ it like a DOS computer for as long as needed. When the manual session is finishe
 terminal (or another terminal using the same reliquary home):
 
 ```powershell
-reliquary stop
+rlq stop
 ```
 
 This shutdown verifies the VM's recorded identity before closing it and flushes guest writes to the virtual FAT drive.
@@ -270,14 +273,14 @@ identity does not match its state file.
 `start` returns when QEMU is ready, not when DOS is. Wait for a prompt before running commands:
 
 ```powershell
-reliquary wait "A:\\\\>"
+rlq wait "A:\\\\>"
 ```
 
 A user-provided boot image must reach its prompt on its own, without interactive menus. Switch to the staged drive
 using an ordinary DOS command:
 
 ```powershell
-reliquary run "c:"
+rlq run "c:"
 ```
 
 Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which waits for a
@@ -286,9 +289,9 @@ prompt.
 ### 5. Run DOS commands
 
 ```powershell
-reliquary run "dir"
-reliquary run "myprog.exe"
-reliquary run "myprog.exe > result.log"
+rlq run "dir"
+rlq run "myprog.exe"
+rlq run "myprog.exe > result.log"
 ```
 
 `run` types the command and waits for a DOS prompt to return. Redirecting output to drive C: is the most reliable way to
@@ -299,19 +302,19 @@ retrieve detailed output. Guest writes become visible in the host staging direct
 Print the current 80-by-25 text screen:
 
 ```powershell
-reliquary text
+rlq text
 ```
 
 Wait until the screen contains a regular expression:
 
 ```powershell
-reliquary wait "C:\\\\>"
+rlq wait "C:\\\\>"
 ```
 
 Take a screenshot:
 
 ```powershell
-reliquary screenshot after-test
+rlq screenshot after-test
 ```
 
 The image is saved as `<home>/screenshots/after-test.png`.
@@ -321,7 +324,7 @@ reliquary home.
 ### 7. Stop QEMU
 
 ```powershell
-reliquary stop
+rlq stop
 ```
 
 Stopping QEMU flushes writes from the virtual FAT drive and removes the active `vm.json` record.
@@ -334,12 +337,12 @@ and restart QEMU before using them in the guest.
 ### Managing the VM
 
 ```text
-reliquary start [--display] [--machine PATH] [-- QEMU_ARGS...]
-reliquary stop
+rlq start [--display] [--machine PATH] [-- QEMU_ARGS...]
+rlq stop
 ```
 
 The CLI accepts an optional versioned JSON machine document. Put
-`machine.json` under the effective home and `reliquary start` loads it
+`machine.json` under the effective home and `rlq start` loads it
 automatically; `--machine PATH` selects another file instead (relative
 paths resolve from the current directory). A missing explicit file is an
 error; a missing home file means the ordinary defaults.
@@ -374,23 +377,23 @@ passing `--platform dos` overrides a non-DOS file value.
 Additional QEMU arguments can follow `--`:
 
 ```powershell
-reliquary start -- -cpu 486 -device virtio-rng-pci
+rlq start -- -cpu 486 -device virtio-rng-pci
 ```
 
 ### Keyboard and command input
 
 ```text
-reliquary type TEXT
-reliquary run COMMAND
-reliquary keys KEY [KEY ...]
-reliquary menu ITEM [--exclude TEXT]
+rlq type TEXT
+rlq run COMMAND
+rlq keys KEY [KEY ...]
+rlq menu ITEM [--exclude TEXT]
 ```
 
 `type` types text followed by Enter. `run` additionally waits for the prompt to return. `keys` accepts raw QEMU key
 names, such as:
 
 ```powershell
-reliquary keys down ret
+rlq keys down ret
 ```
 
 `menu` selects an entry in a cursor-key driven text menu, such as a boot
@@ -399,7 +402,7 @@ highlight through the VGA attribute bytes, so the entry is confirmed by
 what the guest actually displays before Enter is pressed:
 
 ```powershell
-reliquary menu "Use FreeDOS 1.4 in Live Environment mode"
+rlq menu "Use FreeDOS 1.4 in Live Environment mode"
 ```
 
 The item text is matched case-insensitively against the visible screen
@@ -411,7 +414,7 @@ out instead: rows containing an excluded text are never selected, which
 is another way to disambiguate:
 
 ```powershell
-reliquary menu "Full installation" --exclude "with sources"
+rlq menu "Full installation" --exclude "with sources"
 ```
 
 Use the global `--timeout SECONDS` option to change the 30-second
@@ -420,9 +423,9 @@ navigation timeout.
 ### Reading the guest
 
 ```text
-reliquary text
-reliquary wait REGEX
-reliquary screenshot [NAME]
+rlq text
+rlq wait REGEX
+rlq screenshot [NAME]
 ```
 
 Use the global `--timeout SECONDS` option to change the timeout for
@@ -431,7 +434,7 @@ Use the global `--timeout SECONDS` option to change the timeout for
 ### QEMU monitor access
 
 ```powershell
-reliquary hmp "info block"
+rlq hmp "info block"
 ```
 
 `hmp` sends a raw QEMU human-monitor command. It is intended for QEMU operations that do not yet have a dedicated
@@ -620,7 +623,7 @@ Install QEMU and put `qemu-system-i386` on `PATH`, set
 ### A command cannot find an active VM
 
 CLI commands use `<home>/vm.json`. Ensure every command uses the same
-`--home` or `RELIQUARY_HOME` value and that `reliquary start` completed successfully.
+`--home` or `RELIQUARY_HOME` value and that `rlq start` completed successfully.
 
 ### The VM identity does not match
 

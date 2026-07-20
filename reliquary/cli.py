@@ -41,7 +41,7 @@ def _load_recipe(name):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="reliquary",
+        prog="rlq",
         description="OS installation scripting over QEMU guest "
                     "automation (DOS by default)")
     parser.add_argument("--home", help="reliquary home directory (drives/, "
