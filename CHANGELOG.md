@@ -11,6 +11,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.1.0.dev1 (unreleased)
 
+### Added
+
+- Accept `rlq list machine` and `rlq list blueprint` as singular
+  aliases for `rlq list machines` and `rlq list blueprints`. (`#3`)
+
 ### Changed
 
 - Scrubbed private project-history references from release-facing

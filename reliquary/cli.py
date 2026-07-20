@@ -151,9 +151,11 @@ def main(argv=None):
         "list", help="list blueprints or machines")
     list_sub = list_command.add_subparsers(dest="list_what", required=True)
     list_sub.add_parser(
-        "blueprints", help="list available blueprints")
+        "blueprints", aliases=["blueprint"],
+        help="list available blueprints")
     list_machines_parser = list_sub.add_parser(
-        "machines", help="list materialized machines")
+        "machines", aliases=["machine"],
+        help="list materialized machines")
     list_machines_parser.add_argument(
         "--blueprint", dest="filter_blueprint",
         help="show only machines of this blueprint")
@@ -274,9 +276,9 @@ def _dispatch(arguments):
     if arguments.command == "script":
         return _script(arguments)
     if arguments.command == "list":
-        if arguments.list_what == "blueprints":
+        if arguments.list_what in ("blueprints", "blueprint"):
             return _list_blueprints(arguments)
-        if arguments.list_what == "machines":
+        if arguments.list_what in ("machines", "machine"):
             return _list_machines(arguments)
         raise ValueError(f"unknown list target: {arguments.list_what}")
     if arguments.command == "start":

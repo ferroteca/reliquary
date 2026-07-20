@@ -77,6 +77,56 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("ready", output)
         self.assertIn("qemu", output)
 
+    def test_list_blueprint_alias_produces_same_output(self):
+        """'list blueprint' alias produces identical output to 'list blueprints'."""
+        stdout_plural = io.StringIO()
+        with contextlib.redirect_stdout(stdout_plural):
+            cli.main(["--home", self.home, "list", "blueprints"])
+        stdout_singular = io.StringIO()
+        with contextlib.redirect_stdout(stdout_singular):
+            cli.main(["--home", self.home, "list", "blueprint"])
+        self.assertEqual(
+            stdout_plural.getvalue(), stdout_singular.getvalue())
+
+    def test_list_machine_alias_produces_same_output(self):
+        """'list machine' alias produces identical output to 'list machines'."""
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main([
+                "--home", self.home,
+                "--blueprint", "plain",
+                "create",
+            ])
+        stdout_plural = io.StringIO()
+        with contextlib.redirect_stdout(stdout_plural):
+            cli.main(["--home", self.home, "list", "machines"])
+        stdout_singular = io.StringIO()
+        with contextlib.redirect_stdout(stdout_singular):
+            cli.main(["--home", self.home, "list", "machine"])
+        self.assertEqual(
+            stdout_plural.getvalue(), stdout_singular.getvalue())
+
+    def test_list_machine_alias_filters_by_blueprint(self):
+        """'list machine --blueprint NAME' filters machines."""
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main([
+                "--home", self.home,
+                "--blueprint", "plain",
+                "create",
+            ])
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home,
+                "list", "machine",
+                "--blueprint", "plain",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertIn("plain", output)
+        self.assertIn("ready", output)
+
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.
 
