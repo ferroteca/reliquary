@@ -7,6 +7,11 @@ import importlib.metadata
 import os
 import sys
 
+try:
+    _version = importlib.metadata.version("reliquary")
+except importlib.metadata.PackageNotFoundError:
+    _version = "unknown"
+
 from qemu.qmp import ConnectError
 
 from .home import set_home
@@ -52,7 +57,7 @@ def main(argv=None):
                     "automation (DOS by default)")
     parser.add_argument(
         "--version", action="version",
-        version=f"%(prog)s {importlib.metadata.version('reliquary')}")
+        version="%(prog)s " + _version)
     parser.add_argument("--home", help="reliquary home directory (drives/, "
                         "screenshots/); default: $RELIQUARY_HOME, then "
                         "Documents/reliquary")
