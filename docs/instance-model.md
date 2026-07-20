@@ -104,9 +104,13 @@ first.
 
 Editing a blueprint affects future `create` operations, not existing
 machines. Each machine records the source blueprint and resolved digest at
-creation; that resolved snapshot is the machine's baseline, and
-`start` reconciles the machine against it, not against the current
-blueprint file. Adopting blueprint edits is the explicit `apply`: with the
+creation; that resolved snapshot is the machine's baseline. Between
+`apply`s the machine's own state is authoritative — script
+`attach`/`detach` persists there, so a machine may legitimately
+diverge from its baseline — and `start` runs the machine as its
+state describes, never re-reading the current
+blueprint file. Adopting blueprint edits — and returning a
+diverged machine to its blueprint shape — is the explicit `apply`: with the
 machine stopped, it re-resolves the current blueprint and reconciles the
 machine to it — applicable differences (memory, boot order, drives
 enabled or disabled, media changes) are applied and the recorded

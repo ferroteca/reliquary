@@ -348,10 +348,12 @@ rlq --machine a1b2 start
 ```
 
 `create` resolves the blueprint once and records the resolved
-snapshot as the machine's *baseline*. Subsequent `start` operations
-reconcile against this baseline, never against the current blueprint
-file. Editing the blueprint affects future `create` operations only;
-adopt edits into an existing machine with [`apply`](#applying-blueprint-edits).
+snapshot as the machine's *baseline*. Thereafter the machine's own
+state is authoritative — script `attach`/`detach` persists in it —
+and `start` never re-reads the current blueprint file. Editing the
+blueprint affects future `create` operations only; adopt edits into
+an existing machine (or return a diverged machine to its blueprint
+shape) with [`apply`](#applying-blueprint-edits).
 
 ### Starting and stopping
 
@@ -376,8 +378,9 @@ rlq --machine a1b2 start
 rlq --machine a1b2 stop
 ```
 
-Every `start` reconciles: baseline → state → backend identity,
-re-verifying every media hash. Machines stay running until
+Every `start` reconciles the backend to the machine's state —
+verifying backend identity and re-verifying every media hash,
+including media a script attached. Machines stay running until
 explicitly stopped — by `stop`, by a script step, or by guest
 shutdown.
 
@@ -680,10 +683,13 @@ Behind the scenes this:
    definitions, and its scripts from the built-in library (skipping
    any that already exist).
 2. Creates a machine from the blueprint.
-3. Starts it and runs `scripts/freedos-1.4-plain-install.rqs`.
+3. Runs `scripts/freedos-1.4-plain-install.rqs`, which attaches
+   the LiveCD, starts the machine, drives the install, and
+   detaches the CD again as its final step.
 
-When the script ends the machine stays running — stop it explicitly
-or run another script against it:
+When a script ends the machine stays in whatever state its last
+step left it (the FreeDOS install script powers it off); run
+another script against it or control it directly:
 
 ```powershell
 rlq --blueprint freedos-1.4-plain script verify
@@ -691,8 +697,11 @@ rlq --blueprint freedos-1.4-plain stop
 ```
 
 `script` resolves the machine (creating one when `--blueprint` names
-a blueprint with no machine yet), starts it if not already running,
-then executes guest steps. `--display` shows the backend's console
+a blueprint with no machine yet), brings it to the state the
+script's `machine:` header expects — starting a stopped machine
+when the script expects `running` (the default), failing when a
+`machine: stopped` script finds it running — then executes guest
+steps. `--display` shows the backend's console
 window; `--responses` binds a JSON file of input values.
 
 `check-script` runs preflight only: parsing, static control-flow

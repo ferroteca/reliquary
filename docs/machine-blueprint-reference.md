@@ -190,9 +190,11 @@ detected and refused rather than manipulated.
 
 The digest of the resolved blueprint snapshot this machine was created
 from (or last [`apply`](machine-blueprint.md#applying-blueprint-edits)-d
-to). This is the machine's baseline: `start` reconciles against
-it, and editing the blueprint file changes nothing until `apply`
-records a new digest.
+to). This is the machine's baseline. Operation may diverge the
+state from it — script `attach`/`detach` persists in the state —
+and `apply` is what reconciles the machine back to (or forward to
+an edited) blueprint; editing the blueprint file changes nothing
+until `apply` records a new digest.
 
 ---
 
@@ -272,6 +274,25 @@ or `base` — declares where the drive's content comes from; a
 drive object with none of them, or more than one, fails
 validation.
 
+A removable drive (`cdrom`, `floppy`) may instead be declared
+**empty** with the value `null`:
+
+```json
+{"drives": {"cdrom0": null}}
+```
+
+The slot exists as guest-visible hardware with no medium inserted.
+This is the normal shape for a drive that scripts occupy
+temporarily — an install script attaches the installer medium to
+the empty slot and detaches it as its final step (see
+[the script spec](script-spec.md#attach-and-detach)). Declaring
+the slot is required: `attach` only inserts media into hardware
+the blueprint declares, and never creates the drive itself — the
+blueprint alone determines machine topology, so capability
+preflight (and a script's `attach` targets) can be checked before
+anything runs. Fixed drives
+(`hdd`) cannot be empty.
+
 There are no image paths anywhere in the blueprint. A drive that has
 its own image file (declared with `size` or `base`) gets it
 materialized by reliquary inside the cached materialization, named
@@ -295,8 +316,13 @@ and hash-verified on demand. Definitions live in the shared
 definitions there before resolving their target machine. A name no
 definition provides is an error. The drive attaches the media payload
 itself — use this for
-machine-independent, read-only-use media: installer ISOs, boot
-floppies, driver disks. (To boot or modify a copy of a media image,
+machine-independent, read-only-use media the machine should carry
+*at rest*: a driver disk, a reference CD. Media a workflow needs
+only temporarily — above all installer ISOs — conventionally stay
+out of the blueprint: declare the slot empty and let the install
+script attach and detach the medium, so the machine's default
+shape is the installed system, not the installer. (To boot or
+modify a copy of a media image,
 make it a drive [`base`](#base--optional--string-or-object) instead.)
 Media names are the *only* cross-boundary reference a
 blueprint may make.
@@ -428,13 +454,19 @@ matters (as it does under DOS).
 
 #### `enabled` — optional · boolean · default `true`
 
-`false` keeps the entry in the document but detaches the drive
-from the machine — useful for installer media you'll re-enable later, or for
+`false` keeps the entry in the document but removes the drive
+from the machine entirely — no slot, no hardware — useful for
 switching between configurations without deleting entries:
 
 ```json
-{"drives": {"cdrom0": {"media": "freedos-1.4-livecd", "enabled": false}}}
+{"drives": {"hdd1": {"size": "100M", "enabled": false}}}
 ```
+
+This differs from an empty removable drive (`null`): an empty
+drive is present hardware awaiting a medium; a disabled drive does
+not exist on the machine. (Temporarily mounted installer media
+need neither — see the [`media`](#media--optional--string)
+convention above.)
 
 ### Image naming and formats
 
@@ -482,7 +514,13 @@ order.
 {"boot": ["cdrom0", "hdd0"]}
 ```
 
-Every entry must reference a declared, enabled drive. When omitted,
+Every entry must reference a declared, enabled drive. An empty
+removable drive is a valid entry: firmware falls through it to the
+next entry until a medium is attached. This is the standard
+install pattern — `["cdrom0", "hdd0"]` with an empty `cdrom0`
+boots the installer CD while a script has one attached and the
+installed hard disk once it is detached, with no boot-order change
+ever needed. When omitted,
 the default order is: the slot-0 floppy image if declared, else the
 slot-0 hard disk, else the first CD-ROM; the resolved order
 appears in the state.
@@ -570,6 +608,7 @@ Format checks (reject the document):
 - `boot` entries naming undeclared or disabled drives;
 - drive objects declaring none, or more than one, of `media`,
   `size`, and `base`;
+- `null` (empty) values on non-removable (`hdd`) drives;
 - `media` or `base.media` names no media definition provides;
 - `backend-settings` sections overlapping reliquary-owned fields.
 

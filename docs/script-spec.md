@@ -8,9 +8,11 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** Spikes 8–10 implement parsing, the QEMU/DOS runtime
 > (`wait`/`expect`, input verbs, `screenshot`, `start`/`stop`), and
 > `rlq --blueprint|--machine script <label>` wiring with per-invocation
-> run records under `cache/machines/<id>/runs/`. Embedded media blocks,
-> property-bound inputs, reactive `on`, and the full transcript contract
-> remain later milestones; details may still change before first release.
+> run records under `cache/machines/<id>/runs/`. Spike 13 adds the
+> `machine:` header and persistent `attach`/`detach`. Embedded media
+> blocks, property-bound inputs, reactive `on`, and the full transcript
+> contract remain later milestones; details may still change before
+> first release.
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
@@ -25,11 +27,13 @@ rlq script freedos-plain-install --blueprint msdos
 
 After preflight, `script` installs embedded media definitions,
 resolves its machine (creating one when `--blueprint` names a blueprint
-with no machine yet), starts it if it is not already running,
-then executes the script. The machine stays running afterward
-unless a step stopped it. Failure likewise leaves the machine in
-its observed state for diagnosis; no command implicitly tears it
-down.
+with no machine yet), brings it to the state the script's
+[`machine:` header](#header) expects — starting a stopped machine
+when the script expects `running`, failing when the script expects
+`stopped` but the machine is running — then executes the script. The
+machine stays in whatever state the last executed step left it.
+Failure likewise leaves the machine in its observed state for
+diagnosis; no command implicitly tears it down.
 
 Scripts are authored documents: reliquary reads but never rewrites
 them. They belong in version control beside the machine blueprints and
@@ -156,6 +160,15 @@ declarations, and executable or state content:
   platform value; omission never means portable.
 - `initial: <state>` is required in a state-machine script and
   forbidden in a linear script.
+- `machine: running | stopped` declares the machine state the
+  script expects when it starts. The default is `running`: the
+  `script` command starts a stopped machine before executing.
+  `stopped` requires a stopped machine — a running machine fails
+  preflight rather than being implicitly powered off — and the
+  script performs its own explicit `start`, typically after
+  attaching the media it needs. An install script that must attach
+  its installer medium before first boot declares
+  `machine: stopped`.
 - `timeout: <duration>` optionally changes the script-wide
   observation default from `60s`.
 
@@ -165,7 +178,12 @@ promise yet.
 
 ## Embedded media definitions
 
-A script may carry media definitions needed by that workflow. Each
+A script may carry media definitions needed by that workflow, but
+never has to: a script's media references resolve through the
+ordinary shared catalog, so definitions that live as separate
+library documents — as the built-in library keeps its own — work
+identically. Embedding suits a script distributed as a single
+self-contained file. Each
 block has a definition label followed by the ordinary
 media-definition JSON object; the outer opening brace becomes
 `media <label> {`:
@@ -405,10 +423,12 @@ define their typed arguments and allowed modifiers:
 script          = headers, media-definitions, inputs,
                   (linear-body | state-body) ;
 headers         = header, { header } ;
-header          = description | platform | initial | timeout ;
+header          = description | platform | initial | machine
+                | timeout ;
 description     = "description:", string, newline ;
 platform        = "platform:", identifier, newline ;
 initial         = "initial:", identifier, newline ;
+machine         = "machine:", ("running" | "stopped"), newline ;
 timeout         = "timeout:", duration, newline ;
 
 media-definitions = { media-definition } ;
@@ -702,22 +722,38 @@ Failing observations capture a screenshot automatically.
 ### `attach` and `detach`
 
 ```rqs
+attach cdrom0 freedos-1.4-livecd
 attach floppy1 ${supplemental-disk}
-detach cdrom
+detach cdrom0
 ```
 
-These change the running machine and update its state document, not
-its blueprint. `attach` accepts a literal defined-media name or a
-`media` input. By execution time every embedded definition has
-been installed, so resolution uses the ordinary shared catalog, then
-fetches and hash-verifies the item as needed.
+These change what medium occupies a declared removable drive slot
+(`cdrom`, `floppy`) and record the change in the machine's state
+document, not its blueprint. They never create or remove the drive
+itself: drives are guest-visible hardware the blueprint declares —
+an installer-driven blueprint declares the slot empty
+(`"cdrom0": null`) — and an `attach` or `detach` naming a slot the
+machine does not have fails static preflight, before any guest
+input. `attach` accepts a literal
+defined-media name or a `media` input. By execution time every
+embedded definition has been installed, so resolution uses the
+ordinary shared catalog, then fetches and hash-verifies the item as
+needed. Both verbs work on a running machine (a media change the
+guest observes) and on a stopped one (the medium present at the
+next `start`).
 
-Runtime attachment changes last only until the next `start`.
-`start` reconciles the machine to its resolved baseline, so a
-script must not rely on `detach` surviving a stop/start cycle.
-Make permanent boot-media changes in the machine blueprint and adopt
-them with `apply`
-(see [the machine blueprint](machine-blueprint.md#applying-blueprint-edits)).
+**Attachments are definitive machine state.** An `attach` persists
+across `stop`/`start` exactly like an installer's writes to a hard
+disk: the machine has diverged from its blueprint, and stays
+diverged until a later `attach`/`detach` changes the slot again or
+[`apply`](machine-blueprint.md#applying-blueprint-edits) returns
+the machine to its blueprint. A script that changes machine state
+it should not leave behind — an install script's installer CD —
+ends by explicitly restoring it, conventionally with `detach` as
+its final step. A script that fails or is interrupted leaves its
+attachments in place for diagnosis and resumption; `apply` is the
+one-command recovery when a diverged machine should return to its
+blueprint shape.
 
 ### `stage` and `collect`
 
@@ -752,8 +788,9 @@ start
 
 `stop` is a host-side hard power-off and should be used only when a
 clean guest shutdown is unavailable or when offline exchange is
-required. `start` starts a stopped machine after reconciling it to
-its baseline. Starting an already-running machine or stopping an
+required. `start` starts a stopped machine as its state document
+describes it — including media attached earlier in the script or a
+previous run. Starting an already-running machine or stopping an
 already-stopped one is an error.
 
 There is no `restart` or `reboot` verb. A guest reboot is guest
@@ -780,6 +817,9 @@ reject:
 - sequential states with any reachable path lacking an explicit
   transition or `done`;
 - invalid key tokens and invalid typed argument positions;
+- `attach`/`detach` targets that are not removable drive slots and
+  (with a machine in scope) slots the target machine does not
+  declare;
 - unknown response keys, missing noninteractive responses, and
   response values of the wrong type;
 - malformed property bindings, input/property kind mismatches,
@@ -867,8 +907,15 @@ do not introduce a second control-flow model.
 ```rqs
 description: "FreeDOS 1.4 plain install from LiveCD"
 platform: dos
-initial: cd-boot
+machine: stopped
+initial: insert-cd
 timeout: 30s
+
+state insert-cd {
+    attach cdrom0 freedos-1.4-livecd
+    start
+    -> cd-boot
+}
 
 state cd-boot {
     wait "Welcome to FreeDOS 1.4 (LiveCD)"
@@ -913,21 +960,28 @@ state formatting, timeout: 5m, deadline: 20m {
     screenshot installed
     enter "fdapm poweroff"
     wait stopped, timeout: 2m
+    detach cdrom0
     done
 }
 ```
 
-The second visit to `cd-boot` reaches the other `expect` branch
-because the disk has been partitioned. The guest-driven reboot is
-expressed by the installer selection and the resulting screen, not
-by a reliquary reboot command.
+The blueprint declares `cdrom0` empty and boots
+`["cdrom0", "hdd0"]`; the script supplies the installer medium. The
+opening `attach` makes the machine boot the LiveCD, and the closing
+`detach` returns the machine to its default shape, so the same boot
+order thereafter falls through the empty CD drive to the installed
+hard disk. The second visit to `cd-boot` reaches the other `expect`
+branch because the disk has been partitioned. The guest-driven
+reboot is expressed by the installer selection and the resulting
+screen, not by a reliquary reboot command.
 
-Verification is a separate script run after editing the machine
-blueprint to disable the installer CD and boot from the installed hard
-disk, adopted with `apply`
-(see [the machine blueprint](machine-blueprint.md#applying-blueprint-edits)).
-Runtime `detach` followed by `start` is intentionally not used:
-reconciliation would restore the machine's baseline.
+Verification is a separate script needing no machine
+reconfiguration at all: after the install script's final `detach`,
+the machine is back in its blueprint shape and simply boots the
+installed hard disk. The verify script declares
+`machine: stopped` too and issues a plain `start`. If an
+interrupted install run left the CD attached, `apply` restores the
+blueprint shape.
 
 ## Sharing
 

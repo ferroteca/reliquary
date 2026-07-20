@@ -61,7 +61,7 @@ machine. What each verb touches:
 | verb       | blueprint file           | the machine (`cache/machines/<id>/`)   |
 |------------|--------------------------|----------------------------------------|
 | `create`   | reads                    | materializes, under a new id           |
-| `start`    | —                        | runs (reconciles to baseline)          |
+| `start`    | —                        | runs (as its state describes)          |
 | `stop`     | —                        | powers off                             |
 | `apply`    | reads                    | reconciles to edits, new baseline      |
 | `destroy`  | —                        | deletes entirely                       |
@@ -75,7 +75,11 @@ Two rules carry the whole model:
 - **Editing the blueprint never changes an existing machine by
   itself.** A machine keeps the resolved snapshot it was created
   from (its *baseline*); `apply` is the explicit step that adopts
-  your edits, and `start` reconciles against the baseline only.
+  your edits. Between `apply`s the machine's own state is
+  authoritative — operation (installer writes, script
+  `attach`/`detach`) may legitimately diverge it from the
+  baseline, and `start` runs the machine as its state describes,
+  never silently reverting it.
 - **Everything reliquary materialized is disposable.** `destroy` +
   `recreate` rebuilds a machine wholesale from the blueprint,
   media definitions, and scripts; nothing under `cache/` is ever
@@ -278,8 +282,8 @@ produces, on a host where QEMU was selected:
 
 Don't edit the state — or anything else under
 `cache/machines/<id>/`. reliquary rewrites the state as it
-operates the machine, and reconciliation regenerates its
-configuration from the machine's resolved baseline; hand edits
+operates the machine, and reconciliation regenerates the backend's
+configuration from the state; hand edits
 are overwritten without notice. There is never a reason to: the
 blueprint is your interface.
 
@@ -290,25 +294,25 @@ order, two-space indent, UTF-8, trailing newline.
 
 ### Reconciliation at `start`
 
-Every `start` brings the machine's baseline, its state, and the
-backend back into line:
+Every `start` brings the machine's state and the backend back into
+line. The state document — not the baseline — is what the machine
+runs as; the baseline enters only through `create` and `apply`:
 
-1. The machine's resolved baseline — the blueprint snapshot recorded
-   at `create` (or the last [`apply`](#applying-blueprint-edits)) — is
-   loaded. The blueprint file itself is not re-read; adopting blueprint
-   edits is `apply`'s job.
-2. Every media item the machine references is resolved from the
-   visible media catalog and hash-verified (and fetched if missing or
-   stale — see [the media spec](media-spec.md)); the machine never
-   boots against silently changed media. A script installs its
-   embedded definitions into the library before this reconciliation.
-3. The baseline is compared with the state and the actual backend
-   machine (verified by identity — see
-   [backend assignment](#backend-assignment)).
-4. Differences reliquary can apply to the backend — transient
-   runtime attachments reverted, a drive re-enabled or detached —
-   are applied and recorded in the state.
-5. Contradictions reliquary cannot reconcile — an unknown
+1. The machine's state is loaded and validated against the resolved
+   baseline's *shape* — its drive slots, hardware, and capabilities —
+   without reverting divergent content. The blueprint file itself
+   is not re-read; adopting blueprint edits is `apply`'s job.
+2. Every media item the state references — including media a script
+   attached — is resolved from the visible media catalog and
+   hash-verified (and fetched if missing or stale — see
+   [the media spec](media-spec.md)); the machine never boots
+   against silently changed media. A script installs its embedded
+   definitions into the library before this reconciliation.
+3. The state is compared with the actual backend machine (verified
+   by identity — see [backend assignment](#backend-assignment)),
+   and differences reliquary can apply to the backend — its
+   configuration regenerated to match the state — are applied.
+4. Contradictions reliquary cannot reconcile — an unknown
    `backend-id`, a missing image file, a capability the backend
    lacks — stop the start with an error naming both sides. Nothing
    is silently adopted from either side.
@@ -322,9 +326,13 @@ rlq apply --blueprint msdos
 `apply` adopts the current blueprint into an existing, stopped
 machine: it re-validates and re-resolves the blueprint, reconciles the
 machine to the new resolution, and records the new digest as the
-machine's baseline. Differences the machine can absorb without
-regenerating anything — memory, boot order, drives enabled or
-disabled, changed `media` references, added drives — are applied.
+machine's baseline. Because it reconciles the machine *to the
+blueprint*, `apply` is also how a machine that has diverged — an
+interrupted install script that left its installer CD attached —
+is returned to its blueprint shape. Differences the machine can
+absorb without regenerating anything — memory, boot order, drives
+enabled or disabled, changed `media` references, added drives —
+are applied.
 Differences it cannot — a changed `size` on an existing image, a
 `base` change on a materialized drive — fail closed naming both
 sides; `recreate` is the honest alternative when the drives
@@ -332,15 +340,22 @@ should regenerate.
 
 ### Runtime changes live in the state
 
-Script steps and CLI commands that reconfigure a running machine —
+Script steps and CLI commands that reconfigure a machine —
 attaching installer media, ejecting a CD — update the state (and
-the machine), never the blueprint. The blueprint stays what
-you meant the machine to be; the state absorbs what operation has
-done to it. On the next `start`, reconciliation returns the
-machine to its baseline configuration.
+the machine), never the blueprint. The blueprint stays what you
+meant the machine to be; the state absorbs what operation has done
+to it — and keeps it. An attached medium persists across
+`stop`/`start` exactly as an installer's disk writes do; the
+machine has definitively diverged from its blueprint until
+something changes it again. The idiom for temporary media is
+symmetry inside the script: the install script attaches its
+installer CD as its first act and detaches it as its last, leaving
+the machine back in its default shape. A machine left diverged —
+by an interrupted script, or on purpose — is returned to its
+blueprint with `apply`.
 
-To make a runtime change permanent, make it in the blueprint and
-`apply` it.
+To make a state-side change permanent across `apply`s, make it in
+the blueprint.
 
 ### Destroying and recreating a machine
 
