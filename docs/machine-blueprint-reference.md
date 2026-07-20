@@ -3,38 +3,38 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Machine spec — field reference
+# Machine blueprint — field reference
 
-> **Status:** this documents the planned machine spec format. The
+> **Status:** this documents the planned machine blueprint format. The
 > machine model is not implemented yet; details may still change
 > before first release.
 
-Exhaustive reference for every field in the machine spec format —
-shared by the machine's two documents: the **declaration**
-(`machines/<name>.json`, yours) and the **state**
-(`cache/machines/<name>/reliquary.json`, reliquary's). For the
-two-document model, read [the guide](machine-spec.md) first; for
-complete examples, see the [cookbook](machine-spec-cookbook.md).
+Exhaustive reference for every field in the machine blueprint format —
+shared by the **blueprint** (`blueprints/<name>.json`, yours) and each
+machine's **state** (`cache/machines/<id>/state.json`,
+reliquary's). For the blueprint/record/state model, read
+[the guide](machine-blueprint.md) first; for complete examples, see
+the [cookbook](machine-blueprint-cookbook.md).
 
 Each field is marked with where it may appear:
 
-- **declaration** — valid in a declaration (the document you
-  author at `machines/<name>.json` and instantiate with
-  `reliquary create <name>`). Every declaration field is also
+- **blueprint** — valid in a blueprint (the document you author at
+  `blueprints/<name>.json` and realize as a machine with
+  `reliquary create --blueprint <name>`). Every blueprint field is also
   valid in the state, where it always appears fully resolved.
 - **state-only** — written by reliquary into the state; rejected
-  in a declaration.
+  in a blueprint.
 
 All fields are present in the state unless noted otherwise.
 
 There is no version field — see
-[Format stability](machine-spec.md#format-stability-none-yet).
+[Format stability](machine-blueprint.md#format-stability-none-yet).
 
 ---
 
 ## `platform`
 
-**declaration · required · string**
+**blueprint · required · string**
 
 The guest platform — the operating system family the machine is
 for:
@@ -47,19 +47,19 @@ for:
 
 The platform selects workflow behavior (boot readiness detection,
 command syntax, prompt handling) and the
-[platform defaults](machine-spec.md#platform-defaults) for omitted
+[platform defaults](machine-blueprint.md#platform-defaults) for omitted
 fields. The list is extended deliberately, one platform workflow at
 a time.
 
 The platform is **never inferred**. reliquary does not inspect disk
 images, watch the guest screen, or probe devices to decide what OS
-a machine runs; the declaration says so, or nothing does.
+a machine runs; the blueprint says so, or nothing does.
 
 ---
 
 ## `backend`
 
-**declaration (optional) · string · always present in the state**
+**blueprint (optional) · string · always present in the state**
 
 The virtualization backend hosting the machine:
 
@@ -70,21 +70,21 @@ The virtualization backend hosting the machine:
 | `vmware`     | VMware Workstation |
 | `hyperv`     | Hyper-V            |
 
-Omitted from the declaration, the backend is assigned
+Omitted from the blueprint, the backend is assigned
 automatically: the first entry in reliquary's backend priority
 order that is available on the host and capable of everything the
-declaration asks for. Declared explicitly, it pins the choice —
+blueprint asks for. Declared explicitly, it pins the choice —
 `create` fails if that backend is unavailable or incapable, rather
 than falling back.
 
 Either way the resolved value is recorded in the state (an omitted
-declaration stays portable), and the assignment holds for the
+blueprint stays portable), and the assignment holds for the
 machine's life. Backend state — identifiers, disk image formats,
 VM registration — is not portable between hypervisors, so the
 assignment never changes underneath a machine; moving to another
 backend is done with `recreate`, which discards the state and
-backend machine and resolves the declaration afresh (see
-[the guide](machine-spec.md#recreating-a-machine)).
+backend machine and resolves the blueprint afresh (see
+[the guide](machine-blueprint.md#destroying-and-recreating-a-machine)).
 
 ```json
 {"backend": "virtualbox"}
@@ -94,8 +94,11 @@ backend machine and resolves the declaration afresh (see
 
 ## State-only fields
 
-Three fields exist only in the state; a declaration containing any
-of them is rejected.
+Two fields exist only in the state; a blueprint containing either of
+them is rejected. (A machine's creation time and lifecycle phase
+live in its record, and script outcomes live in its run records —
+see [the instance model](instance-model.md); neither appears in
+the blueprint format.)
 
 ### `backend-id`
 
@@ -115,42 +118,38 @@ sends a control command to a hypervisor object until the object's
 identity matches `backend-id`. A stale or foreign machine is
 detected and refused rather than manipulated.
 
-### `created`
+### `blueprint-digest`
 
 **state-only · string**
 
-Creation timestamp: UTC, ISO 8601, `Z` suffix.
-
-```json
-{"created": "2026-07-19T18:20:11Z"}
-```
-
-### `installed`
-
-**state-only · boolean · absent until first set**
-
-Whether an install script has completed against this machine. Set
-by reliquary when an installation finishes; absent on a machine
-nothing has been installed on.
+The digest of the resolved blueprint snapshot this machine was created
+from (or last [`apply`](machine-blueprint.md#applying-blueprint-edits)-d
+to). This is the machine's baseline: `start` reconciles against
+it, and editing the blueprint file changes nothing until `apply`
+records a new digest.
 
 ---
 
 ## `memory`
 
-**declaration (optional) · positive integer**
+**blueprint (optional) · positive integer or size string**
 
-Guest memory in MiB. Defaults by platform (dos 16, win9x 64,
-winnt 256); the resolved value appears in the state.
+Guest memory. A size string uses the same grammar as drive
+[`size`](#size--optional--string) — a positive integer with a
+binary unit suffix — and a bare integer means MiB, so
+`"memory": "32M"` and `"memory": 32` are the same declaration.
+Defaults by platform (dos 16 MiB, win9x 64 MiB, winnt 256 MiB).
+The state always carries the canonical integer-MiB form.
 
 ```json
-{"memory": 32}
+{"memory": "32M"}
 ```
 
 ---
 
 ## `cpus`
 
-**declaration (optional) · positive integer**
+**blueprint (optional) · positive integer**
 
 Virtual CPU count. Default `1`.
 
@@ -158,7 +157,7 @@ Virtual CPU count. Default `1`.
 
 ## `drives`
 
-**declaration (optional) · object**
+**blueprint (optional) · object**
 
 The machine's drive inventory. Keys declare a medium and slot; each
 value declares where the drive's content comes from, and options.
@@ -171,10 +170,10 @@ value declares where the drive's content comes from, and options.
 | `hdd`    | 0–3           | `hdd0` ... `hdd3`         |
 | `cdrom`  | 0–3           | `cdrom0` ... `cdrom3`     |
 
-In a declaration, the bare medium name is accepted as an alias for
+In a blueprint, the bare medium name is accepted as an alias for
 slot 0 (`"hdd"` ≡ `"hdd0"`); the state always uses the canonical
 indexed form. The canonical key is also the name of the drive's
-image file in the cached instantiation, when it has one (see
+image file in the cached materialization, when it has one (see
 [image naming](#image-naming-and-formats) below). Declaring both an alias and its indexed form in one
 document is a slot clash and fails validation, as do slots outside
 the table's ranges.
@@ -206,11 +205,11 @@ or `base` — declares where the drive's content comes from; a
 drive object with none of them, or more than one, fails
 validation.
 
-There are no image paths anywhere in the spec. A drive that has
+There are no image paths anywhere in the blueprint. A drive that has
 its own image file (declared with `size` or `base`) gets it
-materialized by reliquary inside the cached instantiation, named
+materialized by reliquary inside the cached materialization, named
 canonically after the drive key —
-`cache/machines/<name>/drives/hdd0.qcow2` for `hdd0` on QEMU —
+`cache/machines/<id>/drives/hdd0.qcow2` for `hdd0` on QEMU —
 with the extension of the format reliquary chose (see
 [image naming](#image-naming-and-formats)). You never name,
 place, or reference these files; the drive key is the only handle.
@@ -233,7 +232,7 @@ machine-independent, read-only-use media: installer ISOs, boot
 floppies, driver disks. (To boot or modify a copy of a media image,
 make it a drive [`base`](#base--optional--string-or-object) instead.)
 Media names are the *only* cross-boundary reference a
-declaration may make.
+blueprint may make.
 
 #### `size` — optional · string
 
@@ -316,7 +315,7 @@ independent of backing-file support.
 
 The kind of storage controller the drive attaches to. This is
 guest-visible hardware — the guest needs a driver for the
-controller type — so it is spec vocabulary, not a backend detail:
+controller type — so it is blueprint vocabulary, not a backend detail:
 
 | value    | controller                  |
 |----------|-----------------------------|
@@ -335,7 +334,7 @@ creation.
 {"drives": {"hdd0": {"size": "4G", "controller": "scsi"}}}
 ```
 
-What the spec deliberately does **not** say:
+What the blueprint deliberately does **not** say:
 
 - **Port/channel placement.** Drives of one controller type attach
   in slot order; the exact port layout is the backend adapter's
@@ -373,9 +372,9 @@ switching between configurations without deleting entries:
 ### Image naming and formats
 
 A drive's own image file (from `size` or `base`) lives at the
-canonical path `cache/machines/<name>/drives/<key>.<ext>` — the
+canonical path `cache/machines/<id>/drives/<key>.<ext>` — the
 drive key names the file, and the extension follows the image
-format. There are no other image names, ever: the spec has no
+format. There are no other image names, ever: the blueprint has no
 image-path field, and nothing is hand-placed in the cache.
 
 The format is reliquary's choice, made per backend. An image
@@ -392,7 +391,7 @@ drive uses the backend-native differencing format:
 | `hyperv`     | VHDX         |
 
 Because reliquary owns image creation and naming, every
-declaration is format-portable by construction: the right format
+blueprint is format-portable by construction: the right format
 arrives on whatever backend is assigned, and `recreate` onto a
 different backend regenerates the images in the new backend's
 format.
@@ -407,7 +406,7 @@ attach is a capability error naming both.
 
 ## `boot`
 
-**declaration (optional) · array of drive keys**
+**blueprint (optional) · array of drive keys**
 
 The boot order: drive keys (canonical or alias form) tried in
 order.
@@ -429,7 +428,7 @@ capability error rather than silently booting from something else.
 
 ## `control-planes`
 
-**declaration (optional) · array of strings**
+**blueprint (optional) · array of strings**
 
 The ordered control-plane policy: which control planes reliquary
 may use for guest-facing operations on this machine, in preference
@@ -458,7 +457,7 @@ Hyper-V).
 
 ## `backend-settings`
 
-**declaration (optional) · object**
+**blueprint (optional) · object**
 
 The escape hatch for backend-specific configuration — explicitly
 scoped and explicitly non-portable. One object per backend name;
@@ -479,7 +478,7 @@ sections are inert but preserved:
 Rules:
 
 - This is the **only** place backend-specific configuration may
-  appear. A declaration with no `backend-settings` is portable by
+  appear. A blueprint with no `backend-settings` is portable by
   construction.
 - Settings may not touch what reliquary owns through first-class
   fields — memory, drives, boot order, CPU count, machine identity.
@@ -496,15 +495,15 @@ Format checks (reject the document):
 - unknown top-level keys, unknown drive keys, malformed values;
 - slot clashes (alias + indexed form of the same slot) and
   out-of-range slots;
-- state-only fields (`backend-id`, `created`, `installed`) in a
-  declaration;
+- state-only fields (`backend-id`, `blueprint-digest`) in a
+  blueprint;
 - `boot` entries naming undeclared or disabled drives;
 - drive objects declaring none, or more than one, of `media`,
   `size`, and `base`;
 - `media` or `base.media` names no media definition provides;
 - `backend-settings` sections overlapping reliquary-owned fields.
 
-Capability checks (reject the declaration for *this* backend,
+Capability checks (reject the blueprint for *this* backend,
 naming backend and capability):
 
 - media the backend cannot provide (unsupported medium, too many

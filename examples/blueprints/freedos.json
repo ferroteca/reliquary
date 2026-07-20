@@ -1,5 +1,6 @@
 {
   "platform": "dos",
+  "memory": "32M",
   "drives": {
     "hdd": {"size": "20M"},
     "cdrom": "freedos-1.4-livecd"

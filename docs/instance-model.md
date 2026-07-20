@@ -3,88 +3,138 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Machine specs and machines
+# Machine blueprints and machines
 
 > **Status:** this documents the planned machine model. It replaces
 > the earlier one-declaration/one-machine model and is not implemented
 > yet.
 
-A **spec** is a reusable, user-owned JSON description of a kind of
-machine. A **machine** is one named realization of that spec: its
-writable disks, backend object, run history, and lifecycle. One spec
-may have zero, one, or many machines. A spec name is never a machine
-name.
+A **blueprint** is a reusable, user-owned JSON description of a kind of
+machine. A **machine** is one realization of that blueprint: its
+writable disks, backend object, run history, and lifecycle. One blueprint
+may have zero, one, or many machines. Blueprints have names; machines
+have ids.
 
 ```text
 <reliquary_home>/
-├── specs/
-│   └── freedos-plain.json          user-owned reusable spec
+├── blueprints/
+│   └── freedos-plain.json          user-owned reusable blueprint
 ├── machines/
-│   └── lab-a.json                  reliquary-owned machine record
+│   └── 5fd11917….json              reliquary-owned machine record
 └── cache/machines/
-    └── 5fd1…/                      replaceable machine cache
+    └── 5fd11917…/                  replaceable machine cache
         ├── state.json
         ├── drives/
         ├── runs/
         └── backend files and logs
 ```
 
-The file name of `specs/<name>.json` is the spec name. The file name
-of `machines/<name>.json` is the machine name. Machine names are
-unique within a home; a generated UUID in each record is the stable
-machine ID. Backend identity, cache paths, locks, and run directories
-use that UUID rather than either human name.
+The file name of `blueprints/<name>.json` is the blueprint name. A machine's
+identity is a generated UUID; the record file, cache directory,
+locks, run directories, and backend identity all use it, and there
+is no separate machine name.
+
+Commands select their targets with explicit flags, never
+positionally. `--machine <id>` accepts the full UUID or any
+unambiguous prefix, git-style; listings print a short prefix for
+this use. On machine-level verbs, `--blueprint <name>` selects that
+blueprint's machine when exactly one exists — the common
+one-machine-per-blueprint case — and otherwise fails, listing the
+candidate ids (or, with no machine, suggesting `create`;
+`script` creates one instead).
 
 ## Lifecycle
 
-```text
-reliquary create <machine_name> --spec <spec_name>
-reliquary start <machine_name> [--display]
-reliquary stop <machine_name>
-reliquary destroy <machine_name>
-reliquary recreate <machine_name>
-reliquary delete <machine_name>
-reliquary clone <machine_name> <new_machine_name>
-reliquary export <machine_name> [<destination>]
+A machine rests in one of three phases — `uninstantiated`,
+`ready`, `running` — and passes through transitional phases
+(`creating`, `stopping`, `destroying`) that exist so an
+interrupted operation is detectable and recoverable:
+
+```mermaid
+stateDiagram-v2
+    [*] --> creating: create
+    creating --> ready
+    ready --> running: start
+    running --> stopping: stop
+    stopping --> ready
+    ready --> ready: apply
+    ready --> destroying: destroy
+    destroying --> uninstantiated
+    uninstantiated --> creating: recreate
+    uninstantiated --> [*]: delete
+    ready --> [*]: delete
 ```
 
-`create` validates and resolves the current spec, creates a machine
-record with a new UUID, and materializes its writable drives and
-backend object. `destroy` removes only the materialization and marks
-the machine uninstantiated; its name, UUID, and spec reference remain.
-`recreate` is `destroy` followed by `create` using the same machine
-name and UUID. `delete` removes the durable record after
-destroying the materialization.
+`recreate` also runs from `ready` (destroy, then create, same
+id); `clone` and `export` require `ready`. On startup reliquary
+detects a machine stranded in a transitional phase and completes
+a safe rollback or fails with recovery instructions (see below).
 
-Editing a spec affects future `create` operations, not existing
-machines. Each machine records the source spec and resolved digest at
-creation. Applying a newer spec to a stopped machine is an explicit
-operation and never happens implicitly at `start`.
+```text
+reliquary list blueprints
+reliquary list machines [--blueprint <name>]
+reliquary create --blueprint <name>
+reliquary start (--machine <id> | --blueprint <name>) [--display]
+reliquary stop (--machine <id> | --blueprint <name>)
+reliquary apply (--machine <id> | --blueprint <name>)
+reliquary destroy (--machine <id> | --blueprint <name>)
+reliquary recreate (--machine <id> | --blueprint <name>)
+reliquary delete (--machine <id> | --blueprint <name>)
+reliquary clone (--machine <id> | --blueprint <name>)
+reliquary export (--machine <id> | --blueprint <name>) [<destination>]
+```
+
+`list blueprints` shows each blueprint and its machine count; `list machines`
+shows each machine's short id, blueprint, phase, and backend. `create`
+validates and resolves the current blueprint, creates a machine record
+with a new UUID, prints that id, and materializes the machine's
+writable drives and backend object. `destroy` removes only the
+materialization and marks the machine uninstantiated; its id and
+blueprint reference remain. `recreate` is `destroy` followed by `create`
+using the same id. `delete --machine` removes the durable record
+after destroying the materialization; `delete --blueprint` removes the
+blueprint file itself and fails closed while any machine of it exists
+(on this verb only, `--blueprint` names the blueprint to remove, never a
+machine).
+
+Editing a blueprint affects future `create` operations, not existing
+machines. Each machine records the source blueprint and resolved digest at
+creation; that resolved snapshot is the machine's baseline, and
+`start` reconciles the machine against it, not against the current
+blueprint file. Adopting blueprint edits is the explicit `apply`: with the
+machine stopped, it re-resolves the current blueprint and reconciles the
+machine to it — applicable differences (memory, boot order, drives
+enabled or disabled, media changes) are applied and the recorded
+digest updated; contradictions the machine cannot absorb without
+regenerating (such as a changed `size` on an existing image) fail
+closed naming both sides, leaving `recreate` as the honest
+alternative. Applying a newer blueprint never happens implicitly at
+`start`.
 
 `clone` creates a new UUID and machine record. It retains the same
-resolved spec snapshot but copies the source machine's writable drives
+resolved blueprint snapshot but copies the source machine's writable drives
 when they exist; it is therefore a snapshot of a machine, not another
-name for a spec. A future `fork-spec` command may create a new editable spec; it
+name for a blueprint. A future `fork-blueprint` command may create a new editable blueprint; it
 is intentionally not implicit in clone.
 
 ## Instance record and cache state
 
-The spec remains the plain machine JSON object described by the
-[machine spec](machine-spec.md). A machine record is a separate
+The blueprint remains the plain machine JSON object described by the
+[machine blueprint](machine-blueprint.md). A machine record is a separate
 reliquary-owned JSON document, not a second spelling of that schema:
 
 ```json
 {
   "id": "5fd11917-147a-4b6b-b7f6-9f4b6d7d1ab2",
-  "spec": "freedos-plain",
+  "blueprint": "freedos-plain",
   "created": "2026-07-19T18:20:11Z",
   "phase": "ready"
 }
 ```
 
-`cache/machines/<id>/state.json` contains the resolved spec digest,
+`cache/machines/<id>/state.json` contains the resolved blueprint digest,
 backend ID, realized drive/controller addresses, and transient runtime
-attachments. It is fully regenerated from the spec and instance record
+attachments. It is fully regenerated from the blueprint and instance record
 when safe. It must never be edited by hand.
 
 The record and cache state carry an operation generation and one of
@@ -101,22 +151,17 @@ append-only run records under the instance cache, where they can name
 the script, its source digest, result, transcript, and produced
 artifacts without making a vague claim about the guest's contents.
 
-## Naming and renaming
+## Naming and identity
 
-Users author and rename specs by changing files in `specs/`. Machine
-renaming is a lifecycle operation:
-
-```text
-reliquary rename <machine_name> <new_machine_name>
-```
-
-It updates the durable machine record atomically while retaining its
-UUID, cache directory, and backend identity. Manual directory renames
-are unsupported.
+Users author and rename blueprints by changing files in `blueprints/`.
+Machines are never renamed because they have nothing to rename:
+the UUID is the whole identity, fixed at `create` and retained
+through `destroy`/`recreate`. Manual renames of record files or
+cache directories are unsupported.
 
 ## JSON remains the format
 
-Specs, instance records, cache state, and media definitions remain
+Blueprints, instance records, cache state, and media definitions remain
 JSON. They are declarative documents with strict schemas and benefit
 from editor completion, stable formatting, and precise diagnostics.
 The script language remains the separate line-oriented behavioral

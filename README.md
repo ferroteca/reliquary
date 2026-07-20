@@ -14,6 +14,27 @@ exported — either a media image or an entire machine bound for a platform
 built for long-lived machines. reliquary is not a VM manager for machines
 you keep.
 
+## Blueprints and machines
+
+The first thing to learn is reliquary's central model. A **blueprint** is a
+reusable JSON design you author and keep, at
+`<reliquary_home>/blueprints/<name>.json`. A **machine** is a disposable
+realization reliquary builds from it, identified by a generated id — one
+blueprint, many machines. Machines are created, run, destroyed, and
+recreated freely: the blueprint (with media definitions and scripts) is
+always enough to rebuild one, so nothing reliquary materializes is ever
+precious. Editing a blueprint never changes an existing machine by itself;
+the explicit `apply` adopts your edits.
+
+Read [The machine blueprint](docs/machine-blueprint.md) — starting with
+"The model at a glance" and its diagrams — and
+[Machine blueprints and machines](docs/instance-model.md) for the full
+lifecycle.
+
+> **Status:** this model is designed ahead of implementation. Today's
+> release still runs the transitional recipe-and-`drives/` layout that the
+> rest of this README documents.
+
 ## Installation
 
 ```powershell

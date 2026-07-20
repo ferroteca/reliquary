@@ -3,24 +3,24 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Machine spec — cookbook
+# Machine blueprint — cookbook
 
-> **Status:** this documents the planned machine spec format. The
+> **Status:** this documents the planned machine blueprint format. The
 > machine model is not implemented yet; details may still change
 > before first release.
 
-Complete, working declarations for common machine shapes. Each
-recipe shows the declaration (what you write) and, where
+Complete, working blueprints for common machine shapes. Each
+recipe shows the blueprint (what you write) and, where
 instructive, the state document reliquary resolves it into.
-Concepts — including the declaration/state split — are in
-[the guide](machine-spec.md); every rule is in the
-[field reference](machine-spec-reference.md).
+Concepts — including the blueprint/state split — are in
+[the guide](machine-blueprint.md); every rule is in the
+[field reference](machine-blueprint-reference.md).
 
-Throughout, save the declaration as `machines/<name>.json` and
-instantiate it:
+Throughout, save the blueprint as `blueprints/<name>.json` and create a
+machine from it:
 
 ```powershell
-reliquary create <name>
+reliquary create --blueprint <name>
 ```
 
 ---
@@ -50,7 +50,6 @@ The state after `create` on a host where QEMU was selected:
   "platform": "dos",
   "backend": "qemu",
   "backend-id": "reliquary-msdos-8c41",
-  "created": "2026-07-19T18:20:11Z",
   "memory": 16,
   "cpus": 1,
   "drives": {
@@ -77,7 +76,7 @@ the extra memory avoids the FreeDOS LiveCD's low-RAM warning:
 ```json
 {
   "platform": "dos",
-  "memory": 32,
+  "memory": "32M",
   "drives": {
     "hdd": {"size": "20M"},
     "cdrom": "freedos-1.4-livecd"
@@ -88,18 +87,17 @@ the extra memory avoids the FreeDOS LiveCD's low-RAM warning:
 
 reliquary creates the hard disk as a 20 MiB dynamically-allocated
 image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
-the [naming and format](machine-spec-reference.md#image-naming-and-formats)
-are reliquary's choice, not yours). After installation
-completes (via an install script), the machine's state
-additionally carries:
-
-```json
-{"installed": true}
-```
+the [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
+are reliquary's choice, not yours). Installation itself is an
+install script's job, and its outcome lands in the machine's run
+records — the blueprint and state make no claim about the guest's
+contents.
 
 To boot the installed system rather than the installer afterward,
-edit the declaration — disable the CD entry and boot from the hard
-disk; the next `start` applies it:
+edit the blueprint — disable the CD entry and boot from the hard
+disk — and adopt the edit with the explicit
+[`apply`](machine-blueprint.md#applying-blueprint-edits) (a change the
+machine absorbs without touching its drives):
 
 ```json
 {
@@ -110,7 +108,7 @@ disk; the next `start` applies it:
 }
 ```
 
-*(Fragment shown; the rest of the declaration is unchanged.)*
+*(Fragment shown; the rest of the blueprint is unchanged.)*
 
 > **Media note:** `freedos-1.4-livecd` names a
 > [media definition](media-spec.md)
@@ -209,7 +207,7 @@ With `backend` declared, `create` fails if QEMU is unavailable
 rather than picking another backend (which couldn't honor the
 settings anyway). `backend-settings` may not restate what
 first-class fields own — putting `-m 32` in `args` is rejected;
-say `"memory": 32` instead.
+say `"memory": "32M"` instead.
 
 ---
 
@@ -222,7 +220,7 @@ defaults do the right thing (64 MiB memory), and the explicit
 ```json
 {
   "platform": "win9x",
-  "memory": 128,
+  "memory": "128M",
   "drives": {
     "hdd": {"size": "2G"},
     "cdrom": "win98se"
@@ -286,6 +284,6 @@ across the board, which is what DOS-era guests want.
 Vendor variants (BusLogic vs. LsiLogic, etc.) are backend-specific
 and go in `backend-settings` when they matter. And note the
 ordering caveat from the
-[reference](machine-spec-reference.md#controller--optional--string):
+[reference](machine-blueprint-reference.md#controller--optional--string):
 slot order is authoritative within one controller type, so prefer a
 single type per machine when drive lettering matters.

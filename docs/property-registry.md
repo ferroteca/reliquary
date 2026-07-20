@@ -23,7 +23,7 @@ Each reliquary home has one registry:
 
 It belongs to the user, not to a machine or script. Changing homes selects a
 different registry. Reliquary never copies registry values into a machine
-declaration, script, media definition, or response file.
+blueprint, script, media definition, or response file.
 
 An absent file means an empty registry. The first successful `property set`
 creates it; reading or running an unrelated script does not.

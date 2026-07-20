@@ -14,7 +14,7 @@ boot floppies, and driver disks. Definitions normally live in the
 shared `<reliquary_home>/media` library; a reliquary script may also
 embed definitions that are installed into that library when the
 script first runs. Machines reference media by name (the
-[`media` drive field](machine-spec-reference.md#media--optional--string)),
+[`media` drive field](machine-blueprint-reference.md#media--optional--string)),
 and every media item is described by a **definition** stating
 where its file comes from and how it is verified.
 
@@ -55,7 +55,7 @@ cannot be downloaded still gets a definition (with no `url`, or
 with a [`local-path`](#item-fields) pointing at the file where it
 lives); the definition is what names and verifies it.
 
-A media name referenced from a machine declaration resolves to the
+A media name referenced from a machine blueprint resolves to the
 defined item of that name. A script run validates and installs all
 its embedded definitions before its machine is created or started,
 then uses the ordinary shared catalog. A name no definition provides
@@ -81,7 +81,7 @@ mixed partially redundant blocks, are in the
 
 A definition comes in two forms. There is no version field in
 either
-([no backward compatibility before beta](machine-spec.md#format-stability-none-yet)).
+([no backward compatibility before beta](machine-blueprint.md#format-stability-none-yet)).
 Both library JSON files and embedded `media` blocks use these exact
 forms. In a script, `media <label> {` replaces the JSON object's
 outer opening brace; the block body otherwise follows JSON syntax and

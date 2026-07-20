@@ -13,22 +13,24 @@ A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
 across the VM seam. Scripts live in
 `<reliquary_home>/scripts`, one `<name>.rqs` file per script, and
-run against a named machine:
+run against a machine selected with `--machine <id>` or, when the
+blueprint has exactly one machine, `--blueprint <name>`:
 
 ```powershell
-reliquary script msdos freedos-plain-install
+reliquary script freedos-plain-install --blueprint msdos
 ```
 
 After preflight, `script` installs embedded media definitions,
-instantiates the machine if needed, starts it if it is not already
-running, then executes the script. The machine stays running
-afterward unless a step stopped it. Failure likewise leaves the
-machine in its observed state for diagnosis; no command implicitly
-tears it down.
+resolves its machine (creating one when `--blueprint` names a blueprint
+with no machine yet), starts it if it is not already running,
+then executes the script. The machine stays running afterward
+unless a step stopped it. Failure likewise leaves the machine in
+its observed state for diagnosis; no command implicitly tears it
+down.
 
 Scripts are authored documents: reliquary reads but never rewrites
-them. They belong in version control beside the machine and media
-definitions on which they depend.
+them. They belong in version control beside the machine blueprints and
+media definitions on which they depend.
 
 ## The language model
 
@@ -297,7 +299,7 @@ Values can be supplied explicitly in a JSON response file:
 ```
 
 ```powershell
-reliquary script freedos freedos-plain-install --responses answers.json
+reliquary script freedos-plain-install --blueprint freedos --responses answers.json
 ```
 
 Before the machine starts, reliquary validates the response file,
@@ -702,15 +704,17 @@ detach cdrom
 ```
 
 These change the running machine and update its state document, not
-its declaration. `attach` accepts a literal defined-media name or a
+its blueprint. `attach` accepts a literal defined-media name or a
 `media` input. By execution time every embedded definition has
 been installed, so resolution uses the ordinary shared catalog, then
 fetches and hash-verifies the item as needed.
 
 Runtime attachment changes last only until the next `start`.
-`start` reconciles the machine to its authored declaration, so a
-script must not rely on `detach` surviving a stop/start cycle. Make
-permanent boot-media changes in the machine declaration.
+`start` reconciles the machine to its resolved baseline, so a
+script must not rely on `detach` surviving a stop/start cycle.
+Make permanent boot-media changes in the machine blueprint and adopt
+them with `apply`
+(see [the machine blueprint](machine-blueprint.md#applying-blueprint-edits)).
 
 ### `stage` and `collect`
 
@@ -746,7 +750,7 @@ start
 `stop` is a host-side hard power-off and should be used only when a
 clean guest shutdown is unavailable or when offline exchange is
 required. `start` starts a stopped machine after reconciling it to
-the declaration. Starting an already-running machine or stopping an
+its baseline. Starting an already-running machine or stopping an
 already-stopped one is an error.
 
 There is no `restart` or `reboot` verb. A guest reboot is guest
@@ -792,7 +796,7 @@ later statement is impossible.
 
 ```text
 reliquary check-script <script_name>
-    [--machine <machine_name>] [--responses <path>]
+    [--machine <id> | --blueprint <name>] [--responses <path>]
 ```
 
 performs parsing, prospective embedded-media validation, and static
@@ -807,7 +811,7 @@ it never reveals a property value.
 Every invocation creates a unique run directory under:
 
 ```text
-cache/machines/<machine>/runs/<timestamp>-<id>/
+cache/machines/<machine_id>/runs/<timestamp>-<run_id>/
 ├── transcript.txt
 ├── screenshots/
 └── output/
@@ -916,13 +920,15 @@ expressed by the installer selection and the resulting screen, not
 by a reliquary reboot command.
 
 Verification is a separate script run after editing the machine
-declaration to disable the installer CD and boot from the installed
-hard disk. Runtime `detach` followed by `start` is intentionally not
-used: reconciliation would restore the declaration.
+blueprint to disable the installer CD and boot from the installed hard
+disk, adopted with `apply`
+(see [the machine blueprint](machine-blueprint.md#applying-blueprint-edits)).
+Runtime `detach` followed by `start` is intentionally not used:
+reconciliation would restore the machine's baseline.
 
 ## Sharing
 
-A shareable recipe consists of its script, machine declaration, any
+A shareable recipe consists of its script, machine blueprint, any
 separate shared media definitions, and an example response file
 containing only non-sensitive illustrative values. Media definitions
 embedded in a script are installed into the recipient's shared

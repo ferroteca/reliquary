@@ -9,8 +9,8 @@ SPDX-License-Identifier: BSD-3-Clause
 
 reliquary automates guest operating systems — installing them from
 vendor media, booting them, and scripting them — across multiple
-virtualization backends, driven by named machines and a reliquary
-scripting language.
+virtualization backends, driven by named machine blueprints and a
+reliquary scripting language.
 
 reliquary manages **ephemeral machines**. A reliquary machine is a
 disposable rig: created to run a scripted install or an automated
@@ -53,7 +53,7 @@ meaning:
    own OS meaning: provisioning, readiness, command syntax,
    completion, and result collection.
 
-A machine spec names its guest platform and (optionally) its backend;
+A machine blueprint names its guest platform and (optionally) its backend;
 neither is ever inferred from an image or a running guest.
 
 ## Backend adapters
@@ -92,16 +92,16 @@ Design rules:
   the host (binaries on PATH and in conventional install locations,
   the Hyper-V service/module). Discovery only establishes
   availability; it never changes a machine's recorded backend.
-- **Default backend assignment.** When a machine spec does not name
+- **Default backend assignment.** When a machine blueprint does not name
   a backend, reliquary assigns one from an internal prioritized list
   of the backends actually available, and records the assignment in
   the machine state so the machine stays on that backend
   thereafter.
-- **Backend state stays in the cached instantiation.** Each
+- **Backend state stays in the cached materialization.** Each
   backend is instructed to keep its machine files (disk images,
   `.vbox`, `.vmx`, Hyper-V VM/VHD paths) inside
-  `cache/machines/<name>/`, so a machine's cache directory is the
-  whole instantiation.
+  `cache/machines/<id>/`, so a machine's cache directory is the
+  whole materialization.
 - **The serial-carried reliquary guest agent is backend-portable.**
   Every backend can expose an emulated UART, so the QGA-profile
   agent described below is the one guest-side investment that pays
@@ -109,61 +109,82 @@ Design rules:
 
 ## The machine model
 
-Machines are referenced by name everywhere. A machine is a
-declaration plus a cached instantiation:
+A **blueprint** is a reusable, user-owned JSON description of a kind
+of machine. A **machine** is one realization of that blueprint: its
+durable record, writable disks, backend object, and run history.
+One blueprint may have zero, one, or many machines (see
+[docs/instance-model.md](docs/instance-model.md)):
 
 ```text
+<reliquary_home>/blueprints/
+└── <name>.json              the blueprint (user-owned)
 <reliquary_home>/machines/
-└── <name>.json              the declaration (user-owned)
-<reliquary_home>/cache/machines/<name>/
-├── reliquary.json           the state (reliquary-owned)
+└── <id>.json                the machine record (reliquary-owned:
+                             blueprint reference, phase)
+<reliquary_home>/cache/machines/<id>/
+├── state.json               the resolved state (reliquary-owned)
 ├── drives/                  the machine's disk/floppy images
-├── screenshots/             captured screens (transient — grab
-│                            them or lose them)
+├── runs/                    append-only run records (transcripts,
+│                            screenshots, outputs)
 └── ...                      backend files and logs
 ```
 
-Everything under `cache/machines/<name>/` is reliquary's and
-regenerates from the declaration (plus media definitions and
-scripts); nothing is ever hand-placed there. Pre-existing content
-enters a machine through the declaration: `media` references,
-and starting-point images (`base`) that machine drives are
-differenced from, or copies of.
+Everything under `cache/machines/<id>/` is reliquary's and
+regenerates from the blueprint (plus media definitions and scripts);
+nothing is ever hand-placed there. Pre-existing content enters a
+machine through the blueprint: `media` references, and starting-point
+images (`base`) that machine drives are differenced from, or
+copies of.
 
-### The machine spec — declaration and state
+### Blueprint, record, and state
 
 User documentation (planned format, written ahead of
-implementation): [docs/machine-spec.md](docs/machine-spec.md) with
-its [field reference](docs/machine-spec-reference.md) and
-[cookbook](docs/machine-spec-cookbook.md).
+implementation): [docs/machine-blueprint.md](docs/machine-blueprint.md) with
+its [field reference](docs/machine-blueprint-reference.md) and
+[cookbook](docs/machine-blueprint-cookbook.md), and the ownership,
+locking, and recovery model in
+[docs/instance-model.md](docs/instance-model.md).
 
-The spec is reliquary's own backend-agnostic format — never a thin
-veneer over one backend's configuration. Two documents share it,
-with one owner each: the **declaration**
-(`machines/<name>.json`) is the machine as the user defined it —
-authored at `machines/<name>.json` (by hand, `init`, or
-`import`), instantiated by `create`, and edited (while stopped)
-to reconfigure the machine; reliquary reads it and never writes
-it. The **state** (`cache/machines/<name>/reliquary.json`) is the machine as it
-actually is — fully resolved (aliases canonicalized, defaults
-materialized), extended with state-only fields, and rewritten by
-reliquary in the same operation as every machine change. Every
-`start` reconciles declaration, state, and backend: applicable
-differences are applied to the backend, contradictions fail
-closed naming both sides. Runtime reconfiguration (script steps,
-CLI) updates the state only; permanence belongs in the
-declaration.
+The blueprint is reliquary's own backend-agnostic format — never a thin
+veneer over one backend's configuration. Three documents, one
+owner each: the **blueprint** (`blueprints/<name>.json`) is the machine
+shape as the user defined it — authored by hand, by `init`, or by
+`import`; reliquary reads it and never writes it. The **machine
+record** (`machines/<id>.json`) is reliquary-owned: the machine's
+blueprint reference, creation time, and lifecycle phase. Machines have
+no separate human name — the generated UUID in the record's file
+name is the machine's identity, and commands accept any
+unambiguous prefix of it, git-style. The **state** (`cache/machines/<id>/state.json`) is the
+machine as it actually is — fully resolved (aliases
+canonicalized, defaults materialized, the resolved blueprint digest
+and backend identity recorded) and rewritten atomically in the
+same operation as every machine change. Every mutating operation
+takes an exclusive per-machine lock; an interrupted operation is
+detected by phase and generation and either rolled back safely or
+failed with explicit recovery instructions. The resolved snapshot
+recorded at `create` is the machine's **baseline**: every `start`
+reconciles baseline, state, and backend — applicable differences
+are applied, contradictions fail closed naming both sides — and
+never re-reads the blueprint file. Editing a blueprint affects future
+`create` operations only; adopting blueprint edits into an existing
+stopped machine is the explicit `apply`, which re-resolves the
+blueprint, applies what the machine can absorb without regenerating
+drives, and records the new baseline digest (drive-regenerating
+changes fail closed, pointing at `recreate`). Runtime
+reconfiguration (script steps, CLI) updates the state only;
+permanence belongs in the blueprint, adopted by `apply`. Script
+outcomes live in the append-only run records under the machine's
+cache; there is no `installed` flag.
 
 Core fields: `platform` (required, never inferred), `backend`
-(assigned into the state from the availability-filtered priority
-list when not declared; permanent once assigned), `backend-id`/
-`created`/`installed` (state-only), `memory`, `cpus`, `drives`
+(assigned from the availability-filtered priority list when not
+declared; permanent once assigned), `memory`, `cpus`, `drives`
 (the declared-media slot convention, per-drive `controller`
 types, `media` references into the shared library, `size`-based
 image creation, and `base` starting-point images — the backing
 of a differencing disk by default, or copied), `boot`, `control-planes` (the ordered waterfall
 policy), and `backend-settings` (the scoped non-portable escape
-hatch — a declaration without it is portable by construction).
+hatch — a blueprint without it is portable by construction).
 Validation and capability mismatches fail closed, naming the
 backend and missing capability.
 
@@ -171,7 +192,8 @@ backend and missing capability.
 
 ```text
 <reliquary_home>/
-├── machines/            machine declarations, <name>.json (above)
+├── blueprints/               machine blueprints, <name>.json (above)
+├── machines/            machine records, <name>.json (above)
 ├── scripts/             reliquary automation scripts
 ├── properties.json      personal property registry (ordinary values
 │                        and markers for host-stored secrets)
@@ -190,41 +212,64 @@ backend and missing capability.
 
 The current `install-media/` cache folds into `cache/`. The
 current root-level `drives/`, `machine.json`, and `vm.json`
-layout is superseded by the declaration/cache split; the project
+layout is superseded by the blueprint/record/cache split; the project
 is pre-release, so this is a replacement, not a migration.
 
-Cached instantiations live under `cache/machines/<name>/` (see
+Cached materializations live under `cache/machines/<id>/` (see
 "The machine model" above).
 
 ## The CLI
 
-Machine and media commands put their target name directly after the
-command; it needs no separate flag. Property-registry commands instead
-put an operation (`list`, `get`, `set`, or `unset`) after `property`.
+The CLI is a thin veneer over the embedding API, which remains a
+first-class surface: every command maps one-to-one onto a public
+Python call with the same semantics — blueprint resolution, machine
+creation and selection, lifecycle, `apply`, scripting, media,
+properties — and nothing is CLI-only. Where the CLI resolves a
+selector, the API takes the same identifiers (a blueprint name, a
+machine id); where the CLI prints an id, the API returns it.
 
-The lifecycle vocabulary is two-layered. Spec-level verbs act on
-the declaration (`machines/<name>.json`): `init` scaffolds one,
-`delete` removes one — and authoring the file directly in an
-editor is always equally valid. Instance-level verbs act on
-the cached instantiation: `create` instantiates the spec,
-`start`/`stop` run it, `destroy` discards the instantiation
-(never the spec), and `recreate` is `destroy` + `create`.
-`import` synthesizes a spec from a native VM — spec-level only;
-instantiating it afterward is an ordinary `create`.
+Blueprints and machines are selected by explicit flags, never by
+position: `--blueprint <name>` (short `-b`) names a blueprint,
+`--machine <id>` (short `-m`) a machine. A machine's identity is its generated UUID; `--machine`
+accepts the full id or any unambiguous prefix, git-style, and
+listings print a short prefix for exactly this use. As the common
+convenience, `--blueprint` also selects a *machine* on machine-level
+verbs: when exactly one machine of that blueprint exists — the normal
+one-machine-per-blueprint case — the blueprint name is enough; with several
+machines the command fails and lists their ids, and with none it
+fails and suggests `create` (`script` instead creates one).
+Nothing is ever selected positionally or by guessing.
+Property-registry commands put an operation (`list`, `get`,
+`set`, or `unset`) after `property`.
+
+The lifecycle vocabulary is two-layered. Blueprints are plain files
+under `blueprints/`: authored, renamed, and removed directly in an
+editor, with `init` and `import` as authoring conveniences and
+`delete --blueprint` as the managed removal. Machine-level verbs act
+on machines: `create` realizes a blueprint as a new machine (record,
+new id, cached materialization), `start`/`stop` run it, `destroy`
+discards only the materialization (record, id, and blueprint reference
+remain), `recreate` is `destroy` + `create` under the same id,
+and `delete --machine` removes the machine entirely. `import`
+synthesizes a blueprint from a native VM — blueprint authoring only;
+realizing it afterward is an ordinary `create`.
 
 ```text
-reliquary create <name>
-    (instantiates the existing spec machines/<name>.json)
-reliquary start <name> [--display]
-reliquary stop <name>
-reliquary destroy <name>
-reliquary recreate <name>
-reliquary delete <name>
-reliquary clone <name> <new_name>
-reliquary export <name> [<destination>]
-reliquary import <name> <source> --platform <platform>
-reliquary script <name> <script_name> [--responses <path>] [--display]
-reliquary check-script <script_name> [--machine <name>]
+reliquary list blueprints
+reliquary list machines [--blueprint <name>]
+reliquary create --blueprint <name>
+reliquary start (--machine <id> | --blueprint <name>) [--display]
+reliquary stop (--machine <id> | --blueprint <name>)
+reliquary apply (--machine <id> | --blueprint <name>)
+reliquary destroy (--machine <id> | --blueprint <name>)
+reliquary recreate (--machine <id> | --blueprint <name>)
+reliquary delete (--machine <id> | --blueprint <name>)
+reliquary clone (--machine <id> | --blueprint <name>)
+reliquary export (--machine <id> | --blueprint <name>) [<destination>]
+reliquary import <source> --blueprint <name> --platform <platform>
+reliquary script <script_name> (--machine <id> | --blueprint <name>)
+    [--responses <path>] [--display]
+reliquary check-script <script_name> [--machine <id> | --blueprint <name>]
     [--responses <path>]
 reliquary fetch <media_name> [--script <script_name>]
 reliquary property list [<prefix>]
@@ -238,21 +283,38 @@ reliquary clean media
 
 Lifecycle semantics:
 
-- `create` takes no spec argument: it resolves the declaration
-  already at `machines/<name>.json` — written by hand, by
-  `init`, or by `import` — and materializes the cached
-  instantiation. Specs are authored documents. Media definitions
-  are likewise user-owned, though a script can seed missing library
+- `list blueprints` shows each blueprint with its machine count; `list
+  machines` shows each machine's short id, blueprint, phase, and
+  backend (`--blueprint` filters to one blueprint's machines).
+- `create` validates and resolves the named blueprint
+  (`blueprints/<name>.json` — written by hand, by `init`, or by
+  `import`), creates a machine record with a new id, prints that
+  id, and materializes the machine's drives and backend object.
+  Blueprints are authored documents. Media definitions are likewise
+  user-owned, though a script can seed missing library
   definitions from its embedded blocks before its first run.
-- `destroy` discards the machine's cached instantiation — state,
-  backend machine, drive images — and never touches the spec. An
-  uninstantiated spec is just a file.
-- `delete` removes the spec, destroying the instantiation first
-  if one exists. The machine is gone entirely.
+- `apply` adopts the current blueprint into a stopped machine: it
+  re-resolves the blueprint, reconciles the machine to the new
+  resolution (memory, boot order, drives enabled/disabled, media
+  changes), and records the new baseline digest. Changes the
+  machine cannot absorb without regenerating drives (`size` or
+  `base` changes on materialized images) fail closed naming both
+  sides; `recreate` is the honest alternative.
+- `destroy` discards the machine's cached materialization —
+  state, backend machine, drive images — and marks the machine
+  uninstantiated; its record, id, and blueprint reference remain. The
+  blueprint is never touched.
+- `delete --machine` removes the machine record, destroying the
+  materialization first if one exists; the blueprint remains a plain
+  file. `delete --blueprint` removes the blueprint file itself and fails
+  closed while any machine of it exists, naming the machine ids —
+  delete the machines first (on this verb only, `--blueprint` is the
+  blueprint itself, never a machine selector).
 
 - `script` completes preflight, installs missing embedded media
-  definitions, instantiates the machine if needed, and starts it if
-  it is not already running before executing guest steps.
+  definitions, resolves its machine (creating one when `--blueprint`
+  names a blueprint with no machine yet), and starts it if it is not
+  already running before executing guest steps.
 - `fetch` downloads, extracts, and hash-verifies a defined media
   item (see docs/media-spec.md). It is a convenience: machine
   operations resolving a `media` reference to a fetchable
@@ -271,18 +333,19 @@ Lifecycle semantics:
   cached source archives, and payload files reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
   payloads without a download source) is cleanable.
-- `recreate` is exactly `destroy` + `create`: drives regenerate
-  as declared (`size` blank, `base` differenced or copied
-  afresh). Since backend assignment re-runs, a recreated machine
-  may land on a different backend — `recreate` is the sanctioned
-  way to move a machine between backends, and regenerated drives
-  arrive in the new backend's formats.
-- `clone` duplicates a stopped machine: it copies the declaration
-  to the new name and the source's cached drive images into the
-  clone's instantiation, then runs `create` resolution fresh —
-  the clone gets its own backend assignment and `backend-id`.
-  State and backend registration are never copied; a clone shares
-  ancestry, nothing else.
+- `recreate` is exactly `destroy` + `create` under the same
+  machine id: drives regenerate as declared (`size`
+  blank, `base` differenced or copied afresh). Since resolution
+  and backend assignment re-run, a recreated machine may land on
+  a different backend — `recreate` is the sanctioned way to move
+  a machine between backends, and regenerated drives arrive in
+  the new backend's formats.
+- `clone` duplicates a stopped machine as a new machine record
+  under a new id (printed like `create`'s): it retains the
+  source's resolved blueprint snapshot and copies the source's
+  writable drive images — a snapshot of a machine, not another
+  blueprint. The clone gets its own backend object and `backend-id`;
+  state and backend registration are never copied.
 
 - `export` copies a stopped machine out to the backend's native
   management — registered in the backend's own machine location
@@ -292,18 +355,19 @@ Lifecycle semantics:
   result to a platform built for long-lived machines," and
   ownership verification guarantees reliquary can never touch it
   afterward.
-- `import` synthesizes a declaration from a native backend VM's
+- `import` synthesizes a blueprint from a native backend VM's
   configuration (memory, drives, controllers — translation of
   backend config, not guest inference), preserving the VM's
   disks as media items — copied (never moved; the source is not
   touched) with generated definitions (computed hashes, no URL),
-  the declaration's drives taking them as `base`. An imported machine
-  recreates like any other: from its bases. `platform` is not
+  the blueprint's drives taking them as `base`. A machine created
+  from an imported blueprint recreates like any other: from its
+  bases. `platform` is not
   knowable from any backend configuration, so `import` requires
   `--platform` explicitly; the never-infer rule holds. `import`
-  stops at the spec: it never instantiates — running the machine
+  stops at the blueprint: it never instantiates — running the machine
   afterward is an ordinary `create`. Drive preservation is
-  entirely the spec's job, through the drive materialization
+  entirely the blueprint's job, through the drive materialization
   triad: `size` (always a fresh blank disk at `create`), `base`
   with type `difference` (the default — a differencing disk
   backed by the base image), and `base` with type `duplicate`
@@ -317,19 +381,20 @@ Lifecycle semantics:
   object is the one recorded in the machine's state (the QMP
   identity check is the QEMU instance of this rule).
 
-A future milestone adds `init`, the spec-scaffolding
+A future milestone adds `init`, the blueprint-scaffolding
 convenience: a simple CLI command that writes a minimal starter
-declaration from a few answers or flags (platform, disk size,
+blueprint from a few answers or flags (platform, disk size,
 installer media), so new machines don't begin from a blank
 editor. One-shot, fire-and-forget scaffolding only — it emits an
-ordinary declaration file the user owns from then on; no template
+ordinary blueprint file the user owns from then on; no template
 registry, no regeneration, no linkage back to the scaffolder.
 
 ## The scripting language
 
 reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
-`reliquary script <name> <script_name>`.
+`reliquary script <script_name>` against a machine selected with
+`--machine <id>` or `--blueprint <name>`.
 
 **Decided shape: a line-oriented, constrained DSL.** A script is
 a UTF-8 text file (`scripts/<name>.rqs`): header directives, then
@@ -410,7 +475,7 @@ extracted artifacts use the common caches.
 Offline `stage`/`collect` require a stopped machine on every
 control plane; future live transfers get distinct verbs rather
 than backend-dependent semantics. `start` reconciles the authored
-machine declaration and `stop` is visibly a host hard power-off.
+machine blueprint and `stop` is visibly a host hard power-off.
 There is no `restart`: a hard power cycle is the explicit pair,
 and a guest reboot remains guest input. Parsing, response binding,
 whole-script capability preflight, and static control-flow checks
@@ -457,60 +522,371 @@ definitions or directly inside the script.
 
 ## Milestones
 
+**DOS under QEMU is the top priority.** Milestones 1–5 deliver
+the complete documented design — the media library, the instance
+model and machine blueprint, the property registry, and the scripting
+language, i.e. everything in `docs/` — for the DOS platform on
+the QEMU backend alone. Only then does the design generalize:
+the adapter seam is extracted from working code (6), proven by a
+second backend (7), and extended with machine mobility (8), guest
+agents (9), and the VNC control plane (10).
+
+Each milestone is independently shippable: the tree builds, the
+test suite passes, and the FreeDOS install keeps working end to
+end on whichever surface that milestone provides. Within 1–5 the
+order is dependency-driven — the media library before blueprints can
+reference it, the machine model before scripts can drive it, the
+property registry before script inputs can bind to it. Within a
+milestone the listed deliverables are ordered but may land in
+separate commits.
+
 ### Milestone 1 — FreeDOS plain install to hard disk (finish as-is)
 
-Unchanged in substance and nearly done on the current stack; it
-remains the proving ground for scripted installation. Remaining
-steps:
+The proving ground for scripted installation, nearly done on the
+current stack. The recipe's shape (Python module under `recipes/`,
+`reliquary install freedos-plain`) is acknowledged as transitional
+and retires in milestone 5.
+
+Deliverables:
 
 1. Script the installer's "Plain DOS system" path onto the target
    disk (the LiveCD boots to a live `D:\>` prompt; `SETUP.BAT`
-   starts the installer). Watch guest memory: the LiveCD warns about
-   limited RAM at the 16 MiB DOS default.
-2. Add a verification pass that boots the installed disk and
-   confirms a DOS prompt.
+   starts the installer). Watch guest memory: the LiveCD warns
+   about limited RAM at the 16 MiB DOS default.
+2. A verification pass that boots the installed disk and confirms
+   a DOS prompt.
 
-The recipe's current shape (Python module under `recipes/`,
-`reliquary install freedos-plain`) is acknowledged as transitional.
+Done when: `reliquary install freedos-plain` runs unattended from
+a clean home to a bootable hard-disk image, and the verification
+pass confirms the installed disk boots to a prompt.
 
-### Milestone 2 — The machine model
+### Milestone 2 — Media library and caches
 
-Declarations under `machines/<name>.json`, cached instantiations
-under `cache/machines/<name>/`, the `media/` and `scripts/` home
-layout, and the machine-scoped CLI grammar (`create`, `start`,
-`stop`, `destroy`, `delete`). The QEMU machine layer is re-anchored on
-cached instantiations; `MachineConfig`/root-home `machine.json`
-are absorbed into the declaration (user-owned) and state
-(reliquary-owned, reconciled at every `start`).
+All of [docs/media-spec.md](docs/media-spec.md), implemented
+before the machine model so blueprints can reference media by name.
+`media.py`'s recipe-scoped acquisition is reshaped into the
+library; the `install-media/` cache folds into `cache/`.
 
-### Milestone 3 — The backend adapter seam
+Deliverables:
 
-Define the backend adapter API from the reshaped QEMU
-implementation (the only adapter with a complete control plane set), add
-backend autodiscovery and the prioritized default list, and record
-assigned backends into machine specs. Non-QEMU adapters may stub
-with `NotImplementedError`, mirroring how platforms are handled.
+1. Definitions as user-owned documents under `media/`, both
+   forms: item (direct download) and archive (multi-item), with
+   derived defaults (`url`/`local-path` → `file` → `name` →
+   cached name), mirror URL lists, `local-path`,
+   `file-extension`, and the item/archive `sha256` rules.
+2. Eager whole-library scanning before any media operation, with
+   library-wide duplicate-name detection and the
+   normalized-descriptor collision rules (the shared groundwork
+   for embedded script blocks in milestone 5).
+3. The two-cache split: source archives under `cache/downloads/`,
+   payloads under `cache/media/`; fetch/extract/verify on demand,
+   cheapest source first (verified payload, then cached archive,
+   then mirrors). Verification on every use: a payload that fails
+   its hash is treated as absent and refetched when a source
+   exists — the cache heals itself.
+4. `reliquary fetch <media_name>` and `reliquary clean
+   downloads` / `clean media` (nothing irreplaceable —
+   definitions, `local-path` files, sourceless payloads — is
+   cleanable). `fetch --script` follows in milestone 5 with
+   script parsing.
+5. The FreeDOS recipe consumes its media through the library
+   instead of its private `install-media/` path.
 
-### Milestone 4 — The scripting language
+Done when: the FreeDOS media flows through a definition end to
+end; a deliberately corrupted cached payload heals on next use;
+`clean` reclaims only restorable files; the recipe passes on the
+new layer.
 
-Design and implement the language MVP covering the primitive
-vocabulary above; re-express the FreeDOS plain install as an
-install script; retire `recipes/`.
+### Milestone 3 — The instance model and machine blueprints (QEMU-only)
 
-### Milestone 5 — Second backend
+The whole machine model — [docs/instance-model.md](docs/instance-model.md)
+plus the [machine blueprint](docs/machine-blueprint.md) with its
+[field reference](docs/machine-blueprint-reference.md) and
+[cookbook](docs/machine-blueprint-cookbook.md) — scoped to one
+backend. The `backend` field is parsed and validated in full, but
+with QEMU the only implementation, assignment is trivial; the
+adapter seam that makes it real is milestone 6. Capability checks
+are real from the start, derived from what the QEMU
+implementation can actually do. This replaces the root-home
+`drives/`, `machine.json`, and `vm.json` layout wholesale —
+pre-release, so no migration.
 
-Implement the first non-QEMU adapter end to end, proving the
-adapter API against a genuinely different hypervisor. VirtualBox is
-the recommended candidate: `VBoxManage` covers lifecycle, keyboard
-scancodes, screenshots, and serial redirection, which is the
-closest match to the control plane set scripts already rely on. The
-FreeDOS install script running unmodified on both backends is the
-acceptance test.
+Deliverables:
 
-### Milestone 6 — Guest agent communication
+1. Blueprint validation per the full field reference: `platform`,
+   `backend`, `memory`, `cpus`, `drives` (slot convention and
+   aliases, per-drive `controller`, `media` references, `size`
+   blanks, `base` with `difference`/`duplicate`, `enabled`),
+   `boot`, `control-planes`, `backend-settings` — format checks
+   and capability checks both failing closed and naming the
+   problem.
+2. Machine records under `machines/<id>.json` (blueprint reference
+   and resolved digest, creation time, phase; the generated UUID
+   in the file name is the machine's identity) and the
+   cached materialization under `cache/machines/<id>/`
+   (`state.json` fully resolved, canonical drive-image naming,
+   qcow2 materialization of the `size`/`base` triad). The QEMU
+   layer re-anchors on it; `MachineConfig`, root-home
+   `machine.json`, and `vm.json` are absorbed and deleted.
+3. Lifecycle integrity per the instance model: operation
+   generations, exclusive per-machine locks, atomic JSON
+   replacement, and startup detection of interrupted phases with
+   safe rollback or explicit recovery instructions.
+4. The lifecycle CLI with explicit flag-based selection —
+   `--machine <id>` (full id or unambiguous git-style prefix)
+   and `--blueprint <name>` (the blueprint's sole machine, failing with
+   candidate ids when several exist): `list blueprints`,
+   `list machines`, `create --blueprint`, `start` (full
+   reconciliation — baseline, state, backend identity, and
+   re-verification of every referenced media hash), `stop`,
+   `apply` (adopt blueprint edits into the baseline; drive-regenerating
+   changes fail closed), `destroy`, `recreate` (same id), and
+   `delete` (`--machine` for a machine, `--blueprint` for a
+   machineless blueprint file).
+   Runtime changes update the state only; machines stay running
+   until explicitly stopped.
+5. Existing single-machine commands (`type`, `run`, `keys`,
+   `menu`, `wait`, `text`, `screenshot`, `hmp`) take the same
+   `--machine`/`--blueprint` selection and resolve ownership through
+   the record and state.
+6. Published JSON Schemas for the blueprint, machine record, state,
+   and media definition document types.
+7. `examples/` updated to the implemented shapes
+   (`examples/blueprints/`, an explicit `create --blueprint` step in its
+   README) — or the docs corrected where implementation proves
+   the planned format wrong.
 
-The QGA-profile client and guest agents, per the design below —
-now explicitly backend-portable over serial.
+Done when: the FreeDOS install (still recipe-driven) runs against
+a machine created from the example blueprint in a clean home;
+`destroy` + `create` regenerates the materialization from blueprint
+and media alone; a process killed mid-operation is detected and
+recovered per the instance model; the old layout is gone from
+code, tests, and docs.
+
+### Milestone 4 — The property registry
+
+All of [docs/property-registry.md](docs/property-registry.md),
+landed ahead of the scripting language because script inputs bind
+to it. Small and independently useful.
+
+Deliverables:
+
+1. `properties.json` as a flat user-owned map of dotted names to
+   strings or `{"secret": true}` markers, with name validation
+   and canonical atomic writes.
+2. `reliquary property list/get/set/unset`: secret values held
+   only in the host's protected credential store (scoped by home
+   and property name), set via no-echo prompt, never revealed by
+   `list`/`get`; kind changes require `unset` first.
+3. The fail-safe update order (store credential before marker,
+   remove marker before credential), with orphaned-credential
+   reporting and cleanup guidance — never a plaintext fallback.
+
+Done when: ordinary and secret properties round-trip through the
+CLI with no secret material ever in the file, and interrupting an
+update cannot produce a plaintext value or a marker whose
+credential was reported bound but is absent.
+
+### Milestone 5 — The scripting language
+
+All of [docs/script-spec.md](docs/script-spec.md), completing the
+documented design for DOS on QEMU: the FreeDOS install and
+verification as `.rqs` scripts, and the retirement of `recipes/`
+and the `install` command.
+
+Deliverables:
+
+1. Parser and static analysis per the blueprint: headers, linear and
+   state-machine shapes, sequential vs. reactive states, string
+   escapes and raw strings, duration literals, the portable key
+   vocabulary (settling that open decision), and the full
+   validation/warning lists — all before any guest input.
+2. The execution model: `wait`/`expect` observations (normalized
+   text, regex, `stopped`), reactive `on` dispatch with the
+   edge/episode arming rule, `timeout`/`deadline`/`stable`
+   semantics, explicit `->`/`done` transitions.
+3. Action verbs on the machine model: `enter`, `type`, `press`,
+   `select` (feedback-driven, never guessing), `screenshot`,
+   `attach`/`detach` (updating the state, not the blueprint),
+   stopped-only `stage`/`collect` with contained paths, and
+   `start`/`stop`.
+4. Inputs and response files: `text`/`media`/`secret` with
+   `${name}` binding by the response → property → prompt
+   precedence, kind mismatches and missing noninteractive values
+   failing before the machine starts, and the secret contract
+   (expansion only in `enter`/`type`, transcript omission,
+   diagnostic redaction, failure-screenshot suppression).
+5. Embedded `media <label> { }` blocks: the transactional,
+   non-overwriting installation rules against the library
+   groundwork from milestone 2; `fetch --script`.
+6. Run records per the blueprint: a per-invocation directory under
+   the machine's cache `runs/`, the full transcript contract
+   (lines, states, observations, input provenance, installed
+   definitions, selected control plane, artifacts), failure
+   capture, and no automatic retry.
+7. `reliquary script <script_name> --machine/--blueprint` (preflight,
+   embedded
+   media installation, implicit create/start) and
+   `reliquary check-script` (read-only, with optional machine
+   and response binding for capability preflight).
+8. `examples/scripts/freedos-plain-install.rqs` and `-verify.rqs`
+   run end to end; `recipes/` and `install` are deleted.
+
+Done when: the FreeDOS plain install and verification pass as
+`.rqs` scripts from a clean home with no Python recipe left in
+the tree, and transcripts honor the provenance and
+secret-redaction contracts. At this point everything `docs/`
+documents is implemented for DOS on QEMU.
+
+### Milestone 6 — The backend adapter seam
+
+Extract the adapter API from the now-complete QEMU implementation
+— the only adapter with a full control plane set — so the seam is
+defined by working code, not speculation.
+
+Deliverables:
+
+1. The adapter API: lifecycle, media attachment, input, screen
+   access, and control plane endpoints, with honest per-backend
+   capability reporting feeding the existing capability checks.
+2. Backend autodiscovery (binaries on PATH and conventional
+   locations, the Hyper-V service/module) establishing
+   availability only.
+3. Real default assignment from the prioritized availability
+   list, recorded permanently into machine state; a declared
+   `backend` pins the choice and fails closed if unavailable or
+   incapable.
+4. Stub adapters for VirtualBox, VMware Workstation, and Hyper-V
+   raising `NotImplementedError`, mirroring platform handling.
+5. Generalized ownership verification: no adapter sends a control
+   command to a hypervisor object that doesn't match the
+   machine's recorded `backend-id`.
+
+Done when: all QEMU interaction flows through the adapter API and
+the FreeDOS install script passes unchanged.
+
+### Milestone 7 — Second backend: VirtualBox
+
+The first non-QEMU adapter end to end, proving the adapter API
+against a genuinely different hypervisor. VirtualBox is the
+candidate: `VBoxManage` covers lifecycle, keyboard scancodes,
+screenshots, and serial redirection — the closest match to the
+control plane set scripts already rely on.
+
+Deliverables:
+
+1. Lifecycle through `VBoxManage`, with machine files kept inside
+   `cache/machines/<id>/` and VDI/differencing materialization
+   of the drive triad.
+2. The agentless display control plane: `controlvm
+   keyboardputscancode` input and `screenshotpng` capture, with
+   pixel-level text recognition for fixed-font text modes behind
+   the same control plane interface.
+3. VirtualBox in autodiscovery and the priority list; `recreate`
+   as the sanctioned backend move, drives regenerating in native
+   formats.
+
+Done when: the FreeDOS install script runs unmodified on both
+backends from the same blueprint (minus a pinned backend field).
+
+### Milestone 8 — Machine mobility: clone, export, import
+
+The durable-artifact exits, once two backends make them
+meaningful. The open questions under "Decisions still needed"
+(`export` mechanics, `import` scope) must be settled at the start
+of this milestone.
+
+Deliverables:
+
+1. `clone`: a new machine record and UUID retaining the source's
+   resolved blueprint snapshot, with the source's writable drive
+   images copied — a snapshot of a machine, never a shared
+   state or backend registration.
+2. `export`: a stopped machine out to the backend's native
+   management (or a media image out of one drive), independent
+   and permanently outside reliquary's purview.
+3. `import`: synthesize a blueprint from a native VM's configuration,
+   disks preserved as generated media definitions taken as
+   `base`; `--platform` required; never instantiates.
+
+Done when: an exported FreeDOS machine boots under the backend's
+own tooling, and a machine created from an imported blueprint
+recreates from its bases like any authored machine.
+
+### Milestone 9 — Guest agent communication
+
+The QGA-profile client and guest agents per the design below —
+backend-portable over serial. This milestone must not weaken the
+permanent agentless DOS path; the same suites validate agentless
+and guest-agent control planes with equivalent results.
+
+Deliverables:
+
+1. The host QGA client module: framing, `guest-sync-delimited`,
+   `guest-ping`/`guest-info`, `guest-exec`/`guest-exec-status`,
+   shared across carriers.
+2. The extended `GuestExec` interface: request and result types
+   covering deadlines, completion, output, and exit status,
+   without exposing transport objects.
+3. The DOS guest agent speaking the QGA execution profile over an
+   emulated UART, provisioned through the agentless workflow (the
+   serial-to-virtio bootstrap, steps 1–2).
+4. The configured readiness waterfall with conservative fallback:
+   selection before first dispatch only, ambiguous failures never
+   retried on another control plane.
+
+Done when: a guest command runs through the serial-carried agent
+on QEMU with truthful capability reporting, and the agentless
+suite still passes byte-for-byte.
+
+### Milestone 10 — VNC control plane
+
+The second agentless control plane, per "Control plane families"
+below: framebuffer output plus keyboard and pointer input over
+the RFB protocol, where backends provide it — QEMU natively,
+VirtualBox with the extension pack, VMware Workstation; never
+Hyper-V (a capability failure, not an emulation). Beyond a
+backend-independent wire for display automation, this is the
+groundwork for GUI installer scripting: RFB's
+PointerEvent/KeyEvent are exactly the three portable input
+primitives the GUI plan adopts (see "Decisions still needed").
+
+Deliverables:
+
+1. Per-backend VNC endpoint configuration contributed to launch
+   config, endpoint artifacts under the machine cache, and a
+   readiness probe.
+2. An RFB client — framebuffer capture, key events, pointer
+   events — as a control plane behind the same input and screen
+   capabilities as agentless display, reusing the pixel-level
+   text recognition built for the VirtualBox display plane in
+   milestone 7.
+3. `control-planes: ["vnc"]` policy honored end to end, with a
+   capability error naming Hyper-V where it cannot exist.
+4. The three portable input primitives (pointer move, button
+   press/release, key press/release) exposed at the control-plane
+   seam, with pacing control-plane-owned. Script-level pointer
+   verbs and image matching remain horizon work.
+
+Done when: the FreeDOS install script runs unmodified on QEMU
+with the VNC control plane selected in place of agentless
+display, and text observation through pixel recognition matches
+the VGA-scraping results on the same screens.
+
+### Horizon (sequenced later, not yet scheduled)
+
+- `init` blueprint scaffolding and `fork-blueprint` (both fire-and-forget
+  authoring conveniences).
+- The virtio-serial carrier for the DOS agent and bounded
+  `guest-file-*` operations (serial-to-virtio bootstrap,
+  steps 3–5).
+- Win9x/WinNT platform workflows, and with them GUI installer
+  scripting: needle-like assets, script-level pointer verbs (on
+  the milestone-10 input primitives), and image-match `wait`
+  (see "Decisions still needed").
+- VMware Workstation and Hyper-V adapters.
+- Media commands beyond `fetch` (list, verify, remove).
+- A `pytest-reliquary` plugin (per AGENTS.md prior art).
 
 ## Design principles
 
@@ -532,7 +908,7 @@ now explicitly backend-portable over serial.
   scripts and platform workflows target capabilities, not
   hypervisors.
 - **Nothing is inferred from guests.** Platform and backend come
-  from the machine spec. Probes choose among configured control planes;
+  from the machine blueprint. Probes choose among configured control planes;
   they never guess what OS is inside.
 - **Dependencies must pull their weight** (per AGENTS.md).
 
@@ -926,7 +1302,7 @@ duplicate monitor methods on their own interfaces.
 ### Configuration and lifecycle
 
 Platform selection and the allowed control plane policy must be explicit
-through the machine spec or per-invocation configuration. reliquary
+through the machine blueprint or per-invocation configuration. reliquary
 must never infer the platform from the guest image, screen, or
 device behavior; capability probes only choose among control planes
 already permitted by that policy. The current DOS default remains
@@ -968,7 +1344,7 @@ A control plane may need two lifecycle phases:
    startup.
 
 Endpoint paths and other persistent artifacts must remain under the
-machine's cached instantiation. Ownership verification remains
+machine's cached materialization. Ownership verification remains
 mandatory for every
 management-interface operation, including operations used by the agentless
 control plane.
@@ -990,8 +1366,8 @@ Agentless DOS operation on QEMU is the permanent base described in
 AGENTS.md; no milestone may weaken it.
 
 The declared-media convention (drives named by medium, slot, and
-format) carries over into machine declarations and cached
-instantiations. New
+format) carries over into machine blueprints and cached
+materializations. New
 media kinds, controllers, and USB devices must extend the same
 convention — a new medium name — not appear as opaque raw backend
 arguments.
@@ -1003,7 +1379,7 @@ agentless and guest-agent control planes with equivalent results.
 
 ## Decisions still needed
 
-- **Backend priority order** for default assignment when a spec
+- **Backend priority order** for default assignment when a blueprint
   names no backend (proposed: QEMU, VirtualBox, VMware Workstation,
   Hyper-V — best scriptability first).
 - **Script spec details** (the control-flow and response-file shape
@@ -1016,17 +1392,16 @@ agentless and guest-agent control planes with equivalent results.
   no handler-splicing macro in the initial language; real scripts
   must establish the need and a design that preserves local control
   flow and transcript provenance.
-- **Spec details**: whether per-drive backend settings are ever
+- **Blueprint details**: whether per-drive backend settings are ever
   needed beyond the top-level `backend-settings` scope, and how
   running-machine reconfiguration (hot media changes vs.
   stopped-only changes like memory) is surfaced in the CLI and
   script language.
 - **Promoting runtime changes**: whether a convenience command
   copies a state-side runtime change (e.g. attached media) back
-  into the declaration, or users always edit the declaration by
-  hand.
+  into the blueprint, or users always edit the blueprint by hand.
 - **Machine cache cleaning**: whether a `clean machines` command
-  reclaims cached instantiations of stopped machines wholesale
+  reclaims cached materializations of stopped machines wholesale
   (they regenerate like everything else under `cache/`), or
   whether `recreate`/`delete` per machine is enough.
 - **`export` mechanics**: export has two targets — a media image
@@ -1039,15 +1414,15 @@ agentless and guest-agent control planes with equivalent results.
   and whether a `media`-referenced drive blocks whole-machine
   export or is materialized into it.
 - **`import` scope**: which backend config translates into the
-  synthesized declaration (memory, drives, controllers are clear;
-  what of NICs and other devices the spec doesn't model yet), and
+  synthesized blueprint (memory, drives, controllers are clear;
+  what of NICs and other devices the blueprint doesn't model yet), and
   whether untranslatable configuration fails the import or lands
   in `backend-settings`.
-- **Spec device growth**: firmware/boot semantics (BIOS vs UEFI)
+- **Blueprint device growth**: firmware/boot semantics (BIOS vs UEFI)
   for post-DOS platforms, and when network, display adapter,
-  audio, and USB become first-class spec fields (each following
+  audio, and USB become first-class blueprint fields (each following
   the drives pattern: agnostic vocabulary, capability-checked per
-  backend). Storage controller *types* are already spec vocabulary
+  backend). Storage controller *types* are already blueprint vocabulary
   (per-drive `controller`); still open are per-platform controller
   defaults beyond `ide`, whether slot ranges widen for
   multi-device controllers (additive change), and how Hyper-V
@@ -1063,7 +1438,7 @@ agentless and guest-agent control planes with equivalent results.
   click point. Open: the needle-like asset format and where the
   assets live (beside scripts, shared like media definitions?);
   pointer input, which reliquary currently lacks end to end
-  (machine spec pointing-device field, a control-plane input
+  (machine blueprint pointing-device field, a control-plane input
   capability, and script verbs — match-and-click with the click
   point in the asset, following os-autoinst). The input seam
   should follow os-autoinst's two-layer event model: three
@@ -1093,9 +1468,15 @@ agentless and guest-agent control planes with equivalent results.
 - **Hyper-V agentless screen strategy**: whether WMI thumbnail/
   keyboard automation is good enough for installer scripting or
   Hyper-V machines require the serial/agent control planes from day one.
-- **Concurrent machines**: locking per machine, and whether
-  several named machines may run at once from one reliquary home
-  (the per-home identity model suggests yes, per-machine).
+- **Concurrent machines**: per-machine exclusive locking is
+  decided (docs/instance-model.md); still open is whether any
+  home-wide limit applies to machines running at once (the
+  per-machine lock and identity model suggests none).
+- **Friendly machine aliases**: machine identity is the UUID
+  addressed by unambiguous prefix (decided, git-style); still
+  open is whether listings and selectors additionally offer
+  docker-style generated word aliases for memorability, or
+  whether blueprint-based selection makes them unnecessary.
 - The exact initial `guest-exec` subset, including argument and
   environment support, capture modes, output limits, timeouts, and
   legacy-OS deviations.

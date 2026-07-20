@@ -27,11 +27,11 @@ as the default and currently only complete platform workflow:
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 - `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
-- `examples/` contains a complete FreeDOS example in the planned formats: a machine declaration and scripts, with the
+- `examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
   install script embedding the media definition that its first run installs in the media library. Its README carries
   the status note. Keep the examples synchronized with `docs/` when the formats change.
 - `docs/` contains detailed user documentation, currently for planned interfaces written ahead of
-  implementation (e.g. the machine spec: `docs/machine-spec.md` guide, `-reference.md`, `-cookbook.md`,
+  implementation (e.g. the machine blueprint: `docs/machine-blueprint.md` guide, `-reference.md`, `-cookbook.md`,
   each carrying a status note until implemented). ROADMAP.md holds the architectural context and open
   design questions and links into `docs/`; keep design discussion out of `docs/` user pages.
 
@@ -47,7 +47,7 @@ reliquary is evolving rapidly and deliberately maintains **no backward compatibi
 least a beta-quality release: no spec/config format versioning or migration, no API aliasing, no
 deprecated-name shims, no compatibility parsing. When an interface changes, change it coherently and
 completely — update every caller, document, and test to the new shape and delete the old one. Do not add
-transition affordances "to be safe"; stale artifacts (old machine specs, homes, embeddings) may simply fail
+transition affordances "to be safe"; stale artifacts (old machine blueprints, homes, embeddings) may simply fail
 and users recreate them. Compatibility guarantees, if any, will be defined no earlier than beta.
 
 ### Platform selection
