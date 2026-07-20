@@ -57,7 +57,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("create requires --blueprint", stderr.getvalue())
 
     def test_list_machines_shows_created_machine(self):
-        """list machines prints id, blueprint, phase, and backend."""
+        """list machines prints blueprint, number, phase, and backend."""
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.main([
@@ -73,7 +73,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         output = stdout.getvalue()
         self.assertIn("BLUEPRINT", output)
+        self.assertIn("NUMBER", output)
         self.assertIn("plain", output)
+        self.assertIn("0", output)
         self.assertIn("ready", output)
         self.assertIn("qemu", output)
 

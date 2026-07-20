@@ -21,7 +21,8 @@ from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .machines import (create_from_blueprint, destroy, list_machines,
-                       resolve_machine, start as start_machine,
+                       resolve_machine, split_machine_id,
+                       start as start_machine,
                        stop as stop_machine)
 from .script_runner import ScriptRuntimeError, run_script
 from .workflows import _cli_machine_config, start as start_legacy
@@ -258,21 +259,24 @@ def _list_machines(arguments):
         or arguments.blueprint)
     machines = list_machines(
         home=arguments.home, blueprint=filter_blueprint)
-    id_width = max(
-        [8] + [len(state["id"]) for state in machines],
-        default=8)
     bp_width = max(
-        [18] + [len(state.get("blueprint") or "-")
+        [9] + [len(state.get("blueprint") or "-")
                 for state in machines],
-        default=18)
-    print(f"{'ID':<{id_width}}  {'BLUEPRINT':<{bp_width}}  "
+        default=9)
+    num_width = max(
+        [6] + [len(str(split_machine_id(state["id"])[1]))
+                for state in machines
+                if split_machine_id(state["id"]) is not None],
+        default=6)
+    print(f"{'BLUEPRINT':<{bp_width}}  {'NUMBER':>{num_width}}  "
           f"{'PHASE':<8}  BACKEND")
     for state in machines:
-        sid = state["id"]
         blueprint = state.get("blueprint") or "-"
+        parsed = split_machine_id(state["id"])
+        number = str(parsed[1]) if parsed else "-"
         phase = state.get("phase") or "?"
         backend = state.get("backend") or "qemu"
-        print(f"{sid:<{id_width}}  {blueprint:<{bp_width}}  "
+        print(f"{blueprint:<{bp_width}}  {number:>{num_width}}  "
               f"{phase:<8}  {backend}")
     return 0
 
