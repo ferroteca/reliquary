@@ -84,15 +84,21 @@ is not yet implemented.
   across the `media/` library, failing on duplicates. Mirror URL
   lists and several definitions sharing one archive remain
   unimplemented (milestone 2).
-- `fetch_media(name, home=None)` returns a defined item's verified
-  payload on demand, trying the cheapest source first: an existing
-  payload that verifies is returned untouched, a cached source
-  archive that verifies is re-extracted, and only then is the
-  definition's URL downloaded. Source archives are cached under
-  `cache/downloads/` and payloads under `cache/media/`; every file is
-  SHA-256-verified before use, a payload or archive failing
-  verification is refetched when a source exists, and a missing
-  source is an error naming the item, file, and hashes.
+- `fetch_media(name, home=None, on_mismatch="fail")` returns a
+  defined item's verified payload on demand, trying the cheapest
+  source first: an existing payload that verifies is returned
+  untouched, a cached source archive that verifies is re-extracted,
+  and only then is the definition's URL downloaded. Source archives
+  are cached under `cache/downloads/` and payloads under
+  `cache/media/`; every file is SHA-256-verified before use, and a
+  missing source is an error naming the item, file, and hashes.
+  An existing payload or archive that fails its hash is never
+  silently discarded: `on_mismatch` picks between failing fast with
+  both hashes (`"fail"`, the default), an interactive
+  delete-and-refetch checkpoint (`"prompt"`), and pre-approved
+  deletion (`"refetch"`, which the planned `--refetch-mismatched`
+  CLI flag will map to). A mismatched file whose definition names no
+  source is always kept and reported.
 - Path helpers for the planned blueprint home layout:
   `blueprints_dir`, `media_dir`, `scripts_dir`, `cache_dir`,
   `downloads_cache_dir`, `media_cache_dir`, and `machines_cache_dir`

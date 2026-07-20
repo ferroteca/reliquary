@@ -312,6 +312,37 @@ def resolve_media(name, home=None):
     return ResolvedMedia(definition=definition, item=item)
 
 
+_MISMATCH_POLICIES = ("fail", "prompt", "refetch")
+
+
+def _approve_refetch(path, actual, expected, on_mismatch):
+    """Gate discarding an existing file that fails verification.
+
+    Returns when the mismatched file may be deleted and fetched
+    again; raises RuntimeError when it must be kept — the "fail"
+    policy (the programmatic default) and a declined "prompt" both
+    keep it. Only called when a source exists to refetch from.
+    """
+    if on_mismatch == "refetch":
+        print(f"existing file {path} does not match its defined "
+              f"hash; deleting for refetch", file=sys.stderr)
+        return
+    if on_mismatch == "prompt":
+        try:
+            answer = input(
+                f"Existing file {path} does not match its defined "
+                f"hash (SHA-256 {actual}, expected {expected}). "
+                f"Delete it and fetch again? [y/N] ")
+        except EOFError:
+            answer = ""
+        if answer.strip().lower() in ("y", "yes"):
+            return
+    raise RuntimeError(
+        f"existing file {path} has SHA-256 {actual}, expected "
+        f"{expected}; delete it, or pre-approve the deletion with "
+        f"on_mismatch='refetch' to fetch it again")
+
+
 def _payload_path(item, home=None):
     """Return where the item's payload file lives (or will land).
 
@@ -328,7 +359,7 @@ def _payload_path(item, home=None):
     return os.path.join(media_cache_dir(home), cached)
 
 
-def fetch_media(name, home=None):
+def fetch_media(name, home=None, on_mismatch="fail"):
     """Return the named item's verified payload path, fetching it on
     demand.
 
@@ -337,22 +368,37 @@ def fetch_media(name, home=None):
     cached source archive that verifies is re-extracted; only then is
     the definition's url downloaded. Archives land in
     `cache/downloads/` and stay there; payloads land in
-    `cache/media/`. Every file is SHA-256-verified before use. A
-    payload failing verification is treated as absent and refetched;
-    without a source, that is an error naming the item, the file, and
-    both hashes.
+    `cache/media/`. Every file is SHA-256-verified before use.
+
+    An existing payload or archive that fails verification is never
+    silently discarded; `on_mismatch` decides its fate: "fail" (the
+    default) raises an error naming the file and both hashes,
+    "prompt" asks interactively before deleting and refetching, and
+    "refetch" pre-approves the deletion. A mismatched or missing
+    file whose definition names no source is always an error.
     """
+    if on_mismatch not in _MISMATCH_POLICIES:
+        raise ValueError(
+            f"on_mismatch must be one of {_MISMATCH_POLICIES}, "
+            f"got: {on_mismatch!r}")
     resolved = resolve_media(name, home)
     definition, item = resolved.definition, resolved.item
     destination = _payload_path(item, home)
     actual = _sha256(destination) if os.path.exists(destination) else None
     if actual == item.sha256:
         return destination
+    has_source = (definition.archive is not None
+                  or definition.url is not None)
     if actual is not None:
-        print(f"cached media failed verification: {destination}",
-              file=sys.stderr)
+        if not has_source:
+            raise RuntimeError(
+                f"media {item.name} ({item.file}) at {destination} "
+                f"has SHA-256 {actual}, expected {item.sha256}, and "
+                f"its definition names no source to refetch it from")
+        _approve_refetch(destination, actual, item.sha256, on_mismatch)
+        os.remove(destination)
     if definition.archive is not None:
-        archive = _ensure_archive(definition, home)
+        archive = _ensure_archive(definition, home, on_mismatch)
         _extract_item(archive, item, destination)
         return destination
     if definition.url is not None:
@@ -365,30 +411,33 @@ def fetch_media(name, home=None):
                 f"{definition.url} has SHA-256 {downloaded}, "
                 f"expected {item.sha256}")
         return destination
-    if actual is None:
-        raise RuntimeError(
-            f"media {item.name} ({item.file}) is missing at "
-            f"{destination} (expected SHA-256 {item.sha256}) and its "
-            f"definition names no source to fetch it from")
     raise RuntimeError(
-        f"media {item.name} ({item.file}) at {destination} has "
-        f"SHA-256 {actual}, expected {item.sha256}, and its "
-        f"definition names no source to refetch it from")
+        f"media {item.name} ({item.file}) is missing at "
+        f"{destination} (expected SHA-256 {item.sha256}) and its "
+        f"definition names no source to fetch it from")
 
 
-def _ensure_archive(definition, home):
+def _ensure_archive(definition, home, on_mismatch):
     """Return the definition's verified source archive in the cache.
 
-    A cached archive that verifies is reused; one that fails
-    verification is discarded and downloaded again when the
-    definition has a url, and is otherwise an error.
+    A cached archive that verifies is reused. One that fails
+    verification is kept and reported unless `on_mismatch` approves
+    deleting it (and a url exists) for a fresh download; a
+    mismatched or missing archive without a url is always an error.
     """
     archive = os.path.join(downloads_cache_dir(home), definition.archive)
     if os.path.exists(archive):
-        if _sha256(archive) == definition.archive_sha256:
+        actual = _sha256(archive)
+        if actual == definition.archive_sha256:
             return archive
-        print(f"cached archive failed verification, discarding: "
-              f"{archive}", file=sys.stderr)
+        if definition.url is None:
+            raise RuntimeError(
+                f"source archive {definition.archive} at {archive} "
+                f"has SHA-256 {actual}, expected "
+                f"{definition.archive_sha256}, and its definition "
+                f"names no url to refetch it from")
+        _approve_refetch(archive, actual, definition.archive_sha256,
+                         on_mismatch)
         os.remove(archive)
     if definition.url is None:
         raise RuntimeError(

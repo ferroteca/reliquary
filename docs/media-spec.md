@@ -231,8 +231,9 @@ each `items` entry of the archive form:
   drives, so it is worth correcting here.
 - **`sha256`** — required. Hex SHA-256 of the payload file. The
   payload is verified against it on every use; a file that fails
-  verification is treated as absent (and refetched when a source
-  is available — a corrupted cache heals itself).
+  verification is refetched when a source is available and the
+  deletion is approved (see
+  [mismatched files](#mismatched-files)).
 - **`local-path`** — optional. A custom local path for the payload
   file, in place of the default `cache/media/<file>`. Use it when
   a media item should live (or already lives) somewhere else —
@@ -364,8 +365,36 @@ plain error naming the item, the file, and both hashes. In
 particular, **every machine `start` re-verifies the hash of every
 media item the machine references** before the machine boots — a
 payload that no longer verifies is refetched when its definition
-allows, and is otherwise an error; a machine never boots against
-silently changed media.
+allows and the deletion is approved (below), and is otherwise an
+error; a machine never boots against silently changed media.
+
+### Mismatched files
+
+An existing payload or cached archive that fails its hash is
+never silently discarded — the file may be evidence, or the
+definition may simply be wrong. What happens instead depends on
+how reliquary is running:
+
+- **Interactively**, the mismatch is a checkpoint: reliquary asks
+  (`Existing file <path> does not match its defined hash … Delete
+  it and fetch again? [y/N]`) and only deletes and refetches on a
+  yes. Declining keeps the file and fails the operation.
+- **Programmatically** (and whenever input is not a terminal),
+  the mismatch fails fast with an error naming the file and both
+  hashes.
+- The deletion can be **pre-approved**: the CLI flag
+  `--refetch-mismatched` on commands that fetch media, or the
+  embedding API's `on_mismatch="refetch"` option
+  (`fetch_media(name, home=None, on_mismatch="fail")`; the CLI
+  maps interactive runs to `"prompt"`).
+
+A mismatched file whose definition names no source is always kept
+and reported — with nothing to refetch from, deleting it could
+destroy the only copy.
+
+A *freshly downloaded or extracted* file that fails verification
+is not a checkpoint: the partial result is deleted and the
+failure reported; no pre-existing file is touched.
 
 ## Cleaning
 

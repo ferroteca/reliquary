@@ -744,8 +744,12 @@ Deliverables:
    payloads under `cache/media/`; fetch/extract/verify on demand,
    cheapest source first (verified payload, then cached archive,
    then mirrors). Verification on every use: a payload that fails
-   its hash is treated as absent and refetched when a source
-   exists — the cache heals itself.
+   its hash is refetched when a source exists and the deletion is
+   approved — an interactive checkpoint, a fast programmatic
+   failure, or pre-approval (`--refetch-mismatched` on the CLI,
+   `on_mismatch="refetch"` in the API); a mismatched file with no
+   source is always kept and reported (see the media spec's
+   mismatched-files rules).
 4. `rlq fetch <media_name>` and `reliquary clean
    downloads` / `clean media` (nothing irreplaceable —
    definitions, `local-path` files, sourceless payloads — is
@@ -756,7 +760,8 @@ Deliverables:
    `pull media <name>`.
 
 Done when: the FreeDOS media flows through a definition end to
-end; a deliberately corrupted cached payload heals on next use;
+end; a deliberately corrupted cached payload heals on next use
+once its deletion is approved and is kept intact when it is not;
 `clean` reclaims only restorable files; the install script passes
 on the completed layer.
 

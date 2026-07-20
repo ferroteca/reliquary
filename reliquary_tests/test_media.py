@@ -609,9 +609,10 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
         self.payload_path = os.path.join(
             self.home, "cache", "media", "msdos622-boot.img")
 
-    def _fetch(self, urlopen):
+    def _fetch(self, urlopen, on_mismatch="fail"):
         with mock.patch("reliquary.media.urlopen", urlopen):
-            return fetch_media("msdos622-boot", home=self.home)
+            return fetch_media("msdos622-boot", home=self.home,
+                               on_mismatch=on_mismatch)
 
     def test_download_lands_in_media_cache(self):
         """The payload downloads straight into cache/media/ under its
@@ -634,15 +635,66 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
         urlopen.assert_not_called()
         self.assertEqual(result, self.payload_path)
 
-    def test_corrupt_payload_is_refetched(self):
-        """A payload failing verification is treated as absent and
-        downloaded again."""
+    def _write_corrupt_payload(self):
         os.makedirs(os.path.dirname(self.payload_path))
         with open(self.payload_path, "wb") as handle:
             handle.write(b"corrupted")
-        result = self._fetch(mock.Mock(return_value=io.BytesIO(PAYLOAD)))
+        return hashlib.sha256(b"corrupted").hexdigest()
+
+    def test_corrupt_payload_fails_fast_by_default(self):
+        """A payload failing verification is kept and reported with
+        both hashes unless its deletion is approved."""
+        corrupted_sha256 = self._write_corrupt_payload()
+        urlopen = mock.Mock()
+        with self.assertRaises(RuntimeError) as caught:
+            self._fetch(urlopen)
+        urlopen.assert_not_called()
+        message = str(caught.exception)
+        self.assertIn(PAYLOAD_SHA256, message)
+        self.assertIn(corrupted_sha256, message)
+        with open(self.payload_path, "rb") as handle:
+            self.assertEqual(handle.read(), b"corrupted")
+
+    def test_corrupt_payload_is_refetched_when_preapproved(self):
+        """With on_mismatch="refetch", a payload failing verification
+        is deleted and downloaded again."""
+        self._write_corrupt_payload()
+        result = self._fetch(mock.Mock(return_value=io.BytesIO(PAYLOAD)),
+                             on_mismatch="refetch")
         with open(result, "rb") as handle:
             self.assertEqual(handle.read(), PAYLOAD)
+
+    def test_corrupt_payload_prompt_approved_refetches(self):
+        """With on_mismatch="prompt", answering yes deletes the
+        mismatched payload and fetches again."""
+        self._write_corrupt_payload()
+        with mock.patch("builtins.input", return_value="y") as asked:
+            result = self._fetch(
+                mock.Mock(return_value=io.BytesIO(PAYLOAD)),
+                on_mismatch="prompt")
+        asked.assert_called_once()
+        self.assertIn(self.payload_path, asked.call_args[0][0])
+        with open(result, "rb") as handle:
+            self.assertEqual(handle.read(), PAYLOAD)
+
+    def test_corrupt_payload_prompt_declined_keeps_file(self):
+        """With on_mismatch="prompt", declining keeps the mismatched
+        payload and raises."""
+        self._write_corrupt_payload()
+        urlopen = mock.Mock()
+        with mock.patch("builtins.input", return_value="n"):
+            with self.assertRaises(RuntimeError):
+                self._fetch(urlopen, on_mismatch="prompt")
+        urlopen.assert_not_called()
+        with open(self.payload_path, "rb") as handle:
+            self.assertEqual(handle.read(), b"corrupted")
+
+    def test_invalid_on_mismatch_rejected(self):
+        """An unknown on_mismatch policy raises ValueError."""
+        with self.assertRaises(ValueError) as caught:
+            fetch_media("msdos622-boot", home=self.home,
+                        on_mismatch="heal")
+        self.assertIn("on_mismatch", str(caught.exception))
 
     def test_unverifiable_download_is_erased_and_reported(self):
         """A download failing verification is deleted and raises with
@@ -742,9 +794,11 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
         self.payload_path = os.path.join(
             self.home, "cache", "media", "freedos-1.4-livecd.iso")
 
-    def _fetch(self, urlopen, name="freedos-1.4-livecd"):
+    def _fetch(self, urlopen, name="freedos-1.4-livecd",
+               on_mismatch="fail"):
         with mock.patch("reliquary.media.urlopen", urlopen):
-            return fetch_media(name, home=self.home)
+            return fetch_media(name, home=self.home,
+                               on_mismatch=on_mismatch)
 
     def test_livecd_zip_lands_as_verified_iso(self):
         """The spike exit criterion: the zip downloads into
@@ -795,17 +849,57 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
         self.assertEqual(result, self.payload_path)
         self.assertFalse(os.path.exists(self.archive_path))
 
-    def test_corrupt_cached_archive_is_redownloaded(self):
-        """A cached archive failing verification is discarded and
-        downloaded again."""
+    def test_corrupt_cached_archive_fails_fast_by_default(self):
+        """A cached archive failing verification is kept and reported
+        with both hashes unless its deletion is approved."""
+        os.makedirs(os.path.dirname(self.archive_path))
+        with open(self.archive_path, "wb") as handle:
+            handle.write(b"corrupted")
+        corrupted_sha256 = hashlib.sha256(b"corrupted").hexdigest()
+        urlopen = mock.Mock()
+        with self.assertRaises(RuntimeError) as caught:
+            self._fetch(urlopen)
+        urlopen.assert_not_called()
+        message = str(caught.exception)
+        self.assertIn(self.zip_sha256, message)
+        self.assertIn(corrupted_sha256, message)
+        self.assertTrue(os.path.exists(self.archive_path))
+
+    def test_corrupt_cached_archive_is_redownloaded_when_preapproved(self):
+        """With on_mismatch="refetch", a cached archive failing
+        verification is discarded and downloaded again."""
         os.makedirs(os.path.dirname(self.archive_path))
         with open(self.archive_path, "wb") as handle:
             handle.write(b"corrupted")
         urlopen = mock.Mock(return_value=io.BytesIO(self.zip_payload))
-        result = self._fetch(urlopen)
+        result = self._fetch(urlopen, on_mismatch="refetch")
         urlopen.assert_called_once_with(URL)
         with open(result, "rb") as handle:
             self.assertEqual(handle.read(), ISO_BYTES)
+
+    def test_corrupt_sourceless_archive_is_kept_and_reported(self):
+        """A mismatched archive whose definition has no url is never
+        deleted — the error names both hashes and keeps the file."""
+        self.write_definition("sourceless.json", {
+            "archive": "handmade.zip",
+            "sha256": self.zip_sha256,
+            "items": [{"name": "handmade-boot", "file": "boot.img",
+                       "sha256": BOOT_SHA256}]
+        })
+        archive = os.path.join(
+            self.home, "cache", "downloads", "handmade.zip")
+        os.makedirs(os.path.dirname(archive))
+        with open(archive, "wb") as handle:
+            handle.write(b"corrupted")
+        corrupted_sha256 = hashlib.sha256(b"corrupted").hexdigest()
+        with self.assertRaises(RuntimeError) as caught:
+            fetch_media("handmade-boot", home=self.home,
+                        on_mismatch="refetch")
+        message = str(caught.exception)
+        self.assertIn(self.zip_sha256, message)
+        self.assertIn(corrupted_sha256, message)
+        with open(archive, "rb") as handle:
+            self.assertEqual(handle.read(), b"corrupted")
 
     def test_missing_archive_without_url_reports_archive(self):
         """No cached archive and no url is an error naming the
@@ -858,8 +952,8 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
         self.assertFalse(os.path.exists(self.payload_path + ".part"))
 
     def test_corrupt_payload_heals_from_cached_archive(self):
-        """A corrupted payload is re-extracted from the cached
-        archive — the cache heals itself without a download."""
+        """With an approved deletion, a corrupted payload is
+        re-extracted from the cached archive without a download."""
         os.makedirs(os.path.dirname(self.archive_path))
         with open(self.archive_path, "wb") as handle:
             handle.write(self.zip_payload)
@@ -867,7 +961,7 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
         with open(self.payload_path, "wb") as handle:
             handle.write(b"corrupted")
         urlopen = mock.Mock()
-        result = self._fetch(urlopen)
+        result = self._fetch(urlopen, on_mismatch="refetch")
         urlopen.assert_not_called()
         with open(result, "rb") as handle:
             self.assertEqual(handle.read(), ISO_BYTES)
