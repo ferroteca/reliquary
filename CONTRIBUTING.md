@@ -5,9 +5,9 @@ tests, and code changes are welcome when they preserve the project's BSD
 licensing and its role as a self-contained OS installation scripter
 with an agentless QEMU guest automation layer.
 
-reliquary is pre-release. Contributions that implement a recipe should follow
-the recipe module convention documented in ROADMAP.md; the engineering
-constraints and invariants for the machine layer are in AGENTS.md.
+reliquary is pre-release. Contributions that add built-in blueprints,
+media definitions, or scripts should follow the repository structure in
+AGENTS.md and keep user-facing documentation synchronized.
 
 ## Before you start
 

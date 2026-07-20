@@ -12,8 +12,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > may still change before first release.
 
 Complete, working blueprints for common machine shapes. Each
-recipe shows the blueprint (what you write) and, where
-instructive, the state document reliquary resolves it into.
+entry shows the blueprint (what you write) and, where instructive,
+the state document reliquary resolves it into.
 Concepts — including the blueprint/state split — are in
 [the guide](machine-blueprint.md); every rule is in the
 [field reference](machine-blueprint-reference.md).
@@ -272,7 +272,7 @@ with its system disk on SCSI and the installer CD on IDE:
 ```
 
 The CD-ROM takes the platform default (`ide`). Omit `controller`
-everywhere — as every earlier recipe does — and you get `ide`
+everywhere — as every earlier example does — and you get `ide`
 across the board, which is what DOS-era guests want.
 
 Vendor variants (BusLogic vs. LsiLogic, etc.) are backend-specific

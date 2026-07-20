@@ -579,12 +579,11 @@ Language design goals:
   after the language is proven, existing forms retain their
   meanings and new capabilities stay explicit and preflightable.
 
-OS installation recipes became install scripts: the former
-`recipes/` Python package was retired in milestone 1, once the
-language core could express the FreeDOS plain install end to end. Media acquisition (download,
-hash-verify, cache under `cache/media/`) stays a host-side capability
-the language can invoke, with pinned hashes kept in shared
-definitions or directly inside the script.
+OS installation automation is expressed as install and verify scripts
+attached to machine blueprints. Media acquisition (download, hash-verify,
+cache under `cache/media/`) stays a host-side capability the language can
+invoke, with pinned hashes kept in shared definitions or directly inside
+the script.
 
 ## Milestones
 
@@ -620,8 +619,8 @@ installed FreeDOS machine that can then be started and stopped
 from the reliquary command line. Everything in this milestone is
 the minimum vertical slice of the documented design needed to get
 there — each piece grows to its full spec in milestones 2–5. The
-current recipe stack (`recipes/`, `reliquary install`) is
-subsumed and deleted here.
+built-in blueprint bundle is the public vertical slice for this
+milestone.
 
 Deliverables:
 
@@ -650,9 +649,9 @@ Deliverables:
    first reference, the never-overwrite rule, and
    `freedos-1.4-plain` — blueprint, media definitions, and
    install/verify scripts — as its first entries.
-5. `recipes/` and the `install` command deleted; the old
-   root-home `drives/`/`machine.json`/`vm.json` layout replaced
-   (pre-release: no migration).
+5. The built-in blueprint flow replaces the old root-home
+   `drives/`/`machine.json`/`vm.json` layout (pre-release: no
+   migration).
 
 Spikes (ordered; each leaves the tree green and proves one
 seam; later spikes consume earlier ones). Suggested parallel
@@ -719,12 +718,11 @@ semantics reach into `start` reconciliation).
     scripts in `builtins/`. Exit: artifacts resolve and the
     install script matches the LiveCD flow. Out: other OS
     builtins.
-12. **Verify path + retire recipes (complete)** — `script verify` boots the
+12. **Verify path (complete)** — `script verify` boots the
     installed HDD through spike 13's model (blueprint boots
     `hdd0` then `cdrom0`; install script's final `eject` leaves
-    a plain `start` booting the hard disk); delete `recipes/` and
-    `install`. Exit: north-star done criteria green; `install`
-    command gone. Out: full milestone-3 `apply` semantics.
+    a plain `start` booting the hard disk). Exit: north-star done
+    criteria green. Out: full milestone-3 `apply` semantics.
 13. **Media-in-script model (complete)** — the machine-state design for
     install media: blueprints declare empty removable drives
     (`"cdrom0": null`) and no installer media — the blueprint

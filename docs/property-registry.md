@@ -200,8 +200,9 @@ machine is created or started.
 
 ## Sharing
 
-`properties.json` is personal configuration, not part of a shareable recipe.
-A recipe shares input declarations and recommended property names; each
-recipient supplies their own registry, response file, or interactive answers.
+`properties.json` is personal configuration, not part of a shareable
+blueprint/script bundle. A bundle shares input declarations and
+recommended property names; each recipient supplies their own registry,
+response file, or interactive answers.
 Example response files contain only non-sensitive illustrative values. Secret
 markers and credentials are never installed from scripts.

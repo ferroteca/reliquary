@@ -1016,13 +1016,13 @@ anyway while the CD remains attached).
 
 ## Sharing
 
-A shareable recipe consists of its script, machine blueprint, any
-separate shared media definitions, and an example response file
-containing only non-sensitive illustrative values. Media definitions
-embedded in a script are installed into the recipient's shared
-library on first run. Definitions already reused by several scripts
-may be distributed directly under `media/` instead. The user property
-registry, personal or secret response files, and staged payloads stay
-out of the recipe and version control. A script may recommend property
-keys, but every recipient supplies their own values. Media remains
-hash-pinned and independently fetched.
+A shareable blueprint/script bundle consists of its script, machine
+blueprint, any separate shared media definitions, and an example response
+file containing only non-sensitive illustrative values. Media definitions
+embedded in a script are installed into the recipient's shared library on
+first run. Definitions already reused by several scripts may be
+distributed directly under `media/` instead. The user property registry,
+personal or secret response files, and staged payloads stay out of the
+bundle and version control. A script may recommend property keys, but
+every recipient supplies their own values. Media remains hash-pinned and
+independently fetched.

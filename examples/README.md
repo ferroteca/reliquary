@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > definition as a separate library document (the built-in
 > `freedos-1.4-plain` artifacts ship it that way).
 
-A complete, shareable FreeDOS 1.4 plain-install recipe in
+A complete, shareable FreeDOS 1.4 plain-install blueprint bundle in
 reliquary's document formats. The directories mirror the reliquary
 home; copy each file into the matching directory of your home:
 

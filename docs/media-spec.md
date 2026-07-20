@@ -424,6 +424,6 @@ Media definitions travel well: they are small, hash-pinned, and
 machine-independent. A definition may be distributed directly under
 `media/` or embedded in a script and installed into the recipient's
 library on first run. The latter produces a more self-contained
-recipe without changing the persistent catalog, cache, or
+script bundle without changing the persistent catalog, cache, or
 verification model. Either form gives everyone the same verified
 inputs without shipping the payloads themselves.

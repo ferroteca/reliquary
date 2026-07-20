@@ -2,9 +2,9 @@
 
 reliquary scripts OS installations from standard vendor installation media
 and produces bootable disk images without manual interaction. It is built on
-its own agentless QEMU guest automation layer (formerly the separate relict
-project), which owns QEMU lifecycle, media, QMP identity checks, keyboard
-input, screen access, screenshots, and per-run state.
+its own agentless QEMU guest automation layer, which owns QEMU lifecycle,
+media, QMP identity checks, keyboard input, screen access, screenshots, and
+per-run state.
 
 reliquary machines are ephemeral: disposable rigs for scripted installs and
 automated guest tasks, cheap to destroy and recreate. The machine is never

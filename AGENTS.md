@@ -7,8 +7,8 @@ maintenance context.
 ## Project state and layout
 
 reliquary is an OS installation scripter built on its own generic QEMU
-runner (the machine layer, formerly the separate relict project), with DOS
-as the default and currently only complete platform workflow:
+runner, with DOS as the default and currently only complete platform
+workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
   resolution, layout, and containment, `blueprint.py` parses the milestone-1 machine blueprint subset and resolves

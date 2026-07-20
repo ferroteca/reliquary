@@ -9,23 +9,24 @@ All notable changes to reliquary are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.0.dev1 (unreleased)
+
+### Changed
+
+- Scrubbed private project-history references from release-facing
+  documentation and package metadata.
+- Removed obsolete references to a superseded installation abstraction;
+  built-in blueprints, media definitions, and scripts are the documented
+  sharing model.
+
 ## 0.1.0.dev0 - 2026-07-20
 
-The relict project — the agentless QEMU guest automation harness reliquary
-was built on — has been folded into reliquary. Its modules now live in the
-`reliquary` package (its drive-inventory module renamed to `drives.py`), its
-CLI commands are `reliquary` subcommands alongside `install`, and its home,
-`RELICT_HOME`/`RELICT_QEMU_HOME` environment variables, and default
-`Documents/relict` directory are replaced by the reliquary equivalents
-(`RELIQUARY_HOME`, `RELIQUARY_QEMU_HOME`, `Documents/reliquary`). The notes
-below merge both projects' unreleased histories with the relict entries
-renamed accordingly.
+Initial development release of reliquary's agentless QEMU guest automation
+and OS installation scripting surface.
 
-### Recipe layer
+### Script layer
 
-Initial scaffold: package structure, CLI stub, and recipe module convention.
-
-The planned `.rlqs` scripting language now separates linear scripts
+The `.rlqs` scripting language separates linear scripts
 from explicit state machines, uses run-to-completion reactive states,
 and adds immutable text, media, and secret inputs bound from JSON
 responses, a home-wide user property registry, or interactive prompts.
@@ -42,33 +43,21 @@ remains console or menu input, while host power cycling is the explicit
 offline file-exchange semantics are specified consistently ahead of
 implementation.
 
-Added the `freedos-plain` recipe's preparation steps: the FreeDOS 1.4
-LiveCD ISO is downloaded into the reliquary home (the distribution
-zip is deleted after extraction) and SHA-256 verified on every run,
-and
-a 20 MiB dynamically allocated qcow2 (v3) target disk is created. The
-`reliquary install <recipe>` CLI command runs a recipe by name, and
-`--display` (the `display` recipe parameter) requests a visible QEMU
-window for a recipe's guest steps.
-
-The recipe now extracts the LiveCD ISO and boots the installation
-machine with the ISO and target disk mounted, booting
-from the CD. After start it waits for the LiveCD's first install menu
+The built-in `freedos-1.4-plain` blueprint bundle downloads the FreeDOS
+1.4 LiveCD ISO into the reliquary home, verifies it by SHA-256 on every
+use, creates a 20 MiB dynamically allocated qcow2 (v3) target disk, and
+boots the installation machine from the CD. After start it waits for the
+LiveCD's first install menu
 (`Welcome to FreeDOS 1.4 (LiveCD)`), selects "Install to harddisk",
 accepts the defaults for preferred language and the installer welcome
 screen with Enter, confirms partitioning drive C: and the required
 reboot with Yes, accepts the default keyboard layout with Enter,
 chooses the "Plain DOS system" package set (excluding the "with
 sources" sibling), and confirms with Yes on the ready-to-install
-prompt. `install` then blocks while the machine runs and always shuts
-it down when it ends — including on Ctrl-C, which the CLI reports as
-an interruption instead of a traceback.
+prompt. The install script runs through the blueprint machine model and
+leaves the machine stopped with the CD ejected.
 
-The recipe layer has since been retired in favor of the `.rlqs`
-install/verify scripts on the blueprint machine model (see the
-machine-layer notes below); `rlq install` no longer exists.
-
-### Machine layer (formerly relict)
+### Machine layer
 
 ### Changed
 
@@ -90,15 +79,6 @@ machine-layer notes below); `rlq install` no longer exists.
   replacing it. An explicit `enabled: true` on the configured entry
   remains the deliberate way to override the filesystem drive, and
   `enabled: false` still unmounts it.
-
-### Removed
-
-- The recipe layer is retired (milestone-1 Spike 12): the `recipes/`
-  package, the `rlq install <recipe>` command, and the recipe-era
-  helpers (`ensure_media`, `install-media/` and `machines/<recipe>/`
-  home paths) are deleted. The `.rlqs` install/verify scripts on the
-  blueprint machine model replace them; there is no migration
-  (pre-release).
 
 ### Added
 
