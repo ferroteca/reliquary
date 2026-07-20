@@ -647,6 +647,73 @@ Deliverables:
    root-home `drives/`/`machine.json`/`vm.json` layout replaced
    (pre-release: no migration).
 
+Spikes (ordered; each leaves the tree green and proves one
+seam; later spikes consume earlier ones). Suggested parallel
+tracks: 1→2→3→4→5→6 alongside 8, then 7→9→10→11→12. Spike 7
+can start after 4; spike 9 needs 6 and 8. Highest risk: 3
+(cache/hash rules), 9 (LiveCD menu timing), 12 (verify needs a
+boot/media change the M1 CLI list does not name — decide a thin
+`apply` or equivalent in that spike).
+
+1. **New home layout** — `blueprints/`, `media/`, `scripts/`,
+   `cache/{downloads,media,machines}/`; retire root `drives/` /
+   `machine.json` / `vm.json` as the active model. Exit: unit
+   tests assert layout helpers; old paths unused by new code.
+   Out: migration.
+2. **Media definition (item form only)** — parse/validate one
+   FreeDOS-shaped definition; resolve by name from `media/`.
+   Exit: load a `freedos-1.4-livecd`-like JSON; reject bad
+   hashes/fields. Out: archive multi-item, `search`/`list`/
+   `clean`, eager whole-library scan extras.
+3. **Fetch → two caches** — download → `cache/downloads/`,
+   extract/verify → `cache/media/`. Exit: one LiveCD zip lands
+   as a verified `.iso` on demand; never-overwrite payload.
+   Out: CLI media verbs, mirror lists beyond what is needed.
+4. **Blueprint subset** — parse/validate `platform`, `memory`,
+   `drives` (`size`/`media`), `boot`, `name`, `description`,
+   `scripts`. Exit: reject unknown/invalid; resolve media names
+   against spike 2. Out: controllers, `base`,
+   `backend-settings`, `apply`, full cookbook.
+5. **Machine materialize** — `create` → `cache/machines/<id>/`
+   + `reliquary-machine.json` + qcow2 from `size`; attach
+   cached media. Exit: `create` then inspect state/drives; QEMU
+   can see the ISO. Out: locking/recovery polish, `recreate`,
+   clone/export.
+6. **Lifecycle CLI** — `start` / `stop` / `destroy` /
+   `list machines`; `--blueprint` (sole machine) /
+   `--machine` prefix. Exit: start/stop a created
+   FreeDOS-shaped machine from the CLI. Out: `apply`,
+   interaction subcommands, multi-backend.
+7. **Builtins seed** — `builtins/` tree + copy-out on first
+   reference + never-overwrite (+ packaging zip path). Exit:
+   `--blueprint freedos-1.4-plain` seeds home files once;
+   second call leaves them alone. Out: `pull`, provenance
+   columns, full index/`search`.
+8. **`.rqs` parse (FreeDOS shape)** — header + state-machine +
+   the verbs that example uses. Exit: parse the documented
+   install script; useful parse errors. Out: linear-only path,
+   `on`/reactive, `attach`/`stage`/`collect`, inputs/properties.
+9. **Script runtime on QEMU/DOS** — `wait`/`expect` on
+   normalized VGA text; `enter`/`type`/`press`/`select`;
+   `screenshot`; `start`/`stop`. Exit: drive a tiny hand
+   fixture script against a live guest (or the LiveCD menu).
+   Out: full waterfall, guest agent, VNC.
+10. **`script <label>` wiring** — resolve via blueprint
+    `scripts` map; create machine if none; run record under
+    `runs/`. Exit: `rlq --blueprint … script install` invokes
+    runtime end to end (may still fail mid-install). Out:
+    embedded media blocks, property-bound inputs.
+11. **Author `freedos-1.4-plain`** — blueprint + media
+    definition (URL + license assertion) + install/verify
+    scripts in `builtins/`. Exit: artifacts resolve and the
+    install script matches the LiveCD flow. Out: other OS
+    builtins.
+12. **Verify path + retire recipes** — minimal way to boot the
+    installed HDD for `script verify` (thin `apply` or
+    M1-equivalent); delete `recipes/` and `install`. Exit:
+    north-star done criteria green; `install` command gone.
+    Out: full milestone-3 `apply` semantics.
+
 Done when: `rlq --blueprint freedos-1.4-plain script
 install` runs unattended from a clean home to an installed
 machine; `rlq --blueprint freedos-1.4-plain script verify`
