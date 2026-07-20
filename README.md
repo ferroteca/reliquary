@@ -347,14 +347,15 @@ and restart QEMU before using them in the guest.
 rlq --blueprint NAME create
 rlq --blueprint NAME start [--display]
 rlq --blueprint NAME stop
-rlq --machine ID destroy
+rlq --blueprint NAME --machine N destroy
+rlq --machine NAME-N destroy
 rlq list machines [--blueprint NAME]
 ```
 
 `--blueprint` selects that blueprint's sole machine (or names the
-blueprint for `create`). `--machine` accepts the full id or any
-unambiguous hex prefix (minimum four characters). Machines live under
-`cache/machines/<id>/`.
+blueprint for `create`). With more than one machine, combine
+`--blueprint NAME --machine N`, or pass the full id as
+`--machine NAME-N`. Machines live under `cache/machines/<blueprint>-<n>/`.
 
 ```powershell
 rlq --home $scratch --blueprint plain create

@@ -170,11 +170,11 @@ state wraps its resolved form with identity, lifecycle, and
 backend facts. See [the instance model](instance-model.md).
 
 **Blueprints have names; machines have ids.** A blueprint's name is its file
-name. A machine's identity is its generated UUID — commands take
-`--machine <id>` with the full id or any unambiguous prefix,
-git-style, and `--blueprint <name>` selects a blueprint's machine when
-exactly one exists. Machines are never renamed; the id is the
-whole identity.
+name. A machine's identity is `<blueprint>-<n>` — commands take
+`--machine <blueprint>-<n>`, or `--blueprint <name> --machine <n>`,
+and `--blueprint <name>` alone selects a blueprint's machine when
+exactly one exists. Destroy frees the number for reuse on the next
+`create`.
 
 ## A first example
 
@@ -202,8 +202,8 @@ rlq stop --blueprint msdos
 `create` resolves the blueprint against an assigned backend,
 materializes the machine under its id-named cache, and prints the
 new id. With only one machine of the blueprint, `--blueprint msdos` selects
-it everywhere; `--machine <id>` (any unambiguous prefix) always
-works and is required once a blueprint has several machines.
+it everywhere; `--machine msdos-0` or `--blueprint msdos --machine 0`
+always works and is required once a blueprint has several machines.
 
 ## Blueprint and state
 

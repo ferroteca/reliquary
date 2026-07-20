@@ -2,11 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Machine materialization and cached-state management."""
 
+import contextlib
 import json
 import os
-import re
 import shutil
-import uuid
 from datetime import datetime, timezone
 
 from .blueprint import load_blueprint
@@ -18,8 +17,6 @@ from .lifecycle import (create_hdd_image, find_qemu, launch_owned_qemu,
 from .media import fetch_media
 
 
-_MIN_PREFIX = 4
-_HEX_ID = re.compile(r"[0-9a-f]+")
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 _PLATFORM_MEMORY = {
     "dos": 16,
@@ -42,18 +39,102 @@ def _state_path(machine_id, home=None):
                         "reliquary-machine.json")
 
 
+def machine_id_for(blueprint_name, number):
+    """Return the canonical machine id for a blueprint and number."""
+    return f"{blueprint_name}-{number}"
+
+
+def split_machine_id(machine_id):
+    """Return ``(blueprint_name, number)`` for a well-formed id.
+
+    The number is the trailing decimal after the final ``-``.  Returns
+    ``None`` when the id is not ``<blueprint>-<n>``.
+    """
+    if not isinstance(machine_id, str) or "-" not in machine_id:
+        return None
+    blueprint, sep, number = machine_id.rpartition("-")
+    if not sep or not blueprint or not number.isdigit():
+        return None
+    if len(number) > 1 and number.startswith("0"):
+        return None
+    return blueprint, int(number)
+
+
+def _locks_dir(home=None):
+    return os.path.join(machines_cache_dir(home), ".locks")
+
+
+def _lock_file(handle):
+    if os.name == "nt":
+        import msvcrt
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        while True:
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                return
+            except OSError:
+                # LK_LOCK retries ~10s then raises; keep waiting.
+                continue
+    import fcntl
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+
+def _unlock_file(handle):
+    if os.name == "nt":
+        import msvcrt
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    import fcntl
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def _blueprint_alloc_lock(blueprint_name, home=None):
+    """Serialize machine-number allocation for one blueprint."""
+    lock_root = _locks_dir(home)
+    os.makedirs(lock_root, exist_ok=True)
+    lock_path = os.path.join(lock_root, f"{blueprint_name}.lock")
+    with open(lock_path, "a+b") as handle:
+        _lock_file(handle)
+        try:
+            yield
+        finally:
+            _unlock_file(handle)
+
+
+def _allocate_machine_id(blueprint_name, home=None):
+    """Return the lowest free ``<blueprint>-<n>`` id (directories count)."""
+    number = 0
+    while True:
+        machine_id = machine_id_for(blueprint_name, number)
+        if not os.path.exists(machine_dir_path(machine_id, home)):
+            return machine_id
+        number += 1
+
+
 def create(blueprint, *, home=None, blueprint_name=""):
     """Materialize one machine from a parsed Blueprint.
 
-    Creates the machine cache directory under ``cache/machines/<id>/``,
-    writes ``reliquary-machine.json``, creates qcow2 images for
-    every drive declared with ``size``, and fetches every media
-    item to the shared cache (the machine's drives record the
-    payload path).  Returns the generated machine id.
+    Creates the machine cache directory under
+    ``cache/machines/<blueprint>-<n>/``, writes
+    ``reliquary-machine.json``, creates qcow2 images for every drive
+    declared with ``size``, and fetches every media item to the shared
+    cache (the machine's drives record the payload path).  The machine
+    number is the lowest free non-negative integer for that blueprint.
+    Returns the generated machine id.
     """
-    machine_id = uuid.uuid4().hex
-    drives_root = _machine_drives_dir(machine_id, home)
-    os.makedirs(drives_root)
+    if not isinstance(blueprint_name, str) or not blueprint_name:
+        raise ValueError("create requires a non-empty blueprint_name")
+
+    with _blueprint_alloc_lock(blueprint_name, home):
+        machine_id = _allocate_machine_id(blueprint_name, home)
+        drives_root = _machine_drives_dir(machine_id, home)
+        os.makedirs(drives_root)
 
     resolved_drives = {}
     for key, drive in sorted(blueprint.drives.items()):
@@ -139,17 +220,26 @@ def load_machine_state(machine_id, home=None):
         return json.load(handle)
 
 
-def list_machines(home=None, blueprint=None):
-    """Return state dicts for machines under the cache, oldest first.
+def _machine_sort_key(state):
+    """Sort by blueprint name, then machine number, then id."""
+    machine_id = state.get("id") or ""
+    parsed = split_machine_id(machine_id)
+    if parsed is not None:
+        return (parsed[0], parsed[1], machine_id)
+    return (state.get("blueprint") or "", -1, machine_id)
 
-    When ``blueprint`` is set, only machines of that blueprint are
-    returned.
+
+def list_machines(home=None, blueprint=None):
+    """Return state dicts for machines under the cache.
+
+    Ordered by blueprint name, then ascending machine number.  When
+    ``blueprint`` is set, only machines of that blueprint are returned.
     """
     root = machines_cache_dir(home)
     if not os.path.isdir(root):
         return []
     machines = []
-    for entry in sorted(os.listdir(root)):
+    for entry in os.listdir(root):
         path = os.path.join(root, entry, "reliquary-machine.json")
         if not os.path.isfile(path):
             continue
@@ -162,57 +252,88 @@ def list_machines(home=None, blueprint=None):
         if blueprint is not None and state.get("blueprint") != blueprint:
             continue
         machines.append(state)
+    machines.sort(key=_machine_sort_key)
     return machines
-
-
-def short_id(machine_id, home=None):
-    """Return the shortest unambiguous prefix (at least four hex chars)."""
-    ids = [state["id"] for state in list_machines(home)]
-    if machine_id not in ids:
-        ids.append(machine_id)
-    for length in range(_MIN_PREFIX, len(machine_id) + 1):
-        prefix = machine_id[:length]
-        matches = [item for item in ids if item.startswith(prefix)]
-        if len(matches) == 1:
-            return prefix
-    return machine_id
 
 
 def resolve_machine(*, machine=None, blueprint=None, home=None):
     """Resolve a ``--machine`` / ``--blueprint`` selector to one id.
 
-    Exactly one of ``machine`` or ``blueprint`` must be provided.
+    Selectors:
+
+    - ``--blueprint NAME`` alone: the sole machine of that blueprint
+    - ``--machine NAME-N``: the full machine id (or unambiguous prefix)
+    - ``--blueprint NAME --machine N``: machine number ``N`` of that
+      blueprint
     """
-    if machine is not None and blueprint is not None:
-        raise ValueError(
-            "--blueprint and --machine are mutually exclusive")
     if machine is None and blueprint is None:
         raise ValueError(
             "select a machine with --blueprint or --machine")
+    if machine is not None and blueprint is not None:
+        return _resolve_by_blueprint_number(blueprint, machine, home)
     if machine is not None:
-        return _resolve_by_prefix(machine, home)
+        return _resolve_by_id(machine, home)
     return _resolve_by_blueprint(blueprint, home)
 
 
-def _resolve_by_prefix(prefix, home):
-    prefix = prefix.lower()
-    if len(prefix) < _MIN_PREFIX:
+def _parse_machine_number(value):
+    """Parse a machine number from a ``--machine`` value."""
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, str) and value.isdigit():
+        if len(value) > 1 and value.startswith("0"):
+            raise ValueError(
+                f"machine number must not have leading zeros, "
+                f"got: {value!r}")
+        number = int(value)
+    else:
         raise ValueError(
-            f"machine id prefix must be at least {_MIN_PREFIX} "
-            f"hex characters, got: {prefix!r}")
-    if not _HEX_ID.fullmatch(prefix):
+            f"with --blueprint, --machine must be a machine number, "
+            f"got: {value!r}")
+    if number < 0:
         raise ValueError(
-            f"machine id prefix must be hexadecimal, got: {prefix!r}")
+            f"machine number must be non-negative, got: {number}")
+    return number
+
+
+def _resolve_by_blueprint_number(blueprint, machine, home):
+    number = _parse_machine_number(machine)
+    machine_id = machine_id_for(blueprint, number)
+    path = _state_path(machine_id, home)
+    if not os.path.isfile(path):
+        raise ValueError(
+            f"no machine {machine_id!r}\n"
+            f"create one: rlq --blueprint {blueprint} create")
+    state = load_machine_state(machine_id, home)
+    if state.get("blueprint") != blueprint:
+        raise ValueError(
+            f"machine {machine_id!r} belongs to blueprint "
+            f"{state.get('blueprint')!r}, not {blueprint!r}")
+    return machine_id
+
+
+def _resolve_by_id(selector, home):
+    """Resolve a full machine id or unambiguous id prefix."""
+    if not isinstance(selector, str) or not selector:
+        raise ValueError(
+            f"machine id must be a non-empty string, got: {selector!r}")
+    if selector.isdigit():
+        raise ValueError(
+            f"machine number {selector!r} requires --blueprint")
     matches = [state for state in list_machines(home)
-               if state["id"].startswith(prefix)]
+               if state["id"] == selector
+               or state["id"].startswith(selector)]
+    # Prefer exact match when present.
+    exact = [state for state in matches if state["id"] == selector]
+    if exact:
+        return exact[0]["id"]
     if not matches:
-        raise ValueError(f"no machine matches id prefix {prefix!r}")
+        raise ValueError(f"no machine matches id {selector!r}")
     if len(matches) > 1:
-        lines = [f"{prefix!r} matches {len(matches)} machines:"]
+        lines = [f"{selector!r} matches {len(matches)} machines:"]
         for state in matches:
-            sid = short_id(state["id"], home)
             lines.append(
-                f"  {sid}  {state.get('blueprint') or '-'} "
+                f"  {state['id']}  {state.get('blueprint') or '-'} "
                 f"({state.get('phase', '?')})")
         raise ValueError("\n".join(lines))
     return matches[0]["id"]
@@ -227,11 +348,11 @@ def _resolve_by_blueprint(name, home):
     if len(matches) > 1:
         lines = [
             f"blueprint {name!r} has {len(matches)} machines; "
-            "pick one with --machine:",
+            "pick one with --machine <n> or "
+            "--machine <blueprint>-<n>:",
         ]
         for state in matches:
-            sid = short_id(state["id"], home)
-            lines.append(f"  {sid}  ({state.get('phase', '?')})")
+            lines.append(f"  {state['id']}  ({state.get('phase', '?')})")
         raise ValueError("\n".join(lines))
     return matches[0]["id"]
 
@@ -265,10 +386,10 @@ def start(machine_id, *, display=False, home=None):
     phase = state.get("phase")
     if phase == "running":
         raise RuntimeError(
-            f"machine {short_id(machine_id, home)} is already running")
+            f"machine {machine_id} is already running")
     if phase != "ready":
         raise RuntimeError(
-            f"machine {short_id(machine_id, home)} cannot start "
+            f"machine {machine_id} cannot start "
             f"(phase: {phase})")
 
     drives = state.get("drives", {})
@@ -284,7 +405,7 @@ def start(machine_id, *, display=False, home=None):
         memory = _PLATFORM_MEMORY.get(state.get("platform"), 16)
     qemu = find_qemu()
     print(f"using QEMU: {qemu}")
-    vm_name = f"reliquary-{machine_id[:12]}"
+    vm_name = f"reliquary-{machine_id}"
     args = [qemu, "-name", vm_name, "-m", str(memory)]
     args += machine_drive_args(machine_id, home)
     boot = _boot_order(state.get("boot", []), drives)
@@ -304,7 +425,7 @@ def stop(machine_id, home=None):
     phase = state.get("phase")
     if phase != "running":
         raise RuntimeError(
-            f"machine {short_id(machine_id, home)} is not running "
+            f"machine {machine_id} is not running "
             f"(phase: {phase})")
     machine_home = machine_dir_path(machine_id, home)
     try:
@@ -323,12 +444,12 @@ def _removable_drive(state, slot, home):
     phase = state.get("phase")
     if phase != "ready":
         raise RuntimeError(
-            f"machine {short_id(state['id'], home)} must be stopped "
+            f"machine {state['id']} must be stopped "
             f"to change media (phase: {phase})")
     drive = state.get("drives", {}).get(slot)
     if drive is None:
         raise ValueError(
-            f"machine {short_id(state['id'], home)} declares no "
+            f"machine {state['id']} declares no "
             f"drive {slot}")
     if drive.get("medium") not in _REMOVABLE_MEDIA:
         raise ValueError(
@@ -382,7 +503,7 @@ def set_boot_order(machine_id, boot_keys, *, home=None):
     phase = state.get("phase")
     if phase != "ready":
         raise RuntimeError(
-            f"machine {short_id(machine_id, home)} must be stopped "
+            f"machine {machine_id} must be stopped "
             f"to change boot order (phase: {phase})")
     drives = state.get("drives", {})
     if not isinstance(boot_keys, (list, tuple)) or not boot_keys:
@@ -434,11 +555,11 @@ def destroy(machine_id, home=None):
     phase = state.get("phase")
     if phase == "running":
         raise RuntimeError(
-            f"machine {short_id(machine_id, home)} is running; "
+            f"machine {machine_id} is running; "
             "stop it before destroy")
     if phase not in ("ready", "destroying"):
         raise RuntimeError(
-            f"machine {short_id(machine_id, home)} cannot be destroyed "
+            f"machine {machine_id} cannot be destroyed "
             f"(phase: {phase})")
     if phase == "ready":
         _set_phase(machine_id, "destroying", home)

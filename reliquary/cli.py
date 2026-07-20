@@ -20,7 +20,7 @@ from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .machines import (create_from_blueprint, destroy, list_machines,
-                       resolve_machine, short_id, start as start_machine,
+                       resolve_machine, start as start_machine,
                        stop as stop_machine)
 from .script_runner import ScriptRuntimeError, run_script
 from .workflows import _cli_machine_config, start as start_legacy
@@ -40,9 +40,9 @@ def _cli_start_overrides(arguments):
 
 def _require_machine_selector(arguments):
     """Return a resolved machine id from global selectors."""
-    if arguments.blueprint and arguments.machine:
+    if not arguments.blueprint and not arguments.machine:
         raise ValueError(
-            "--blueprint and --machine are mutually exclusive")
+            "select a machine with --blueprint or --machine")
     return resolve_machine(
         machine=arguments.machine,
         blueprint=arguments.blueprint,
@@ -63,12 +63,12 @@ def main(argv=None):
                         "Documents/reliquary")
     parser.add_argument(
         "--blueprint",
-        help="select a blueprint's sole machine "
-             "(or name the blueprint for create / list filter)")
+        help="select a blueprint's sole machine, or combine with "
+             "--machine <n>; names the blueprint for create / list")
     parser.add_argument(
         "--machine",
-        help="select a machine by full id or unambiguous hex prefix "
-             "(minimum four characters)")
+        help="select a machine by id (<blueprint>-<n>), unambiguous "
+             "id prefix, or number with --blueprint")
     parser.add_argument("--port", type=int,
                         help="QMP port (legacy interaction commands; "
                              "new lifecycle stores port per machine)")
@@ -92,12 +92,13 @@ def main(argv=None):
              "root-home machine.json)")
     command.add_argument("--home", help="reliquary home directory")
     command.add_argument(
-        "--blueprint",
-        help="select a blueprint's sole machine")
+        "--blueprint", default=argparse.SUPPRESS,
+        help="select a blueprint's sole machine, or combine with "
+             "--machine <n>")
     command.add_argument(
-        "--machine",
-        help="select a machine by full id or unambiguous hex prefix "
-             "(minimum four characters)")
+        "--machine", default=argparse.SUPPRESS,
+        help="select by id (<blueprint>-<n>), prefix, or number "
+             "with --blueprint")
     command.add_argument("--display", action="store_true")
     command.add_argument(
         "qemu_args", nargs="*",
@@ -109,24 +110,26 @@ def main(argv=None):
              "root-home vm.json)")
     command.add_argument("--home", help="reliquary home directory")
     command.add_argument(
-        "--blueprint",
-        help="select a blueprint's sole machine")
+        "--blueprint", default=argparse.SUPPRESS,
+        help="select a blueprint's sole machine, or combine with "
+             "--machine <n>")
     command.add_argument(
-        "--machine",
-        help="select a machine by full id or unambiguous hex prefix "
-             "(minimum four characters)")
+        "--machine", default=argparse.SUPPRESS,
+        help="select by id (<blueprint>-<n>), prefix, or number "
+             "with --blueprint")
     command = subcommands.add_parser(
         "destroy",
         help="delete a stopped machine "
              "(requires --blueprint or --machine)")
     command.add_argument("--home", help="reliquary home directory")
     command.add_argument(
-        "--blueprint",
-        help="select a blueprint's sole machine")
+        "--blueprint", default=argparse.SUPPRESS,
+        help="select a blueprint's sole machine, or combine with "
+             "--machine <n>")
     command.add_argument(
-        "--machine",
-        help="select a machine by full id or unambiguous hex prefix "
-             "(minimum four characters)")
+        "--machine", default=argparse.SUPPRESS,
+        help="select by id (<blueprint>-<n>), prefix, or number "
+             "with --blueprint")
 
     command = subcommands.add_parser(
         "script",
@@ -194,7 +197,7 @@ def _create(arguments):
         raise ValueError("create requires --blueprint")
     if arguments.machine:
         raise ValueError(
-            "--blueprint and --machine are mutually exclusive")
+            "create allocates the machine number; do not pass --machine")
     machine_id = create_from_blueprint(
         arguments.blueprint, home=arguments.home)
     print(f"created machine {machine_id}")
@@ -218,9 +221,8 @@ def _script(arguments):
         return 130
     if result.created_machine:
         print(f"created machine {result.machine_id}")
-    sid = short_id(result.machine_id, arguments.home)
     print(f"ran {os.path.basename(result.script_path)} "
-          f"on machine {sid}")
+          f"on machine {result.machine_id}")
     print(f"run: {result.run_dir}")
     return 0
 
@@ -241,13 +243,22 @@ def _list_machines(arguments):
         or arguments.blueprint)
     machines = list_machines(
         home=arguments.home, blueprint=filter_blueprint)
-    print(f"{'ID':<8} {'BLUEPRINT':<18} {'PHASE':<8} BACKEND")
+    id_width = max(
+        [8] + [len(state["id"]) for state in machines],
+        default=8)
+    bp_width = max(
+        [18] + [len(state.get("blueprint") or "-")
+                for state in machines],
+        default=18)
+    print(f"{'ID':<{id_width}}  {'BLUEPRINT':<{bp_width}}  "
+          f"{'PHASE':<8}  BACKEND")
     for state in machines:
-        sid = short_id(state["id"], arguments.home)
+        sid = state["id"]
         blueprint = state.get("blueprint") or "-"
         phase = state.get("phase") or "?"
         backend = state.get("backend") or "qemu"
-        print(f"{sid:<8} {blueprint:<18} {phase:<8} {backend}")
+        print(f"{sid:<{id_width}}  {blueprint:<{bp_width}}  "
+              f"{phase:<8}  {backend}")
     return 0
 
 

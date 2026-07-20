@@ -62,7 +62,7 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
             machine_id, created = _resolve_or_create_machine(
                 blueprint="plain", home=self.home)
         self.assertTrue(created)
-        self.assertRegex(machine_id, r"^[0-9a-f]{32}$")
+        self.assertEqual(machine_id, "plain-0")
 
     def test_reuses_sole_machine(self):
         with mock.patch("reliquary.machines.create_hdd_image"):
@@ -74,14 +74,26 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
         self.assertFalse(created)
         self.assertEqual(first, second)
 
-    def test_machine_prefix_resolves(self):
+    def test_machine_id_resolves(self):
         with mock.patch("reliquary.machines.create_hdd_image"):
             machine_id, _ = _resolve_or_create_machine(
                 blueprint="plain", home=self.home)
         resolved, created = _resolve_or_create_machine(
-            machine=machine_id[:4], home=self.home)
+            machine=machine_id, home=self.home)
         self.assertFalse(created)
         self.assertEqual(resolved, machine_id)
+
+    def test_blueprint_and_number_resolves(self):
+        from reliquary.machines import create_from_blueprint
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            first = create_from_blueprint("plain", home=self.home)
+            second = create_from_blueprint("plain", home=self.home)
+        resolved, created = _resolve_or_create_machine(
+            blueprint="plain", machine="1", home=self.home)
+        self.assertFalse(created)
+        self.assertEqual(first, "plain-0")
+        self.assertEqual(resolved, second)
+        self.assertEqual(resolved, "plain-1")
 
 
 class CreateRunDirTests(unittest.TestCase):

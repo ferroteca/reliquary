@@ -15,7 +15,7 @@ from reliquary.machines import (insert_media, create,
                                 load_machine_state, machine_dir_path,
                                 machine_drive_args, mark_stopped,
                                 resolve_machine, set_boot_order,
-                                short_id, start, stop)
+                                start, stop)
 
 
 SHA256 = "1" * 64
@@ -253,15 +253,34 @@ class MachineMaterializationTests(unittest.TestCase):
             load_machine_state("nonexistent", home=self.home)
         self.assertIn("nonexistent", str(caught.exception))
 
-    def test_machine_id_is_unique(self):
-        """Two consecutive creates produce distinct ids."""
+    def test_machine_id_is_numbered_per_blueprint(self):
+        """Creates allocate <blueprint>-<n>, reusing the lowest free n."""
         blueprint = self._blueprint({"platform": "dos"})
 
         with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create(blueprint, home=self.home)
-            second = create(blueprint, home=self.home)
+            first = create(blueprint, home=self.home,
+                           blueprint_name="plain")
+            second = create(blueprint, home=self.home,
+                            blueprint_name="plain")
+            other = create(blueprint, home=self.home,
+                           blueprint_name="other")
 
-        self.assertNotEqual(first, second)
+        self.assertEqual(first, "plain-0")
+        self.assertEqual(second, "plain-1")
+        self.assertEqual(other, "other-0")
+
+        destroy(second, home=self.home)
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            reused = create(blueprint, home=self.home,
+                            blueprint_name="plain")
+        self.assertEqual(reused, "plain-1")
+
+    def test_create_requires_blueprint_name(self):
+        """create rejects an empty blueprint_name."""
+        blueprint = self._blueprint({"platform": "dos"})
+        with self.assertRaises(ValueError) as caught:
+            create(blueprint, home=self.home)
+        self.assertIn("blueprint_name", str(caught.exception))
 
     def test_create_exposes_public_surface(self):
         """The module's public functions are importable and callable."""
@@ -269,7 +288,7 @@ class MachineMaterializationTests(unittest.TestCase):
         for name in ("create", "create_from_blueprint", "destroy",
                      "list_machines", "load_machine_state",
                      "machine_dir_path", "machine_drive_args",
-                     "resolve_machine", "short_id", "start", "stop"):
+                     "resolve_machine", "start", "stop"):
             self.assertTrue(hasattr(machines_module, name), name)
 
     def _create_ready(self, blueprint_name="test-bp", **fields):
@@ -292,12 +311,23 @@ class MachineMaterializationTests(unittest.TestCase):
         filtered = list_machines(home=self.home, blueprint="alpha")
         self.assertEqual([state["id"] for state in filtered], [first])
 
+    def test_list_machines_orders_by_number(self):
+        """Machines of one blueprint list in ascending number order."""
+        self._create_ready("plain")
+        self._create_ready("plain")
+        self._create_ready("plain")
+        destroy("plain-1", home=self.home)
+        ordered = [state["id"] for state in list_machines(
+            home=self.home, blueprint="plain")]
+        self.assertEqual(ordered, ["plain-0", "plain-2"])
+
     def test_resolve_machine_by_blueprint_sole_match(self):
         """--blueprint selects the sole machine of that blueprint."""
         machine_id = self._create_ready("freedos")
         self.assertEqual(
             resolve_machine(blueprint="freedos", home=self.home),
             machine_id)
+        self.assertEqual(machine_id, "freedos-0")
 
     def test_resolve_machine_by_blueprint_none_suggests_create(self):
         """No machine for a blueprint names create in the error."""
@@ -317,43 +347,43 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertIn("has 2 machines", message)
         self.assertIn("--machine", message)
 
-    def test_resolve_machine_by_prefix(self):
-        """--machine accepts a unique hex prefix of at least four chars."""
+    def test_resolve_machine_by_full_id(self):
+        """--machine accepts the full <blueprint>-<n> id."""
         machine_id = self._create_ready("freedos")
         self.assertEqual(
-            resolve_machine(machine=machine_id[:4], home=self.home),
+            resolve_machine(machine=machine_id, home=self.home),
             machine_id)
 
-    def test_resolve_machine_prefix_too_short(self):
-        """Prefixes shorter than four hex characters are rejected."""
+    def test_resolve_machine_by_blueprint_and_number(self):
+        """--blueprint with --machine <n> selects that numbered machine."""
+        self._create_ready("freedos")
+        second = self._create_ready("freedos")
+        self.assertEqual(
+            resolve_machine(blueprint="freedos", machine="1",
+                            home=self.home),
+            second)
+
+    def test_resolve_machine_number_requires_blueprint(self):
+        """A bare machine number is rejected without --blueprint."""
+        self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(machine="abc", home=self.home)
-        self.assertIn("at least 4", str(caught.exception))
+            resolve_machine(machine="0", home=self.home)
+        self.assertIn("--blueprint", str(caught.exception))
+
+    def test_resolve_machine_prefix(self):
+        """--machine accepts an unambiguous id prefix."""
+        machine_id = self._create_ready("freedos-plain")
+        self.assertEqual(
+            resolve_machine(machine="freedos-plain-", home=self.home),
+            machine_id)
 
     def test_resolve_machine_prefix_ambiguous(self):
         """An ambiguous prefix lists candidate machines."""
-        with mock.patch("reliquary.machines.uuid.uuid4") as uuid4:
-            uuid4.side_effect = [
-                mock.Mock(hex="aaaa1111" + "0" * 24),
-                mock.Mock(hex="aaaa2222" + "0" * 24),
-            ]
-            self._create_ready("one")
-            self._create_ready("two")
+        self._create_ready("plain")
+        self._create_ready("plain")
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(machine="aaaa", home=self.home)
+            resolve_machine(machine="plain-", home=self.home)
         self.assertIn("matches 2 machines", str(caught.exception))
-
-    def test_short_id_is_unambiguous(self):
-        """short_id lengthens past four characters when needed."""
-        with mock.patch("reliquary.machines.uuid.uuid4") as uuid4:
-            uuid4.side_effect = [
-                mock.Mock(hex="abcd1111" + "0" * 24),
-                mock.Mock(hex="abcd2222" + "0" * 24),
-            ]
-            first = self._create_ready("one")
-            second = self._create_ready("two")
-        self.assertEqual(short_id(first, self.home), "abcd1")
-        self.assertEqual(short_id(second, self.home), "abcd2")
 
     def test_start_launches_qemu_and_sets_running(self):
         """start re-verifies media, launches QEMU, and sets phase."""

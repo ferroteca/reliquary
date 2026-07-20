@@ -18,18 +18,20 @@ Every command maps one-to-one onto a public Python call. The CLI
 resolves `--blueprint` and `--machine` selectors; the API takes the
 same identifiers. Nothing is CLI-only.
 
-**Selection.** Machine-level verbs take one target selector, never
-both:
+**Selection.** Machine-level verbs take a target selector:
 
 - `--blueprint <name>` — selects that blueprint's machine when
   exactly one exists; fails listing candidate ids when several
   exist; fails suggesting `create` when none exist (except
   `script`, which creates one).
-- `--machine <id>` — the full UUID or any unambiguous prefix,
-  git-style (minimum four hex characters).
+- `--machine <blueprint>-<n>` — the full machine id or any
+  unambiguous prefix.
+- `--blueprint <name> --machine <n>` — machine number `<n>` of that
+  blueprint.
 
 Blueprints are selected by name alone (`--blueprint <name>`, the
-stem of `blueprints/<name>.json`).
+stem of `blueprints/<name>.json`). Machine ids are
+`<blueprint>-<n>` (lowest free number, reused after destroy).
 
 ---
 
@@ -320,9 +322,10 @@ bases like any other.
 ## Machines
 
 Machines are disposable realizations of a blueprint, each identified
-by a generated UUID and stored entirely under
-`cache/machines/<id>/`. Everything under `cache/` is reliquary's and
-regenerates from blueprints, media definitions, and scripts.
+by `<blueprint>-<n>` and stored entirely under
+`cache/machines/<blueprint>-<n>/`. Everything under `cache/` is
+reliquary's and regenerates from blueprints, media definitions, and
+scripts.
 
 ### Creating a machine
 
@@ -336,19 +339,22 @@ extracted — along with any referenced media definitions and scripts
 not already present. Existing files are never overwritten.
 
 Validates the blueprint, assigns a backend (if not declared),
-generates a UUID, materializes the machine under
-`cache/machines/<id>/`, and prints the new id:
+allocates the lowest free machine number for that blueprint,
+materializes the machine under `cache/machines/<blueprint>-<n>/`,
+and prints the new id:
 
 ```powershell
 $ rlq --blueprint freedos create
-created machine a1b2c3d4-e5f6-7890-abcd-ef1234567890
+created machine freedos-0
 ```
 
-The printed id is the machine's identity — use any unambiguous prefix
-of it with `--machine`:
+The printed id is the machine's identity — use it with
+`--machine`, or select by `--blueprint` when it is the sole
+machine, or by `--blueprint NAME --machine N`:
 
 ```powershell
-rlq --machine a1b2 start
+rlq --machine freedos-0 start
+rlq --blueprint freedos --machine 0 start
 ```
 
 `create` resolves the blueprint once and records the resolved
@@ -450,7 +456,8 @@ rlq --machine a1b2 recreate
 reliquary (--blueprint <name> | --machine <id>) clone
 ```
 
-Duplicates a stopped machine under a new UUID. The clone retains the
+Duplicates a stopped machine under the next free
+`<blueprint>-<n>` id. The clone retains the
 source's resolved blueprint snapshot and copies the source's
 writable drive images:
 
@@ -486,14 +493,13 @@ rlq list machines [--blueprint <name>]
 ```
 
 ```
-ID       BLUEPRINT          PHASE    BACKEND
-a1b2     freedos            ready    qemu
-c3d4     freedos            running  qemu
-e5f6     msdos              ready    qemu
+ID              BLUEPRINT          PHASE    BACKEND
+freedos-0       freedos            ready    qemu
+freedos-1       freedos            running  qemu
+msdos-0         msdos              ready    qemu
 ```
 
-`--blueprint` filters to one blueprint's machines. `--verbose`
-prints the full UUID.
+`--blueprint` filters to one blueprint's machines.
 
 ### Selection rules
 
@@ -510,9 +516,9 @@ With several machines, the command fails and lists candidate ids:
 
 ```
 $ rlq --blueprint freedos start
-rlq: blueprint 'freedos' has 2 machines; pick one with --machine:
-  a1b2  (ready)
-  c3d4  (running)
+rlq: blueprint 'freedos' has 2 machines; pick one with --machine <n> or --machine <blueprint>-<n>:
+  freedos-0  (ready)
+  freedos-1  (running)
 ```
 
 With none, the command fails suggesting `create`:
@@ -523,12 +529,12 @@ rlq: no machine exists for blueprint 'freedos'
 create one: rlq --blueprint freedos create
 ```
 
-`--machine <id>` always works — the full UUID or any unambiguous
-prefix (minimum four hex characters):
+`--machine <blueprint>-<n>` always works; so does
+`--blueprint <name> --machine <n>`:
 
 ```powershell
-rlq --machine a1b2c3d4 start
-rlq --machine a1b2 start
+rlq --machine freedos-0 start
+rlq --blueprint freedos --machine 0 start
 ```
 
 Ambiguous prefixes list candidates:

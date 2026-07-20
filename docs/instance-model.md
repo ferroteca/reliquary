@@ -24,7 +24,7 @@ have ids.
 ├── blueprints/
 │   └── freedos-plain.json          user-owned reusable blueprint
 └── cache/machines/
-    └── 5fd11917…/                  the machine — disposable
+    └── freedos-plain-0/            the machine — disposable
         ├── reliquary-machine.json
         ├── drives/
         ├── runs/
@@ -32,21 +32,29 @@ have ids.
 ```
 
 The file name of `blueprints/<name>.json` is the blueprint name. A machine's
-identity is a generated UUID; the cache directory, locks, run
-directories, and backend identity all use it, and there is no
-separate machine name. A machine **is** its cache directory —
-nothing about a machine lives outside `cache/`, because nothing
-about a machine is durable. Deleting the cache deletes the
-machines, by design.
+identity is `<blueprint>-<n>`, where `<n>` is the lowest free
+non-negative integer for that blueprint at `create` time (destroy
+frees the number for reuse). Allocation is serialized with a
+per-blueprint lock under `cache/machines/.locks/`. The cache
+directory, run directories, and backend identity all use the
+machine id, and there is no separate machine name. A machine
+**is** its cache directory — nothing about a machine lives
+outside `cache/`, because nothing about a machine is durable.
+Deleting the cache deletes the machines, by design.
 
 Commands select their targets with explicit flags, never
-positionally. `--machine <id>` accepts the full UUID or any
-unambiguous prefix, git-style; listings print a short prefix for
-this use. On machine-level verbs, `--blueprint <name>` selects that
-blueprint's machine when exactly one exists — the common
-one-machine-per-blueprint case — and otherwise fails, listing the
-candidate ids (or, with no machine, suggesting `create`;
-`script` creates one instead).
+positionally:
+
+- `--blueprint <name>` — that blueprint's machine when exactly one
+  exists
+- `--machine <blueprint>-<n>` — the full machine id (or any
+  unambiguous prefix)
+- `--blueprint <name> --machine <n>` — machine number `<n>` of that
+  blueprint
+
+On machine-level verbs, `--blueprint <name>` alone fails when
+several machines exist (listing the candidate ids) or when none
+exist (suggesting `create`; `script` creates one instead).
 
 ## Lifecycle
 
@@ -90,12 +98,12 @@ rlq export (--machine <id> | --blueprint <name>) [<destination>]
 ```
 
 `list blueprints` shows each blueprint and its machine count; `list machines`
-shows each machine's short id, blueprint, phase, and backend —
+shows each machine's id, blueprint, phase, and backend —
 both enumerated by scanning `cache/machines/`. `create`
 validates and resolves the current blueprint, materializes a new
-machine under a new UUID — state, writable drives, backend
-object — and prints the id. `destroy` deletes the machine
-entirely: the whole cache directory and the backend machine.
+machine under the next free `<blueprint>-<n>` id — state, writable
+drives, backend object — and prints the id. `destroy` deletes the
+machine entirely: the whole cache directory and the backend machine.
 `recreate` is `destroy` followed by `create` as one command,
 reusing the same id. `delete` takes only `--blueprint`: it
 removes the blueprint file itself and fails closed while any
@@ -120,7 +128,8 @@ closed naming both sides, leaving `recreate` as the honest
 alternative. Applying a newer blueprint never happens implicitly at
 `start`.
 
-`clone` creates a new machine under a new UUID. It retains the same
+`clone` creates a new machine under the next free
+`<blueprint>-<n>` id. It retains the same
 resolved blueprint snapshot but copies the source machine's writable drives
 when they exist; it is therefore a snapshot of a machine, not another
 name for a blueprint. A future `fork-blueprint` command may create a new editable blueprint; it
@@ -169,10 +178,10 @@ artifacts without making a vague claim about the guest's contents.
 ## Naming and identity
 
 Users author and rename blueprints by changing files in `blueprints/`.
-Machines are never renamed because they have nothing to rename:
-the UUID is the whole identity, fixed at `create` and carried
-through `recreate`. Manual renames of machine
-directories under `cache/machines/` are unsupported.
+Machines are never renamed because the id is the whole identity:
+`<blueprint>-<n>`, assigned at `create` (lowest free number) and
+reused after `destroy`. Manual renames of machine directories under
+`cache/machines/` are unsupported.
 
 ## JSON remains the format
 

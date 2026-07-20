@@ -162,10 +162,10 @@ outcomes live in run records. See
 
 **state-only · string**
 
-The machine's own UUID, repeated inside the state as a safety
-check: it must match the machine directory the state sits in. A
-mismatch — a hand-copied or misplaced machine directory — fails
-closed before any operation touches the backend.
+The machine's own id (`<blueprint>-<n>`), repeated inside the state
+as a safety check: it must match the machine directory the state
+sits in. A mismatch — a hand-copied or misplaced machine directory —
+fails closed before any operation touches the backend.
 
 ### `backend-id`
 

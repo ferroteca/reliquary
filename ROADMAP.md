@@ -167,9 +167,11 @@ recorded) plus the machine's own bookkeeping (its id, repeated
 inside the file as a safety check against a misplaced directory;
 its blueprint's name; creation time; lifecycle phase) — rewritten
 atomically in the same operation as every machine change.
-Machines have no separate human name — the generated UUID naming
-the machine's directory is its identity, and commands accept any
-unambiguous prefix of it, git-style. Every mutating operation
+Machines have no separate human name — the id
+`<blueprint>-<n>` naming the machine's directory is its identity
+(lowest free number at create; reused after destroy), and
+commands accept the full id, an unambiguous prefix, or
+`--blueprint` with a machine number. Every mutating operation
 takes an exclusive per-machine lock; an interrupted operation is
 detected by phase and generation and either rolled back safely or
 failed with explicit recovery instructions. The resolved snapshot
@@ -284,14 +286,15 @@ machine id); where the CLI prints an id, the API returns it.
 
 Blueprints and machines are selected by explicit flags, never by
 position: `--blueprint <name>` (short `-b`) names a blueprint,
-`--machine <id>` (short `-m`) a machine. A machine's identity is its generated UUID; `--machine`
-accepts the full id or any unambiguous prefix, git-style, and
-listings print a short prefix for exactly this use. As the common
-convenience, `--blueprint` also selects a *machine* on machine-level
-verbs: when exactly one machine of that blueprint exists — the normal
-one-machine-per-blueprint case — the blueprint name is enough; with several
-machines the command fails and lists their ids, and with none it
-fails and suggests `create` (`script` instead creates one).
+`--machine <id>` (short `-m`) a machine. A machine's identity is
+`<blueprint>-<n>`; `--machine` accepts the full id or any
+unambiguous prefix, and `--blueprint NAME --machine N` selects by
+number. As the common convenience, `--blueprint` also selects a
+*machine* on machine-level verbs: when exactly one machine of that
+blueprint exists — the normal one-machine-per-blueprint case — the
+blueprint name is enough; with several machines the command fails
+and lists their ids, and with none it fails and suggests `create`
+(`script` instead creates one).
 Nothing is ever selected positionally or by guessing.
 Property-registry commands put an operation (`list`, `get`,
 `set`, or `unset`) after `property`.
@@ -346,7 +349,7 @@ rlq clean media
 Lifecycle semantics:
 
 - `list blueprints` shows each blueprint with its machine count; `list
-  machines` shows each machine's short id, blueprint, phase, and
+  machines` shows each machine's id, blueprint, phase, and
   backend (`--blueprint` filters to one blueprint's machines).
 - `create` validates and resolves the named blueprint
   (`blueprints/<name>.json` — written by hand, by `init`, or by
@@ -814,8 +817,8 @@ Deliverables:
    `boot`, `control-planes`, `backend-settings` — format checks
    and capability checks both failing closed and naming the
    problem.
-2. Machines wholly under `cache/machines/<id>/` — the generated
-   UUID naming the directory is the machine's identity —
+2. Machines wholly under `cache/machines/<blueprint>-<n>/` — the
+   numbered id naming the directory is the machine's identity —
    with `reliquary-machine.json` (id repeated as a safety check,
    blueprint reference and resolved digest, creation time, phase,
    fully resolved configuration), canonical drive-image naming,
@@ -1669,11 +1672,11 @@ agentless and guest-agent control planes with equivalent results.
   decided (docs/instance-model.md); still open is whether any
   home-wide limit applies to machines running at once (the
   per-machine lock and identity model suggests none).
-- **Friendly machine aliases**: machine identity is the UUID
-  addressed by unambiguous prefix (decided, git-style); still
-  open is whether listings and selectors additionally offer
-  docker-style generated word aliases for memorability, or
-  whether blueprint-based selection makes them unnecessary.
+- **Friendly machine aliases**: machine identity is already
+  human-readable (`<blueprint>-<n>`); still open is whether
+  listings and selectors additionally offer docker-style generated
+  word aliases, or whether numbered ids plus blueprint selection
+  make them unnecessary.
 - The exact initial `guest-exec` subset, including argument and
   environment support, capture modes, output limits, timeouts, and
   legacy-OS deviations.

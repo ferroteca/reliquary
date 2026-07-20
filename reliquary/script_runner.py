@@ -129,12 +129,12 @@ class _ScriptEngine:
                 raise self._error(
                     "the script expects a stopped machine, but "
                     f"machine "
-                    f"{_machines.short_id(self._machine_id, self._home)} "
+                    f"{self._machine_id} "
                     "is running; stop it first")
             if phase != "ready":
                 raise self._error(
                     f"machine "
-                    f"{_machines.short_id(self._machine_id, self._home)}"
+                    f"{self._machine_id}"
                     f" cannot execute a script (phase: {phase})")
         elif phase == "ready":
             self._port = _machines.start(
@@ -150,7 +150,7 @@ class _ScriptEngine:
             self._port = vm["port"]
         else:
             raise self._error(
-                f"machine {_machines.short_id(self._machine_id, self._home)}"
+                f"machine {self._machine_id}"
                 f" cannot execute a script (phase: {phase})")
 
         transcript_path = None
@@ -560,15 +560,15 @@ def _describe_condition(condition):
 def _resolve_or_create_machine(*, machine=None, blueprint=None,
                                home=None):
     """Resolve a selector, creating a machine when blueprint has none."""
-    if machine is not None and blueprint is not None:
-        raise ValueError(
-            "--blueprint and --machine are mutually exclusive")
-    if machine is not None:
-        return _machines.resolve_machine(
-            machine=machine, home=home), False
-    if blueprint is None:
+    if machine is None and blueprint is None:
         raise ValueError(
             "select a machine with --blueprint or --machine")
+    if machine is not None and blueprint is None:
+        return _machines.resolve_machine(
+            machine=machine, home=home), False
+    if machine is not None:
+        return _machines.resolve_machine(
+            machine=machine, blueprint=blueprint, home=home), False
     matches = _machines.list_machines(home, blueprint=blueprint)
     if not matches:
         machine_id = _machines.create_from_blueprint(

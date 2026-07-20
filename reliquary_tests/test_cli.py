@@ -46,7 +46,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         self.assertRegex(stdout.getvalue(),
-                         r"created machine [0-9a-f]{32}")
+                         r"created machine plain-0")
 
     def test_create_requires_blueprint(self):
         """create without --blueprint fails cleanly."""
@@ -107,8 +107,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         stop.assert_called_once()
 
-    def test_destroy_via_machine_prefix(self):
-        """--machine PREFIX destroy deletes the resolved machine."""
+    def test_destroy_via_machine_id(self):
+        """--machine <blueprint>-<n> destroy deletes the machine."""
         stdout = io.StringIO()
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
@@ -123,10 +123,35 @@ class CliMachineLifecycleTests(unittest.TestCase):
             result = cli.main([
                 "--home", self.home,
                 "destroy",
-                "--machine", machine_id[:4],
+                "--machine", machine_id,
             ])
         self.assertEqual(result, 0)
         destroy.assert_called_once_with(machine_id, home=self.home)
+
+    def test_destroy_via_blueprint_and_number(self):
+        """--blueprint with --machine <n> selects that machine."""
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main([
+                "--home", self.home,
+                "--blueprint", "plain",
+                "create",
+            ])
+            cli.main([
+                "--home", self.home,
+                "--blueprint", "plain",
+                "create",
+            ])
+        with mock.patch("reliquary.cli.destroy") as destroy, \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = cli.main([
+                "--home", self.home,
+                "--blueprint", "plain",
+                "--machine", "1",
+                "destroy",
+            ])
+        self.assertEqual(result, 0)
+        destroy.assert_called_once_with("plain-1", home=self.home)
 
     def test_start_without_selector_uses_legacy_path(self):
         """Bare start still loads the root-home MachineConfig path."""

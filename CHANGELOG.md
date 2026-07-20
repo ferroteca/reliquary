@@ -70,6 +70,15 @@ machine-layer notes below); `rlq install` no longer exists.
 
 ### Machine layer (formerly relict)
 
+### Changed
+
+- Machine ids are `<blueprint>-<n>` instead of random UUID hex.
+  `create` allocates the lowest free number for the blueprint
+  (reused after `destroy`), serialized by a per-blueprint lock.
+  Select with `--machine NAME-N`, `--blueprint NAME --machine N`,
+  or `--blueprint NAME` when that blueprint has exactly one machine.
+  `short_id()` is removed; the id is already the display form.
+
 ### Fixed
 
 - An interrupted machine deletion, such as a transient Windows file lock,
@@ -150,16 +159,18 @@ machine-layer notes below); `rlq install` no longer exists.
   explicit redistribution assertion — FreeDOS is GPL free
   software), and the install/verify scripts.
 - Machine lifecycle CLI and API for cached machines: `create`
-  / `start` / `stop` / `destroy` / `list machines`, with global
-  `--blueprint` (sole machine of that blueprint) and `--machine`
-  (full id or unambiguous hex prefix, minimum four characters).
-  `create_from_blueprint()`, `list_machines()`, `resolve_machine()`,
-  and `machines.start` / `machines.stop` / `destroy` operate on
-  `cache/machines/<id>/`; QEMU ownership (`vm.json`) lives under
-  the machine directory. Bare `rlq start` / `rlq stop` without a
-  selector still use the transitional root-home `MachineConfig`
-  path. `apply`, interaction-via-selector, and multi-backend remain
-  later spikes.
+  / `start` / `stop` / `destroy` / `list machines`, with
+  `--blueprint` (sole machine of that blueprint),
+  `--machine <blueprint>-<n>` (full id or unambiguous prefix), or
+  `--blueprint NAME --machine N` (machine number). Machine ids are
+  `<blueprint>-<n>` with the lowest free number reused after
+  destroy; allocation is serialized per blueprint. `create_from_blueprint()`,
+  `list_machines()`, `resolve_machine()`, and `machines.start` /
+  `machines.stop` / `destroy` operate on `cache/machines/<id>/`;
+  QEMU ownership (`vm.json`) lives under the machine directory.
+  Bare `rlq start` / `rlq stop` without a selector still use the
+  transitional root-home `MachineConfig` path. `apply`,
+  interaction-via-selector, and multi-backend remain later spikes.
 - Immutable machine-blueprint parsing for the milestone 1 subset:
   `parse_blueprint()` / `load_blueprint()` accept `platform`, `memory`,
   `drives` (`size` or `media`), `boot`, `name`, `description`, and
@@ -168,10 +179,10 @@ machine-layer notes below); `rlq install` no longer exists.
   unknown fields, slot clashes, invalid sources, and undeclared boot
   targets.
 - Machine materialization: `create(blueprint)` writes
-  `cache/machines/<id>/reliquary-machine.json`, qcow2 images for
-  `size` drives, and media payload paths for `media` drives;
-  `machine_drive_args()` renders QEMU `-drive` tokens from that
-  state.
+  `cache/machines/<blueprint>-<n>/reliquary-machine.json`, qcow2
+  images for `size` drives, and media payload paths for `media`
+  drives; `machine_drive_args()` renders QEMU `-drive` tokens from
+  that state.
 - Media definitions per docs/media-spec.md: `parse_definition` /
   `load_definition` validate both the item (direct-download) form and
   the archive form (one source archive itemizing payloads, single

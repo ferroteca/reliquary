@@ -16,8 +16,9 @@ as the default and currently only complete platform workflow:
   (parsing, name resolution) and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the built-in library
   (`reliquary/builtins/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
-  `cache/machines/<id>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
-  `resolve_machine`) and persistent machine-state mutations
+  `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
+  `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
+  lowest-free reuse and a per-blueprint allocation lock) and persistent machine-state mutations
   (`insert_media` / `eject_media` / `set_boot_order` /
   `mark_stopped` — insert/eject are floppy and cdrom only;
   boot-order keys may name any declared drive; all three require
@@ -31,7 +32,7 @@ as the default and currently only complete platform workflow:
   `insert`/`eject`/`boot`), `script_runner.py` executes scripts against cached machines and
   wires `script <label>` (resolve via blueprint map, create-if-none, the machine-state header, static
   preflight of insert/eject/boot drive keys, run records under
-  `cache/machines/<id>/runs/`), `cli.py` owns command parsing, and `__main__.py`
+  `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and `__main__.py`
   preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.
@@ -103,13 +104,13 @@ Current home layout (still the active machine model):
 - `screenshots/` — screenshots
 - `qemu-stderr.log` — startup diagnostics
 - `vm.json` — active VM identity, port, and PID (legacy root-home path;
-  cached machines keep theirs under `cache/machines/<id>/vm.json`)
+  cached machines keep theirs under `cache/machines/<blueprint>-<n>/vm.json`)
 - `blueprints/` — machine blueprints (`blueprints_dir`)
 - `media/` — shared media definitions (`media_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
 - `cache/downloads/` — cached source archives (`downloads_cache_dir`)
 - `cache/media/` — cached media payloads (`media_cache_dir`)
-- `cache/machines/<id>/` — machine materializations (`machines_cache_dir`;
+- `cache/machines/<blueprint>-<n>/` — machine materializations (`machines_cache_dir`;
   parent via `cache_dir`), each with `reliquary-machine.json`, `drives/`,
   and when running `vm.json` / `qemu-stderr.log`
 
