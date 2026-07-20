@@ -2,14 +2,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Runtime executor for milestone-one .rqs scripts on QEMU/DOS."""
 
+import dataclasses
+import os
 import re
 import time
+import uuid
+from datetime import datetime, timezone
 
 from qemu.qmp import ConnectError
 
+from .home import scripts_dir
+from .library import seed_script
 from .lifecycle import Qmp
-from .machine import (Machine, _DisplayConsole, char_keys,
+from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
+from .script import load_script
 from . import machines as _machines
 
 
@@ -70,12 +77,26 @@ class ScriptRuntimeError(RuntimeError):
         return f"{self.path or '<script>'}{location}: {super().__str__()}"
 
 
+@dataclasses.dataclass(frozen=True)
+class ScriptRun:
+    """Result of a labeled ``script <label>`` invocation."""
+
+    machine_id: str
+    run_dir: str
+    script_path: str
+    created_machine: bool = False
+
+
 class _ScriptEngine:
-    def __init__(self, script, machine_id, home, machine_home):
+    def __init__(self, script, machine_id, home, machine_home,
+                 run_dir=None, script_path=None):
         self._script = script
         self._machine_id = machine_id
         self._home = home
         self._machine_home = machine_home
+        self._run_dir = run_dir
+        self._script_path = script_path
+        self._transcript = None
         self._port = None
         self._current_state = script.initial
         self._step = 0
@@ -86,6 +107,16 @@ class _ScriptEngine:
             return _parse_duration(self._script.timeout)
         return 30.0
 
+    def _error(self, message, statement=None):
+        return ScriptRuntimeError(
+            message, statement=statement, path=self._script_path)
+
+    def _log(self, message):
+        print(message)
+        if self._transcript is not None:
+            self._transcript.write(message + "\n")
+            self._transcript.flush()
+
     def run(self, display=False):
         state = _machines.load_machine_state(self._machine_id, self._home)
         phase = state.get("phase")
@@ -93,35 +124,62 @@ class _ScriptEngine:
             self._port = _machines.start(
                 self._machine_id, display=display, home=self._home)
         elif phase == "running":
-            vm_state = _machines.load_machine_state(
-                self._machine_id, self._home)
             state_path = _machines.machine_dir_path(
                 self._machine_id, self._home)
             from .lifecycle import read_vm_state
             vm = read_vm_state(home=state_path)
             if vm is None:
-                raise ScriptRuntimeError(
+                raise self._error(
                     "machine phase is running but no vm.json found")
             self._port = vm["port"]
         else:
-            raise ScriptRuntimeError(
+            raise self._error(
                 f"machine {_machines.short_id(self._machine_id, self._home)}"
                 f" cannot execute a script (phase: {phase})")
+
+        transcript_path = None
+        if self._run_dir is not None:
+            transcript_path = os.path.join(
+                self._run_dir, "transcript.txt")
+            self._transcript = open(
+                transcript_path, "w", encoding="utf-8", newline="\n")
+            self._log(f"script: {self._script_path or '<script>'}")
+            self._log(f"machine: {self._machine_id}")
+            started = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
+            self._log(f"started: {started}")
+            if self._current_state is not None:
+                self._log(f"initial: {self._current_state}")
 
         try:
             if self._current_state is not None:
                 while self._current_state is not None:
+                    if self._transcript is not None:
+                        self._log(f"state: {self._current_state}")
                     state = self._script.states[self._current_state]
                     block_mods = dict(state.modifiers)
                     self._execute_block(state.statements, block_mods)
             else:
                 self._execute_block(self._script.statements, {})
+            if self._transcript is not None:
+                self._log("result: ok")
         except (ScriptRuntimeError, TimeoutError, RuntimeError,
-                ValueError):
+                ValueError) as exc:
+            if self._transcript is not None:
+                self._log(f"result: failed")
+                self._log(f"error: {exc}")
+            if isinstance(exc, ScriptRuntimeError) and exc.path is None:
+                exc.path = self._script_path
             raise
         except Exception as exc:
-            raise ScriptRuntimeError(
-                f"unexpected error: {exc}") from exc
+            if self._transcript is not None:
+                self._log("result: failed")
+                self._log(f"error: {exc}")
+            raise self._error(f"unexpected error: {exc}") from exc
+        finally:
+            if self._transcript is not None:
+                self._transcript.close()
+                self._transcript = None
 
     def _execute_block(self, statements, block_modifiers):
         for statement in statements:
@@ -157,7 +215,7 @@ class _ScriptEngine:
         try:
             return Qmp(self._port)
         except (OSError, ConnectError):
-            raise ScriptRuntimeError("machine is no longer reachable")
+            raise self._error("machine is no longer reachable")
 
     def _console(self, qmp):
         return _DisplayConsole(qmp)
@@ -177,6 +235,9 @@ class _ScriptEngine:
         condition = statement.argument
         timeout = self._resolve_timeout(statement, block_modifiers)
         stable = self._resolve_stable(statement.modifiers)
+        self._log(
+            f"line {statement.line}: wait "
+            f"{_describe_condition(condition)}")
 
         if condition.kind == "stopped":
             self._wait_stopped(timeout)
@@ -206,7 +267,7 @@ class _ScriptEngine:
                 else:
                     last_match = False
                 time.sleep(2)
-        raise ScriptRuntimeError(
+        raise self._error(
             f"timed out after {timeout}s waiting for "
             f"{_describe_condition(condition)}",
             statement=statement)
@@ -217,13 +278,14 @@ class _ScriptEngine:
             if self._is_stopped():
                 return
             time.sleep(2)
-        raise ScriptRuntimeError(
+        raise self._error(
             f"timed out after {timeout}s waiting for machine to stop")
 
     def _do_expect(self, statement, block_modifiers):
         branches = statement.argument
         timeout = self._resolve_timeout(statement, block_modifiers)
         stable = self._resolve_stable(statement.modifiers)
+        self._log(f"line {statement.line}: expect")
 
         deadline = time.monotonic() + timeout
         stable_deadline = None
@@ -280,19 +342,20 @@ class _ScriptEngine:
                 else:
                     last_matched_branch = None
                 time.sleep(2)
-        raise ScriptRuntimeError(
+        raise self._error(
             f"timed out after {timeout}s waiting for any expect "
             f"condition to match",
             statement=statement)
 
     def _do_enter(self, statement):
-        print(f"enter: {statement.argument!r}")
+        self._log(f"line {statement.line}: enter "
+                  f"{statement.argument!r}")
         with self._session() as qmp:
             self._console(qmp).send_text(statement.argument)
 
     def _do_type(self, statement):
         text = statement.argument
-        print(f"type: {text!r}")
+        self._log(f"line {statement.line}: type {text!r}")
         combos = []
         index = 0
         for match in _KEY_RE.finditer(text):
@@ -303,7 +366,7 @@ class _ScriptEngine:
             key_name = match.group(1)
             resolved = _resolve_key(key_name)
             if resolved is None:
-                raise ScriptRuntimeError(
+                raise self._error(
                     f"unknown key: {key_name}",
                     statement=statement)
             if isinstance(resolved, tuple):
@@ -320,12 +383,12 @@ class _ScriptEngine:
 
     def _do_press(self, statement):
         keys = statement.argument
-        print(f"press: {' '.join(keys)}")
+        self._log(f"line {statement.line}: press {' '.join(keys)}")
         combos = []
         for key_spec in keys:
             resolved = _resolve_key(key_spec)
             if resolved is None:
-                raise ScriptRuntimeError(
+                raise self._error(
                     f"unknown key: {key_spec}",
                     statement=statement)
             if isinstance(resolved, tuple):
@@ -338,8 +401,10 @@ class _ScriptEngine:
     def _do_select(self, statement):
         item = statement.argument
         exclude = statement.modifiers.get("exclude")
-        print(f"select: {item!r}"
-              + (f" (exclude: {exclude!r})" if exclude else ""))
+        detail = f"select {item!r}"
+        if exclude:
+            detail += f" (exclude: {exclude!r})"
+        self._log(f"line {statement.line}: {detail}")
         with self._session() as qmp:
             self._console(qmp).cursor_menu_select(
                 item, timeout=60,
@@ -348,15 +413,19 @@ class _ScriptEngine:
     def _do_screenshot(self, statement):
         name = statement.argument or f"step-{self._step}"
         name = validate_screenshot_name(name)
-        self._machine().screenshot(name)
+        self._log(f"line {statement.line}: screenshot {name}")
+        if self._run_dir is not None:
+            screenshot(name, self._port, self._run_dir)
+        else:
+            self._machine().screenshot(name)
 
     def _do_start(self):
-        print("start machine")
+        self._log("start machine")
         self._port = _machines.start(
             self._machine_id, home=self._home)
 
     def _do_stop(self):
-        print("stop machine")
+        self._log("stop machine")
         _machines.stop(self._machine_id, home=self._home)
 
     def _match_condition(self, screen, condition):
@@ -412,17 +481,113 @@ def _describe_condition(condition):
     return repr(condition.value)
 
 
-def execute_script(script, *, machine_id, home=None, display=False):
+def _resolve_or_create_machine(*, machine=None, blueprint=None,
+                               home=None):
+    """Resolve a selector, creating a machine when blueprint has none."""
+    if machine is not None and blueprint is not None:
+        raise ValueError(
+            "--blueprint and --machine are mutually exclusive")
+    if machine is not None:
+        return _machines.resolve_machine(
+            machine=machine, home=home), False
+    if blueprint is None:
+        raise ValueError(
+            "select a machine with --blueprint or --machine")
+    matches = _machines.list_machines(home, blueprint=blueprint)
+    if not matches:
+        machine_id = _machines.create_from_blueprint(
+            blueprint, home=home)
+        return machine_id, True
+    return _machines.resolve_machine(
+        blueprint=blueprint, home=home), False
+
+
+def _resolve_script_stem(label, scripts_map):
+    """Map a label through the blueprint scripts map, else use bare stem."""
+    if not isinstance(label, str) or not label.strip():
+        raise ValueError("script label must be a non-empty string")
+    label = label.strip()
+    if label in (".", "..") or "/" in label or "\\" in label:
+        raise ValueError(
+            f"script label must be a bare name, got: {label!r}")
+    if label.lower().endswith(".rqs"):
+        raise ValueError(
+            f"script label must omit the .rqs suffix, got: {label!r}")
+    if isinstance(scripts_map, dict) and label in scripts_map:
+        return scripts_map[label]
+    return label
+
+
+def _ensure_script_path(stem, home=None):
+    """Return the home path for ``stem``, seeding from builtins if needed."""
+    path = os.path.join(scripts_dir(home), f"{stem}.rqs")
+    if not os.path.isfile(path):
+        seed_script(stem, home=home)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"script not found: {stem}.rqs\n"
+            f"expected under {scripts_dir(home)}")
+    return path
+
+
+def _create_run_dir(machine_id, home=None):
+    """Create ``runs/<timestamp>-<id>/`` under the machine cache."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_id = uuid.uuid4().hex[:8]
+    run_dir = os.path.join(
+        _machines.machine_dir_path(machine_id, home),
+        "runs",
+        f"{timestamp}-{run_id}",
+    )
+    os.makedirs(os.path.join(run_dir, "screenshots"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir, "output"), exist_ok=True)
+    return run_dir
+
+
+def execute_script(script, *, machine_id, home=None, display=False,
+                   run_dir=None, script_path=None):
     """Execute a parsed Script against a cached machine.
 
     The machine must be in ``ready`` or ``running`` phase.  When it
     is ready it is started first; when it is running execution
     connects to its QMP port.  The machine is left running at exit
     unless the script stopped it.
+
+    When ``run_dir`` is set, a transcript is written there and
+    screenshots land under ``run_dir/screenshots/``.
     """
     if not script.states and not script.statements:
         return
 
     machine_home = _machines.machine_dir_path(machine_id, home)
-    engine = _ScriptEngine(script, machine_id, home, machine_home)
+    engine = _ScriptEngine(
+        script, machine_id, home, machine_home,
+        run_dir=run_dir, script_path=script_path)
     engine.run(display=display)
+
+
+def run_script(label, *, blueprint=None, machine=None, home=None,
+               display=False):
+    """Resolve ``label``, ensure a machine, and execute under ``runs/``.
+
+    Looks up ``label`` in the machine's blueprint ``scripts`` map
+    first; when absent, treats ``label`` as a bare script stem under
+    ``scripts/``.  With ``--blueprint`` and no machine yet, creates
+    one.  Returns a :class:`ScriptRun` naming the run directory.
+    """
+    machine_id, created = _resolve_or_create_machine(
+        machine=machine, blueprint=blueprint, home=home)
+    state = _machines.load_machine_state(machine_id, home)
+    stem = _resolve_script_stem(label, state.get("scripts") or {})
+    script_path = _ensure_script_path(stem, home=home)
+    script = load_script(script_path)
+    run_dir = _create_run_dir(machine_id, home=home)
+    execute_script(
+        script, machine_id=machine_id, home=home, display=display,
+        run_dir=run_dir, script_path=script_path)
+    return ScriptRun(
+        machine_id=machine_id,
+        run_dir=run_dir,
+        script_path=script_path,
+        created_machine=created,
+    )

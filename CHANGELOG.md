@@ -77,12 +77,27 @@ is not yet implemented.
 
 ### Added
 
+- Milestone-1 Spike 10 wires `rlq --blueprint|--machine script <label>`:
+  resolve the label through the blueprint `scripts` map (bare stem when
+  absent), seed a missing script from the built-in library, create a
+  machine when `--blueprint` names one with none yet, and execute under
+  an append-only run directory
+  `cache/machines/<id>/runs/<timestamp>-<run_id>/` with `transcript.txt`,
+  `screenshots/`, and `output/`. `run_script()` is the Python surface;
+  `--display` forwards to the runtime. Embedded media blocks,
+  `--responses`, and `check-script` remain later spikes.
+
+- Milestone-1 Spike 9 executes FreeDOS-shaped `.rqs` scripts against a
+  cached QEMU/DOS machine: normalized VGA `wait`/`expect`,
+  `enter`/`type`/`press`/`select`, `screenshot`, and host `start`/`stop`,
+  starting a ready machine when needed and leaving it running unless the
+  script stopped it.
+
 - Milestone-1 Spike 8 parses the FreeDOS-shaped `.rqs` language into an
   immutable script model: headers, embedded media definitions, linear and
   state-machine bodies, `wait`, `expect`, `enter`, `type`, `press`,
   `select`, `screenshot`, `start`, `stop`, and explicit transitions report
-  source-located, compiler-style syntax and static-validation errors. Script
-  execution remains the next spike.
+  source-located, compiler-style syntax and static-validation errors.
 
 - The built-in library seed: blueprints, media definitions, and
   scripts ship inside the package under `reliquary/builtins/`

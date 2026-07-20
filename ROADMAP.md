@@ -692,16 +692,16 @@ boot/media change the M1 CLI list does not name — decide a thin
    `--blueprint freedos-1.4-plain` seeds home files once;
    second call leaves them alone. Out: `pull`, provenance
    columns, full index/`search`.
-8. **`.rqs` parse (FreeDOS shape)** — header + state-machine +
+8. **`.rqs` parse (FreeDOS shape; complete)** — header + state-machine +
    the verbs that example uses. Exit: parse the documented
    install script; useful parse errors. Out: linear-only path,
    `on`/reactive, `attach`/`stage`/`collect`, inputs/properties.
-9. **Script runtime on QEMU/DOS** — `wait`/`expect` on
+9. **Script runtime on QEMU/DOS (complete)** — `wait`/`expect` on
    normalized VGA text; `enter`/`type`/`press`/`select`;
    `screenshot`; `start`/`stop`. Exit: drive a tiny hand
    fixture script against a live guest (or the LiveCD menu).
    Out: full waterfall, guest agent, VNC.
-10. **`script <label>` wiring** — resolve via blueprint
+10. **`script <label>` wiring (complete)** — resolve via blueprint
     `scripts` map; create machine if none; run record under
     `runs/`. Exit: `rlq --blueprint … script install` invokes
     runtime end to end (may still fail mid-install). Out:

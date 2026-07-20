@@ -4,6 +4,7 @@
 
 import argparse
 import importlib
+import os
 import sys
 
 from qemu.qmp import ConnectError
@@ -16,6 +17,7 @@ from .machine import (Machine, cursor_menu_select, screen_text,
 from .machines import (create_from_blueprint, destroy, list_machines,
                        resolve_machine, short_id, start as start_machine,
                        stop as stop_machine)
+from .script_runner import ScriptRuntimeError, run_script
 from .workflows import _cli_machine_config, start as start_legacy
 
 
@@ -114,6 +116,17 @@ def main(argv=None):
         help="delete a stopped machine "
              "(requires --blueprint or --machine)")
 
+    command = subcommands.add_parser(
+        "script",
+        help="run a labeled .rqs script against a machine "
+             "(creates one when --blueprint has none)")
+    command.add_argument(
+        "label",
+        help="blueprint scripts-map label, or bare script stem")
+    command.add_argument(
+        "--display", action="store_true",
+        help="show the QEMU window during guest steps")
+
     list_command = subcommands.add_parser(
         "list", help="list blueprints or machines")
     list_sub = list_command.add_subparsers(dest="list_what", required=True)
@@ -155,8 +168,9 @@ def main(argv=None):
               "is the VM running? (rlq --blueprint NAME start)",
               file=sys.stderr)
         return 1
-    except (RuntimeError, TimeoutError, FileNotFoundError,
-            NotImplementedError, ValueError, OSError) as error:
+    except (ScriptRuntimeError, RuntimeError, TimeoutError,
+            FileNotFoundError, NotImplementedError, ValueError,
+            OSError) as error:
         print(f"reliquary: error: {error}", file=sys.stderr)
         return 1
 
@@ -190,6 +204,30 @@ def _create(arguments):
     return 0
 
 
+def _script(arguments):
+    if not arguments.blueprint and not arguments.machine:
+        raise ValueError(
+            "script requires --blueprint or --machine")
+    try:
+        result = run_script(
+            arguments.label,
+            blueprint=arguments.blueprint,
+            machine=arguments.machine,
+            home=arguments.home,
+            display=arguments.display,
+        )
+    except KeyboardInterrupt:
+        print("reliquary: interrupted", file=sys.stderr)
+        return 130
+    if result.created_machine:
+        print(f"created machine {result.machine_id}")
+    sid = short_id(result.machine_id, arguments.home)
+    print(f"ran {os.path.basename(result.script_path)} "
+          f"on machine {sid}")
+    print(f"run: {result.run_dir}")
+    return 0
+
+
 def _list_machines(arguments):
     filter_blueprint = (
         getattr(arguments, "filter_blueprint", None)
@@ -212,6 +250,8 @@ def _dispatch(arguments):
         return _install(arguments)
     if arguments.command == "create":
         return _create(arguments)
+    if arguments.command == "script":
+        return _script(arguments)
     if arguments.command == "list":
         if arguments.list_what == "machines":
             return _list_machines(arguments)

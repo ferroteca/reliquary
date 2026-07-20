@@ -21,8 +21,11 @@ as the default and currently only complete platform workflow:
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
-  `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `recipes/`
-  contains OS installation recipes (one module per target OS), `cli.py` owns command parsing, and `__main__.py`
+  `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `script.py`
+  parses the milestone-1 `.rqs` subset, `script_runner.py` executes scripts against cached machines and
+  wires `script <label>` (resolve via blueprint map, create-if-none, run records under
+  `cache/machines/<id>/runs/`), `recipes/` contains OS installation recipes (one module per target OS;
+  retiring once the north-star script path lands), `cli.py` owns command parsing, and `__main__.py`
   preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.

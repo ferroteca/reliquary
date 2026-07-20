@@ -5,10 +5,12 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The script spec
 
-> **Status:** Spike 8 implements parsing and static validation for the
-> milestone-1 FreeDOS shape, with source-located diagnostics. Script
-> execution remains unimplemented; details may still change before first
-> release.
+> **Status:** Spikes 8–10 implement parsing, the QEMU/DOS runtime
+> (`wait`/`expect`, input verbs, `screenshot`, `start`/`stop`), and
+> `rlq --blueprint|--machine script <label>` wiring with per-invocation
+> run records under `cache/machines/<id>/runs/`. Embedded media blocks,
+> property-bound inputs, reactive `on`, and the full transcript contract
+> remain later milestones; details may still change before first release.
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files

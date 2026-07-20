@@ -31,11 +31,12 @@ Read [The machine blueprint](docs/machine-blueprint.md) — starting with
 [Machine blueprints and machines](docs/instance-model.md) for the full
 lifecycle.
 
-> **Status:** the milestone-1 blueprint subset can now be parsed and
-> validated through the Python API, including media-name resolution. Machine
-> materialization and blueprint CLI commands are not implemented yet;
-> today's release still runs the transitional recipe-and-`drives/` layout
-> that the rest of this README documents.
+> **Status:** milestone-1 blueprint materialization, lifecycle CLI
+> (`create` / `start` / `stop` / `destroy` / `list machines`), and
+> `rlq --blueprint NAME script <label>` (resolve, create-if-none, run
+> records) are implemented for the QEMU/DOS subset. The transitional
+> `rlq install <recipe>` path below remains until the FreeDOS builtin
+> install/verify scripts and recipe retirement land.
 
 ## Installation
 
