@@ -14,6 +14,8 @@ from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
                         stop)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
+from .machines import (create, load_machine_state, machine_dir_path,
+                       machine_drive_args)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
                     fetch_media, resolve_media)
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
@@ -28,6 +30,7 @@ __all__ = [
     "MachineConfig",
     "AgentlessGuestExec",
     "GuestExec",
+    "create",
     "create_hdd_image",
     "cursor_menu_select",
     "MediaDefinition",
@@ -42,6 +45,9 @@ __all__ = [
     "find_qemu_img",
     "home",
     "load_blueprint",
+    "load_machine_state",
+    "machine_dir_path",
+    "machine_drive_args",
     "machines_cache_dir",
     "main",
     "media_cache_dir",
