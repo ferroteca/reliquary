@@ -97,7 +97,7 @@ def main(argv=None):
 
     command = subcommands.add_parser(
         "script",
-        help="run a labeled .rqs script against a machine "
+        help="run a labeled .rlqs script against a machine "
              "(creates one when --blueprint has none)")
     command.add_argument(
         "label",

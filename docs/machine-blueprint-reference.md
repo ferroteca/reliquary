@@ -130,7 +130,7 @@ reading the fields from the file (see
 **blueprint (optional) · object**
 
 A map of short labels to script file names (the stem of
-`scripts/<name>.rqs`). Labels are the verbs used with the `script`
+`scripts/<name>.rlqs`). Labels are the verbs used with the `script`
 command: `rlq --blueprint freedos-1.4-plain script install`
 looks up `scripts.install` and runs the script it names. Labels
 take priority over bare script filenames.

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Tests for the milestone-one .rqs script runtime."""
+"""Tests for the milestone-one .rlqs script runtime."""
 
 import json
 import os

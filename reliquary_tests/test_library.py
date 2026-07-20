@@ -39,7 +39,7 @@ class SeedingTest(unittest.TestCase):
             self._path("media", f"{MEDIA}.json")))
         for stem in SCRIPTS:
             self.assertTrue(os.path.isfile(
-                self._path("scripts", f"{stem}.rqs")))
+                self._path("scripts", f"{stem}.rlqs")))
 
     def test_second_seed_leaves_user_files_alone(self):
         """A seeded file that the user edited is never overwritten."""

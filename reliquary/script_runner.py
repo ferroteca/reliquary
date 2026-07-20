@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Runtime executor for milestone-one .rqs scripts on QEMU/DOS."""
+"""Runtime executor for milestone-one .rlqs scripts on QEMU/DOS."""
 
 import dataclasses
 import os
@@ -586,9 +586,9 @@ def _resolve_script_stem(label, scripts_map):
     if label in (".", "..") or "/" in label or "\\" in label:
         raise ValueError(
             f"script label must be a bare name, got: {label!r}")
-    if label.lower().endswith(".rqs"):
+    if label.lower().endswith(".rlqs"):
         raise ValueError(
-            f"script label must omit the .rqs suffix, got: {label!r}")
+            f"script label must omit the .rlqs suffix, got: {label!r}")
     if isinstance(scripts_map, dict) and label in scripts_map:
         return scripts_map[label]
     return label
@@ -596,12 +596,12 @@ def _resolve_script_stem(label, scripts_map):
 
 def _ensure_script_path(stem, home=None):
     """Return the home path for ``stem``, seeding from builtins if needed."""
-    path = os.path.join(scripts_dir(home), f"{stem}.rqs")
+    path = os.path.join(scripts_dir(home), f"{stem}.rlqs")
     if not os.path.isfile(path):
         seed_script(stem, home=home)
     if not os.path.isfile(path):
         raise FileNotFoundError(
-            f"script not found: {stem}.rqs\n"
+            f"script not found: {stem}.rlqs\n"
             f"expected under {scripts_dir(home)}")
     return path
 

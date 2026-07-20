@@ -131,17 +131,17 @@ def _referenced_insert_media(script_text):
 
 
 def seed_script(stem, home=None):
-    """Seed ``scripts/<stem>.rqs`` from the built-in library.
+    """Seed ``scripts/<stem>.rlqs`` from the built-in library.
 
     Returns whether the script file was copied out. The media
     definitions the script's ``insert`` statements reference come
     along (each obeying the never-overwrite rule), so a seeded
     script resolves its media without a live fetch first.
     """
-    source = _builtins_root() / "scripts" / f"{stem}.rqs"
+    source = _builtins_root() / "scripts" / f"{stem}.rlqs"
     if not source.is_file():
         return False
-    destination = os.path.join(scripts_dir(home), f"{stem}.rqs")
+    destination = os.path.join(scripts_dir(home), f"{stem}.rlqs")
     if not _copy_out(source, destination):
         return False
     try:

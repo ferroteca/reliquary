@@ -119,7 +119,7 @@ blueprint and script:
 | artifact | pattern | example |
 |---|---|---|
 | blueprint | `<name>.json` | `freedos-1.4-plain.json` |
-| script | `<blueprint>-<script-id>.rqs` | `freedos-1.4-plain-install.rqs` |
+| script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
 | script-aligned media | `<blueprint>-<script-id>-<drive>.json` | `freedos-1.4-plain-install-cdrom.json` |
 | shared media | `<name>.json` | `freedos-1.4-livecd.json` |
 
@@ -133,7 +133,7 @@ not a namespace.
 ## Named scripts on blueprints
 
 A blueprint may declare a `scripts` map — short labels naming
-`.rqs` script files — plus optional `name` and `description`
+`.rlqs` script files — plus optional `name` and `description`
 fields for discovery (see the
 [field reference](machine-blueprint-reference.md)). The labels are
 the verbs you use with `script`:

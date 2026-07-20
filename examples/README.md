@@ -20,8 +20,8 @@ home; copy each file into the matching directory of your home:
 
 ```text
 blueprints/freedos.json             the install machine blueprint
-scripts/freedos-plain-install.rqs   install script + LiveCD definition
-scripts/freedos-plain-verify.rqs    boot the result, confirm C:\>
+scripts/freedos-plain-install.rlqs   install script + LiveCD definition
+scripts/freedos-plain-verify.rlqs    boot the result, confirm C:\>
 ```
 
 The install script embeds the LiveCD definition. Its first run copies

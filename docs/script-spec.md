@@ -19,7 +19,7 @@ SPDX-License-Identifier: BSD-3-Clause
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
 across the VM seam. Scripts live in
-`<reliquary_home>/scripts`, one `<name>.rqs` file per script, and
+`<reliquary_home>/scripts`, one `<name>.rlqs` file per script, and
 run against a machine selected with `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:
 

@@ -68,7 +68,7 @@ first use.
 ### Named scripts
 
 A blueprint may declare a `scripts` map — short labels that name
-`.rqs` script files. It may also carry optional `name` and
+`.rlqs` script files. It may also carry optional `name` and
 `description` fields for discovery:
 
 ```json
@@ -91,7 +91,7 @@ A blueprint may declare a `scripts` map — short labels that name
 The labels are the verbs you use with `script`:
 `rlq --blueprint freedos-1.4-plain script install` looks up
 `scripts.install`, finds `freedos-1.4-plain-install`, and runs
-`scripts/freedos-1.4-plain-install.rqs`.
+`scripts/freedos-1.4-plain-install.rlqs`.
 
 `name` and `description` are optional in both user and built-in
 blueprints. The built-in library carries an index mapping every
@@ -227,7 +227,7 @@ blueprint and script:
 | artifact | pattern | example |
 |---|---|---|
 | blueprint | `<name>.json` | `freedos-1.4-plain.json` |
-| script | `<blueprint>-<script-id>.rqs` | `freedos-1.4-plain-install.rqs` |
+| script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
 | script-aligned media | `<blueprint>-<script-id>-<drive>.json` | `freedos-1.4-plain-install-cdrom.json` |
 | shared media | `<name>.json` | `freedos-1.4-livecd.json` |
 
@@ -665,11 +665,11 @@ rlq check-script <script_name>
     [--blueprint <name> | --machine <id>] [--responses <path>]
 ```
 
-A script is a `.rqs` file under `scripts/`. `script <label>` first
+A script is a `.rlqs` file under `scripts/`. `script <label>` first
 looks up `<label>` in the blueprint's `scripts` map (labels are
 short verbs — `install`, `verify`, `test`, `configure`); when there
 is no matching label, `<label>` is taken as a bare script filename
-and `scripts/<label>.rqs` is run. Label takes priority over bare
+and `scripts/<label>.rlqs` is run. Label takes priority over bare
 filename.
 
 If a referenced script doesn't exist in `scripts/` but is available
@@ -687,7 +687,7 @@ Behind the scenes this:
    definitions, and its scripts from the built-in library (skipping
    any that already exist).
 2. Creates a machine from the blueprint.
-3. Runs `scripts/freedos-1.4-plain-install.rqs`, which inserts
+3. Runs `scripts/freedos-1.4-plain-install.rlqs`, which inserts
    the LiveCD, starts the machine, drives the install, and
    ejects the CD again as its final step.
 

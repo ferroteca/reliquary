@@ -239,7 +239,7 @@ class ParseBlueprintTests(BlueprintTestCase):
             {"scripts": []},
             {"scripts": {"": "install"}},
             {"scripts": {"install": "../install"}},
-            {"scripts": {"install": "install.rqs"}},
+            {"scripts": {"install": "install.rlqs"}},
         )
         for fields in invalid:
             with self.subTest(fields=fields):

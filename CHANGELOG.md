@@ -25,7 +25,7 @@ renamed accordingly.
 
 Initial scaffold: package structure, CLI stub, and recipe module convention.
 
-The planned `.rqs` scripting language now separates linear scripts
+The planned `.rlqs` scripting language now separates linear scripts
 from explicit state machines, uses run-to-completion reactive states,
 and adds immutable text, media, and secret inputs bound from JSON
 responses, a home-wide user property registry, or interactive prompts.
@@ -64,7 +64,7 @@ prompt. `install` then blocks while the machine runs and always shuts
 it down when it ends — including on Ctrl-C, which the CLI reports as
 an interruption instead of a traceback.
 
-The recipe layer has since been retired in favor of the `.rqs`
+The recipe layer has since been retired in favor of the `.rlqs`
 install/verify scripts on the blueprint machine model (see the
 machine-layer notes below); `rlq install` no longer exists.
 
@@ -83,7 +83,7 @@ machine-layer notes below); `rlq install` no longer exists.
 - The recipe layer is retired (milestone-1 Spike 12): the `recipes/`
   package, the `rlq install <recipe>` command, and the recipe-era
   helpers (`ensure_media`, `install-media/` and `machines/<recipe>/`
-  home paths) are deleted. The `.rqs` install/verify scripts on the
+  home paths) are deleted. The `.rlqs` install/verify scripts on the
   blueprint machine model replace them; there is no migration
   (pre-release).
 
@@ -118,14 +118,14 @@ machine-layer notes below); `rlq install` no longer exists.
   `--display` forwards to the runtime. Embedded media blocks,
   `--responses`, and `check-script` remain later spikes.
 
-- Milestone-1 Spike 9 executes FreeDOS-shaped `.rqs` scripts against a
+- Milestone-1 Spike 9 executes FreeDOS-shaped `.rlqs` scripts against a
   cached QEMU/DOS machine: normalized VGA `wait`/`expect`,
   `enter`/`type`/`press`/`select`, `screenshot`, host `start`/`stop`,
   and (with Spike 13) stopped-machine `insert`/`eject`/`boot`,
   starting a ready machine when needed and leaving it running unless the
   script stopped it.
 
-- Milestone-1 Spike 8 parses the FreeDOS-shaped `.rqs` language into an
+- Milestone-1 Spike 8 parses the FreeDOS-shaped `.rlqs` language into an
   immutable script model: headers, embedded media definitions, linear and
   state-machine bodies, `wait`, `expect`, `enter`, `type`, `press`,
   `select`, `screenshot`, `insert`, `eject`, `boot`, `start`, `stop`,

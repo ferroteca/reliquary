@@ -92,7 +92,7 @@ class EmbeddedMedia:
 
 @dataclass(frozen=True)
 class Script:
-    """An immutable parsed linear or state-machine ``.rqs`` document."""
+    """An immutable parsed linear or state-machine ``.rlqs`` document."""
 
     platform: str
     description: Optional[str] = None
@@ -498,7 +498,7 @@ class _Parser:
 
 
 def parse_script(source, path="<script>"):
-    """Parse and statically validate a milestone-one ``.rqs`` document."""
+    """Parse and statically validate a milestone-one ``.rlqs`` document."""
     if not isinstance(source, str):
         raise TypeError("script source must be text")
     source = source.lstrip("\ufeff")
@@ -510,7 +510,7 @@ def parse_script(source, path="<script>"):
 
 
 def load_script(path):
-    """Load and parse a UTF-8 ``.rqs`` file with path-aware diagnostics."""
+    """Load and parse a UTF-8 ``.rlqs`` file with path-aware diagnostics."""
     path = os.path.abspath(os.fspath(path))
     try:
         with open(path, encoding="utf-8") as handle:

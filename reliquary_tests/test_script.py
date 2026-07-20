@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Tests for the milestone-one FreeDOS-shaped ``.rqs`` parser."""
+"""Tests for the milestone-one FreeDOS-shaped ``.rlqs`` parser."""
 
 import os
 import unittest
@@ -17,7 +17,7 @@ class ScriptParserTests(unittest.TestCase):
             return handle.read()
 
     def test_parses_the_shipped_install_state_machine(self):
-        result = parse_script(self._builtin("freedos-1.4-plain-install.rqs"))
+        result = parse_script(self._builtin("freedos-1.4-plain-install.rlqs"))
         self.assertIsInstance(result, Script)
         self.assertEqual(result.platform, "dos")
         self.assertEqual(result.machine, "stopped")
@@ -29,7 +29,7 @@ class ScriptParserTests(unittest.TestCase):
                          "done")
 
     def test_parses_the_shipped_linear_verify_script(self):
-        result = parse_script(self._builtin("freedos-1.4-plain-verify.rqs"))
+        result = parse_script(self._builtin("freedos-1.4-plain-verify.rlqs"))
         self.assertEqual(result.initial, None)
         self.assertEqual(result.machine, "stopped")
         self.assertEqual([statement.verb for statement in result.statements],
@@ -66,9 +66,9 @@ class ScriptParserTests(unittest.TestCase):
         source = ('platform: dos\ninitial: ready\nstate ready {\n'
                   ' -> missing\n}\n')
         with self.assertRaises(ScriptParseError) as caught:
-            parse_script(source, path="install.rqs")
+            parse_script(source, path="install.rlqs")
         self.assertEqual(caught.exception.line, 4)
-        self.assertIn("install.rqs:4:1: error", str(caught.exception))
+        self.assertIn("install.rlqs:4:1: error", str(caught.exception))
         self.assertIn("4 |  -> missing", str(caught.exception))
 
     def test_machine_header_defaults_to_running(self):
@@ -142,7 +142,7 @@ class FreeDOSInstallFlowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         path = os.path.join(os.path.dirname(reliquary.__file__), "builtins",
-                            "scripts", "freedos-1.4-plain-install.rqs")
+                            "scripts", "freedos-1.4-plain-install.rlqs")
         with open(path, encoding="utf-8") as handle:
             cls.script = parse_script(handle.read())
 

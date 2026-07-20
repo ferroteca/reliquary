@@ -29,7 +29,7 @@ flowchart LR
     subgraph yours["yours — durable, worth versioning"]
         BP["blueprint<br/>blueprints/freedos.json"]
         MED["media definitions<br/>media/*.json"]
-        SCR["scripts<br/>scripts/*.rqs"]
+        SCR["scripts<br/>scripts/*.rlqs"]
     end
     subgraph reliquarys["reliquary's — disposable, regenerates"]
         M1["machine 5fd1…<br/>state · drives · runs"]

@@ -200,7 +200,7 @@ def _scripts(value):
         label = _nonempty_string(label, "scripts label")
         script = _nonempty_string(script, f"scripts.{label}")
         if (script in (".", "..") or "/" in script or "\\" in script
-                or script.lower().endswith(".rqs")):
+                or script.lower().endswith(".rlqs")):
             raise ValueError(
                 f"scripts.{label} must be the file stem under "
                 f"scripts/, got: {script!r}")
