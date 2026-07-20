@@ -15,6 +15,7 @@ except importlib.metadata.PackageNotFoundError:
 from qemu.qmp import ConnectError
 
 from .home import blueprints_dir, set_home
+from .library import list_builtin_blueprints
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
@@ -150,9 +151,12 @@ def main(argv=None):
     list_command = subcommands.add_parser(
         "list", help="list blueprints or machines")
     list_sub = list_command.add_subparsers(dest="list_what", required=True)
-    list_sub.add_parser(
+    list_bps_parser = list_sub.add_parser(
         "blueprints", aliases=["blueprint"],
         help="list available blueprints")
+    list_bps_parser.add_argument(
+        "--builtin", action="store_true",
+        help="list only built-in blueprints")
     list_machines_parser = list_sub.add_parser(
         "machines", aliases=["machine"],
         help="list materialized machines")
@@ -235,6 +239,10 @@ def _script(arguments):
 
 
 def _list_blueprints(arguments):
+    if getattr(arguments, "builtin", False):
+        for name in list_builtin_blueprints():
+            print(name)
+        return 0
     blueprints_path = blueprints_dir(arguments.home)
     if not os.path.exists(blueprints_path):
         return 0

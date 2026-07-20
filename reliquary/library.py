@@ -64,6 +64,16 @@ def _referenced_scripts(blueprint_data):
             yield stem
 
 
+def list_builtin_blueprints():
+    """Yield the stem names of blueprints shipped in the built-in library."""
+    root = _builtins_root() / "blueprints"
+    if not root.is_dir():
+        return
+    for entry in sorted(root.iterdir(), key=lambda item: item.name):
+        if entry.name.endswith(".json"):
+            yield entry.name[:-5]
+
+
 def seed_blueprint(name, home=None):
     """Seed ``blueprints/<name>.json`` from the built-in library.
 

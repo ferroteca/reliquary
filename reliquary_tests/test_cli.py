@@ -77,6 +77,34 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("ready", output)
         self.assertIn("qemu", output)
 
+    def test_list_blueprints_builtin_lists_builtins(self):
+        """--builtin lists only built-in blueprint names."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list", "blueprints",
+                "--builtin",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue().strip().splitlines()
+        self.assertTrue(output)
+        for name in output:
+            self.assertNotIn(
+                name, ["plain"],
+                "--builtin must not include local blueprints")
+
+    def test_list_blueprints_default_is_local(self):
+        """Default list blueprints shows only local blueprints."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list", "blueprints",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue().strip().splitlines()
+        self.assertIn("plain", output,
+                      "default must include local blueprint 'plain'")
+
     def test_list_blueprint_alias_produces_same_output(self):
         """'list blueprint' alias produces identical output to 'list blueprints'."""
         stdout_plural = io.StringIO()
