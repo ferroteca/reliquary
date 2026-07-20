@@ -3,7 +3,8 @@
 
 description: "FreeDOS 1.4 plain install from LiveCD"
 platform: dos
-initial: cd-boot
+machine: stopped
+initial: insert-cd
 timeout: 30s
 
 media freedos-1.4-livecd {
@@ -16,6 +17,12 @@ media freedos-1.4-livecd {
       "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
     }
   ]
+}
+
+state insert-cd {
+    insert cdrom0 freedos-1.4-livecd
+    start
+    -> cd-boot
 }
 
 state cd-boot {
@@ -61,5 +68,6 @@ state formatting, timeout: 5m, deadline: 20m {
     screenshot installed
     enter "fdapm poweroff"
     wait stopped, timeout: 2m
+    eject cdrom0
     done
 }

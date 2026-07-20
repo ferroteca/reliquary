@@ -8,9 +8,11 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** Spikes 8–10 implement parsing, the QEMU/DOS runtime
 > (`wait`/`expect`, input verbs, `screenshot`, `start`/`stop`), and
 > `rlq --blueprint|--machine script <label>` wiring with per-invocation
-> run records under `cache/machines/<id>/runs/`. Spike 13 adds the
-> `machine:` header and persistent `attach`/`detach`. Embedded media
-> blocks, property-bound inputs, reactive `on`, and the full transcript
+> run records under `cache/machines/<id>/runs/`. Spike 13 implements
+> the `machine:` header, persistent `insert`/`eject` on
+> blueprint-declared removable slots, and `boot` to reorder boot
+> devices (stopped machines only for now). Embedded media blocks,
+> property-bound inputs, reactive `on`, and the full transcript
 > contract remain later milestones; details may still change before
 > first release.
 
@@ -57,8 +59,9 @@ select "English (United States)"
 - **Observations** establish that the guest or machine has reached
   a known state: `wait`, `expect`, and reactive `on` handlers.
 - **Actions** deliver intent-level input or perform supporting host
-  operations: `enter`, `type`, `press`, `select`, `attach`,
-  `detach`, `stage`, `collect`, `screenshot`, `start`, and `stop`.
+  operations: `enter`, `type`, `press`, `select`, `insert`,
+  `eject`, `boot`, `stage`, `collect`, `screenshot`, `start`, and
+  `stop`.
 
 Intent-level verbs remain above portable input events. `select`
 means choosing a visible menu entry, not sending a guessed number
@@ -166,7 +169,7 @@ declarations, and executable or state content:
   `stopped` requires a stopped machine — a running machine fails
   preflight rather than being implicitly powered off — and the
   script performs its own explicit `start`, typically after
-  attaching the media it needs. An install script that must attach
+  inserting the media it needs. An install script that must insert
   its installer medium before first boot declares
   `machine: stopped`.
 - `timeout: <duration>` optionally changes the script-wide
@@ -285,7 +288,7 @@ input secret product-key, property: "products.windows-98.install-key"
   `enter`, `type`, and `select`. It cannot parameterize watch
   conditions, state names, paths, or control flow.
 - `media` is the name of a defined media item. It is valid only
-  where a media argument is expected, such as `attach`.
+  where a media argument is expected, such as `insert`.
 - `secret` is protected immutable text. It may be expanded only in
   `enter` and `type`; its value and expanded argument are omitted
   from transcripts and diagnostics.
@@ -299,7 +302,7 @@ References use `${name}`:
 
 ```rqs
 enter "setup /owner=${owner-name}"
-attach floppy1 ${supplemental-disk}
+insert floppy1 ${supplemental-disk}
 type "${product-key}"
 ```
 
@@ -597,7 +600,7 @@ actions are always braced; there is no separate inline form:
 ```rqs
 state copying, timeout: 5m, deadline: 30m {
     on "Please insert disk 2" {
-        attach floppy ${supplemental-disk}
+        insert floppy ${supplemental-disk}
         press enter
     }
     on "Installation complete" {
@@ -719,22 +722,23 @@ contains the step number. Repeated explicit names receive an
 occurrence suffix rather than overwriting an earlier capture.
 Failing observations capture a screenshot automatically.
 
-### `attach` and `detach`
+### `insert` and `eject`
 
 ```rqs
-attach cdrom0 freedos-1.4-livecd
-attach floppy1 ${supplemental-disk}
-detach cdrom0
+insert cdrom0 freedos-1.4-livecd
+insert floppy1 ${supplemental-disk}
+eject cdrom0
 ```
 
-These change what medium occupies a declared removable drive slot
-(`cdrom`, `floppy`) and record the change in the machine's state
-document, not its blueprint. They never create or remove the drive
-itself: drives are guest-visible hardware the blueprint declares —
-an installer-driven blueprint declares the slot empty
-(`"cdrom0": null`) — and an `attach` or `detach` naming a slot the
-machine does not have fails static preflight, before any guest
-input. `attach` accepts a literal
+These change what medium occupies a declared **floppy or CD-ROM**
+slot and record the change in the machine's state document, not
+its blueprint. Hard-disk slots are not targets — only
+`floppy[0..1]` and `cdrom[0..3]`. The verbs never create or remove
+the drive itself: drives are guest-visible hardware the blueprint
+declares — an installer-driven blueprint declares the slot empty
+(`"cdrom0": null`) — and an `insert` or `eject` naming a missing
+or non-removable slot fails static preflight, before any guest
+input. `insert` accepts a literal
 defined-media name or a `media` input. By execution time every
 embedded definition has been installed, so resolution uses the
 ordinary shared catalog, then fetches and hash-verifies the item as
@@ -742,18 +746,41 @@ needed. Both verbs work on a running machine (a media change the
 guest observes) and on a stopped one (the medium present at the
 next `start`).
 
-**Attachments are definitive machine state.** An `attach` persists
+**Insertions are definitive machine state.** An `insert` persists
 across `stop`/`start` exactly like an installer's writes to a hard
 disk: the machine has diverged from its blueprint, and stays
-diverged until a later `attach`/`detach` changes the slot again or
+diverged until a later `insert`/`eject` changes the slot again or
 [`apply`](machine-blueprint.md#applying-blueprint-edits) returns
 the machine to its blueprint. A script that changes machine state
 it should not leave behind — an install script's installer CD —
-ends by explicitly restoring it, conventionally with `detach` as
+ends by explicitly restoring it, conventionally with `eject` as
 its final step. A script that fails or is interrupted leaves its
-attachments in place for diagnosis and resumption; `apply` is the
+media changes in place for diagnosis and resumption; `apply` is the
 one-command recovery when a diverged machine should return to its
 blueprint shape.
+
+### `boot`
+
+```rqs
+boot hdd0 cdrom0
+boot cdrom0
+```
+
+`boot` replaces the machine's boot order with the listed drive
+keys (canonical or alias form), persisted in the machine's state
+document. Every key must name a drive the machine already
+declares; duplicates are rejected. The machine must be stopped —
+the new order takes effect on the next `start`. Like
+`insert`/`eject`, the change diverges the machine from its
+blueprint until a later `boot`, or
+[`apply`](machine-blueprint.md#applying-blueprint-edits), restores
+it.
+
+Most install scripts never need this: a blueprint that boots
+`["hdd0", "cdrom0"]` with a blank hard disk falls through to an
+attached installer CD, then boots the installed disk once it is
+populated. The verb exists for scripts that genuinely need a
+different order than the blueprint's default.
 
 ### `stage` and `collect`
 
@@ -789,7 +816,7 @@ start
 `stop` is a host-side hard power-off and should be used only when a
 clean guest shutdown is unavailable or when offline exchange is
 required. `start` starts a stopped machine as its state document
-describes it — including media attached earlier in the script or a
+describes it — including media inserted earlier in the script or a
 previous run. Starting an already-running machine or stopping an
 already-stopped one is an error.
 
@@ -817,9 +844,11 @@ reject:
 - sequential states with any reachable path lacking an explicit
   transition or `done`;
 - invalid key tokens and invalid typed argument positions;
-- `attach`/`detach` targets that are not removable drive slots and
+- `insert`/`eject` targets that are not floppy or cdrom slots and
   (with a machine in scope) slots the target machine does not
   declare;
+- `boot` keys that are not drive slots or (with a machine in
+  scope) drives the target machine does not declare;
 - unknown response keys, missing noninteractive responses, and
   response values of the wrong type;
 - malformed property bindings, input/property kind mismatches,
@@ -912,7 +941,7 @@ initial: insert-cd
 timeout: 30s
 
 state insert-cd {
-    attach cdrom0 freedos-1.4-livecd
+    insert cdrom0 freedos-1.4-livecd
     start
     -> cd-boot
 }
@@ -960,28 +989,30 @@ state formatting, timeout: 5m, deadline: 20m {
     screenshot installed
     enter "fdapm poweroff"
     wait stopped, timeout: 2m
-    detach cdrom0
+    eject cdrom0
     done
 }
 ```
 
 The blueprint declares `cdrom0` empty and boots
-`["cdrom0", "hdd0"]`; the script supplies the installer medium. The
-opening `attach` makes the machine boot the LiveCD, and the closing
-`detach` returns the machine to its default shape, so the same boot
-order thereafter falls through the empty CD drive to the installed
-hard disk. The second visit to `cd-boot` reaches the other `expect`
-branch because the disk has been partitioned. The guest-driven
-reboot is expressed by the installer selection and the resulting
-screen, not by a reliquary reboot command.
+`["hdd0", "cdrom0"]`; the script supplies the installer medium. A
+blank hard disk fails to boot, so the opening `insert` makes the
+machine fall through to the LiveCD, and the closing `eject`
+returns the machine to its default shape — the same boot order
+thereafter boots the installed hard disk. No `boot` verb is needed.
+The second visit to `cd-boot` reaches the other `expect` branch
+because the disk has been partitioned. The guest-driven reboot is
+expressed by the installer selection and the resulting screen, not
+by a reliquary reboot command.
 
 Verification is a separate script needing no machine
-reconfiguration at all: after the install script's final `detach`,
+reconfiguration at all: after the install script's final `eject`,
 the machine is back in its blueprint shape and simply boots the
 installed hard disk. The verify script declares
 `machine: stopped` too and issues a plain `start`. If an
 interrupted install run left the CD attached, `apply` restores the
-blueprint shape.
+blueprint shape (or the HD-first order boots the installed disk
+anyway while the CD remains attached).
 
 ## Sharing
 

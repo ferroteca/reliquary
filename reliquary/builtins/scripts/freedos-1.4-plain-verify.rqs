@@ -3,10 +3,13 @@
 
 description: "Boot the installed FreeDOS disk and confirm a DOS prompt"
 platform: dos
+machine: stopped
 timeout: 2m
 
-# Before running, disable the installer CD in the machine blueprint, make
-# hdd the first boot device, and adopt the edit with reliquary apply.
+# After the install script's final eject, the machine is back in its
+# blueprint shape: boot is hdd then cdrom, so a plain start boots the
+# installed hard disk (an empty CD is never tried).
+start
 wait "C:\>"
 screenshot verified
 enter "fdapm poweroff"

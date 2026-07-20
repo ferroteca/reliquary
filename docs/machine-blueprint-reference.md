@@ -6,10 +6,11 @@ SPDX-License-Identifier: BSD-3-Clause
 # Machine blueprint — field reference
 
 > **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
-> `size`/`media`, `boot`, `name`, `description`, and `scripts`) is
-> implemented for parsing, validation, and media-name resolution. Machine
-> materialization and the remaining fields are not implemented yet; details
-> may still change before first release.
+> `size`/`media` and empty removable slots (`null`), `boot`, `name`,
+> `description`, and `scripts`) is implemented: parsing, validation,
+> media-name resolution, machine materialization, and persistent
+> script-driven `insert`/`eject`. The remaining fields are not
+> implemented yet; details may still change before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`blueprints/<name>.json`, yours) and each
@@ -191,7 +192,7 @@ detected and refused rather than manipulated.
 The digest of the resolved blueprint snapshot this machine was created
 from (or last [`apply`](machine-blueprint.md#applying-blueprint-edits)-d
 to). This is the machine's baseline. Operation may diverge the
-state from it — script `attach`/`detach` persists in the state —
+state from it — script `insert`/`eject` persists in the state —
 and `apply` is what reconciles the machine back to (or forward to
 an edited) blueprint; editing the blueprint file changes nothing
 until `apply` records a new digest.
@@ -283,13 +284,13 @@ A removable drive (`cdrom`, `floppy`) may instead be declared
 
 The slot exists as guest-visible hardware with no medium inserted.
 This is the normal shape for a drive that scripts occupy
-temporarily — an install script attaches the installer medium to
-the empty slot and detaches it as its final step (see
-[the script spec](script-spec.md#attach-and-detach)). Declaring
-the slot is required: `attach` only inserts media into hardware
+temporarily — an install script inserts the installer medium into
+the empty slot and ejects it as its final step (see
+[the script spec](script-spec.md#insert-and-eject)). Declaring
+the slot is required: `insert` only places media into hardware
 the blueprint declares, and never creates the drive itself — the
 blueprint alone determines machine topology, so capability
-preflight (and a script's `attach` targets) can be checked before
+preflight (and a script's `insert` targets) can be checked before
 anything runs. Fixed drives
 (`hdd`) cannot be empty.
 
@@ -320,7 +321,7 @@ machine-independent, read-only-use media the machine should carry
 *at rest*: a driver disk, a reference CD. Media a workflow needs
 only temporarily — above all installer ISOs — conventionally stay
 out of the blueprint: declare the slot empty and let the install
-script attach and detach the medium, so the machine's default
+script insert and eject the medium, so the machine's default
 shape is the installed system, not the installer. (To boot or
 modify a copy of a media image,
 make it a drive [`base`](#base--optional--string-or-object) instead.)
@@ -511,19 +512,20 @@ The boot order: drive keys (canonical or alias form) tried in
 order.
 
 ```json
-{"boot": ["cdrom0", "hdd0"]}
+{"boot": ["hdd0", "cdrom0"]}
 ```
 
 Every entry must reference a declared, enabled drive. An empty
-removable drive is a valid entry: firmware falls through it to the
-next entry until a medium is attached. This is the standard
-install pattern — `["cdrom0", "hdd0"]` with an empty `cdrom0`
-boots the installer CD while a script has one attached and the
-installed hard disk once it is detached, with no boot-order change
-ever needed. When omitted,
-the default order is: the slot-0 floppy image if declared, else the
-slot-0 hard disk, else the first CD-ROM; the resolved order
-appears in the state.
+or non-bootable drive is a valid entry: firmware falls through it
+to the next entry. This is the standard install pattern —
+`["hdd0", "cdrom0"]` with a blank `hdd0` and an empty `cdrom0`
+falls through to the installer CD while a script has one attached,
+and boots the installed hard disk afterward, with no boot-order
+change needed. Scripts may still reorder boot devices with the
+[`boot`](script-spec.md#boot) verb while the machine is stopped.
+When omitted, the default order is: the slot-0 floppy image if
+declared, else the slot-0 hard disk, else the first CD-ROM; the
+resolved order appears in the state.
 
 Backends differ in how faithfully they honor multi-entry boot
 orders; a backend that cannot honor the declared order reports a

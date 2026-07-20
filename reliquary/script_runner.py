@@ -98,6 +98,7 @@ class _ScriptEngine:
         self._script_path = script_path
         self._transcript = None
         self._port = None
+        self._display = False
         self._current_state = script.initial
         self._step = 0
 
@@ -118,9 +119,24 @@ class _ScriptEngine:
             self._transcript.flush()
 
     def run(self, display=False):
+        self._display = display
         state = _machines.load_machine_state(self._machine_id, self._home)
         phase = state.get("phase")
-        if phase == "ready":
+        if self._script.machine == "stopped":
+            # The script expects a stopped machine and performs its
+            # own explicit start, typically after inserting media.
+            if phase == "running":
+                raise self._error(
+                    "the script expects a stopped machine, but "
+                    f"machine "
+                    f"{_machines.short_id(self._machine_id, self._home)} "
+                    "is running; stop it first")
+            if phase != "ready":
+                raise self._error(
+                    f"machine "
+                    f"{_machines.short_id(self._machine_id, self._home)}"
+                    f" cannot execute a script (phase: {phase})")
+        elif phase == "ready":
             self._port = _machines.start(
                 self._machine_id, display=display, home=self._home)
         elif phase == "running":
@@ -201,6 +217,12 @@ class _ScriptEngine:
                 self._do_select(statement)
             elif statement.verb == "screenshot":
                 self._do_screenshot(statement)
+            elif statement.verb == "insert":
+                self._do_insert(statement)
+            elif statement.verb == "eject":
+                self._do_eject(statement)
+            elif statement.verb == "boot":
+                self._do_boot(statement)
             elif statement.verb == "start":
                 self._do_start()
             elif statement.verb == "stop":
@@ -212,6 +234,10 @@ class _ScriptEngine:
                 return
 
     def _session(self):
+        if self._port is None:
+            raise self._error(
+                "the machine is not running; the script must start "
+                "it first")
         try:
             return Qmp(self._port)
         except (OSError, ConnectError):
@@ -224,6 +250,8 @@ class _ScriptEngine:
         return Machine(self._port, self._machine_home)
 
     def _is_stopped(self):
+        if self._port is None:
+            return True
         try:
             with Qmp(self._port):
                 pass
@@ -276,10 +304,24 @@ class _ScriptEngine:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self._is_stopped():
+                self._mark_stopped()
                 return
             time.sleep(2)
         raise self._error(
             f"timed out after {timeout}s waiting for machine to stop")
+
+    def _mark_stopped(self):
+        """Reconcile state after observing the machine gone.
+
+        The guest powered itself off, so the QEMU process exited
+        without a reliquary ``stop``; the machine phase must return
+        to ``ready`` for later insert/eject and ``start`` steps.
+        """
+        self._port = None
+        try:
+            _machines.mark_stopped(self._machine_id, home=self._home)
+        except FileNotFoundError:
+            pass
 
     def _do_expect(self, statement, block_modifiers):
         branches = statement.argument
@@ -324,6 +366,12 @@ class _ScriptEngine:
                             self._do_select(substatement)
                         elif substatement.verb == "screenshot":
                             self._do_screenshot(substatement)
+                        elif substatement.verb == "insert":
+                            self._do_insert(substatement)
+                        elif substatement.verb == "eject":
+                            self._do_eject(substatement)
+                        elif substatement.verb == "boot":
+                            self._do_boot(substatement)
                         elif substatement.verb == "start":
                             self._do_start()
                         elif substatement.verb == "stop":
@@ -419,14 +467,42 @@ class _ScriptEngine:
         else:
             self._machine().screenshot(name)
 
+    def _do_insert(self, statement):
+        slot, media_name = statement.argument
+        self._log(f"line {statement.line}: insert {slot} {media_name}")
+        try:
+            _machines.insert_media(
+                self._machine_id, slot, media_name, home=self._home)
+        except (RuntimeError, ValueError) as exc:
+            raise self._error(str(exc), statement=statement) from exc
+
+    def _do_eject(self, statement):
+        slot = statement.argument
+        self._log(f"line {statement.line}: eject {slot}")
+        try:
+            _machines.eject_media(
+                self._machine_id, slot, home=self._home)
+        except (RuntimeError, ValueError) as exc:
+            raise self._error(str(exc), statement=statement) from exc
+
+    def _do_boot(self, statement):
+        keys = statement.argument
+        self._log(f"line {statement.line}: boot {' '.join(keys)}")
+        try:
+            _machines.set_boot_order(
+                self._machine_id, keys, home=self._home)
+        except (RuntimeError, ValueError) as exc:
+            raise self._error(str(exc), statement=statement) from exc
+
     def _do_start(self):
         self._log("start machine")
         self._port = _machines.start(
-            self._machine_id, home=self._home)
+            self._machine_id, display=self._display, home=self._home)
 
     def _do_stop(self):
         self._log("stop machine")
         _machines.stop(self._machine_id, home=self._home)
+        self._port = None
 
     def _match_condition(self, screen, condition):
         if condition.kind == "text":
@@ -544,14 +620,70 @@ def _create_run_dir(machine_id, home=None):
     return run_dir
 
 
+def _walk_statements(statements):
+    """Yield every statement, descending into expect branches."""
+    for statement in statements:
+        yield statement
+        if statement.verb == "expect":
+            for branch in statement.argument:
+                yield from _walk_statements(branch.statements)
+
+
+def _iter_statements(script):
+    """Yield every statement of a linear or state-machine script."""
+    yield from _walk_statements(script.statements)
+    for state in script.states.values():
+        yield from _walk_statements(state.statements)
+
+
+_REMOVABLE_MEDIA = frozenset({"floppy", "cdrom"})
+
+
+def _preflight_media_slots(script, machine_state, script_path):
+    """Fail before any guest input when a script names an
+    undeclared slot or boot drive.
+
+    ``insert``/``eject``/``boot`` never create or remove a drive —
+    the blueprint alone defines machine topology — so every named
+    slot must exist in the machine's state.  ``insert``/``eject``
+    further require a floppy or cdrom slot.
+    """
+    drives = machine_state.get("drives", {})
+    for statement in _iter_statements(script):
+        if statement.verb == "insert":
+            slots = (statement.argument[0],)
+            removable_only = True
+        elif statement.verb == "eject":
+            slots = (statement.argument,)
+            removable_only = True
+        elif statement.verb == "boot":
+            slots = statement.argument
+            removable_only = False
+        else:
+            continue
+        for slot in slots:
+            drive = drives.get(slot)
+            if drive is None:
+                raise ScriptRuntimeError(
+                    f"the machine declares no drive {slot}",
+                    statement=statement, path=script_path)
+            if (removable_only
+                    and drive.get("medium") not in _REMOVABLE_MEDIA):
+                raise ScriptRuntimeError(
+                    f"{slot} is not a removable drive slot "
+                    "(insert/eject are floppy and cdrom only)",
+                    statement=statement, path=script_path)
+
+
 def execute_script(script, *, machine_id, home=None, display=False,
                    run_dir=None, script_path=None):
     """Execute a parsed Script against a cached machine.
 
-    The machine must be in ``ready`` or ``running`` phase.  When it
-    is ready it is started first; when it is running execution
-    connects to its QMP port.  The machine is left running at exit
-    unless the script stopped it.
+    The machine state the script's ``machine:`` header expects is
+    established first: the default ``running`` starts a ready
+    machine, while ``stopped`` requires a stopped machine and
+    leaves starting to the script itself.  The machine is left in
+    whatever state the last executed step produced.
 
     When ``run_dir`` is set, a transcript is written there and
     screenshots land under ``run_dir/screenshots/``.
@@ -559,6 +691,9 @@ def execute_script(script, *, machine_id, home=None, display=False,
     if not script.states and not script.statements:
         return
 
+    _preflight_media_slots(
+        script, _machines.load_machine_state(machine_id, home),
+        script_path)
     machine_home = _machines.machine_dir_path(machine_id, home)
     engine = _ScriptEngine(
         script, machine_id, home, machine_home,

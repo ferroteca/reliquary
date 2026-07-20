@@ -16,9 +16,14 @@ _IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*$")
 _DURATION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:ms|s|m|h)$")
 _STRING = re.compile(r'(?:r)?"(?:\\.|[^"\\])*"$')
 _KEY = re.compile(r"[a-z]+(?:\+[a-z]+)*$")
-_RESERVED = {"description", "platform", "initial", "timeout", "media",
-             "state", "wait", "expect", "enter", "type", "press",
-             "select", "screenshot", "start", "stop", "done"}
+_RESERVED = {"description", "platform", "initial", "machine", "timeout",
+             "media", "state", "wait", "expect", "enter", "type", "press",
+             "select", "screenshot", "insert", "eject", "boot", "start",
+             "stop", "done"}
+_REMOVABLE_SLOT = re.compile(r"(floppy|cdrom)([0-9]+)?$")
+_REMOVABLE_LIMITS = {"floppy": 2, "cdrom": 4}
+_DRIVE_SLOT = re.compile(r"(floppy|hdd|cdrom)([0-9]+)?$")
+_DRIVE_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4}
 
 
 class ScriptParseError(ValueError):
@@ -93,6 +98,7 @@ class Script:
     description: Optional[str] = None
     timeout: Optional[str] = None
     initial: Optional[str] = None
+    machine: str = "running"
     media: Tuple[EmbeddedMedia, ...] = ()
     statements: Tuple[Statement, ...] = ()
     states: Mapping[str, State] = field(default_factory=dict)
@@ -181,6 +187,40 @@ def _condition(text, line):
     return Condition("text", _string(text, line))
 
 
+def _removable_slot(value, line):
+    """Normalize a removable drive slot name (``cdrom0``, ``floppy``)."""
+    match = _REMOVABLE_SLOT.fullmatch(value)
+    if not match:
+        raise ScriptParseError(
+            line, f"not a removable drive slot: {value!r} (expected "
+            "floppy[0..1] or cdrom[0..3])")
+    medium = match.group(1)
+    slot = int(match.group(2) or 0)
+    limit = _REMOVABLE_LIMITS[medium]
+    if slot >= limit:
+        raise ScriptParseError(
+            line, f"invalid drive slot {value!r}: {medium} slots run "
+            f"from 0 to {limit - 1}")
+    return f"{medium}{slot}"
+
+
+def _drive_slot(value, line):
+    """Normalize any drive slot name (``hdd0``, ``cdrom``, ...)."""
+    match = _DRIVE_SLOT.fullmatch(value)
+    if not match:
+        raise ScriptParseError(
+            line, f"not a drive slot: {value!r} (expected "
+            "floppy[0..1], hdd[0..3], or cdrom[0..3])")
+    medium = match.group(1)
+    slot = int(match.group(2) or 0)
+    limit = _DRIVE_LIMITS[medium]
+    if slot >= limit:
+        raise ScriptParseError(
+            line, f"invalid drive slot {value!r}: {medium} slots run "
+            f"from 0 to {limit - 1}")
+    return f"{medium}{slot}"
+
+
 def _terminal(text, line):
     if text == "done":
         return Statement("done", line=line)
@@ -220,6 +260,39 @@ def _statement(text, line):
             raise ScriptParseError(
                 line, "screenshot accepts one optional name")
         return Statement("screenshot", remainder or None, line=line)
+    if verb in {"insert", "eject"}:
+        if comma:
+            raise ScriptParseError(line, f"{verb} takes no modifiers")
+        parts = remainder.split()
+        if verb == "insert":
+            if len(parts) != 2:
+                raise ScriptParseError(
+                    line, "insert requires a drive slot and a media name")
+            slot = _removable_slot(parts[0], line)
+            media_name = _identifier(parts[1], line, "media name")
+            return Statement("insert", (slot, media_name), line=line)
+        if len(parts) != 1:
+            raise ScriptParseError(
+                line, "eject requires exactly a drive slot")
+        return Statement(
+            "eject", _removable_slot(parts[0], line), line=line)
+    if verb == "boot":
+        if comma:
+            raise ScriptParseError(line, "boot takes no modifiers")
+        parts = remainder.split()
+        if not parts:
+            raise ScriptParseError(
+                line, "boot requires at least one drive key")
+        keys = []
+        seen = set()
+        for part in parts:
+            key = _drive_slot(part, line)
+            if key in seen:
+                raise ScriptParseError(
+                    line, f"boot contains duplicate drive {key}")
+            seen.add(key)
+            keys.append(key)
+        return Statement("boot", tuple(keys), line=line)
     if verb in {"start", "stop"}:
         if remainder:
             raise ScriptParseError(line, f"{verb} takes no arguments")
@@ -369,7 +442,8 @@ class _Parser:
                                {"timeout", "deadline"}), line)
                 continue
             match = re.fullmatch(
-                r"(description|platform|initial|timeout):\s*(.*)", text)
+                r"(description|platform|initial|machine|timeout):\s*(.*)",
+                text)
             if match:
                 key, value = match.groups()
                 if states or linear or media or key in headers:
@@ -381,6 +455,10 @@ class _Parser:
                     if not _DURATION.fullmatch(value):
                         raise ScriptParseError(
                             line, "timeout must be a positive duration")
+                elif key == "machine":
+                    if value not in ("running", "stopped"):
+                        raise ScriptParseError(
+                            line, "machine must be running or stopped")
                 else:
                     value = _identifier(value, line, key)
                 headers[key] = value
@@ -415,6 +493,7 @@ class _Parser:
                                 f"{transition.argument}")
         return Script(headers["platform"], headers.get("description"),
                       headers.get("timeout"), headers.get("initial"),
+                      headers.get("machine", "running"),
                       tuple(media), tuple(linear), _freeze(states))
 
 

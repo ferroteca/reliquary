@@ -35,22 +35,6 @@ class HomeTests(unittest.TestCase):
         home._home = None
         self.assertEqual(os.path.basename(home.home()), "reliquary")
 
-    def test_install_media_dir_layout(self):
-        """Install media lives under <home>/install-media/<os_name>."""
-        home.set_home("base")
-        self.assertEqual(
-            home.install_media_dir("freedos"),
-            os.path.join(os.path.abspath("base"),
-                         "install-media", "freedos"))
-
-    def test_machine_dir_layout(self):
-        """Machine state lives under <home>/machines/<recipe>."""
-        home.set_home("base")
-        self.assertEqual(
-            home.machine_dir("freedos-plain"),
-            os.path.join(os.path.abspath("base"),
-                         "machines", "freedos-plain"))
-
 
 if __name__ == "__main__":
     unittest.main()

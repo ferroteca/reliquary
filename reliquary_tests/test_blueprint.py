@@ -52,11 +52,12 @@ class ParseBlueprintTests(BlueprintTestCase):
             "memory": "32m",
             "drives": {
                 "hdd": {"size": "20m"},
-                "cdrom": "freedos-1.4-livecd",
+                "cdrom": None,
             },
-            "boot": ["cdrom", "hdd"],
-            "name": "FreeDOS 1.4 — Plain DOS system",
-            "description": "Installs a plain FreeDOS system.",
+            "boot": ["hdd", "cdrom"],
+            "name": "FreeDOS 1.4 plain",
+            "description": "Plain FreeDOS 1.4 system installed "
+                           "from the LiveCD",
             "scripts": {
                 "install": "freedos-1.4-plain-install",
                 "verify": "freedos-1.4-plain-verify",
@@ -70,9 +71,8 @@ class ParseBlueprintTests(BlueprintTestCase):
         self.assertIsInstance(result.drives["hdd0"], BlueprintDrive)
         self.assertEqual(result.drives["hdd0"].size, "20M")
         self.assertIsNone(result.drives["hdd0"].media)
-        resolved = result.drives["cdrom0"].media
-        self.assertEqual(resolved.item.name, "freedos-1.4-livecd")
-        self.assertEqual(result.boot, ("cdrom0", "hdd0"))
+        self.assertIsNone(result.drives["cdrom0"].media)
+        self.assertEqual(result.boot, ("hdd0", "cdrom0"))
         self.assertEqual(result.scripts["install"],
                          "freedos-1.4-plain-install")
 
@@ -174,6 +174,35 @@ class ParseBlueprintTests(BlueprintTestCase):
                 "drives": {"cdrom": {"size": "650M"}},
             })
         self.assertIn("cdrom0", str(caught.exception))
+
+    def test_null_removable_drive_is_an_empty_slot(self):
+        """An installer-driven blueprint declares the slot empty."""
+        result = self.parse({
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M"}, "cdrom0": None},
+            "boot": ["hdd0", "cdrom0"],
+        })
+        cdrom = result.drives["cdrom0"]
+        self.assertEqual(cdrom.medium, "cdrom")
+        self.assertIsNone(cdrom.size)
+        self.assertIsNone(cdrom.media)
+        self.assertEqual(result.boot, ("hdd0", "cdrom0"))
+
+    def test_null_floppy_is_an_empty_slot(self):
+        result = self.parse({
+            "platform": "dos",
+            "drives": {"floppy1": None},
+        })
+        self.assertEqual(result.drives["floppy1"].medium, "floppy")
+
+    def test_null_hdd_is_rejected(self):
+        """Only removable drives may be declared empty."""
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "drives": {"hdd0": None},
+            })
+        self.assertIn("removable", str(caught.exception))
 
     def test_drive_alias_clash_is_rejected(self):
         with self.assertRaises(ValueError) as caught:

@@ -6,10 +6,11 @@ SPDX-License-Identifier: BSD-3-Clause
 # The machine blueprint
 
 > **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
-> `size`/`media`, `boot`, `name`, `description`, and `scripts`) is
-> implemented for parsing, validation, and media-name resolution. Machine
-> materialization and the remaining fields are not implemented yet; details
-> may still change before first release.
+> `size`/`media` and empty removable slots (`null`), `boot`, `name`,
+> `description`, and `scripts`) is implemented: parsing, validation,
+> media-name resolution, machine materialization, and persistent
+> script-driven `insert`/`eject`. The remaining fields are not
+> implemented yet; details may still change before first release.
 
 Every reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create
@@ -77,7 +78,7 @@ Two rules carry the whole model:
   from (its *baseline*); `apply` is the explicit step that adopts
   your edits. Between `apply`s the machine's own state is
   authoritative — operation (installer writes, script
-  `attach`/`detach`) may legitimately diverge it from the
+  `insert`/`eject`) may legitimately diverge it from the
   baseline, and `start` runs the machine as its state describes,
   never silently reverting it.
 - **Everything reliquary materialized is disposable.** `destroy` +
@@ -239,7 +240,7 @@ implicitly at `start`.
 
 `cache/machines/<id>/reliquary-machine.json` describes the machine as
 it actually is, and reliquary maintains it: whenever reliquary
-changes the machine — attaches media, changes memory, reorders
+changes the machine — inserts media, changes memory, reorders
 boot devices — it updates the state in the same operation. A
 state document that disagrees with the hypervisor's actual
 configuration is a bug in reliquary, not an ambiguity you have to
@@ -341,15 +342,15 @@ should regenerate.
 ### Runtime changes live in the state
 
 Script steps and CLI commands that reconfigure a machine —
-attaching installer media, ejecting a CD — update the state (and
+inserting installer media, ejecting a CD — update the state (and
 the machine), never the blueprint. The blueprint stays what you
 meant the machine to be; the state absorbs what operation has done
-to it — and keeps it. An attached medium persists across
+to it — and keeps it. An inserted medium persists across
 `stop`/`start` exactly as an installer's disk writes do; the
 machine has definitively diverged from its blueprint until
 something changes it again. The idiom for temporary media is
-symmetry inside the script: the install script attaches its
-installer CD as its first act and detaches it as its last, leaving
+symmetry inside the script: the install script inserts its
+installer CD as its first act and ejects it as its last, leaving
 the machine back in its default shape. A machine left diverged —
 by an interrupted script, or on purpose — is returned to its
 blueprint with `apply`.

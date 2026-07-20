@@ -17,20 +17,26 @@ as the default and currently only complete platform workflow:
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the built-in library
   (`reliquary/builtins/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
   `cache/machines/<id>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
-  `resolve_machine`), `lifecycle.py` owns QMP, QEMU processes, and host-side `qemu-img` helpers,
+  `resolve_machine`) and persistent machine-state mutations
+  (`insert_media` / `eject_media` / `set_boot_order` /
+  `mark_stopped` — insert/eject are floppy and cdrom only;
+  boot-order keys may name any declared drive; all three require
+  a stopped machine and survive stop/start), `lifecycle.py` owns QMP,
+  QEMU processes, and host-side `qemu-img` helpers,
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
   `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `script.py`
-  parses the milestone-1 `.rqs` subset, `script_runner.py` executes scripts against cached machines and
-  wires `script <label>` (resolve via blueprint map, create-if-none, run records under
-  `cache/machines/<id>/runs/`), `recipes/` contains OS installation recipes (one module per target OS;
-  retiring once the north-star script path lands), `cli.py` owns command parsing, and `__main__.py`
+  parses the milestone-1 `.rqs` subset (including the `machine: running|stopped` header and
+  `insert`/`eject`/`boot`), `script_runner.py` executes scripts against cached machines and
+  wires `script <label>` (resolve via blueprint map, create-if-none, the machine-state header, static
+  preflight of insert/eject/boot drive keys, run records under
+  `cache/machines/<id>/runs/`), `cli.py` owns command parsing, and `__main__.py`
   preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.
 - `reliquary_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
-  media acquisition, and recipes.
+  media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 - `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
@@ -98,10 +104,6 @@ Current home layout (still the active machine model):
 - `qemu-stderr.log` — startup diagnostics
 - `vm.json` — active VM identity, port, and PID (legacy root-home path;
   cached machines keep theirs under `cache/machines/<id>/vm.json`)
-- `install-media/<os>/` — cached, hash-verified OS installation media
-  (recipe layer)
-- `machines/<recipe>/` — per-recipe machine homes; each is itself a full
-  machine home with the layout above (recipe layer)
 - `blueprints/` — machine blueprints (`blueprints_dir`)
 - `media/` — shared media definitions (`media_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
@@ -174,10 +176,11 @@ workflow orchestration must not impose that rule on other platforms. reliquary a
 command-line flags, result parsing) belong to consuming projects. The CppUTest adapter that used to live here was
 removed to enforce that boundary; do not reintroduce framework-specific code. Refer to consumers only in the general
 instructional sense ("the caller", "consuming projects", generic usage examples) — never name specific downstream
-projects; the machine layer stays ignorant of who builds on it. The recipe
-layer (`recipes/`, `media.py`, the `install` CLI command) is the in-repo
-consumer of that surface and must drive it only through the same public
-interfaces available to external callers.
+projects; the machine layer stays ignorant of who builds on it. The
+media layer (`media.py`, `library.py`) and the script runtime
+(`script_runner.py`) are in-repo consumers of that surface and must
+drive it only through the same public interfaces available to external
+callers.
 
 ## The runner surface
 
@@ -268,8 +271,7 @@ frontend. Runtime dependencies remain under `[project].dependencies`.
 Run checks with the project virtual environment.
 
 ```powershell
-$pythonFiles = (Get-ChildItem reliquary,reliquary
-ecipes,reliquary_tests -Filter *.py).FullName
+$pythonFiles = (Get-ChildItem reliquary,reliquary_tests -Filter *.py).FullName
 .venv\Scripts\python.exe -m py_compile $pythonFiles
 .venv\Scripts\python.exe -m unittest -v reliquary_tests
 .venv\Scripts\python.exe -m build

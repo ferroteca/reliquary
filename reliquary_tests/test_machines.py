@@ -9,10 +9,13 @@ import unittest
 from unittest import mock
 
 from reliquary.blueprint import parse_blueprint
-from reliquary.machines import (create, create_from_blueprint, destroy,
-                                list_machines, load_machine_state,
-                                machine_dir_path, machine_drive_args,
-                                resolve_machine, short_id, start, stop)
+from reliquary.machines import (insert_media, create,
+                                create_from_blueprint, destroy,
+                                eject_media, list_machines,
+                                load_machine_state, machine_dir_path,
+                                machine_drive_args, mark_stopped,
+                                resolve_machine, set_boot_order,
+                                short_id, start, stop)
 
 
 SHA256 = "1" * 64
@@ -460,6 +463,200 @@ class MachineMaterializationTests(unittest.TestCase):
             machine_id = create_from_blueprint("plain", home=self.home)
         state = load_machine_state(machine_id, self.home)
         self.assertEqual(state["blueprint"], "plain")
+
+
+class MediaInsertionTests(unittest.TestCase):
+    """Persistent insert/eject on declared removable slots."""
+
+    def setUp(self):
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+        library = os.path.join(self.home, "media")
+        os.makedirs(library)
+        with open(os.path.join(library, "freedos.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({
+                "name": "freedos-1.4-livecd",
+                "file": "FD14LIVE.iso",
+                "sha256": SHA256,
+            }, handle)
+        self.iso_path = os.path.join(
+            self.home, "cache", "media", "freedos-1.4-livecd.iso")
+
+    def _blueprint(self, value):
+        return parse_blueprint(value, home=self.home)
+
+    def _create_installer_shaped(self):
+        """A machine with an empty cdrom0 booting hdd-then-cdrom."""
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M"}, "cdrom0": None},
+            "boot": ["hdd0", "cdrom0"],
+        })
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            return create(blueprint, home=self.home,
+                          blueprint_name="installer")
+
+    def test_create_records_empty_removable_drive(self):
+        """An empty cdrom0 lands in the state with no media or path."""
+        machine_id = self._create_installer_shaped()
+        state = load_machine_state(machine_id, self.home)
+        cdrom = state["drives"]["cdrom0"]
+        self.assertEqual(cdrom["medium"], "cdrom")
+        self.assertIsNone(cdrom["media"])
+        self.assertIsNone(cdrom["path"])
+
+    def test_empty_cdrom_renders_a_medium_less_qemu_drive(self):
+        """The empty slot is still guest-visible hardware."""
+        machine_id = self._create_installer_shaped()
+        args = machine_drive_args(machine_id, self.home)
+        values = [args[i + 1] for i, a in enumerate(args)
+                  if a == "-drive"]
+        cdrom_arg = [v for v in values if "media=cdrom" in v]
+        self.assertEqual(cdrom_arg, ["media=cdrom,if=ide,index=1"])
+
+    def test_insert_persists_media_in_machine_state(self):
+        """insert fetches the item and records it on the slot."""
+        machine_id = self._create_installer_shaped()
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path) as fetch:
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         home=self.home)
+        fetch.assert_called_once_with("freedos-1.4-livecd",
+                                      home=self.home)
+        cdrom = load_machine_state(machine_id, self.home)["drives"][
+            "cdrom0"]
+        self.assertEqual(cdrom["media"], "freedos-1.4-livecd")
+        self.assertEqual(cdrom["path"], self.iso_path)
+
+    def test_eject_returns_the_slot_to_empty(self):
+        """eject empties the slot but never removes the drive."""
+        machine_id = self._create_installer_shaped()
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path):
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         home=self.home)
+        eject_media(machine_id, "cdrom0", home=self.home)
+        state = load_machine_state(machine_id, self.home)
+        cdrom = state["drives"]["cdrom0"]
+        self.assertIn("cdrom0", state["drives"])
+        self.assertIsNone(cdrom["media"])
+        self.assertIsNone(cdrom["path"])
+
+    def test_set_boot_order_persists_on_a_stopped_machine(self):
+        """Scripts may reorder boot devices while the machine is stopped."""
+        machine_id = self._create_installer_shaped()
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["boot"],
+            ["hdd0", "cdrom0"])
+        set_boot_order(machine_id, ["cdrom0", "hdd0"], home=self.home)
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["boot"],
+            ["cdrom0", "hdd0"])
+
+    def test_set_boot_order_rejects_a_running_machine(self):
+        machine_id = self._create_installer_shaped()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        with open(os.path.join(machine_dir_path(machine_id, self.home),
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+        with self.assertRaises(RuntimeError) as caught:
+            set_boot_order(machine_id, ["cdrom0"], home=self.home)
+        self.assertIn("must be stopped", str(caught.exception))
+
+    def test_set_boot_order_rejects_undeclared_drives(self):
+        machine_id = self._create_installer_shaped()
+        with self.assertRaises(ValueError) as caught:
+            set_boot_order(machine_id, ["floppy0"], home=self.home)
+        self.assertIn("undeclared drive floppy0", str(caught.exception))
+
+    def test_hdd_then_cdrom_boot_renders_order_cd(self):
+        """Blank-disk fallthrough: try the hard disk, then the CD."""
+        machine_id = self._create_installer_shaped()
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu"), \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=4444) as launch:
+            start(machine_id, home=self.home)
+        args = launch.call_args.args[0]
+        self.assertIn("-boot", args)
+        self.assertIn("order=cd", args)
+
+    def test_inserted_media_survives_the_next_start(self):
+        """A start after insert mounts the inserted medium."""
+        machine_id = self._create_installer_shaped()
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path):
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         home=self.home)
+            with mock.patch("reliquary.machines.find_qemu",
+                            return_value="qemu"), \
+                    mock.patch("reliquary.machines.launch_owned_qemu",
+                               return_value=4444) as launch:
+                start(machine_id, home=self.home)
+        args = launch.call_args.args[0]
+        cdrom_arg = [a for a in args if "media=cdrom" in a]
+        self.assertEqual(len(cdrom_arg), 1)
+        self.assertIn(self.iso_path, cdrom_arg[0])
+
+    def test_insert_rejects_undeclared_slot(self):
+        """insert never creates a drive the blueprint did not declare."""
+        machine_id = self._create_installer_shaped()
+        with self.assertRaises(ValueError) as caught:
+            insert_media(machine_id, "floppy0", "freedos-1.4-livecd",
+                         home=self.home)
+        self.assertIn("declares no drive floppy0", str(caught.exception))
+
+    def test_insert_rejects_non_removable_slot(self):
+        """A hard-disk slot never takes insert/eject."""
+        machine_id = self._create_installer_shaped()
+        with self.assertRaises(ValueError) as caught:
+            insert_media(machine_id, "hdd0", "freedos-1.4-livecd",
+                         home=self.home)
+        self.assertIn("not a removable drive slot", str(caught.exception))
+
+    def test_insert_requires_a_stopped_machine(self):
+        """Changing media on a running machine is not supported yet."""
+        machine_id = self._create_installer_shaped()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        with open(os.path.join(machine_dir_path(machine_id, self.home),
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+        with self.assertRaises(RuntimeError) as caught:
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         home=self.home)
+        self.assertIn("must be stopped", str(caught.exception))
+
+    def test_mark_stopped_reconciles_a_powered_off_guest(self):
+        """mark_stopped returns phase to ready and drops vm.json."""
+        machine_id = self._create_installer_shaped()
+        root = machine_dir_path(machine_id, self.home)
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        with open(os.path.join(root, "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+        with open(os.path.join(root, "vm.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({"port": 4444, "name": "reliquary-x"}, handle)
+
+        mark_stopped(machine_id, home=self.home)
+
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"], "ready")
+        self.assertFalse(os.path.exists(os.path.join(root, "vm.json")))
+
+    def test_mark_stopped_leaves_a_ready_machine_alone(self):
+        """A machine that is not running is untouched."""
+        machine_id = self._create_installer_shaped()
+        mark_stopped(machine_id, home=self.home)
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"], "ready")
 
 
 if __name__ == "__main__":

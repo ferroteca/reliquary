@@ -4,10 +4,10 @@
   "name": "FreeDOS 1.4 plain",
   "description": "Plain FreeDOS 1.4 system installed from the LiveCD",
   "drives": {
-    "hdd": {"size": "20M"},
-    "cdrom": "freedos-1.4-livecd"
+    "hdd0": {"size": "20M"},
+    "cdrom0": null
   },
-  "boot": ["cdrom", "hdd"],
+  "boot": ["hdd0", "cdrom0"],
   "scripts": {
     "install": "freedos-1.4-plain-install",
     "verify": "freedos-1.4-plain-verify"

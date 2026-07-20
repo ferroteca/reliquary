@@ -82,9 +82,9 @@ A blueprint may declare a `scripts` map — short labels that name
   },
   "drives": {
     "hdd": {"size": "20M"},
-    "cdrom": "freedos-1.4-livecd"
+    "cdrom": null
   },
-  "boot": ["cdrom", "hdd"]
+  "boot": ["hdd", "cdrom"]
 }
 ```
 
@@ -129,14 +129,15 @@ Writes `blueprints/test-rig.json`:
 }
 ```
 
-**An installation machine — hard disk plus installer CD:**
+**An installation machine — blank hard disk plus empty CD slot:**
 
 ```powershell
 rlq create blueprint freedos --platform dos --memory 32M `
-    --hdd 20M --cdrom freedos-1.4-livecd --boot cdrom,hdd
+    --hdd 20M --boot hdd,cdrom
 ```
 
-Writes `blueprints/freedos.json`:
+Then edit the blueprint to declare the empty CD slot the install
+script will fill (`"cdrom": null`). Resulting shape:
 
 ```json
 {
@@ -144,11 +145,14 @@ Writes `blueprints/freedos.json`:
   "memory": "32M",
   "drives": {
     "hdd": {"size": "20M"},
-    "cdrom": "freedos-1.4-livecd"
+    "cdrom": null
   },
-  "boot": ["cdrom", "hdd"]
+  "boot": ["hdd", "cdrom"]
 }
 ```
+
+(A blank hard disk falls through to an attached LiveCD; no
+boot-order change is needed after install.)
 
 **Pin to a backend, with a specific machine type:**
 
@@ -228,7 +232,7 @@ blueprint and script:
 | shared media | `<name>.json` | `freedos-1.4-livecd.json` |
 
 A media definition that is specific to one script's step — the
-installer CD that script attaches, a driver disk it stages — uses the
+installer CD that script inserts, a driver disk it stages — uses the
 script-aligned pattern. A media definition shared across scripts or
 blueprints (or used independently by `create --blueprint`) uses a
 standalone name. Both resolve through the same media library;
@@ -349,7 +353,7 @@ rlq --machine a1b2 start
 
 `create` resolves the blueprint once and records the resolved
 snapshot as the machine's *baseline*. Thereafter the machine's own
-state is authoritative — script `attach`/`detach` persists in it —
+state is authoritative — script `insert`/`eject` persists in it —
 and `start` never re-reads the current blueprint file. Editing the
 blueprint affects future `create` operations only; adopt edits into
 an existing machine (or return a diverged machine to its blueprint
@@ -683,9 +687,9 @@ Behind the scenes this:
    definitions, and its scripts from the built-in library (skipping
    any that already exist).
 2. Creates a machine from the blueprint.
-3. Runs `scripts/freedos-1.4-plain-install.rqs`, which attaches
+3. Runs `scripts/freedos-1.4-plain-install.rqs`, which inserts
    the LiveCD, starts the machine, drives the install, and
-   detaches the CD again as its final step.
+   ejects the CD again as its final step.
 
 When a script ends the machine stays in whatever state its last
 step left it (the FreeDOS install script powers it off); run

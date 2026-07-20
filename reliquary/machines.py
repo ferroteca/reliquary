@@ -75,6 +75,15 @@ def create(blueprint, *, home=None, blueprint_name=""):
                 "media": drive.media.item.name,
                 "path": payload,
             }
+        else:
+            # An empty removable drive: guest-visible hardware with
+            # no medium until a script inserts one.
+            resolved_drives[key] = {
+                "medium": drive.medium,
+                "slot": drive.slot,
+                "media": None,
+                "path": None,
+            }
 
     state = {
         "id": machine_id,
@@ -306,6 +315,114 @@ def stop(machine_id, home=None):
     _set_phase(machine_id, "ready", home)
 
 
+_REMOVABLE_MEDIA = {"floppy", "cdrom"}
+
+
+def _removable_drive(state, slot, home):
+    """Return the mutable state entry for a removable drive slot."""
+    phase = state.get("phase")
+    if phase != "ready":
+        raise RuntimeError(
+            f"machine {short_id(state['id'], home)} must be stopped "
+            f"to change media (phase: {phase})")
+    drive = state.get("drives", {}).get(slot)
+    if drive is None:
+        raise ValueError(
+            f"machine {short_id(state['id'], home)} declares no "
+            f"drive {slot}")
+    if drive.get("medium") not in _REMOVABLE_MEDIA:
+        raise ValueError(
+            f"{slot} is not a removable drive slot")
+    return drive
+
+
+def insert_media(machine_id, slot, media_name, *, home=None):
+    """Insert a defined media item into a floppy or cdrom slot.
+
+    Hard-disk slots are rejected.  The slot must already exist in
+    the machine's state — drives are guest-visible hardware the
+    blueprint declares, so ``insert`` never creates one.  The
+    change persists in ``reliquary-machine.json`` across
+    stop/start: the machine diverges from its blueprint until a
+    later ``insert``/``eject`` changes the slot again.  The
+    machine must be stopped; changing the medium of a running
+    machine is not supported yet.
+    """
+    state = load_machine_state(machine_id, home)
+    drive = _removable_drive(state, slot, home)
+    drive["path"] = fetch_media(media_name, home=home)
+    drive["media"] = media_name
+    _write_state(machine_id, state, home)
+
+
+def eject_media(machine_id, slot, *, home=None):
+    """Empty a declared removable slot, persisting the change.
+
+    The drive itself remains — the blueprint alone defines machine
+    topology — but the next ``start`` presents it without a medium.
+    The machine must be stopped, as for :func:`insert_media`.
+    """
+    state = load_machine_state(machine_id, home)
+    drive = _removable_drive(state, slot, home)
+    drive["media"] = None
+    drive["path"] = None
+    _write_state(machine_id, state, home)
+
+
+def set_boot_order(machine_id, boot_keys, *, home=None):
+    """Persist a new boot order on a stopped machine.
+
+    Every key must name a drive the machine already declares.
+    Duplicates are rejected.  The change lives in
+    ``reliquary-machine.json`` and takes effect on the next
+    ``start``; the machine diverges from its blueprint until
+    ``apply`` (or another ``set_boot_order``) restores it.
+    """
+    state = load_machine_state(machine_id, home)
+    phase = state.get("phase")
+    if phase != "ready":
+        raise RuntimeError(
+            f"machine {short_id(machine_id, home)} must be stopped "
+            f"to change boot order (phase: {phase})")
+    drives = state.get("drives", {})
+    if not isinstance(boot_keys, (list, tuple)) or not boot_keys:
+        raise ValueError("boot order requires at least one drive key")
+    normalized = []
+    seen = set()
+    for index, key in enumerate(boot_keys):
+        if not isinstance(key, str) or not key:
+            raise ValueError(
+                f"boot[{index}] must be a non-empty drive key")
+        if key not in drives:
+            raise ValueError(
+                f"boot[{index}] references undeclared drive {key}")
+        if key in seen:
+            raise ValueError(f"boot contains duplicate drive {key}")
+        seen.add(key)
+        normalized.append(key)
+    state["boot"] = normalized
+    _write_state(machine_id, state, home)
+
+
+def mark_stopped(machine_id, home=None):
+    """Reconcile the phase of a machine whose QEMU process has gone.
+
+    Used when the guest powers itself off (the script observed
+    ``stopped``): the phase returns to ``ready`` and the stale
+    ``vm.json`` is removed.  A machine not in phase ``running`` is
+    left untouched.
+    """
+    state = load_machine_state(machine_id, home)
+    if state.get("phase") != "running":
+        return
+    vm_path = os.path.join(machine_dir_path(machine_id, home), "vm.json")
+    try:
+        os.remove(vm_path)
+    except FileNotFoundError:
+        pass
+    _set_phase(machine_id, "ready", home)
+
+
 def destroy(machine_id, home=None):
     """Delete a stopped machine's cache directory entirely."""
     state = load_machine_state(machine_id, home)
@@ -338,6 +455,9 @@ def machine_drive_args(machine_id, home=None):
                  if v["medium"] == "floppy"]
     for _key, drive in sorted(floppies, key=lambda kv: kv[1]["slot"]):
         path = drive["path"]
+        if path is None:
+            args += ["-drive", f"if=floppy,index={drive['slot']}"]
+            continue
         is_dir = os.path.isdir(path)
         source = (f"fat:floppy:rw:{path},format=raw,"
                   if is_dir else path + ",")
@@ -366,6 +486,10 @@ def machine_drive_args(machine_id, home=None):
                 sorted(cdroms, key=lambda kv: kv[1]["slot"])):
             path = drive["path"]
             index = next_ide + ordinal
+            if path is None:
+                args += ["-drive",
+                         f"media=cdrom,if=ide,index={index}"]
+                continue
             inferred = format_options(path)
             args += ["-drive",
                      f"file={path},{inferred}media=cdrom,if=ide,index={index}"]

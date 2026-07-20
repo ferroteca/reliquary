@@ -3,7 +3,6 @@
 """Command-line parsing and dispatch."""
 
 import argparse
-import importlib
 import os
 import sys
 
@@ -31,17 +30,6 @@ def _cli_start_overrides(arguments):
     if getattr(arguments, "qemu_args", None):
         overrides["qemu_args"] = arguments.qemu_args
     return overrides
-
-
-def _load_recipe(name):
-    """Import the recipe module for a hyphenated recipe name."""
-    module = name.replace("-", "_")
-    if not module.isidentifier():
-        raise ValueError(f"invalid recipe name: {name}")
-    try:
-        return importlib.import_module(f"reliquary.recipes.{module}")
-    except ModuleNotFoundError as error:
-        raise ValueError(f"unknown recipe: {name}") from error
 
 
 def _require_machine_selector(arguments):
@@ -84,15 +72,6 @@ def main(argv=None):
     parser.add_argument("--timeout", type=int, help="seconds to wait "
                         "(defaults: run 120, wait 60)")
     subcommands = parser.add_subparsers(dest="command", required=True)
-
-    command = subcommands.add_parser(
-        "install", help="run an OS installation recipe")
-    command.add_argument(
-        "recipe", help="recipe name, e.g. freedos-plain")
-    command.add_argument(
-        "--display", action="store_true",
-        help="show the QEMU window during guest steps (for "
-             "debugging recipes)")
 
     command = subcommands.add_parser(
         "create",
@@ -175,23 +154,6 @@ def main(argv=None):
         return 1
 
 
-def _install(arguments):
-    """Run one OS installation recipe."""
-    try:
-        recipe = _load_recipe(arguments.recipe)
-    except ValueError as error:
-        print(f"reliquary: {error}", file=sys.stderr)
-        return 2
-    try:
-        artifacts = recipe.install(display=arguments.display)
-    except KeyboardInterrupt:
-        print("reliquary: interrupted", file=sys.stderr)
-        return 130
-    for name, path in artifacts.items():
-        print(f"{name}: {path}")
-    return 0
-
-
 def _create(arguments):
     if not arguments.blueprint:
         raise ValueError("create requires --blueprint")
@@ -246,8 +208,6 @@ def _list_machines(arguments):
 
 def _dispatch(arguments):
     platform = arguments.platform or "dos"
-    if arguments.command == "install":
-        return _install(arguments)
     if arguments.command == "create":
         return _create(arguments)
     if arguments.command == "script":

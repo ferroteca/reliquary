@@ -108,13 +108,3 @@ def media_cache_dir(home=None):
 def machines_cache_dir(home=None):
     """Return the cached machine-materialization directory."""
     return os.path.join(cache_dir(home), "machines")
-
-
-def install_media_dir(os_name):
-    """Return the cached install media directory for one OS target."""
-    return os.path.join(home(), "install-media", os_name)
-
-
-def machine_dir(recipe_name):
-    """Return the reliquary machine home for one recipe's guest state."""
-    return os.path.join(home(), "machines", recipe_name)

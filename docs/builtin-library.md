@@ -124,7 +124,7 @@ blueprint and script:
 | shared media | `<name>.json` | `freedos-1.4-livecd.json` |
 
 A media definition specific to one script's step — the installer
-CD that script attaches, a driver disk it stages — uses the
+CD that script inserts, a driver disk it stages — uses the
 script-aligned pattern. A media definition shared across scripts
 or blueprints uses a standalone name. Both resolve through the
 same media library; the naming convention identifies ownership,

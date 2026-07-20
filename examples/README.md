@@ -5,11 +5,14 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Examples
 
-> **Status:** these documents use the planned blueprint, media, and
-> script formats ([docs/](../docs/)), written ahead of
-> implementation. They are the target shape for the FreeDOS plain
-> install (today's `reliquary install freedos-plain` recipe) and
-> cannot run yet.
+> **Status:** the blueprint and the machine model these scripts use
+> (empty removable slots, the `machine:` header, persistent
+> `insert`/`eject`) are implemented. The install script's embedded
+> `media` block uses the planned self-contained-script format
+> ([docs/script-spec.md](../docs/script-spec.md)), which is not
+> installed on first run yet; until that lands, also copy the media
+> definition as a separate library document (the built-in
+> `freedos-1.4-plain` artifacts ship it that way).
 
 A complete, shareable FreeDOS 1.4 plain-install recipe in
 reliquary's document formats. The directories mirror the reliquary
@@ -29,47 +32,34 @@ commands resolve the same media through the ordinary library.
 Then:
 
 ```powershell
-reliquary script freedos-plain-install --blueprint freedos
+reliquary --blueprint freedos script freedos-plain-install
 ```
 
 With no machine of the blueprint yet, `script` creates one; the blueprint
 name then selects that machine on every later command. The blueprint
 declares 32 MiB of memory (the FreeDOS LiveCD warns about low RAM
-at the 16 MiB DOS default), a blank 20M hard disk, and the LiveCD
-attached, booting from CD. The install script drives the
-installer's "Plain DOS system" path onto the disk.
+at the 16 MiB DOS default), a blank 20M hard disk, and an **empty**
+CD drive (`"cdrom0": null`), booting hard disk first then CD. The
+blueprint alone defines the machine's hardware; the install script
+supplies the installer medium itself: it declares `machine: stopped`,
+inserts the LiveCD into the empty slot, starts the machine, and drives
+the installer's "Plain DOS system" path onto the disk. A blank hard
+disk fails to boot, so firmware falls through to the inserted CD —
+no boot-order change is needed.
 
-Before verification, edit `blueprints/freedos.json` so the drive and
-boot fields are:
-
-```json
-{
-  "platform": "dos",
-  "memory": "32M",
-  "drives": {
-    "hdd": {"size": "20M"},
-    "cdrom": {
-      "media": "freedos-1.4-livecd",
-      "enabled": false
-    }
-  },
-  "boot": ["hdd"]
-}
-```
-
-This is the post-install form shown in the
-[machine cookbook](../docs/machine-blueprint-cookbook.md#2-an-os-installation-machine).
-Blueprint edits never reach an existing machine implicitly, so adopt
-the change explicitly, then verify:
+The insertion is definitive machine state, persisted in the
+machine's state document across stop/start — the machine diverges
+from its blueprint while the installer CD is in the drive. The
+script's final `eject` restores the blueprint shape, so no blueprint
+edit or `apply` is needed before verification: the same
+`["hdd0", "cdrom0"]` boot order now boots the installed hard disk.
 
 ```powershell
-reliquary apply --blueprint freedos
-reliquary script freedos-plain-verify --blueprint freedos
+reliquary --blueprint freedos script freedos-plain-verify
 ```
 
-`apply` reconciles the stopped machine to the edited blueprint — a
-change it absorbs without touching the installed disk — and the
-verify script confirms that the installed system reaches a DOS
-prompt. A runtime `detach` followed by a host stop/start is not
-used: `start` would correctly restore the machine's baseline and
-reattach the CD.
+The verify script also declares `machine: stopped`, issues a plain
+`start`, and confirms that the installed system reaches a DOS prompt.
+If an interrupted install run left the CD attached, a future
+`apply` is the one-command recovery back to the blueprint shape;
+until it lands, re-run the install script or recreate the machine.

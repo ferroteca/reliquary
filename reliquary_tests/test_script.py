@@ -20,19 +20,20 @@ class ScriptParserTests(unittest.TestCase):
         result = parse_script(self._builtin("freedos-1.4-plain-install.rqs"))
         self.assertIsInstance(result, Script)
         self.assertEqual(result.platform, "dos")
-        self.assertEqual(result.initial, "cd-boot")
+        self.assertEqual(result.machine, "stopped")
+        self.assertEqual(result.initial, "insert-cd")
         self.assertEqual(
-            tuple(result.states), ("cd-boot", "partitioning", "formatting"))
-        self.assertEqual(result.media[0].definition.items[0].name,
-                         "freedos-1.4-livecd")
+            tuple(result.states),
+            ("insert-cd", "cd-boot", "partitioning", "formatting"))
         self.assertEqual(result.states["formatting"].statements[-1].verb,
                          "done")
 
     def test_parses_the_shipped_linear_verify_script(self):
         result = parse_script(self._builtin("freedos-1.4-plain-verify.rqs"))
         self.assertEqual(result.initial, None)
+        self.assertEqual(result.machine, "stopped")
         self.assertEqual([statement.verb for statement in result.statements],
-                         ["wait", "screenshot", "enter", "wait"])
+                         ["start", "wait", "screenshot", "enter", "wait"])
 
     def test_bad_syntax_reports_the_line(self):
         with self.assertRaises(ScriptParseError) as caught:
@@ -43,7 +44,7 @@ class ScriptParserTests(unittest.TestCase):
                          "string\n2 | wait not-quoted\n    ^")
 
     def test_state_machine_requires_a_real_initial_state(self):
-        source = 'platform: dos\ninitial: missing\nstate boot {\n done\n}\n'
+        source = 'platform: dos\ninitial: missing\nstate ready {\n done\n}\n'
         with self.assertRaises(ScriptParseError) as caught:
             parse_script(source)
         self.assertIn("undeclared", str(caught.exception))
@@ -62,13 +63,77 @@ class ScriptParserTests(unittest.TestCase):
                     parse_script(f'platform: dos\n{statement}\n')
 
     def test_transition_error_points_to_the_transition(self):
-        source = ('platform: dos\ninitial: boot\nstate boot {\n'
+        source = ('platform: dos\ninitial: ready\nstate ready {\n'
                   ' -> missing\n}\n')
         with self.assertRaises(ScriptParseError) as caught:
             parse_script(source, path="install.rqs")
         self.assertEqual(caught.exception.line, 4)
         self.assertIn("install.rqs:4:1: error", str(caught.exception))
         self.assertIn("4 |  -> missing", str(caught.exception))
+
+    def test_machine_header_defaults_to_running(self):
+        result = parse_script('platform: dos\nwait "x"\n')
+        self.assertEqual(result.machine, "running")
+
+    def test_machine_header_accepts_stopped(self):
+        result = parse_script(
+            'platform: dos\nmachine: stopped\nstart\nwait "x"\n')
+        self.assertEqual(result.machine, "stopped")
+
+    def test_machine_header_rejects_other_values(self):
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script('platform: dos\nmachine: paused\nwait "x"\n')
+        self.assertIn("running or stopped", str(caught.exception))
+
+    def test_insert_parses_slot_and_media_name(self):
+        result = parse_script(
+            'platform: dos\ninsert cdrom0 freedos-1.4-livecd\n')
+        statement = result.statements[0]
+        self.assertEqual(statement.verb, "insert")
+        self.assertEqual(statement.argument,
+                         ("cdrom0", "freedos-1.4-livecd"))
+
+    def test_insert_normalizes_unindexed_slot(self):
+        result = parse_script('platform: dos\ninsert floppy boot-disk\n')
+        self.assertEqual(result.statements[0].argument,
+                         ("floppy0", "boot-disk"))
+
+    def test_eject_parses_slot(self):
+        result = parse_script('platform: dos\neject cdrom0\n')
+        statement = result.statements[0]
+        self.assertEqual(statement.verb, "eject")
+        self.assertEqual(statement.argument, "cdrom0")
+
+    def test_boot_parses_drive_keys(self):
+        result = parse_script('platform: dos\nboot hdd0 cdrom0\n')
+        statement = result.statements[0]
+        self.assertEqual(statement.verb, "boot")
+        self.assertEqual(statement.argument, ("hdd0", "cdrom0"))
+
+    def test_boot_normalizes_unindexed_slots(self):
+        result = parse_script('platform: dos\nboot hdd cdrom\n')
+        self.assertEqual(result.statements[0].argument,
+                         ("hdd0", "cdrom0"))
+
+    def test_boot_rejects_duplicates_and_empty(self):
+        for statement in ("boot", "boot hdd0 hdd0", "boot hdd0, cdrom0"):
+            with self.subTest(statement=statement):
+                with self.assertRaises(ScriptParseError):
+                    parse_script(f'platform: dos\n{statement}\n')
+
+    def test_insert_rejects_non_removable_slots(self):
+        for statement in ("insert hdd0 some-media", "eject hdd0",
+                          "eject cdrom4", "insert floppy2 x"):
+            with self.subTest(statement=statement):
+                with self.assertRaises(ScriptParseError):
+                    parse_script(f'platform: dos\n{statement}\n')
+
+    def test_insert_requires_slot_and_media(self):
+        for statement in ("insert cdrom0", "insert", "eject",
+                          "eject cdrom0 extra"):
+            with self.subTest(statement=statement):
+                with self.assertRaises(ScriptParseError):
+                    parse_script(f'platform: dos\n{statement}\n')
 
 
 class FreeDOSInstallFlowTests(unittest.TestCase):
@@ -81,20 +146,19 @@ class FreeDOSInstallFlowTests(unittest.TestCase):
         with open(path, encoding="utf-8") as handle:
             cls.script = parse_script(handle.read())
 
-    def test_embedded_media_pins_livecd_hashes(self):
-        """The script embeds the official LiveCD with pinned SHA-256 hashes."""
-        media = self.script.media[0]
-        self.assertEqual(media.label, "freedos-1.4-livecd")
-        self.assertEqual(
-            media.definition.url,
-            "https://download.freedos.org/1.4/FD14-LiveCD.zip")
-        item = media.definition.items[0]
-        self.assertEqual(item.name, "freedos-1.4-livecd")
-        self.assertEqual(item.file, "FD14LIVE.iso")
-        self.assertEqual(
-            item.sha256,
-            "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e"
-            "6ef2deb0477f81fb")
+    def test_insert_cd_inserts_livecd_then_starts(self):
+        """insert-cd supplies the installer medium, then boots into it."""
+        stmts = self.script.states["insert-cd"].statements
+        self.assertEqual(stmts[0].verb, "insert")
+        self.assertEqual(stmts[0].argument,
+                         ("cdrom0", "freedos-1.4-livecd"))
+        self.assertEqual(stmts[1].verb, "start")
+        self.assertEqual(stmts[-1].verb, "transition")
+        self.assertEqual(stmts[-1].argument, "cd-boot")
+
+    def test_script_expects_a_stopped_machine(self):
+        """The installer medium must be inserted before first boot."""
+        self.assertEqual(self.script.machine, "stopped")
 
     def test_cd_boot_navigates_installer_from_livecd_menu(self):
         """cd-boot picks the installer from the LiveCD menu and accepts English."""
@@ -147,8 +211,10 @@ class FreeDOSInstallFlowTests(unittest.TestCase):
                    if s.verb == "select" and "Plain DOS" in s.argument)
         self.assertIn("sources", pkg.modifiers.get("exclude", ""))
         self.assertEqual(stmts[-1].verb, "done")
-        self.assertEqual(stmts[-2].verb, "wait")
-        self.assertEqual(stmts[-2].argument.kind, "stopped")
+        self.assertEqual(stmts[-2].verb, "eject")
+        self.assertEqual(stmts[-2].argument, "cdrom0")
+        self.assertEqual(stmts[-3].verb, "wait")
+        self.assertEqual(stmts[-3].argument.kind, "stopped")
 
 
 if __name__ == "__main__":

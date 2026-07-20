@@ -2,12 +2,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Tests for the milestone-one .rqs script runtime."""
 
+import json
+import os
+import tempfile
 import unittest
 from unittest import mock
 
 from reliquary.script import parse_script
-from reliquary.script_runner import (ScriptRuntimeError, _parse_duration,
-                                     _normalize_row, _resolve_key)
+from reliquary.script_runner import (ScriptRuntimeError, execute_script,
+                                     _parse_duration, _normalize_row,
+                                     _resolve_key)
 
 
 class TextNormalizationTests(unittest.TestCase):
@@ -258,8 +262,8 @@ class ScriptRuntimeTests(unittest.TestCase):
     def test_state_machine_executes_to_completion(self):
         engine = self._make_engine("""
             platform: dos
-            initial: boot
-            state boot {
+            initial: ready
+            state ready {
                 wait "Ready"
                 -> finish
             }
@@ -275,9 +279,9 @@ class ScriptRuntimeTests(unittest.TestCase):
                 engine, "_session", return_value=qmp), \
                 mock.patch.object(
                     engine, "_console", side_effect=_FakeConsole):
-            engine._current_state = "boot"
+            engine._current_state = "ready"
             engine._execute_block(
-                engine._script.states["boot"].statements, {})
+                engine._script.states["ready"].statements, {})
             self.assertEqual(engine._current_state, "finish")
             engine._execute_block(
                 engine._script.states["finish"].statements, {})
@@ -498,7 +502,7 @@ class ScriptRuntimeTests(unittest.TestCase):
             mock_machines.start.return_value = 9999
             engine._do_start()
             mock_machines.start.assert_called_once_with(
-                engine._machine_id, home=engine._home)
+                engine._machine_id, display=False, home=engine._home)
             self.assertEqual(engine._port, 9999)
 
     def test_do_stop_stops_the_machine(self):
@@ -515,6 +519,81 @@ class ScriptRuntimeTests(unittest.TestCase):
             engine._do_stop()
             mock_machines.stop.assert_called_once_with(
                 engine._machine_id, home=engine._home)
+        self.assertIsNone(engine._port)
+
+    def test_do_insert_persists_media_into_machine_state(self):
+        engine = self._make_engine("""
+            platform: dos
+            insert cdrom0 freedos-1.4-livecd
+        """.strip())
+        with mock.patch(
+                "reliquary.script_runner._machines") as mock_machines:
+            engine._execute_block(engine._script.statements, {})
+            mock_machines.insert_media.assert_called_once_with(
+                engine._machine_id, "cdrom0", "freedos-1.4-livecd",
+                home=engine._home)
+
+    def test_do_eject_empties_the_slot(self):
+        engine = self._make_engine("""
+            platform: dos
+            eject cdrom0
+        """.strip())
+        with mock.patch(
+                "reliquary.script_runner._machines") as mock_machines:
+            engine._execute_block(engine._script.statements, {})
+            mock_machines.eject_media.assert_called_once_with(
+                engine._machine_id, "cdrom0", home=engine._home)
+
+    def test_do_boot_sets_boot_order(self):
+        engine = self._make_engine("""
+            platform: dos
+            boot cdrom0 hdd0
+        """.strip())
+        with mock.patch(
+                "reliquary.script_runner._machines") as mock_machines:
+            engine._execute_block(engine._script.statements, {})
+            mock_machines.set_boot_order.assert_called_once_with(
+                engine._machine_id, ("cdrom0", "hdd0"),
+                home=engine._home)
+
+    def test_insert_failure_reports_the_statement(self):
+        engine = self._make_engine("""
+            platform: dos
+            insert cdrom0 freedos-1.4-livecd
+        """.strip())
+        with mock.patch(
+                "reliquary.script_runner._machines") as mock_machines:
+            mock_machines.insert_media.side_effect = ValueError(
+                "machine abcd declares no drive cdrom0")
+            with self.assertRaises(ScriptRuntimeError) as caught:
+                engine._execute_block(engine._script.statements, {})
+        self.assertIn("declares no drive", str(caught.exception))
+        self.assertIn("line 2", str(caught.exception))
+
+    def test_session_without_running_machine_is_a_named_error(self):
+        engine = self._make_engine("""
+            platform: dos
+            machine: stopped
+            enter "too early"
+        """.strip(), port=None)
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            engine._execute_block(engine._script.statements, {})
+        self.assertIn("not running", str(caught.exception))
+
+    def test_wait_stopped_reconciles_machine_phase(self):
+        engine = self._make_engine("""
+            platform: dos
+            wait stopped, timeout: 10s
+        """.strip())
+        engine._port = 5555
+        with mock.patch(
+                "reliquary.script_runner._machines") as mock_machines, \
+                mock.patch.object(engine, "_is_stopped",
+                                  return_value=True):
+            engine._execute_block(engine._script.statements, {})
+            mock_machines.mark_stopped.assert_called_once_with(
+                engine._machine_id, home=engine._home)
+        self.assertIsNone(engine._port)
 
     def test_enter_verb_in_state_machine(self):
         engine = self._make_engine("""
@@ -540,11 +619,102 @@ class ScriptRuntimeTests(unittest.TestCase):
 
 class EmptyScriptTests(unittest.TestCase):
     def test_execute_empty_script_returns_silently(self):
-        from reliquary.script_runner import execute_script
         script = parse_script('platform: dos\n')
         result = execute_script(
             script, machine_id="abcd" * 8, home="/tmp/home")
         self.assertIsNone(result)
+
+
+class ExecutePreflightTests(unittest.TestCase):
+    """Static preflight and machine-header checks before guest input."""
+
+    def setUp(self):
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+        self.machine_id = "abcd" * 8
+
+    def _write_state(self, phase="ready", drives=None):
+        root = os.path.join(self.home, "cache", "machines",
+                            self.machine_id)
+        os.makedirs(root)
+        state = {
+            "id": self.machine_id,
+            "phase": phase,
+            "drives": drives if drives is not None else {
+                "hdd0": {"medium": "hdd", "slot": 0, "size": "20M",
+                         "path": "hdd0.qcow2"},
+            },
+        }
+        with open(os.path.join(root, "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+
+    def test_insert_to_undeclared_slot_fails_before_execution(self):
+        """A slot the machine does not declare fails static preflight."""
+        self._write_state()
+        script = parse_script(
+            'platform: dos\nmachine: stopped\n'
+            'insert cdrom0 freedos-1.4-livecd\nstart\nwait "x"\n')
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            execute_script(script, machine_id=self.machine_id,
+                           home=self.home)
+        self.assertIn("declares no drive cdrom0", str(caught.exception))
+        self.assertIn("line 3", str(caught.exception))
+
+    def test_eject_inside_expect_branch_is_preflighted(self):
+        """Preflight descends into expect branches."""
+        self._write_state()
+        script = parse_script(
+            'platform: dos\ninitial: fork\n'
+            'state fork {\n'
+            'expect {\n"a": {\neject floppy1\ndone\n}\n}\n'
+            '}\n')
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            execute_script(script, machine_id=self.machine_id,
+                           home=self.home)
+        self.assertIn("declares no drive floppy1", str(caught.exception))
+
+    def test_boot_undeclared_drive_fails_before_execution(self):
+        """boot keys are preflighted against the machine's drives."""
+        self._write_state()
+        script = parse_script(
+            'platform: dos\nmachine: stopped\n'
+            'boot cdrom0 hdd0\n')
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            execute_script(script, machine_id=self.machine_id,
+                           home=self.home)
+        self.assertIn("declares no drive cdrom0", str(caught.exception))
+
+    def test_stopped_script_rejects_a_running_machine(self):
+        """machine: stopped never implicitly powers a machine off."""
+        self._write_state(phase="running")
+        script = parse_script(
+            'platform: dos\nmachine: stopped\nstart\nwait "x"\n')
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            execute_script(script, machine_id=self.machine_id,
+                           home=self.home)
+        self.assertIn("expects a stopped machine", str(caught.exception))
+
+    def test_stopped_script_does_not_auto_start(self):
+        """The script itself starts the machine, not the runner."""
+        self._write_state(drives={
+            "cdrom0": {"medium": "cdrom", "slot": 0, "media": None,
+                       "path": None},
+        })
+        script = parse_script(
+            'platform: dos\nmachine: stopped\n'
+            'insert cdrom0 freedos-1.4-livecd\n')
+        with mock.patch(
+                "reliquary.script_runner._machines") as mock_machines:
+            mock_machines.load_machine_state.return_value = {
+                "id": self.machine_id, "phase": "ready",
+                "drives": {"cdrom0": {"medium": "cdrom", "slot": 0}},
+            }
+            execute_script(script, machine_id=self.machine_id,
+                           home=self.home)
+            mock_machines.start.assert_not_called()
+            mock_machines.insert_media.assert_called_once()
 
 
 if __name__ == "__main__":

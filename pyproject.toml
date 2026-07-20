@@ -35,7 +35,7 @@ rlq = "reliquary:main"
 reliquary = "reliquary:main"
 
 [tool.setuptools]
-packages = ["reliquary", "reliquary.recipes", "reliquary_tests"]
+packages = ["reliquary", "reliquary_tests"]
 
 [tool.setuptools.package-data]
 reliquary = [

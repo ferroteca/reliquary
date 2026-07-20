@@ -34,9 +34,8 @@ lifecycle.
 > **Status:** milestone-1 blueprint materialization, lifecycle CLI
 > (`create` / `start` / `stop` / `destroy` / `list machines`), and
 > `rlq --blueprint NAME script <label>` (resolve, create-if-none, run
-> records) are implemented for the QEMU/DOS subset. The transitional
-> `rlq install <recipe>` path below remains until the FreeDOS builtin
-> install/verify scripts and recipe retirement land.
+> records, persistent `insert`/`eject`) are implemented for the
+> QEMU/DOS subset.
 
 ## Installation
 
@@ -61,32 +60,37 @@ form used throughout the docs) and `reliquary`.
 
 ```powershell
 rlq --help
-rlq install freedos-plain
+rlq --blueprint freedos-1.4-plain script install
 ```
 
-`install` runs the whole recipe in the foreground: it fetches and
-verifies the vendor media, prepares the target disk, boots the
-installation machine, waits for the first install
-menu, selects "Install to harddisk", accepts the defaults for
-language and the welcome screen, confirms partitioning drive C: and
-the required reboot, accepts the default keyboard layout, chooses the
-"Plain DOS system" package set, and confirms the install before
-blocking until the machine exits. Interrupting reliquary (Ctrl-C)
-shuts the machine down rather than leaving it running. Pass
-`--display` to show the QEMU window instead of running headless —
-helpful when debugging a recipe.
+From a clean home, that one command materializes a machine from the
+built-in `freedos-1.4-plain` blueprint (seeding the blueprint, its
+scripts, and the LiveCD media definition into your home as ordinary
+user-owned files), inserts the fetched, hash-verified LiveCD to the
+blueprint's empty CD drive, boots it, and drives the FreeDOS installer
+end to end — language, partitioning, the reboot, the "Plain DOS
+system" package set — until the guest powers itself off and the
+script ejects the CD. The machine is left with FreeDOS installed on
+its hard disk; confirm it boots, then start and stop it freely:
 
-Recipes fetch their vendor installation media automatically and cache
-it under the reliquary home; the cached media (e.g. an installer ISO
-extracted from a distribution zip — the zip itself is not kept) is
-verified against a pinned SHA-256 on every run
-(`Documents\reliquary` by default; override with `--home` or the
-`RELIQUARY_HOME` environment variable). Disk images are created under
-`<home>\machines\<recipe>\drives`.
+```powershell
+rlq --blueprint freedos-1.4-plain script verify
+rlq --blueprint freedos-1.4-plain start
+rlq --blueprint freedos-1.4-plain stop
+```
+
+Vendor media is cached and verified against pinned SHA-256 hashes on
+every use: source archives under `cache/downloads/`, extracted
+payloads under `cache/media/` (`Documents\reliquary` by default;
+override with `--home` or the `RELIQUARY_HOME` environment variable).
+Each script run writes a transcript and screenshots under the
+machine's `cache/machines/<id>/runs/` directory. Pass `--display` to
+show the QEMU window instead of running headless — helpful when
+debugging a script.
 
 ## The machine layer
 
-Beneath the recipes, reliquary is a general automation harness for running
+Beneath the scripts, reliquary is a general automation harness for running
 remote tasks in QEMU guests, usable on its own through the CLI and Python
 interfaces documented below.
 

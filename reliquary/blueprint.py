@@ -113,6 +113,12 @@ def _drive_key(value):
 
 
 def _drive(value, key, medium, slot, home):
+    if value is None:
+        if medium == "hdd":
+            raise ValueError(
+                f"drives.{key} cannot be null: only removable drives "
+                "(floppy, cdrom) may be declared empty")
+        return BlueprintDrive(key=key, medium=medium, slot=slot)
     if isinstance(value, str):
         value = {"media": value}
     if not isinstance(value, collections.abc.Mapping):

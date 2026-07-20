@@ -74,10 +74,12 @@ values, and the state-only fields appeared.
 
 ## 2. An OS installation machine
 
-A machine to install FreeDOS onto: an installer ISO from the media
-library, plus a hard disk that doesn't exist yet — reliquary
-creates it from `size`. Boot from CD first so the installer runs;
-the extra memory avoids the FreeDOS LiveCD's low-RAM warning:
+A machine to install FreeDOS onto: a blank hard disk, an empty CD
+slot the install script will fill, and boot order hard-disk then
+CD. A blank disk fails to boot, so firmware falls through to the
+attached installer — no boot-order change is needed before or after
+install. The extra memory avoids the FreeDOS LiveCD's low-RAM
+warning:
 
 ```json
 {
@@ -85,9 +87,9 @@ the extra memory avoids the FreeDOS LiveCD's low-RAM warning:
   "memory": "32M",
   "drives": {
     "hdd": {"size": "20M"},
-    "cdrom": "freedos-1.4-livecd"
+    "cdrom": null
   },
-  "boot": ["cdrom", "hdd"]
+  "boot": ["hdd", "cdrom"]
 }
 ```
 
@@ -95,26 +97,12 @@ rlq creates the hard disk as a 20 MiB dynamically-allocated
 image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
 the [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
 are reliquary's choice, not yours). Installation itself is an
-install script's job, and its outcome lands in the machine's run
-records — the blueprint and state make no claim about the guest's
-contents.
-
-To boot the installed system rather than the installer afterward,
-edit the blueprint — disable the CD entry and boot from the hard
-disk — and adopt the edit with the explicit
-[`apply`](machine-blueprint.md#applying-blueprint-edits) (a change the
-machine absorbs without touching its drives):
-
-```json
-{
-  "drives": {
-    "cdrom0": {"media": "freedos-1.4-livecd", "enabled": false}
-  },
-  "boot": ["hdd0"]
-}
-```
-
-*(Fragment shown; the rest of the blueprint is unchanged.)*
+install script's job (`insert` the LiveCD, drive the installer,
+`eject`); its outcome lands in the machine's run records — the
+blueprint and state make no claim about the guest's contents. After
+install, the same boot order boots the hard disk. Scripts that need
+a different order can use the [`boot`](script-spec.md#boot) verb
+while the machine is stopped.
 
 > **Media note:** `freedos-1.4-livecd` names a
 > [media definition](media-spec.md)

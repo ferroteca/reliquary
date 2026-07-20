@@ -62,8 +62,11 @@ chooses the "Plain DOS system" package set (excluding the "with
 sources" sibling), and confirms with Yes on the ready-to-install
 prompt. `install` then blocks while the machine runs and always shuts
 it down when it ends — including on Ctrl-C, which the CLI reports as
-an interruption instead of a traceback. Further installer scripting
-is not yet implemented.
+an interruption instead of a traceback.
+
+The recipe layer has since been retired in favor of the `.rqs`
+install/verify scripts on the blueprint machine model (see the
+machine-layer notes below); `rlq install` no longer exists.
 
 ### Machine layer (formerly relict)
 
@@ -75,7 +78,35 @@ is not yet implemented.
   remains the deliberate way to override the filesystem drive, and
   `enabled: false` still unmounts it.
 
+### Removed
+
+- The recipe layer is retired (milestone-1 Spike 12): the `recipes/`
+  package, the `rlq install <recipe>` command, and the recipe-era
+  helpers (`ensure_media`, `install-media/` and `machines/<recipe>/`
+  home paths) are deleted. The `.rqs` install/verify scripts on the
+  blueprint machine model replace them; there is no migration
+  (pre-release).
+
 ### Added
+
+- Milestone-1 Spike 13 lands the media-in-script machine model:
+  blueprints declare empty removable drives (`"cdrom0": null`) — the
+  blueprint alone defines machine topology — and scripts `insert` a
+  defined media item to a declared slot and `eject` it, persisted in
+  `reliquary-machine.json` across stop/start (`insert_media` /
+  `eject_media` on the Python surface; stopped machines only for
+  now). The new `machine: running | stopped` script header declares
+  the state a script expects: `stopped` scripts start the machine
+  themselves after inserting media, and `script` no longer
+  unconditionally auto-starts. Insert/eject slots are statically
+  preflighted against the machine before any guest input, and a
+  guest-initiated power-off observed by `wait stopped` reconciles the
+  machine back to phase `ready`. The built-in `freedos-1.4-plain`
+  blueprint boots `["hdd0", "cdrom0"]`: a blank hard disk falls
+  through to an attached LiveCD for install, then boots the
+  installed disk afterward with no boot-order change. Scripts may
+  still reorder boot devices with the `boot` verb / `set_boot_order`
+  while the machine is stopped.
 
 - Milestone-1 Spike 10 wires `rlq --blueprint|--machine script <label>`:
   resolve the label through the blueprint `scripts` map (bare stem when
@@ -89,15 +120,17 @@ is not yet implemented.
 
 - Milestone-1 Spike 9 executes FreeDOS-shaped `.rqs` scripts against a
   cached QEMU/DOS machine: normalized VGA `wait`/`expect`,
-  `enter`/`type`/`press`/`select`, `screenshot`, and host `start`/`stop`,
+  `enter`/`type`/`press`/`select`, `screenshot`, host `start`/`stop`,
+  and (with Spike 13) stopped-machine `insert`/`eject`/`boot`,
   starting a ready machine when needed and leaving it running unless the
   script stopped it.
 
 - Milestone-1 Spike 8 parses the FreeDOS-shaped `.rqs` language into an
   immutable script model: headers, embedded media definitions, linear and
   state-machine bodies, `wait`, `expect`, `enter`, `type`, `press`,
-  `select`, `screenshot`, `start`, `stop`, and explicit transitions report
-  source-located, compiler-style syntax and static-validation errors.
+  `select`, `screenshot`, `insert`, `eject`, `boot`, `start`, `stop`,
+  and explicit transitions report source-located, compiler-style
+  syntax and static-validation errors.
 
 - The built-in library seed: blueprints, media definitions, and
   scripts ship inside the package under `reliquary/builtins/`

@@ -25,7 +25,7 @@ every design choice may assume machines are cheap to destroy and
 rebuild.
 
 The unit of design is the **operation** performed against a
-machine: start it, stop it, attach media, send input, run a guest
+machine: start it, stop it, insert media, send input, run a guest
 command, read the screen, transfer a file, take a screenshot. Two
 seams stack beneath the operations, and a third concept scopes OS
 meaning:
@@ -183,7 +183,7 @@ stopped machine is the explicit `apply`, which re-resolves the
 blueprint, applies what the machine can absorb without regenerating
 drives, and records the new baseline digest (drive-regenerating
 changes fail closed, pointing at `recreate`). Reconfiguration
-(script `attach`/`detach`, CLI) updates the state only, and
+(script `insert`/`eject`, CLI) updates the state only, and
 persists there — a machine legitimately diverges from its
 blueprint, as an install script does while its installer CD is
 attached, until the script restores it or `apply` reconciles the
@@ -554,7 +554,7 @@ surface — it is the proven instruction set the language must cover:
   state, or a stable observation, with timeout/deadline bounds;
 - select an entry in a cursor-key menu by visible feedback;
 - take a screenshot;
-- define embedded media, attach/detach it, and start/stop the
+- define embedded media, insert/eject it, and start/stop the
   machine;
 - stage files to and collect files from the guest.
 
@@ -576,9 +576,9 @@ Language design goals:
   after the language is proven, existing forms retain their
   meanings and new capabilities stay explicit and preflightable.
 
-OS installation recipes become install scripts: the current
-`recipes/` Python package retires in milestone 1, as soon as the
-language core can express the FreeDOS plain install end to end. Media acquisition (download,
+OS installation recipes became install scripts: the former
+`recipes/` Python package was retired in milestone 1, once the
+language core could express the FreeDOS plain install end to end. Media acquisition (download,
 hash-verify, cache under `cache/media/`) stays a host-side capability
 the language can invoke, with pinned hashes kept in shared
 definitions or directly inside the script.
@@ -655,7 +655,7 @@ Spikes (ordered; each leaves the tree green and proves one
 seam; later spikes consume earlier ones). Suggested parallel
 tracks: 1→2→3→4→5→6 alongside 8, then 7→9→10→11→13→12. Spike 7
 can start after 4; spike 9 needs 6 and 8; spike 12 consumes 13
-(persistent `attach`/`detach` is how verify boots the installed
+(persistent `insert`/`eject` is how verify boots the installed
 disk — no thin `apply` needed). Highest risk: 3
 (cache/hash rules), 9 (LiveCD menu timing), 13 (persistence
 semantics reach into `start` reconciliation).
@@ -683,7 +683,7 @@ semantics reach into `start` reconciliation).
    against spike 2. Out: controllers, `base`,
    `backend-settings`, `apply`, full cookbook.
 5. **Machine materialize (complete)** — `create` → `cache/machines/<id>/`
-   + `reliquary-machine.json` + qcow2 from `size`; attach
+   + `reliquary-machine.json` + qcow2 from `size`; insert
    cached media. Exit: `create` then inspect state/drives; QEMU
    can see the ISO. Out: locking/recovery polish, `recreate`,
    clone/export.
@@ -700,7 +700,7 @@ semantics reach into `start` reconciliation).
 8. **`.rqs` parse (FreeDOS shape; complete)** — header + state-machine +
    the verbs that example uses. Exit: parse the documented
    install script; useful parse errors. Out: linear-only path,
-   `on`/reactive, `attach`/`stage`/`collect`, inputs/properties.
+   `on`/reactive, `insert`/`stage`/`collect`, inputs/properties.
 9. **Script runtime on QEMU/DOS (complete)** — `wait`/`expect` on
    normalized VGA text; `enter`/`type`/`press`/`select`;
    `screenshot`; `start`/`stop`. Exit: drive a tiny hand
@@ -711,34 +711,34 @@ semantics reach into `start` reconciliation).
     `runs/`. Exit: `rlq --blueprint … script install` invokes
     runtime end to end (may still fail mid-install). Out:
     embedded media blocks, property-bound inputs.
-11. **Author `freedos-1.4-plain`** — blueprint + media
+11. **Author `freedos-1.4-plain` (complete)** — blueprint + media
     definition (URL + license assertion) + install/verify
     scripts in `builtins/`. Exit: artifacts resolve and the
     install script matches the LiveCD flow. Out: other OS
     builtins.
-12. **Verify path + retire recipes** — `script verify` boots the
-    installed HDD through spike 13's model (install script's
-    final `detach` leaves the empty-`cdrom0` boot order falling
-    through to `hdd0`); delete `recipes/` and `install`. Exit:
-    north-star done criteria green; `install` command gone.
-    Out: full milestone-3 `apply` semantics.
-13. **Media-in-script model** — the machine-state design for
+12. **Verify path + retire recipes (complete)** — `script verify` boots the
+    installed HDD through spike 13's model (blueprint boots
+    `hdd0` then `cdrom0`; install script's final `eject` leaves
+    a plain `start` booting the hard disk); delete `recipes/` and
+    `install`. Exit: north-star done criteria green; `install`
+    command gone. Out: full milestone-3 `apply` semantics.
+13. **Media-in-script model (complete)** — the machine-state design for
     install media: blueprints declare empty removable drives
     (`"cdrom0": null`) and no installer media — the blueprint
-    alone defines machine topology, so `attach`/`detach` never
+    alone defines machine topology, so `insert`/`eject` never
     create or remove a drive, and a script naming an undeclared
-    slot fails static preflight; scripts `attach`
-    a defined media item to a declared slot and `detach` it, persisted in
+    slot fails static preflight; scripts `insert`
+    a defined media item to a declared slot and `eject` it, persisted in
     `reliquary-machine.json` across stop/start (the machine
     diverges from its blueprint until the script's final
-    `detach` restores it); the `machine: running|stopped`
+    `eject` restores it); the `machine: running|stopped`
     script header, with `stopped` scripts starting the machine
-    explicitly after attaching media, and `script` no longer
+    explicitly after inserting media, and `script` no longer
     unconditionally auto-starting. Media definitions stay
     separate library documents for builtins (embedded blocks
     remain a later milestone). Exit: the FreeDOS install script
-    attaches the LiveCD to an empty blueprint slot, installs,
-    detaches, and a subsequent plain `start` boots the hard
+    inserts the LiveCD into an empty blueprint slot, installs,
+    ejects, and a subsequent plain `start` boots the hard
     disk. Out: `apply` (recovery for diverged machines is
     milestone 3), embedded media blocks, hot-swap polish beyond
     what the install needs. Runs before spike 12, which
@@ -898,7 +898,7 @@ Deliverables:
    semantics, explicit `->`/`done` transitions.
 3. Action verbs on the machine model: `enter`, `type`, `press`,
    `select` (feedback-driven, never guessing), `screenshot`,
-   `attach`/`detach` (persistent state-document changes — never
+   `insert`/`eject` (persistent state-document changes — never
    the blueprint — surviving stop/start per spike 13's model),
    stopped-only `stage`/`collect` with contained paths, and
    `start`/`stop`.

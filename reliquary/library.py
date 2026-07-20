@@ -13,6 +13,7 @@ copy is how it is refreshed.
 import collections.abc
 import json
 import os
+import re
 from importlib import resources
 
 from .home import blueprints_dir, media_dir, scripts_dir
@@ -121,13 +122,32 @@ def seed_media(name, home=None):
     return False
 
 
+_INSERT_MEDIA = re.compile(r"^\s*insert\s+\S+\s+(\S+)\s*$", re.MULTILINE)
+
+
+def _referenced_insert_media(script_text):
+    """Yield the media names a script's ``insert`` statements use."""
+    yield from _INSERT_MEDIA.findall(script_text)
+
+
 def seed_script(stem, home=None):
     """Seed ``scripts/<stem>.rqs`` from the built-in library.
 
-    Returns whether the script file was copied out.
+    Returns whether the script file was copied out. The media
+    definitions the script's ``insert`` statements reference come
+    along (each obeying the never-overwrite rule), so a seeded
+    script resolves its media without a live fetch first.
     """
     source = _builtins_root() / "scripts" / f"{stem}.rqs"
     if not source.is_file():
         return False
     destination = os.path.join(scripts_dir(home), f"{stem}.rqs")
-    return _copy_out(source, destination)
+    if not _copy_out(source, destination):
+        return False
+    try:
+        text = source.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return True
+    for media_name in _referenced_insert_media(text):
+        seed_media(media_name, home=home)
+    return True
