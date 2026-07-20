@@ -8,10 +8,11 @@ import tempfile
 import unittest
 from unittest import mock
 
+import reliquary
 from reliquary.library import seed_blueprint, seed_media, seed_script
 from reliquary.machines import (create_from_blueprint,
                                 load_machine_state)
-from reliquary.media import resolve_media
+from reliquary.media import parse_definition, resolve_media
 
 BLUEPRINT = "freedos-1.4-plain"
 MEDIA = "freedos-1.4-livecd"
@@ -136,6 +137,37 @@ class FirstReferenceTest(unittest.TestCase):
     def test_create_from_blueprint_unknown_name_errors(self):
         with self.assertRaises(FileNotFoundError):
             create_from_blueprint("no-such-blueprint", home=self.home)
+
+
+class BuiltinMediaDefinitionTests(unittest.TestCase):
+    """The shipped freedos-1.4-livecd definition carries correct content."""
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(
+            os.path.dirname(reliquary.__file__),
+            "builtins", "media", "freedos-1.4-livecd.json")
+        with open(path, encoding="utf-8") as handle:
+            cls._raw = json.load(handle)
+        cls._parsed = parse_definition(cls._raw)
+
+    def test_url_carrying_definition_has_redistribution_assertion(self):
+        """Built-in definitions with a URL must assert redistribution rights."""
+        self.assertIn("url", self._raw)
+        self.assertIn("redistribution", self._raw)
+        self.assertIsInstance(self._raw["redistribution"], str)
+        self.assertTrue(self._raw["redistribution"].strip())
+
+    def test_livecd_item_identifies_correct_file(self):
+        self.assertEqual(self._parsed.items[0].name, "freedos-1.4-livecd")
+        self.assertEqual(self._parsed.items[0].file, "FD14LIVE.iso")
+
+    def test_iso_sha256_matches_known_good_hash(self):
+        """The ISO hash is the known-good FreeDOS 1.4 LiveCD payload hash."""
+        self.assertEqual(
+            self._parsed.items[0].sha256,
+            "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e"
+            "6ef2deb0477f81fb")
 
 
 if __name__ == "__main__":
