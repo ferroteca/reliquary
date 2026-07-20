@@ -436,6 +436,35 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertFalse(os.path.exists(root))
         self.assertEqual(list_machines(home=self.home), [])
 
+    def test_destroy_retries_an_interrupted_destroy(self):
+        """A failed deletion leaves the machine ready for another try."""
+        machine_id = self._create_ready()
+        root = machine_dir_path(machine_id, self.home)
+
+        with mock.patch("reliquary.machines.shutil.rmtree",
+                        side_effect=PermissionError("locked output")):
+            with self.assertRaises(PermissionError):
+                destroy(machine_id, home=self.home)
+
+        self.assertEqual(load_machine_state(machine_id, self.home)["phase"],
+                         "ready")
+        destroy(machine_id, home=self.home)
+        self.assertFalse(os.path.exists(root))
+
+    def test_destroy_retries_a_previously_interrupted_destroy(self):
+        """A legacy destroying phase can be recovered by retrying it."""
+        machine_id = self._create_ready()
+        state_path = os.path.join(machine_dir_path(machine_id, self.home),
+                                  "reliquary-machine.json")
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "destroying"
+        with open(state_path, "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+
+        destroy(machine_id, home=self.home)
+        self.assertFalse(os.path.exists(machine_dir_path(machine_id,
+                                                         self.home)))
+
     def test_destroy_rejects_running_machine(self):
         """A running machine must be stopped before destroy."""
         machine_id = self._create_ready()

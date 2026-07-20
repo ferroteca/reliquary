@@ -72,6 +72,10 @@ machine-layer notes below); `rlq install` no longer exists.
 
 ### Fixed
 
+- An interrupted machine deletion, such as a transient Windows file lock,
+  no longer leaves the machine permanently in the `destroying` phase;
+  rerunning `rlq destroy` now retries it safely.
+
 - A configured drive source for a slot already declared by a filesystem
   drive now fails closed with a slot-clash error instead of silently
   replacing it. An explicit `enabled: true` on the configured entry

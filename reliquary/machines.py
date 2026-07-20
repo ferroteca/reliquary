@@ -424,19 +424,29 @@ def mark_stopped(machine_id, home=None):
 
 
 def destroy(machine_id, home=None):
-    """Delete a stopped machine's cache directory entirely."""
+    """Delete a stopped machine's cache directory entirely.
+
+    A deletion interrupted by a host lock can be retried.  New failed
+    deletions restore the machine to ``ready`` so they do not strand it
+    in the transient ``destroying`` phase.
+    """
     state = load_machine_state(machine_id, home)
     phase = state.get("phase")
     if phase == "running":
         raise RuntimeError(
             f"machine {short_id(machine_id, home)} is running; "
             "stop it before destroy")
-    if phase != "ready":
+    if phase not in ("ready", "destroying"):
         raise RuntimeError(
             f"machine {short_id(machine_id, home)} cannot be destroyed "
             f"(phase: {phase})")
-    _set_phase(machine_id, "destroying", home)
-    shutil.rmtree(machine_dir_path(machine_id, home))
+    if phase == "ready":
+        _set_phase(machine_id, "destroying", home)
+    try:
+        shutil.rmtree(machine_dir_path(machine_id, home))
+    except OSError:
+        _set_phase(machine_id, "ready", home)
+        raise
 
 
 def machine_drive_args(machine_id, home=None):
