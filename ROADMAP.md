@@ -99,14 +99,15 @@ Design rules:
   available (and capable) backend. Capability is judged against
   the whole blueprint: referenced media and image types the
   backend must be able to attach, required control planes, and
-  backend-specific options. A blueprint can therefore dictate the
-  backend without declaring `backend` — a `backend-settings`
-  section for exactly one backend, or a media type only one
-  backend can consume, narrows the walk to that backend. The
-  assignment is recorded in the machine state so the machine
-  stays on that backend thereafter. A blueprint that does declare `backend` skips the
-  walk entirely — that backend is probed alone and `create` fails
-  closed if it is unavailable or incapable.
+  the settings that apply to that candidate backend. Backend-specific
+  settings are conditional, not a backend selector: a blueprint may
+  say "if this materializes on VirtualBox, disable I/O APIC" without
+  requiring VirtualBox. Candidates without applicable settings simply
+  ignore that backend's settings block. Only an explicit `backend`
+  field pins the choice and skips the walk — that backend is probed
+  alone and `create` fails closed if it is unavailable or incapable.
+  The assignment is recorded in the machine state so the machine
+  stays on that backend thereafter.
 - **Backend state stays in the cached materialization.** Each
   backend is instructed to keep its machine files (disk images,
   `.vbox`, `.vmx`, Hyper-V VM/VHD paths) inside
@@ -201,7 +202,8 @@ types, `media` references into the shared library, `size`-based
 image creation, and `base` starting-point images — the backing
 of a differencing disk by default, or copied), `boot`, `control-planes` (the ordered waterfall
 policy), and `backend-settings` (the scoped non-portable escape
-hatch — a blueprint without it is portable by construction).
+hatch applied only when its named backend is selected; it never
+selects that backend by itself).
 Discovery and scripting fields: optional `name` and `description`
 (indexed by `search`), and the `scripts` map — short labels naming
 `.rlqs` files, the verbs used with `script`
@@ -638,7 +640,7 @@ Deliverables:
    `list machines`; selection by `--blueprint` (sole machine) and
    `--machine` (git-style prefix).
 3. **Scripting core** (of docs/script-spec.md): enough of the
-   `.rlqs` language to express the FreeDOS plain install and
+   `.rlqs` language to express the FreeDOS install and
    verification — parsing, `wait`/`expect` on normalized screen
    text, `enter`/`type`/`press`, `select`, `screenshot`,
    `start`/`stop` — and `script <label>` resolution through the
@@ -925,7 +927,7 @@ Deliverables:
 8. `list scripts`, `search scripts` (built-in index plus user
    files, with provenance), and `pull script <name>`.
 
-Done when: the FreeDOS plain install and verification scripts
+Done when: the FreeDOS install and verification scripts
 exercise the full language (states, inputs, embedded media
 blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `docs/`

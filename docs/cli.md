@@ -62,7 +62,7 @@ references — a blueprint naming a media definition or script you
 removed — re-seed the same way.
 
 This means the lazy path is often one command with zero files in
-your home beforehand: `rlq --blueprint freedos-1.4-plain
+your home beforehand: `rlq --blueprint freedos-1.4
 script install` extracts the blueprint, its media, and its scripts,
 creates a machine, and runs the install — everything materialized on
 first use.
@@ -208,7 +208,7 @@ Existing files are never overwritten.
 
 ```powershell
 # Pull everything for a built-in blueprint
-rlq pull blueprint freedos-1.4-plain
+rlq pull blueprint freedos-1.4
 
 # Pull individual artifacts
 rlq pull blueprint freedos-1.4-plain --only
@@ -255,13 +255,13 @@ platform. Multiple terms are ANDed:
 ```powershell
 $ rlq search blueprints dos
 BLUEPRINT              NAME                                MACHINES  BUILT-IN
-freedos-1.4-plain      FreeDOS 1.4 — Plain DOS system      2         seeded
+freedos-1.4-plain      FreeDOS 1.4                         2         seeded
 test-rig               (untitled)                          0
 msdos-622              MS-DOS 6.22 — base install          —         yes
 
 $ rlq search blueprints freedos install
 BLUEPRINT              NAME                                MACHINES  BUILT-IN
-freedos-1.4-plain      FreeDOS 1.4 — Plain DOS system      2         seeded
+freedos-1.4-plain      FreeDOS 1.4                         2         seeded
 ```
 
 The BUILT-IN column tracks provenance by name: `yes` marks a
@@ -275,8 +275,7 @@ the name); blank marks a purely user-authored file.
 $ rlq search blueprints freedos --verbose
 BLUEPRINT              freedos-1.4-plain
 NAME                   FreeDOS 1.4 — Plain DOS system
-DESCRIPTION            Installs FreeDOS 1.4 onto a blank hard disk.
-                       Selects the Plain DOS system package set.
+DESCRIPTION            Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set.
 PLATFORM               dos
 SCRIPTS                install → freedos-1.4-plain-install
                        verify → freedos-1.4-plain-verify
@@ -293,7 +292,7 @@ Removes `blueprints/<name>.json`. Refuses while any machine of it
 exists, listing their ids:
 
 ```
-$ rlq delete blueprint freedos-1.4-plain
+$ rlq delete blueprint freedos-1.4
 rlq: blueprint 'freedos-1.4-plain' still has 2 machine(s): a1b2c3d4, e5f6a7b8
 destroy them first, then delete the blueprint
 ```
@@ -659,7 +658,7 @@ filename, `name`, and `description`:
 ```powershell
 $ rlq search scripts freedos
 SCRIPT                        NAME                          BUILT-IN
-freedos-1.4-plain-install     FreeDOS 1.4 — plain install   seeded
+freedos-1.4-plain-install     FreeDOS 1.4 — plain install         seeded
 freedos-1.4-plain-verify      FreeDOS 1.4 — verify boot     yes
 ```
 
@@ -723,7 +722,7 @@ rlq --blueprint freedos-1.4-plain script install --display
 rlq --blueprint freedos-1.4-plain script install --responses answers.json
 
 rlq check-script freedos-1.4-plain-install
-rlq check-script freedos-1.4-plain-install --blueprint freedos-1.4-plain
+rlq check-script freedos-1.4-plain-install --blueprint freedos-1.4
 ```
 
 ---

@@ -22,9 +22,9 @@ have ids.
 ```text
 <reliquary_home>/
 ├── blueprints/
-│   └── freedos-plain.json          user-owned reusable blueprint
+│   └── freedos.json          user-owned reusable blueprint
 └── cache/machines/
-    └── freedos-plain-0/            the machine — disposable
+    └── freedos-0/            the machine — disposable
         ├── reliquary-machine.json
         ├── drives/
         ├── runs/
@@ -146,7 +146,7 @@ spelling of the blueprint schema:
 ```json
 {
   "id": "5fd11917-147a-4b6b-b7f6-9f4b6d7d1ab2",
-  "blueprint": "freedos-plain",
+  "blueprint": "freedos",
   "created": "2026-07-19T18:20:11Z",
   "phase": "ready",
   "...": "resolved blueprint fields, backend-id, blueprint-digest"

@@ -55,7 +55,7 @@ class ParseBlueprintTests(BlueprintTestCase):
                 "cdrom": None,
             },
             "boot": ["hdd", "cdrom"],
-            "name": "FreeDOS 1.4 plain",
+            "name": "FreeDOS 1.4 — Plain DOS system",
             "description": "Plain FreeDOS 1.4 system installed "
                            "from the LiveCD",
             "scripts": {

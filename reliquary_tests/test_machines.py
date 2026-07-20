@@ -79,11 +79,11 @@ class MachineMaterializationTests(unittest.TestCase):
 
         with mock.patch("reliquary.machines.create_hdd_image"):
             machine_id = create(blueprint, home=self.home,
-                                blueprint_name="freedos-plain")
+                                blueprint_name="freedos")
 
         state = load_machine_state(machine_id, self.home)
         self.assertEqual(state["id"], machine_id)
-        self.assertEqual(state["blueprint"], "freedos-plain")
+        self.assertEqual(state["blueprint"], "freedos")
         self.assertIn("created", state)
         self.assertEqual(state["phase"], "ready")
         self.assertEqual(state["backend"], "qemu")
@@ -372,9 +372,9 @@ class MachineMaterializationTests(unittest.TestCase):
 
     def test_resolve_machine_prefix(self):
         """--machine accepts an unambiguous id prefix."""
-        machine_id = self._create_ready("freedos-plain")
+        machine_id = self._create_ready("freedos")
         self.assertEqual(
-            resolve_machine(machine="freedos-plain-", home=self.home),
+            resolve_machine(machine="freedos-", home=self.home),
             machine_id)
 
     def test_resolve_machine_prefix_ambiguous(self):

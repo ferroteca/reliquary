@@ -54,7 +54,7 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
             json.dump({
                 "platform": "dos",
                 "drives": {"hdd": {"size": "20M"}},
-                "scripts": {"install": "plain-install"},
+                "scripts": {"install": "install-script"},
             }, handle)
 
     def test_creates_when_blueprint_has_no_machine(self):
@@ -194,9 +194,9 @@ class RunScriptWiringTests(unittest.TestCase):
             json.dump({
                 "platform": "dos",
                 "drives": {"hdd": {"size": "20M"}},
-                "scripts": {"install": "plain-install"},
+                "scripts": {"install": "install-script"},
             }, handle)
-        with open(os.path.join(scripts, "plain-install.rlqs"), "w",
+        with open(os.path.join(scripts, "install-script.rlqs"), "w",
                   encoding="utf-8", newline="\n") as handle:
             handle.write("platform: dos\n")
             handle.write('wait "ready", timeout: 1s\n')
@@ -210,7 +210,7 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertIsInstance(result, ScriptRun)
         self.assertTrue(result.created_machine)
         self.assertTrue(result.script_path.endswith(
-            "plain-install.rlqs"))
+            "install-script.rlqs"))
         self.assertTrue(os.path.isdir(result.run_dir))
         execute.assert_called_once()
         kwargs = execute.call_args.kwargs
@@ -233,7 +233,7 @@ class RunScriptWiringTests(unittest.TestCase):
 
     def test_run_script_seeds_missing_script(self):
         os.remove(os.path.join(
-            self.home, "scripts", "plain-install.rlqs"))
+            self.home, "scripts", "install-script.rlqs"))
 
         def fake_seed(stem, home=None):
             path = os.path.join(self.home, "scripts", f"{stem}.rlqs")
@@ -248,12 +248,12 @@ class RunScriptWiringTests(unittest.TestCase):
                 mock.patch("reliquary.script_runner.execute_script"):
             result = run_script(
                 "install", blueprint="plain", home=self.home)
-        seed.assert_called_once_with("plain-install", home=self.home)
+        seed.assert_called_once_with("install-script", home=self.home)
         self.assertTrue(os.path.isfile(result.script_path))
 
     def test_run_script_missing_script_fails(self):
         os.remove(os.path.join(
-            self.home, "scripts", "plain-install.rlqs"))
+            self.home, "scripts", "install-script.rlqs"))
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch(
                     "reliquary.script_runner.seed_script",
@@ -261,7 +261,7 @@ class RunScriptWiringTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError) as caught:
                 run_script(
                     "install", blueprint="plain", home=self.home)
-        self.assertIn("plain-install.rlqs", str(caught.exception))
+        self.assertIn("install-script.rlqs", str(caught.exception))
 
     def test_run_script_forwards_display(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
@@ -286,7 +286,7 @@ class RunScriptWiringTests(unittest.TestCase):
                             "20260101T000000Z-deadbeef"),
                         script_path=os.path.join(
                             self.home, "scripts",
-                            "plain-install.rlqs"),
+                            "install-script.rlqs"),
                         created_machine=True,
                     )) as run, \
                 contextlib.redirect_stdout(stdout):
@@ -305,7 +305,7 @@ class RunScriptWiringTests(unittest.TestCase):
         )
         output = stdout.getvalue()
         self.assertIn("created machine", output)
-        self.assertIn("plain-install.rlqs", output)
+        self.assertIn("install-script.rlqs", output)
         self.assertIn("run:", output)
 
     def test_cli_script_requires_selector(self):
