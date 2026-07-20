@@ -245,6 +245,101 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         destroy.assert_called_once_with("plain-1", home=self.home)
 
+    def test_list_scripts_default_lists_shared_dir(self):
+        """list scripts without --blueprint lists scripts/ directory."""
+        scripts = os.path.join(self.home, "scripts")
+        os.makedirs(scripts)
+        with open(os.path.join(scripts, "alpha.rlqs"), "w",
+                  encoding="utf-8") as handle:
+            handle.write(
+                'description: "Alpha script"\n'
+                'platform: dos\n'
+                'type "hello"\n'
+            )
+        stdout = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list", "scripts",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertIn("LABEL", output)
+        self.assertIn("DESCRIPTION", output)
+        self.assertIn("alpha", output)
+        self.assertIn("Alpha script", output)
+
+    def test_list_scripts_with_blueprint_uses_scripts_map(self):
+        """list scripts --blueprint reads the blueprint's scripts map."""
+        blueprints = os.path.join(self.home, "blueprints")
+        scripts = os.path.join(self.home, "scripts")
+        os.makedirs(scripts)
+        with open(os.path.join(blueprints, "cust.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({
+                "platform": "dos",
+                "drives": {"hdd": {"size": "20M"}},
+                "scripts": {
+                    "setup": "cust-setup",
+                    "teardown": "cust-teardown",
+                },
+            }, handle)
+        with open(os.path.join(scripts, "cust-setup.rlqs"), "w",
+                  encoding="utf-8") as handle:
+            handle.write(
+                'description: "Custom setup"\n'
+                'platform: dos\n'
+                'type "hello"\n'
+            )
+        with open(os.path.join(scripts, "cust-teardown.rlqs"), "w",
+                  encoding="utf-8") as handle:
+            handle.write(
+                'platform: dos\n'
+                'type "bye"\n'
+            )
+        stdout = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home,
+                "list", "scripts",
+                "--blueprint", "cust",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertIn("LABEL", output)
+        self.assertIn("DESCRIPTION", output)
+        self.assertIn("setup", output)
+        self.assertIn("Custom setup", output)
+        self.assertIn("teardown", output)
+        self.assertIn("-", output)
+
+    def test_list_script_alias_produces_same_output(self):
+        """'list script' alias produces identical output to 'list scripts'."""
+        scripts = os.path.join(self.home, "scripts")
+        os.makedirs(scripts)
+        with open(os.path.join(scripts, "task.rlqs"), "w",
+                  encoding="utf-8") as handle:
+            handle.write(
+                'description: "A task"\n'
+                'platform: dos\n'
+                'type "hello"\n'
+            )
+        stdout_plural = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout_plural):
+            cli.main([
+                "--home", self.home, "list", "scripts",
+            ])
+        stdout_singular = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout_singular):
+            cli.main([
+                "--home", self.home, "list", "script",
+            ])
+        self.assertEqual(
+            stdout_plural.getvalue(), stdout_singular.getvalue())
+
     def test_start_without_selector_uses_legacy_path(self):
         """Bare start still loads the root-home MachineConfig path."""
         with mock.patch("reliquary.cli.start_legacy") as start, \

@@ -14,17 +14,19 @@ except importlib.metadata.PackageNotFoundError:
 
 from qemu.qmp import ConnectError
 
-from .home import blueprints_dir, set_home
-from .library import list_builtin_blueprints
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
+from .home import blueprints_dir, scripts_dir, set_home
+from .library import list_builtin_blueprints, seed_blueprint
+from . import blueprint as blueprint_mod
 from .machines import (create_from_blueprint, destroy, list_machines,
                        resolve_machine, split_machine_id,
                        start as start_machine,
                        stop as stop_machine)
 from .script_runner import ScriptRuntimeError, run_script
+from .script import ScriptParseError, load_script
 from .workflows import _cli_machine_config, start as start_legacy
 
 
@@ -164,6 +166,14 @@ def main(argv=None):
     list_machines_parser.add_argument(
         "--blueprint", dest="filter_blueprint",
         help="show only machines of this blueprint")
+    list_scripts_parser = list_sub.add_parser(
+        "scripts", aliases=["script"],
+        help="list scripts (shared scripts/ by default; "
+             "--blueprint lists a blueprint's own scripts)")
+    list_scripts_parser.add_argument(
+        "--blueprint", dest="list_scripts_blueprint",
+        help="blueprint whose scripts to list (omit for shared "
+             "scripts/)")
 
     command = subcommands.add_parser("type")
     command.add_argument("text")
@@ -281,6 +291,65 @@ def _list_machines(arguments):
     return 0
 
 
+def _list_scripts(arguments):
+    blueprint_name = (getattr(arguments, "list_scripts_blueprint", None)
+                      or arguments.blueprint)
+    if blueprint_name:
+        bp_path = os.path.join(blueprints_dir(arguments.home),
+                               f"{blueprint_name}.json")
+        if not os.path.exists(bp_path):
+            seed_blueprint(blueprint_name, home=arguments.home)
+        bp = blueprint_mod.load_blueprint(bp_path, home=arguments.home)
+        scripts = bp.scripts
+        if not scripts:
+            print(f"(blueprint {blueprint_name} declares no scripts)")
+            return 0
+        label_width = max(
+            [4] + [len(label) for label in scripts],
+            default=4)
+        print(f"{'NAME':<{label_width}}  DESCRIPTION")
+        for label, stem in scripts.items():
+            script_path = os.path.join(scripts_dir(arguments.home),
+                                       f"{stem}.rlqs")
+            try:
+                script = load_script(script_path)
+            except (FileNotFoundError, ScriptParseError) as error:
+                description = f"(error: {error})"
+            else:
+                description = script.description or "-"
+            print(f"{label:<{label_width}}  {description}")
+        return 0
+    _print_scripts_in_dir(scripts_dir(arguments.home))
+    return 0
+
+
+def _print_scripts_in_dir(scripts_path):
+    if not os.path.isdir(scripts_path):
+        print(f"(no scripts directory: {scripts_path})")
+        return 0
+    stems = sorted(
+        entry[:-5] for entry in os.listdir(scripts_path)
+        if entry.endswith(".rlqs")
+    )
+    if not stems:
+        print(f"(no scripts in {scripts_path})")
+        return 0
+    label_width = max(
+        [4] + [len(stem) for stem in stems],
+        default=4)
+    print(f"{'NAME':<{label_width}}  DESCRIPTION")
+    for stem in stems:
+        script_path = os.path.join(scripts_path, f"{stem}.rlqs")
+        try:
+            script = load_script(script_path)
+        except (FileNotFoundError, ScriptParseError) as error:
+            description = f"(error: {error})"
+        else:
+            description = script.description or "-"
+        print(f"{stem:<{label_width}}  {description}")
+    return 0
+
+
 def _dispatch(arguments):
     platform = arguments.platform or "dos"
     if arguments.command == "create":
@@ -292,6 +361,8 @@ def _dispatch(arguments):
             return _list_blueprints(arguments)
         if arguments.list_what in ("machines", "machine"):
             return _list_machines(arguments)
+        if arguments.list_what in ("scripts", "script"):
+            return _list_scripts(arguments)
         raise ValueError(f"unknown list target: {arguments.list_what}")
     if arguments.command == "start":
         if arguments.blueprint or arguments.machine:
