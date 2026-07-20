@@ -5,9 +5,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The script spec
 
-> **Status:** this documents the planned reliquary script format.
-> The scripting language is not implemented yet; details may still
-> change before first release.
+> **Status:** Spike 8 implements parsing and static validation for the
+> milestone-1 FreeDOS shape, with source-located diagnostics. Script
+> execution remains unimplemented; details may still change before first
+> release.
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
@@ -345,7 +346,7 @@ registry is the normal reusable source for protected values.
 - One statement occupies one line. A `{` at the end of a line opens
   a block and a `}` alone closes it.
 - `#` begins a comment outside a quoted string.
-- Identifiers use ASCII letters, digits, `_`, and `-`, must start
+- Identifiers use ASCII letters, digits, `.`, `_`, and `-`, must start
   with a letter, and are case-sensitive.
 - Reserved verbs and header names cannot be used as state or input
   names.

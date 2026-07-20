@@ -77,6 +77,13 @@ is not yet implemented.
 
 ### Added
 
+- Milestone-1 Spike 8 parses the FreeDOS-shaped `.rqs` language into an
+  immutable script model: headers, embedded media definitions, linear and
+  state-machine bodies, `wait`, `expect`, `enter`, `type`, `press`,
+  `select`, `screenshot`, `start`, `stop`, and explicit transitions report
+  source-located, compiler-style syntax and static-validation errors. Script
+  execution remains the next spike.
+
 - The built-in library seed: blueprints, media definitions, and
   scripts ship inside the package under `reliquary/builtins/`
   (included in wheels and sdists, readable from zip-bundled

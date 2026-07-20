@@ -21,15 +21,25 @@ from .machines import (create, create_from_blueprint, destroy,
                        stop as stop_cached_machine)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
                     fetch_media, resolve_media)
+from .script import (Condition, EmbeddedMedia, ExpectBranch, Script,
+                     ScriptParseError, State, Statement, load_script,
+                     parse_script)
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
 __all__ = [
     "Blueprint",
     "BlueprintDrive",
+    "Condition",
+    "EmbeddedMedia",
+    "ExpectBranch",
     "Machine",
     "Qmp",
     "Runner",
+    "Script",
+    "ScriptParseError",
+    "State",
+    "Statement",
     "MachineConfig",
     "AgentlessGuestExec",
     "GuestExec",
@@ -51,6 +61,7 @@ __all__ = [
     "home",
     "list_machines",
     "load_blueprint",
+    "load_script",
     "load_machine_state",
     "machine_dir_path",
     "machine_drive_args",
@@ -59,6 +70,7 @@ __all__ = [
     "media_cache_dir",
     "media_dir",
     "parse_blueprint",
+    "parse_script",
     "resolve_machine",
     "run_guest_program",
     "run_task",
