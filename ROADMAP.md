@@ -655,7 +655,7 @@ can start after 4; spike 9 needs 6 and 8. Highest risk: 3
 boot/media change the M1 CLI list does not name — decide a thin
 `apply` or equivalent in that spike).
 
-1. **New home layout (additive)** — path helpers for
+1. **New home layout (additive; complete)** — path helpers for
    `blueprints/`, `media/`, `scripts/`,
    `cache/{downloads,media,machines}/` alongside the existing
    `drives/` / `machine.json` / `vm.json` model. Exit: unit tests
@@ -663,16 +663,16 @@ boot/media change the M1 CLI list does not name — decide a thin
    effective home; callers of the current machine path are
    unchanged. Out: migration; cutting the tree over to the new
    layout (spikes 5–6 and 12).
-2. **Media definition (item form only)** — parse/validate one
+2. **Media definition (item form only; complete)** — parse/validate one
    FreeDOS-shaped definition; resolve by name from `media/`.
    Exit: load a `freedos-1.4-livecd`-like JSON; reject bad
    hashes/fields. Out: archive multi-item, `search`/`list`/
    `clean`, eager whole-library scan extras.
-3. **Fetch → two caches** — download → `cache/downloads/`,
+3. **Fetch → two caches (complete)** — download → `cache/downloads/`,
    extract/verify → `cache/media/`. Exit: one LiveCD zip lands
    as a verified `.iso` on demand; never-overwrite payload.
    Out: CLI media verbs, mirror lists beyond what is needed.
-4. **Blueprint subset** — parse/validate `platform`, `memory`,
+4. **Blueprint subset (complete)** — parse/validate `platform`, `memory`,
    `drives` (`size`/`media`), `boot`, `name`, `description`,
    `scripts`. Exit: reject unknown/invalid; resolve media names
    against spike 2. Out: controllers, `base`,

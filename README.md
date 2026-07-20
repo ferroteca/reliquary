@@ -31,9 +31,11 @@ Read [The machine blueprint](docs/machine-blueprint.md) — starting with
 [Machine blueprints and machines](docs/instance-model.md) for the full
 lifecycle.
 
-> **Status:** this model is designed ahead of implementation. Today's
-> release still runs the transitional recipe-and-`drives/` layout that the
-> rest of this README documents.
+> **Status:** the milestone-1 blueprint subset can now be parsed and
+> validated through the Python API, including media-name resolution. Machine
+> materialization and blueprint CLI commands are not implemented yet;
+> today's release still runs the transitional recipe-and-`drives/` layout
+> that the rest of this README documents.
 
 ## Installation
 

@@ -5,9 +5,11 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Machine blueprint — cookbook
 
-> **Status:** this documents the planned machine blueprint format. The
-> machine model is not implemented yet; details may still change
-> before first release.
+> **Status:** examples using only the milestone-1 subset (`platform`,
+> `memory`, `drives` with `size`/`media`, `boot`, `name`, `description`,
+> and `scripts`) can now be parsed, validated, and resolved. Machine
+> materialization and the remaining fields are not implemented yet; details
+> may still change before first release.
 
 Complete, working blueprints for common machine shapes. Each
 recipe shows the blueprint (what you write) and, where

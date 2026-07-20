@@ -5,9 +5,11 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Machine blueprint — field reference
 
-> **Status:** this documents the planned machine blueprint format. The
-> machine model is not implemented yet; details may still change
-> before first release.
+> **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
+> `size`/`media`, `boot`, `name`, `description`, and `scripts`) is
+> implemented for parsing, validation, and media-name resolution. Machine
+> materialization and the remaining fields are not implemented yet; details
+> may still change before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`blueprints/<name>.json`, yours) and each
@@ -202,8 +204,9 @@ Guest memory. A size string uses the same grammar as drive
 [`size`](#size--optional--string) — a positive integer with a
 binary unit suffix — and a bare integer means MiB, so
 `"memory": "32M"` and `"memory": 32` are the same declaration.
-Defaults by platform (dos 16 MiB, win9x 64 MiB, winnt 256 MiB).
-The state always carries the canonical integer-MiB form.
+The size must resolve to a whole number of MiB because the state
+always carries the canonical integer-MiB form. Defaults by platform
+(dos 16 MiB, win9x 64 MiB, winnt 256 MiB).
 
 ```json
 {"memory": "32M"}

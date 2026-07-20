@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """OS installation scripting over agentless QEMU guest automation."""
 
+from .blueprint import (Blueprint, BlueprintDrive, load_blueprint,
+                        parse_blueprint)
 from .cli import main
 from .home import (blueprints_dir, cache_dir, documents_dir,
                    downloads_cache_dir, drives_dir, home, machines_cache_dir,
@@ -18,6 +20,8 @@ from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
 __all__ = [
+    "Blueprint",
+    "BlueprintDrive",
     "Machine",
     "Qmp",
     "Runner",
@@ -37,10 +41,12 @@ __all__ = [
     "find_qemu",
     "find_qemu_img",
     "home",
+    "load_blueprint",
     "machines_cache_dir",
     "main",
     "media_cache_dir",
     "media_dir",
+    "parse_blueprint",
     "run_guest_program",
     "run_task",
     "screen_text",

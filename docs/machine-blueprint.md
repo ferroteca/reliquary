@@ -5,9 +5,11 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The machine blueprint
 
-> **Status:** this documents the planned machine blueprint format. The
-> machine model is not implemented yet; details may still change
-> before first release.
+> **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
+> `size`/`media`, `boot`, `name`, `description`, and `scripts`) is
+> implemented for parsing, validation, and media-name resolution. Machine
+> materialization and the remaining fields are not implemented yet; details
+> may still change before first release.
 
 Every reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create

@@ -11,7 +11,8 @@ runner (the machine layer, formerly the separate relict project), with DOS
 as the default and currently only complete platform workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
-  resolution, layout, and containment, `drives.py` parses declared drives, `media.py` owns media definitions
+  resolution, layout, and containment, `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
+  its media references, `drives.py` parses declared drives, `media.py` owns media definitions
   (parsing, name resolution) and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `lifecycle.py` owns QMP, QEMU
   processes, and host-side `qemu-img` helpers, `interaction.py` defines
@@ -31,10 +32,10 @@ as the default and currently only complete platform workflow:
 - `examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
   install script embedding the media definition that its first run installs in the media library. Its README carries
   the status note. Keep the examples synchronized with `docs/` when the formats change.
-- `docs/` contains detailed user documentation, currently for planned interfaces written ahead of
-  implementation (e.g. the machine blueprint: `docs/machine-blueprint.md` guide, `-reference.md`, `-cookbook.md`,
-  each carrying a status note until implemented). ROADMAP.md holds the architectural context and open
-  design questions and links into `docs/`; keep design discussion out of `docs/` user pages.
+- `docs/` contains detailed user documentation, currently a mix of implemented cores and planned interfaces written
+  ahead of implementation (e.g. the machine blueprint: `docs/machine-blueprint.md` guide, `-reference.md`,
+  `-cookbook.md`, each carrying a status note until fully implemented). ROADMAP.md holds the architectural context
+  and open design questions and links into `docs/`; keep design discussion out of `docs/` user pages.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no

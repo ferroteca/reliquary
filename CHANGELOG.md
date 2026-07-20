@@ -77,6 +77,14 @@ is not yet implemented.
 
 ### Added
 
+- Immutable machine-blueprint parsing for the milestone 1 subset:
+  `parse_blueprint()` / `load_blueprint()` accept `platform`, `memory`,
+  `drives` (`size` or `media`), `boot`, `name`, `description`, and
+  `scripts`; canonicalize drive aliases, sizes, memory, and boot keys;
+  resolve media names through the shared media library; and reject
+  unknown fields, slot clashes, invalid sources, and undeclared boot
+  targets. Machine materialization and CLI blueprint selection remain
+  later milestone 1 spikes.
 - Media definitions per docs/media-spec.md: `parse_definition` /
   `load_definition` validate both the item (direct-download) form and
   the archive form (one source archive itemizing payloads, single
