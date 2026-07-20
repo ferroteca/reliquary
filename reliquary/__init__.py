@@ -24,6 +24,7 @@ from .media import (MediaDefinition, MediaItem, ResolvedMedia,
 from .script import (Condition, EmbeddedMedia, ExpectBranch, Script,
                      ScriptParseError, State, Statement, load_script,
                      parse_script)
+from .script_runner import ScriptRuntimeError, execute_script
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
@@ -38,6 +39,7 @@ __all__ = [
     "Runner",
     "Script",
     "ScriptParseError",
+    "ScriptRuntimeError",
     "State",
     "Statement",
     "MachineConfig",
@@ -86,4 +88,5 @@ __all__ = [
     "stop",
     "stop_cached_machine",
     "wait_text",
+    "execute_script",
 ]
