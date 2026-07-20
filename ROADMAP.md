@@ -302,7 +302,7 @@ Lifecycle semantics:
   sides; `recreate` is the honest alternative.
 - `destroy` discards the machine's cached materialization —
   state, backend machine, drive images — and marks the machine
-  uninstantiated; its record, id, and blueprint reference remain. The
+  unmaterialized; its record, id, and blueprint reference remain. The
   blueprint is never touched.
 - `delete --machine` removes the machine record, destroying the
   materialization first if one exists; the blueprint remains a plain
@@ -365,7 +365,7 @@ Lifecycle semantics:
   bases. `platform` is not
   knowable from any backend configuration, so `import` requires
   `--platform` explicitly; the never-infer rule holds. `import`
-  stops at the blueprint: it never instantiates — running the machine
+  stops at the blueprint: it never materializes a machine — running one
   afterward is an ordinary `create`. Drive preservation is
   entirely the blueprint's job, through the drive materialization
   triad: `size` (always a fresh blank disk at `create`), `base`
@@ -807,7 +807,7 @@ Deliverables:
    and permanently outside reliquary's purview.
 3. `import`: synthesize a blueprint from a native VM's configuration,
    disks preserved as generated media definitions taken as
-   `base`; `--platform` required; never instantiates.
+   `base`; `--platform` required; never materializes a machine.
 
 Done when: an exported FreeDOS machine boots under the backend's
 own tooling, and a machine created from an imported blueprint

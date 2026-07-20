@@ -49,9 +49,9 @@ stateDiagram-v2
     Ready --> Running: start
     Running --> Ready: stop (or guest shutdown)
     Ready --> Ready: apply — adopt blueprint edits
-    Ready --> Uninstantiated: destroy
-    Uninstantiated --> Ready: recreate
-    Uninstantiated --> [*]: delete
+    Ready --> Unmaterialized: destroy
+    Unmaterialized --> Ready: recreate
+    Unmaterialized --> [*]: delete
     Ready --> [*]: delete
 ```
 
@@ -352,7 +352,7 @@ reliquary recreate --blueprint msdos
 `destroy` discards the machine's entire cached materialization —
 the state, the backend's machine, and the drive images — and
 never touches the blueprint or the machine's record; the machine
-remains, uninstantiated, under its id, ready for a later
+remains, unmaterialized, under its id, ready for a later
 `create`-equivalent `recreate`. `recreate` is exactly
 `destroy` + `create` under the same id. Drives
 regenerate the way they were declared: `size` drives come back

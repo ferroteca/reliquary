@@ -45,7 +45,7 @@ candidate ids (or, with no machine, suggesting `create`;
 
 ## Lifecycle
 
-A machine rests in one of three phases — `uninstantiated`,
+A machine rests in one of three phases — `unmaterialized`,
 `ready`, `running` — and passes through transitional phases
 (`creating`, `stopping`, `destroying`) that exist so an
 interrupted operation is detectable and recoverable:
@@ -59,9 +59,9 @@ stateDiagram-v2
     stopping --> ready
     ready --> ready: apply
     ready --> destroying: destroy
-    destroying --> uninstantiated
-    uninstantiated --> creating: recreate
-    uninstantiated --> [*]: delete
+    destroying --> unmaterialized
+    unmaterialized --> creating: recreate
+    unmaterialized --> [*]: delete
     ready --> [*]: delete
 ```
 
@@ -89,7 +89,7 @@ shows each machine's short id, blueprint, phase, and backend. `create`
 validates and resolves the current blueprint, creates a machine record
 with a new UUID, prints that id, and materializes the machine's
 writable drives and backend object. `destroy` removes only the
-materialization and marks the machine uninstantiated; its id and
+materialization and marks the machine unmaterialized; its id and
 blueprint reference remain. `recreate` is `destroy` followed by `create`
 using the same id. `delete --machine` removes the durable record
 after destroying the materialization; `delete --blueprint` removes the
@@ -138,7 +138,7 @@ attachments. It is fully regenerated from the blueprint and instance record
 when safe. It must never be edited by hand.
 
 The record and cache state carry an operation generation and one of
-`uninstantiated`, `creating`, `ready`, `running`, `stopping`, or
+`unmaterialized`, `creating`, `ready`, `running`, `stopping`, or
 `destroying`. Every mutating operation takes an exclusive per-machine
 lock before inspecting backend state. On startup reliquary detects an
 interrupted phase, verifies backend identity, and either completes a
