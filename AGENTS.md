@@ -81,7 +81,7 @@ when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--h
 operations accept an explicit `home=` that overrides the process-global home for that call — the `_effective_home()`
 seam). Never write beside the module or into the source repository during normal use.
 
-Current home layout:
+Current home layout (still the active machine model):
 
 - `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting")
 - `machine.json` — optional CLI machine configuration (not loaded by Python workflows)
@@ -92,6 +92,17 @@ Current home layout:
   (recipe layer)
 - `machines/<recipe>/` — per-recipe machine homes; each is itself a full
   machine home with the layout above (recipe layer)
+
+Planned home layout path helpers (additive; not yet the active model —
+see milestone 1 in ROADMAP.md):
+
+- `blueprints/` — machine blueprints (`blueprints_dir`)
+- `media/` — shared media definitions (`media_dir`)
+- `scripts/` — automation scripts (`scripts_dir`)
+- `cache/downloads/` — cached source archives (`downloads_cache_dir`)
+- `cache/media/` — cached media payloads (`media_cache_dir`)
+- `cache/machines/<id>/` — machine materializations (`machines_cache_dir`;
+  parent via `cache_dir`)
 
 ### VM ownership
 

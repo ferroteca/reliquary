@@ -655,11 +655,14 @@ can start after 4; spike 9 needs 6 and 8. Highest risk: 3
 boot/media change the M1 CLI list does not name — decide a thin
 `apply` or equivalent in that spike).
 
-1. **New home layout** — `blueprints/`, `media/`, `scripts/`,
-   `cache/{downloads,media,machines}/`; retire root `drives/` /
-   `machine.json` / `vm.json` as the active model. Exit: unit
-   tests assert layout helpers; old paths unused by new code.
-   Out: migration.
+1. **New home layout (additive)** — path helpers for
+   `blueprints/`, `media/`, `scripts/`,
+   `cache/{downloads,media,machines}/` alongside the existing
+   `drives/` / `machine.json` / `vm.json` model. Exit: unit tests
+   assert the helpers (including `home=`) resolve under the
+   effective home; callers of the current machine path are
+   unchanged. Out: migration; cutting the tree over to the new
+   layout (spikes 5–6 and 12).
 2. **Media definition (item form only)** — parse/validate one
    FreeDOS-shaped definition; resolve by name from `media/`.
    Exit: load a `freedos-1.4-livecd`-like JSON; reject bad

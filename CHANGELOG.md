@@ -77,6 +77,11 @@ is not yet implemented.
 
 ### Added
 
+- Path helpers for the planned blueprint home layout:
+  `blueprints_dir`, `media_dir`, `scripts_dir`, `cache_dir`,
+  `downloads_cache_dir`, `media_cache_dir`, and `machines_cache_dir`
+  (each accepts optional `home=`). The existing `drives/` /
+  `machine.json` / `vm.json` machine model is unchanged.
 - `cursor_menu_select(item, timeout=30, exclude=(), port=None,
   home=None)` and the `reliquary menu ITEM [--exclude TEXT]` CLI command
   select an entry in a cursor-key driven text menu (for example a boot

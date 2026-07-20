@@ -75,6 +75,41 @@ def drives_dir(home=None):
     return os.path.join(effective_home(home), "drives")
 
 
+def blueprints_dir(home=None):
+    """Return the machine-blueprint directory under the effective home."""
+    return os.path.join(effective_home(home), "blueprints")
+
+
+def media_dir(home=None):
+    """Return the shared media-definition directory under the home."""
+    return os.path.join(effective_home(home), "media")
+
+
+def scripts_dir(home=None):
+    """Return the automation-script directory under the effective home."""
+    return os.path.join(effective_home(home), "scripts")
+
+
+def cache_dir(home=None):
+    """Return the regenerable-cache root under the effective home."""
+    return os.path.join(effective_home(home), "cache")
+
+
+def downloads_cache_dir(home=None):
+    """Return the cached source-archive directory under the home."""
+    return os.path.join(cache_dir(home), "downloads")
+
+
+def media_cache_dir(home=None):
+    """Return the cached media-payload directory under the home."""
+    return os.path.join(cache_dir(home), "media")
+
+
+def machines_cache_dir(home=None):
+    """Return the cached machine-materialization directory."""
+    return os.path.join(cache_dir(home), "machines")
+
+
 def install_media_dir(os_name):
     """Return the cached install media directory for one OS target."""
     return os.path.join(home(), "install-media", os_name)

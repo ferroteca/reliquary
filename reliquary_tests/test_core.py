@@ -46,6 +46,42 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(reliquary.drives_dir(),
                          os.path.join(self.tempdir.name, "drives"))
 
+    def test_planned_layout_paths_are_contained_by_configured_home(self):
+        root = self.tempdir.name
+        cache = os.path.join(root, "cache")
+        self.assertEqual(reliquary.blueprints_dir(),
+                         os.path.join(root, "blueprints"))
+        self.assertEqual(reliquary.media_dir(),
+                         os.path.join(root, "media"))
+        self.assertEqual(reliquary.scripts_dir(),
+                         os.path.join(root, "scripts"))
+        self.assertEqual(reliquary.cache_dir(), cache)
+        self.assertEqual(reliquary.downloads_cache_dir(),
+                         os.path.join(cache, "downloads"))
+        self.assertEqual(reliquary.media_cache_dir(),
+                         os.path.join(cache, "media"))
+        self.assertEqual(reliquary.machines_cache_dir(),
+                         os.path.join(cache, "machines"))
+
+    def test_planned_layout_paths_honor_explicit_home(self):
+        other = tempfile.TemporaryDirectory()
+        self.addCleanup(other.cleanup)
+        root = other.name
+        cache = os.path.join(root, "cache")
+        self.assertEqual(reliquary.blueprints_dir(home=root),
+                         os.path.join(root, "blueprints"))
+        self.assertEqual(reliquary.media_dir(home=root),
+                         os.path.join(root, "media"))
+        self.assertEqual(reliquary.scripts_dir(home=root),
+                         os.path.join(root, "scripts"))
+        self.assertEqual(reliquary.cache_dir(home=root), cache)
+        self.assertEqual(reliquary.downloads_cache_dir(home=root),
+                         os.path.join(cache, "downloads"))
+        self.assertEqual(reliquary.media_cache_dir(home=root),
+                         os.path.join(cache, "media"))
+        self.assertEqual(reliquary.machines_cache_dir(home=root),
+                         os.path.join(cache, "machines"))
+
     def test_documents_dir_is_public_and_absolute_or_none(self):
         """documents_dir() reports the platform Documents folder."""
         documents = reliquary.documents_dir()
