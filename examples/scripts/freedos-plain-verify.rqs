@@ -1,15 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 
-description: Boot the installed FreeDOS disk and confirm a DOS prompt
+description: "Boot the installed FreeDOS disk and confirm a DOS prompt"
 platform: dos
-timeout: 120
+timeout: 2m
 
-# boot the hard disk, not the LiveCD
-detach cdrom
-restart
-# the FreeDOS boot menu proceeds on its own default
+# Before running, disable the installer CD in the machine declaration
+# and make hdd the first boot device. start reconciles that declaration.
 wait "C:\>"
-screenshot
+screenshot verified
 enter "fdapm poweroff"
-wait shutdown
+wait stopped

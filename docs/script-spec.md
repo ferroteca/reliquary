@@ -9,460 +9,632 @@ SPDX-License-Identifier: BSD-3-Clause
 > The scripting language is not implemented yet; details may still
 > change before first release.
 
-A reliquary script automates a guest: it types at it, watches its
-screen, swaps its media, and moves files across the VM seam.
-Scripts live in `<reliquary_home>/scripts` — one text file per
-script, named `<name>.rqs` — and run against a named machine:
-
-```text
-<reliquary_home>/scripts/
-└── freedos-plain-install.rqs
-```
+A reliquary script automates a guest: it watches observable guest
+and machine state, supplies input, swaps media, and moves files
+across the VM seam. Scripts live in
+`<reliquary_home>/scripts`, one `<name>.rqs` file per script, and
+run against a named machine:
 
 ```powershell
 reliquary script msdos freedos-plain-install
 ```
 
-`script` starts the machine if it is not already running, then
-executes the script in order. The machine stays running when the
-script ends unless a step stopped it — no command implicitly
-tears a machine down.
+After preflight, `script` installs embedded media definitions,
+instantiates the machine if needed, starts it if it is not already
+running, then executes the script. The machine stays running
+afterward unless a step stopped it. Failure likewise leaves the
+machine in its observed state for diagnosis; no command implicitly
+tears it down.
 
-Scripts follow the same ownership philosophy as
-[machine declarations](machine-spec.md) and
-[media definitions](media-spec.md): a script is a small, authored
-file you own — reliquary reads it and never writes it — worth
-versioning and sharing alongside the media definitions it relies
-on.
+Scripts are authored documents: reliquary reads but never rewrites
+them. They belong in version control beside the machine and media
+definitions on which they depend.
 
-## The model
+## The language model
 
-A guest being automated — an installer especially — is a
-sequence of moments where it needs information: a menu choice, a
-keystroke, a command, a disk swapped in. A script is that
-sequence written down, and every statement serves one of two
-roles:
+The language is a deliberately constrained, domain-specific
+programming language. It has sequencing, branching, named states,
+and explicit state transitions, but no expressions, mutable
+variables, arithmetic, user-defined functions, or general-purpose
+loops. Its job is guest automation, not computation.
 
-- **inputting the information** — `enter`, `type`, `press`,
-  `select`,
-  `run`, `attach`/`detach`, `stage`; or
-- **knowing when the right time is to input it** — `wait`,
-  `on`, `expect`: the observation that the guest is ready.
-
-Put shortly: the script **watches and inputs**. A watch point,
-when it matches, triggers one of two things:
-
-- **input events** — the statements that follow an ordered
-  `wait`, or the action of a reactive
-  [`on` handler](#on--reactive-condition-action-pairs); or
-- **a state transition** — a [`->`](#transitions) on a handler
-  or in a state body, an
-  [`expect`](#expect--branch-on-what-appears) choosing its
-  branch, a bare `wait` advancing the sequence.
-
-Nothing else ever happens: no watch point computes, stores, or
-decides beyond these two consequences, which is what keeps a
-script readable as a plan.
-
-Beneath the verbs, every input reduces to **input events** — the
-small portable vocabulary of primitives a guest actually
-receives: key press and release today; pointer move and button
-press and release when the GUI era arrives. Verbs state intent
-(`enter` a command, `select` an entry); the selected control
-plane
-composes and delivers the events, owning their pacing — old
-guests drop input delivered at host speed, and feeding them at a
-survivable rate is the control plane's job, never the script's.
-
-In an **ordered sequence**, watching and inputting are separate
-statements — wait for the screen, then answer it:
+The basic rhythm is **observe, then act**:
 
 ```rqs
 wait "What is your preferred language"
 select "English (United States)"
 ```
 
-In a **reactive context**, the two fuse into the
-condition–action pair — one line, condition then action:
+- **Observations** establish that the guest or machine has reached
+  a known state: `wait`, `expect`, and reactive `on` handlers.
+- **Actions** deliver intent-level input or perform supporting host
+  operations: `enter`, `type`, `press`, `select`, `attach`,
+  `detach`, `stage`, `collect`, `screenshot`, `start`, and `stop`.
+
+Intent-level verbs remain above portable input events. `select`
+means choosing a visible menu entry, not sending a guessed number
+of Down keys. The selected control plane composes the necessary
+key press and release events and owns their pacing. Pointer actions
+will follow the same model when GUI automation arrives.
+
+The authored control-flow graph is statically finite, but a run may
+be unbounded when transitions form a cycle. Execution is
+inspectable and replay-oriented, not inherently deterministic: the
+guest and the timing of observable states can choose among declared
+routes. The transcript records the route actually taken.
+
+Anything computational belongs around scripts in Python: choosing
+which script to run, deriving response values, repeating a failed
+job from a known machine state, parsing results, and integrating
+with other tools. Inputs supply immutable data to a script;
+they do not add expression or decision syntax.
+
+## Script shapes
+
+A script uses one of two shapes. Mixing them is a parse error.
+
+### Linear script
+
+A linear script has top-level statements, executed in order. It is
+the normal form for a known sequence:
 
 ```rqs
-on "Drive C: does not appear to be partitioned.": select "Yes"
-```
-
-Either way: one observed right time, one delivery of input. This
-is why the language has no blind delays and no sleep verb —
-timing comes from watching the guest, never from guessing — and
-why everything else in the vocabulary (`screenshot`, `collect`,
-lifecycle verbs) is supporting cast around delivering input at
-the right time — not the point of the language.
-
-Seen whole, the guest is a **state machine**, and the script is
-that machine written down:
-
-- **[States](#state--ordered-body-ambient-handlers)** hold an
-  ordered body — the sequence for that phase — plus reactive
-  handlers, each armed at its position in the body and active
-  until the state ends.
-- **[Transitions](#transitions)** (`->`) move between named
-  states: on a handler ("when this screen appears, answer it and
-  go there") or in the body ("at this point, go there"). An
-  installer phase that loops — a mid-install reboot replaying
-  the same menus — is a transition back to the state that
-  handles them: the loop is drawn, not duplicated.
-
-Reactivity is always **scoped to its state** — there are no
-global "whenever X, do Y" declarations and no open-ended
-dispatch loop. The machine is finite, explicit, and fully
-written down, and the transcript records the route actually
-taken: every state entered, every handler fired, every
-transition followed.
-
-The model is also what makes the GUI era an extension rather
-than a redesign: image matching is a new way of *knowing when*,
-and pointer input a new way of *inputting* — new observations
-and new inputs slotting into the same rhythm.
-
-## Its own syntax — and not a programming language
-
-Scripts are a **line-oriented text format**, not JSON and not a
-general-purpose language. Machine declarations and media
-definitions are data, and stay JSON; a script is sequential
-prose — read top to bottom, one statement per line — and gets a
-syntax built for that:
-
-- **Comments.** `#` starts a comment (own line or end of line) —
-  installer scripts need margin notes ("this menu replays after
-  the reboot"), and a data format has nowhere to put them.
-- **Text is just text.** A watch pattern is the literal screen
-  text you are waiting for; nothing in it needs escaping.
-  Matching by regular expression is the opt-in exception
-  (`wait regex "…"`), not the default.
-- **The pair fits on a line.** `on "…": select "Yes"` is the
-  condition–action pair exactly as the model describes it.
-
-The syntax is small and parsed fail-closed: a malformed line
-rejects the script before step one, naming the line and what was
-expected.
-
-What the language deliberately is **not** is programmable. There
-are no variables, no expressions, no arithmetic, and no loops
-beyond drawn state transitions:
-
-- **Deterministic and inspectable.** A script is a fixed,
-  finite machine; the guest chooses the route, never the
-  meaning. When a run fails, the transcript names the failing
-  line — quoted verbatim — plus the screen state and a
-  screenshot. Scripts must be debuggable from the transcript
-  alone.
-- **Backend- and control-plane-agnostic.** A statement says
-  *what* — "wait for this text", "run this command" — and the
-  machine's backend and selected
-  [control plane](machine-spec.md) decide *how* it is observed
-  or delivered. Nothing in a script names a hypervisor.
-- **Small on purpose.** The language exists to sequence guest
-  automation. Anything computational — deciding *which* script
-  to run, generating inputs, parsing collected results — belongs
-  in Python via the embedding API, which remains a first-class
-  surface. A Python program that calls three scripts with logic
-  in between is the intended shape for complex jobs, not a
-  bigger script language.
-
-One script, one target: each OS version and edition gets its own
-install script. There are no parameters to mutate a script's
-behavior — a script that would need flags should be two scripts,
-or Python.
-
-## A first example
-
-A script that boots a machine to a DOS prompt and runs a program
-staged on its virtual FAT drive:
-
-```rqs
-description: Run CHKDSK and capture the output
+description: "Confirm that the installed DOS system boots"
 platform: dos
+timeout: 2m
 
 wait "C:\>"
-run "chkdsk c: > d:\chkout.txt"
-screenshot
-stop
-collect chkout.txt results/
+screenshot booted
+enter "fdapm poweroff"
+wait stopped
 ```
 
-A script is header lines followed by statements, one per line
-(states and other blocks in braces, as shown below). Statements
-run strictly in order; the first that fails ends the script.
+The first failing statement ends the run. Reaching end of file
+completes it.
 
-## The script file
+### State-machine script
 
-### Header
+A state-machine script declares named states and an explicit
+initial state. Top-level executable statements are not allowed:
 
-Header lines come before the first statement:
+```rqs
+description: "An installer with a reboot loop"
+platform: dos
+initial: cd-boot
+timeout: 30s
 
-- **`description: <text>`** — optional. One line saying what the
-  script does; shown when the script runs and in the transcript.
-- **`platform: <platform>`** — optional. The guest platform this
-  script is written for (`dos`, `win9x`, `winnt`). When present,
-  running the script against a machine of any other platform
-  fails before the first step. A script is always written *for*
-  one platform — declaring it just makes the mismatch fail fast.
-- **`timeout: <seconds>` / `delay: <seconds>`** — optional.
-  Script-wide [timing defaults](#timing-timeout-and-delay).
+state cd-boot {
+    # ordered statements
+    -> partitioning
+}
 
-There is no version marker
-([no backward compatibility before beta](machine-spec.md#format-stability-none-yet)),
-and no name field — **the script's name is its file name**
-without the `.rqs` extension, exactly as a machine's name is its
-declaration file name.
+state partitioning {
+    # ordered statements
+    done
+}
+```
 
-### Lines, strings, and blocks
+Every reachable path through a sequential state ends explicitly with
+`-> <state>` or `done`; a final `expect` is valid when every branch
+ends that way. Named states never fall through according to their
+textual order. `initial` must name exactly one declared state.
+Duplicate, missing, and unreachable states are validation errors or
+warnings as described under
+[validation](#validation-and-preflight).
 
-- **One statement per line.** A statement is a verb and its
-  arguments, followed by comma-separated
-  [modifier](#timing-timeout-and-delay) clauses. One rule reads
-  the punctuation: **a colon binds — a condition to its action
-  (`on "…": select "Yes"`), a setting to its value
-  (`timeout: 300`); a comma separates clauses:**
+A state is either **sequential** or **reactive**:
+
+- A sequential state contains ordinary ordered statements and
+  `expect` blocks, ending explicitly in `->` or `done`. It cannot
+  contain `on` handlers.
+- A reactive state contains only `on` handlers. Every handler is
+  active from state entry. A handler may transition, finish the
+  script, or complete its action and return to the same reactive
+  state. It cannot contain an interleaved ordered body.
+
+If a handler should only become relevant later, the script enters a
+smaller state at that point. Handler activation is therefore
+visible in the state graph rather than hidden in statement
+position.
+
+There are no anonymous states and no implicit state entry.
+
+## Header
+
+Header fields precede embedded media definitions, input
+declarations, and executable or state content:
+
+- `description: "..."` is optional human-facing text.
+- `platform: <platform>` is required. It fails preflight when the
+  target machine declares another platform. A future genuinely
+  platform-neutral script may use an explicitly defined portable
+  platform value; omission never means portable.
+- `initial: <state>` is required in a state-machine script and
+  forbidden in a linear script.
+- `timeout: <duration>` optionally changes the script-wide
+  observation default from `60s`.
+
+The file name supplies the script name. There is no format-version
+field before beta because the planned format carries no compatibility
+promise yet.
+
+## Embedded media definitions
+
+A script may carry media definitions needed by that workflow. Each
+block has a definition label followed by the ordinary
+media-definition JSON object; the outer opening brace becomes
+`media <label> {`:
+
+```rqs
+media freedos-livecd {
+  "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
+  "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
+  "items": [
+    {
+      "name": "freedos-1.4-livecd",
+      "file": "FD14LIVE.iso",
+      "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
+    }
+  ]
+}
+```
+
+The label is an identifier and determines the installed file name:
+the block above installs as `media/freedos-livecd.json`. It labels
+the definition, not an item; an archive definition may still contain
+several independently named items.
+
+The body uses exactly the item or archive form documented by the
+[media spec](media-spec.md); scripts do not get a second media
+schema. Several distinctly labeled `media` blocks are allowed. They
+appear after the header and before input declarations.
+
+### Installation into the media library
+
+Checking a script treats its embedded definitions as a prospective
+addition to the shared catalog but remains read-only. Running a
+script installs them into `<reliquary_home>/media` before fetching
+media, reconciling the target machine, or delivering guest input.
+Consequently, machine and media commands can use the definitions
+after the first run without needing the script in scope.
+
+Installation is fail-closed and non-overwriting:
+
+1. Reliquary parses the whole script, binds responses and user
+   properties, completes static and capability preflight, and
+   validates every embedded definition against the entire shared
+   library in memory. No file has been written yet.
+2. If every item in a block is already defined identically anywhere
+   in the library, that block is already installed and needs no new
+   file. If only some items overlap, installation fails and asks the
+   author to split the new and already-shared items into separate
+   blocks; writing the mixed block would create duplicate names.
+3. Otherwise the label's target path must not exist and none of the
+   block's item names may conflict. A differing target file or item
+   definition fails with both locations named; scripts never replace
+   or override library definitions.
+4. All new definitions are written in canonical JSON formatting by
+   temp-and-replace. Installation is transactional across the blocks:
+   an I/O failure removes files created by that attempt before the
+   script proceeds.
+5. The library is rescanned, then ordinary resolution, fetching, and
+   machine startup begin. Definitions remain installed even if a
+   later download or guest step fails; installing them is a durable
+   successful pre-run action.
+
+If an embedded definition changes after it has been installed, the
+next run fails rather than overwriting the library copy. The user
+explicitly removes or edits the shared definition before adopting
+the new one. Once installed, definitions are ordinary user-owned
+library documents; reliquary never updates or deletes them
+implicitly.
+
+A relative `local-path` is resolved from the script's directory
+before comparison or serialization, so the installed JSON contains
+an absolute path and retains the same meaning outside the script.
+Downloads and extracted payloads use the ordinary shared caches.
+
+Inputs are not expanded inside a media definition. Sources and
+hashes are authored, reproducible inputs; a `media` input chooses
+among names supplied by embedded definitions and the existing
+library.
+
+Name collisions never create an override. An embedded item whose
+normalized descriptor is identical to a shared or earlier embedded
+item coalesces harmlessly. The descriptor includes its payload name
+and hash plus its complete direct-source or archive-source context;
+unrelated sibling items in the same archive definition do not affect
+the comparison. Any difference is an error before installation,
+naming both definition locations and the colliding media item.
+
+## Inputs, properties, and response files
+
+Inputs externalize run-specific data while keeping control flow fixed.
+Three input types exist initially:
+
+```rqs
+input text owner-name, property: "identity.full-name", prompt: "Registered owner"
+input media supplemental-disk, prompt: "Supplemental disk"
+input secret product-key, property: "products.windows-98.install-key"
+```
+
+- `text` is immutable text supplied to action arguments such as
+  `enter`, `type`, and `select`. It cannot parameterize watch
+  conditions, state names, paths, or control flow.
+- `media` is the name of a defined media item. It is valid only
+  where a media argument is expected, such as `attach`.
+- `secret` is protected immutable text. It may be expanded only in
+  `enter` and `type`; its value and expanded argument are omitted
+  from transcripts and diagnostics.
+- `property` optionally binds the input to a key in the
+  [user property registry](property-registry.md). The quoted key is
+  literal and cannot contain an input reference.
+- `prompt` is optional user-facing text; the input name is used
+  when it is omitted.
+
+References use `${name}`:
+
+```rqs
+enter "setup /owner=${owner-name}"
+attach floppy1 ${supplemental-disk}
+type "${product-key}"
+```
+
+A `media` input must occupy the whole media argument; it cannot be
+interpolated into text. A `text` input may appear more than once in
+an ordinary quoted input string. Input references are
+not expressions and cannot control `expect`, transitions, or state
+selection. A `secret` input follows the text interpolation rules
+only inside `enter` and `type`.
+
+Values can be supplied explicitly in a JSON response file:
+
+```json
+{
+  "owner-name": "Paul Galbraith",
+  "supplemental-disk": "freedos-1.4-bonus"
+}
+```
+
+```powershell
+reliquary script freedos freedos-plain-install --responses answers.json
+```
+
+Before the machine starts, reliquary validates the response file,
+rejects unknown keys, and binds each input from the first
+available source:
+
+1. an explicit response-file value;
+2. the property named by `property:`; or
+3. an interactive prompt.
+
+Without an interactive terminal, a still-missing value fails before
+execution. Response files therefore override personal registry
+defaults for one invocation. Prompted values are not written back to
+the registry. A media value is resolved after binding, and a media
+prompt lists the embedded and existing library names valid for that
+response.
+
+Ordinary properties are strings. Secret properties keep only a
+marker in `properties.json`; their values live in the host credential
+store. `text` and `media` inputs require ordinary properties, while
+`secret` requires a secret property. Kind mismatches fail
+rather than silently downgrading protected data. See the
+[property-registry specification](property-registry.md) for its file
+format, maintenance commands, precise failure rules, and security
+boundary.
+
+The transcript records input references and source kinds, never
+expanded values. For a `secret`, it also omits the entire expanded
+input argument, redacts the value from textual diagnostics, and
+suppresses later automatic failure screenshots. An explicitly
+requested screenshot and the guest's own display, logs, or command
+history remain capable of exposing guest-entered data.
+
+Response files may contain sensitive text and should not be assumed
+safe to commit. A response-file string may override a `secret` input,
+but it is still plaintext in that file; the property
+registry is the normal reusable source for protected values.
+
+## Lexical and structural rules
+
+- Files are UTF-8 text. A UTF-8 BOM is accepted but not required;
+  LF and CRLF line endings are equivalent.
+- One statement occupies one line. A `{` at the end of a line opens
+  a block and a `}` alone closes it.
+- `#` begins a comment outside a quoted string.
+- Identifiers use ASCII letters, digits, `_`, and `-`, must start
+  with a letter, and are case-sensitive.
+- Reserved verbs and header names cannot be used as state or input
+  names.
+- A colon binds a named setting to its value. A comma separates
+  positional arguments from modifiers and separates subsequent
+  modifiers. When a block verb has no positional argument, its first
+  modifier follows the verb directly:
 
   ```rqs
-  wait "Please select your keyboard layout", timeout: 300
+  wait "Copying files", timeout: 10m, stable: 500ms
+  state formatting, timeout: 5m, deadline: 20m {
+  expect timeout: 2m {
   ```
 
-- **`#` comments**, full-line or trailing. Comments are the
-  annotation mechanism; the transcript shows each executed line
-  as written.
-- **Strings are double-quoted plain text.** Text is just text:
-  `"C:\>"` is the four characters `C`, `:`, `\`, `>`. Exactly
-  three escapes exist — for the three characters that carry
-  syntax:
+  Block modifiers always appear on the opening line, never after
+  the closing brace.
+- Durations require an explicit unit: `ms`, `s`, `m`, or `h`.
+  Values must be positive; fractional values are allowed.
+- Paths and human text are quoted. Bare arguments are restricted to
+  identifiers, key names, drive slots, state names, input
+  references, and machine-event keywords.
 
-  | escape | meaning                                       |
-  |--------|-----------------------------------------------|
-  | `\"`   | a literal `"` (the string delimiter)          |
-  | `\<`   | a literal `<` (not a [key token](#type--type-text)) |
-  | `\\`   | a literal `\` (so `\<` can follow a real backslash) |
+### Strings
 
-  Any other backslash is literal: `"C:\FDOS"` is exactly
-  `C:\FDOS`. For the harder cases there is the fully raw form,
-  `r"…"` — as in Python: **no** escapes and no
-  [`<key>` tokens](#type--type-text), every character
-  between the quotes literal (its one limit: it cannot contain a
-  `"`). Simple arguments — key names, state and drive and media
-  names, paths without spaces — are written bare.
-- **Blocks use braces.** A `{` at the end of a line opens a
-  block; a matching `}` alone on a line (with any trailing
-  modifier clauses) closes it. `state` bodies, `expect`
-  branches, and multi-action handlers all brace their blocks.
-  Indentation is yours to choose — the braces carry the
-  structure.
+Ordinary strings are double-quoted. Backslashes in DOS and Windows
+paths are literal by default. Four escapes exist for syntax-bearing
+text:
 
-### Watch patterns: literal by default
+| escape | meaning |
+|---|---|
+| `\"` | literal `"` |
+| `\\` | literal `\` |
+| `\<` | literal `<` rather than the start of a key token |
+| `\${` | literal `${` rather than an input reference |
 
-A watch pattern — the argument of `wait`, `on`, and `expect`
-branches — is **literal screen text**: the words as the guest
-displays them, matched case-sensitively within a screen row,
-with runs of whitespace treated as one (screens pad and center
-with spaces; invisible padding must not break a match).
+Any other backslash is literal. Input references are expanded
+only where the containing argument accepts them. In `enter` and
+`type`, recognized `<key>` tokens produce key input.
+
+The raw form `r"..."` performs no escapes, input expansion, or
+key-token recognition. Its one limitation is that it cannot contain
+a double quote.
+
+Expanded text must be representable by the selected input control
+plane. An unmappable character is a named input error, never a
+silent replacement.
+
+### Core grammar
+
+This EBNF fixes the structural grammar; individual verb sections
+define their typed arguments and allowed modifiers:
+
+```text
+script          = headers, media-definitions, inputs,
+                  (linear-body | state-body) ;
+headers         = header, { header } ;
+header          = description | platform | initial | timeout ;
+description     = "description:", string, newline ;
+platform        = "platform:", identifier, newline ;
+initial         = "initial:", identifier, newline ;
+timeout         = "timeout:", duration, newline ;
+
+media-definitions = { media-definition } ;
+media-definition  = "media", identifier, json-object-body, newline ;
+
+inputs          = { input } ;
+input           = "input", ("text" | "media" | "secret"), identifier,
+                   [ comma-modifiers ], newline ;
+
+linear-body     = { statement } ;
+state-body      = state, { state } ;
+state           = "state", identifier, [ comma-modifiers ], "{",
+                  newline, (sequential-body | reactive-body), "}",
+                  newline ;
+sequential-body = { ordered-statement }, terminal ;
+reactive-body   = on-handler, { on-handler } ;
+
+on-handler      = "on", condition, [ comma-modifiers ], "{", newline,
+                  { ordered-statement }, [ terminal ], "}", newline ;
+expect          = "expect", [ direct-modifiers ], "{", newline,
+                  branch, { branch }, "}", newline ;
+branch          = condition, ":", "{", newline,
+                  { ordered-statement }, [ terminal ], "}", newline ;
+
+condition       = string | "regex", string | "stopped" ;
+terminal        = ("->", identifier | "done"), newline ;
+```
+
+`initial` is present exactly in `state-body` scripts. Comments and
+blank lines may appear between grammatical lines. An `expect` may be
+the final element of a sequential body when control-flow analysis
+proves every branch terminal; this is the structured equivalent of
+the final `terminal` production.
+
+`json-object-body` begins with `{`, ends at its matching `}`, and
+uses JSON lexical rules internally. Script comments and input
+references have no meaning inside it. Media-definition labels must
+be unique within the script.
+
+## Observations
+
+### Normalized text matching
+
+A quoted watch pattern is a case-sensitive, normalized literal text
+match against one visible screen row:
 
 ```rqs
 wait "Welcome to FreeDOS 1.4 (LiveCD)"
 ```
 
-Nothing is escaped, because nothing means anything: dots,
-parentheses, brackets, backslashes are themselves. When literal
-text is not enough — anchoring, alternation, a pattern over
-varying text — the `regex` keyword selects a Python regular
-expression instead:
+The control plane decodes screen cells to Unicode, trims trailing
+cell padding, and collapses each run of whitespace to one space.
+The literal pattern is normalized the same way and then searched as
+a substring within each row. Patterns do not span rows.
+
+This is deliberately called a **normalized text match**, not an
+exact or fully literal screen match. It ignores layout padding but
+does not ignore case or punctuation.
+
+Regular expressions are opt-in:
 
 ```rqs
 wait regex "installed [0-9]+ of [0-9]+ packages"
 ```
 
-Regex patterns use the same quoted-string rules, so `\s`, `\.`,
-and friends are written exactly as in Python. A regex needing a
-literal backslash is where the raw string form earns its keep —
-`regex r"C:\\>"` matches the text `C:\>`, the pattern written
-exactly as Python's `re` would receive it.
+Regex uses Python's regular-expression syntax and runs against each
+normalized row. The first matching row satisfies the condition.
+Regex strings use the same string rules; raw strings are useful for
+backslash-heavy patterns.
 
-Besides the screen, a watch condition can observe **machine
-events** — bare keywords, no quotes, because they are not text:
+When several `expect` branches or reactive handlers match the same
+screen snapshot, the first declaration wins. Validation warns about
+obvious literal shadowing; regex overlap cannot generally be proven.
 
-```rqs
-wait shutdown
-```
+### Machine state
 
-One event exists: **`shutdown`** — the guest powered the machine
-off. It is observed through the backend's management interface
-and is universal: every backend reports a machine ceasing to
-run. (A guest *reboot* is deliberately not an event — most
-hypervisors' management interfaces don't surface a guest reset
-at all; the machine simply stays "running" through it. A script
-handles a reboot the portable way: by watching for the screen
-the reboot leads to.)
-
-### Timing: `timeout` and `delay`
-
-Timing is first-class and **scoped**. Two settings cover it:
-
-- **`timeout`** — seconds an observation may take before the
-  step fails: a `wait` condition (screen text or machine
-  event), `run` completion, a state's next watch point, an
-  `expect`'s first match.
-- **`delay`** — seconds of pacing: the interval between screen
-  observations, and the settle pause between a condition
-  matching and the input that answers it. A fast-repeating menu
-  wants a short `delay`; a slow-redrawing guest wants a longer
-  one. Pacing is *never a gate*: the language has no blind
-  sleeps, and `delay` makes nothing wait **for** anything —
-  conditions do that.
-
-Each is written two ways:
-
-- **As a directive line** — `timeout: 300` on its own line — it
-  sets the default for the rest of its scope: the whole script
-  in the header, the containing block inside one.
-- **As a modifier clause** — `…, timeout: 300` at the end of a
-  statement — it applies to that statement alone. A block's
-  modifiers go after its closing brace, exactly where any
-  statement's go.
-
-Scopes nest, innermost wins: script header, then each enclosing
-block's directives, then the statement's own modifiers.
-
-A block's *own* `timeout` — after its closing brace — is
-distinct from the defaults directive inside it, and the two say
-different things; both are often wanted at once. "This phase
-must complete within 20 minutes, and no single screen inside it
-may take more than 5" is:
+`stopped` is the initial machine-state condition:
 
 ```rqs
-state formatting {
-    timeout: 300
-    …
-}, timeout: 1200
+wait stopped
 ```
 
-The trailing `timeout` bounds the whole state — time to exit,
-however many handlers fire meanwhile; for an `expect`, time to
-its first branch match. The directive inside bounds each
-individual observation: a stretch where nothing matches for 5
-minutes fails early, long before the 20-minute budget — catching
-a hung screen fast while still allowing a slow phase its full
-time. Both fail with the state named; the diagnostics say which
-bound was exceeded.
-
-Initial defaults: `timeout` 60; `delay` is the selected control
-plane's pacing unless a scope sets it — pacing has a
-per-control-plane reality (VGA scraping and VNC framebuffers
-observe differently) that an unset `delay` respects.
-
-### Retries — there are none
-
-There is deliberately no retry modifier. A statement either
-completes within its timeout or the script fails with a full
-diagnostic; re-running a failed script is the retry. Loops exist
-only as drawn state transitions — an installer that replays a
-phase transitions back to the state that handles it. Verbs that
-operate by feedback (notably
-[`select`](#select--choose-in-a-cursor-menu)) iterate internally
-until they succeed or time out — that is the verb's mechanics,
-not script-level control flow. Anything that genuinely needs
-retry-with-logic belongs in Python, wrapped around script runs.
-
-## The verb vocabulary
-
-The vocabulary is the proven primitive set of reliquary's
-existing automation surface, organized by the
-[model](#the-model): verbs that observe readiness, verbs that
-input, and the supporting cast. Each verb maps to a capability
-the machine's configured control planes must provide; a
-statement whose capability no configured control plane supplies
-fails closed, naming the verb and the missing capability — never
-silently degrading.
-
-### `wait` — wait for screen text
-
-```rqs
-wait "Welcome to FreeDOS 1.4 (LiveCD)"
-wait "C:\>", timeout: 300
-```
-
-Waits until the guest's visible screen text shows the literal
-pattern ([matching rules](#watch-patterns-literal-by-default);
-`wait regex "…"` for a regular expression). This is the workhorse
-of installer scripting: every prompt, menu, and completion
-message is a watch point — observed however the machine's
-control plane observes text (VGA text memory on QEMU's agentless
-display; other backends their own way). The input statements
-that answer the awaited screen simply follow the `wait`.
-
-A quoted pattern always means literal screen text, and `regex`
-always means a regular expression; other observation forms —
-image matching for GUI guests — will arrive as sibling keyword
-forms (`wait image <needle>` is the reserved shape), never by
-reinterpreting an existing one (see
-[how the vocabulary grows](#how-the-vocabulary-grows)).
-
-### `on` — reactive condition–action pairs
-
-```rqs
-on "Drive C: does not appear to be partitioned.": select "Yes" -> partitioning
-on "Please insert disk 2": attach floppy install-disk-2
-```
-
-The condition–action pair, valid inside a
-[`state`](#state--ordered-body-ambient-handlers): from the
-moment execution reaches the handler's line, whenever the
-pattern appears — as many times as it appears, until the state
-ends — the action's input is delivered. An
-action needing more than one verb takes a brace block:
-
-```rqs
-on "Setup is ready to continue": {
-    enter "Y"
-    wait "Copying files"
-}
-```
-
-With a [`-> target`](#transitions), the pair is also an exit:
-answer the screen, leave the state. The condition takes any
-watch form, including the
-[`shutdown` event](#watch-patterns-literal-by-default).
-
-### `enter` — enter a line
+It means that the backend reports the machine no longer running. It
+does not by itself prove that shutdown was graceful; the preceding
+guest action supplies that intent:
 
 ```rqs
 enter "fdapm poweroff"
-enter "Y"
+wait stopped, timeout: 2m
 ```
 
-Types the string into the guest and presses Enter: `enter` means
-"enter a line" — the common way to answer a prompt or issue a
-command. `enter "…"` is exactly `type "…<enter>"`.
+A guest reboot is not a special event or verb. The script issues the
+guest's own command or input and watches for the screen that follows:
 
-### `type` — type text
+```rqs
+enter "reboot"
+wait "login:"
+```
+
+### Timing
+
+Three settings have distinct meanings:
+
+- `timeout` bounds one observation. At script scope it supplies the
+  default for each `wait`, `expect`, or reactive state's next
+  handler firing. A statement or state modifier overrides it.
+- `deadline` bounds total elapsed time in a state or block and never
+  resets when progress occurs.
+- `stable` requires a watch condition to remain matched for the
+  stated duration before succeeding.
+
+Screen polling and input-event pacing remain control-plane-owned;
+the script does not tune them. There is no generic sleep or delay
+verb. `stable` strengthens an observation rather than blindly
+pausing after it.
+
+In a reactive state, `timeout` is the maximum interval with no
+handler firing and resets after a handler action completes.
+`deadline` always continues from state entry. In a sequential state,
+handler activity cannot alter a pending timeout because sequential
+states have no handlers.
+
+### `wait`
+
+```rqs
+wait "C:\>"
+wait regex "[0-9]+ files copied", timeout: 5m
+wait stopped
+```
+
+`wait` succeeds when its condition matches and fails when its
+timeout expires. A script that needs to know a console command
+completed waits for output uniquely produced by that command or for
+the resulting guest state; `enter` itself makes no completion claim.
+
+### `expect`
+
+`expect` waits for the first matching branch, executes that branch,
+then continues after the block unless the branch transitions or
+finishes:
+
+```rqs
+expect timeout: 2m {
+    "Drive C: is formatted": {
+        press enter
+    }
+    "does not appear to be formatted": {
+        select "Yes"
+        wait "Press a key..."
+        press enter
+    }
+}
+```
+
+An empty block is the explicit no-action branch. Branches may
+contain ordered statements and may end in `->` or `done`; they
+cannot contain states, handlers, or nested `expect` blocks.
+Branch conditions accept the same normalized text, `regex`, and
+machine-state forms as `wait`.
+
+### `on` and reactive states
+
+A reactive state is a set of condition-action handlers. Handler
+actions are always braced; there is no separate inline form:
+
+```rqs
+state copying, timeout: 5m, deadline: 30m {
+    on "Please insert disk 2" {
+        attach floppy ${supplemental-disk}
+        press enter
+    }
+    on "Installation complete" {
+        select "Reboot"
+        -> first-boot
+    }
+}
+```
+
+All handlers are active from state entry and evaluated in
+declaration order. Dispatch is single-threaded and run-to-completion:
+
+1. The first matching, armed handler is selected.
+2. That handler is consumed for the current matching episode.
+3. Its action completes without interruption from other handlers.
+4. A transition or `done` takes effect; otherwise dispatch resumes
+   in the same state.
+5. The handler cannot fire again until its condition has first become
+   unmatched and later matches again.
+
+This edge/episode rule prevents a persistent confirmation screen
+from generating repeated input on every poll. A handler action may
+contain ordered statements, including `wait`, but no handler is
+dispatched recursively while the action runs.
+
+Handler conditions accept the same normalized text, `regex`, and
+machine-state forms as `wait`. Observation modifiers appear after
+the condition and before the opening brace:
+
+```rqs
+on "Installation complete", stable: 1s {
+    -> first-boot
+}
+```
+
+## Input verbs
+
+### `enter`
+
+```rqs
+enter "fdapm poweroff"
+enter "setup /owner=${owner-name}"
+```
+
+Types the expanded string and presses Enter. It sends input only; it
+does not assert that a command started, completed, or succeeded.
+Completion is an explicit subsequent observation.
+
+`enter "..."` is equivalent to `type "...<enter>"`.
+
+### `type`
 
 ```rqs
 type "A:"
 type "<down><down><enter>"
 ```
 
-Types exactly the string, nothing implicit: plain text and
-`<key>` tokens, delivered verbatim. Use it for partial input a
-later statement completes, and for sequences whose ending the
-script controls token by token.
+Types text and recognized `<key>` tokens with no implicit ending.
+Use it for input containing both text and keys. An unrecognized key
+token is a parse error.
 
-In both verbs, text is plain text and a **`<key>` token**
-presses a named key — `<enter>`, `<esc>`, `<tab>`, `<up>`,
-`<f8>`, a chord as `<ctrl+c>` — using the same portable key
-vocabulary as [`press`](#press--press-keys). An unrecognized
-token is a parse error naming the token (a typo like `<entre>`
-can never reach the guest); a literal `<` that starts no token
-is written `\<` — or use a raw string, `type r"a < b"`, which
-types every character literally with no tokens at all. Key
-tokens exist only in `enter` and `type` strings — watch patterns
-and `run` commands take no keys, so `<` is literal there.
-
-### `press` — press keys
+### `press`
 
 ```rqs
 press enter
@@ -470,364 +642,226 @@ press down down enter
 press ctrl+c
 ```
 
-Presses a sequence of keys. Each argument is a key name, or
-names joined with `+` pressed together as a chord — the same key
-vocabulary as `enter`/`type`'s `<key>` tokens, bare:
-`press enter` is exactly `type "<enter>"`. Use `press` when the
-input is only keys; `type` when keys punctuate text; `enter` to
-enter a line. Key names are
-reliquary's own portable vocabulary (`enter`, `esc`, `tab`,
-`up`, `down`, `left`, `right`, `f1`–`f12`, `ctrl`, `alt`,
-`shift`, letters and digits, …) — each backend translates them
-to its native input mechanism.
+Presses a sequence of keys. Names joined by `+` form a chord. The
+portable key vocabulary is shared with `type` tokens and is
+validated before execution.
 
-### `select` — choose in a cursor-menu
+### `select`
 
 ```rqs
 select "Install to harddisk"
 select "Plain DOS system", exclude: "with sources"
 ```
 
-Selects an entry in a cursor-key menu by its visible label
-(literal text, like a watch pattern): the verb reads the screen,
-moves the highlight with the arrow keys until the labeled entry
-is highlighted — verifying by visible feedback after every
-keypress — and presses Enter. Prefer selecting the wanted entry
-by name over blindly accepting a default with `press enter`: the
-label is checked, the default is not.
+Selects an entry in a cursor-key menu by normalized visible label.
+It identifies candidate rows, rejects any containing `exclude`,
+moves the highlight using observable feedback, and presses Enter.
+Zero candidates, multiple remaining candidates, an undetectable
+highlight, or traversal without progress are named failures; the
+verb never guesses.
 
-- **`exclude: "<text>"`** — text that disqualifies an
-  otherwise-matching entry (distinguishing `Plain DOS system`
-  from `Plain DOS system with sources` above).
+## State transitions
 
-### `run` — run a command and await completion
-
-```rqs
-run "chkdsk c: > d:\chkout.txt", timeout: 600
-```
-
-Runs a command in the guest and waits for it to complete. The
-string is plain command text — no key tokens; `<` and `>` are
-the guest shell's. *How* is the selected control plane's
-business: the agentless DOS control plane types the command and
-waits for the prompt to return; a guest-agent control plane
-executes it through the agent and awaits the exit status. Where
-a control plane can report an exit status, a nonzero status
-fails the step; where it cannot (the agentless DOS path has no
-exit codes), completion is prompt return and the limitation is
-the control plane's documented behavior — never an invented
-success.
-
-### `state` — ordered body, ambient handlers
+`-> <state>` is a standalone statement. In a sequential state it
+must be the final reachable statement. In a reactive handler or
+`expect` branch it ends the action immediately:
 
 ```rqs
-state cd-boot {
-    wait "Welcome to FreeDOS 1.4 (LiveCD)"
-    select "Install to harddisk"
-    wait "What is your preferred language"
-    select "English (United States)"
-    on "Drive C: does not appear to be partitioned.": select "Yes" -> partitioning
-    on "Drive C: does not appear to be formatted.": select "Yes" -> formatting
-}
+-> formatting
 ```
 
-A state is a phase of the guest's life, and holds two kinds of
-line:
-
-- **The ordered body** — ordinary statements (`wait`, `select`,
-  `type`, …), run in order from the top each time the state is
-  entered. This is the phase's known sequence.
-- **`on` handlers** — reactive pairs, **armed positionally**:
-  a handler becomes active when execution reaches its line, and
-  stays active until the state ends. Handlers written at the top
-  of the block are active from entry; a handler placed after a
-  body statement cannot fire until that statement has run — so a
-  screen that only makes sense later in the phase cannot be
-  answered early. At every observation the armed handlers are
-  checked first (in declaration order; first match fires), then
-  the body's current watch point — an armed handler can fire
-  between any two body statements, and may fire repeatedly.
-  Handlers cover the phase's *unordered* screens: prompts that
-  may appear at any point from their arming on, screens whose
-  order the guest decides.
-
-`state <name>` binds the name transitions target; a bare
-`{ … }` block is an anonymous state (its contents say what it
-is), identified in diagnostics by line number. Timing directives
-(`timeout: 300`) inside the block scope its observations; the
-block's own bound trails the brace (`}, timeout: 600`).
-
-States do not nest, and there are no `on` handlers outside a
-state. The transcript records each entry, every body statement
-and handler firing in the order the guest evoked them, and the
-exit taken; on failure, diagnostics name the state, the pending
-watch points, and which handlers had fired.
-
-#### Transitions
-
-`->` moves the script to a named state. It appears in two
-places:
+`done` successfully ends the script:
 
 ```rqs
-on "You must reboot your computer": select "Yes" -> cd-boot
+done
 ```
 
-— on a handler: answer the screen, leave the state — and in the
-body, trailing a statement ("do this, then go") or alone:
+There is no implicit fallthrough and no transition attached to the
+end of another action. Keeping transitions on their own lines makes
+the state graph searchable and removes precedence ambiguity.
 
-```rqs
-state partitioning {
-    wait "You must reboot your computer"
-    # guest reboots; the LiveCD menu sequence replays
-    select "Yes" -> cd-boot
-}
-```
+## Supporting operations
 
-— at a point in the body: reaching the `->` transitions, after
-the statement it trails (if any) completes.
-Transitions may go to any named state, including backward — a
-loop in the guest (a reboot replaying menus) is drawn as a
-transition back to the state that handles those screens, and the
-replay costs nothing: entering a state runs its body afresh.
-
-A state exits in one of two ways:
-
-- **A transition fires** — from a handler or the body.
-- **The body completes** in a state with no `->`-bearing
-  handlers: the state is done, and the script continues after
-  the block. (A state that *has* transition handlers idles after
-  its body, watching, until one fires — its exits are the
-  transitions; the block timeout bounds the idle.)
-
-The machine is finite, explicit, and fully written down: `->`
-targets only named states, and every transition is recorded in
-the transcript.
-
-### `handlers` / `use` — name a reactive block, reuse it
-
-When several states pass through the same screens — an installer
-whose menu sequence precedes every phase — the shared handlers
-are defined once, as a named top-level block, and spliced into
-each state that needs them:
-
-```rqs
-handlers livecd-menus {
-    on "Welcome to FreeDOS 1.4 (LiveCD)": select "Install to harddisk"
-    on "What is your preferred language": select "English (United States)"
-}
-
-state partition {
-    use livecd-menus
-    on "Drive C: does not appear to be partitioned.": select "Yes"
-    on "You must reboot your computer": select "Yes" -> partition
-}
-```
-
-- **`handlers <name> { … }`** — a top-level definition (beside
-  the states, conventionally before first use) containing only
-  `on` handlers. It is a named block, not a statement: defining
-  it does nothing until a state uses it.
-- **`use <name>`** — inside a `state` block, splices the named
-  block's handlers at that position, exactly as if they were
-  written there — they arm at the splice point, and declaration
-  order still decides first-match priority, so a state can put
-  its own handlers before or after the shared ones.
-
-`use` is splicing, not calling: no arguments, no nesting (a
-`handlers` block cannot `use` another), and no `use` outside a
-`state`. A state may `use` several blocks and add its own
-handlers around them. The transcript attributes each firing
-through its origin (state, block, handler), so reuse costs no
-debuggability.
-
-### `expect` — branch on what appears
-
-For divergence *within* an ordered sequence, without leaving the
-state: `expect` waits until any one of several patterns matches,
-runs that branch's statements, and continues after the block.
-Each branch is a pattern and its actions — inline for one,
-a brace block for several, empty for none:
-
-```rqs
-expect {
-    "Drive C: is formatted":
-    "does not appear to be formatted": {
-        select "Yes"
-        wait "Press a key..."
-        press enter
-    }
-}, timeout: 120
-```
-
-The first branch whose pattern matches wins. If no pattern
-matches within the block's timeout, the step fails like any
-other. An empty branch is valid — "this screen may appear;
-nothing to do."
-
-`expect` exists for small forks — a prompt whose wording depends
-on disk state, an optional extra screen. When the fork is a real
-phase change, prefer [states and transitions](#transitions),
-which name the branches and can rejoin; and anything resembling
-decision logic belongs in Python. Branches cannot contain
-`state` blocks or nested `expect`.
-
-### `screenshot` — capture the screen
+### `screenshot`
 
 ```rqs
 screenshot
 screenshot after-package-selection
 ```
 
-Captures the guest screen into the machine's
-`cache/machines/<name>/screenshots/` directory — under the given
-name, or a step-numbered default. Screenshots are transient
-diagnostics ([no retention promise](machine-spec.md)); collect
-the ones you want to keep. Failing steps capture a screenshot
-automatically — explicit `screenshot` steps are for documenting
-success paths.
+Captures the screen in the current run directory. The default name
+contains the step number. Repeated explicit names receive an
+occurrence suffix rather than overwriting an earlier capture.
+Failing observations capture a screenshot automatically.
 
-### `attach` / `detach` — change media
+### `attach` and `detach`
 
 ```rqs
-attach cdrom freedos-1.4-livecd
+attach floppy1 ${supplemental-disk}
 detach cdrom
 ```
 
-Attaches a media item to a drive slot, or detaches whatever the
-slot holds. The first argument is a
-[drive slot](machine-spec-reference.md) (`cdrom`, `floppy1`, …),
-`attach`'s second a [defined media item](media-spec.md); the
-item is fetched and hash-verified on demand like any other media
-resolution. These are **runtime changes**: they update the
-machine's state document, not its declaration, and the next
-`start`
-[reconciles back to the declaration](machine-spec.md#reconciliation-at-start).
+These change the running machine and update its state document, not
+its declaration. `attach` accepts a literal defined-media name or a
+`media` input. By execution time every embedded definition has
+been installed, so resolution uses the ordinary shared catalog, then
+fetches and hash-verifies the item as needed.
 
-### `stage` / `collect` — move files across the seam
+Runtime attachment changes last only until the next `start`.
+`start` reconciles the machine to its authored declaration, so a
+script must not rely on `detach` surviving a stop/start cycle. Make
+permanent boot-media changes in the machine declaration.
+
+### `stage` and `collect`
 
 ```rqs
-stage payloads/AUTOTEST.EXE
-collect RESULTS.LOG results/
+stop
+stage "payloads/AUTOTEST.EXE"
+start
+
+# guest runs and shuts down
+collect "RESULTS.LOG", to: "results/"
 ```
 
-`stage` places host files where the guest can reach them;
-`collect` retrieves guest files to the host. `stage` takes a
-host path (relative paths resolve from the script's directory);
-`collect` takes a path on the exchange drive and an optional
-host destination directory (default: the current directory).
-Paths with spaces are quoted. The mechanics are
-control-plane-owned: the agentless path uses the machine's
-staged virtual-FAT drive, with that mechanism's timing rules
-(staged content snapshots when the machine starts; guest writes
-are readable after it stops — so a `collect` on the agentless
-path implies the machine has been stopped); a guest-agent
-control plane moves files live. A script that needs live file
-exchange on a machine whose control planes cannot provide it
-fails closed at the `stage`/`collect` step.
+`stage` places a host file on the declared exchange drive;
+`collect` copies a guest-produced file from it. Both require the
+machine to be stopped on every control plane. This uniform contract
+preserves agentless virtual-FAT snapshot and write-back semantics.
+Future live guest-agent transfer, if added, will use different verbs
+with an explicitly stronger capability rather than silently changing
+these verbs' lifecycle behavior.
 
-### `start` / `stop` / `restart` — machine lifecycle
+Stage sources resolve relative to the script directory. Collection
+destinations resolve beneath the run's output directory, never the
+process working directory. The CLI may select another output root;
+script paths cannot escape it.
+
+### `start` and `stop`
 
 ```rqs
 stop
 start
-restart
 ```
 
-- **`stop`** stops the machine from the host — the hypervisor
-  equivalent of the power switch.
-- **`start`** starts it again (a script begins with the machine
-  running, so `start` only follows a `stop`).
-- **`restart`** is exactly `stop` + `start` — the cycle
-  agentless file exchange needs between staging and collecting.
+`stop` is a host-side hard power-off and should be used only when a
+clean guest shutdown is unavailable or when offline exchange is
+required. `start` starts a stopped machine after reconciling it to
+the declaration. Starting an already-running machine or stopping an
+already-stopped one is an error.
 
-Guest-initiated lifecycle needs no verb at all — it is
-*watched*, not commanded, through
-[machine events](#watch-patterns-literal-by-default). A clean
-shutdown is the guest's own command plus the observation:
+There is no `restart` or `reboot` verb. A guest reboot is guest
+input (`enter "reboot"`, a menu choice, or the appropriate key
+sequence) followed by observation of the resulting screen. A hard
+power cycle, when genuinely wanted, is written explicitly as
+`stop` followed by `start`, making both its destructiveness and its
+reconciliation behavior visible.
 
-```rqs
-enter "fdapm poweroff"
-wait shutdown, timeout: 120
+## Validation and preflight
+
+Parsing and static validation finish before the machine starts. They
+reject:
+
+- malformed syntax, unknown verbs or modifiers, and unbalanced
+  blocks;
+- duplicate or invalid names and unknown input references;
+- conflicting embedded or shared media definitions and definition
+  labels whose target files already contain different content;
+- a missing or invalid `initial` state;
+- transitions to undeclared states;
+- mixed linear/state-machine shapes;
+- mixed sequential/reactive state contents;
+- sequential states with any reachable path lacking an explicit
+  transition or `done`;
+- invalid key tokens and invalid typed argument positions;
+- unknown response keys, missing noninteractive responses, and
+  response values of the wrong type;
+- malformed property bindings, input/property kind mismatches,
+  and required secret credentials unavailable from a secure host
+  store.
+
+Static analysis warns about unreachable states, reactive states with
+no possible exit, obvious shadowed literal conditions, and inputs
+that are declared but unused.
+
+After binding inputs, preflight computes every capability the
+script may require and compares the complete set with the machine's
+configured backend and control planes. Capability failure occurs
+before the first input, naming every unsupported verb and required
+capability; a script never runs halfway before discovering that a
+later statement is impossible.
+
+```text
+reliquary check-script <script_name>
+    [--machine <machine_name>] [--responses <path>]
 ```
 
-Prefer this ending over `stop` whenever the guest has disk state
-worth flushing. A guest-initiated *reboot* needs no observation
-of its own: the machine keeps running through it, and the script
-watches for the screen the reboot leads to.
+performs parsing, prospective embedded-media validation, and static
+analysis without executing the script, changing the user property
+registry, accessing secret values, or writing to `media/`. Supplying
+a machine and response file also performs typed binding and capability
+preflight. Registry-aware checking reports property presence and kind;
+it never reveals a property value.
 
-## Failure and the transcript
+## Failure, runs, and transcripts
 
-Every run writes a transcript: each executed line (verbatim,
-with its line number), what it observed, and how long it took —
-including, per state, every entry, handler firing, and
-transition. When a step fails, the transcript ends with:
+Every invocation creates a unique run directory under:
 
-- the failing line, quoted, with its line number;
-- the reason (timeout, unmatched pattern, missing capability,
-  nonzero exit status);
-- the final screen text as the control plane last observed it;
-  and
-- a screenshot, captured automatically into
-  `cache/machines/<name>/screenshots/`.
+```text
+cache/machines/<machine>/runs/<timestamp>-<id>/
+├── transcript.txt
+├── screenshots/
+└── output/
+```
 
-Fail closed, name the problem — the same
-[validation stance as the machine spec](machine-spec.md#validation-fail-closed-name-the-problem).
-Parse errors (an unknown verb, a malformed line, an unbalanced
-brace, an unrecognized `<key>` token, a `->` naming no state)
-reject the script before step one, naming the line; capability
-errors name the verb, the machine's backend, and the missing
-capability.
+The CLI may redirect the output root, but transcript paths are always
+reported explicitly. A transcript records:
+
+- each executed source line and line number;
+- state entries, handler firings, branches, and transitions;
+- observations, normalized matches, and elapsed time;
+- input names and whether each came from a response, named user
+  property, or prompt, but never expanded input values;
+- each media definition installed or found identical, its source
+  script line and shared-library path, and verified hashes;
+- the selected backend and control plane for each operation; and
+- every produced screenshot or collected-file path.
+
+On failure it adds the pending condition or action, timeout versus
+deadline distinction, final observed screen text, machine state,
+and an automatic screenshot when available.
+
+There is no automatic retry. Re-running an installation against a
+partially modified disk is not generally safe and is not described
+as a retry. The caller deliberately resumes, recreates the machine,
+or runs again according to that workflow's documented recovery
+semantics.
 
 ## How the vocabulary grows
 
-The verb set above is text-mode complete, not final: GUI guests
-are a declared long-term goal (screenshot-based matching,
-pointer input — see the roadmap), and the language is designed
-so that era arrives **additively**, never by changing what an
-existing script means. This is a **very high design priority** —
-the GUI era must never require a breaking redesign of the
-language, and a proposed feature that can't satisfy the rules
-below is rejected on that ground alone. Three rules bind every
-future extension:
+The text-mode vocabulary is a foundation, not a promise that every
+future feature must fit an already frozen grammar before the first
+implementation has validated it. Before beta, empirical use may
+still reshape the language coherently.
 
-- **A quoted watch pattern is frozen.** `wait "…"`, `on "…"`,
-  and expect branches mean literal screen text today and
-  forever, and `regex "…"` a regular expression. New observation
-  or input forms take sibling keyword forms (`wait image
-  <needle>` is the reserved shape for image matching) or new
-  verbs (`click`, `drag`); an existing form is never
-  reinterpreted.
-- **New behavior arrives as new verbs and new optional
-  modifiers.** A statement written today never gains different
-  behavior from a modifier it doesn't use.
-- **Everything stays capability-gated.** New verbs demand their
-  capability (pointer input, image matching) from the machine's
-  control planes and fail closed where it is missing — exactly
-  as today's verbs do — so a script and a machine from different
-  eras produce a named capability error, never silent
-  misbehavior.
+The intended post-beta growth discipline is:
 
-(Before beta, reliquary keeps
-[no backward compatibility](machine-spec.md#format-stability-none-yet)
-and may still reshape anything. These rules are design
-discipline for the format's growth, so the text-first language
-never needs a breaking redesign to admit the GUI era.)
+- existing observation forms keep their meanings;
+- new observation and action kinds use explicit sibling forms, such
+  as `wait image <asset>` and future pointer verbs;
+- new behavior never appears merely because a script omitted a new
+  modifier; and
+- capability requirements remain explicit and preflightable.
 
-## A complete install script
+Image matching and pointer input extend observation and action; they
+do not introduce a second control-flow model.
 
-The FreeDOS 1.4 plain install, end to end — the script form of
-reliquary's founding workflow, written as the installer's own
-state machine: boot the LiveCD, take the partitioning pass, let
-the reboot replay the menus, take the formatting pass, install,
-and shut down. It expects a machine declared with a blank hard
-disk and the LiveCD attached (see the
-[machine-spec cookbook](machine-spec-cookbook.md)), and it
-leaves that disk holding an installed, bootable FreeDOS:
+## Complete FreeDOS install example
 
 ```rqs
-description: FreeDOS 1.4 plain install from LiveCD
+description: "FreeDOS 1.4 plain install from LiveCD"
 platform: dos
-timeout: 30
+initial: cd-boot
+timeout: 30s
 
 state cd-boot {
     wait "Welcome to FreeDOS 1.4 (LiveCD)"
@@ -836,17 +870,26 @@ state cd-boot {
     select "English (United States)"
     wait "Welcome to the FreeDOS 1.4 installation program"
     press enter
-    on "Drive C: does not appear to be partitioned.": select "Yes" -> partitioning
-    on "Drive C: does not appear to be formatted.": select "Yes" -> formatting
+
+    expect {
+        "Drive C: does not appear to be partitioned.": {
+            select "Yes"
+            -> partitioning
+        }
+        "Drive C: does not appear to be formatted.": {
+            select "Yes"
+            -> formatting
+        }
+    }
 }
 
 state partitioning {
     wait "You must reboot your computer"
-    # guest reboots; the LiveCD menu sequence replays
-    select "Yes" -> cd-boot
+    select "Yes"
+    -> cd-boot
 }
 
-state formatting, timeout: 600 {
+state formatting, timeout: 5m, deadline: 20m {
     wait "Press a key..."
     press enter
     wait "Please select your keyboard layout"
@@ -855,46 +898,37 @@ state formatting, timeout: 600 {
     select "Plain DOS system", exclude: "with sources"
     wait "We are now ready to install FreeDOS 1.4."
     select "Yes"
-    wait "Installation of FreeDOS 1.4 is now complete.", timeout: 600
+    wait "Installation of FreeDOS 1.4 is now complete."
     select "Yes"
     wait "Load FreeDOS with JEMMEX (more compatible)"
     press enter
     wait "C:\>"
-    screenshot
+    screenshot installed
     enter "fdapm poweroff"
-    wait shutdown
+    wait stopped, timeout: 2m
+    done
 }
 ```
 
-The second visit to `cd-boot` — after the reboot — takes the
-other exit on its own: the drive is partitioned now, so the
-"not formatted" handler fires instead, and the machine moves to
-`formatting`. The loop is drawn, not duplicated.
+The second visit to `cd-boot` reaches the other `expect` branch
+because the disk has been partitioned. The guest-driven reboot is
+expressed by the installer selection and the resulting screen, not
+by a reliquary reboot command.
 
-The complete recipe — this script with its media definition,
-machine declaration, and verification script — lives in the
-repository's [examples/](../examples/README.md) directory.
-
-Verification is its own script — boot the installed disk (the
-declaration minus the LiveCD, or after a `detach`), wait for
-`C:\>`, shut down — because one script does one thing.
-
-## Python remains first-class
-
-The embedding API is not the fallback for what scripts cannot do
-— it is the other half of the design. Scripts cover the
-deterministic, replayable middle of a job; Python covers
-judgment around it: choosing machines and scripts, generating
-per-run inputs, parsing collected results, looping, branching,
-integrating with test frameworks. The Python surface can run
-scripts, and everything a script statement does remains
-individually callable.
+Verification is a separate script run after editing the machine
+declaration to disable the installer CD and boot from the installed
+hard disk. Runtime `detach` followed by `start` is intentionally not
+used: reconciliation would restore the declaration.
 
 ## Sharing
 
-A script travels with its inputs: the script file, the media
-definitions it relies on (hash-pinned — see
-[the media spec](media-spec.md#sharing)), and the machine
-declaration it targets are together a complete, verifiable
-recipe small enough to check into version control. Payload files
-stay out; everyone fetches and verifies their own.
+A shareable recipe consists of its script, machine declaration, any
+separate shared media definitions, and an example response file
+containing only non-sensitive illustrative values. Media definitions
+embedded in a script are installed into the recipient's shared
+library on first run. Definitions already reused by several scripts
+may be distributed directly under `media/` instead. The user property
+registry, personal or secret response files, and staged payloads stay
+out of the recipe and version control. A script may recommend property
+keys, but every recipient supplies their own values. Media remains
+hash-pinned and independently fetched.

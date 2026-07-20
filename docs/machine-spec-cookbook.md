@@ -117,6 +117,10 @@ disk; the next `start` applies it:
 > (`media/freedos-1.4-livecd.json` with the LiveCD's download
 > URL, archive details, and hashes) — every media reference
 > resolves through a definition, fetched and verified on demand.
+> This shared definition lets the machine be operated independently;
+> a script may instead carry it in a labeled `media` block, which
+> installs the definition into the library before resolving the
+> machine and leaves it available to later independent operations.
 
 ---
 

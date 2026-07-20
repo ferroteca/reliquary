@@ -49,12 +49,16 @@ entire machine, handed to a hypervisor built for long-lived
 machines. reliquary is not the place to keep a machine you care
 about.
 
-The same line runs through the whole reliquary home: everything
-outside `cache/` is a document you authored — machine
-declarations, media definitions, scripts — small, shareable, and
-worth versioning; everything under `cache/` is reliquary's and
-reconstructible. There is no dropping of pre-created files into
-cache directories; inputs enter machines through the declaration —
+The same ownership line runs through the whole reliquary home:
+everything outside `cache/` is durable data you own. Machine
+declarations, media definitions, and scripts are small, shareable,
+and worth versioning. The [user property registry](property-registry.md)
+is also durable but personal and normally not shared or committed. A
+media definition may initially be installed from an embedded script
+block, after which its library copy is likewise user-owned. Everything
+under `cache/` is reliquary's and reconstructible. There is no dropping
+of pre-created files into cache directories; inputs enter machines
+through the declaration —
 [`media` references](machine-spec-reference.md#media--optional--string)
 and [starting-point
 images](machine-spec-reference.md#base--optional--string-or-object)
@@ -67,8 +71,10 @@ through a machine's life. Companion pages:
   every rule.
 - **[Cookbook](machine-spec-cookbook.md)** — complete worked
   examples.
-- **[The media spec](media-spec.md)** — the shared media library
-  that `media` drive fields reference.
+- **[The media spec](media-spec.md)** — the media library, including
+  definitions that scripts can install before machine resolution.
+- **[The user property registry](property-registry.md)** — reusable
+  personal values and protected secrets bound to script inputs.
 
 ## What the spec format is
 
@@ -206,10 +212,11 @@ Every `start` brings the three parties — declaration, state,
 backend — back into line:
 
 1. The declaration is validated and resolved.
-2. Every media item the machine references is hash-verified
-   (and fetched if missing or stale — see
-   [the media spec](media-spec.md)); the machine never boots
-   against silently changed media.
+2. Every media item the machine references is resolved from the
+   visible media catalog and hash-verified (and fetched if missing or
+   stale — see [the media spec](media-spec.md)); the machine never
+   boots against silently changed media. A script installs its
+   embedded definitions into the library before this reconciliation.
 3. The resolved configuration is compared with the state and the
    actual backend machine (verified by identity — see
    [backend assignment](#backend-assignment)).

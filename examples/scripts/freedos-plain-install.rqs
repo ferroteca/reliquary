@@ -1,9 +1,22 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 
-description: FreeDOS 1.4 plain install from LiveCD
+description: "FreeDOS 1.4 plain install from LiveCD"
 platform: dos
-timeout: 30
+initial: cd-boot
+timeout: 30s
+
+media freedos-1.4-livecd {
+  "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
+  "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
+  "items": [
+    {
+      "name": "freedos-1.4-livecd",
+      "file": "FD14LIVE.iso",
+      "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
+    }
+  ]
+}
 
 state cd-boot {
     wait "Welcome to FreeDOS 1.4 (LiveCD)"
@@ -12,16 +25,26 @@ state cd-boot {
     select "English (United States)"
     wait "Welcome to the FreeDOS 1.4 installation program"
     press enter
-    on "Drive C: does not appear to be partitioned.": select "Yes" -> partitioning
-    on "Drive C: does not appear to be formatted.": select "Yes" -> formatting
+
+    expect {
+        "Drive C: does not appear to be partitioned.": {
+            select "Yes"
+            -> partitioning
+        }
+        "Drive C: does not appear to be formatted.": {
+            select "Yes"
+            -> formatting
+        }
+    }
 }
 
 state partitioning {
     wait "You must reboot your computer"
-    select "Yes" -> cd-boot
+    select "Yes"
+    -> cd-boot
 }
 
-state formatting, timeout: 600 {
+state formatting, timeout: 5m, deadline: 20m {
     wait "Press a key..."
     press enter
     wait "Please select your keyboard layout"
@@ -30,12 +53,13 @@ state formatting, timeout: 600 {
     select "Plain DOS system", exclude: "with sources"
     wait "We are now ready to install FreeDOS 1.4."
     select "Yes"
-    wait "Installation of FreeDOS 1.4 is now complete.", timeout: 600
+    wait "Installation of FreeDOS 1.4 is now complete."
     select "Yes"
     wait "Load FreeDOS with JEMMEX (more compatible)"
     press enter
     wait "C:\>"
-    screenshot
+    screenshot installed
     enter "fdapm poweroff"
-    wait shutdown
+    wait stopped, timeout: 2m
+    done
 }

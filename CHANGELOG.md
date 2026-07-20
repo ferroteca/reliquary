@@ -25,6 +25,23 @@ renamed accordingly.
 
 Initial scaffold: package structure, CLI stub, and recipe module convention.
 
+The planned `.rqs` scripting language now separates linear scripts
+from explicit state machines, uses run-to-completion reactive states,
+and adds immutable text, media, and secret inputs bound from JSON
+responses, a home-wide user property registry, or interactive prompts.
+Ordinary reusable values live in `properties.json`; passwords and
+product keys can use secret markers backed by the host credential
+store, and script declarations bind them with `property:`. Scripts may
+also embed the same JSON media-definition objects used by the shared
+library; after preflight, running a script installs missing definitions
+into `media/` without overwriting or updating existing files, while
+verified artifacts continue to use shared caches. Console input is
+expressed with `enter` rather than a separate `run` verb; guest reboot
+remains console or menu input, while host power cycling is the explicit
+`stop`/`start` pair. Timing, matching, preflight, transcript, and
+offline file-exchange semantics are specified consistently ahead of
+implementation.
+
 Added the `freedos-plain` recipe's preparation steps: the FreeDOS 1.4
 LiveCD ISO is downloaded into the reliquary home (the distribution
 zip is deleted after extraction) and SHA-256 verified on every run,

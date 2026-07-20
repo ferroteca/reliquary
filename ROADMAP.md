@@ -173,7 +173,9 @@ backend and missing capability.
 <reliquary_home>/
 ├── machines/            machine declarations, <name>.json (above)
 ├── scripts/             reliquary automation scripts
-├── media/               media definitions (mirror URLs, archive
+├── properties.json      personal property registry (ordinary values
+│                        and markers for host-stored secrets)
+├── media/               shared media definitions (mirror URLs, archive
 │                        and payload SHA-256; one definition per
 │                        source archive can itemize several named
 │                        files) — see docs/media-spec.md
@@ -196,9 +198,9 @@ Cached instantiations live under `cache/machines/<name>/` (see
 
 ## The CLI
 
-Every command applies to a named machine or named media, so the
-name needs no flag: it is the second command word
-(`reliquary <command> <name> ...`).
+Machine and media commands put their target name directly after the
+command; it needs no separate flag. Property-registry commands instead
+put an operation (`list`, `get`, `set`, or `unset`) after `property`.
 
 The lifecycle vocabulary is two-layered. Spec-level verbs act on
 the declaration (`machines/<name>.json`): `init` scaffolds one,
@@ -221,8 +223,15 @@ reliquary delete <name>
 reliquary clone <name> <new_name>
 reliquary export <name> [<destination>]
 reliquary import <name> <source> --platform <platform>
-reliquary script <name> <script_name> [--display]
-reliquary fetch <media_name>
+reliquary script <name> <script_name> [--responses <path>] [--display]
+reliquary check-script <script_name> [--machine <name>]
+    [--responses <path>]
+reliquary fetch <media_name> [--script <script_name>]
+reliquary property list [<prefix>]
+reliquary property get <key>
+reliquary property set <key> <value>
+reliquary property set <key> --secret
+reliquary property unset <key>
 reliquary clean downloads
 reliquary clean media
 ```
@@ -232,21 +241,32 @@ Lifecycle semantics:
 - `create` takes no spec argument: it resolves the declaration
   already at `machines/<name>.json` — written by hand, by
   `init`, or by `import` — and materializes the cached
-  instantiation. Specs reach `machines/` the way media
-  definitions reach `media/`: they are authored documents.
+  instantiation. Specs are authored documents. Media definitions
+  are likewise user-owned, though a script can seed missing library
+  definitions from its embedded blocks before its first run.
 - `destroy` discards the machine's cached instantiation — state,
   backend machine, drive images — and never touches the spec. An
   uninstantiated spec is just a file.
 - `delete` removes the spec, destroying the instantiation first
   if one exists. The machine is gone entirely.
 
-- `script` starts the machine if it is not already running.
+- `script` completes preflight, installs missing embedded media
+  definitions, instantiates the machine if needed, and starts it if
+  it is not already running before executing guest steps.
 - `fetch` downloads, extracts, and hash-verifies a defined media
   item (see docs/media-spec.md). It is a convenience: machine
   operations resolving a `media` reference to a fetchable
   definition fetch implicitly. Source archives are cached under
   `cache/downloads/`, separate from the payloads in
-  `cache/media/`.
+  `cache/media/`. `--script` installs that script's embedded
+  definitions before fetching, without executing guest steps.
+- `property` maintains the home-wide personal registry described in
+  docs/property-registry.md. Ordinary strings live in
+  `properties.json`; secret values live only in a protected host
+  credential store, with a marker in the file. Listing and getting
+  secrets never reveal them, and secret setting uses a no-echo prompt
+  rather than an argument that would enter process listings or shell
+  history.
 - `clean downloads` / `clean media` reclaim the two caches:
   cached source archives, and payload files reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
@@ -311,68 +331,103 @@ reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
 `reliquary script <name> <script_name>`.
 
-**Decided shape: a line-oriented step language.** A script is a
-text file (`scripts/<name>.rqs`): header directives, then one
-step per line — a verb, its arguments, then comma-separated
-`key: value` modifier clauses (one rule reads the syntax: a colon
-binds a name to a value, a comma separates clauses) — with `#`
-comments and C-style brace blocks for the
-two structural constructs (`state`, `expect`). Text is just
-text: watch patterns are literal screen text by default (regex
-is the opt-in `regex "…"` keyword form), and strings have
-exactly three escapes (`\"`, `\<`, `\\`) — every other character,
-backslashes included, is itself — plus a Python-style raw form,
-`r"…"`, with no escapes and no tokens for the harder cases.
-`type` strings embed `<key>`
-tokens (`<enter>`, `<ctrl+c>`; unrecognized tokens are parse
-errors). Scripts are
-sequential prose, so they get a prose syntax; machine
-declarations and media definitions are data and stay JSON. The
-parser is small and fail-closed (errors name the line). It is
-deliberately not an expression
-syntax (computation is explicitly Python's job). A script is the
-guest's **state machine written down**. In ordered sequences,
-watching and inputting are separate statements (`wait "…"` then
-`select "…"`); in reactive contexts they fuse into the
-**condition–action pair** `on "…": action`. A `state <name> { … }`
-block holds an ordered body (run afresh at each entry) plus
-`on` handlers, each armed when execution reaches its line and
-active until the state ends (armed handlers are checked before
-the body's current watch point, and fire however often their
-screens appear); `->` transitions move between named states —
-on a handler (answer the screen, leave) or as a body statement —
-including backward, so a guest loop (a mid-install reboot
-replaying menus) is drawn as a transition, not duplicated. A
-state with no transition handlers exits when its body completes;
-one with them idles after its body until one fires. Shared
-screens are factored with `handlers <name> { … }` — a named
-top-level block of reactive pairs — spliced into any state with
-`use <name>` (splicing, not calling: no arguments, no nesting).
-`expect` covers small in-sequence forks; the machine event
-`shutdown` is a watch condition like screen text — `wait
-shutdown` ends a clean shutdown (the causing command is typed
-explicitly; a machine ceasing to run is observable on every
-backend). A guest reboot is deliberately not an event (most
-hypervisors do not surface guest resets); scripts watch for the
-post-reboot screen. Timing is first-class and scoped: `timeout`
-(observation bounds) and `delay` (observation/input pacing —
-never a gate) apply at script, block, and statement scope,
-innermost wins, with a block's own `timeout` trailing its
-closing brace and bounding the block itself. There are
-deliberately no retries and no loops (re-running the script is the
-retry; feedback-driven verbs like menu selection iterate
-internally). User documentation (planned format, written ahead
-of implementation): [docs/script-spec.md](docs/script-spec.md).
+**Decided shape: a line-oriented, constrained DSL.** A script is
+a UTF-8 text file (`scripts/<name>.rqs`): header directives, then
+one statement per line — a verb, arguments, and comma-separated
+`key: value` modifiers — with `#` comments and brace blocks. It
+is a domain-specific programming language with sequencing,
+branching, named states, and explicit transitions, but no
+expressions, mutable variables, functions, arithmetic, or
+general-purpose loop construct. Computational orchestration
+belongs in Python.
+
+A script has one of two non-mixing shapes. A **linear script** is
+an ordered top-level sequence. A **state-machine script** declares
+an explicit `initial` state and named states; every sequential
+state ends in a standalone `-> <state>` or `done`, with no
+textual fallthrough. A state is either sequential (ordered
+statements and `expect`) or reactive (only `on` handlers, all
+active from entry), never the former hybrid of an ordered body
+and positionally armed ambient handlers. Reactive dispatch is
+single-threaded and run-to-completion. A handler fires once per
+matching episode and cannot fire again until its condition has
+become unmatched and later matches again, preventing persistent
+screens from repeating destructive input on every poll. Smaller
+states, rather than statement position, scope which handlers are
+active. There are no anonymous states or handler-splicing macros.
+
+Text watches are case-sensitive **normalized text matches**:
+screen rows decode to Unicode, trim cell padding, and collapse
+whitespace before literal substring or opt-in Python-regex
+matching. `expect` covers small ordered forks. `stopped` is the
+machine no-longer-running condition; it does not claim that the
+shutdown was graceful. A guest reboot has no reliquary verb or
+event: the script types the guest command, makes a menu choice, or
+sends the appropriate key sequence, then watches for the screen
+that follows. There is likewise no `run` verb: `enter` delivers a
+console line, and completion is a separate explicit observation.
+
+Timing separates three meanings: `timeout` bounds one
+observation (or a reactive state's inactivity), `deadline` bounds
+total state/block time without resetting, and `stable` requires a
+condition to remain matched. Polling and input pacing belong to
+the control plane; the language has no `delay` or sleep. Duration
+literals carry units (`500ms`, `30s`, `20m`). Block modifiers are
+written on the opening line.
+
+Immutable `text`, `media`, and `secret` inputs externalize
+run-specific data without adding decisions or expressions. `${name}`
+references are bound before execution. Each input may name a
+home-wide user property with `property: "<key>"`; an explicit JSON
+response wins for that invocation, then the property registry, then
+interactive prompting. Missing noninteractive, mistyped, or
+unresolved-media values fail before the machine starts, as do
+ordinary/secret kind mismatches.
+
+The registry is a flat, user-owned `properties.json` map of dotted
+names to strings or `{"secret": true}` markers. Secret values never
+enter that file: they live in the host's protected credential store,
+scoped by reliquary home and property name, with no plaintext fallback.
+`secret` inputs may expand only in `enter` and `type`. Transcripts
+record input references and source kinds, never values or expanded
+secret-bearing arguments; textual diagnostics redact known secret
+values, and automatic failure screenshots are suppressed after secret
+input. This protects reliquary's records, not guest logs, history, or
+an explicitly requested screenshot. The complete planned contract is
+in [docs/property-registry.md](docs/property-registry.md).
+
+Scripts may also embed ordinary media-definition JSON objects in
+top-level, labeled `media <label> { ... }` blocks. After full
+preflight but before machine resolution, running the script installs
+each missing definition as `media/<label>.json`; `fetch --script`
+does the same without executing guest steps. Existing definitions are
+never overwritten: wholly identical blocks are already installed,
+while differing targets, item collisions, and partially overlapping
+blocks fail with both locations named. New files use canonical JSON
+and become ordinary user-owned library documents. Fetched and
+extracted artifacts use the common caches.
+
+Offline `stage`/`collect` require a stopped machine on every
+control plane; future live transfers get distinct verbs rather
+than backend-dependent semantics. `start` reconciles the authored
+machine declaration and `stop` is visibly a host hard power-off.
+There is no `restart`: a hard power cycle is the explicit pair,
+and a guest reboot remains guest input. Parsing, response binding,
+whole-script capability preflight, and static control-flow checks
+all finish before the first guest input. User documentation
+(planned format, written ahead of implementation):
+[docs/script-spec.md](docs/script-spec.md).
 
 The primitive vocabulary already exists in today's CLI and Python
 surface — it is the proven instruction set the language must cover:
 
-- type text / send keys / run a command and await the prompt;
-- wait for screen text (regex) with a timeout;
+- enter/type text and send keys;
+- wait for normalized screen text (literal or regex), machine
+  state, or a stable observation, with timeout/deadline bounds;
 - select an entry in a cursor-key menu by visible feedback;
 - take a screenshot;
-- attach/detach media; start, stop, and (from a script) shut down
-  the machine;
+- define embedded media, attach/detach it, and start/stop the
+  machine;
 - stage files to and collect files from the guest.
 
 Language design goals:
@@ -380,32 +435,25 @@ Language design goals:
 - **Backend- and control plane-agnostic at the surface.** A script says
   "wait for this text"; the machine's backend and selected control plane
   decide how that is observed.
-- **Deterministic and inspectable.** Failures report the step, the
-  screen state, and a screenshot; scripts must be debuggable from
-  the transcript alone.
+- **Inspectable and replay-oriented.** The graph is explicit and
+  finite, while guest-selected routes and cycles remain honest.
+  Failures report the step, route, observed state, and screenshot.
 - **Small.** The language exists to sequence guest automation, not
   to be a general-purpose programming language. Anything
   computational belongs in Python via the embedding API, which
   remains a first-class surface.
-- **Grows additively — a very high design priority.** The GUI era
-  (image matching, pointer input) must arrive without a breaking
-  redesign of the language. Every language decision is checked
-  against the growth rules in docs/script-spec.md ("How the
-  vocabulary grows"): quoted forms are frozen at their original
-  meaning (a bare quoted watch pattern is literal screen text
-  forever, `regex "…"` a regular expression; image matching
-  takes the reserved `wait image` keyword form), new behavior
-  arrives only as new verbs and new optional modifiers, and every
-  verb stays capability-gated so cross-era script/machine
-  mismatches fail closed by name. A proposed language feature
-  that cannot satisfy these rules is wrong, whatever else it has
-  going for it.
+- **Grows coherently.** Image matching and pointer input extend
+  observation and action without adding a second control-flow
+  model. Before beta, empirical use may still reshape the syntax;
+  after the language is proven, existing forms retain their
+  meanings and new capabilities stay explicit and preflightable.
 
 OS installation recipes become install scripts: the current
 `recipes/` Python package retires once the language can express the
 FreeDOS plain install end to end. Media acquisition (download,
-hash-verify, cache under `media/`) stays a host-side capability the
-language can invoke, with pinned hashes kept alongside the script.
+hash-verify, cache under `cache/media/`) stays a host-side capability
+the language can invoke, with pinned hashes kept in shared
+definitions or directly inside the script.
 
 ## Milestones
 
@@ -472,8 +520,10 @@ now explicitly backend-portable over serial.
   precious — no feature should exist solely to nurse a long-lived
   machine.
 - **One script, one target.** Each OS version and edition gets one
-  install script. Avoid parameterized mega-scripts that mutate
-  behavior based on flags.
+  install script. Immutable text, media, and secret inputs supply
+  that target's run-specific data from responses, user properties, or
+  prompting; they do not select branches or turn a script into a
+  flag-driven mega-script.
 - **Installation media is input, disk images are output.** Install
   scripts consume vendor media and produce bootable machines. They
   are not runtime configuration generators.
@@ -956,20 +1006,16 @@ agentless and guest-agent control planes with equivalent results.
 - **Backend priority order** for default assignment when a spec
   names no backend (proposed: QEMU, VirtualBox, VMware Workstation,
   Hyper-V — best scriptability first).
-- **Script spec details** (the shape itself is decided — see "The
-  scripting language" and docs/script-spec.md): the portable key
-  name vocabulary for `press`/`<key>` tokens, and the exact `stage`/`collect`
-  semantics per control plane (agentless staging's
-  snapshot-at-start / read-after-stop rules vs. live guest-agent
-  file operations).
-- **`state` construct details** (the construct itself is decided
-  — ordered body plus ambient handlers plus `->` transitions; see
-  docs/script-spec.md): whether a handler can be marked
-  fire-at-most-once (for inputs that must not repeat, like
-  destructive confirmations); and
-  whether *scripts* can share a named `handlers` block (within
-  one script, `handlers`/`use` is decided) without a general
-  include mechanism.
+- **Script spec details** (the control-flow and response-file shape
+  are decided — see "The scripting language" and
+  docs/script-spec.md): the portable key-name vocabulary for
+  `press`/`<key>` tokens, and whether literal input defaults are
+  useful in addition to user-property bindings.
+- **Cross-script reuse**: whether repeated behavior eventually
+  justifies a constrained include mechanism. There is deliberately
+  no handler-splicing macro in the initial language; real scripts
+  must establish the need and a design that preserves local control
+  flow and transcript provenance.
 - **Spec details**: whether per-drive backend settings are ever
   needed beyond the top-level `backend-settings` scope, and how
   running-machine reconfiguration (hot media changes vs.
@@ -1040,14 +1086,13 @@ agentless and guest-agent control planes with equivalent results.
   keyboard-first remains the preferred path where it works.
   Throughout, os-autoinst is a **concept reference only** — its
   designs are studied and reimplemented, never its code (see
-  AGENTS.md prior art for the licensing boundary). whether the CLI grows media
-  verbs like list/verify/remove.
+  AGENTS.md prior art for the licensing boundary).
+- **Media commands beyond `fetch`**: whether the CLI grows verbs
+  such as list, verify, and remove, and whether each can select
+  embedded definitions through `--script` when needed.
 - **Hyper-V agentless screen strategy**: whether WMI thumbnail/
   keyboard automation is good enough for installer scripting or
   Hyper-V machines require the serial/agent control planes from day one.
-- **Media catalog shape** under `media/`: whether pinned hashes and
-  download URLs live beside install scripts, in a manifest per
-  media item, or both.
 - **Concurrent machines**: locking per machine, and whether
   several named machines may run at once from one reliquary home
   (the per-home identity model suggests yes, per-machine).

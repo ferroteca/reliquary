@@ -217,21 +217,22 @@ place, or reference these files; the drive key is the only handle.
 
 #### `media` — optional · string
 
-The name of an item in the shared media library
-`<reliquary_home>/media`:
+The name of a defined media item:
 
 ```json
 {"media": "freedos-1.4-livecd"}
 ```
 
-The name resolves to a [defined media item](media-spec.md),
-fetched and hash-verified on demand; every media item has a
-definition under `media/`, and a name no definition provides is
-an error. The drive attaches the media payload itself — use this
-for machine-independent, read-only-use media: installer ISOs,
-boot floppies, driver disks. (To boot or modify a copy of a media
-image, make it a drive [`base`](#base--optional--string-or-object)
-instead.) Media names are the *only* cross-boundary reference a
+The name resolves to a [defined media item](media-spec.md), fetched
+and hash-verified on demand. Definitions live in the shared
+`<reliquary_home>/media` library; scripts may install embedded
+definitions there before resolving their target machine. A name no
+definition provides is an error. The drive attaches the media payload
+itself — use this for
+machine-independent, read-only-use media: installer ISOs, boot
+floppies, driver disks. (To boot or modify a copy of a media image,
+make it a drive [`base`](#base--optional--string-or-object) instead.)
+Media names are the *only* cross-boundary reference a
 declaration may make.
 
 #### `size` — optional · string
@@ -260,11 +261,12 @@ A **starting-point image** for the drive: a media item the
 drive's own image is materialized from — at `create`, or at the
 first `start`. As an object it has two fields — `media` (required)
 and `type` (how to materialize, optional). `base.media` names an
-item in the shared media library, exactly like the
-[`media` field](#media--optional--string): the name must resolve
-to a [media definition](media-spec.md) under
-`<reliquary_home>/media`, and the item is fetched and
-hash-verified on demand. The difference is what happens next —
+defined item in the media catalog, exactly like the
+[`media` field](#media--optional--string): the name must resolve to a
+[media definition](media-spec.md) in the library, possibly installed
+from the current script before machine resolution, and the item is
+fetched and hash-verified on demand. The difference is what happens
+next —
 `media` attaches the payload itself, `base` materializes the
 drive's own image from it:
 
