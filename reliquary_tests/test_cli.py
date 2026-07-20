@@ -78,7 +78,15 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("qemu", output)
 
     def test_start_and_stop_via_blueprint_selector(self):
-        """--blueprint start/stop resolve the sole machine."""
+        """--blueprint start/stop resolve the sole machine.
+
+        The process-global home is pointed elsewhere before each call:
+        the global --home must reach the subcommand on its own, not by
+        leaking through earlier set_home calls — a global --home that
+        gets dropped must never let stop target a machine in another
+        home (the identity name alone cannot tell same-numbered
+        machines of two homes apart).
+        """
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.main([
@@ -86,6 +94,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--blueprint", "plain",
                 "create",
             ])
+        decoy = os.path.join(self.home, "elsewhere")
+        home._home = decoy
         with mock.patch("reliquary.cli.start_machine") as start, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
@@ -97,6 +107,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         start.assert_called_once()
         self.assertEqual(start.call_args.kwargs["home"], self.home)
 
+        home._home = decoy
         with mock.patch("reliquary.cli.stop_machine") as stop, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
@@ -106,6 +117,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         stop.assert_called_once()
+        self.assertEqual(stop.call_args.kwargs["home"], self.home)
 
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""

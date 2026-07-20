@@ -223,10 +223,12 @@ def read_vm_state(home=None):
             state = json.load(state_file)
         port = state["port"]
         name = state["name"]
+        vm_uuid = state["uuid"]
         if (not isinstance(port, int) or isinstance(port, bool)
                 or not 1 <= port <= 65535
-                or not isinstance(name, str) or not name):
-            raise ValueError("invalid port or name")
+                or not isinstance(name, str) or not name
+                or not isinstance(vm_uuid, str) or not vm_uuid):
+            raise ValueError("invalid port, name, or uuid")
         return state
     except FileNotFoundError:
         return None
@@ -235,12 +237,13 @@ def read_vm_state(home=None):
             f"invalid reliquary VM state file: {path}: {error}") from error
 
 
-def write_vm_state(port, name, pid, home=None):
+def write_vm_state(port, name, vm_uuid, pid, home=None):
     os.makedirs(effective_home(home), exist_ok=True)
     path = state_path(home)
     part = path + ".part"
     with open(part, "w", encoding="utf-8", newline="\n") as state_file:
-        json.dump({"port": port, "name": name, "pid": pid},
+        json.dump({"port": port, "name": name, "uuid": vm_uuid,
+                   "pid": pid},
                   state_file, indent=2)
         state_file.write("\n")
     os.replace(part, path)
@@ -266,17 +269,23 @@ def resolve_vm(port=None, home=None):
         if not state:
             raise RuntimeError(
                 "no active reliquary VM is recorded; run: reliquary start")
-        return state["port"], state["name"]
+        return state["port"], state["name"], state["uuid"]
     if not 1 <= port <= 65535:
         raise ValueError(f"QMP port must be between 1 and 65535: {port}")
     if not state or state["port"] != port:
         raise RuntimeError(
             f"QMP port {port} is not the recorded reliquary VM; "
             "start it with reliquary or omit --port to use the active VM")
-    return port, state["name"]
+    return port, state["name"], state["uuid"]
 
 
-def verify_vm(qmp, port, expected_name):
+def verify_vm(qmp, port, expected_name, expected_uuid):
+    """Fail closed unless the server is the exact VM instance recorded.
+
+    The name alone cannot identify a VM: same-numbered machines of
+    two homes share their readable name, so the per-start uuid must
+    match as well before any command may target the server.
+    """
     reply = qmp.cmd("query-name")
     actual_name = reply.get("name") if isinstance(reply, dict) else None
     if actual_name != expected_name:
@@ -284,6 +293,16 @@ def verify_vm(qmp, port, expected_name):
             "QMP identity mismatch; the unrelated VM was not modified\n"
             f"  expected: {expected_name} on 127.0.0.1:{port}\n"
             f"  found:    {actual_name or '<unnamed QMP server>'}")
+    reply = qmp.cmd("query-uuid")
+    actual_uuid = reply.get("UUID") if isinstance(reply, dict) else None
+    if (not isinstance(actual_uuid, str)
+            or actual_uuid.casefold() != expected_uuid.casefold()):
+        raise RuntimeError(
+            "QMP identity mismatch; the unrelated VM was not modified\n"
+            f"  expected: {expected_name} ({expected_uuid}) "
+            f"on 127.0.0.1:{port}\n"
+            f"  found:    {actual_name} "
+            f"({actual_uuid or '<no uuid>'})")
 
 
 @contextlib.contextmanager
@@ -292,10 +311,10 @@ def qmp_session(port=None, home=None):
     if isinstance(port, Qmp):
         yield port
     else:
-        actual_port, expected_name = resolve_vm(port, home)
+        actual_port, expected_name, expected_uuid = resolve_vm(port, home)
         try:
             with Qmp(actual_port) as qmp:
-                verify_vm(qmp, actual_port, expected_name)
+                verify_vm(qmp, actual_port, expected_name, expected_uuid)
                 yield qmp
         except (OSError, ConnectError) as error:
             remove_vm_state(actual_port, expected_name, home)
@@ -369,7 +388,8 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     if old_state:
         try:
             with Qmp(old_state["port"]) as old_qmp:
-                verify_vm(old_qmp, old_state["port"], old_state["name"])
+                verify_vm(old_qmp, old_state["port"],
+                          old_state["name"], old_state["uuid"])
         except (OSError, ConnectError):
             remove_vm_state(old_state["port"], old_state["name"], home)
         else:
@@ -378,7 +398,12 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                 f"  name: {old_state['name']}\n"
                 f"  QMP port: 127.0.0.1:{old_state['port']}\n"
                 "stop it before starting another VM in this home")
+    # The readable -name repeats across homes (same-numbered machines
+    # of one blueprint); the per-start uuid is what makes this exact
+    # QEMU instance verifiable.
+    vm_uuid = str(uuid.uuid4())
     command = list(args)
+    command += ["-uuid", vm_uuid]
     command += ["-qmp", f"tcp:127.0.0.1:{port},server,nowait"]
     if not display:
         command += ["-display", "none"]
@@ -399,7 +424,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                 "QEMU exited during startup", command)
         try:
             with Qmp(port) as qmp:
-                verify_vm(qmp, port, vm_name)
+                verify_vm(qmp, port, vm_name, vm_uuid)
             if proc.poll() is not None:
                 raise _startup_error(
                     proc, stderr_log, port, automatic_port,
@@ -418,7 +443,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
             _terminate_started_process(proc)
             raise
     try:
-        write_vm_state(port, vm_name, proc.pid, home)
+        write_vm_state(port, vm_name, vm_uuid, proc.pid, home)
     except OSError as error:
         _terminate_started_process(proc)
         raise RuntimeError(
@@ -442,7 +467,9 @@ def start_machine(config, display=False, port=None, home=None):
     print(f"using QEMU: {qemu}")
     drives = drives_dir(home)
     media = resolve_media(drives, config.drives)
-    vm_name = f"reliquary-{uuid.uuid4().hex[:12]}"
+    # Uniqueness comes from the per-start uuid recorded by
+    # launch_owned_qemu, so the window title can stay readable.
+    vm_name = "reliquary-machine"
     qemu_args = list(config.qemu_args)
     machine_value = machine_argument(config.machine)
     args = [qemu, "-name", vm_name]
@@ -462,10 +489,10 @@ def start_machine(config, display=False, port=None, home=None):
 
 
 def stop(port=None, home=None):
-    port, expected_name = resolve_vm(port, home)
+    port, expected_name, expected_uuid = resolve_vm(port, home)
     try:
         with Qmp(port) as qmp:
-            verify_vm(qmp, port, expected_name)
+            verify_vm(qmp, port, expected_name, expected_uuid)
             try:
                 qmp.cmd("quit")
             except Exception:

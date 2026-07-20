@@ -118,10 +118,14 @@ Current home layout (still the active machine model):
 
 Never send a control command to a QMP server until its identity is verified.
 
-`start()` assigns a unique QEMU name, records it with the selected port in
-`vm.json`, and returns the port. Every later connection checks `query-name`
-against that record. Identity mismatches fail closed; in particular,
-`stop()` must never send `quit` to an unrelated VM.
+`start()` assigns a readable QEMU name plus a fresh per-start `-uuid`,
+records both with the selected port in `vm.json`, and returns the port.
+Every later connection checks `query-name` **and** `query-uuid` against
+that record. The name alone must never authorize a command: same-numbered
+machines of one blueprint in different homes share their readable name, so
+only the uuid identifies the exact QEMU instance this home started.
+Identity mismatches fail closed; in particular, `stop()` must never send
+`quit` to an unrelated VM.
 
 `Machine.qmp()` is the public raw-monitor seam. It yields the
 identity-verified QMP session, whose `cmd()` and `hmp()` methods remain
@@ -298,6 +302,8 @@ Lifecycle changes need focused tests, especially for failure paths. Preserve cov
 - occupied explicit ports fail before launch
 - identity mismatch terminates a just-started child
 - identity mismatch never reaches `quit`
+- a name match with a uuid mismatch is an identity mismatch
+- a stop refused on identity mismatch leaves the machine phase `running`
 - stale state produces clear diagnostics and cannot target another VM
 
 Use stdlib `unittest` and `unittest.mock` unless a compelling reason justifies another dependency.

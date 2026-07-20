@@ -7,6 +7,7 @@ import sys
 import tempfile
 import types
 import unittest
+import uuid
 from unittest import mock
 
 try:
@@ -49,7 +50,8 @@ class _FakeProcess:
 
 class _FakeQmp:
     commands = []
-    name = "reliquary-0123456789ab"
+    name = "reliquary-machine"
+    vm_uuid = "00000000-0000-0000-0000-000000000000"
 
     def __init__(self, port):
         self.port = port
@@ -64,6 +66,8 @@ class _FakeQmp:
         self.commands.append(name)
         if name == "query-name":
             return {"name": self.name}
+        if name == "query-uuid":
+            return {"UUID": self.vm_uuid}
         return None
 
 
@@ -73,7 +77,8 @@ class LifecycleTests(unittest.TestCase):
         self.home = self.tempdir.name
         reliquary.set_home(self.home)
         _FakeQmp.commands = []
-        _FakeQmp.name = "reliquary-0123456789ab"
+        _FakeQmp.name = "reliquary-machine"
+        _FakeQmp.vm_uuid = "00000000-0000-0000-0000-000000000000"
         self._remove_generated_files()
 
     def tearDown(self):
@@ -102,7 +107,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_start_returns_port_and_records_identity(self):
         self._write_boot_image()
-        fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
+        fake_uuid = uuid.UUID(int=0)
         proc = _FakeProcess()
 
         with mock.patch.object(lifecycle_module, "available_port",
@@ -119,16 +124,19 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(port, 54321)
         self.assertEqual(lifecycle_module.read_vm_state(), {
             "port": 54321,
-            "name": "reliquary-0123456789ab",
+            "name": "reliquary-machine",
+            "uuid": "00000000-0000-0000-0000-000000000000",
             "pid": 1234,
         })
         args = popen.call_args.args[0]
         self.assertEqual(args[args.index("-name") + 1],
-                         "reliquary-0123456789ab")
+                         "reliquary-machine")
+        self.assertEqual(args[args.index("-uuid") + 1],
+                         "00000000-0000-0000-0000-000000000000")
 
     def _start_qemu_args(self, image_name, **start_kwargs):
         image = self._write_boot_image(image_name)
-        fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
+        fake_uuid = uuid.UUID(int=0)
         proc = _FakeProcess()
 
         with mock.patch.object(lifecycle_module, "available_port",
@@ -146,7 +154,7 @@ class LifecycleTests(unittest.TestCase):
         return image, popen.call_args.args[0]
 
     def _start_configured_args(self, drives, machine=None, memory=None):
-        fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
+        fake_uuid = uuid.UUID(int=0)
         proc = _FakeProcess()
         with mock.patch.object(lifecycle_module, "available_port",
                                return_value=54321), \
@@ -312,7 +320,8 @@ class LifecycleTests(unittest.TestCase):
 
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
         lifecycle_module.write_vm_state(
-            54321, "reliquary-expected", 1234)
+            54321, "reliquary-expected",
+            "00000000-0000-0000-0000-000000000000", 1234)
         _FakeQmp.name = "unrelated-vm"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
@@ -320,6 +329,23 @@ class LifecycleTests(unittest.TestCase):
                 reliquary.stop()
 
         self.assertEqual(_FakeQmp.commands, ["query-name"])
+        self.assertIsNotNone(lifecycle_module.read_vm_state())
+
+    def test_stop_does_not_quit_same_named_vm_of_another_home(self):
+        # two homes materialize same-numbered machines with the same
+        # readable name; only the per-start uuid tells their VMs
+        # apart, so a name match alone must never authorize quit
+        lifecycle_module.write_vm_state(
+            54321, "reliquary-machine",
+            "11111111-1111-1111-1111-111111111111", 1234)
+        _FakeQmp.name = "reliquary-machine"
+        _FakeQmp.vm_uuid = "22222222-2222-2222-2222-222222222222"
+
+        with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
+            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+                reliquary.stop()
+
+        self.assertNotIn("quit", _FakeQmp.commands)
         self.assertIsNotNone(lifecycle_module.read_vm_state())
 
     def test_start_rejects_explicit_occupied_port_before_launch(self):
@@ -335,7 +361,7 @@ class LifecycleTests(unittest.TestCase):
         self._write_boot_image()
         proc = _FakeProcess()
         _FakeQmp.name = "unrelated-vm"
-        fake_uuid = types.SimpleNamespace(hex="0123456789abcdef")
+        fake_uuid = uuid.UUID(int=0)
 
         with mock.patch.object(lifecycle_module, "available_port",
                                return_value=54321), \

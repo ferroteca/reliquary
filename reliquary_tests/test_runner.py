@@ -562,7 +562,9 @@ class RunnerRunTests(unittest.TestCase):
         # nothing may fall back to the process-global home
         self._stage_boot_image()
         lifecycle_module.write_vm_state(
-            54321, _FakeQmp.name, 1234, home=self.home)
+            54321, _FakeQmp.name,
+            "12345678-1234-1234-1234-123456789012", 1234,
+            home=self.home)
         staging = os.path.join(reliquary.drives_dir(home=self.home),
                                "hdd")
         log_path = os.path.join(staging, "SUITE.log")
@@ -597,9 +599,13 @@ class RunnerRunTests(unittest.TestCase):
             first_runner = reliquary.Runner(self.home)
             second_runner = reliquary.Runner(other)
             lifecycle_module.write_vm_state(
-                1111, "reliquary-first", 1, home=first_runner.home)
+                1111, "reliquary-first",
+                "11111111-1111-1111-1111-111111111111", 1,
+                home=first_runner.home)
             lifecycle_module.write_vm_state(
-                2222, "reliquary-second", 2, home=second_runner.home)
+                2222, "reliquary-second",
+                "22222222-2222-2222-2222-222222222222", 2,
+                home=second_runner.home)
 
             first = lifecycle_module.read_vm_state(first_runner.home)
             second = lifecycle_module.read_vm_state(second_runner.home)

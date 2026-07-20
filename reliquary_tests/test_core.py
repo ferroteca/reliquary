@@ -95,11 +95,14 @@ class HomeTests(unittest.TestCase):
                 media_module.check_staged_drive(letter)
 
     def test_vm_state_round_trip(self):
-        lifecycle_module.write_vm_state(54321, "reliquary-test", 1234)
+        lifecycle_module.write_vm_state(
+            54321, "reliquary-test",
+            "12345678-1234-1234-1234-123456789012", 1234)
 
         self.assertEqual(lifecycle_module.read_vm_state(), {
             "port": 54321,
             "name": "reliquary-test",
+            "uuid": "12345678-1234-1234-1234-123456789012",
             "pid": 1234,
         })
         self.assertFalse(os.path.exists(
@@ -114,8 +117,22 @@ class HomeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
             lifecycle_module.read_vm_state()
 
+    def test_vm_state_without_uuid_is_rejected(self):
+        # a name alone cannot identify a VM instance; state files
+        # predating the per-start uuid are invalid, not grandfathered
+        os.makedirs(self.tempdir.name, exist_ok=True)
+        with open(lifecycle_module.state_path(), "w",
+                  encoding="utf-8") as state:
+            json.dump({"port": 54321, "name": "reliquary-test",
+                       "pid": 1234}, state)
+
+        with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
+            lifecycle_module.read_vm_state()
+
     def test_remove_vm_state_requires_matching_identity(self):
-        lifecycle_module.write_vm_state(54321, "reliquary-test", 1234)
+        lifecycle_module.write_vm_state(
+            54321, "reliquary-test",
+            "12345678-1234-1234-1234-123456789012", 1234)
 
         lifecycle_module.remove_vm_state(54321, "another-vm")
         self.assertIsNotNone(lifecycle_module.read_vm_state())
@@ -311,12 +328,18 @@ class InputAndScreenTests(unittest.TestCase):
 
 
 class _MenuClock:
-    """A deterministic monotonic clock advanced by sleeping."""
+    """A deterministic monotonic clock advanced by sleeping.
+
+    Each reading also advances time a little, so a loop polling
+    without sleeping still reaches its deadline instead of hanging
+    the test run.
+    """
 
     def __init__(self):
         self.now = 0.0
 
     def monotonic(self):
+        self.now += 0.001
         return self.now
 
     def sleep(self, seconds):
@@ -360,6 +383,129 @@ class _FakeLanguageMenu(_FakeMenu):
     def screen(self):
         self.items = self._rendered[self.cursor]
         return super().screen()
+
+
+class _SlowLanguageMenu(_FakeLanguageMenu):
+    """Repaints over several reads: bar removed, then rows redrawn.
+
+    After each cursor move one screen read still shows the old rows
+    with the selection bar already erased; only the next read shows
+    the finished screen, like the FreeDOS language chooser slowly
+    retranslating itself.
+    """
+
+    def __init__(self, rendered):
+        super().__init__(rendered)
+        self._frames = []
+
+    def press(self, key):
+        before = self.cursor
+        super().press(key)
+        if key != "ret" and self.cursor != before:
+            rows = ["Welcome menu", ""] + list(self._rendered[before])
+            rows += [""] * (25 - len(rows))
+            self._frames.append(
+                (rows, [[0x1B] * 80 for _ in range(25)]))
+
+    def screen(self):
+        if self._frames:
+            return self._frames.pop(0)
+        return super().screen()
+
+
+class _PausingLanguageMenu:
+    """Repaints slowly with a mid-repaint pause and flushes type-ahead.
+
+    Mimics the FreeDOS language chooser: a blue backdrop, a grey
+    dialog, a selection bar. A cursor move first shows a half-drawn
+    screen — bar erased, one dialog row overdrawn with backdrop —
+    holds it for several reads (translations loading from CD), then
+    paints the finished screen in the new language. Keys pressed
+    while the repaint is pending are discarded, like a menu flushing
+    its type-ahead buffer.
+    """
+
+    BACKDROP = 0x1F
+    NORMAL = 0x07
+    BAR = 0x70
+
+    def __init__(self, rendered):
+        self._rendered = rendered
+        self.cursor = 0
+        self.selected = None
+        self._frames = []
+
+    def _screen(self, items, bar_row):
+        rows = ["Welcome menu", ""] + list(items)
+        rows += [""] * (25 - len(rows))
+        attributes = [[self.BACKDROP] * 80 for _ in range(25)]
+        for row in range(2, 2 + len(items)):
+            attributes[row] = [self.NORMAL] * 80
+        if bar_row is not None:
+            attributes[bar_row] = [self.BAR] * 80
+        return rows, attributes
+
+    def press(self, key):
+        if self._frames:
+            return
+        if key == "ret":
+            self.selected = self.cursor
+            return
+        before = self.cursor
+        if key == "down" and self.cursor + 1 < len(self._rendered):
+            self.cursor += 1
+        elif key == "up" and self.cursor > 0:
+            self.cursor -= 1
+        else:
+            return
+        items = self._rendered[before]
+        rows, attributes = self._screen(items, None)
+        attributes[2 + len(items) - 1] = [self.BACKDROP] * 80
+        self._frames = [(rows, attributes)] * 4
+
+    def screen(self):
+        if self._frames:
+            return self._frames.pop(0)
+        return self._screen(self._rendered[self.cursor],
+                            2 + self.cursor)
+
+
+class _PaintingMenu(_FakeMenu):
+    """Still painting its dialog when selection starts.
+
+    For the first reads the selection bar flickers as the menu
+    draws itself; only after `frames` reads does the screen hold
+    still. Sampling for the animation mask during that paint used
+    to blind highlight tracking to the bar's own cells.
+    """
+
+    def __init__(self, items, frames):
+        super().__init__(items)
+        self._painting = frames
+
+    def screen(self):
+        rows, attributes = super().screen()
+        if self._painting > 0:
+            self._painting -= 1
+            if self._painting % 2:
+                attributes[2 + self.cursor] = [0x1B] * 80
+        return rows, attributes
+
+
+class _BlinkingClockMenu(_FakeMenu):
+    """A menu with a status-line clock that repaints on every read."""
+
+    def __init__(self, items):
+        super().__init__(items)
+        self._tick = 0
+
+    def screen(self):
+        rows, attributes = super().screen()
+        self._tick += 1
+        rows[24] = "12:0%d" % (self._tick % 10)
+        attributes[24] = list(attributes[24])
+        attributes[24][0] = 0x8E if self._tick % 2 else 0x0E
+        return rows, attributes
 
 
 class CursorMenuTests(unittest.TestCase):
@@ -436,6 +582,63 @@ class CursorMenuTests(unittest.TestCase):
 
         self.assertEqual(menu.selected, 2)
         self.assertEqual(selected, "Español")
+
+    def test_a_slow_redraw_does_not_select_the_probed_neighbor(self):
+        # the first read after a cursor move catches the bar already
+        # erased but the new bar not yet drawn; concluding from that
+        # half-drawn screen selected the wrong language
+        menu = _SlowLanguageMenu([
+            ["English", "German"],
+            ["Englisch", "Deutsch"],
+        ])
+
+        selected = self._select(menu, "English")
+
+        self.assertEqual(menu.selected, 0)
+        self.assertEqual(selected, "English")
+
+    def test_a_repaint_pause_does_not_pass_for_a_settled_screen(self):
+        # the chooser pauses mid-repaint while loading translations;
+        # concluding from the half-drawn screen pressed ENTER into a
+        # busy menu that flushed it, reporting success while the
+        # guest still sat unselected at the menu
+        menu = _PausingLanguageMenu([
+            ["English", "German", "Spanish", "French"],
+            ["Englisch", "Deutsch", "Spanisch", "Franz sisch"],
+            ["Ingl s", "Alem n", "Espa ol", "Franc s"],
+            ["Anglais", "Allemand", "Espagnol", "Fran ais"],
+        ])
+
+        selected = self._select(menu, "English")
+
+        self.assertEqual(menu.selected, 0)
+        self.assertEqual(selected, "English")
+
+    def test_selection_waits_out_the_menus_own_initial_paint(self):
+        # sampling for the animation mask while the menu was still
+        # painting masked the bar's cells as "animation" and blinded
+        # the tracking to every later bar movement
+        menu = _PaintingMenu(["First item", "Second item"], frames=4)
+
+        selected = self._select(menu, "First item")
+
+        self.assertEqual(menu.selected, 0)
+        self.assertEqual(selected, "First item")
+
+    def test_a_self_updating_clock_cell_is_ignored(self):
+        menu = _BlinkingClockMenu(["First item", "Second item"])
+
+        selected = self._select(menu, "Second item")
+
+        self.assertEqual(menu.selected, 1)
+        self.assertEqual(selected, "Second item")
+
+    def test_a_lone_unhighlight_is_not_a_new_cursor_position(self):
+        before = [[0x1B] * 80 for _ in range(25)]
+        before[2] = [0x70] * 80
+        after = [[0x1B] * 80 for _ in range(25)]
+
+        self.assertIsNone(machine_module._cursor_row(before, after))
 
     def test_a_neighbor_rewritten_by_the_probe_is_still_selected(self):
         # moving off "English" rewrites the list in French, and the

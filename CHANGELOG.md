@@ -128,7 +128,11 @@ machine-layer notes below); `rlq install` no longer exists.
   an append-only run directory
   `cache/machines/<id>/runs/<timestamp>-<run_id>/` with `transcript.txt`,
   `screenshots/`, and `output/`. `run_script()` is the Python surface;
-  `--display` forwards to the runtime. Embedded media blocks,
+  `--display` forwards to the runtime. A `screenshot` inside a run
+  verifies the QMP session against the machine's own `vm.json` while
+  writing the image into the run record (`machine.screenshot()` gained
+  a `directory` override to separate the destination from the
+  identity home). Embedded media blocks,
   `--responses`, and `check-script` remain later spikes.
 
 - Milestone-1 Spike 9 executes FreeDOS-shaped `.rlqs` scripts against a
@@ -136,7 +140,27 @@ machine-layer notes below); `rlq install` no longer exists.
   `enter`/`type`/`press`/`select`, `screenshot`, host `start`/`stop`,
   and (with Spike 13) stopped-machine `insert`/`eject`/`boot`,
   starting a ready machine when needed and leaving it running unless the
-  script stopped it.
+  script stopped it. `expect` closes its polling QMP session before
+  running the matched branch: QEMU's QMP server admits one client at
+  a time, so a branch statement opening its own session while the
+  polling session was still held would block forever.
+
+- The global `--home` now reaches the `start`/`stop`/`destroy`
+  subcommands: their own `--home` options no longer clobber an
+  already-parsed global value with their default, which silently
+  targeted machines in the default home.
+
+- VM identity is per QEMU instance, not per name: every start passes
+  a fresh `-uuid`, records it in `vm.json` beside the name, and every
+  session verifies `query-uuid` as well as `query-name`. Same-numbered
+  machines of one blueprint in different homes share their readable
+  name, so a name match alone can no longer authorize a command
+  against the wrong home's VM. The legacy root-home start path now
+  uses the readable name `reliquary-machine` instead of a random hex
+  suffix, since uniqueness comes from the uuid. A machine stop that
+  fails closed on an identity mismatch no longer resets the phase to
+  `ready`: the machine's own QEMU may still be running, so the phase
+  only reconciles when the recorded VM is actually gone.
 
 - Milestone-1 Spike 8 parses the FreeDOS-shaped `.rlqs` language into an
   immutable script model: headers, embedded media definitions, linear and
@@ -221,7 +245,24 @@ machine-layer notes below); `rlq install` no longer exists.
   highlight through the VGA attribute bytes, and presses Enter only
   once the highlight sits on the single screen row matching the given
   text (case-insensitively; an exact row match wins over rows merely
-  containing the item, which otherwise must be unique). Also available
+  containing the item, which otherwise must be unique). Each keypress
+  waits for the repaint it causes to finish and hold steady rather
+  than acting on the first changed read, so slowly repainting menus —
+  the FreeDOS language chooser retranslating itself, with mid-repaint
+  pauses while translations load — are never acted on half-drawn: a
+  difference that shows no row gaining a bar-like (rare) attribute is
+  re-observed instead of steered on, since keys sent to a menu that
+  is still repainting are lost to its type-ahead flush. Before the
+  first keypress the screen must hold still and is then sampled so
+  self-repainting cells (clocks, countdowns, blinking indicators) are
+  ignored throughout — without the quiet wait, a menu's own initial
+  paint would be mistaken for animation and hide the very cells the
+  tracking watches. When a keypress produces no classifiable movement
+  the animation cells are re-learned and the bar is located directly
+  by its attribute, so a keypress at the menu's edge or a briefly
+  blinded diff recovers instead of failing. Enter
+  is only sent after a fresh read confirms the highlight on the
+  target row. Also available
   as
   `Machine.cursor_menu_select()`; `machine.vga_screen(qmp)` newly
   exposes the attribute bytes alongside the text rows.

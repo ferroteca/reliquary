@@ -20,6 +20,11 @@ from .script import load_script
 from . import machines as _machines
 
 
+# Returned by _do_expect when a branch ran `done`: the script is
+# complete, distinct from both "no transition" (None) and a target
+# state name.
+_DONE = object()
+
 _KEY_NAMES = {
     "enter": "ret",
     "esc": "esc",
@@ -204,6 +209,9 @@ class _ScriptEngine:
                 self._do_wait(statement, block_modifiers)
             elif statement.verb == "expect":
                 result_state = self._do_expect(statement, block_modifiers)
+                if result_state is _DONE:
+                    self._current_state = None
+                    return
                 if result_state is not None:
                     self._current_state = result_state
                     return
@@ -228,6 +236,9 @@ class _ScriptEngine:
             elif statement.verb == "stop":
                 self._do_stop()
             elif statement.verb == "done":
+                # Clear the state or the state loop re-enters the
+                # finished state.
+                self._current_state = None
                 return
             elif statement.verb == "transition":
                 self._current_state = statement.argument
@@ -332,6 +343,11 @@ class _ScriptEngine:
         deadline = time.monotonic() + timeout
         stable_deadline = None
         last_matched_branch = None
+        chosen = None
+        # The polling session must close before the branch runs: its
+        # statements open sessions of their own, and QEMU's QMP server
+        # admits one client at a time — a nested connection would
+        # block forever.
         with self._session() as qmp:
             console = self._console(qmp)
             while time.monotonic() < deadline:
@@ -354,46 +370,49 @@ class _ScriptEngine:
                         if time.monotonic() < stable_deadline:
                             time.sleep(1)
                             continue
-                    for substatement in matched.statements:
-                        self._step += 1
-                        if substatement.verb == "enter":
-                            self._do_enter(substatement)
-                        elif substatement.verb == "type":
-                            self._do_type(substatement)
-                        elif substatement.verb == "press":
-                            self._do_press(substatement)
-                        elif substatement.verb == "select":
-                            self._do_select(substatement)
-                        elif substatement.verb == "screenshot":
-                            self._do_screenshot(substatement)
-                        elif substatement.verb == "insert":
-                            self._do_insert(substatement)
-                        elif substatement.verb == "eject":
-                            self._do_eject(substatement)
-                        elif substatement.verb == "boot":
-                            self._do_boot(substatement)
-                        elif substatement.verb == "start":
-                            self._do_start()
-                        elif substatement.verb == "stop":
-                            self._do_stop()
-                        elif substatement.verb == "done":
-                            return
-                        elif substatement.verb == "transition":
-                            return substatement.argument
-                        elif substatement.verb == "wait":
-                            self._do_wait(substatement, {})
-                        elif substatement.verb == "expect":
-                            result = self._do_expect(substatement, {})
-                            if result is not None:
-                                return result
-                    return None
+                    chosen = matched
+                    break
                 else:
                     last_matched_branch = None
                 time.sleep(2)
-        raise self._error(
-            f"timed out after {timeout}s waiting for any expect "
-            f"condition to match",
-            statement=statement)
+        if chosen is None:
+            raise self._error(
+                f"timed out after {timeout}s waiting for any expect "
+                f"condition to match",
+                statement=statement)
+        for substatement in chosen.statements:
+            self._step += 1
+            if substatement.verb == "enter":
+                self._do_enter(substatement)
+            elif substatement.verb == "type":
+                self._do_type(substatement)
+            elif substatement.verb == "press":
+                self._do_press(substatement)
+            elif substatement.verb == "select":
+                self._do_select(substatement)
+            elif substatement.verb == "screenshot":
+                self._do_screenshot(substatement)
+            elif substatement.verb == "insert":
+                self._do_insert(substatement)
+            elif substatement.verb == "eject":
+                self._do_eject(substatement)
+            elif substatement.verb == "boot":
+                self._do_boot(substatement)
+            elif substatement.verb == "start":
+                self._do_start()
+            elif substatement.verb == "stop":
+                self._do_stop()
+            elif substatement.verb == "done":
+                return _DONE
+            elif substatement.verb == "transition":
+                return substatement.argument
+            elif substatement.verb == "wait":
+                self._do_wait(substatement, {})
+            elif substatement.verb == "expect":
+                result = self._do_expect(substatement, {})
+                if result is not None:
+                    return result
+        return None
 
     def _do_enter(self, statement):
         self._log(f"line {statement.line}: enter "
@@ -463,7 +482,9 @@ class _ScriptEngine:
         name = validate_screenshot_name(name)
         self._log(f"line {statement.line}: screenshot {name}")
         if self._run_dir is not None:
-            screenshot(name, self._port, self._run_dir)
+            screenshot(
+                name, self._port, self._machine_home,
+                directory=os.path.join(self._run_dir, "screenshots"))
         else:
             self._machine().screenshot(name)
 

@@ -29,7 +29,7 @@ state cd-boot {
     wait "Welcome to FreeDOS 1.4 (LiveCD)"
     select "Install to harddisk"
     wait "What is your preferred language"
-    select "English (United States)"
+    select "English"
     wait "Welcome to the FreeDOS 1.4 installation program"
     press enter
 
@@ -55,7 +55,7 @@ state formatting, timeout: 5m, deadline: 20m {
     wait "Press a key..."
     press enter
     wait "Please select your keyboard layout"
-    press enter
+    select "US English (Default)"
     wait "What FreeDOS packages do you want to install?"
     select "Plain DOS system", exclude: "with sources"
     wait "We are now ready to install FreeDOS 1.4."

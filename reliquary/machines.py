@@ -13,7 +13,7 @@ from .drives import format_options
 from .home import blueprints_dir, machines_cache_dir
 from .library import seed_blueprint
 from .lifecycle import (create_hdd_image, find_qemu, launch_owned_qemu,
-                        stop as stop_owned_qemu)
+                        read_vm_state, stop as stop_owned_qemu)
 from .media import fetch_media
 
 
@@ -431,7 +431,12 @@ def stop(machine_id, home=None):
     try:
         stop_owned_qemu(home=machine_home)
     except RuntimeError:
-        _set_phase(machine_id, "ready", home)
+        # A stop that found the recorded VM gone removed the stale
+        # vm.json; only then is `ready` true. A stop that failed
+        # closed (identity mismatch) left vm.json in place — our QEMU
+        # may still be running, so the phase must not change.
+        if read_vm_state(machine_home) is None:
+            _set_phase(machine_id, "ready", home)
         raise
     _set_phase(machine_id, "ready", home)
 

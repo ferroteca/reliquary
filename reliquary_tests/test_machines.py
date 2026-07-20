@@ -457,6 +457,64 @@ class MachineMaterializationTests(unittest.TestCase):
             load_machine_state(machine_id, self.home)["phase"],
             "ready")
 
+    def test_stop_keeps_phase_running_on_identity_mismatch(self):
+        """A refused stop must not lie about the machine's phase.
+
+        When the lifecycle stop fails closed (identity mismatch: the
+        server at the recorded port is not our VM), vm.json survives
+        and our QEMU may still be running — the phase must stay
+        `running` so destroy and a second start stay blocked. Only a
+        stop that found the recorded VM gone (stale state removed)
+        may reconcile the phase to `ready`.
+        """
+        machine_id = self._create_ready()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        machine_home = machine_dir_path(machine_id, self.home)
+        with open(os.path.join(machine_home,
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+        with open(os.path.join(machine_home, "vm.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({"port": 54321, "name": f"reliquary-{machine_id}",
+                       "uuid": "11111111-1111-1111-1111-111111111111",
+                       "pid": 1234}, handle)
+
+        with mock.patch(
+                "reliquary.machines.stop_owned_qemu",
+                side_effect=RuntimeError("QMP identity mismatch")):
+            with self.assertRaisesRegex(RuntimeError,
+                                        "identity mismatch"):
+                stop(machine_id, home=self.home)
+
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"],
+            "running")
+
+    def test_stop_reconciles_phase_when_the_vm_is_gone(self):
+        """An unreachable recorded VM (stale state removed by the
+        lifecycle stop) returns the machine to `ready`."""
+        machine_id = self._create_ready()
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = "running"
+        machine_home = machine_dir_path(machine_id, self.home)
+        with open(os.path.join(machine_home,
+                               "reliquary-machine.json"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(state, handle)
+
+        with mock.patch(
+                "reliquary.machines.stop_owned_qemu",
+                side_effect=RuntimeError("no longer reachable")):
+            with self.assertRaisesRegex(RuntimeError,
+                                        "no longer reachable"):
+                stop(machine_id, home=self.home)
+
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"],
+            "ready")
+
     def test_destroy_removes_machine_directory(self):
         """destroy deletes a ready machine's cache directory."""
         machine_id = self._create_ready()

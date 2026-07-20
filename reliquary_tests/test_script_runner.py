@@ -341,6 +341,60 @@ class ScriptRuntimeTests(unittest.TestCase):
             ("cursor_menu_select", "Yes", 60, ()),
             qmp._commands)
 
+    def test_expect_branch_statements_run_outside_the_polling_session(self):
+        # QEMU's QMP server admits one client at a time: a branch
+        # statement that opens its own session while the expect
+        # polling session is still open blocks forever against a
+        # real machine
+        engine = self._make_engine("""
+            platform: dos
+            initial: test
+            state test {
+                expect {
+                    "Drive C: does not appear to be partitioned.": {
+                        select "Yes"
+                        -> partitioning
+                    }
+                }
+            }
+            state partitioning {
+                done
+            }
+        """.strip())
+        state = {"open": 0, "overlap": False}
+        sessions = []
+
+        class _TrackedQmp(_FakeQmp):
+            def __enter__(self):
+                state["open"] += 1
+                state["overlap"] = (state["overlap"]
+                                    or state["open"] > 1)
+                return self
+
+            def __exit__(self, *exc):
+                state["open"] -= 1
+
+        def make_session():
+            qmp = _TrackedQmp()
+            qmp._screen_func = lambda: [
+                "Drive C: does not appear to be partitioned."]
+            sessions.append(qmp)
+            return qmp
+
+        with mock.patch.object(
+                engine, "_session", side_effect=make_session), \
+                mock.patch.object(
+                    engine, "_console", side_effect=_FakeConsole):
+            result = engine._do_expect(
+                engine._script.states["test"].statements[0], {})
+
+        self.assertEqual(result, "partitioning")
+        self.assertFalse(state["overlap"])
+        self.assertIn(
+            ("cursor_menu_select", "Yes", 60, ()),
+            [command for qmp in sessions
+             for command in qmp._commands])
+
     def test_expect_second_branch_matches(self):
         engine = self._make_engine("""
             platform: dos
@@ -374,6 +428,50 @@ class ScriptRuntimeTests(unittest.TestCase):
         self.assertIn(
             ("cursor_menu_select", "No", 60, ()),
             qmp._commands)
+
+    def test_done_ends_a_state_machine_run(self):
+        # `done` must clear the current state or the state loop
+        # re-enters the finished state forever
+        engine = self._make_engine("""
+            platform: dos
+            initial: only
+            state only {
+                press enter
+                done
+            }
+        """.strip())
+        engine._current_state = "only"
+        qmp = _FakeQmp()
+        with mock.patch.object(
+                engine, "_session", return_value=qmp), \
+                mock.patch.object(
+                    engine, "_console", side_effect=_FakeConsole):
+            engine._execute_block(
+                engine._script.states["only"].statements, {})
+        self.assertIsNone(engine._current_state)
+
+    def test_done_inside_expect_ends_a_state_machine_run(self):
+        engine = self._make_engine("""
+            platform: dos
+            initial: test
+            state test {
+                expect {
+                    "all finished": {
+                        done
+                    }
+                }
+            }
+        """.strip())
+        engine._current_state = "test"
+        qmp = _FakeQmp()
+        qmp._screen_func = lambda: ["all finished"]
+        with mock.patch.object(
+                engine, "_session", return_value=qmp), \
+                mock.patch.object(
+                    engine, "_console", side_effect=_FakeConsole):
+            engine._execute_block(
+                engine._script.states["test"].statements, {})
+        self.assertIsNone(engine._current_state)
 
     def test_expect_timeout_when_nothing_matches(self):
         engine = self._make_engine("""
@@ -447,6 +545,22 @@ class ScriptRuntimeTests(unittest.TestCase):
                 return_value=fake_machine):
             engine._execute_block(engine._script.statements, {})
         fake_machine.screenshot.assert_called_once_with("installed")
+
+    def test_screenshot_in_a_run_verifies_machine_not_run_dir(self):
+        # the run dir holds no vm.json: session identity must resolve
+        # through the machine home while the image lands in the run
+        engine = self._make_engine("""
+            platform: dos
+            screenshot installed
+        """.strip())
+        engine._run_dir = os.path.join(
+            "/tmp/home/cache/machines/test", "runs", "r1")
+        with mock.patch(
+                "reliquary.script_runner.screenshot") as capture:
+            engine._execute_block(engine._script.statements, {})
+        capture.assert_called_once_with(
+            "installed", 5555, "/tmp/home/cache/machines/test",
+            directory=os.path.join(engine._run_dir, "screenshots"))
 
     def test_type_with_key_tokens(self):
         engine = self._make_engine("""
