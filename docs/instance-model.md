@@ -19,20 +19,21 @@ have ids.
 <reliquary_home>/
 ├── blueprints/
 │   └── freedos-plain.json          user-owned reusable blueprint
-├── machines/
-│   └── 5fd11917….json              reliquary-owned machine record
 └── cache/machines/
-    └── 5fd11917…/                  replaceable machine cache
-        ├── state.json
+    └── 5fd11917…/                  the machine — disposable
+        ├── reliquary-machine.json
         ├── drives/
         ├── runs/
         └── backend files and logs
 ```
 
 The file name of `blueprints/<name>.json` is the blueprint name. A machine's
-identity is a generated UUID; the record file, cache directory,
-locks, run directories, and backend identity all use it, and there
-is no separate machine name.
+identity is a generated UUID; the cache directory, locks, run
+directories, and backend identity all use it, and there is no
+separate machine name. A machine **is** its cache directory —
+nothing about a machine lives outside `cache/`, because nothing
+about a machine is durable. Deleting the cache deletes the
+machines, by design.
 
 Commands select their targets with explicit flags, never
 positionally. `--machine <id>` accepts the full UUID or any
@@ -45,10 +46,10 @@ candidate ids (or, with no machine, suggesting `create`;
 
 ## Lifecycle
 
-A machine rests in one of three phases — `unmaterialized`,
-`ready`, `running` — and passes through transitional phases
-(`creating`, `stopping`, `destroying`) that exist so an
-interrupted operation is detectable and recoverable:
+A machine rests in one of two phases — `ready` or `running` — and
+passes through transitional phases (`creating`, `stopping`,
+`destroying`) that exist so an interrupted operation is
+detectable and recoverable:
 
 ```mermaid
 stateDiagram-v2
@@ -59,16 +60,16 @@ stateDiagram-v2
     stopping --> ready
     ready --> ready: apply
     ready --> destroying: destroy
-    destroying --> unmaterialized
-    unmaterialized --> creating: recreate
-    unmaterialized --> [*]: delete
-    ready --> [*]: delete
+    destroying --> [*]
 ```
 
-`recreate` also runs from `ready` (destroy, then create, same
-id); `clone` and `export` require `ready`. On startup reliquary
-detects a machine stranded in a transitional phase and completes
-a safe rollback or fails with recovery instructions (see below).
+`destroy` removes the machine entirely — there is no
+half-destroyed resting phase, because a machine is nothing but
+its cache directory. `recreate` is `destroy` + `create` as one
+command, reusing the same id; `clone` and `export` require
+`ready`. On startup reliquary detects a machine stranded in a
+transitional phase and completes a safe rollback or fails with
+recovery instructions (see below).
 
 ```text
 reliquary list blueprints
@@ -79,23 +80,23 @@ reliquary stop (--machine <id> | --blueprint <name>)
 reliquary apply (--machine <id> | --blueprint <name>)
 reliquary destroy (--machine <id> | --blueprint <name>)
 reliquary recreate (--machine <id> | --blueprint <name>)
-reliquary delete (--machine <id> | --blueprint <name>)
+reliquary delete --blueprint <name>
 reliquary clone (--machine <id> | --blueprint <name>)
 reliquary export (--machine <id> | --blueprint <name>) [<destination>]
 ```
 
 `list blueprints` shows each blueprint and its machine count; `list machines`
-shows each machine's short id, blueprint, phase, and backend. `create`
-validates and resolves the current blueprint, creates a machine record
-with a new UUID, prints that id, and materializes the machine's
-writable drives and backend object. `destroy` removes only the
-materialization and marks the machine unmaterialized; its id and
-blueprint reference remain. `recreate` is `destroy` followed by `create`
-using the same id. `delete --machine` removes the durable record
-after destroying the materialization; `delete --blueprint` removes the
-blueprint file itself and fails closed while any machine of it exists
-(on this verb only, `--blueprint` names the blueprint to remove, never a
-machine).
+shows each machine's short id, blueprint, phase, and backend —
+both enumerated by scanning `cache/machines/`. `create`
+validates and resolves the current blueprint, materializes a new
+machine under a new UUID — state, writable drives, backend
+object — and prints the id. `destroy` deletes the machine
+entirely: the whole cache directory and the backend machine.
+`recreate` is `destroy` followed by `create` as one command,
+reusing the same id. `delete` takes only `--blueprint`: it
+removes the blueprint file itself and fails closed while any
+machine of it exists, naming the machine ids — destroy them
+first.
 
 Editing a blueprint affects future `create` operations, not existing
 machines. Each machine records the source blueprint and resolved digest at
@@ -111,40 +112,46 @@ closed naming both sides, leaving `recreate` as the honest
 alternative. Applying a newer blueprint never happens implicitly at
 `start`.
 
-`clone` creates a new UUID and machine record. It retains the same
+`clone` creates a new machine under a new UUID. It retains the same
 resolved blueprint snapshot but copies the source machine's writable drives
 when they exist; it is therefore a snapshot of a machine, not another
 name for a blueprint. A future `fork-blueprint` command may create a new editable blueprint; it
 is intentionally not implicit in clone.
 
-## Instance record and cache state
+## The machine state
 
 The blueprint remains the plain machine JSON object described by the
-[machine blueprint](machine-blueprint.md). A machine record is a separate
-reliquary-owned JSON document, not a second spelling of that schema:
+[machine blueprint](machine-blueprint.md). The machine's one document is
+`cache/machines/<id>/reliquary-machine.json` — the resolved
+blueprint fields plus the machine's own bookkeeping, not a second
+spelling of the blueprint schema:
 
 ```json
 {
   "id": "5fd11917-147a-4b6b-b7f6-9f4b6d7d1ab2",
   "blueprint": "freedos-plain",
   "created": "2026-07-19T18:20:11Z",
-  "phase": "ready"
+  "phase": "ready",
+  "...": "resolved blueprint fields, backend-id, blueprint-digest"
 }
 ```
 
-`cache/machines/<id>/state.json` contains the resolved blueprint digest,
-backend ID, realized drive/controller addresses, and transient runtime
-attachments. It is fully regenerated from the blueprint and instance record
-when safe. It must never be edited by hand.
+It contains the machine's own id (repeated inside the file as a
+safety check — it must match the directory it sits in, so a
+hand-copied or misplaced machine directory fails closed), the
+source blueprint name, creation time, lifecycle phase, operation
+generation, the resolved blueprint digest, backend ID, realized
+drive/controller addresses, and transient runtime attachments. It
+must never be edited by hand.
 
-The record and cache state carry an operation generation and one of
-`unmaterialized`, `creating`, `ready`, `running`, `stopping`, or
-`destroying`. Every mutating operation takes an exclusive per-machine
-lock before inspecting backend state. On startup reliquary detects an
-interrupted phase, verifies backend identity, and either completes a
-safe rollback or fails with explicit recovery instructions. Atomic
-file replacement protects JSON writes; it does not pretend a host file
-write and a hypervisor operation are one transaction.
+The phase is one of `creating`, `ready`, `running`, `stopping`,
+or `destroying`. Every mutating operation takes an exclusive
+per-machine lock before inspecting backend state. On startup
+reliquary detects an interrupted phase, verifies backend
+identity, and either completes a safe rollback or fails with
+explicit recovery instructions. Atomic file replacement protects
+JSON writes; it does not pretend a host file write and a
+hypervisor operation are one transaction.
 
 There is no `installed` boolean. Script outcomes belong to the
 append-only run records under the instance cache, where they can name
@@ -155,13 +162,13 @@ artifacts without making a vague claim about the guest's contents.
 
 Users author and rename blueprints by changing files in `blueprints/`.
 Machines are never renamed because they have nothing to rename:
-the UUID is the whole identity, fixed at `create` and retained
-through `destroy`/`recreate`. Manual renames of record files or
-cache directories are unsupported.
+the UUID is the whole identity, fixed at `create` and carried
+through `recreate`. Manual renames of machine
+directories under `cache/machines/` are unsupported.
 
 ## JSON remains the format
 
-Blueprints, instance records, cache state, and media definitions remain
+Blueprints, machine state, and media definitions remain
 JSON. They are declarative documents with strict schemas and benefit
 from editor completion, stable formatting, and precise diagnostics.
 The script language remains the separate line-oriented behavioral

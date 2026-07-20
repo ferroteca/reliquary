@@ -111,18 +111,18 @@ Design rules:
 
 A **blueprint** is a reusable, user-owned JSON description of a kind
 of machine. A **machine** is one realization of that blueprint: its
-durable record, writable disks, backend object, and run history.
-One blueprint may have zero, one, or many machines (see
+state, writable disks, backend object, and run history. One
+blueprint may have zero, one, or many machines. Nothing about a
+machine is durable: a machine **is** its cache directory (see
 [docs/instance-model.md](docs/instance-model.md)):
 
 ```text
 <reliquary_home>/blueprints/
 └── <name>.json              the blueprint (user-owned)
-<reliquary_home>/machines/
-└── <id>.json                the machine record (reliquary-owned:
-                             blueprint reference, phase)
 <reliquary_home>/cache/machines/<id>/
-├── state.json               the resolved state (reliquary-owned)
+├── reliquary-machine.json   the machine's state (reliquary-owned:
+│                            id, blueprint reference, phase,
+│                            resolved configuration)
 ├── drives/                  the machine's disk/floppy images
 ├── runs/                    append-only run records (transcripts,
 │                            screenshots, outputs)
@@ -136,7 +136,7 @@ machine through the blueprint: `media` references, and starting-point
 images (`base`) that machine drives are differenced from, or
 copies of.
 
-### Blueprint, record, and state
+### Blueprint and state
 
 User documentation (planned format, written ahead of
 implementation): [docs/machine-blueprint.md](docs/machine-blueprint.md) with
@@ -146,19 +146,20 @@ locking, and recovery model in
 [docs/instance-model.md](docs/instance-model.md).
 
 The blueprint is reliquary's own backend-agnostic format — never a thin
-veneer over one backend's configuration. Three documents, one
-owner each: the **blueprint** (`blueprints/<name>.json`) is the machine
+veneer over one backend's configuration. Two documents, one owner
+each: the **blueprint** (`blueprints/<name>.json`) is the machine
 shape as the user defined it — authored by hand, by `init`, or by
-`import`; reliquary reads it and never writes it. The **machine
-record** (`machines/<id>.json`) is reliquary-owned: the machine's
-blueprint reference, creation time, and lifecycle phase. Machines have
-no separate human name — the generated UUID in the record's file
-name is the machine's identity, and commands accept any
-unambiguous prefix of it, git-style. The **state** (`cache/machines/<id>/state.json`) is the
-machine as it actually is — fully resolved (aliases
-canonicalized, defaults materialized, the resolved blueprint digest
-and backend identity recorded) and rewritten atomically in the
-same operation as every machine change. Every mutating operation
+`import`; reliquary reads it and never writes it. The **state**
+(`cache/machines/<id>/reliquary-machine.json`) is the machine as
+it actually is — fully resolved (aliases canonicalized, defaults
+materialized, the resolved blueprint digest and backend identity
+recorded) plus the machine's own bookkeeping (its id, repeated
+inside the file as a safety check against a misplaced directory;
+its blueprint's name; creation time; lifecycle phase) — rewritten
+atomically in the same operation as every machine change.
+Machines have no separate human name — the generated UUID naming
+the machine's directory is its identity, and commands accept any
+unambiguous prefix of it, git-style. Every mutating operation
 takes an exclusive per-machine lock; an interrupted operation is
 detected by phase and generation and either rolled back safely or
 failed with explicit recovery instructions. The resolved snapshot
@@ -192,8 +193,7 @@ backend and missing capability.
 
 ```text
 <reliquary_home>/
-├── blueprints/               machine blueprints, <name>.json (above)
-├── machines/            machine records, <name>.json (above)
+├── blueprints/          machine blueprints, <name>.json (above)
 ├── scripts/             reliquary automation scripts
 ├── properties.json      personal property registry (ordinary values
 │                        and markers for host-stored secrets)
@@ -201,22 +201,20 @@ backend and missing capability.
 │                        and payload SHA-256; one definition per
 │                        source archive can itemize several named
 │                        files) — see docs/media-spec.md
-└── cache/               fetched/cached files (clean commands
-                         only ever delete what reliquary can
-                         restore)
-    ├── downloads/        cached source archives (redownloadable;
+└── cache/               reliquary's regenerable files
+    ├── downloads/       cached source archives (redownloadable;
     │                    reclaimed by `clean downloads`)
-    └── media/           the named payload files machines mount,
-                         fetched/extracted/verified on demand
+    ├── media/           the named payload files machines mount,
+    │                    fetched/extracted/verified on demand
+    └── machines/<id>/   cached materializations (above —
+                         disposable: regenerate from blueprint
+                         and media; run records are transient)
 ```
 
 The current `install-media/` cache folds into `cache/`. The
 current root-level `drives/`, `machine.json`, and `vm.json`
-layout is superseded by the blueprint/record/cache split; the project
+layout is superseded by the blueprint/cache split; the project
 is pre-release, so this is a replacement, not a migration.
-
-Cached materializations live under `cache/machines/<id>/` (see
-"The machine model" above).
 
 ## The CLI
 
@@ -246,13 +244,12 @@ The lifecycle vocabulary is two-layered. Blueprints are plain files
 under `blueprints/`: authored, renamed, and removed directly in an
 editor, with `init` and `import` as authoring conveniences and
 `delete --blueprint` as the managed removal. Machine-level verbs act
-on machines: `create` realizes a blueprint as a new machine (record,
-new id, cached materialization), `start`/`stop` run it, `destroy`
-discards only the materialization (record, id, and blueprint reference
-remain), `recreate` is `destroy` + `create` under the same id,
-and `delete --machine` removes the machine entirely. `import`
-synthesizes a blueprint from a native VM — blueprint authoring only;
-realizing it afterward is an ordinary `create`.
+on machines: `create` materializes a blueprint as a new machine
+under a new id, `start`/`stop` run it, `destroy` deletes it
+entirely (a machine is nothing but its cache directory), and
+`recreate` is `destroy` + `create` as one command under the same
+id. `import` synthesizes a blueprint from a native VM — blueprint
+authoring only; realizing it afterward is an ordinary `create`.
 
 ```text
 reliquary list blueprints
@@ -263,7 +260,7 @@ reliquary stop (--machine <id> | --blueprint <name>)
 reliquary apply (--machine <id> | --blueprint <name>)
 reliquary destroy (--machine <id> | --blueprint <name>)
 reliquary recreate (--machine <id> | --blueprint <name>)
-reliquary delete (--machine <id> | --blueprint <name>)
+reliquary delete --blueprint <name>
 reliquary clone (--machine <id> | --blueprint <name>)
 reliquary export (--machine <id> | --blueprint <name>) [<destination>]
 reliquary import <source> --blueprint <name> --platform <platform>
@@ -288,8 +285,8 @@ Lifecycle semantics:
   backend (`--blueprint` filters to one blueprint's machines).
 - `create` validates and resolves the named blueprint
   (`blueprints/<name>.json` — written by hand, by `init`, or by
-  `import`), creates a machine record with a new id, prints that
-  id, and materializes the machine's drives and backend object.
+  `import`), materializes a new machine under a new id — state,
+  drives, backend object — and prints that id.
   Blueprints are authored documents. Media definitions are likewise
   user-owned, though a script can seed missing library
   definitions from its embedded blocks before its first run.
@@ -300,16 +297,15 @@ Lifecycle semantics:
   machine cannot absorb without regenerating drives (`size` or
   `base` changes on materialized images) fail closed naming both
   sides; `recreate` is the honest alternative.
-- `destroy` discards the machine's cached materialization —
-  state, backend machine, drive images — and marks the machine
-  unmaterialized; its record, id, and blueprint reference remain. The
-  blueprint is never touched.
-- `delete --machine` removes the machine record, destroying the
-  materialization first if one exists; the blueprint remains a plain
-  file. `delete --blueprint` removes the blueprint file itself and fails
-  closed while any machine of it exists, naming the machine ids —
-  delete the machines first (on this verb only, `--blueprint` is the
-  blueprint itself, never a machine selector).
+- `destroy` deletes the machine entirely — its directory (state,
+  drive images, run records) and the backend's machine. The
+  blueprint is never touched; `create` makes a fresh machine
+  whenever one is wanted again.
+- `delete` takes only `--blueprint`: it removes the blueprint
+  file itself and fails closed while any machine of it exists,
+  naming the machine ids — `destroy` them first. (On this verb,
+  `--blueprint` is the blueprint itself, never a machine
+  selector; removing a machine is `destroy`'s job.)
 
 - `script` completes preflight, installs missing embedded media
   definitions, resolves its machine (creating one when `--blueprint`
@@ -340,8 +336,8 @@ Lifecycle semantics:
   a different backend — `recreate` is the sanctioned way to move
   a machine between backends, and regenerated drives arrive in
   the new backend's formats.
-- `clone` duplicates a stopped machine as a new machine record
-  under a new id (printed like `create`'s): it retains the
+- `clone` duplicates a stopped machine as a new machine under a
+  new id (printed like `create`'s): it retains the
   source's resolved blueprint snapshot and copies the source's
   writable drive images — a snapshot of a machine, not another
   blueprint. The clone gets its own backend object and `backend-id`;
@@ -620,12 +616,12 @@ Deliverables:
    `boot`, `control-planes`, `backend-settings` — format checks
    and capability checks both failing closed and naming the
    problem.
-2. Machine records under `machines/<id>.json` (blueprint reference
-   and resolved digest, creation time, phase; the generated UUID
-   in the file name is the machine's identity) and the
-   cached materialization under `cache/machines/<id>/`
-   (`state.json` fully resolved, canonical drive-image naming,
-   qcow2 materialization of the `size`/`base` triad). The QEMU
+2. Machines wholly under `cache/machines/<id>/` — the generated
+   UUID naming the directory is the machine's identity —
+   with `reliquary-machine.json` (id repeated as a safety check,
+   blueprint reference and resolved digest, creation time, phase,
+   fully resolved configuration), canonical drive-image naming,
+   and qcow2 materialization of the `size`/`base` triad. The QEMU
    layer re-anchors on it; `MachineConfig`, root-home
    `machine.json`, and `vm.json` are absorbed and deleted.
 3. Lifecycle integrity per the instance model: operation
@@ -640,17 +636,17 @@ Deliverables:
    reconciliation — baseline, state, backend identity, and
    re-verification of every referenced media hash), `stop`,
    `apply` (adopt blueprint edits into the baseline; drive-regenerating
-   changes fail closed), `destroy`, `recreate` (same id), and
-   `delete` (`--machine` for a machine, `--blueprint` for a
-   machineless blueprint file).
+   changes fail closed), `destroy` (deletes the machine
+   entirely), `recreate` (same id), and `delete --blueprint`
+   (machineless blueprint files only).
    Runtime changes update the state only; machines stay running
    until explicitly stopped.
 5. Existing single-machine commands (`type`, `run`, `keys`,
    `menu`, `wait`, `text`, `screenshot`, `hmp`) take the same
    `--machine`/`--blueprint` selection and resolve ownership through
-   the record and state.
-6. Published JSON Schemas for the blueprint, machine record, state,
-   and media definition document types.
+   the machine state.
+6. Published JSON Schemas for the blueprint, machine state, and
+   media definition document types.
 7. `examples/` updated to the implemented shapes
    (`examples/blueprints/`, an explicit `create --blueprint` step in its
    README) — or the docs corrected where implementation proves
@@ -798,7 +794,7 @@ of this milestone.
 
 Deliverables:
 
-1. `clone`: a new machine record and UUID retaining the source's
+1. `clone`: a new machine under a new UUID retaining the source's
    resolved blueprint snapshot, with the source's writable drive
    images copied — a snapshot of a machine, never a shared
    state or backend registration.

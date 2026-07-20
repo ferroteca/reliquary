@@ -11,8 +11,8 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`blueprints/<name>.json`, yours) and each
-machine's **state** (`cache/machines/<id>/state.json`,
-reliquary's). For the blueprint/record/state model, read
+machine's **state** (`cache/machines/<id>/reliquary-machine.json`,
+reliquary's). For the blueprint/state model, read
 [the guide](machine-blueprint.md) first; for complete examples, see
 the [cookbook](machine-blueprint-cookbook.md).
 
@@ -94,11 +94,21 @@ backend machine and resolves the blueprint afresh (see
 
 ## State-only fields
 
-Two fields exist only in the state; a blueprint containing either of
-them is rejected. (A machine's creation time and lifecycle phase
-live in its record, and script outcomes live in its run records —
-see [the instance model](instance-model.md); neither appears in
-the blueprint format.)
+Three fields exist only in the state; a blueprint containing any of
+them is rejected. (The state document also carries the machine's
+bookkeeping — its blueprint's name, creation time, and lifecycle
+phase — which is outside the blueprint field set entirely; script
+outcomes live in run records. See
+[the instance model](instance-model.md).)
+
+### `id`
+
+**state-only · string**
+
+The machine's own UUID, repeated inside the state as a safety
+check: it must match the machine directory the state sits in. A
+mismatch — a hand-copied or misplaced machine directory — fails
+closed before any operation touches the backend.
 
 ### `backend-id`
 

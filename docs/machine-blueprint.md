@@ -29,8 +29,8 @@ flowchart LR
         SCR["scripts<br/>scripts/*.rqs"]
     end
     subgraph reliquarys["reliquary's — disposable, regenerates"]
-        M1["machine 5fd1…<br/>record · state · drives · runs"]
-        M2["machine 9c2e…<br/>record · state · drives · runs"]
+        M1["machine 5fd1…<br/>state · drives · runs"]
+        M2["machine 9c2e…<br/>state · drives · runs"]
     end
     BP -- "create" --> M1
     BP -- "create" --> M2
@@ -49,27 +49,24 @@ stateDiagram-v2
     Ready --> Running: start
     Running --> Ready: stop (or guest shutdown)
     Ready --> Ready: apply — adopt blueprint edits
-    Ready --> Unmaterialized: destroy
-    Unmaterialized --> Ready: recreate
-    Unmaterialized --> [*]: delete
-    Ready --> [*]: delete
+    Ready --> [*]: destroy
 ```
 
-`recreate` also works from Ready (it is exactly `destroy` +
-`create` under the same id), and `clone` and `export` act on a
-Ready (stopped) machine. What each verb touches:
+`recreate` is exactly `destroy` + `create` as one command, under
+the same id; `clone` and `export` act on a Ready (stopped)
+machine. What each verb touches:
 
-| verb       | blueprint file | machine record | materialization       |
-|------------|----------------|----------------|-----------------------|
-| `create`   | reads          | creates        | creates               |
-| `start`    | —              | reads          | runs (reconciles to baseline) |
-| `stop`     | —              | reads          | powers off            |
-| `apply`    | reads          | updates digest | reconciles to edits   |
-| `destroy`  | —              | keeps          | deletes               |
-| `recreate` | reads          | keeps (same id)| regenerates           |
-| `clone`    | —              | new record, new id | copies drives     |
-| `delete`   | `--blueprint`: deletes | `--machine`: deletes | deletes  |
-| `export`   | —              | reads          | copies out            |
+| verb       | blueprint file           | the machine (`cache/machines/<id>/`)   |
+|------------|--------------------------|----------------------------------------|
+| `create`   | reads                    | materializes, under a new id           |
+| `start`    | —                        | runs (reconciles to baseline)          |
+| `stop`     | —                        | powers off                             |
+| `apply`    | reads                    | reconciles to edits, new baseline      |
+| `destroy`  | —                        | deletes entirely                       |
+| `recreate` | reads                    | regenerates, same id                   |
+| `clone`    | —                        | new machine, new id, drives copied     |
+| `delete`   | deletes (refuses while machines exist) | —                        |
+| `export`   | —                        | copies out                             |
 
 Two rules carry the whole model:
 
@@ -87,10 +84,8 @@ Two rules carry the whole model:
 ```text
 <reliquary_home>/blueprints/
 └── msdos.json               reusable blueprint — yours
-<reliquary_home>/machines/
-└── 5fd11917….json           durable machine record — reliquary's
 <reliquary_home>/cache/machines/<id>/
-├── state.json               resolved state — reliquary's
+├── reliquary-machine.json   the machine's state — reliquary's
 ├── drives/                  the machine's disk and floppy images
 ├── screenshots/             captured screens (transient)
 └── ...                      backend files and logs
@@ -98,17 +93,17 @@ Two rules carry the whole model:
 
 - The **blueprint** (`blueprints/<name>.json`) is the reusable machine shape
   you defined. You own it: reliquary reads it and never writes it.
-- The **machine record** (`machines/<id>.json`) identifies one
-  realization of a blueprint. The generated UUID in its file name is
-  the machine's identity and locates its cache.
-- The **state** (`cache/machines/<id>/state.json`) describes the
-  resolved configuration and lifecycle of that machine, at the root
-  of its **cached materialization** — the directory holding
-  everything reliquary materialized for the machine: state, disk
-  images, screenshots, backend files. reliquary owns all of it;
-  you never need to touch it. Screenshots in particular are
-  transient diagnostics with no retention promise — copy out any
-  capture you want to keep, promptly.
+- The **state** (`cache/machines/<id>/reliquary-machine.json`)
+  describes one machine: its identity, blueprint, lifecycle
+  phase, and resolved configuration, at the root of the
+  machine's directory — which holds everything reliquary
+  materialized for it: state, disk images, screenshots, backend
+  files. The machine **is** this directory; nothing about a
+  machine lives outside `cache/`, because nothing about a machine
+  is durable. reliquary owns all of it; you never need to touch
+  it. Screenshots in particular are transient diagnostics with no
+  retention promise — copy out any capture you want to keep,
+  promptly.
 
 The split reflects what reliquary machines are for: **ephemeral
 work**. A reliquary machine is a disposable rig — created to run a
@@ -164,9 +159,8 @@ doesn't use it is portable by construction.
 
 **A blueprint and its state are not the same format.** The blueprint is the
 portable JSON document you author. The reliquary-owned machine
-record and cache state wrap its resolved form with identity,
-lifecycle, and backend facts. See
-[the instance model](instance-model.md).
+state wraps its resolved form with identity, lifecycle, and
+backend facts. See [the instance model](instance-model.md).
 
 **Blueprints have names; machines have ids.** A blueprint's name is its file
 name. A machine's identity is its generated UUID — commands take
@@ -204,7 +198,7 @@ new id. With only one machine of the blueprint, `--blueprint msdos` selects
 it everywhere; `--machine <id>` (any unambiguous prefix) always
 works and is required once a blueprint has several machines.
 
-## Blueprint, record, and state
+## Blueprint and state
 
 ### The blueprint — yours
 
@@ -237,7 +231,7 @@ implicitly at `start`.
 
 ### The state — reliquary's
 
-`cache/machines/<id>/state.json` describes the machine as
+`cache/machines/<id>/reliquary-machine.json` describes the machine as
 it actually is, and reliquary maintains it: whenever reliquary
 changes the machine — attaches media, changes memory, reorders
 boot devices — it updates the state in the same operation. A
@@ -251,15 +245,22 @@ The state is fully resolved:
   a bare media name → a `media` object);
 - platform defaults are materialized into explicit values;
 - the assigned `backend` is recorded, along with the state-only
-  fields: `backend-id` and the resolved blueprint digest. (Creation
-  time and lifecycle phase live in the machine record; script
-  outcomes live in run records — there is no `installed` flag.)
+  fields: the machine's own `id` (repeated in the file as a safety
+  check against a misplaced or hand-copied machine directory),
+  `backend-id`, and the resolved blueprint digest — plus the
+  machine's bookkeeping: its blueprint's name, creation time, and
+  lifecycle phase. (Script outcomes live in run records — there
+  is no `installed` flag.)
 
 The blueprint from the [first example](#a-first-example)
 produces, on a host where QEMU was selected:
 
 ```json
 {
+  "id": "5fd11917-147a-4b6b-b7f6-9f4b6d7d1ab2",
+  "blueprint": "msdos",
+  "created": "2026-07-19T18:20:11Z",
+  "phase": "ready",
   "platform": "dos",
   "backend": "qemu",
   "backend-id": "reliquary-msdos-8c41",
@@ -341,7 +342,7 @@ To make a runtime change permanent, make it in the blueprint and
 
 ### Destroying and recreating a machine
 
-Because the blueprint lives outside the cache, a materialization is
+Because the blueprint lives outside the cache, a machine is
 always disposable:
 
 ```powershell
@@ -349,12 +350,11 @@ reliquary destroy --blueprint msdos
 reliquary recreate --blueprint msdos
 ```
 
-`destroy` discards the machine's entire cached materialization —
-the state, the backend's machine, and the drive images — and
-never touches the blueprint or the machine's record; the machine
-remains, unmaterialized, under its id, ready for a later
-`create`-equivalent `recreate`. `recreate` is exactly
-`destroy` + `create` under the same id. Drives
+`destroy` deletes the machine entirely — its directory (state,
+drive images, run records) and the backend's machine — and never
+touches the blueprint; `create` makes a fresh machine from the
+blueprint whenever one is wanted again. `recreate` is exactly
+`destroy` + `create` as one command, reusing the same id. Drives
 regenerate the way they were declared: `size` drives come back
 blank, [`base` drives](machine-blueprint-reference.md#base--optional--string-or-object)
 come back as fresh differencing disks (or fresh copies) of their
@@ -375,8 +375,8 @@ native formats.
 Three more lifecycle commands follow from the same model
 (machine stopped, in every case):
 
-**`clone`** duplicates a machine as a new machine record under a
-new id (printed like `create`'s): the clone retains the source's
+**`clone`** duplicates a machine as a new machine under a new id
+(printed like `create`'s): the clone retains the source's
 resolved blueprint snapshot as its own baseline, and the source's
 writable drive images (if materialized) are copied into the
 clone's cache — a snapshot of a machine, not another blueprint. The
@@ -409,12 +409,11 @@ records it, so `--platform` is required. Use import to run
 scripted, disposable experiments against a copy of a real machine
 without risking the original.
 
-`delete --machine` removes the machine's record, destroying the
-materialization first if one exists — the machine is gone
-entirely, the blueprint untouched. `delete --blueprint` removes the blueprint
-file itself and fails closed while any machine of it exists (on
-this verb only, `--blueprint` names the blueprint to remove, never a
-machine). To discard only the materialization, use `destroy`.
+`delete` takes only `--blueprint`: it removes the blueprint file
+itself and fails closed while any machine of it exists, naming
+the machine ids — `destroy` them first. (Removing a machine is
+`destroy`'s job; on `delete`, `--blueprint` names the blueprint
+to remove, never a machine.)
 
 ## Backend assignment
 

@@ -47,6 +47,10 @@ The state after `create` on a host where QEMU was selected:
 
 ```json
 {
+  "id": "5fd11917-147a-4b6b-b7f6-9f4b6d7d1ab2",
+  "blueprint": "msdos",
+  "created": "2026-07-19T18:20:11Z",
+  "phase": "ready",
   "platform": "dos",
   "backend": "qemu",
   "backend-id": "reliquary-msdos-8c41",
