@@ -90,19 +90,43 @@ def main(argv=None):
         "start",
         help="start a machine (--blueprint/--machine, or legacy "
              "root-home machine.json)")
+    command.add_argument("--home", help="reliquary home directory")
+    command.add_argument(
+        "--blueprint",
+        help="select a blueprint's sole machine")
+    command.add_argument(
+        "--machine",
+        help="select a machine by full id or unambiguous hex prefix "
+             "(minimum four characters)")
     command.add_argument("--display", action="store_true")
     command.add_argument(
         "qemu_args", nargs="*",
         help=argparse.SUPPRESS)
 
-    subcommands.add_parser(
+    command = subcommands.add_parser(
         "stop",
         help="stop a machine (--blueprint/--machine, or legacy "
              "root-home vm.json)")
-    subcommands.add_parser(
+    command.add_argument("--home", help="reliquary home directory")
+    command.add_argument(
+        "--blueprint",
+        help="select a blueprint's sole machine")
+    command.add_argument(
+        "--machine",
+        help="select a machine by full id or unambiguous hex prefix "
+             "(minimum four characters)")
+    command = subcommands.add_parser(
         "destroy",
         help="delete a stopped machine "
              "(requires --blueprint or --machine)")
+    command.add_argument("--home", help="reliquary home directory")
+    command.add_argument(
+        "--blueprint",
+        help="select a blueprint's sole machine")
+    command.add_argument(
+        "--machine",
+        help="select a machine by full id or unambiguous hex prefix "
+             "(minimum four characters)")
 
     command = subcommands.add_parser(
         "script",
@@ -229,6 +253,15 @@ def _list_machines(arguments):
 
 def _dispatch(arguments):
     platform = arguments.platform or "dos"
+    # Merge global and subcommand arguments for commands that have both
+    if arguments.command in ("start", "stop", "destroy"):
+        # If subcommand home is None, use the global home (already set by set_home)
+        if arguments.home is None:
+            # home was already set by the global argument processing
+            # We need to get it from the home module
+            from .home import _home
+            arguments.home = _home
+
     if arguments.command == "create":
         return _create(arguments)
     if arguments.command == "script":

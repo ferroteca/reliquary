@@ -90,8 +90,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
-                "--blueprint", "plain",
                 "start",
+                "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
         start.assert_called_once()
@@ -101,8 +101,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
-                "--blueprint", "plain",
                 "stop",
+                "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
         stop.assert_called_once()
@@ -122,8 +122,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
-                "--machine", machine_id[:4],
                 "destroy",
+                "--machine", machine_id[:4],
             ])
         self.assertEqual(result, 0)
         destroy.assert_called_once_with(machine_id, home=self.home)
