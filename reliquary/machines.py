@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from .blueprint import load_blueprint
 from .drives import format_options
 from .home import blueprints_dir, machines_cache_dir
+from .library import seed_blueprint
 from .lifecycle import (create_hdd_image, find_qemu, launch_owned_qemu,
                         stop as stop_owned_qemu)
 from .media import fetch_media
@@ -96,8 +97,16 @@ def create(blueprint, *, home=None, blueprint_name=""):
 
 
 def create_from_blueprint(name, *, home=None):
-    """Load ``blueprints/<name>.json`` and materialize one machine."""
+    """Load ``blueprints/<name>.json`` and materialize one machine.
+
+    A blueprint the home does not contain is seeded from the
+    built-in library on this first reference, along with the media
+    definitions and scripts it references (never overwriting user
+    files).
+    """
     path = os.path.join(blueprints_dir(home), f"{name}.json")
+    if not os.path.exists(path):
+        seed_blueprint(name, home=home)
     blueprint = load_blueprint(path, home=home)
     return create(blueprint, home=home, blueprint_name=name)
 

@@ -14,7 +14,8 @@ as the default and currently only complete platform workflow:
   resolution, layout, and containment, `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
   its media references, `drives.py` parses declared drives, `media.py` owns media definitions
   (parsing, name resolution) and hash-verified acquisition of OS installation media into the
-  `cache/downloads/` and `cache/media/` caches, `machines.py` owns machine materialization under
+  `cache/downloads/` and `cache/media/` caches, `library.py` owns the built-in library
+  (`reliquary/builtins/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
   `cache/machines/<id>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
   `resolve_machine`), `lifecycle.py` owns QMP, QEMU processes, and host-side `qemu-img` helpers,
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS

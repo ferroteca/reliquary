@@ -11,6 +11,7 @@ path = [
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "examples/**/*.json",
+    "reliquary/builtins/**/*.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Paul Galbraith"

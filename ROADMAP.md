@@ -687,7 +687,7 @@ boot/media change the M1 CLI list does not name — decide a thin
    `--machine` prefix. Exit: start/stop a created
    FreeDOS-shaped machine from the CLI. Out: `apply`,
    interaction subcommands, multi-backend.
-7. **Builtins seed** — `builtins/` tree + copy-out on first
+7. **Builtins seed (complete)** — `builtins/` tree + copy-out on first
    reference + never-overwrite (+ packaging zip path). Exit:
    `--blueprint freedos-1.4-plain` seeds home files once;
    second call leaves them alone. Out: `pull`, provenance

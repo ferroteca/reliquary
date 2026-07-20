@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+description: "Boot the installed FreeDOS disk and confirm a DOS prompt"
+platform: dos
+timeout: 2m
+
+# Before running, disable the installer CD in the machine blueprint, make
+# hdd the first boot device, and adopt the edit with reliquary apply.
+wait "C:\>"
+screenshot verified
+enter "fdapm poweroff"
+wait stopped

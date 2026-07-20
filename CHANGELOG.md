@@ -77,6 +77,19 @@ is not yet implemented.
 
 ### Added
 
+- The built-in library seed: blueprints, media definitions, and
+  scripts ship inside the package under `reliquary/builtins/`
+  (included in wheels and sdists, readable from zip-bundled
+  installs) and are copied out into the home on first reference —
+  resolving an unknown blueprint via `create` seeds
+  `blueprints/<name>.json` plus the media definitions and scripts
+  it references, and resolving an unknown media name seeds its
+  definition. A file already present in the home is never
+  overwritten; deleting a copy is how it is refreshed. First
+  entries: the `freedos-1.4-plain` blueprint, the
+  `freedos-1.4-livecd` media definition (URL carried with an
+  explicit redistribution assertion — FreeDOS is GPL free
+  software), and the install/verify scripts.
 - Machine lifecycle CLI and API for cached machines: `create`
   / `start` / `stop` / `destroy` / `list machines`, with global
   `--blueprint` (sole machine of that blueprint) and `--machine`

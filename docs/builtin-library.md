@@ -5,9 +5,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The built-in library
 
-> **Status:** this documents the planned built-in library. It is
-> not implemented yet; details may still change before first
-> release.
+> **Status:** the seeding core — the packaged tree, copy-out on
+> first reference, and the never-overwrite rule — is implemented.
+> The index, provenance columns, `search`, and `pull` are still
+> planned; details may change before first release.
 
 reliquary ships a library of blueprints, media definitions, and
 scripts for popular open source operating systems, so the common
@@ -23,10 +24,10 @@ verifies the installation media, and runs the scripted install.
 
 ## A seed, not a resolution tier
 
-In a source checkout the library lives as ordinary files under
-`builtins/blueprints/`, `builtins/media/`, and `builtins/scripts/`;
-packaged for distribution, the same files are bundled in a zip
-archive inside the reliquary package. Either way the library is
+The library ships inside the reliquary package as ordinary files
+under `reliquary/builtins/` (`blueprints/`, `media/`, `scripts/`),
+so it travels with every distribution form, including zip-bundled
+installs. Wherever it lives, the library is
 never consulted at run time as a fallback layer. Instead, when you
 reference a built-in artifact that does not yet exist in your home,
 reliquary **copies it out**. From that point on it is an ordinary

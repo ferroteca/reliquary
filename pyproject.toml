@@ -36,3 +36,10 @@ reliquary = "reliquary:main"
 
 [tool.setuptools]
 packages = ["reliquary", "reliquary.recipes", "reliquary_tests"]
+
+[tool.setuptools.package-data]
+reliquary = [
+    "builtins/blueprints/*.json",
+    "builtins/media/*.json",
+    "builtins/scripts/*.rqs",
+]

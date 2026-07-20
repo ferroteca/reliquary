@@ -273,20 +273,18 @@ def load_definition(path):
     return parse_definition(data)
 
 
-def resolve_media(name, home=None):
-    """Resolve a defined media item by name from the media library.
+def scan_media_definitions(library, name):
+    """Return (path, definition, item) for every definition of name.
 
-    Scans every definition under `media/` and returns a
-    ResolvedMedia for the item whose name matches. A name defined
-    more than once is an error naming the definition files.
+    Scans every definition file under the library directory,
+    skipping invalid files (they'll be caught by explicit
+    operations on them). A missing library directory scans empty.
     """
-    library = media_dir(home)
-    if not os.path.exists(library):
-        raise FileNotFoundError(
-            f"Media directory does not exist: {library}")
-    if not os.path.isdir(library):
+    if os.path.exists(library) and not os.path.isdir(library):
         raise ValueError(f"Media path is not a directory: {library}")
     matches = []
+    if not os.path.isdir(library):
+        return matches
     for filename in sorted(os.listdir(library)):
         if not filename.endswith(".json"):
             continue
@@ -294,12 +292,28 @@ def resolve_media(name, home=None):
         try:
             definition = load_definition(filepath)
         except (json.JSONDecodeError, ValueError, KeyError):
-            # Skip invalid files; they'll be caught by explicit
-            # operations on them.
             continue
         for item in definition.items:
             if item.name == name:
                 matches.append((filepath, definition, item))
+    return matches
+
+
+def resolve_media(name, home=None):
+    """Resolve a defined media item by name from the media library.
+
+    Scans every definition under `media/` and returns a
+    ResolvedMedia for the item whose name matches. A name the home
+    does not define is seeded from the built-in library on this
+    first reference (never overwriting user files). A name defined
+    more than once is an error naming the definition files.
+    """
+    library = media_dir(home)
+    matches = scan_media_definitions(library, name)
+    if not matches:
+        from .library import seed_media
+        if seed_media(name, home=home):
+            matches = scan_media_definitions(library, name)
     if not matches:
         raise FileNotFoundError(
             f"No media definition found with name: {name}")
