@@ -7,12 +7,9 @@ project), which owns QEMU lifecycle, media, QMP identity checks, keyboard
 input, screen access, screenshots, and per-run state.
 
 reliquary machines are ephemeral: disposable rigs for scripted installs and
-automated guest tasks, cheap to recreate and delete. The machine is never
+automated guest tasks, cheap to destroy and recreate. The machine is never
 the product — often nothing durable comes out at all (the point was to run
-some tests); when there is interest in something more durable, it is
-exported — either a media image or an entire machine bound for a platform
-built for long-lived machines. reliquary is not a VM manager for machines
-you keep.
+some tests). reliquary is not a VM manager for machines you keep.
 
 ## Blueprints and machines
 
@@ -24,7 +21,8 @@ blueprint, many machines. Machines are created, run, destroyed, and
 recreated freely: the blueprint (with media definitions and scripts) is
 always enough to rebuild one, so nothing reliquary materializes is ever
 precious. Editing a blueprint never changes an existing machine by itself;
-the explicit `apply` adopts your edits.
+a machine keeps the snapshot it was created from. To adopt blueprint edits,
+destroy the machine and create it again.
 
 Read [The machine blueprint](docs/machine-blueprint.md) — starting with
 "The model at a glance" and its diagrams — and
@@ -197,6 +195,9 @@ The layout is:
 
 ```text
 Documents/reliquary/
+├── blueprints/           machine blueprints you author
+├── media/                shared media definitions
+├── scripts/              automation scripts (.rlqs)
 ├── drives/               the machine's declared drives
 │   ├── floppy.img        a boot floppy image (slot 0 = A:)
 │   ├── hdd/              a folder exposed as a virtual FAT hard disk
@@ -204,7 +205,11 @@ Documents/reliquary/
 ├── machine.json          optional legacy CLI config for bare `rlq start`
 ├── screenshots/          captured PNG files
 ├── qemu-stderr.log       diagnostics from the last QEMU start
-└── vm.json               identity and port of the active VM
+├── vm.json               identity and port of the active VM
+└── cache/
+    ├── downloads/        cached source archives (redownloadable)
+    ├── media/            cached media payloads
+    └── machines/         materialized machine directories
 ```
 
 All files created by reliquary stay under this home. The selected home is printed to standard error the first time it is
