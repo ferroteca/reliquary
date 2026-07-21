@@ -18,7 +18,8 @@ Concepts — including the blueprint/state split — are in
 [the guide](machine-blueprint.md); every rule is in the
 [field reference](machine-blueprint-reference.md).
 
-Throughout, save the blueprint as `blueprints/<name>.json` and create a
+Throughout, save the blueprint as `<name>.rlqb` under your asset
+root and create a
 machine from it:
 
 ```powershell
@@ -107,7 +108,7 @@ stopped.
 
 > **Media note:** `freedos-1.4-livecd` names a
 > [media definition](media-spec.md)
-> (`media/freedos-1.4-livecd.json` with the LiveCD's download
+> (`freedos-1.4-livecd.rlqm` with the LiveCD's download
 > URL, archive details, and hashes) — every media reference
 > resolves through a definition, fetched and verified on demand.
 > This shared definition lets the machine be operated independently;

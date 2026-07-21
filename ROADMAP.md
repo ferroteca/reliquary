@@ -134,7 +134,7 @@ machine is durable: a machine **is** its cache directory (see
 
 ```text
 <reliquary_home>/blueprints/
-└── <name>.json              the blueprint (user-owned)
+└── <name>.rlqb              the blueprint (user-owned)
 <reliquary_home>/cache/machines/<id>/
 ├── reliquary-machine.json   the machine's state (reliquary-owned:
 │                            id, blueprint reference, phase,
@@ -164,12 +164,13 @@ locking, and recovery model in
 
 The blueprint is reliquary's own backend-agnostic format — never a thin
 veneer over one backend's configuration. Two documents, one owner
-each: the **blueprint** (`blueprints/<name>.json`) is the machine
+each: the **blueprint** (`<name>.rlqb`) is the machine
 shape as the user defined it — authored by hand, by `init`, or by
 `import`; reliquary reads it and never writes it. The **state**
 (`cache/machines/<id>/reliquary-machine.json`) is the machine as
 it actually is — fully resolved (aliases canonicalized, defaults
-materialized, the resolved blueprint digest and backend identity
+materialized, the resolved blueprint digest, the blueprint's
+source path, and backend identity
 recorded) plus the machine's own bookkeeping (its id, repeated
 inside the file as a safety check against a misplaced directory;
 its blueprint's name; creation time; lifecycle phase) — rewritten
@@ -227,7 +228,7 @@ backend and missing capability.
 
 ```text
 <reliquary_home>/
-├── blueprints/          machine blueprints, <name>.json (above)
+├── blueprints/          machine blueprints, <name>.rlqb (above)
 ├── scripts/             reliquary automation scripts
 ├── properties.json      personal property registry (ordinary values
 │                        and markers for host-stored secrets)
@@ -279,6 +280,60 @@ open source systems the lazy path is:
 ```powershell
 rlq --blueprint freedos-1.4-plain script install
 ```
+
+## Authored-asset resolution
+
+Where reliquary looks for authored assets — blueprints, media
+definitions, and scripts — is an invocation-level setting: the
+mechanism behind the artifact-residency split (USE-CASES.md).
+
+- Every invocation names its **asset root**; unspecified, it
+  defaults to the **current directory**. Assets are identified by
+  extension, not location: `.rlqb` is a machine blueprint,
+  `.rlqm` a media definition, `.rlqs` a script. Discovery walks
+  the root for the three extensions, so a project lays out its
+  files however it likes — `blueprints/`, `media/`, and
+  `scripts/` subdirectories are optional organizational dressing,
+  the home's own convention included (U3, U4). Within one root,
+  two files of one kind with the same stem are an error; the
+  home's `cache/` is never scanned.
+- Resolution falls back to the reliquary home for assets the root
+  does not provide. Home assets are a convenience for human CLI
+  interaction — one shared place for the blueprints, media
+  definitions, and scripts a person reuses across
+  human-interaction scenarios (U1, U5). An explicit option
+  disables the fallback entirely, and automation runs with it
+  off: resolution is then strictly
+  project-scoped, and nothing outside source control — neither
+  home assets nor the built-in library seeded behind them — can
+  reach the run.
+- The home remains reliquary's own ground regardless of asset
+  root: machines materialize into the home cache, downloads and
+  payloads use the home caches, and the personal property
+  registry stays home-side (a license key never enters the repo —
+  U5).
+- `--assets <dir>` names the root and `--assets-only` disables
+  the home fallback — global flags, mirrored by the API
+  parameters `assets=` / `assets_only=` under parity.
+
+Three rules complete the model. **The root shadows the home**:
+when both define a name, the asset root wins — identical media
+descriptors coalesce, duplicates within one root remain errors,
+and run records name which root supplied each asset. **Machines
+record their blueprint's source**: the state carries the resolved
+blueprint file's absolute path, and `--blueprint <name>`
+selection matches only machines whose recorded source equals the
+invocation's own resolution of that name, so same-named
+blueprints in different projects never select — and `apply` never
+adopts — each other's machines. **reliquary reads by
+extension and writes by convention**: embedded media blocks
+install as `<label>.rlqm` — into the home's `media/` for a
+home-resolved script, beside the script file itself for a
+source-resident one — a new source file its author commits;
+installation is idempotent by identity, so a committed definition
+means no further writes and a clean CI tree. U6's recorder
+likewise emits its drafts into the asset root the session ran
+with.
 
 ## The CLI
 
@@ -343,7 +398,9 @@ id. `import` synthesizes a blueprint from a native VM — blueprint
 authoring only; realizing it afterward is an ordinary `create`.
 
 `--blueprint` and `--machine` are global selectors, given before
-the verb; there is no bare-script shorthand — an unrecognized
+the verb — as are `--assets <dir>` and `--assets-only`, which
+name and scope the asset root ("Authored-asset resolution"
+above); there is no bare-script shorthand — an unrecognized
 command word is an error, never a script lookup (`script <label>`
 is the tightest form).
 
@@ -383,7 +440,7 @@ Lifecycle semantics:
   machines` shows each machine's id, blueprint, phase, and
   backend (`--blueprint` filters to one blueprint's machines).
 - `create` validates and resolves the named blueprint
-  (`blueprints/<name>.json` — written by hand, by `init`, or by
+  (a `.rlqb` file — written by hand, by `init`, or by
   `import`), materializes a new machine under a new id — state,
   drives, backend object — and prints that id.
   Blueprints are authored documents. Media definitions are likewise
@@ -599,7 +656,7 @@ in [docs/property-registry.md](docs/property-registry.md).
 Scripts may also embed ordinary media-definition JSON objects in
 top-level, labeled `media <label> { ... }` blocks. After full
 preflight but before machine resolution, running the script installs
-each missing definition as `media/<label>.json`; `fetch --script`
+each missing definition as `<label>.rlqm`; `fetch --script`
 does the same without executing guest steps. Existing definitions are
 never overwritten: wholly identical blocks are already installed,
 while differing targets, item collisions, and partially overlapping

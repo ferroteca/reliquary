@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
-shared by the **blueprint** (`blueprints/<name>.json`, yours) and each
+shared by the **blueprint** (`<name>.rlqb`, yours) and each
 machine's **state** (`cache/machines/<id>/reliquary-machine.json`,
 reliquary's). For the blueprint/state model, read
 [the guide](machine-blueprint.md) first; for complete examples, see
@@ -22,8 +22,8 @@ the [cookbook](machine-blueprint-cookbook.md).
 
 Each field is marked with where it may appear:
 
-- **blueprint** — valid in a blueprint (the document you author at
-  `blueprints/<name>.json` and realize as a machine with
+- **blueprint** — valid in a blueprint (the `.rlqb` document you
+  author and realize as a machine with
   `rlq create --blueprint <name>`). Every blueprint field is also
   valid in the state, where it always appears fully resolved.
 - **state-only** — written by reliquary into the state; rejected
@@ -227,7 +227,7 @@ U5 loop is edit the blueprint, run the script.
 
 ## State-only fields
 
-Three fields exist only in the state; a blueprint containing any of
+Four fields exist only in the state; a blueprint containing any of
 them is rejected. (The state document also carries the machine's
 bookkeeping — its blueprint's name, creation time, and lifecycle
 phase — which is outside the blueprint field set entirely; script
@@ -260,6 +260,21 @@ This is the anchor for **ownership verification**: reliquary never
 sends a control command to a hypervisor object until the object's
 identity matches `backend-id`. A stale or foreign machine is
 detected and refused rather than manipulated.
+
+### `blueprint-source`
+
+**state-only · string**
+
+The absolute path of the blueprint file this machine resolved
+from at `create` (re-recorded by `apply`). Selection by
+`--blueprint <name>` matches only machines whose recorded source
+equals the invocation's own resolution of that name — through its
+asset root (ROADMAP.md, "Authored-asset resolution") — so
+same-named blueprints in different projects never select each
+other's machines, and `apply` can never adopt another project's
+blueprint: a selection or reconciliation whose resolution
+disagrees with the recorded source fails closed naming both
+paths.
 
 ### `blueprint-digest`
 
@@ -681,8 +696,8 @@ Format checks (reject the document):
 - unknown top-level keys, unknown drive keys, malformed values;
 - slot clashes (alias + indexed form of the same slot) and
   out-of-range slots;
-- state-only fields (`backend-id`, `blueprint-digest`) in a
-  blueprint;
+- state-only fields (`backend-id`, `blueprint-digest`,
+  `blueprint-source`) in a blueprint;
 - `boot` entries naming undeclared or disabled drives;
 - drive objects declaring none, or more than one, of `media`,
   `size`, and `base`;

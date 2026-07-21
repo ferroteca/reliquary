@@ -30,7 +30,8 @@ same identifiers. Nothing is CLI-only.
   blueprint.
 
 Blueprints are selected by name alone (`--blueprint <name>`, the
-stem of `blueprints/<name>.json`). Machine ids are
+stem of the `<name>.rlqb` file the asset root supplies). Machine
+ids are
 `<blueprint>-<n>` (lowest free number, reused after destroy).
 
 ---
@@ -106,7 +107,7 @@ user blueprints are indexed by reading these fields from the file.
 rlq create blueprint <name> [flags]
 ```
 
-Scaffolds `blueprints/<name>.json` from CLI flags. Refuses if the
+Scaffolds `blueprints/<name>.rlqb` from CLI flags. Refuses if the
 file already exists. `--platform` is required; everything else is
 optional. Omitted fields stay omitted (the blueprint tracks
 defaults, it doesn't bake them in).
@@ -120,7 +121,7 @@ then on.
 rlq create blueprint test-rig --platform dos --hdd 20M
 ```
 
-Writes `blueprints/test-rig.json`:
+Writes `blueprints/test-rig.rlqb`:
 
 ```json
 {
@@ -288,7 +289,7 @@ MACHINES               2
 rlq delete blueprint <name>
 ```
 
-Removes `blueprints/<name>.json`. Refuses while any machine of it
+Removes the blueprint's `.rlqb` file. Refuses while any machine of it
 exists, listing their ids:
 
 ```
@@ -405,7 +406,7 @@ drives enabled or disabled, changed `media` references, added drives
 — are applied and the baseline digest updated:
 
 ```powershell
-# Edit blueprints/freedos.json: disable the CD, boot from hard disk
+# Edit freedos.rlqb: disable the CD, boot from hard disk
 rlq --blueprint freedos stop
 rlq --blueprint freedos apply
 rlq --blueprint freedos start
@@ -688,7 +689,7 @@ rlq --blueprint freedos-1.4-plain script install
 ```
 
 Behind the scenes this:
-1. Extracts `blueprints/freedos-1.4-plain.json`, its companion media
+1. Extracts `blueprints/freedos-1.4-plain.rlqb`, its companion media
    definitions, and its scripts from the built-in library (skipping
    any that already exist).
 2. Creates a machine from the blueprint.

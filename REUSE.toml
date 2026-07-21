@@ -11,6 +11,8 @@ path = [
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "examples/**/*.json",
+    "examples/**/*.rlqb",
+    "examples/**/*.rlqm",
     "reliquary/builtins/**/*.json",
 ]
 precedence = "aggregate"

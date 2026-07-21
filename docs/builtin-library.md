@@ -130,10 +130,10 @@ blueprint and script:
 
 | artifact | pattern | example |
 |---|---|---|
-| blueprint | `<name>.json` | `freedos-1.4-plain.json` |
+| blueprint | `<name>.rlqb` | `freedos-1.4-plain.rlqb` |
 | script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
-| script-aligned media | `<blueprint>-<script-id>-<drive>.json` | `freedos-1.4-plain-install-cdrom.json` |
-| shared media | `<name>.json` | `freedos-1.4-livecd.json` |
+| script-aligned media | `<blueprint>-<script-id>-<drive>.rlqm` | `freedos-1.4-plain-install-cdrom.rlqm` |
+| shared media | `<name>.rlqm` | `freedos-1.4-livecd.rlqm` |
 
 A media definition specific to one script's step — the installer
 CD that script inserts, a driver disk it stages — uses the

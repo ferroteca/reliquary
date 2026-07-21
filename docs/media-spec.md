@@ -16,17 +16,26 @@ SPDX-License-Identifier: BSD-3-Clause
 > release.
 
 The media catalog holds machine-independent media: installer ISOs,
-boot floppies, and driver disks. Definitions normally live in the
-shared `<reliquary_home>/media` library; a rlq script may also
-embed definitions that are installed into that library when the
-script first runs. Machines reference media by name (the
+boot floppies, and driver disks. Definitions are authored assets —
+`.rlqm` files, identified by extension and discovered anywhere
+under the invocation's asset root (the current directory by
+default), falling back to the reliquary home unless
+`--assets-only` disables the fallback (ROADMAP.md,
+"Authored-asset resolution"); a `media/` subdirectory is optional
+organizational dressing, the home's own convention included. The
+home library is the human
+convenience: one shared place for definitions reused across
+interactive scenarios. A rlq script may also
+embed definitions, installed on first run as `<label>.rlqm`
+beside the script — or into the home's `media/` when the script
+resolved from the home. Machines reference media by name (the
 [`media` drive field](machine-blueprint-reference.md#media--optional--string)),
 and every media item is described by a **definition** stating
 where its file comes from and how it is verified.
 
 ```text
 <reliquary_home>/media/
-└── freedos-1.4-livecd.json       a media definition
+└── freedos-1.4-livecd.rlqm       a media definition
 <reliquary_home>/cache/
 ├── downloads/
 │   └── FD14-LiveCD.zip          a cached source archive
@@ -39,13 +48,15 @@ reconstructible: `media/` holds shared definitions — the part worth
 sharing and versioning — while its sibling `cache/` holds the files:
 `cache/media/` the media files machines actually mount, and
 `cache/downloads/` the source archives, cached separately from the
-media items themselves. A definition embedded in a script remains in
+media items themselves. A project asset root organizes its
+`.rlqm` files however it likes; the caches stay under the home
+either way. A definition embedded in a script remains in
 that authored script and is also copied into the library on first
 run; its downloaded artifacts use the same shared caches.
 
 ## Media items
 
-**Every media item has a definition** — a file in `media/`, possibly
+**Every media item has a definition** — a `.rlqm` file, possibly
 installed from a labeled `media <label> { ... }` block in a script.
 During read-only script checking, embedded blocks are treated as
 prospective library additions. A definition declares the item's
@@ -78,9 +89,13 @@ verification is fetched when its definition allows, and is otherwise
 an error.
 
 Names are checked eagerly: any command that touches media begins by
-scanning every definition before resolving references, fetching, or
-starting a machine. Two library files with the same item name are an
-error. Before installing embedded definitions, reliquary compares
+scanning every `.rlqm` under the asset root — and, unless
+the fallback is disabled, the home — before resolving
+references, fetching, or
+starting a machine. Two files in one root with the same item name
+are an error; across roots the asset root shadows the home
+(identical descriptors coalesce, and run records name which root
+supplied each item). Before installing embedded definitions, reliquary compares
 their prospective items with the library and one another. An item may
 coincide only when its normalized descriptor is identical. The
 descriptor includes the payload identity and its direct-source or
@@ -100,7 +115,7 @@ Both library JSON files and embedded `media` blocks use these exact
 forms. In a script, `media <label> {` replaces the JSON object's
 outer opening brace; the block body otherwise follows JSON syntax and
 closes with the object's `}`. The label determines the installed
-file name, `media/<label>.json`, and carries no item meaning. See
+file name, `<label>.rlqm`, and carries no item meaning. See
 [the script spec](script-spec.md#embedded-media-definitions) for
 scope and resolution rules.
 
@@ -127,7 +142,7 @@ from the installed file.
 
 ### Item form — one definition, one item
 
-`media/msdos622-boot.json`:
+`msdos622-boot.rlqm`:
 
 ```json
 {
@@ -156,7 +171,7 @@ archive contributes only one item.
 
 When a source archive contains several files worth naming, one
 definition describes the archive once and itemizes them.
-`media/freedos-1.4-livecd.json`:
+`freedos-1.4-livecd.rlqm`:
 
 ```json
 {

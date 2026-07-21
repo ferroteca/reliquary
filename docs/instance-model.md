@@ -22,7 +22,7 @@ have ids.
 ```text
 <reliquary_home>/
 ├── blueprints/
-│   └── freedos.json          user-owned reusable blueprint
+│   └── freedos.rlqb          user-owned reusable blueprint
 └── cache/machines/
     └── freedos-0/            the machine — disposable
         ├── reliquary-machine.json
@@ -31,7 +31,11 @@ have ids.
         └── backend files and logs
 ```
 
-The file name of `blueprints/<name>.json` is the blueprint name. A machine's
+A blueprint's name is its file stem — `<name>.rlqb`, anywhere
+under whichever asset root supplies it (ROADMAP.md,
+"Authored-asset resolution"); the machine's state records which
+file it resolved from, and name selection matches only machines
+of the invocation's own resolution. A machine's
 identity is `<blueprint>-<n>`, where `<n>` is the lowest free
 non-negative integer for that blueprint at `create` time (destroy
 frees the number for reuse). Allocation is serialized with a
@@ -177,7 +181,8 @@ artifacts without making a vague claim about the guest's contents.
 
 ## Naming and identity
 
-Users author and rename blueprints by changing files in `blueprints/`.
+Users author and rename blueprints by changing `.rlqb` files
+under an asset root.
 Machines are never renamed because the id is the whole identity:
 `<blueprint>-<n>`, assigned at `create` (lowest free number) and
 reused after `destroy`. Manual renames of machine directories under

@@ -22,9 +22,14 @@ SPDX-License-Identifier: BSD-3-Clause
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
-across the VM seam. Scripts live in
-`<reliquary_home>/scripts`, one `<name>.rlqs` file per script, and
-run against a machine selected with `--machine <id>` or, when the
+across the VM seam. Scripts are authored assets — `.rlqs` files,
+identified by extension and discovered anywhere under the
+invocation's asset root (the current directory by default),
+falling back to the reliquary home unless `--assets-only`
+disables the fallback (ROADMAP.md, "Authored-asset resolution");
+a `scripts/` subdirectory is optional organizational dressing.
+One `<name>.rlqs` file per script; a run selects its machine with
+`--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:
 
 ```powershell
@@ -618,7 +623,7 @@ media freedos-livecd {
 ```
 
 The label is an identifier and determines the installed file name:
-the block above installs as `media/freedos-livecd.json`. It labels
+the block above installs as `freedos-livecd.rlqm`. It labels
 the definition, not an item; an archive definition may still
 contain several independently named items, each referenced by
 `@<item-name>`.
@@ -632,7 +637,11 @@ appear after the header and before input declarations.
 
 Checking a script treats its embedded definitions as a prospective
 addition to the shared catalog but remains read-only. Running a
-script installs them into `<reliquary_home>/media` before fetching
+script installs them as `<label>.rlqm`, following reliquary's
+write convention — into the home's `media/` for a home-resolved
+script, beside the script file itself for a source-resident one,
+where the new file is source its author
+commits — before fetching
 media, reconciling the target machine, or delivering guest input.
 Consequently, machine and media commands can use the definitions
 after the first run without needing the script in scope.
@@ -1569,8 +1578,9 @@ anyway while the CD remains attached).
 A shareable blueprint/script bundle consists of its script, machine
 blueprint, any separate shared media definitions, and an example
 response file containing only non-sensitive illustrative values.
-Media definitions embedded in a script are installed into the
-recipient's shared library on first run. Definitions already reused
+Media definitions embedded in a script are installed on first
+run — into the recipient's home `media/`, or beside the script in
+a project. Definitions already reused
 by several scripts may be distributed directly under `media/`
 instead. The user property registry, personal or secret response
 files, and staged payloads stay out of the bundle and version

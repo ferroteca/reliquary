@@ -213,28 +213,43 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     export artifact ("bare image + launch config") is a reliquary-invented
     format with no spec — the default-install-to-VirtualBox journey is
     unresolved
-  - ARTIFACT RESIDENCY (use-case amendment, 2026-07-21 — the cross-
-    cutting split now in USE-CASES.md): for automation, blueprints,
-    media definitions, and scripts are source code — they live in the
-    consuming project's source control, never in the reliquary home;
-    the home fits the manual/library side and keeps caches, machines,
-    and the registry either way. Every settled spec assumes home
-    residency (scripts resolve from <home>/scripts, blueprints from
-    blueprints/<name>.json, media from the home library). Design
-    needed: path-based blueprint/script selection on CLI + API,
-    project-scoped resolution for media/blueprint/script references
-    (definitions beside the artifacts that use them), embedded-block
-    installation semantics when the script is source-resident, and U6
-    drafts saved straight into a source tree. Supersedes the former
-    "U4 repo-clone-to-reliquary-home hand-off" watch item: there is
-    no hand-off — artifacts run in place. CONSTRAINT (owner,
-    2026-07-21): the built-in library is NEVER a resolution tier for
-    automation — a blueprint changing outside project source control
-    breaks the project; the library is at most copied from, the copy
-    committed. Open question for the round: does the same trap
-    exclude the home's own blueprints/media/scripts from
-    source-resident resolution too (the home also changes outside the
-    repo), making project resolution strictly project-scoped?
+  - ARTIFACT RESIDENCY (use-case amendment 2026-07-21, the split in
+    USE-CASES.md; resolution model DECIDED owner 2026-07-21, recorded
+    in ROADMAP.md "Authored-asset resolution"): every invocation
+    names where authored assets live — the asset root — defaulting to
+    the current directory (blueprints/ media/ scripts/ subdirs, the
+    home's own layout), falling back to the reliquary home unless an
+    explicit no-home option disables it. Automation runs with the
+    fallback OFF: strictly project-scoped resolution, so neither home
+    assets nor the built-in library behind them can reach the run
+    (answers the former open question — home exclusion is the
+    opt-out, not automatic). The built-in library remains NEVER a
+    resolution tier for automation; at most copied from, the copy
+    committed. DETAILS DECIDED (owner, 2026-07-21) and folded:
+    --assets <dir> + --assets-only (API assets= / assets_only=,
+    global, under parity); root shadows home (identical descriptors
+    coalesce, within-root duplicates stay errors, provenance in run
+    records); machine state records the blueprint's absolute source
+    path (state-only blueprint-source) and --blueprint selection is
+    scoped to the invocation's resolution — apply can never adopt
+    another project's same-named blueprint; embedded blocks install
+    into the resolving root's media/ (idempotent by identity —
+    commit once, CI trees stay clean); U6 drafts emit into the
+    session's asset root. Folded into ROADMAP "Authored-asset
+    resolution" + "The CLI", media-spec, script-spec, blueprint
+    guide + reference (blueprint-source), instance-model. EXTENSIONS
+    DECIDED (owner, 2026-07-21): blueprints are *.rlqb, media
+    definitions *.rlqm (scripts *.rlqs) — assets identified by
+    extension, discovery walks the root, subdirs are optional
+    organizational dressing (home convention included); within-root
+    same-kind stem collisions are errors; reliquary reads by
+    extension and writes by convention (home media/ for home-resolved
+    installs, beside the script in a project); folded across the same
+    docs plus cli.md, builtin-library, README, CLAUDE.md, examples.
+    Remaining:
+    implementation only (resolution module, extension rename in
+    builtins/ and the library index, state field, selection scoping,
+    install targeting), at the residency milestone
   - watches (served but strained; re-ask as they harden): live-run progress
     surface (G4 during the run — ties to run-events); GUI/landmark
     assets forming a new authored artifact class; published JSON Schemas

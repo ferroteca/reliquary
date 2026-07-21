@@ -11,8 +11,8 @@ reliquary is not a VM manager for machines you keep.
 
 ## Blueprints and machines
 
-The first thing to learn is reliquary's central model. A **blueprint** is a reusable JSON design you author and keep, at
-`<reliquary_home>/blueprints/<name>.json`. A **machine** is a disposable realization reliquary builds from it,
+The first thing to learn is reliquary's central model. A **blueprint** is a reusable JSON design you author and keep —
+a `<name>.rlqb` file, conventionally under `<reliquary_home>/blueprints/`. A **machine** is a disposable realization reliquary builds from it,
 identified by a generated id — one blueprint, many machines. Machines are created, run, destroyed, and recreated freely:
 the blueprint (with media definitions and scripts) is always enough to rebuild one, so nothing reliquary materializes is
 ever precious. Editing a blueprint never changes an existing machine by itself; a machine keeps the snapshot it was

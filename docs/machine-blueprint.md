@@ -28,9 +28,9 @@ When a result should outlive its machine, `export` carries it out.
 ```mermaid
 flowchart LR
     subgraph yours["yours — durable, worth versioning"]
-        BP["blueprint<br/>blueprints/freedos.json"]
-        MED["media definitions<br/>media/*.json"]
-        SCR["scripts<br/>scripts/*.rlqs"]
+        BP["blueprint<br/>freedos.rlqb"]
+        MED["media definitions<br/>*.rlqm"]
+        SCR["scripts<br/>*.rlqs"]
     end
     subgraph reliquarys["reliquary's — disposable, regenerates"]
         M1["machine 5fd1…<br/>state · drives · runs"]
@@ -91,7 +91,7 @@ Two rules carry the whole model:
 
 ```text
 <reliquary_home>/blueprints/
-└── msdos.json               reusable blueprint — yours
+└── msdos.rlqb               reusable blueprint — yours
 <reliquary_home>/cache/machines/<id>/
 ├── reliquary-machine.json   the machine's state — reliquary's
 ├── drives/                  the machine's disk and floppy images
@@ -99,7 +99,7 @@ Two rules carry the whole model:
 └── ...                      backend files and logs
 ```
 
-- The **blueprint** (`blueprints/<name>.json`) is the reusable machine shape
+- The **blueprint** (`<name>.rlqb`) is the reusable machine shape
   you defined. You own it: reliquary reads it and never writes it.
 - The **state** (`cache/machines/<id>/reliquary-machine.json`)
   describes one machine: its identity, blueprint, lifecycle
@@ -172,11 +172,16 @@ state wraps its resolved form with identity, lifecycle, and
 backend facts. See [the instance model](instance-model.md).
 
 **Blueprints have names; machines have ids.** A blueprint's name is its file
-name. A machine's identity is `<blueprint>-<n>` — commands take
+stem (`<name>.rlqb`). A machine's identity is `<blueprint>-<n>` — commands take
 `--machine <blueprint>-<n>`, or `--blueprint <name> --machine <n>`,
 and `--blueprint <name>` alone selects a blueprint's machine when
 exactly one exists. Destroy frees the number for reuse on the next
-`create`.
+`create`. Selection by name is scoped to the invocation's
+resolution: a machine matches only when the name resolves —
+through the asset root — to the same blueprint file the machine
+[records](machine-blueprint-reference.md#blueprint-source), so
+same-named blueprints in different projects never select each
+other's machines.
 
 ## A first example
 
@@ -191,8 +196,12 @@ A minimal blueprint that boots a DOS floppy image:
 }
 ```
 
-Save it as `blueprints/msdos.json` — blueprints arrive in
-`blueprints/` written by hand, seeded out of the
+Save it as `msdos.rlqb` anywhere under your asset root — the
+current directory by default, or the reliquary home for the
+shared personal collection; a `blueprints/` subdirectory is
+optional organizational dressing (ROADMAP.md, "Authored-asset
+resolution"). Blueprints arrive written by hand, seeded
+out of the
 [built-in library](builtin-library.md) (implicitly on first
 reference, or explicitly with `pull`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command —
@@ -214,7 +223,7 @@ always works and is required once a blueprint has several machines.
 
 ### The blueprint — yours
 
-`blueprints/<name>.json` holds the machine shape as you defined it —
+A `.rlqb` file holds the machine shape as you defined it —
 the file you authored, and whatever you edit it to later. Write as
 little as possible and let resolution fill in the rest:
 
@@ -259,7 +268,8 @@ The state is fully resolved:
 - the assigned `backend` is recorded, along with the state-only
   fields: the machine's own `id` (repeated in the file as a safety
   check against a misplaced or hand-copied machine directory),
-  `backend-id`, and the resolved blueprint digest — plus the
+  `backend-id`, the resolved blueprint digest, and the blueprint's
+  resolved source path — plus the
   machine's bookkeeping: its blueprint's name, creation time, and
   lifecycle phase. (Script outcomes live in run records — there
   is no `installed` flag.)

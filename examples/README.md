@@ -15,19 +15,22 @@ SPDX-License-Identifier: BSD-3-Clause
 > `freedos-1.4-plain` artifacts ship it that way).
 
 A complete, shareable FreeDOS 1.4 plain-install blueprint bundle in
-reliquary's document formats. The directories mirror the reliquary
-home; copy each file into the matching directory of your home:
+reliquary's document formats. Assets are identified by extension,
+so the directories are organizational dressing mirroring the
+reliquary home's convention; use the bundle in place as an asset
+root, or copy the files into your home:
 
 ```text
-blueprints/freedos.json             the install machine blueprint
+blueprints/freedos.rlqb             the install machine blueprint
 scripts/freedos-plain-install.rlqs   install script + LiveCD definition
 scripts/freedos-plain-verify.rlqs    boot the result, confirm C:\>
 ```
 
-The install script embeds the LiveCD definition. Its first run copies
-that block to `media/freedos-1.4-livecd.json` before creating the
-machine, so the verification script and later independent machine
-commands resolve the same media through the ordinary library.
+The install script embeds the LiveCD definition. Its first run
+installs that block as `freedos-1.4-livecd.rlqm` before creating
+the machine, so the verification script and later independent
+machine commands resolve the same media through the ordinary
+catalog.
 
 Then:
 

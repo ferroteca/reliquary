@@ -150,10 +150,11 @@ never builds its own: agents may not exist for some operating
 systems, but writing one would be a whole project unto itself,
 outside reliquary's scope.
 
-Alongside it runs an artifact-residency split. For manual, human
-interaction the built-in library and the home's file structure —
-blueprints, media definitions, and scripts defined in the
-reliquary home — fit naturally (U1, U5). The other side of the
+Alongside it runs an artifact-residency split. Assets in the
+reliquary home are a convenience for human CLI interaction: users
+get a convenient home for shared assets — blueprints, media
+definitions, and scripts reused across human-interaction
+scenarios — seeded by the built-in library (U1, U5). The other side of the
 coin: for automation, media definitions, scripts, and blueprints
 are source code artifacts — they belong to the consuming project,
 live in its source control, and never live in reliquary's home
