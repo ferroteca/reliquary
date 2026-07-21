@@ -38,9 +38,11 @@ wait  machine=stopped   # channel named: unmistakably machine state
 
 # The domains can no longer swap on a quoting slip: the machine
 # domain always carries its channel name, and a quoted word is
-# always the screen. The fix also opened the growth path — image=
-# and console= arrive as new channel names, not new syntax (see
-# the spec's channel table and vocabulary-growth section).
+# always the screen. The fix also opened the growth path —
+# console= arrives as a new channel name (a new observable), and
+# image matching as a new value spelling over the screen (a
+# @landmark reference) — never new syntax (see the spec's channel
+# table and vocabulary-growth section).
 #
 # RESIDUE (minor, accepted): the word "stopped" still appears in
 # two inert-vs-observed roles — `machine stopped` (header
