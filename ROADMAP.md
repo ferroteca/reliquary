@@ -1070,6 +1070,19 @@ blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `docs/`
 documents is implemented for DOS on QEMU.
 
+### Milestone zero — settle the surface
+
+Before the realignment below writes any code, the small set of
+adjudicated language decisions recorded in TASKS.md ("DECISIONS
+NEEDED BEFORE PARSER REALIGNMENT STARTS") is resolved and folded
+into the spec: the enter/key-token resolution, the reactive-handler
+keyword question, the cyclic-deadline rule, the terminating-
+statement details, the pre-approved validation batch, and the
+execution-model-before-runner sequencing rule. Milestone zero is
+done when the spec answers every one of them and the reference
+script parses under the answers. Deciding here is nearly free;
+deciding after the parser exists costs a rewrite.
+
 ### Script-surface realignment — absolute priority #1
 
 The July 2026 script-language redesign

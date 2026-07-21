@@ -20,6 +20,37 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     string/regex is the screen observation, its only spelling; machine=stopped
     the only machine-state spelling; console= later as a new channel,
     @landmark later as a new matcher spelling)
+  - MILESTONE ZERO — DECISIONS NEEDED BEFORE PARSER REALIGNMENT STARTS
+    (see ROADMAP.md "Milestone zero — settle the surface"; each adjudicated;
+    evidence in workflow journals wf_ac5f89b4-402 / wf_1a266a6b-ff8):
+    1. problem 01 (the word "enter"): pick ONE — (a) delete the enter verb,
+       keep type/press + <key> tokens; (b) delete <key> tokens, keep
+       enter/press; (c) delete both (type = text only, press = keys only).
+       Audit confirmed (a) and (b) separately; they conflict as stated
+    2. problem 04 (on's two lifecycles): pick ONE — (a) keyword split:
+       `always` for reactive handlers, `on` only inside branching waits;
+       (b) merge the constructs, lifetime carried by the handler's own
+       terminal. Both survived review from different lenses
+    3. mandatory header deadline for phased scripts whose transition graph
+       has a cycle: accept (design-install.rlqs must then add one — it is
+       currently invalid under this rule) or reject with recorded reason
+    4. two terminating-statement details: ban trailing `finish` in linear
+       scripts (EOF-only; contradicts current spec sentence)? require >=2
+       handlers in a branching wait (single condition = plain wait)?
+    5. bless-as-batch (adjudicated, no conflicts, apply mechanically):
+       insert-into-occupied / eject-from-empty as run errors; empty-pattern
+       and fixed-string-regex static checks; regex-compile validation;
+       stage source-path existence check; input delivery contract
+       paragraph; select's clocks named; prompt-echo false-positive note
+    6. sequencing rule: write the spec's execution model (sample / episode /
+       clock table) BEFORE retargeting script_runner.py, and design the
+       minimum run-events stream INTO that retarget, not after it
+    - decide soon (naming freezes free before v1, never after): boot ->
+      set-boot or keep; is machine=running legal; machine stopped
+      undiverged header option
+    - NOT urgent, deliberately open: landmark namespace scoping, GUI asset
+      format details, error-id index (beta), full spec document restructure
+      (editorial, may trail realignment)
   - timing model: timeout/stable are lexically scoped defaults (innermost wins),
     deadline is a per-activation budget (fresh per phase entry; header deadline
     backstops the run); the placement matrix is enforced as parse errors
