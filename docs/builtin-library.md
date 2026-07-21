@@ -79,14 +79,24 @@ Extraction happens two ways:
 
 Both paths obey the never-overwrite rule.
 
+Built-in blueprints and standalone media definitions are JSONC
+documents (see
+[format stability](machine-blueprint.md#format-stability-none-yet))
+and use comments deliberately: a built-in blueprint annotates its
+[customization seams](machine-blueprint.md#customization-seams) —
+`// this parameter is your registered owner name` — so the
+seeded copy teaches at exactly the point of edit (U5). Extraction
+copies files verbatim, comments included.
+
 ## Non-redistributable media
 
 **Top-priority rule: a built-in media definition may carry a
-`url` only when it also carries an explicit assertion that the
-media's own licensing permits redistribution** (naming the
-license — e.g. FreeDOS's GPL). The assertion lives in the
-definition itself, so the claim travels with the URL it
-justifies. No change adding or altering a URL in a built-in
+`url` only when it also carries the
+[`redistributable-under` field](media-spec.md#definition-level-fields)
+— the explicit assertion that the media's own licensing permits
+redistribution, naming the license** (e.g. FreeDOS's
+`"GPL-2.0-or-later"`). The assertion lives in the definition
+itself, so the claim travels with the URL it justifies. No change adding or altering a URL in a built-in
 media definition is accepted without it; absent the assertion, a
 built-in definition ships hashes only. This is what keeps the
 library shippable: reliquary never points at — or fetches —
@@ -104,9 +114,11 @@ fails by design**: resolution finds a definition with no download
 source and no payload on disk, and stops before anything is
 created, naming the missing media. That failure is the prompt —
 the user pulls (or lets reliquary seed) the definition, then
-either adds their own `url` or `local-path` to it, or places the
-payload file where the definition expects it. The SHA-256 hash
-then verifies that what they supplied is the exact media the
+adds their own `url` or `local-path` to it, pointing at the
+media wherever they keep it — the cache is never hand-fed;
+definitions are the interface, and a payload the user supplies
+always enters through `local-path`. The SHA-256 hash then
+verifies that what they supplied is the exact media the
 scripts were built for (see
 [media-spec.md](media-spec.md) for URL-less definitions and
 `local-path`).

@@ -281,3 +281,46 @@ ordering caveat from the
 [reference](machine-blueprint-reference.md#controller--optional--string):
 slot order is authoritative within one controller type, so prefer a
 single type per machine when drive lettering matters.
+
+---
+
+## 9. A parameterized install
+
+A blueprint written to be seeded and customized (its
+[customization seams](machine-blueprint.md#customization-seams)):
+the install script declares `owner-name` and `install-key`
+inputs, and the blueprint binds them.
+
+```json
+{
+  "platform": "win9x",
+  "drives": {
+    "hdd": {"size": "2G"},
+    "cdrom": null
+  },
+  "boot": ["hdd", "cdrom"],
+  "scripts": {
+    "install": "win98-install",
+    "verify": "win98-verify"
+  },
+  "parameters": {
+    "owner-name": "testuser",
+    "install-key": {"property": "products.windows-98.install-key"}
+  }
+}
+```
+
+`owner-name` is specified directly — every machine installs as
+`testuser` until you edit the value. `install-key` is only
+referred to: each user stores their own key once
+(`rlq property set products.windows-98.install-key --secret`) and
+the script retrieves it at use; the key never enters the
+blueprint or version control. A response file still overrides
+either binding for one invocation
+(`rlq --blueprint win98 script install --responses answers.json`).
+
+Both are value seams. Installing the *German* edition instead is
+a [composition seam](machine-blueprint.md#customization-seams):
+the seeded blueprint's `drives` media reference and `scripts` map
+are pointed at a localized media/script pair, and each script
+stands alone against the installer it was written for.

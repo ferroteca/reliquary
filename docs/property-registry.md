@@ -61,7 +61,10 @@ stores only strings: input declarations provide the useful type, and
 future value kinds can be introduced deliberately instead of through JSON
 coercion.
 
-The file is UTF-8 JSON. Reliquary accepts user formatting but writes a stable,
+The file is UTF-8 strict JSON — unlike blueprints and media
+definitions, it accepts no comments or trailing commas, because
+property commands rewrite it canonically and would destroy them.
+Reliquary accepts user formatting but writes a stable,
 canonical format when a property command changes it. Writes are atomic; an
 invalid file is reported with its path and location and is never partly
 rewritten.
@@ -143,12 +146,16 @@ bind to the same property.
 Binding uses this precedence for each input:
 
 1. A value explicitly supplied in the invocation's response file.
-2. The property named by the declaration's `property:` modifier.
-3. Interactive prompting using `prompt:` or the input name.
+2. A [blueprint parameter](machine-blueprint-reference.md#parameters) of the
+   target machine's blueprint — a direct value, or a property reference that
+   replaces the input's own binding rather than chaining to it.
+3. The property named by the declaration's `property:` modifier.
+4. Interactive prompting using `prompt:` or the input name.
 
-An explicit response therefore overrides a personal default for one run.
-When neither a response nor a usable property is present, an interactive run
-prompts and a noninteractive run fails before the machine starts. Prompted
+An explicit response therefore overrides a personal default for one run, and
+a blueprint's designed values override personal registry defaults. When no
+response, blueprint parameter, or usable property is present, an interactive
+run prompts and a noninteractive run fails before the machine starts. Prompted
 values are invocation-local; reliquary never changes the registry unless the
 user runs a property command or calls the corresponding embedding API.
 

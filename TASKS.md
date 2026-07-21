@@ -179,18 +179,37 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   - U3 run records: only `script` invocations produce a run record — a
     programmatic API/CLI-primitives loop leaves nothing, yet U3 says the
     run record is the product; align with the decided run-events.jsonl
-    normative-stream model (every surface a renderer of it)
+    normative-stream model (every surface a renderer of it); the
+    unit-test loop is now IN U3 itself (amended 2026-07-21: the
+    canonical journey uses reliquary twice — define and build the test
+    VM, then automate testing inside it; detailed per-test results,
+    update a test object, re-run one test or the whole suite; granular
+    results and selective re-run are first-class demands) — so the
+    run-records design serves a primary use case directly: per-run
+    test selection is response data (inputs-as-data holds), and the
+    iterate loop needs per-iteration run records plus collected
+    results the automator can parse
   - U3 stage/collect: the "declared exchange drive" cannot be declared in
     the decided blueprint drive vocabulary (no directory/vvfat kind), the
     CLI has no file-exchange commands, and only the superseded legacy
     Runner/root-home surface serves injection today
-  - U5 blueprint parameterization (the center of the use case, designed
-    nowhere): no parameter field, no seam vocabulary, no channel by which
-    a blueprint-held value reaches a script, and nothing enumerates a
-    blueprint's seams; hard language limit to face: inputs cannot
-    parameterize watch conditions, so a value seam covers typed values and
-    media but never a different-language installer UI — "the script can
-    stand alone" currently holds only for value-only seams
+  - U5 blueprint parameterization — DESIGN RECORDED 2026-07-21, owner
+    adjudication pending: blueprint `parameters` field (direct value |
+    {"property": ...} reference; binding order response > blueprint >
+    input property= > prompt; a reference REPLACES the input's own
+    property= binding, never chains; secret inputs never take direct
+    values — U4; read at invocation like the scripts map, no
+    state/apply/digest involvement) plus the seam doctrine: value
+    seams = parameters, locale-class customization = composition seam
+    (the blueprint selects the media/script pair; the watch-condition
+    ban stands, G2/G3). Landed: machine-blueprint-reference.md
+    #parameters, machine-blueprint.md #customization-seams, cookbook
+    #9, script-spec.md inputs + validation + check-script, ROADMAP
+    (blueprint fields, inputs paragraph, literal-defaults open
+    decision resolved). Original gap text: no parameter field, no
+    seam vocabulary, no channel by which a blueprint-held value
+    reaches a script; inputs cannot parameterize watch conditions, so
+    a value seam never covers a different-language installer UI
   - U1 export journey: the easy path lands on QEMU, export targets the
     machine's own backend, cross-backend conversion is open, and QEMU's
     export artifact ("bare image + launch config") is a reliquary-invented
@@ -198,10 +217,29 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     unresolved
   - watches (served but strained; re-ask as they harden): live-run progress
     surface (G4 during the run — ties to run-events); U4's repo-clone-to-
-    reliquary-home hand-off has no named workflow; hand-placed proprietary
-    payloads vs the "cache is not an interface" doctrine; GUI/landmark
+    reliquary-home hand-off has no named workflow; GUI/landmark
     assets forming a new authored artifact class; published JSON Schemas
     elevating reliquary-machine.json into a public contract
+  - RESOLVED (July 2026): hand-placed proprietary payloads vs the "cache is
+    not an interface" doctrine — local-path (item- or archive-level) is now
+    the only hand-supply path; the cache is never hand-fed; a sourceless
+    definition pins hashes but fails resolution naming the definition to
+    edit (specced in media-spec.md + builtin-library.md)
+- SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
+  media/blueprint specs now describe these; implementation work items:
+  - shared JSONC reader for authored documents (blueprints + standalone
+    media definitions): RFC 8259 + // and /* */ comments + trailing commas,
+    nothing more (no JSON5 features); string-aware tokenizer, comments
+    replaced by spaces so error line/col survive; JSON islands in scripts,
+    the property registry, and every machine-written file stay strict JSON
+  - new media definition surface: definition-level description / notes /
+    redistributable-under (the built-in URL licensing-assertion field),
+    archive-level local-path; sourceless definitions fail resolution with
+    the edit-the-definition error
+  - CLI fetch/clean commands + API parity: fetch_media(script=),
+    clean_downloads(), clean_media()
+  - built-in library: teaching comments at blueprint seams once the JSONC
+    reader lands
 - install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
 - "rlq script install --blueprint freedos-1.4-plain" should be our north star
   - "rlq --blueprint freedos-1.4-plain script install" is identical 

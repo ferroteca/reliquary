@@ -210,9 +210,15 @@ policy), and `backend-settings` (the scoped non-portable escape
 hatch applied only when its named backend is selected; it never
 selects that backend by itself).
 Discovery and scripting fields: optional `name` and `description`
-(indexed by `search`), and the `scripts` map — short labels naming
+(indexed by `search`), the `scripts` map — short labels naming
 `.rlqs` files, the verbs used with `script`
-(`rlq --blueprint freedos-1.4-plain script install`).
+(`rlq --blueprint freedos-1.4-plain script install`) — and the
+`parameters` map: blueprint-supplied script-input bindings, each
+a direct value or a `{"property": ...}` reference, the blueprint
+half of U5's customization seams. Like the `scripts` map it is
+read at script invocation and configures script binding, not
+machine shape — no state, `apply`, or baseline-digest
+involvement (see docs/machine-blueprint-reference.md).
 Validation and capability mismatches fail closed, naming the
 backend and missing capability.
 
@@ -565,8 +571,13 @@ run-specific data without adding decisions or expressions.
 `$name` references (`${name}` inside strings) are bound before
 execution. Each input may name a
 home-wide user property with `property="<key>"`; an explicit JSON
-response wins for that invocation, then the property registry, then
-interactive prompting. Missing noninteractive, mistyped, or
+response wins for that invocation, then the machine blueprint's
+`parameters` binding (a direct value, or a property reference
+replacing the input's own), then the property registry, then
+interactive prompting. Locale-class customization that would
+change watch conditions is never a value binding: it is the
+blueprint's composition seam — selecting the media/script pair —
+per U5 (docs/machine-blueprint.md, "Customization seams"). Missing noninteractive, mistyped, or
 unresolved-media values fail before the machine starts, as do
 ordinary/secret kind mismatches.
 
@@ -1796,8 +1807,12 @@ agentless and guest-agent control planes with equivalent results.
 - **Script spec details** (the control-flow and response-file shape
   are decided — see "The scripting language" and
   docs/script-spec.md): the portable key-name vocabulary for
-  `press`/`<key>` tokens, and whether literal input defaults are
-  useful in addition to user-property bindings.
+  `press`/`<key>` tokens is published in the spec as a closed set;
+  confirm it at realignment. Literal input defaults are resolved:
+  they live in the blueprint `parameters` field (U5's
+  blueprint-held seam), never in input declarations — a default in
+  the script would undercut the blueprint as the customization
+  surface.
 - **Cross-script reuse**: whether repeated behavior eventually
   justifies a constrained include mechanism. There is deliberately
   no handler-splicing macro in the initial language; real scripts

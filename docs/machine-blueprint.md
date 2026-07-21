@@ -9,8 +9,9 @@ SPDX-License-Identifier: BSD-3-Clause
 > `size`/`media` and empty removable slots (`null`), `boot`, `name`,
 > `description`, and `scripts`) is implemented: parsing, validation,
 > media-name resolution, machine materialization, and persistent
-> script-driven `insert`/`eject`. The remaining fields are not
-> implemented yet; details may still change before first release.
+> script-driven `insert`/`eject`. The remaining fields, and JSONC
+> acceptance, are not implemented yet; details may still change
+> before first release.
 
 Every reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create
@@ -162,7 +163,8 @@ format is a QEMU option or a VirtualBox setting in disguise. The
 one deliberate exception is the
 [`backend-settings`](machine-blueprint-reference.md#backend-settings)
 field, an explicitly scoped escape hatch; a blueprint that
-doesn't use it is portable by construction.
+doesn't use it is portable by construction — one checked-in
+blueprint serves every developer's host (U4).
 
 **A blueprint and its state are not the same format.** The blueprint is the
 portable JSON document you author. The reliquary-owned machine
@@ -189,9 +191,12 @@ A minimal blueprint that boots a DOS floppy image:
 }
 ```
 
-Save it as `blueprints/msdos.json` — blueprints are authored directly into
-`blueprints/`, by hand, by the future `init` scaffolding command, or by
-`import` — then create a machine from it and run it:
+Save it as `blueprints/msdos.json` — blueprints arrive in
+`blueprints/` written by hand, seeded out of the
+[built-in library](builtin-library.md) (implicitly on first
+reference, or explicitly with `pull`), synthesized from a native
+VM by `import`, or scaffolded by the future `init` command —
+then create a machine from it and run it:
 
 ```powershell
 rlq create --blueprint msdos
@@ -290,8 +295,9 @@ blueprint is your interface.
 
 reliquary rewrites the state carefully: in the same operation as
 the machine change it records, atomically
-(write-temp-and-replace), and in canonical formatting — stable key
-order, two-space indent, UTF-8, trailing newline.
+(write-temp-and-replace), and in canonical formatting — strict
+JSON, stable key order, two-space indent, UTF-8, trailing
+newline.
 
 ### Reconciliation at `start`
 
@@ -408,7 +414,7 @@ machine**, copied to its backend's native management, registered
 where that backend normally keeps VMs with disks in its native
 format. This is the first-class form of the intended endgame:
 reliquary machines are ephemeral, and when something should live
-on, you export it. An exported machine is independent and
+on, you export it (U1). An exported machine is independent and
 permanently outside reliquary's purview — reliquary will never
 touch it again.
 
@@ -425,7 +431,7 @@ any other: from its bases. Translating backend config — memory, drives, contro
 is fine; guessing what OS is inside is not, and no backend
 records it, so `--platform` is required. Use import to run
 scripted, disposable experiments against a copy of a real machine
-without risking the original.
+without risking the original (U2).
 
 `delete` takes only `--blueprint`: it removes the blueprint file
 itself and fails closed while any machine of it exists, naming
@@ -460,6 +466,36 @@ backend's own identifier for the machine. reliquary never sends a
 control command to a hypervisor object until its identity matches
 `backend-id`, so a stale or foreign machine is detected and
 refused rather than manipulated.
+
+## Customization seams
+
+A blueprint is written to be seeded and customized (U5): find the
+standard blueprint, copy it, change the obvious thing, run. Its
+author designs the seams in, and they come in two kinds.
+
+**Value seams** carry data into the blueprint's scripts: a user
+name, a license key, which supplemental disk. The
+[`parameters` field](machine-blueprint-reference.md#parameters)
+binds [script
+inputs](script-spec.md#inputs-properties-and-response-files) by
+name — fixing a value directly in the blueprint, or referring to
+a [user property](property-registry.md) each user defines
+locally, so a license key is retrievable at use yet never checked
+in.
+
+**Composition seams** change what the guest itself shows.
+Installing the German edition of Windows means German vendor
+media and German installer screens — different text for the
+script to watch, which no value can parameterize: script inputs
+deliberately never reach watch conditions, so the control-flow
+graph stays static. That seam is compositional, and the blueprint
+already owns both halves: its
+[`drives`](machine-blueprint-reference.md#drives) media
+references name the vendor media, and its
+[`scripts`](machine-blueprint-reference.md#scripts) map names the
+scripts that drive it. A customized blueprint points both at the
+localized pair, and each script stands alone against the media it
+was written for.
 
 ## Validation: fail closed, name the problem
 
@@ -511,16 +547,30 @@ There is deliberately no version field. Versioning is
 compatibility machinery, and the blueprint carries none until a real
 second format version exists — no earlier than beta.
 
-The blueprint is JSON only. YAML may be supported later; if it is, it
-will normalize through exactly the same model with no YAML-only
-features.
+The blueprint's value grammar is JSON, and JSON only — there is
+no YAML form, and none is planned. Because a blueprint is a
+document you author and reliquary only ever reads (`import` and
+`init` write one once, then never again), the file accepts the
+JSONC dialect: JSON (RFC 8259) plus `//` and `/* */` comments
+and trailing commas in arrays and objects — the dialect editors
+already apply to files like `tsconfig.json`, and nothing more
+(no unquoted keys, no single-quoted strings, no other JSON5
+extensions). Comments are the author's margin notes — a seeded
+built-in blueprint uses them to point out its customization
+seams (U5) — and carry no meaning: reliquary never reads them,
+and nothing normative may live in one; anything the contract
+needs is a field. A blueprint without comments remains valid
+strict JSON; one with them is not parseable by strict JSON
+tooling — a deliberate trade. Machine-written documents are
+different: the state — and every other file reliquary writes —
+is strict canonical JSON, always.
 
 ## Where to next
 
 - [Field reference](machine-blueprint-reference.md) — `platform`,
   `backend`, `drives` (including starting-point `base` images),
-  `boot`, `control-planes`, `backend-settings`, and the
-  state-only fields, with every rule and per-field examples.
+  `boot`, `control-planes`, `parameters`, `backend-settings`, and
+  the state-only fields, with every rule and per-field examples.
 - [Cookbook](machine-blueprint-cookbook.md) — complete blueprints for
   common machine shapes, with the state documents they resolve
   into.

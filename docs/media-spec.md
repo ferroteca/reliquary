@@ -5,9 +5,15 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The media spec
 
-> **Status:** this documents the planned media definition format.
-> The media catalog is not implemented yet; details may still
-> change before first release.
+> **Status:** the definition core is implemented: both forms with
+> their derived defaults, `file-extension`, `local-path`, library
+> scanning with duplicate detection, and hash-verified fetching
+> and extraction with the mismatched-file contract. Embedded
+> `media` blocks parse in scripts; their installation into the
+> library, mirror URL lists, the `fetch` and `clean` commands,
+> JSONC acceptance, and the definition-level annotation fields
+> are not implemented yet; details may still change before first
+> release.
 
 The media catalog holds machine-independent media: installer ISOs,
 boot floppies, and driver disks. Definitions normally live in the
@@ -50,10 +56,18 @@ definition can itemize several media files from one source archive.
 
 There is no way to use a media file without a definition:
 dropping a bare file into `cache/media/` does nothing — the
-cache directories are reliquary's, not an interface. Media that
-cannot be downloaded still gets a definition (with no `url`, or
-with a [`local-path`](#item-fields) pointing at the file where it
-lives); the definition is what names and verifies it.
+cache directories are reliquary's, not an interface, and are
+never hand-fed; everything under `cache/` stays reconstructible.
+Media that cannot be downloaded still gets a definition, with a
+[`local-path`](#item-fields) — item-level, or
+[archive-level](#archive-fields) — pointing at the file where
+the user keeps it; the definition is what names and verifies it
+(U4). A definition may also name no source at all: it then pins
+the item's identity and hashes — the form built-in definitions
+for non-redistributable media ship in — but cannot resolve.
+Resolution fails naming the missing media and the definition to
+edit; supplying the payload means adding a `url` or `local-path`
+to the definition, never placing files in the cache.
 
 A media name referenced from a machine blueprint resolves to the
 defined item of that name. A script run validates and installs all
@@ -89,6 +103,27 @@ closes with the object's `}`. The label determines the installed
 file name, `media/<label>.json`, and carries no item meaning. See
 [the script spec](script-spec.md#embedded-media-definitions) for
 scope and resolution rules.
+
+Library definition files are authored documents and accept the
+JSONC dialect: JSON (RFC 8259) plus `//` and `/* */` comments
+and trailing commas in arrays and objects — the dialect editors
+already apply to files like `tsconfig.json`, and nothing more
+(no unquoted keys, no single-quoted strings, no other JSON5
+extensions). Comments are the author's margin notes —
+provenance, review context, where a hash came from (U4) — and
+carry no meaning: reliquary never reads them, and nothing
+normative may live in one; anything the contract needs is a
+field. A definition without comments remains valid strict JSON;
+one with them is not parseable by strict JSON tooling — a
+deliberate trade.
+
+Embedded `media` blocks are strict JSON: no comments, no
+trailing commas. The divergence from library files is a named
+decision with two reasons — the script grammar closes the JSON
+island by tracking its braces, which a comment containing a
+brace would break, and installation writes the library copy in
+canonical strict JSON, so block comments would silently vanish
+from the installed file.
 
 ### Item form — one definition, one item
 
@@ -191,10 +226,21 @@ The top level of the archive form:
   Every mirror must serve the identical artifact — the hashes are
   the arbiter, not the URL. In the item form, the URL yields the
   payload itself; in the archive form, the archive. Without a
-  `url`, the payload (or archive) must be placed on disk by hand;
-  the definition still names and verifies it — useful for media
-  that cannot be downloaded, like your own licensed installer
-  ISOs.
+  `url`, the payload (or archive) must be supplied locally
+  through `local-path`; the definition still names and verifies
+  it — useful for media that cannot be downloaded, like your own
+  licensed installer ISOs (U4).
+
+- **`local-path`** — optional. A local path to the archive file,
+  in place of the downloads cache: for archives that cannot be
+  downloaded — obtained behind a login, say — or that already
+  live in a managed folder. Download (when a `url` is present),
+  extraction, and `sha256` verification behave exactly as they
+  would in the cache, just at this path. When present, `archive`
+  defaults to its file-name component. Relative paths resolve
+  exactly like the [item field](#item-fields) of the same name.
+  A local archive is outside `cache/`, so `clean downloads`
+  never touches it — the file is the user's, wherever it is.
 
 ### Item fields
 
@@ -261,6 +307,26 @@ each `items` entry of the archive form:
   Extraction takes exactly this entry as `file` and keeps the
   archive in the downloads cache, where it can be re-extracted
   later without downloading again.
+
+### Definition-level fields
+
+Valid at the top level of either form, alongside the fields
+above:
+
+- **`description`** — optional. A one-line human description of
+  the definition, read into listings and `search` exactly like a
+  blueprint's `description` (see
+  [the built-in library](builtin-library.md)).
+- **`notes`** — optional. Free-form prose for anything longer:
+  provenance, licensing context, why a particular mirror.
+  reliquary never interprets it.
+- **`redistributable-under`** — optional. The explicit assertion
+  that the payload's own licensing permits redistribution,
+  naming the license (`"GPL-2.0-or-later"`, say). Its presence
+  is the assertion; reliquary records and displays it but cannot
+  verify a license. A built-in definition may carry a `url` only
+  when it also carries this field — the
+  [built-in library's licensing rule](builtin-library.md#non-redistributable-media).
 
 ### Derived defaults, worked through
 
@@ -355,9 +421,15 @@ With it, fetch validates and installs that script's embedded
 definitions using the same rules as script execution, then fetches
 the named item; it does not execute guest steps or start a machine.
 
-Fetch prefers the caches, cheapest source first: a payload that
-verifies is used as-is; otherwise a cached archive that verifies
-is re-extracted; only then are the mirror URLs tried.
+Fetch prefers what is already on disk, cheapest source first: a
+payload that verifies is used as-is; otherwise a cached (or
+`local-path`) archive that verifies is re-extracted; only then
+are the mirror URLs tried.
+
+The embedding API counterpart is
+`fetch_media(name, home=None, script=None, on_mismatch="fail")`,
+with `script` mirroring `--script` — the CLI and the API move
+together (INTERFACES.md).
 
 Verification is not optional: an item is never used without its
 `sha256` matching, and a failed download or hash mismatch is a
@@ -366,7 +438,8 @@ particular, **every machine `start` re-verifies the hash of every
 media item the machine references** before the machine boots — a
 payload that no longer verifies is refetched when its definition
 allows and the deletion is approved (below), and is otherwise an
-error; a machine never boots against silently changed media.
+error; a machine never boots against silently changed media
+(U1, U4).
 
 ### Mismatched files
 
@@ -385,8 +458,9 @@ how reliquary is running:
 - The deletion can be **pre-approved**: the CLI flag
   `--refetch-mismatched` on commands that fetch media, or the
   embedding API's `on_mismatch="refetch"` option
-  (`fetch_media(name, home=None, on_mismatch="fail")`; the CLI
-  maps interactive runs to `"prompt"`).
+  (`fetch_media(name, home=None, script=None,
+  on_mismatch="fail")`; the CLI maps interactive runs to
+  `"prompt"`).
 
 A mismatched file whose definition names no source is always kept
 and reported — with nothing to refetch from, deleting it could
@@ -410,13 +484,16 @@ rlq clean media
 - `clean downloads` deletes cached source archives. Always safe:
   archives exist only to spare a re-download.
 - `clean media` deletes payload files that reliquary can fetch
-  again — items whose definition has a `url` (or a cached,
-  verifying archive). It never touches definitions, `local-path`
-  files, or payloads without a download source: nothing
-  irreplaceable is cleanable.
+  again — items whose definition has a `url` (or a cached — or
+  local — verifying archive). It never touches definitions,
+  `local-path` files, or payloads without a download source:
+  nothing irreplaceable is cleanable. (A hand-supplied payload
+  is always a `local-path` file, outside the cache's reach.)
 
 To reclaim everything for an item reliquary can restore, run both;
-the next reference to the item fetches it fresh.
+the next reference to the item fetches it fresh. The API
+counterparts are `clean_downloads(home=None)` and
+`clean_media(home=None)`.
 
 ## Sharing
 
@@ -426,4 +503,4 @@ machine-independent. A definition may be distributed directly under
 library on first run. The latter produces a more self-contained
 script bundle without changing the persistent catalog, cache, or
 verification model. Either form gives everyone the same verified
-inputs without shipping the payloads themselves.
+inputs without shipping the payloads themselves (U4).

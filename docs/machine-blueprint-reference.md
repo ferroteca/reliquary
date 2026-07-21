@@ -9,8 +9,9 @@ SPDX-License-Identifier: BSD-3-Clause
 > `size`/`media` and empty removable slots (`null`), `boot`, `name`,
 > `description`, and `scripts`) is implemented: parsing, validation,
 > media-name resolution, machine materialization, and persistent
-> script-driven `insert`/`eject`. The remaining fields are not
-> implemented yet; details may still change before first release.
+> script-driven `insert`/`eject`. The remaining fields, and JSONC
+> acceptance, are not implemented yet; details may still change
+> before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`blueprints/<name>.json`, yours) and each
@@ -32,6 +33,9 @@ All fields are present in the state unless noted otherwise.
 
 There is no version field — see
 [Format stability](machine-blueprint.md#format-stability-none-yet).
+Blueprints accept comments and trailing commas — the JSONC
+dialect — per the same section; the state is strict canonical
+JSON, always.
 
 ---
 
@@ -111,7 +115,7 @@ backend machine and resolves the blueprint afresh (see
 Human-readable discovery metadata: a one-line display `name` and a
 longer `description`. Neither affects machine behavior; both feed
 `search`, which matches terms against filename, `name`,
-`description`, and platform. Built-in library blueprints carry
+`description`, and platform (U5). Built-in library blueprints carry
 them through the library index; user blueprints are indexed by
 reading the fields from the file (see
 [the built-in library](builtin-library.md)).
@@ -146,6 +150,78 @@ take priority over bare script filenames.
 
 Labels are conventionally short verbs — `install`, `verify`,
 `test`, `configure`.
+
+---
+
+## `parameters`
+
+**blueprint (optional) · object · not carried in the state**
+
+Values the blueprint supplies to [script
+inputs](script-spec.md#inputs-properties-and-response-files) — the
+blueprint's half of the customization seams its author designs in
+(U5; see [the guide](machine-blueprint.md#customization-seams)).
+Keys are input names. Each value is one of the two bindings the
+use case names:
+
+- a **direct value** — a JSON string: the parameter is specified
+  in the blueprint itself. An automated-testing blueprint fixes
+  its user name as `"testuser"`; a seeded copy is customized by
+  editing the value.
+- a **property reference** — `{"property": "<key>"}`: the
+  parameter is only *referred to* here and defined externally, in
+  the [user property registry](property-registry.md). This is the
+  form for values that must never enter the blueprint — a license
+  key is the canonical example.
+
+```json
+{
+  "parameters": {
+    "owner-name": "testuser",
+    "install-key": {"property": "products.windows-98.install-key"},
+    "supplemental-disk": "freedos-1.4-bonus"
+  }
+}
+```
+
+When a script runs against a machine of this blueprint (or
+creates one), each input the script declares binds from the first
+available source: an explicit response-file value, then the
+blueprint parameter, then the property named by the input's own
+`property=`, then an interactive prompt. The blueprint therefore
+overrides the personal registry — a value the blueprint fixes
+stays fixed for every machine of it — while a response file still
+overrides everything for one invocation. A property reference
+*replaces* the input's own `property=` binding rather than
+chaining to it: if the referenced key is unset, binding falls
+through to prompting (or fails noninteractively) — never to a
+different key than the one the author chose.
+
+Rules, checked at blueprint validation and script preflight:
+
+- A value is a string or a `{"property": "<key>"}` object —
+  nothing else. Keys must be valid input names and property keys
+  valid registry names.
+- A `secret` input never takes a direct value: blueprints are
+  written to be shared and versioned (U4), and a secret in one is
+  plaintext in source control. A secret parameter uses the
+  property-reference form, the referenced property must be a
+  secret property, and ordinary (`text`, `media`) inputs require
+  ordinary properties — kind mismatches fail rather than
+  downgrading protected data.
+- A parameter naming no input of the *running* script is unused
+  for that run: one blueprint's parameters serve every script in
+  its [`scripts`](#scripts) map, and each script binds only the
+  inputs it declares. A parameter matching no input of *any*
+  script in the map draws a validation warning — it is probably a
+  typo.
+
+Like the `scripts` map, `parameters` is read from the blueprint
+at script invocation: it configures script binding, not machine
+shape. It never appears in the machine's state, takes no part in
+[`apply`](machine-blueprint.md#applying-blueprint-edits) or the
+baseline digest, and an edit is live on the next script run — the
+U5 loop is edit the blueprint, run the script.
 
 ---
 
@@ -285,7 +361,7 @@ A removable drive (`cdrom`, `floppy`) may instead be declared
 The slot exists as guest-visible hardware with no medium inserted.
 This is the normal shape for a drive that scripts occupy
 temporarily — an install script inserts the installer medium into
-the empty slot and ejects it as its final step (see
+the empty slot and ejects it as its final step (U1; see
 [the script spec](script-spec.md#insert-and-eject)). Declaring
 the slot is required: `insert` only places media into hardware
 the blueprint declares, and never creates the drive itself — the
@@ -326,7 +402,7 @@ shape is the installed system, not the installer. (To boot or
 modify a copy of a media image,
 make it a drive [`base`](#base--optional--string-or-object) instead.)
 Media names are the *only* cross-boundary reference a
-blueprint may make.
+blueprint may make (U4).
 
 #### `size` — optional · string
 
@@ -612,7 +688,10 @@ Format checks (reject the document):
   `size`, and `base`;
 - `null` (empty) values on non-removable (`hdd`) drives;
 - `media` or `base.media` names no media definition provides;
-- `backend-settings` sections overlapping reliquary-owned fields.
+- `backend-settings` sections overlapping reliquary-owned fields;
+- `parameters` values that are neither a string nor a
+  `{"property": "<key>"}` object, or with invalid input or
+  property names.
 
 Capability checks (reject the blueprint for *this* backend,
 naming backend and capability):
