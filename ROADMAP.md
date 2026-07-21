@@ -25,8 +25,9 @@ every design choice may assume machines are cheap to destroy and
 rebuild.
 
 [INTERFACES.md](INTERFACES.md) names the interfaces through which
-the world drives reliquary, the primary use cases they serve, and
-the vetting rule every interface-changing decision must follow.
+the world drives reliquary and the vetting rule every
+interface-changing decision must follow; the primary use cases
+they serve live in [USE-CASES.md](USE-CASES.md).
 
 The unit of design is the **operation** performed against a
 machine: start it, stop it, insert media, send input, run a guest

@@ -43,8 +43,9 @@ workflow:
 - `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
 - `INTERFACES.md` is the governing document for reliquary's world-facing interfaces: it names the interface
   inventory (CLI, embedding API, scripting language, machine blueprints, and media definitions, plus the
-  property registry, recorded outputs, and the home layout), the numbered primary use cases, and the
-  vetting rule every interface-changing decision must follow.
+  property registry, recorded outputs, and the home layout) and the
+  vetting rule every interface-changing decision must follow. The numbered primary use cases — the decision
+  surface that rule weighs against — live in `USE-CASES.md`.
 - `examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
   install script embedding the media definition that its first run installs in the media library. Its README carries
   the status note. Keep the examples synchronized with `docs/` when the formats change.
@@ -74,11 +75,11 @@ The CLI, the embedding API, the scripting language, the machine blueprint, and t
 reliquary's primary interfaces to the world; the property registry, recorded outputs (run records,
 transcripts), and the home layout are world-facing contracts alongside them. Any decision that
 changes one follows the rule in [INTERFACES.md](INTERFACES.md): requests triage by their impact on the
-numbered primary use cases — no impact or strong alignment is an easy approval, adding a new use case is more work but still
+numbered primary use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
 work starting only after the amendment lands — then the change is named across every surface it touches
-and landed coherently on all of them. Where ROADMAP.md and INTERFACES.md disagree, INTERFACES.md governs;
-the roadmap is realigned to it.
+and landed coherently on all of them. Where ROADMAP.md and INTERFACES.md or USE-CASES.md disagree, the
+principles and use cases govern; the roadmap is realigned to them.
 
 ### CLI–API parity
 

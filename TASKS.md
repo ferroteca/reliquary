@@ -214,7 +214,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     format with no spec — the default-install-to-VirtualBox journey is
     unresolved
   - ARTIFACT RESIDENCY (use-case amendment, 2026-07-21 — the cross-
-    cutting split now in INTERFACES.md): for automation, blueprints,
+    cutting split now in USE-CASES.md): for automation, blueprints,
     media definitions, and scripts are source code — they live in the
     consuming project's source control, never in the reliquary home;
     the home fits the manual/library side and keeps caches, machines,
@@ -259,7 +259,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     clean_downloads(), clean_media()
   - built-in library: teaching comments at blueprint seams once the JSONC
     reader lands
-- U6 AUTHORING RECORDER (use case amended into INTERFACES.md; design in
+- U6 AUTHORING RECORDER (use case in USE-CASES.md; design in
   ROADMAP.md "Script authoring by recording") — work items, in rough
   dependency order:
   - reliquary-owned console viewer over the vnc control plane (recording
