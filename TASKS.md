@@ -7,6 +7,9 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Small to-do tasks.  Large tasks belong in the roadmap.
 
+- install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
+- "rlq script install --blueprint freedos-1.4-plain" should be our north star
+  - "rlq --blueprint freedos-1.4-plain script install" is identical 
 - allow specifying cache location outside of home dir
 - tension between 'media/download' that we need to resolve
   - see 'inventory'
@@ -50,6 +53,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
 - cli help
   - script "runs a scipt on a machine" not much more than that
 - we need an 'inventory' report:
+  - every item in the home and cache dirs should be itemized in one way or another!
+  -  backend implementation files ignored, just the presence of a machine is noticed
   - orphaned (listed first because, either you *really* want to keep it, or, you really *should* delete it)
     - media (specs not cached media)
     - scripts
