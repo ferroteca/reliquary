@@ -160,6 +160,48 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     imports: container-determined semantics rule (hits [04] — a construct's
     lifetime should be recoverable from its own text), reserve future
     keyword space now, naming freeze is free before v1 and never after
+- GUIDING-PRINCIPLES GAP QUEUE (INTERFACES.md necessity/sufficiency panel,
+  adversarially walked per use case; evidence in workflow journal
+  wf_92864b8e-623) — verdict: the five primary interfaces are necessary and
+  minimal; every gap below is a spec lagging the principles, and this queue
+  is the realignment pass's work list:
+  - CLI programmatic contract (U3 via CLI; the whole unbound-language path
+    rests on it): exit codes, stdout/stderr discipline, output stability, a
+    machine-readable mode — pieces already decided piecemeal (error classes
+    + exit codes, rawjson renderer, run-events.jsonl) but no contracted
+    home; also the interaction command family (type/keys/run/text/wait/
+    screenshot/menu/hmp) is absent from the settled CLI list though a
+    CLI-driving U3 agent lives on it
+  - U2 import: the disk-location choice (leave-in-place vs copy-to-durable-
+    base) is the use case's named key decision point but every settled spec
+    admits only unconditional copy; `local-path` in the media spec is the
+    natural leave-in-place spelling; the CLI shape carries no flag for it
+  - U3 run records: only `script` invocations produce a run record — a
+    programmatic API/CLI-primitives loop leaves nothing, yet U3 says the
+    run record is the product; align with the decided run-events.jsonl
+    normative-stream model (every surface a renderer of it)
+  - U3 stage/collect: the "declared exchange drive" cannot be declared in
+    the decided blueprint drive vocabulary (no directory/vvfat kind), the
+    CLI has no file-exchange commands, and only the superseded legacy
+    Runner/root-home surface serves injection today
+  - U5 blueprint parameterization (the center of the use case, designed
+    nowhere): no parameter field, no seam vocabulary, no channel by which
+    a blueprint-held value reaches a script, and nothing enumerates a
+    blueprint's seams; hard language limit to face: inputs cannot
+    parameterize watch conditions, so a value seam covers typed values and
+    media but never a different-language installer UI — "the script can
+    stand alone" currently holds only for value-only seams
+  - U1 export journey: the easy path lands on QEMU, export targets the
+    machine's own backend, cross-backend conversion is open, and QEMU's
+    export artifact ("bare image + launch config") is a reliquary-invented
+    format with no spec — the default-install-to-VirtualBox journey is
+    unresolved
+  - watches (served but strained; re-ask as they harden): live-run progress
+    surface (G4 during the run — ties to run-events); U4's repo-clone-to-
+    reliquary-home hand-off has no named workflow; hand-placed proprietary
+    payloads vs the "cache is not an interface" doctrine; GUI/landmark
+    assets forming a new authored artifact class; published JSON Schemas
+    elevating reliquary-machine.json into a public contract
 - install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
 - "rlq script install --blueprint freedos-1.4-plain" should be our north star
   - "rlq --blueprint freedos-1.4-plain script install" is identical 
