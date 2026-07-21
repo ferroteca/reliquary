@@ -445,7 +445,21 @@ are the mirror URLs tried.
 The embedding API counterpart is
 `fetch_media(name, home=None, script=None, on_mismatch="fail")`,
 with `script` mirroring `--script` — the CLI and the API move
-together (planning/INTERFACES.md).
+together (planning/INTERFACES.md). `fetch_media` is the blocking
+form: a typed result, errors raised by class. Its asynchronous
+twin `start_fetch(...)` (same parameters) returns a pull-only
+fetch handle — `status()`, `events(follow=)` as a blocking
+iterator over the same event kinds
+([fetch progress](#fetch-progress)), `wait(timeout=)` returning
+the blocking form's result, and `cancel()`, which aborts at the
+next event boundary and deletes the partial download (no
+pre-existing file is touched) — no callbacks, nothing a common
+binding language cannot express. A fetch stream is ephemeral, so
+a handle lives only in the process that started it — there is no
+attach-by-id; reattachment is what run records exist to provide.
+The handle form is noninteractive by construction:
+`on_mismatch="prompt"` is rejected, so a background fetch can
+never hang on a hidden prompt.
 
 Verification is not optional: an item is never used without its
 `sha256` matching, and a failed download or hash mismatch is a
@@ -456,6 +470,44 @@ payload that no longer verifies is refetched when its definition
 allows and the deletion is approved (below), and is otherwise an
 error; a machine never boots against silently changed media
 (U1, U4).
+
+### Fetch progress
+
+Fetching is reliquary's longest operation outside a run, and it
+reports progress under the same feedback model as script runs
+(the feedback split, planning/USE-CASES.md): one event
+vocabulary, every surface a renderer of it. Media movement —
+download, extraction, verification — emits the same transfer
+and verification event kinds the run-event stream defines
+([script spec](script-spec.md)), wherever it happens:
+
+- **Inside a script run**, the events ride the run's own stream;
+  followers of the run see the fetch as part of it.
+- **Standalone `fetch`** renders them itself. `--progress
+  (auto | tty | plain | rawjson)` selects the rendering exactly
+  as on `script`: pretty, live progress on a tty under `auto`;
+  under `rawjson`, stdout carries the event stream as JSON lines
+  and nothing else, the last line the terminal event stating the
+  outcome. The stream is ephemeral — media has no state document
+  and there is no fetch record: nothing persists, and there is
+  nothing to reattach to. Run records remain the only recorded
+  outputs.
+- **Machine operations that fetch implicitly** outside a run —
+  `create`, `start`, `apply`, and `recreate` resolving,
+  verifying, and fetching referenced media — render the same
+  events in their own output under the same defaults. Their full
+  output contract belongs to the general CLI output discipline,
+  settled separately.
+
+Progress is honest: a download shows byte totals only when the
+source names them, hashing and extraction render as elapsed-only
+phases with no invented denominators, and each mirror attempt is
+its own event, so a follower sees the walk. The renderer modes
+are noninteractive exactly as on `script`: under `plain` and
+`rawjson` the [mismatched-file checkpoint](#mismatched-files)
+below never prompts — an unapproved mismatch fails fast, the
+documented programmatic behavior — while `auto`/`tty` map it to
+the interactive checkpoint.
 
 ### Mismatched files
 

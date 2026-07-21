@@ -273,7 +273,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     selection, rawjson stdout purity (pure event JSON, terminal event =
     the result), and the plain/rawjson no-prompt rule are settled for
     the stream-bearing commands (2026-07-21, ROADMAP "Asynchronous
-    runs"); still unhomed: the general stdout/stderr discipline and
+    runs") — now script, run tail, AND fetch, with the implicit-fetch
+    phases of bare machine ops rendering the same events (2026-07-21,
+    blueprint-spec queue item 3); still unhomed: the general stdout/stderr discipline and
     output stability across every command, the rawjson event-schema
     stability contract
     (the machine-readable mode is now demanded directly by the USE-CASES
@@ -455,14 +457,36 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      modified. Folded into the same documents; disks that are
      already snapshot chains remain with the open import-scope
      question
-  3. the feedback split does not reach media fetching: the decided
-     run-feedback shape carries media-fetch transfer events INSIDE a
-     script run's event stream, but the media spec never references
-     the progress model, and standalone `rlq fetch` / non-script
-     machine operations (create/start reconciliation re-hashing and
-     fetching every referenced item) have no progress contract at all
-     — a person watches a silent multi-GB download (U1), a program has
-     nothing machine-readable to follow (U3/U4)
+  3. RESOLVED (owner, 2026-07-21, design round) — the feedback split
+     now reaches media fetching, with no new machinery: one event
+     vocabulary, every surface a renderer. Media movement (download,
+     extraction, verification) emits the run-event stream's
+     transfer/verification event kinds wherever it happens: inside a
+     script run it rides the run's stream (already decided);
+     standalone fetch renders it itself — --progress
+     (auto|tty|plain|rawjson) with script's exact semantics, rawjson
+     stdout purity, terminal event = the result; the implicit-fetch
+     phases of bare machine ops (create/start/apply/recreate
+     reconciliation) render the same events under the same defaults,
+     their full output contract staying with the general
+     CLI-discipline work. The fetch stream is EPHEMERAL: media has
+     no state document, there is no fetch record, nothing
+     reattaches — run records remain the only recorded outputs.
+     Honesty rules carry over (byte totals only where the source
+     names them; hashing/extraction elapsed-only; each mirror
+     attempt its own event); plain/rawjson never prompt — the
+     mismatched-file checkpoint maps to "prompt" under auto/tty and
+     fails fast otherwise. API (owner chose build-now over defer):
+     fetch_media() stays blocking (typed result, errors by class);
+     start_fetch() returns a pull-only handle — status() /
+     events(follow=) / wait(timeout=) / cancel() (event-boundary
+     abort, partial download deleted) — process-local, no
+     attach-by-id (reattachment is what run records provide), and
+     rejects on_mismatch="prompt". Folded: media-spec (#fetch-
+     progress + API twins), cli.md fetch, ROADMAP "Asynchronous
+     runs" (fetch joins the stream-bearing commands + the settled
+     fetch-progress paragraph); guiding-principles CLI-contract
+     entry updated
   4. CLI-API parity silent across the lifecycle verbs: the blueprint
      spec documents create/start/stop/apply/destroy/recreate/clone/
      export/import/delete exclusively as CLI commands and names no

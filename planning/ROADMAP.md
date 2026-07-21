@@ -1129,8 +1129,8 @@ result and raises by error class, while the foreground `script`
 command speaks the stream and its exit code. Rendering is
 selected explicitly with `--progress (auto | tty | plain |
 rawjson)` (default `auto`, tty detection — the decided BuildKit
-vocabulary) on the stream-bearing commands, `script` and
-`run tail`. Under `rawjson`, stdout carries the event stream as
+vocabulary) on the stream-bearing commands — `script`,
+`run tail`, and `fetch`. Under `rawjson`, stdout carries the event stream as
 JSON lines and nothing else, ever — diagnostics go to stderr —
 and because the stream ends with the terminal event, the last
 line is the machine-readable result: no separate result mode
@@ -1142,6 +1142,34 @@ settles renderer selection and rawjson stdout purity for the
 stream-bearing commands now; the general stdout/stderr
 discipline and output-stability contract across every command
 remains queued (TASKS).
+
+**Fetch progress — the same model (owner, 2026-07-21).** Media
+movement emits the same transfer and verification event kinds
+wherever it happens; only where they land differs. Inside a
+script run they ride the run's stream (the transfer events
+above). Standalone `fetch` renders them itself under the same
+`--progress` vocabulary — rawjson stdout purity and the
+no-prompt rule included, so the mismatched-file checkpoint
+prompts only under `auto`/`tty` and fails fast under
+`plain`/`rawjson`. The stream is ephemeral: media has no state
+document and there is no fetch record — nothing persists,
+nothing reattaches; run records remain the only recorded
+outputs. Machine operations that fetch implicitly outside a run
+(`create`/`start`/`apply`/`recreate` reconciliation) render the
+same events under the same defaults, their full output contract
+remaining with the general CLI discipline (TASKS). Honesty
+rules carry over: byte totals only where the source names them,
+hashing and extraction elapsed-only, each mirror attempt its own
+event. On the API, `fetch_media()` stays the blocking form
+(typed result, errors by class); `start_fetch()` (same
+parameters) returns a pull-only fetch handle — `status()`,
+`events(follow=)`, `wait(timeout=)`, `cancel()` (aborts at an
+event boundary; the partial download is deleted, no pre-existing
+file touched). There is no attach-by-id: an ephemeral stream is
+process-local, and reattachment is what run records provide. The
+handle form is noninteractive by construction and rejects
+`on_mismatch="prompt"` — a background fetch can never hang on a
+hidden prompt. Contract home: media-spec "Fetch progress".
 
 ## Milestones
 

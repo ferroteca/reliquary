@@ -847,7 +847,7 @@ win98se                 Windows 98 SE OEM ISO   yes
 ### Fetching and cleaning
 
 ```
-rlq fetch <media_name> [--script <script_name>]
+rlq fetch <media_name> [--script <script_name>] [--progress <mode>]
 rlq clean downloads
 rlq clean media
 ```
@@ -856,7 +856,12 @@ rlq clean media
 Machine operations resolving a `media` reference to a fetchable
 definition fetch implicitly; `fetch` is the standalone convenience.
 `--script` installs that script's embedded definitions before
-fetching, without executing guest steps.
+fetching, without executing guest steps. `--progress` selects
+rendering as on `script` — pretty live progress on a tty under
+`auto`; `rawjson` emits pure event JSON on stdout, the last line
+the terminal event stating the outcome. `plain` and `rawjson`
+never prompt: a hash mismatch without `--refetch-mismatched`
+fails fast.
 
 ```powershell
 rlq fetch freedos-1.4-livecd
