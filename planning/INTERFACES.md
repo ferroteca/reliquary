@@ -59,7 +59,7 @@ the CLI serves programs as well as people — and, like the API, it
 must never make working from a common language difficult: a
 program in any language must be able to invoke it, observe it,
 and parse what it prints cleanly. Settled decisions:
-planning/ROADMAP.md "The CLI"; working notes: [planning/design/cli-design.md](design/cli-design.md).
+planning/ROADMAP.md "The CLI"; working notes: [planning/design/cli.md](design/cli.md).
 
 ### The embedding API
 
@@ -86,7 +86,7 @@ about resources, imperative about guest interaction, statically
 inspectable before the machine starts, and governed by numbered
 language goals (G1–G7; planning/ROADMAP.md, "Primary language goals").
 Source of truth:
-[planning/design/script-spec-design.md](design/script-spec-design.md), with
+[planning/design/script-spec.md](design/script-spec.md), with
 [script-examples/](../script-examples/) as reference material.
 
 ### The machine blueprint
@@ -97,9 +97,9 @@ codex, or synthesized from a native VM by `import` —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
 customization (U5). Specification:
-[planning/design/machine-blueprint-design.md](design/machine-blueprint-design.md) with its
-[reference](design/machine-blueprint-reference-design.md) and
-[cookbook](design/machine-blueprint-cookbook-design.md).
+[planning/design/machine-blueprint.md](design/machine-blueprint.md) with its
+[reference](design/machine-blueprint-reference.md) and
+[cookbook](design/machine-blueprint-cookbook.md).
 
 ### The media definition
 
@@ -107,7 +107,7 @@ A media definition names installation media and pins it: where a
 payload may be acquired, and the hashes that verify the exact
 build the scripts target. Hash-pinned definitions are what let a
 repository refer precisely to media it cannot distribute (U4).
-Specification: [planning/design/media-spec-design.md](design/media-spec-design.md).
+Specification: [planning/design/media-spec.md](design/media-spec.md).
 
 ## Supporting world-facing contracts
 
@@ -117,12 +117,12 @@ covers them equally:
 
 - **The property registry** — a user-owned file authored directly
   in an editor, without passing through any primary interface:
-  [planning/design/property-registry-design.md](design/property-registry-design.md).
+  [planning/design/property-registry.md](design/property-registry.md).
 - **The codex** — reliquary's built-in seed content and its
   index: seed-not-a-resolution-tier semantics, never-overwrite,
   delete-to-refresh, provenance, and the licensing rule
   for shipped media URLs:
-  [planning/design/codex-design.md](design/codex-design.md).
+  [planning/design/codex.md](design/codex.md).
 - **Recorded outputs** — run records under a machine's `runs/`
   directory: transcripts (with the secret-redaction contract),
   screenshots, and collected outputs. The world reads these;
@@ -132,10 +132,10 @@ covers them equally:
   record is evidence, not reconstructible; durability beyond the
   machine is the consumer's claim — the record directory is
   self-contained, and copying it out is the sanctioned way to
-  keep one ([planning/design/script-spec-design.md](design/script-spec-design.md)).
+  keep one ([planning/design/script-spec.md](design/script-spec.md)).
 - **The home layout** — where users place payload files, find
   caches, and locate everything above:
-  [planning/design/instance-model-design.md](design/instance-model-design.md).
+  [planning/design/instance-model.md](design/instance-model.md).
 
 ## Primary use cases
 
@@ -205,12 +205,12 @@ Every approved change then lands the same way:
 
 | Interface | Specification |
 |---|---|
-| CLI | planning/ROADMAP.md "The CLI"; working notes in [planning/design/cli-design.md](design/cli-design.md) |
+| CLI | planning/ROADMAP.md "The CLI"; working notes in [planning/design/cli.md](design/cli.md) |
 | Embedding API | [AGENTS.md](../AGENTS.md) "The runner surface" (the Python binding's contract) |
-| Scripting language | [planning/design/script-spec-design.md](design/script-spec-design.md) |
-| Blueprints | [planning/design/machine-blueprint-design.md](design/machine-blueprint-design.md) with its [reference](design/machine-blueprint-reference-design.md) and [cookbook](design/machine-blueprint-cookbook-design.md) |
-| Media definitions | [planning/design/media-spec-design.md](design/media-spec-design.md) |
-| Property registry | [planning/design/property-registry-design.md](design/property-registry-design.md) |
-| The codex | [planning/design/codex-design.md](design/codex-design.md) |
-| Home / machines | [planning/design/instance-model-design.md](design/instance-model-design.md) |
-| Run records | transcript contract in [planning/design/script-spec-design.md](design/script-spec-design.md) |
+| Scripting language | [planning/design/script-spec.md](design/script-spec.md) |
+| Blueprints | [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its [reference](design/machine-blueprint-reference.md) and [cookbook](design/machine-blueprint-cookbook.md) |
+| Media definitions | [planning/design/media-spec.md](design/media-spec.md) |
+| Property registry | [planning/design/property-registry.md](design/property-registry.md) |
+| The codex | [planning/design/codex.md](design/codex.md) |
+| Home / machines | [planning/design/instance-model.md](design/instance-model.md) |
+| Run records | transcript contract in [planning/design/script-spec.md](design/script-spec.md) |

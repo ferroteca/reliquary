@@ -130,7 +130,7 @@ of machine. A **machine** is one realization of that blueprint: its
 state, writable disks, backend object, and run history. One
 blueprint may have zero, one, or many machines. Nothing about a
 machine is durable: a machine **is** its cache directory (see
-[planning/design/instance-model-design.md](design/instance-model-design.md)):
+[planning/design/instance-model.md](design/instance-model.md)):
 
 ```text
 <reliquary_home>/blueprints/
@@ -159,11 +159,11 @@ copies of.
 
 User documentation (the milestone-1 core is implemented; the
 remaining format is written ahead of implementation):
-[planning/design/machine-blueprint-design.md](design/machine-blueprint-design.md) with
-its [field reference](design/machine-blueprint-reference-design.md) and
-[cookbook](design/machine-blueprint-cookbook-design.md), and the ownership,
+[planning/design/machine-blueprint.md](design/machine-blueprint.md) with
+its [field reference](design/machine-blueprint-reference.md) and
+[cookbook](design/machine-blueprint-cookbook.md), and the ownership,
 locking, and recovery model in
-[planning/design/instance-model-design.md](design/instance-model-design.md).
+[planning/design/instance-model.md](design/instance-model.md).
 
 The blueprint is reliquary's own backend-agnostic format — never a thin
 veneer over one backend's configuration. Two documents, one owner
@@ -223,7 +223,7 @@ a direct value or a `{"property": ...}` reference, the blueprint
 half of U5's customization seams. Like the `scripts` map it is
 read at script invocation and configures script binding, not
 machine shape — no state, `apply`, or baseline-digest
-involvement (see planning/design/machine-blueprint-reference-design.md).
+involvement (see planning/design/machine-blueprint-reference.md).
 Validation and capability mismatches fail closed, naming the
 backend and missing capability.
 
@@ -241,7 +241,7 @@ backend and missing capability.
 ├── media/               shared media definitions (mirror URLs, archive
 │                        and payload SHA-256; one definition per
 │                        source archive can itemize several named
-│                        files) — see planning/design/media-spec-design.md
+│                        files) — see planning/design/media-spec.md
 └── cache/               reliquary's regenerable files
     ├── downloads/       cached source archives (redownloadable;
     │                    reclaimed by `clean downloads`)
@@ -264,7 +264,7 @@ is pre-release, so this is a replacement, not a migration.
 reliquary ships the codex — built-in blueprints, media
 definitions, and scripts for popular open source operating
 systems: see
-[planning/design/codex-design.md](design/codex-design.md). The codex is
+[planning/design/codex.md](design/codex.md). The codex is
 a **seed, not a resolution tier**: referencing a codex artifact
 that doesn't yet exist in the home copies it out as an ordinary
 user-owned file; a file already present in the home is never
@@ -350,7 +350,7 @@ with.
 ## The CLI
 
 The command-line structure is being worked out in
-[planning/design/cli-design.md](design/cli-design.md) (a working document; this section
+[planning/design/cli.md](design/cli.md) (a working document; this section
 carries the settled decisions and outlives it).
 
 The command is installed under two names: `rlq`, the short form
@@ -491,14 +491,14 @@ Lifecycle semantics:
   names a blueprint with no machine yet), and starts it if it is not
   already running before executing guest steps.
 - `fetch` downloads, extracts, and hash-verifies a defined media
-  item (see planning/design/media-spec-design.md). It is a convenience: machine
+  item (see planning/design/media-spec.md). It is a convenience: machine
   operations resolving a `media` reference to a fetchable
   definition fetch implicitly. Source archives are cached under
   `cache/downloads/`, separate from the payloads in
   `cache/media/`. `--script` installs that script's embedded
   definitions before fetching, without executing guest steps.
 - `property` maintains the home-wide personal registry described in
-  planning/design/property-registry-design.md. Ordinary strings live in
+  planning/design/property-registry.md. Ordinary strings live in
   `properties.json`; secret values live only in a protected host
   credential store, with a marker in the file. Listing and getting
   secrets never reveal them, and secret setting uses a no-echo prompt
@@ -610,7 +610,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 `--machine <id>` or `--blueprint <name>`.
 
 **The July 2026 surface redesign is decided and
-[planning/design/script-spec-design.md](design/script-spec-design.md) is its source of
+[planning/design/script-spec.md](design/script-spec.md) is its source of
 truth** (including the complete typed EBNF), with
 `script-examples/design-install.rlqs` as the reference
 script. Realigning the implementation — parser, runtime, shipped
@@ -696,7 +696,7 @@ replacing the input's own), then the property registry, then
 interactive prompting. Locale-class customization that would
 change watch conditions is never a value binding: it is the
 blueprint's composition seam — selecting the media/script pair —
-per U5 (planning/design/machine-blueprint-design.md, "Customization seams"). Missing noninteractive, mistyped, or
+per U5 (planning/design/machine-blueprint.md, "Customization seams"). Missing noninteractive, mistyped, or
 unresolved-media values fail before the machine starts, as do
 ordinary/secret kind mismatches.
 
@@ -710,7 +710,7 @@ secret-bearing arguments; textual diagnostics redact known secret
 values, and automatic failure screenshots are suppressed after secret
 input. This protects reliquary's records, not guest logs, history, or
 an explicitly requested screenshot. The complete planned contract is
-in [planning/design/property-registry-design.md](design/property-registry-design.md).
+in [planning/design/property-registry.md](design/property-registry.md).
 
 Scripts may also embed ordinary media-definition JSON objects in
 top-level, labeled `media <label> { ... }` blocks. After full
@@ -731,7 +731,7 @@ There is no `restart`: a hard power cycle is the explicit pair,
 and a guest reboot remains guest input. Parsing, response binding,
 whole-script capability preflight, and static control-flow checks
 all finish before the first guest input. User documentation and
-source of truth: [planning/design/script-spec-design.md](design/script-spec-design.md)
+source of truth: [planning/design/script-spec.md](design/script-spec.md)
 (the July 2026 redesign; the implementation still speaks the
 superseded surface until the realignment milestone lands).
 
@@ -1187,12 +1187,12 @@ milestone.
 
 Deliverables:
 
-1. **Media library core** (of planning/design/media-spec-design.md): definitions as
+1. **Media library core** (of planning/design/media-spec.md): definitions as
    user-owned documents under `media/`, fetch/extract/SHA-256
    verify on demand, the two-cache split (`cache/downloads/`,
    `cache/media/`) — enough to feed the FreeDOS LiveCD.
-2. **Blueprint and machine core** (of planning/design/machine-blueprint-design.md
-   and planning/design/instance-model-design.md, QEMU-only): parse and validate the
+2. **Blueprint and machine core** (of planning/design/machine-blueprint.md
+   and planning/design/instance-model.md, QEMU-only): parse and validate the
    blueprint shape the codex needs (`platform`,
    `memory`, `drives` with `size` and `media`, `boot`, `name`,
    `description`, `scripts`); machines wholly under
@@ -1200,14 +1200,14 @@ Deliverables:
    qcow2 materialization; `create`, `start`, `stop`, `destroy`,
    `list machines`; selection by `--blueprint` (sole machine) and
    `--machine` (git-style prefix).
-3. **Scripting core** (of planning/design/script-spec-design.md): enough of the
+3. **Scripting core** (of planning/design/script-spec.md): enough of the
    `.rlqs` language to express the FreeDOS install and
    verification — parsing, `wait`/`expect` on normalized screen
    text, `enter`/`type`/`press`, `select`, `screenshot`,
    `start`/`stop` — and `script <label>` resolution through the
    blueprint's `scripts` map, creating a machine when the
    blueprint has none.
-4. **The codex** (planning/design/codex-design.md): the
+4. **The codex** (planning/design/codex.md): the
    `builtins/` tree (zip-bundled when packaged), copy-out on
    first reference, the never-overwrite rule, and
    `freedos-1.4-plain` — blueprint, media definitions, and
@@ -1316,7 +1316,7 @@ confirms the installed disk boots to a DOS prompt; and `start` /
 
 ### Milestone 2 — Media library and caches (complete)
 
-The remainder of [planning/design/media-spec-design.md](design/media-spec-design.md) beyond
+The remainder of [planning/design/media-spec.md](design/media-spec.md) beyond
 milestone 1's core, plus the media-facing CLI (`list media`,
 `search media`, `pull media`, `clean`).
 
@@ -1359,10 +1359,10 @@ on the completed layer.
 ### Milestone 3 — The instance model and machine blueprints
 
 The whole machine model beyond milestone 1's core —
-[planning/design/instance-model-design.md](design/instance-model-design.md)
-plus the [machine blueprint](design/machine-blueprint-design.md) with its
-[field reference](design/machine-blueprint-reference-design.md) and
-[cookbook](design/machine-blueprint-cookbook-design.md) — still scoped to
+[planning/design/instance-model.md](design/instance-model.md)
+plus the [machine blueprint](design/machine-blueprint.md) with its
+[field reference](design/machine-blueprint-reference.md) and
+[cookbook](design/machine-blueprint-cookbook.md) — still scoped to
 one backend. The `backend` field is parsed and validated in full,
 but with QEMU the only implementation, assignment is trivial; the
 adapter seam that makes it real is milestone 6. Capability checks
@@ -1421,7 +1421,7 @@ per the instance model; blueprint edits round-trip through
 
 ### Milestone 4 — The property registry
 
-All of [planning/design/property-registry-design.md](design/property-registry-design.md),
+All of [planning/design/property-registry.md](design/property-registry.md),
 landed ahead of the scripting language because script inputs bind
 to it. Small and independently useful.
 
@@ -1519,7 +1519,7 @@ script is valid under the answers.
 ### Script-surface realignment — absolute priority #1
 
 The July 2026 script-language redesign
-([planning/design/script-spec-design.md](design/script-spec-design.md), with
+([planning/design/script-spec.md](design/script-spec.md), with
 `script-examples/design-install.rlqs` as the reference script)
 supersedes the surface milestones 1 and 5 implemented.
 This milestone gates everything after it: no later milestone
@@ -2208,7 +2208,7 @@ agentless and guest-agent control planes with equivalent results.
   Hyper-V — best scriptability first).
 - **Script spec details** (the control-flow and response-file shape
   are decided — see "The scripting language" and
-  planning/design/script-spec-design.md): the portable key-name vocabulary for
+  planning/design/script-spec.md): the portable key-name vocabulary for
   `press`/`<key>` tokens is published in the spec as a closed set;
   confirm it at realignment. Literal input defaults are resolved:
   they live in the blueprint `parameters` field (U5's
@@ -2316,7 +2316,7 @@ agentless and guest-agent control planes with equivalent results.
   keyboard automation is good enough for installer scripting or
   Hyper-V machines require the serial/agent control planes from day one.
 - **Concurrent machines**: per-machine exclusive locking is
-  decided (planning/design/instance-model-design.md); still open is whether any
+  decided (planning/design/instance-model.md); still open is whether any
   home-wide limit applies to machines running at once (the
   per-machine lock and identity model suggests none).
 - **Friendly machine aliases**: machine identity is already

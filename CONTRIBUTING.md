@@ -65,7 +65,7 @@ BSD-3-Clause license cannot be accepted.
 Codex media definitions follow an additional
 top-priority rule: a definition may include a download `url` only
 together with an explicit assertion that the media's own
-licensing permits redistribution (see planning/design/codex-design.md).
+licensing permits redistribution (see planning/design/codex.md).
 Changes that add or alter URLs in built-in media definitions
 without that assertion cannot be accepted; definitions for
 non-redistributable media ship hashes only.

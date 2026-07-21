@@ -9,7 +9,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > (empty removable slots, the `machine:` header, persistent
 > `insert`/`eject`) are implemented. The install script's embedded
 > `media` block uses the planned self-contained-script format
-> ([planning/design/script-spec-design.md](../design/script-spec-design.md)), which is not
+> ([planning/design/script-spec.md](../design/script-spec.md)), which is not
 > installed on first run yet; until that lands, also copy the media
 > definition as a separate library document (the built-in
 > `freedos-1.4-plain` artifacts ship it that way).

@@ -51,8 +51,9 @@ workflow:
   the status note. Keep the examples synchronized with `planning/design/` when the formats change.
 - `docs/` holds user-facing documentation for implemented features
   (CLI reference, blueprint guide, DOS automation). Design documents
-  and planned interfaces live in `planning/design/` with `-design.md`
-  suffixes. Placement rules are in `.agents/skills/documentation-rules.md`.
+  and planned interfaces live in `planning/design/` — the directory
+  is the classification; file names carry no suffix. Placement rules
+  are in `.agents/skills/documentation-rules.md`.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no

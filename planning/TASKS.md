@@ -8,7 +8,7 @@ SPDX-License-Identifier: BSD-3-Clause
 Small to-do tasks.  Large tasks belong in the roadmap.
 
 - ABSOLUTE PRIORITY #1: realign the implementation with the redesigned script language
-  - the July 2026 redesign is decided; planning/design/script-spec-design.md is the source of truth
+  - the July 2026 redesign is decided; planning/design/script-spec.md is the source of truth
     (full typed EBNF included) and script-examples/design-install.rlqs is the
     reference script
   - the redesign resolves the old "clunky/awkward" critiques: one node shape

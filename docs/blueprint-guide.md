@@ -88,4 +88,4 @@ Machines live under `cache/machines/<blueprint>-<n>/`. Each machine has:
 - `vm.json` - Active VM identity and port (when running)
 - `qemu-stderr.log` - QEMU diagnostics
 
-For the complete blueprint specification (including unimplemented fields), see [planning/design/machine-blueprint-design.md](../planning/design/machine-blueprint-design.md).
+For the complete blueprint specification (including unimplemented fields), see [planning/design/machine-blueprint.md](../planning/design/machine-blueprint.md).
