@@ -380,6 +380,76 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     the only hand-supply path; the cache is never hand-fed; a sourceless
     definition pins hashes but fails resolution naming the definition to
     edit (specced in media-spec.md + codex.md)
+- BLUEPRINT-SPEC GAP QUEUE (owner-requested review, 2026-07-21: the media
+  and blueprint specs walked against INTERFACES.md / USE-CASES.md; the
+  media spec tracks the principles closely — the gaps cluster in the
+  blueprint spec: machine-blueprint.md + -reference.md + -cookbook.md):
+  1. run records vs disposability (the big one): U3 says the run record
+     is the product and INTERFACES names recorded outputs a world-facing
+     contract, but the blueprint guide declares the machine directory
+     wholly reliquary's ("nothing about a machine is durable ... you
+     never need to touch it"; "everything under cache/ is reliquary's
+     and reconstructible"), destroy deletes run records with the rest,
+     export offers only media-image and whole-machine targets, and
+     ROADMAP's home-layout tree calls run records "transient". Run
+     records are precisely NOT reconstructible — they are evidence of a
+     run, often the only durable outcome — so the artifact-residency
+     split (durable outside cache / disposable under cache) is violated
+     by its most important artifact, and no document names the tension.
+     Needs a named survival story (an export target? a copy-out
+     contract? a residency amendment?) — extends the U3 run-records
+     entry in the guiding-principles queue above, which covers records
+     for API/CLI-primitive runs but not durability
+  2. U2 import disk-location choice: already queued above (the
+     guiding-principles queue's U2 entry); recorded here too because
+     the blueprint guide's import section is itself a foreclosing
+     surface — it documents unconditional copy only, while the media
+     spec's local-path is the natural leave-in-place spelling
+  3. the feedback split does not reach media fetching: the decided
+     run-feedback shape carries media-fetch transfer events INSIDE a
+     script run's event stream, but the media spec never references
+     the progress model, and standalone `rlq fetch` / non-script
+     machine operations (create/start reconciliation re-hashing and
+     fetching every referenced item) have no progress contract at all
+     — a person watches a silent multi-GB download (U1), a program has
+     nothing machine-readable to follow (U3/U4)
+  4. CLI-API parity silent across the lifecycle verbs: the blueprint
+     spec documents create/start/stop/apply/destroy/recreate/clone/
+     export/import/delete exclusively as CLI commands and names no
+     embedding-API twin for any of them — under INTERFACES "the
+     omission is a named decision, not drift" this is drift (the media
+     spec names fetch_media/clean_*, the script spec names
+     run_script/check_script; the blueprint spec names nothing)
+  5. the codex-automation trap is unflagged at the point of use: the
+     guide advertises implicit seeding "on first reference" with no
+     automation caveat, though the residency model (decided
+     2026-07-21) excludes the codex from automation resolution
+     entirely; one sentence in the guide (and in the media spec's
+     home-fallback paragraph) closes it
+  6. the machine-id story didn't land in the guide's examples: settled
+     identity is <blueprint>-<n> (reference #id, instance-model,
+     ROADMAP, AGENTS), but the guide's state example, its mermaid
+     diagram, and the cookbook's state example still show UUID ids
+     ("5fd11917-...", "machine 5fd1..."). Relatedly the guide's
+     machine-directory tree is stale against its own linked model:
+     screenshots/ at the machine root and no runs/ at all, where
+     instance-model and ROADMAP both put runs/ there with screenshots
+     inside run records
+  7. "media names are the ONLY cross-boundary reference a blueprint
+     may make (U4)" (reference, #media) is contradicted two sections
+     away: the scripts map references .rlqs files by name and
+     parameters references property-registry keys — scope the
+     sentence (the only reference into machine-entering content, or
+     drive-inventory-only)
+  8. "reliquary reads it and never writes it" appears unqualified in
+     the guide's ownership section, ahead of the format-stability
+     section's import/init write-once qualification and the delete
+     verb that removes the file — state the qualification where the
+     claim is made
+  9. cookbook example 2's media note explains freedos-1.4-livecd
+     though the blueprint shown no longer names it (a leftover from
+     before the empty-slot-plus-insert convention); reanchor or drop
+     the note
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
   - shared JSONC reader for authored documents (blueprints, standalone
