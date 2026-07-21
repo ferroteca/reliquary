@@ -65,11 +65,11 @@ select "English (United States)"
 
 - **Observations** establish that the guest or machine has reached
   a known state: `wait`, in its single-condition and branching
-  forms, and reactive `on` handlers.
+  forms, and reactive `always` handlers.
 - **Actions** deliver intent-level input or perform supporting host
   operations: `enter`, `type`, `press`, `select`, `insert`,
-  `eject`, `boot`, `stage`, `collect`, `screenshot`, `start`, and
-  `stop`.
+  `eject`, `set-boot`, `stage`, `collect`, `screenshot`, `start`,
+  and `stop`.
 
 Intent-level verbs remain above portable input events. `select`
 means choosing a visible menu entry, not sending a guessed number
@@ -166,28 +166,27 @@ Every token class has one spelling:
 | `$name` | run-supplied input value | `insert floppy1 $supplemental-disk` |
 | `name=value` | property of the node it follows | `timeout=5m`, `machine=stopped`, `exclude="with sources"` |
 | `5m`, `500ms` | duration | `wait machine=stopped timeout=2m` |
-| `<key>` in typed strings | key token | `type "<down><down><enter>"` |
 
 ### Strings
 
 Ordinary strings are double-quoted. Backslashes in DOS and Windows
-paths are literal by default. Four escapes exist for syntax-bearing
+paths are literal by default. Three escapes exist for syntax-bearing
 text:
 
 | escape | meaning |
 |---|---|
 | `\"` | literal `"` |
 | `\\` | literal `\` |
-| `\<` | literal `<` rather than the start of a key token |
 | `\${` | literal `${` rather than an input reference |
 
 Any other backslash is literal. Inside a string, an input reference
 is written `${name}` and is expanded only where the containing
-argument accepts it; a `$` not followed by `{` is literal. In
-`enter` and `type`, recognized `<key>` tokens produce key input.
+argument accepts it; a `$` not followed by `{` is literal. String
+content is text and only text: keys never travel inside a string —
+they are `press`'s job.
 
 There is no raw-string form. Backslashes are already literal, so a
-raw form would only save the `\<` and `\${` escapes — one token
+raw form would only save the `\${` escape — one token
 class is too high a price for that, and it would break the rule
 that a token is classified by its first character.
 
@@ -283,6 +282,7 @@ Statements:
 | `wait` | one condition (string/regex, or `machine=` state) | `timeout`, `stable` | — |
 | `wait` | — (no condition; its handlers carry them) | `timeout` | `on` handlers |
 | `on` | one condition | `stable` | statements |
+| `always` | one condition | `stable` | statements |
 | `goto` | phase name | — | — |
 | `finish` | — | — | — |
 | `enter` | string | — | — |
@@ -292,7 +292,7 @@ Statements:
 | `screenshot` | optional name | — | — |
 | `insert` | slot, `@media` or `$input` | — | — |
 | `eject` | slot | — | — |
-| `boot` | drive keys | — | — |
+| `set-boot` | drive keys | — | — |
 | `start` | — | — | — |
 | `stop` | — | — | — |
 | `stage` | path string | — | — |
@@ -302,7 +302,7 @@ And the phase declaration:
 
 | node | arguments | properties | block |
 |---|---|---|---|
-| `phase` | name | `timeout`, `deadline` | statements, or `on` handlers |
+| `phase` | name | `timeout`, `deadline` | statements, or `always` handlers |
 
 ### Grammar (normative)
 
@@ -336,14 +336,17 @@ phase           = "phase" , name , { timing-prop } , block-open ,
 timing-prop     = ( "timeout" | "deadline" ) , "=" , duration ;
 
 sequential-body = statement-list ;
-reactive-body   = handler , { handler } ;
+reactive-body   = always-handler , { always-handler } ;
+always-handler  = "always" , condition ,
+                  [ "stable" , "=" , duration ] , block-open ,
+                  statement-list , block-close ;
 statement-list  = { statement } ;
 
 statement       = observation | action | transfer ;
 transfer        = "goto" , name , eol | "finish" , eol ;
 observation     = "wait" , condition , { watch-prop } , eol
                 | "wait" , [ "timeout" , "=" , duration ] ,
-                  block-open , handler , { handler } ,
+                  block-open , handler , handler , { handler } ,
                   block-close ;
 handler         = "on" , condition ,
                   [ "stable" , "=" , duration ] , block-open ,
@@ -363,7 +366,7 @@ action          = "enter" , string , eol
                 | "insert" , slot , ( media-ref | input-ref ) ,
                   eol
                 | "eject" , slot , eol
-                | "boot" , slot , { slot } , eol
+                | "set-boot" , slot , { slot } , eol
                 | "start" , eol
                 | "stop" , eol
                 | "stage" , string , eol
@@ -381,12 +384,11 @@ duration        = number , ( "ms" | "s" | "m" | "h" ) ;
 number          = digit , { digit } ,
                   [ "." , digit , { digit } ]
                 | "." , digit , { digit } ;
-string          = '"' , { str-char | escape | interpolation
-                        | key-token } , '"' ;
+string          = '"' , { str-char | escape | interpolation } ,
+                  '"' ;
 escape          = "\" , ? any character except a line
                         terminator ? ;
 interpolation   = "${" , name , "}" ;
-key-token       = "<" , key , ">" ;
 regex           = "/" , { regex-char | regex-escape } , "/" ;
 regex-char      = ? any character except "/", "\", and a line
                     terminator ? ;
@@ -403,9 +405,8 @@ trailing commas; see
 legal here: a comment could carry an unbalanced brace past the
 island's brace tracking, and installation writes the library
 copy in canonical strict JSON, which would silently drop them.
-`interpolation` and `key-token`
-are recognized only where the argument accepts them — never in a
-regex, `key-token` only in `enter` and `type`. `slot`, `key-name`,
+`interpolation` is recognized only where the argument accepts it —
+never in a regex. `slot`, `key-name`,
 and `machine-state` values are `name` tokens whose closed
 vocabularies (drive slots, the portable key set, machine states)
 are checked by validation, not the grammar.
@@ -431,9 +432,9 @@ Two rules follow, checked by static validation:
   list. A statement written after one is unreachable and is an
   error.
 - The statement list of a sequential phase terminates. A linear
-  script's does not have to: reaching end of file completes the
-  run, and a trailing `finish` states that explicitly. `goto`
-  remains invalid in a linear script.
+  script's does not: reaching end of file completes the run, and
+  that is its one spelling — `goto` and `finish` are both invalid
+  in a linear script.
 
 A small set of constraints is deliberately context-sensitive —
 enforced by static validation over the parse tree rather than
@@ -496,14 +497,22 @@ deadline    45m
   implicitly powered off — and the script performs its own explicit
   `start`, typically after inserting the media it needs. An install
   script that must insert its installer medium before first boot
-  declares `machine stopped`.
+  declares `machine stopped`. There is deliberately no undiverged
+  variant of the precondition: whether a diverged machine matters
+  is the operator's call, and `apply` is the documented recovery —
+  divergence policy never lives in a script header.
 - `entry` names the phase where a phased script begins. It is
   required in a phased script and forbidden in a linear one.
 - `timeout` optionally changes the script-wide observation default
   from `60s`. See [timing](#timing).
-- `deadline` optionally bounds the whole run's wall clock. It is
-  the backstop for legitimate transition cycles — a reboot loop
-  that never converges fails here rather than running forever.
+- `deadline` bounds the whole run's wall clock. It is the backstop
+  for legitimate transition cycles — a reboot loop that never
+  converges fails here rather than running forever — and it is
+  therefore *required*, not optional, in a phased script whose
+  transition graph contains a cycle: a cyclable run is unbounded
+  without it, and validation rejects the script rather than let
+  the backstop be forgotten. Acyclic and linear scripts may omit
+  it.
 
 Each header may appear at most once. The file name supplies the
 script name. There is no format-version field before beta because
@@ -530,8 +539,10 @@ wait machine=stopped
 ```
 
 The first failing statement ends the run. Reaching end of file
-completes it, equivalently to an explicit `finish`. `goto` is
-invalid in a linear script — there are no phases to name.
+completes it — the linear script's only ending. `goto` and
+`finish` are both invalid in a linear script: there are no phases
+to name, and end of file already spells completion — the language
+refuses a second spelling for it.
 
 ### Phased script
 
@@ -568,9 +579,9 @@ A phase is either **sequential** or **reactive**:
 
 - A sequential phase contains ordinary ordered statements,
   including branching `wait` blocks, ending explicitly in `goto`
-  or `finish`. It cannot contain direct `on` handlers.
-- A reactive phase contains only `on` handlers. Every handler is
-  active from phase entry. A handler may transition, finish the
+  or `finish`. It cannot contain direct handlers.
+- A reactive phase contains only `always` handlers. Every handler
+  is active from phase entry. A handler may transition, finish the
   script, or complete its action and return to the same reactive
   phase. It cannot contain an interleaved ordered body.
 
@@ -739,6 +750,13 @@ Values can be supplied explicitly in a JSON response file:
 rlq script freedos-plain-install --blueprint freedos --responses answers.json
 ```
 
+A response file is an authored document reliquary only reads, so
+it accepts the JSONC dialect — comments and trailing commas,
+exactly as [library definition
+files](media-spec.md#the-definition-format) do. A harness that
+generates one emits strict JSON and is unaffected: strict JSON is
+a JSONC subset.
+
 Before the machine starts, reliquary validates the response file,
 rejects unknown keys, and binds each input from the first
 available source:
@@ -859,7 +877,7 @@ wait /installed [0-9]+ of [0-9]+ packages/
 A regex runs against each normalized row. The first matching row
 satisfies the condition.
 
-When several `on` handlers could match the same screen snapshot,
+When several handlers could match the same screen snapshot,
 the first declaration wins. Validation warns about obvious literal
 shadowing; regex overlap cannot generally be proven.
 
@@ -873,7 +891,11 @@ wait machine=stopped
 
 It means that the backend reports the machine no longer running. It
 does not by itself prove that shutdown was graceful; the preceding
-guest action supplies that intent:
+guest action supplies that intent. There is deliberately no
+`machine=running` condition: `start` is synchronous, and no other
+observable transition produces the running state, so the condition
+would have nothing to wait for — if a real use appears it arrives
+as an ordinary vocabulary addition under the growth rules.
 
 ```rlqs
 enter "fdapm poweroff"
@@ -903,7 +925,11 @@ wait machine=stopped
 
 A script that needs to know a console command completed waits for
 output uniquely produced by that command or for the resulting guest
-state; `enter` itself makes no completion claim.
+state; `enter` itself makes no completion claim. Beware the echo:
+the guest displays the command line the script typed before the
+command has done anything, so a pattern containing the script's
+own input can match that echo — wait for text only the command's
+*effect* produces.
 
 The branching form waits for the first of several conditions,
 executes that handler's body, then continues after the block unless
@@ -924,19 +950,24 @@ wait timeout=2m {
 
 This is the classic Expect semantic — one command covering the
 single- and multi-pattern cases — under one verb. A branching
-`wait` requires at least one handler. An empty handler body is the
-explicit no-action branch.
+`wait` requires at least two handlers: a single condition is a
+plain `wait`, and the language refuses a second spelling for it.
+An empty handler body is the explicit no-action branch.
 
-### `on` and reactive phases
+### `on`, `always`, and reactive phases
 
-`on <condition> { ... }` binds a condition to an action, using the
-same condition spellings as `wait` — an unprefixed string or
-regex for the screen, or a named non-default channel such as
-`machine=stopped`. Its lifecycle belongs
-to its container: inside a branching `wait` the first match ends
-the wait; directly inside a reactive phase every handler stays
-active until the phase transitions. The syntax is identical in
-both places — the language has exactly one branch form.
+`on <condition> { ... }` binds a condition to an action inside a
+branching `wait`; `always <condition> { ... }` declares a standing
+rule directly inside a reactive phase. Both use the same condition
+spellings as `wait` — an unprefixed string or regex for the
+screen, or a named non-default channel such as `machine=stopped` —
+and the same handler shape: one branch form, two arming keywords,
+and the first word carries the lifetime. An `on` fires at most
+once — the first match ends its `wait` — while an `always` stays
+armed until the phase transitions. Each keyword is legal only in
+its own container: an `on` directly inside a phase, or an `always`
+inside a branching `wait`, is a validation error, so a handler's
+lifetime is always recoverable from its own text.
 
 A handler body — in a branching `wait` or in a reactive phase —
 contains ordered statements and single-condition `wait`s, and may
@@ -949,11 +980,11 @@ A reactive phase is a set of handlers, all armed from phase entry:
 
 ```rlqs
 phase copying timeout=5m deadline=30m {
-    on "Please insert disk 2" {
+    always "Please insert disk 2" {
         insert floppy1 $supplemental-disk
         press enter
     }
-    on "Installation complete" {
+    always "Installation complete" {
         select "Reboot"
         goto first-boot
     }
@@ -980,7 +1011,7 @@ Handler conditions accept the same channels as `wait`. A `stable`
 property strengthens the condition:
 
 ```rlqs
-on "Installation complete" stable=1s {
+always "Installation complete" stable=1s {
     goto first-boot
 }
 ```
@@ -1022,7 +1053,7 @@ placement is a parse error:
 | `phase` | default within the phase | budget per phase entry | error |
 | single-condition `wait` | bound on this observation | error | hold requirement on this match |
 | branching `wait` | bound on reaching the first match | error | error — put it on the `on` |
-| `on` | error — the container owns the waiting | error | hold requirement on this condition |
+| `on` / `always` | error — the container owns the waiting | error | hold requirement on this condition |
 
 Two placements are rejected deliberately rather than tolerated:
 `deadline` on a single observation would be an exact synonym for
@@ -1054,6 +1085,15 @@ the script does not tune them.
 
 ## Input verbs
 
+All input verbs share one delivery contract: the selected control
+plane composes the concrete events and owns their pacing, and the
+verb completes when the control plane has delivered them — making
+no claim that the guest consumed or acted on the input.
+Completion claims belong to the observation that follows, and an
+unmappable character is the named input error the
+[lexical rules](#lexical-rules) promise, never a silent
+substitution.
+
 ### `enter`
 
 ```rlqs
@@ -1065,18 +1105,24 @@ Types the expanded string and presses Enter. It sends input only;
 it does not assert that a command started, completed, or succeeded.
 Completion is an explicit subsequent observation.
 
-`enter "..."` is equivalent to `type "...<enter>"`.
+`enter "..."` is equivalent to `type "..."` followed by
+`press enter`.
 
 ### `type`
 
 ```rlqs
 type "A:"
-type "<down><down><enter>"
+type "1"
 ```
 
-Types text and recognized `<key>` tokens with no implicit ending.
-Use it for input containing both text and keys. An unrecognized key
-token is a static validation error.
+Types text with no implicit ending. Text is all `type` sends —
+keys are `press`'s job, and a sequence mixing them is written as
+alternating `type` and `press` statements, each single-role:
+
+```rlqs
+type  "A:"
+press enter
+```
 
 ### `press`
 
@@ -1089,7 +1135,7 @@ press ctrl+c
 Presses a sequence of keys. Names joined by `+` form a chord.
 
 The portable key vocabulary is one closed set, owned by the
-language and shared between `press` and `<key>` tokens:
+language and used only after `press`:
 
 ```text
 enter esc tab space backspace
@@ -1101,12 +1147,9 @@ ctrl alt shift
 
 Single printable characters are not key names — they reach the
 guest as text through `type` or `enter`, except as the
-non-modifier member of a chord (`ctrl+c`). The chord production
-`key = key-name , { "+" , key-name }` holds identically inside
-`<...>` in a typed string, so `type "<ctrl+c>"` is legal and means
-the same as `press ctrl+c`. A control plane that cannot deliver a
-listed key is a named capability failure at preflight; the
-vocabulary is never per-platform.
+non-modifier member of a chord (`ctrl+c`). A control plane that
+cannot deliver a listed key is a named capability failure at
+preflight; the vocabulary is never per-platform.
 
 ### `select`
 
@@ -1120,7 +1163,10 @@ It identifies candidate rows, rejects any containing `exclude`,
 moves the highlight using observable feedback, and presses Enter.
 Zero candidates, multiple remaining candidates, an undetectable
 highlight, or traversal without progress are named failures; the
-verb never guesses.
+verb never guesses. `select` is an observation-bearing action: its
+feedback watches run under the statement's effective `timeout`,
+resolved by the same lexical rules as any observation, and a
+failure names that clock and its source scope.
 
 ## Phase transitions
 
@@ -1171,13 +1217,16 @@ slot and record the change in the machine's state document, not
 its blueprint. Hard-disk slots are never targets: `insert` and
 `eject` address removable slots only. Slot names, ranges, and the
 alias/canonical rule are defined once, in the
-[blueprint field reference](machine-blueprint-reference.md); `boot`
-keys use the same vocabulary. The verbs never create or remove
+[blueprint field reference](machine-blueprint-reference.md);
+`set-boot` keys use the same vocabulary. The verbs never create or remove
 the drive itself: drives are guest-visible hardware the blueprint
 declares — an installer-driven blueprint declares the slot empty
 (`"cdrom0": null`) — and an `insert` or `eject` naming a missing
 or non-removable slot fails static preflight, before any guest
-input. `insert` accepts a media reference (`@name`) or a `media`
+input. `insert` into an occupied slot, and `eject` from an empty
+one, are run errors: media state is explicit, and a swap is
+written as `eject` then `insert`. `insert` accepts a media
+reference (`@name`) or a `media`
 input (`$name`); bare media names are not valid. By execution time
 every embedded definition has been installed, so resolution uses
 the ordinary shared catalog, then fetches and hash-verifies the
@@ -1198,20 +1247,22 @@ media changes in place for diagnosis and resumption; `apply` is the
 one-command recovery when a diverged machine should return to its
 blueprint shape.
 
-### `boot`
+### `set-boot`
 
 ```rlqs
-boot hdd0 cdrom0
-boot cdrom0
+set-boot hdd0 cdrom0
+set-boot cdrom0
 ```
 
-`boot` replaces the machine's boot order with the listed drive
+`set-boot` replaces the machine's boot order with the listed drive
 keys (canonical or alias form), persisted in the machine's state
-document. Every key must name a drive the machine already
+document — the verb *sets configuration* rather than performing an
+immediate action, and its name says so. Every key must name a
+drive the machine already
 declares; duplicates are rejected. The machine must be stopped —
 the new order takes effect on the next `start`. Like
 `insert`/`eject`, the change diverges the machine from its
-blueprint until a later `boot`, or
+blueprint until a later `set-boot`, or
 [`apply`](machine-blueprint.md#applying-blueprint-edits), restores
 it.
 
@@ -1280,24 +1331,30 @@ They reject:
 - conflicting embedded or shared media definitions and definition
   labels whose target files already contain different content;
 - a missing or invalid `entry` phase;
-- `goto` targets naming undeclared phases, and `goto` in a linear
-  script;
+- `goto` targets naming undeclared phases, and `goto` or `finish`
+  in a linear script;
+- a phased script whose transition graph contains a cycle but
+  whose header declares no `deadline`;
 - mixed linear/phased shapes;
-- mixed sequential/reactive phase contents;
+- mixed sequential/reactive phase contents, an `on` directly
+  inside a phase, and an `always` inside a branching `wait`;
 - a sequential phase whose statement list does not terminate, and
   any statement written after a terminating statement;
-- a branching `wait` with no handlers, or a branching `wait`
-  anywhere inside a handler body;
+- a branching `wait` with fewer than two handlers, or a branching
+  `wait` anywhere inside a handler body;
+- empty watch patterns, and regexes that fail to compile;
 - any property name repeated on one node;
 - unknown channel names, an observation carrying no condition or
   more than one, a condition on a branching `wait` itself, and
   channel values of the wrong kind (a string for `machine=`, or an
   unknown machine state);
-- invalid key tokens and invalid typed argument positions;
+- invalid key names and invalid typed argument positions;
+- `stage` sources that do not exist relative to the script's
+  directory;
 - `insert`/`eject` targets that are not floppy or cdrom slots and
   (with a machine in scope) slots the target machine does not
   declare;
-- `boot` keys that are not drive slots or (with a machine in
+- `set-boot` keys that are not drive slots or (with a machine in
   scope) drives the target machine does not declare;
 - unknown response keys, missing noninteractive responses, and
   response values of the wrong type;
@@ -1308,7 +1365,9 @@ They reject:
   store.
 
 Static analysis warns about unreachable phases, reactive phases
-with no possible exit, obvious shadowed literal conditions, inputs
+with no possible exit, obvious shadowed literal conditions, a
+regex containing no regex metacharacters (write the string form),
+inputs
 that are declared but unused, and — with a blueprint in scope —
 blueprint parameters matching no input of any script in its
 `scripts` map.
@@ -1420,6 +1479,7 @@ platform    dos
 machine     stopped
 entry       startup
 timeout     30s
+deadline    45m
 
 phase startup {
     insert cdrom0 @freedos-1.4-livecd
@@ -1488,7 +1548,8 @@ The blueprint declares `cdrom0` empty and boots
 blank hard disk fails to boot, so the opening `insert` makes the
 machine fall through to the LiveCD, and the closing `eject`
 returns the machine to its default shape — the same boot order
-thereafter boots the installed hard disk. No `boot` verb is needed.
+thereafter boots the installed hard disk. No `set-boot` verb is
+needed.
 The second visit to `cd-boot` reaches the other branch of its
 closing `wait` because the disk has been partitioned. The
 guest-driven reboot is expressed by the installer selection and the

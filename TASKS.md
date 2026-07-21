@@ -20,34 +20,31 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     string/regex is the screen observation, its only spelling; machine=stopped
     the only machine-state spelling; console= later as a new channel,
     @landmark later as a new matcher spelling)
-  - MILESTONE ZERO — DECISIONS NEEDED BEFORE PARSER REALIGNMENT STARTS
-    (see ROADMAP.md "Milestone zero — settle the surface"; each adjudicated;
-    evidence in workflow journals wf_ac5f89b4-402 / wf_1a266a6b-ff8):
-    1. problem 01 (the word "enter"): pick ONE — (a) delete the enter verb,
-       keep type/press + <key> tokens; (b) delete <key> tokens, keep
-       enter/press; (c) delete both (type = text only, press = keys only).
-       Audit confirmed (a) and (b) separately; they conflict as stated
-    2. problem 04 (on's two lifecycles): pick ONE — (a) keyword split:
-       `always` for reactive handlers, `on` only inside branching waits;
-       (b) merge the constructs, lifetime carried by the handler's own
-       terminal. Both survived review from different lenses
-    3. mandatory header deadline for phased scripts whose transition graph
-       has a cycle: accept (design-install.rlqs must then add one — it is
-       currently invalid under this rule) or reject with recorded reason
-    4. two terminating-statement details: ban trailing `finish` in linear
-       scripts (EOF-only; contradicts current spec sentence)? require >=2
-       handlers in a branching wait (single condition = plain wait)?
-    5. bless-as-batch (adjudicated, no conflicts, apply mechanically):
-       insert-into-occupied / eject-from-empty as run errors; empty-pattern
-       and fixed-string-regex static checks; regex-compile validation;
-       stage source-path existence check; input delivery contract
-       paragraph; select's clocks named; prompt-echo false-positive note
-    6. sequencing rule: write the spec's execution model (sample / episode /
-       clock table) BEFORE retargeting script_runner.py, and design the
-       minimum run-events stream INTO that retarget, not after it
-    - decide soon (naming freezes free before v1, never after): boot ->
-      set-boot or keep; is machine=running legal; machine stopped
-      undiverged header option
+  - MILESTONE ZERO — DECIDED (owner, 2026-07-21), folded into the spec
+    (see ROADMAP.md "Milestone zero — settle the surface"; evidence in
+    workflow journals wf_ac5f89b4-402 / wf_1a266a6b-ff8):
+    1. enter/key-tokens: (b) — <key> tokens DELETED, enter/press kept;
+       keys live only after press, the \< escape is gone, enter stays a
+       derived form (type + press enter)
+    2. on's two lifecycles: (a) keyword split — `always` for reactive
+       handlers, `on` only inside branching waits; a container mismatch
+       is a validation error (lifetime readable from the first word)
+    3. cyclic-deadline: ACCEPTED — header deadline required when the
+       phase graph cycles; design-install.rlqs and the spec example now
+       carry deadline 45m
+    4. terminating details: BOTH — finish banned in linear scripts (EOF
+       is the one ending); branching wait requires >=2 handlers
+    5. bless-as-batch: APPLIED to the spec (insert/eject occupancy run
+       errors; empty-pattern + regex-compile checks; fixed-string-regex
+       warning; stage-source existence; input delivery contract;
+       select's clocks named; prompt-echo note)
+    6. sequencing rule: ADOPTED — the execution model (sample / episode /
+       clock table) with the minimum run-events vocabulary is written
+       into the spec before script_runner.py is retargeted
+    - namings DECIDED: boot renamed set-boot; machine=running deferred
+      (no waitable transition exists — the growth rule admits it later);
+      undiverged header option deferred (divergence policy belongs to
+      apply, never a script header); response files accept JSONC
     - NOT urgent, deliberately open: landmark namespace scoping, GUI asset
       format details, error-id index (beta), full spec document restructure
       (editorial, may trail realignment)
@@ -71,15 +68,16 @@ Small to-do tasks.  Large tasks belong in the roadmap.
        spec redesign, also closes most of [01]'s asymmetry
     2. [06] default a single-item media block's label to its item name;
        warn when an @-reference doesn't match any known item
-    3. [01] rename the `enter` verb (or accept it) — cheap once decided,
-       mostly a taste call, wants a gut check rather than more analysis
-    4. [04] the `on` one-shot-vs-reactive lifecycle split — the one true
-       polysemy bug here; unsure a fix is worth it without seeing how often
-       scripts actually hit both forms side by side
-    5. [03], [05], [07], [09] — provisionally leave as documented
+    3. [01] RESOLVED (milestone zero): <key> tokens deleted, enter kept
+       as a derived form — its file is a regression note
+    4. [04] RESOLVED (milestone zero): the on/always keyword split —
+       its file is a regression note
+    5. [03], [05], [07] — provisionally leave as documented
        tradeoffs, not bugs: boundary tax (guest-text/host-path, string/regex
        escaping) or placement-equals-scope consequences, where a "fix"
        mostly just relocates the mush rather than removing it
+    - [09] RESOLVED (milestone zero): boot renamed set-boot — its file
+      is a regression note
     - [02] RESOLVED by named observation channels (wait machine=stopped,
       bare string = the screen, its only spelling); its file is a regression note
     - note: several of these are the procedural/declarative seam showing
@@ -227,8 +225,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     edit (specced in media-spec.md + builtin-library.md)
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
-  - shared JSONC reader for authored documents (blueprints + standalone
-    media definitions): RFC 8259 + // and /* */ comments + trailing commas,
+  - shared JSONC reader for authored documents (blueprints, standalone
+    media definitions, response files): RFC 8259 + // and /* */ comments + trailing commas,
     nothing more (no JSON5 features); string-aware tokenizer, comments
     replaced by spaces so error line/col survive; JSON islands in scripts,
     the property registry, and every machine-written file stay strict JSON

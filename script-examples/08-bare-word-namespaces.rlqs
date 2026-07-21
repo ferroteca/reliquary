@@ -45,7 +45,7 @@ phase finished {
 # So whether "enter" is a valid bare word depends on which of the
 # six namespaces the position selects (see 01-enter-three-roles).
 # Slots have the same shadow in miniature: `cdrom0` is valid after
-# insert/eject/boot but is an ordinary (confusing) identifier
+# insert/eject/set-boot but is an ordinary (confusing) identifier
 # anywhere else — nothing stops `phase cdrom0` or
 # `screenshot cdrom0`.
 #

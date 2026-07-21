@@ -1,42 +1,35 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# PROBLEM: the word "enter" carries three roles — a verb, a key
-# name, and a key token. One concept (the Enter key), three
-# spellings, and the same action writable three ways.
+# RESOLVED (July 2026, milestone zero) — kept as a regression note.
+#
+# The problem was: the word "enter" carried three roles — a verb,
+# a key name, and a key token — one concept, three spellings, and
+# the same action writable three ways:
+#
+#   enter "exit"        # guest text + the key   (verb)
+#   press enter         # just the key           (key name)
+#   type  "<enter>"     # also just the key      (key token, OLD SURFACE)
+#
+# THE FIX: <key> tokens are deleted. Strings carry text and only
+# text; keys travel only through press. The \< escape disappeared
+# with the tokens (three string escapes remain), and key names now
+# appear in exactly one lexical position — after press:
 
-description "The three spellings of the Enter key"
+description "The spellings of the Enter key — resolved"
 platform    dos
 timeout     30s
 
-# Role 1 — the verb: type guest text, then press the Enter key.
-enter "dir"
-
-# Role 2 — the key name: a bare word in press's key vocabulary.
+enter "dir"             # verb: guest text, then the Enter key
+press enter             # the key alone
+type  "A:"              # text alone; no key markup exists
 press enter
 
-# Role 3 — the key token: quoted markup inside a typed string.
-type "<enter>"
-
-# By definition, these two lines are the same action:
-enter "cls"
-type  "cls<enter>"
-
-# The collision at a glance: three consecutive lines, and the
-# reader must know that the first IMPLIES the key, the second NAMES
-# it, and the third QUOTES it —
-enter "exit"        # guest text + the key
-press enter         # just the key
-type  "<enter>"     # also just the key
-
-# The asymmetry runs deeper: `enter` is reserved as an identifier
-# (no phase may be named enter), yet it is an ordinary word in the
-# key namespace one token after `press`. Reserved in one namespace,
-# plain in another (see 08-bare-word-namespaces.rlqs).
+# enter remains a derived form — `enter "cls"` is `type "cls"`
+# then `press enter` — kept because console lines dominate real
+# install scripts (see design-install.rlqs).
 #
-# OPEN QUESTION: rename the verb so "enter" appears in exactly one
-# lexical class? Candidates: `submit "dir"` (verb-first, honest
-# about the implied keypress), `line "dir"`, or dropping the verb
-# entirely — `type "dir<enter>"` is only three characters longer
-# and single-role. The verb earns its keep only if install scripts
-# use it constantly (they do — see design-install.rlqs `shutdown`).
+# RESIDUE (minor, accepted): "enter" is still a verb in one
+# position and a key name after press. The two are distinguished
+# purely positionally, so a reader never needs context beyond the
+# line itself.

@@ -521,7 +521,7 @@ an ordered top-level sequence. A **phased script** declares an
 explicit `entry` phase and named phases; every sequential phase
 ends in `goto <phase>` or `finish`, with no textual fallthrough.
 A phase is either sequential (ordered statements, including
-branching `wait` blocks) or reactive (only `on` handlers, all
+branching `wait` blocks) or reactive (only `always` handlers, all
 active from entry), never the former hybrid of an ordered body
 and positionally armed ambient handlers. Reactive dispatch is
 single-threaded and run-to-completion. A handler fires once per
@@ -544,9 +544,11 @@ case-sensitive **normalized text matches**: screen rows decode to
 Unicode, trim cell padding, and collapse whitespace before
 literal substring or opt-in regex matching. `wait` is the one
 observation construct, in single-condition and branching forms —
-the branching `wait { on ... }` covers small ordered forks, and
-`on <condition> { }` is the one branch form, shared with reactive
-phases. `machine=stopped` is the machine no-longer-running
+the branching `wait { on ... }` covers small ordered forks (two
+handlers minimum), and one handler shape carries two arming
+keywords: `on`, a one-shot case inside a branching `wait`, and
+`always`, a standing rule in a reactive phase — the lifetime
+readable from the first word. `machine=stopped` is the machine no-longer-running
 condition; it does not claim that the shutdown was graceful. A
 guest reboot has no reliquary verb or event: the script types the
 guest command, makes a menu choice, or sends the appropriate key
@@ -717,16 +719,17 @@ residual problems in `script-examples/`:
   declarative, and both are spelled `phase`. The two are forbidden
   to mix rather than given a combined semantics — a prohibition,
   not a definition.
-- `on` therefore has one syntax and two lifecycles: a case in a
-  branching `wait` versus a standing rule in a reactive phase
-  (`script-examples/04`). That is the paradigm boundary showing
-  through the syntax.
+- The paradigm boundary shows in the handler keywords: `on` is a
+  case in a branching `wait`, `always` a standing rule in a
+  reactive phase — one shape, two named lifetimes
+  (`script-examples/04`, resolved by the keyword split).
 - Declarative timing scopes annotate procedural statements, so an
   observation's effective bound is not locally readable
   (`script-examples/03`).
-- Procedural `insert`/`eject`/`boot` mutate declarative machine
-  state that outlives the run (`script-examples/09`), deliberately
-  diverging a machine from its blueprint until restored.
+- Procedural `insert`/`eject`/`set-boot` mutate declarative
+  machine state that outlives the run (`script-examples/09`),
+  deliberately diverging a machine from its blueprint until
+  restored.
 
 **The prohibitions that keep the seam clean.** Each exists to stop
 the procedural half from eroding the declarative half:
@@ -1169,18 +1172,24 @@ blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `docs/`
 documents is implemented for DOS on QEMU.
 
-### Milestone zero — settle the surface
+### Milestone zero — settle the surface (decided July 2026)
 
-Before the realignment below writes any code, the small set of
-adjudicated language decisions recorded in TASKS.md ("DECISIONS
-NEEDED BEFORE PARSER REALIGNMENT STARTS") is resolved and folded
-into the spec: the enter/key-token resolution, the reactive-handler
-keyword question, the cyclic-deadline rule, the terminating-
-statement details, the pre-approved validation batch, and the
-execution-model-before-runner sequencing rule. Milestone zero is
-done when the spec answers every one of them and the reference
-script parses under the answers. Deciding here is nearly free;
-deciding after the parser exists costs a rewrite.
+The adjudicated language decisions recorded in TASKS.md are
+resolved and folded into the spec: `<key>` tokens deleted (keys
+live only after `press`; `enter` kept as a derived form —
+`type` + `press enter`); the reactive-handler keyword split
+(`always` in reactive phases, `on` only in branching waits, a
+container mismatch a validation error); a mandatory header
+`deadline` for cyclic phase graphs; `finish` banned from linear
+scripts (end of file is the one ending) and two handlers minimum
+per branching `wait`; the pre-approved validation batch applied;
+`boot` renamed `set-boot`; `machine=running` and an undiverged
+header option deferred with reasons recorded in the spec;
+response files accept JSONC. The execution-model-before-runner
+sequencing rule stands: the spec's execution model (sample /
+episode / clock table), with the minimum run-events vocabulary,
+is written before `script_runner.py` is retargeted. The reference
+script is valid under the answers.
 
 ### Script-surface realignment — absolute priority #1
 
@@ -1202,7 +1211,9 @@ Deliverables:
    `deadline`.
 2. The renamed vocabulary: `phase` (was `state`), `goto` (was
    `->`), `finish` (was `done`); `expect` folded into the
-   branching `wait { on ... }` with `on` as the one branch form;
+   branching `wait { on ... }`; `always` for reactive handlers
+   (`on` only in branching waits); `set-boot` (was `boot`); no
+   `<key>` tokens (keys only after `press`);
    the `regex` keyword replaced by the regex literal.
 3. Observation channels, screen-default form: a bare string or
    regex is the screen observation's only spelling (`screen=`

@@ -6,6 +6,7 @@ platform    dos
 machine     stopped                 # script begins with a stopped machine
 entry       startup                 # entry phase
 timeout     30s
+deadline    45m                     # required: cd-boot <-> partitioning cycle
 
 phase startup {
     insert cdrom0 @freedos-1.4-livecd

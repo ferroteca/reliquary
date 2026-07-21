@@ -15,15 +15,15 @@ marked), and the themes matter more than end-to-end coherence.
 
 | file | residual problem |
 |---|---|
-| [01-enter-three-roles.rlqs](01-enter-three-roles.rlqs) | the word "enter" is a verb, a key name, and a key token |
+| [01-enter-three-roles.rlqs](01-enter-three-roles.rlqs) | **RESOLVED** by deleting `<key>` tokens — keys live only after `press`; kept as a regression note |
 | [02-stop-stopped-family.rlqs](02-stop-stopped-family.rlqs) | **RESOLVED** by named observation channels (`machine=stopped`; a bare string/regex is the screen's only spelling) — kept as a regression note |
 | [03-timing-spellings-and-scope.rlqs](03-timing-spellings-and-scope.rlqs) | `timeout 30s` vs `timeout=5m`; non-local defaults; the stable split; reset asymmetry |
-| [04-on-two-lifecycles.rlqs](04-on-two-lifecycles.rlqs) | one `on` syntax, two lifecycles; invisible fall-through; hidden terminals |
+| [04-on-two-lifecycles.rlqs](04-on-two-lifecycles.rlqs) | **RESOLVED** by the `on`/`always` keyword split — lifetime in the first word; fall-through and hidden terminals stay documented — regression note |
 | [05-strings-two-worlds.rlqs](05-strings-two-worlds.rlqs) | quoted strings are guest text in one verb, host paths in the next |
 | [06-media-label-vs-item.rlqs](06-media-label-vs-item.rlqs) | the media label names a file, `@` references an item; `@` vs `$` definiteness |
 | [07-regex-escaping-regimes.rlqs](07-regex-escaping-regimes.rlqs) | the same screen text escapes differently in `"..."` and `/.../` |
 | [08-bare-word-namespaces.rlqs](08-bare-word-namespaces.rlqs) | bare words span six namespaces; asymmetric reservations |
-| [09-boot-verb-tense.rlqs](09-boot-verb-tense.rlqs) | `boot` reads immediate but is persistent configuration |
+| [09-boot-verb-tense.rlqs](09-boot-verb-tense.rlqs) | **RESOLVED** by renaming to `set-boot` — the prefix names the persistence; kept as a regression note |
 
 Each file ends with an open question. Resolving one should update
 the spec first, then delete the example (or rewrite it as a

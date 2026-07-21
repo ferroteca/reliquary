@@ -101,8 +101,9 @@ install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
 blueprint and state make no claim about the guest's contents. After
 install, the same boot order boots the hard disk. Scripts that need
-a different order can use the [`boot`](script-spec.md#boot) verb
-while the machine is stopped.
+a different order can use the
+[`set-boot`](script-spec.md#set-boot) verb while the machine is
+stopped.
 
 > **Media note:** `freedos-1.4-livecd` names a
 > [media definition](media-spec.md)
