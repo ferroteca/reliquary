@@ -126,7 +126,13 @@ covers them equally:
 - **Recorded outputs** — run records under a machine's `runs/`
   directory: transcripts (with the secret-redaction contract),
   screenshots, and collected outputs. The world reads these;
-  their shape is a contract.
+  their shape and retention are a contract: append-only, never
+  rewritten, never implicitly pruned — a record lives until its
+  machine is destroyed or the user explicitly deletes it. A
+  record is evidence, not reconstructible; durability beyond the
+  machine is the consumer's claim — the record directory is
+  self-contained, and copying it out is the sanctioned way to
+  keep one ([docs/script-spec.md](docs/script-spec.md)).
 - **The home layout** — where users place payload files, find
   caches, and locate everything above:
   [docs/instance-model.md](docs/instance-model.md).

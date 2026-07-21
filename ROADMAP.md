@@ -146,8 +146,11 @@ machine is durable: a machine **is** its cache directory (see
 ```
 
 Everything under `cache/machines/<id>/` is reliquary's and
-regenerates from the blueprint (plus media definitions and scripts);
-nothing is ever hand-placed there. Pre-existing content enters a
+disposable: drives and backend files regenerate from the blueprint
+(plus media definitions and scripts); run records are evidence —
+retained for the machine's life, never regenerable, copied out to
+survive it.
+Nothing is ever hand-placed there. Pre-existing content enters a
 machine through the blueprint: `media` references, and starting-point
 images (`base`) that machine drives are differenced from, or
 copies of.
@@ -245,8 +248,10 @@ backend and missing capability.
     ├── media/           the named payload files machines mount,
     │                    fetched/extracted/verified on demand
     └── machines/<id>/   cached materializations (above —
-                         disposable: regenerate from blueprint
-                         and media; run records are transient)
+                         disposable: drives regenerate from
+                         blueprint and media; run records are
+                         evidence, copied out to outlive the
+                         machine)
 ```
 
 The current `install-media/` cache folds into `cache/`. The
@@ -1042,16 +1047,39 @@ precedent), defaulting to the machine's latest run, with the
 machine chosen by the ordinary `--machine` / `--blueprint`
 selectors.
 
+**Retention is machine-bounded and explicit (owner,
+2026-07-21).** A run record is append-only, never rewritten, and
+never implicitly pruned: the only deleters are machine
+`destroy`/`recreate` and the explicit `run delete` — a `run`
+family member, never a `clean` one, because `clean`'s own
+invariant is that nothing irreplaceable is cleanable, and
+records are evidence, not regenerable output. `run delete` alone
+never defaults to the latest run (deleting evidence warrants
+naming it): numbers are explicit, several may be given, a live
+run's record is refused (fail closed, naming the writer), and
+deletion frees no number. The record directory is self-contained
+and self-identifying (machine id, run number, timestamps, script
+digest — distinguishable across `recreate` generations that
+reuse a machine id); copying it out with ordinary tools is the
+sanctioned way to keep a record beyond its machine, and there is
+deliberately no export verb for it — the record is already
+host-side plain files at a reported path. Contract home:
+script-spec.md "Failure, runs, and transcripts"; custody model
+in USE-CASES (the artifact-residency split) and INTERFACES
+(recorded outputs).
+
 **Two presentations, under parity.** The CLI carries
 `script --detach`, the `run` noun family — `run status`,
 `run tail` (rendering per the decided progress vocabulary:
 pretty on a tty, plain and rawjson for programs), `run wait`
 (its exit code mirrors the run's outcome, so unbound languages
-get results by waiting), and `run cancel [--stop]` — and
+get results by waiting), `run cancel [--stop]`, and
+`run delete <n> [<n> ...]` — and
 `list runs`. The embedding API's twins: `run_script()` stays the
 blocking form; `start_script()` returns a run handle —
 `status()`, `events(follow=)` as a blocking iterator,
-`wait(timeout=)`, `cancel(stop_machine=)` — and an attach-by-id
+`wait(timeout=)`, `cancel(stop_machine=)` — plus `delete_run()`
+and an attach-by-id
 call reopens a handle from a fresh process. The handle is
 pull-only: no callbacks, nothing a common binding language
 cannot express directly. A caller wanting concurrency without

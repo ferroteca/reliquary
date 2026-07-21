@@ -1659,6 +1659,34 @@ cache/machines/<machine_id>/runs/<n>/
 Runs number monotonically per machine and a number is never
 reused; `<machine_id>/<n>` is a run's full identity.
 
+A run record is **evidence, with machine-bounded retention**:
+append-only, never rewritten, and never implicitly pruned. It
+lives until its machine is destroyed (or recreated), or until
+the user deletes it explicitly with `run delete` (API twin
+`delete_run()`, under parity). `run delete` takes its run
+numbers explicitly — the one `run` operation that never defaults
+to the machine's latest run, because deleting evidence warrants
+naming it — accepts several at once, refuses a live run's record
+(fail closed, naming the writer; `run cancel` ends the run
+first), and frees no number: numbering stays monotonic over
+deletions.
+
+The record directory is self-contained and self-identifying:
+plain files, no links into machine internals, carrying the
+machine id, run number, timestamps, and the script's source and
+digest — so a record copied out of the cache stands alone, and
+records from different machine generations (machine ids are
+reused after `destroy`) remain distinguishable. Copying
+`runs/<n>/` out with ordinary tools is the sanctioned way to
+keep a record beyond its machine's life; there is deliberately
+no export verb for it — the record is already host-side plain
+files at a path `run status` and `list runs` report, and the
+shape contract here is what makes the copy readable. The run
+record is often the product of the whole exercise (U3):
+reliquary retains it with the machine and delivers its contents
+live through the event stream; durability beyond the machine is
+the consumer's claim.
+
 `run-events.jsonl` is the run's normative record — the
 [event stream](#the-run-event-stream) the execution model
 defines; `transcript.txt` is a human-readable rendering of it.

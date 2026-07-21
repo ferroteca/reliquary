@@ -292,7 +292,10 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     minimum vocabulary is now normative in script-spec.md's execution
     model (2026-07-21); async consumption settled (2026-07-21, ROADMAP
     "Asynchronous runs": live-write, script --detach, the run family,
-    start_script/attach handles); remaining: records for API/CLI-primitive runs,
+    start_script/attach handles); record durability/custody settled
+    (2026-07-21, blueprint-spec queue item 1: machine-bounded
+    retention, run delete, copy-out survival);
+    remaining: records for API/CLI-primitive runs,
     the full renderer contract (transcript rewrite), per-test result
     collection; the
     unit-test loop is now IN U3 itself (amended 2026-07-21: the
@@ -384,22 +387,28 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   and blueprint specs walked against INTERFACES.md / USE-CASES.md; the
   media spec tracks the principles closely — the gaps cluster in the
   blueprint spec: machine-blueprint.md + -reference.md + -cookbook.md):
-  1. run records vs disposability (the big one): U3 says the run record
-     is the product and INTERFACES names recorded outputs a world-facing
-     contract, but the blueprint guide declares the machine directory
-     wholly reliquary's ("nothing about a machine is durable ... you
-     never need to touch it"; "everything under cache/ is reliquary's
-     and reconstructible"), destroy deletes run records with the rest,
-     export offers only media-image and whole-machine targets, and
-     ROADMAP's home-layout tree calls run records "transient". Run
-     records are precisely NOT reconstructible — they are evidence of a
-     run, often the only durable outcome — so the artifact-residency
-     split (durable outside cache / disposable under cache) is violated
-     by its most important artifact, and no document names the tension.
-     Needs a named survival story (an export target? a copy-out
-     contract? a residency amendment?) — extends the U3 run-records
-     entry in the guiding-principles queue above, which covers records
-     for API/CLI-primitive runs but not durability
+  1. RESOLVED (owner, 2026-07-21, design round) — run records vs
+     disposability, settled as the CUSTODY MODEL: disposable and
+     reconstructible are distinct properties — everything under cache/
+     is disposable, run records are the named exception to
+     reconstructible (evidence, never regenerable); retention is part
+     of the recorded-outputs contract (append-only, never rewritten,
+     never implicitly pruned, machine-bounded: destroy/recreate and
+     the explicit `run delete` are the only deleters — a run-family
+     verb, NOT clean, whose own invariant is nothing-irreplaceable-
+     is-cleanable; run delete takes explicit numbers, never defaults
+     to latest, refuses live runs, frees no number; API twin
+     delete_run under parity); survival is the custody handoff —
+     contents are delivered live (the feedback split), the record
+     directory is self-contained/self-identifying (stands alone
+     across recreate id reuse), copying it out is the sanctioned
+     path, deliberately no export verb (named decision). Folded:
+     USE-CASES residency split, INTERFACES recorded outputs,
+     script-spec "Failure, runs, and transcripts" (contract home),
+     blueprint guide (ownership prose + tree gains runs/ — the tree
+     half of item 6), ROADMAP (both layout claims + "Asynchronous
+     runs" retention paragraph + run delete in the family),
+     instance-model, cli.md
   2. U2 import disk-location choice: already queued above (the
      guiding-principles queue's U2 entry); recorded here too because
      the blueprint guide's import section is itself a foreclosing
@@ -434,7 +443,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      machine-directory tree is stale against its own linked model:
      screenshots/ at the machine root and no runs/ at all, where
      instance-model and ROADMAP both put runs/ there with screenshots
-     inside run records
+     inside run records — tree half RESOLVED with item 1's fold
+     (2026-07-21): the guide's tree now shows runs/; the UUID
+     examples remain this item's work
   7. "media names are the ONLY cross-boundary reference a blueprint
      may make (U4)" (reference, #media) is contradicted two sections
      away: the scripts map references .rlqs files by name and

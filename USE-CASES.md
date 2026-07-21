@@ -170,7 +170,13 @@ control and evolves there. Either way the home remains
 reliquary's own ground — caches, machines, the personal property
 registry — so a project's artifacts must work in place: runnable
 from the source tree, with nothing copied into a home to make
-them usable.
+them usable. One cache artifact is disposable without being
+reconstructible: run records are evidence, not regenerable
+output. Their contents are delivered live to whoever drives the
+run (the feedback split below), and the record is retained for
+its machine's life; durability beyond the machine is the
+consumer's claim — copy the record out while the machine exists
+(U3, U4).
 
 Alongside these runs a feedback split. reliquary's runs are
 long, and whoever drives one gets timely progress — presented

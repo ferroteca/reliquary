@@ -43,8 +43,12 @@ per-blueprint lock under `cache/machines/.locks/`. The cache
 directory, run directories, and backend identity all use the
 machine id, and there is no separate machine name. A machine
 **is** its cache directory — nothing about a machine lives
-outside `cache/`, because nothing about a machine is durable.
-Deleting the cache deletes the machines, by design.
+outside `cache/`, because a machine lives and dies as one thing.
+Deleting the cache deletes the machines, by design — run records
+included, and unlike everything else there, records are evidence
+rather than regenerable output: copy a record out while the
+machine exists when it should outlive it (see the script spec's
+run-record contract).
 
 Commands select their targets with explicit flags, never
 positionally:
@@ -178,6 +182,11 @@ There is no `installed` boolean. Script outcomes belong to the
 append-only run records under the instance cache, where they can name
 the script, its source digest, result, transcript, and produced
 artifacts without making a vague claim about the guest's contents.
+Records have machine-bounded retention: never rewritten or
+implicitly pruned, deleted only with their machine
+(`destroy`/`recreate`) or explicitly by `run delete`; each record
+directory is self-contained plain files, copied out to survive
+the machine.
 
 ## Naming and identity
 

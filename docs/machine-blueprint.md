@@ -95,7 +95,8 @@ Two rules carry the whole model:
 <reliquary_home>/cache/machines/<id>/
 ├── reliquary-machine.json   the machine's state — reliquary's
 ├── drives/                  the machine's disk and floppy images
-├── screenshots/             captured screens (transient)
+├── runs/                    append-only run records (transcripts,
+│                            screenshots, collected outputs)
 └── ...                      backend files and logs
 ```
 
@@ -105,27 +106,33 @@ Two rules carry the whole model:
   describes one machine: its identity, blueprint, lifecycle
   phase, and resolved configuration, at the root of the
   machine's directory — which holds everything reliquary
-  materialized for it: state, disk images, screenshots, backend
+  materialized for it: state, disk images, run records, backend
   files. The machine **is** this directory; nothing about a
-  machine lives outside `cache/`, because nothing about a machine
-  is durable. reliquary owns all of it; you never need to touch
-  it. Screenshots in particular are transient diagnostics with no
-  retention promise — copy out any capture you want to keep,
-  promptly.
+  machine lives outside `cache/`, because a machine lives and
+  dies as one thing. reliquary writes all of it; the one part
+  written *for you* is `runs/` — the machine's run records
+  (transcripts, screenshots, collected outputs), which the world
+  reads in place and copies out to keep (see below). Everything
+  else you never need to touch.
 
 The split reflects what reliquary machines are for: **ephemeral
 work**. A reliquary machine is a disposable rig — created to run a
 scripted OS install or an automated task, recreated freely, and
 deleted when done. The blueprint makes rebuilding cheap; the
 entire cached materialization is safe to throw away, because
-everything in it regenerates from blueprints, media definitions,
-and scripts. The machine is never the product — often nothing
-durable comes out at all (the point was to run some tests); when
-there is interest in something more durable, `export` it — either
-a media image (a disk image taken out of the machine) or the
-entire machine, handed to a hypervisor built for long-lived
-machines. reliquary is not the place to keep a machine you care
-about.
+everything in it — run records excepted — regenerates from
+blueprints, media definitions, and scripts. The records are
+evidence of runs, delivered live to whoever drove them and
+retained until the machine goes; they are the one thing in the
+cache no re-run reproduces. The machine is never the product —
+often the run record is (U3): the point was to run some tests,
+and the record is copied out as plain files when it should
+outlive the machine
+([the record contract](script-spec.md#failure-runs-and-transcripts)).
+When the durable thing is bigger, `export` it — either a media
+image (a disk image taken out of the machine) or the entire
+machine, handed to a hypervisor built for long-lived machines.
+reliquary is not the place to keep a machine you care about.
 
 The same ownership line runs through the whole reliquary home:
 everything outside `cache/` is durable data you own. Machine
@@ -134,7 +141,10 @@ and worth versioning. The [user property registry](property-registry.md)
 is also durable but personal and normally not shared or committed. A
 media definition may initially be installed from an embedded script
 block, after which its library copy is likewise user-owned. Everything
-under `cache/` is reliquary's and reconstructible. There is no dropping
+under `cache/` is reliquary's and disposable — and, run records
+excepted, reconstructible: the records are evidence, kept for the
+machine's life and never regenerable, so copy out any record that
+should outlive its machine. There is no dropping
 of pre-created files into cache directories; inputs enter machines
 through the blueprint —
 [`media` references](machine-blueprint-reference.md#media--optional--string)
@@ -385,7 +395,8 @@ rlq recreate --blueprint msdos
 ```
 
 `destroy` deletes the machine entirely — its directory (state,
-drive images, run records) and the backend's machine — and never
+drive images, run records: copy out any record worth keeping
+first) and the backend's machine — and never
 touches the blueprint; `create` makes a fresh machine from the
 blueprint whenever one is wanted again. `recreate` is exactly
 `destroy` + `create` as one command, reusing the same id. Drives

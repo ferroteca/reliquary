@@ -743,6 +743,7 @@ reliquary (--blueprint <name> | --machine <id>) run status [<n>]
 reliquary (--blueprint <name> | --machine <id>) run tail [<n>]
 reliquary (--blueprint <name> | --machine <id>) run wait [<n>]
 reliquary (--blueprint <name> | --machine <id>) run cancel [<n>] [--stop]
+reliquary (--blueprint <name> | --machine <id>) run delete <n> [<n> ...]
 rlq list runs [--blueprint <name> | --machine <id>]
 ```
 
@@ -763,6 +764,13 @@ terminal event and exits with the run's own outcome code, so a
 shell script or unbound language gets the result by waiting;
 `run cancel` ends the run at the next event boundary and leaves
 the machine as-is — `--stop` also hard powers it off.
+`run delete` removes a run's record — the one `run` operation
+that never defaults to the latest run, because deleting evidence
+warrants naming it: the numbers are explicit, several may be
+given, a live run's record is refused (`run cancel` first), and
+deletion frees no number. Records are otherwise kept for the
+machine's life; copy a record's directory out to keep it beyond
+`destroy` (the record contract is in the script spec).
 
 ```powershell
 rlq --blueprint freedos-1.4-plain script install --detach
