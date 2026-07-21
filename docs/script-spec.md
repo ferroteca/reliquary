@@ -42,8 +42,11 @@ Failure likewise leaves the machine in its observed state for
 diagnosis; no command implicitly tears it down.
 
 Scripts are authored documents: reliquary reads but never rewrites
-them. They belong in version control beside the machine blueprints
-and media definitions on which they depend.
+them — with one named exception: the authoring recorder's opt-in
+fragment apply (U6; [ROADMAP.md](../ROADMAP.md), "Script authoring
+by recording") inserts a captured fragment at its playback anchor
+and touches no other byte. They belong in version control beside
+the machine blueprints and media definitions on which they depend.
 
 ## The language model
 
@@ -201,10 +204,13 @@ wait /installed [0-9]+ of [0-9]+ packages/
 ```
 
 `\/` produces a literal slash; every other character, including
-backslashes, passes through to Python's regular-expression syntax
-unchanged. A regex is a screen condition; `machine=` accepts
-only a machine-state word. Input references are never expanded
-inside a regex.
+backslashes, passes through to the regex engine unchanged. The
+dialect is Python's `re` syntax — named deliberately as the
+language's contract rather than inherited as an implementation
+detail: an implementation in another language must provide this
+dialect, not substitute its host's. A regex is a screen condition;
+`machine=` accepts only a machine-state word. Input references are
+never expanded inside a regex.
 
 ### References
 
@@ -390,7 +396,14 @@ regex-escape    = "\" , ? any character except a line
 
 `json-line` is any line of the JSON island, tokenized by RFC 8259
 rather than by this grammar; the island closes at the `}` closing
-its object, as described above. `interpolation` and `key-token`
+its object, as described above. The island is strict JSON — the
+JSONC affordances library definition files accept (comments,
+trailing commas; see
+[the media spec](media-spec.md#the-definition-format)) are not
+legal here: a comment could carry an unbalanced brace past the
+island's brace tracking, and installation writes the library
+copy in canonical strict JSON, which would silently drop them.
+`interpolation` and `key-token`
 are recognized only where the argument accepts them — never in a
 regex, `key-token` only in `enter` and `type`. `slot`, `key-name`,
 and `machine-state` values are `name` tokens whose closed
@@ -703,6 +716,16 @@ expressions and cannot control watch conditions, transitions, or
 phase selection. A `secret` input follows the text interpolation
 rules only inside `enter` and `type`.
 
+That prohibition also bounds what any binding source can
+customize: no input — whatever supplies it — can retarget a
+script at a different-language installer, whose every screen
+differs. Locale-class customization is a *composition* seam owned
+by the machine blueprint, which selects the media/script pair;
+value seams (blueprint parameters, properties, responses) supply
+data only, and each script stands alone against the guest it was
+written for (U5; see [customization
+seams](machine-blueprint.md#customization-seams)).
+
 Values can be supplied explicitly in a JSON response file:
 
 ```json
@@ -721,13 +744,20 @@ rejects unknown keys, and binds each input from the first
 available source:
 
 1. an explicit response-file value;
-2. the property named by `property=`; or
-3. an interactive prompt.
+2. a [blueprint
+   parameter](machine-blueprint-reference.md#parameters) of the
+   target machine's blueprint — a direct value, or a property
+   reference that *replaces* the input's own `property=` binding
+   rather than chaining to it;
+3. the property named by `property=`; or
+4. an interactive prompt.
 
 Without an interactive terminal, a still-missing value fails before
-execution. Response files therefore override personal registry
-defaults for one invocation. Prompted values are not written back
-to the registry. A media value is resolved after binding, and a
+execution. A response file therefore overrides everything for one
+invocation, while a blueprint's designed values override personal
+registry defaults — a blueprint that fixes its user name as
+"testuser" keeps it fixed on every machine of it (U5). Prompted
+values are not written back to the registry. A media value is resolved after binding, and a
 media prompt lists the embedded and existing library names valid
 for that response.
 
@@ -736,6 +766,10 @@ marker in `properties.json`; their values live in the host
 credential store. `text` and `media` inputs require ordinary
 properties, while `secret` requires a secret property. Kind
 mismatches fail rather than silently downgrading protected data.
+Blueprint parameters follow the same kind rules, and a `secret`
+input never takes a direct blueprint value — the [field
+reference](machine-blueprint-reference.md#parameters) states the
+blueprint-side rules.
 See the [property-registry specification](property-registry.md) for
 its file format, maintenance commands, precise failure rules, and
 security boundary.
@@ -1267,13 +1301,17 @@ They reject:
   scope) drives the target machine does not declare;
 - unknown response keys, missing noninteractive responses, and
   response values of the wrong type;
+- malformed blueprint parameters, direct blueprint values on
+  `secret` inputs, and parameter/input kind mismatches;
 - malformed property bindings, input/property kind mismatches,
   and required secret credentials unavailable from a secure host
   store.
 
 Static analysis warns about unreachable phases, reactive phases
-with no possible exit, obvious shadowed literal conditions, and
-inputs that are declared but unused.
+with no possible exit, obvious shadowed literal conditions, inputs
+that are declared but unused, and — with a blueprint in scope —
+blueprint parameters matching no input of any script in its
+`scripts` map.
 
 After binding inputs, preflight computes every capability the
 script may require and compares the complete set with the machine's
@@ -1292,7 +1330,9 @@ analysis — including the resolved timing plan, each observation's
 effective timeout, and its source scope — without executing the
 script, changing the user property registry, accessing secret
 values, or writing to `media/`. Supplying a machine and response
-file also performs typed binding and capability preflight.
+file also performs typed binding — reporting each input's binding
+source (response, blueprint parameter, property, or prompt) — and
+capability preflight.
 Registry-aware checking reports property presence and kind; it
 never reveals a property value.
 
@@ -1314,8 +1354,9 @@ always reported explicitly. A transcript records:
 - phase entries, handler firings, branches, and transitions;
 - observations with their channel, normalized matches, and elapsed
   time;
-- input names and whether each came from a response, named user
-  property, or prompt, but never expanded input values;
+- input names and whether each came from a response, a blueprint
+  parameter, a blueprint-referenced or input-named user property,
+  or a prompt, but never expanded input values;
 - each media definition installed or found identical, its source
   script line and shared-library path, and verified hashes;
 - the selected backend and control plane for each operation; and
