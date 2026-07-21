@@ -44,7 +44,9 @@ when the script expects `running`, failing when the script expects
 `stopped` but the machine is running — then executes the script. The
 machine stays in whatever state the last executed step left it.
 Failure likewise leaves the machine in its observed state for
-diagnosis; no command implicitly tears it down.
+diagnosis; no command implicitly tears it down. The embedding
+API's twin is `run_script`, taking the same identifiers under
+CLI–API parity.
 
 Scripts are authored documents: reliquary reads but never rewrites
 them — with one named exception: the authoring recorder's opt-in
@@ -59,7 +61,7 @@ The language is a deliberately constrained, domain-specific
 programming language. It has sequencing, branching, named phases,
 and explicit phase transitions, but no expressions, mutable
 variables, arithmetic, user-defined functions, or general-purpose
-loops. Its job is guest automation, not computation.
+loops. Its job is guest automation, not computation (G2).
 
 The basic rhythm is **observe, then act**:
 
@@ -79,7 +81,7 @@ select "English (United States)"
 Intent-level verbs remain above portable input events. `select`
 means choosing a visible menu entry, not sending a guessed number
 of Down keys. The selected control plane composes the necessary
-key press and release events and owns their pacing. Pointer actions
+key press and release events and owns their pacing (G5). Pointer actions
 will follow the same model when GUI automation arrives.
 
 Three design rules govern the whole surface:
@@ -124,6 +126,43 @@ which script to run, deriving response values, repeating a failed
 job from a known machine state, parsing results, and integrating
 with other tools. Inputs supply immutable data to a script;
 they do not add expression or decision syntax.
+
+## Processing model
+
+A script passes through a fixed pipeline: **lex → parse →
+desugar → validate → bind → preflight → execute**. Tokens form
+nodes ([lexical rules](#lexical-rules)); nodes parse under the
+typed grammar; [derived forms](#derived-forms) rewrite to the
+core language; validation and binding check what follows; and
+the [execution model](#execution-model) gives the result its
+run-time meaning.
+
+Every rule in this spec belongs to one of three enforcement
+tiers:
+
+- **Legality rules** — checkable from the script text alone: the
+  lexical rules, the grammar, and the
+  [syntactic restrictions](#syntactic-restrictions) (S-ids).
+  Violations are STATIC ERRORs.
+- **Machine rules** — need something beyond the text in scope:
+  the visible media catalog, the filesystem, a machine or
+  blueprint, a response set. Capability preflight, slot and
+  drive existence, input binding, and media reconciliation live
+  here ([validation and preflight](#validation-and-preflight)).
+  Violations are PREFLIGHT ERRORs, raised before any guest
+  input.
+- **Dynamic semantics** — the meaning of execution itself
+  ([the execution model](#execution-model)). What goes wrong
+  here is a RUN FAILURE.
+
+`check-script` has exactly two modes, one per checkable tier:
+without a machine it applies every legality rule plus the
+prospective embedded-media validation the visible catalog
+allows; with `--machine`/`--blueprint` (and optionally
+`--responses`) it adds the machine rules. Dynamic semantics are
+exercised only by a run. See
+[error classes](#error-classes-and-exit-codes) for how the tiers
+surface to callers.
 
 ## Lexical rules
 
@@ -260,7 +299,9 @@ language definition:
 - **Signatures.** Each node name fixes its argument types, allowed
   properties, and whether it takes a block. The complete signature
   tables follow; an argument or property outside a node's
-  signature is a parse error.
+  signature is a parse error. The tables are informative
+  summaries — the typed grammar and the
+  [syntactic restrictions](#syntactic-restrictions) govern.
 
 Header nodes:
 
@@ -441,30 +482,51 @@ Two rules follow, checked by static validation:
   that is its one spelling — `goto` and `finish` are both invalid
   in a linear script.
 
-A small set of constraints is deliberately context-sensitive —
-enforced by static validation over the parse tree rather than
-encoded in the CFG:
+### Syntactic restrictions
 
-- each header appears at most once; `entry` appears exactly in
-  phased scripts;
-- no node carries the same property name twice; a repeat is a
-  static error, never a last-wins override;
-- an observation carries **exactly one** condition — a bare
-  string/regex condition beside a `machine=` property, or two
-  `machine=` properties, are errors — and the condition precedes
-  any timing property on the same observation;
-- a branching `wait` carries no condition of its own; its
-  handlers do;
-- no handler body contains a branching `wait`. The recursion
-  `handler → statement → observation` is deliberate: the grammar
-  stays context-free and the depth limit is a static rule, not a
-  parse rule;
-- the [terminating-statements rules](#terminating-statements);
-- the [timing placement matrix](#timing): each timing property is
-  legal only where the matrix allows it;
-- `goto` names a declared phase and never appears in a linear
-  script; media labels are unique; reserved node names are not
-  identifiers; durations are positive.
+These are the legality rules the grammar cannot carry — enforced
+by static validation over the parse tree rather than encoded in
+the CFG. Each has a stable id; diagnostics cite them:
+
+- **S1** — syntax is well formed: no unknown node names, no
+  unbalanced blocks.
+- **S2** — every argument, property, and block fits its node's
+  signature, including each timing property's placement per the
+  [placement matrix](#timing).
+- **S3** — each header appears at most once; `entry` appears
+  exactly in phased scripts.
+- **S4** — no node carries the same property name twice; a
+  repeat is an error, never a last-wins override.
+- **S5** — names are valid and unique in their namespaces:
+  reserved node names are not identifiers, media labels are
+  unique, durations are positive.
+- **S6** — every `$` reference names a declared input.
+- **S7** — an observation carries **exactly one** condition — a
+  bare string/regex beside a `machine=` property, or two
+  `machine=` properties, are errors — the condition precedes any
+  timing property, the channel is known, and its value is of the
+  right kind (a state word for `machine=`, never a string).
+- **S8** — a branching `wait` carries no condition of its own,
+  has at least two handlers, and appears nowhere inside a
+  handler body. The recursion `handler → statement →
+  observation` is deliberate: the grammar stays context-free and
+  the depth limit is a static rule, not a parse rule.
+- **S9** — `on` appears only inside a branching `wait`, `always`
+  only directly inside a reactive phase, and a phase is
+  sequential or reactive, never mixed.
+- **S10** — the two script shapes never mix; `goto` and `finish`
+  are invalid in a linear script; every `goto` names a declared
+  phase; `entry` names exactly one.
+- **S11** — the [terminating-statements rules](#terminating-statements):
+  nothing follows a terminating statement, and a sequential
+  phase's statement list terminates.
+- **S12** — a phased script whose transition graph contains a
+  cycle declares a header `deadline`.
+- **S13** — watch patterns are non-empty and regexes compile.
+- **S14** — closed vocabularies hold by name: key names are from
+  the portable set, `insert`/`eject` name removable
+  (floppy/cdrom) slots, `set-boot` names drive slots, and
+  interpolation appears only where the argument accepts it.
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
@@ -475,6 +537,27 @@ are the same token until the `=` is seen, as in
 terminating-statement checking, transition targets, capability
 preflight, timing resolution — runs over the typed tree before any
 machine starts.
+
+### Derived forms
+
+The surface language is defined by rewriting: a small set of
+derived forms desugar — over parsed nodes, never over text —
+into a smaller core, and every rule thereafter is stated once,
+against the core (G6):
+
+- `enter "s"` ⇒ `type "s"` followed by `press enter`.
+- A bare string or regex condition ⇒ that condition on the
+  screen channel — the default channel's only spelling, made
+  explicit in the core.
+- A linear script ⇒ a phased script with one implicit phase as
+  its entry, whose statement list ends in an implicit `finish`
+  (end of file ⇒ `finish`). The implicit phase has no name and
+  cannot be targeted; `goto` and `finish` stay illegal in the
+  authored linear surface (S10).
+
+Desugaring is definitional, not observable: diagnostics, the
+transcript, and the run event stream always name the authored
+surface — the source line as written, never the rewritten core.
 
 ## Header
 
@@ -1221,7 +1304,8 @@ meaning; `stable` on a container is meaningless because only a
 match can be required to hold.
 
 Because per-observation resolution is fully lexical, the effective
-timeout of every observation is computable at parse time:
+timeout of every observation is computable at parse time (G3,
+G4):
 `check-script` reports the resolved timing plan, and a timing
 failure names which clock expired and the scope that supplied it —
 an observation timeout from a statement, a phase deadline from its
@@ -1234,7 +1318,8 @@ stated duration before succeeding:
 wait "Formatting" stable=2s
 ```
 
-There is no generic sleep or delay verb, on principle: a blind
+There is no generic sleep or delay verb, on principle (G1, G5): a
+blind
 pause encodes a guess about guest speed that will be wrong on
 another host. Every pause must be justified by an observation;
 `stable` strengthens one rather than blindly pausing after it.
@@ -1477,50 +1562,27 @@ reconciliation behavior visible.
 
 ## Validation and preflight
 
-Parsing and static validation finish before the machine starts.
-They reject:
+Parsing and static validation enforce the legality rules — the
+[lexical rules](#lexical-rules), the grammar, and the
+[syntactic restrictions](#syntactic-restrictions) S1–S14 — from
+the script text alone, before the machine starts. With more in
+scope, preflight further rejects, naming what it needed:
 
-- malformed syntax, unknown node names, and unbalanced blocks;
-- arguments, properties, or blocks outside a node's signature,
-  including every illegal timing placement in the
-  [placement table](#timing);
-- duplicate or invalid names, reserved words used as names, and
-  unknown `$` input references;
-- conflicting embedded or shared media definitions and definition
-  labels whose target files already contain different content;
-- a missing or invalid `entry` phase;
-- `goto` targets naming undeclared phases, and `goto` or `finish`
-  in a linear script;
-- a phased script whose transition graph contains a cycle but
-  whose header declares no `deadline`;
-- mixed linear/phased shapes;
-- mixed sequential/reactive phase contents, an `on` directly
-  inside a phase, and an `always` inside a branching `wait`;
-- a sequential phase whose statement list does not terminate, and
-  any statement written after a terminating statement;
-- a branching `wait` with fewer than two handlers, or a branching
-  `wait` anywhere inside a handler body;
-- empty watch patterns, and regexes that fail to compile;
-- any property name repeated on one node;
-- unknown channel names, an observation carrying no condition or
-  more than one, a condition on a branching `wait` itself, and
-  channel values of the wrong kind (a string for `machine=`, or an
-  unknown machine state);
-- invalid key names and invalid typed argument positions;
+- conflicting embedded or shared media definitions, and
+  definition labels whose target files already contain different
+  content (the visible catalog);
 - `stage` sources that do not exist relative to the script's
-  directory;
-- `insert`/`eject` targets that are not floppy or cdrom slots and
-  (with a machine in scope) slots the target machine does not
-  declare;
-- `set-boot` keys that are not drive slots or (with a machine in
-  scope) drives the target machine does not declare;
+  directory (the filesystem);
+- `insert`/`eject` slots and `set-boot` drives the target
+  machine does not declare (a machine);
 - unknown response keys, missing noninteractive responses, and
-  response values of the wrong type;
+  response values of the wrong type (a response set);
 - malformed blueprint parameters, direct blueprint values on
-  `secret` inputs, and parameter/input kind mismatches;
+  `secret` inputs, and parameter/input kind mismatches (a
+  blueprint);
 - malformed property bindings, input/property kind mismatches,
   and required secret credentials unavailable from a secure host
-  store.
+  store (the registry).
 
 Static analysis warns about unreachable phases, reactive phases
 with no possible exit, obvious shadowed literal conditions, a
@@ -1551,7 +1613,28 @@ file also performs typed binding — reporting each input's binding
 source (response, blueprint parameter, property, or prompt) — and
 capability preflight.
 Registry-aware checking reports property presence and kind; it
-never reveals a property value.
+never reveals a property value. Its two modes are the two
+checkable tiers of the [processing model](#processing-model);
+the embedding API's twins are `run_script` and `check_script`,
+taking the same identifiers under CLI–API parity.
+
+### Error classes and exit codes
+
+Every failure this surface can produce belongs to one of three
+classes, matching the enforcement tiers:
+
+| class | tier | exit code |
+|---|---|---|
+| STATIC ERROR | legality rules (S-ids) | 2 |
+| PREFLIGHT ERROR | machine rules | 3 |
+| RUN FAILURE | dynamic semantics | 4 |
+
+`0` is success; `1` is reserved for reliquary's own unexpected
+faults. The classes are the CLI's exit codes and the API's
+exception taxonomy — one mapping, under parity. Every diagnostic
+carries a stable dotted identifier naming its rule
+(`obs.two-channels` style); identifiers share one namespace
+across the classes, and the full id index is deferred to beta.
 
 ## Failure, runs, and transcripts
 
@@ -1601,7 +1684,7 @@ future feature must fit an already frozen grammar before the first
 implementation has validated it. Before beta, empirical use may
 still reshape the language coherently.
 
-The intended post-beta growth discipline is:
+The intended post-beta growth discipline is (G7):
 
 - existing observation forms keep their meanings;
 - **a new channel names a new non-default observable surface; a
@@ -1633,7 +1716,7 @@ Image matching and pointer input extend observation and action;
 they do not introduce a second control-flow model or any new
 punctuation role.
 
-## Complete FreeDOS install example
+## Complete FreeDOS install example (non-normative)
 
 ```rlqs
 description "FreeDOS 1.4 plain install from LiveCD"

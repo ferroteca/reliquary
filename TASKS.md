@@ -137,23 +137,26 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       are freshness + at-least-one, cadence deliberately unspecified;
       a fired handler re-arms only after an OBSERVED non-holding
       sample (episodes exist over dispatch samples only)
-    - three enforcement tiers named once: Legality Rules (script text
-      alone) / Machine Rules (needs machine in scope) / Dynamic Semantics;
-      short §Processing model (lex - parse - desugar - validate);
-      check-script's two modes defined in those terms
-    - error classes now, id INDEX deferred to beta: STATIC ERROR /
-      PREFLIGHT ERROR / RUN FAILURE (+ exit codes); one id namespace
-      (obs.two-channels style) landing WITH the reorg, plus a
-      static-conformance fixture corpus
-    - derived forms section after the grammar, rewrites over PARSED NODES:
-      screen shorthand, enter=>type+<enter>, press=>type tokens, linear
-      script => entry + one phase, EOF => finish ("the spec already IS a
-      desugaring-based language")
-    - normative/informative marked at point of use ("This section is
-      non-normative." + Reason blockquotes); signature tables marked
-      informative with the grammar named as governor
-    - constraint list renamed "Syntactic restrictions" with stable ids
-      (S1..Sn) folded together with the static half of the validation list
+    - SPEC-CRAFT REORG LANDED (2026-07-21): §Processing model with the
+      three enforcement tiers (legality / machine rules / dynamic
+      semantics) and check-script's two modes defined in tier terms;
+      §Error classes and exit codes (STATIC ERROR 2 / PREFLIGHT ERROR 3
+      / RUN FAILURE 4, 0 success, 1 reserved — exit-code values are the
+      agent's proposal, veto cheap; dotted id namespace obs.two-channels
+      style, id INDEX deferred to beta; static-conformance fixture
+      corpus queued to the parser retarget); §Derived forms over parsed
+      nodes (enter => type + press enter; bare condition => screen
+      channel; linear script => implicit entry phase + EOF => finish —
+      the recorded press=>key-tokens rewrite was voided by milestone
+      zero's token deletion; desugaring is definitional, diagnostics
+      name the authored surface); §Syntactic restrictions S1-S14
+      merging the context-sensitive list with the static half of the
+      validation list, preflight list rewritten per tier naming what it
+      needed; signature tables marked informative, the example marked
+      non-normative; G-citations threaded at load-bearing spots;
+      run_script / check_script named as the API parity twins. The full
+      Reason-blockquote editorial sweep remains deliberately open (may
+      trail realignment)
     - killed by adjudication (do not revisit without new evidence): ISO
       terms clause, five-subheading per-construct template, four-table
       vocabulary appendix, separate image= channel restructure,
@@ -170,9 +173,11 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   is the realignment pass's work list:
   - CLI programmatic contract (U3 via CLI; the whole unbound-language path
     rests on it): exit codes, stdout/stderr discipline, output stability, a
-    machine-readable mode — pieces already decided piecemeal (error classes
-    + exit codes, rawjson renderer, run-events.jsonl) but no contracted
-    home; also the interaction command family (type/keys/run/text/wait/
+    machine-readable mode — error classes + exit codes are now homed in
+    script-spec.md "Error classes and exit codes" and the run-events
+    minimum in its execution model (2026-07-21); still unhomed: stdout/
+    stderr discipline, output stability, the rawjson renderer contract;
+    also the interaction command family (type/keys/run/text/wait/
     screenshot/menu/hmp) is absent from the settled CLI list though a
     CLI-driving U3 agent lives on it
   - U2 import: the disk-location choice (leave-in-place vs copy-to-durable-
