@@ -116,9 +116,10 @@ and amendments are made deliberately and recorded here.
   and media swap, and the screen states between them — and
   drafts the wait conditions and actions, capturing the source
   screenshots landmarks crop from. The output is a *draft*:
-  ordinary script text plus catalog assets, owned and edited
-  like anything hand-written — recording cannot know which
-  screen features are load-bearing or how long a step may
+  ordinary script text (self-contained with its landmarks
+  embedded by default, or with factored catalog assets), owned
+  and edited like anything hand-written — recording cannot know
+  which screen features are load-bearing or how long a step may
   honestly take, so the person tailors what reliquary proposes.
   Tailoring is not a one-way exit: authoring round-trips. When
   the task changes or coverage grows, a later session captures
@@ -155,10 +156,10 @@ reliquary home are a convenience for human CLI interaction: users
 get a convenient home for shared assets — blueprints, media
 definitions, and scripts reused across human-interaction
 scenarios — seeded by the codex (U1, U5). The other side of the
-coin: for automation, media definitions, scripts, and blueprints
-are source code artifacts — they belong to the consuming project,
-live in its source control, and never live in reliquary's home
-(U3, U4). The codex is *never* used for machine
+coin: for automation, media definitions, scripts, blueprints,
+and landmark assets are source code artifacts — they belong to
+the consuming project, live in its source control, and never
+live in reliquary's home (U3, U4). The codex is *never* used for machine
 automation — that would be a trap: a blueprint changing outside
 the project's source control breaks the project. For automation
 the library is at most a place to copy a first draft from; the

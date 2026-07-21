@@ -230,6 +230,9 @@ backend and missing capability.
 <reliquary_home>/
 ├── blueprints/          machine blueprints, <name>.rlqb (above)
 ├── scripts/             reliquary automation scripts
+├── landmarks/           landmark declarations and their variant
+│                        renderings, <name>.rlql + <name>.<n>.png
+│                        (see "Landmarks")
 ├── properties.json      personal property registry (ordinary values
 │                        and markers for host-stored secrets)
 ├── media/               shared media definitions (mirror URLs, archive
@@ -292,13 +295,15 @@ mechanism behind the artifact-residency split (USE-CASES.md).
 - Every invocation names its **asset root**; unspecified, it
   defaults to the **current directory**. Assets are identified by
   extension, not location: `.rlqb` is a machine blueprint,
-  `.rlqm` a media definition, `.rlqs` a script. Discovery walks
-  the root for the three extensions, so a project lays out its
-  files however it likes — `blueprints/`, `media/`, and
-  `scripts/` subdirectories are optional organizational dressing,
-  the home's own convention included (U3, U4). Within one root,
-  two files of one kind with the same stem are an error; the
-  home's `cache/` is never scanned.
+  `.rlqm` a media definition, `.rlqs` a script, `.rlql` a
+  landmark declaration (its `<name>.<n>.png` variant renderings
+  attach by stem adjacency, not discovery — see "Landmarks").
+  Discovery walks the root for the four extensions, so a project
+  lays out its files however it likes — `blueprints/`, `media/`,
+  `scripts/`, and `landmarks/` subdirectories are optional
+  organizational dressing, the home's own convention included
+  (U3, U4). Within one root, two files of one kind with the same
+  stem are an error; the home's `cache/` is never scanned.
 - Resolution falls back to the reliquary home for assets the root
   does not provide. Home assets are a convenience for human CLI
   interaction — one shared place for the blueprints, media
@@ -813,6 +818,98 @@ cache under `cache/media/`) stays a host-side capability the language can
 invoke, with pinned hashes kept in shared definitions or directly inside
 the script.
 
+## Landmarks
+
+Landmarks are the image-match assets for GUI guests — the
+`@landmark` matcher the growth rule already names, and the assets
+U6's recorder captures. The 2026-07-21 owner round settled their
+shape; the full asset spec (JSON schema, similarity metric) is
+queued work, and "Decisions still needed" below carries what
+remains open.
+
+**One declaration, N renderings.** A landmark is a single
+declaration owning its geometry — the region list and the named
+spot set (click points), with pinned screen dimensions and mode —
+plus one or more *variants*: alternative renderings of the same
+screen (palette, font, or shading differences). Variants share
+the declaration's dimensions, mode, regions, and spots by
+construction, which makes the decided variant invariants
+(identical spot sets, declared order) structural rather than
+checked. A screen whose *layout* changed is a different landmark,
+not a variant — keeping variants aligned with U6's "changed
+screen for an unchanged step".
+
+**Whole-screen match; regions are modifiers.** A bare landmark
+matches the entire screen exactly (pixel-equal after decode
+normalization). Declared regions soften or void areas: a `fuzzy`
+region carries an explicit `similarity` percent literal (its unit
+spelled, as durations spell theirs; no implicit default — G6),
+and an `ignore` region is excluded outright. This chooses the
+safe failure asymmetry: over-matching misses and times out
+visibly (G4), where under-matching would fire on the wrong
+screen. os-autoinst-style *selecting* regions that confine
+matching to declared rectangles are deferred as additive growth
+(G7). Failure reporting stays per-variant: the nearest miss names
+the closest variant.
+
+**Catalog form.** The declaration is `<name>.rlql`, a JSONC
+authored document — the fourth authored extension beside
+`.rlqb` / `.rlqm` / `.rlqs`, resolved under exactly the same
+rules ("Authored-asset resolution" above: root discovery by
+extension, root shadows home, `--assets-only`; a `landmarks/`
+subdirectory is optional dressing). Variant renderings are plain
+PNGs attached by stem-and-number adjacency — `<name>.<n>.png`
+beside the declaration, ordered numerically — so a U6 asset
+refresh is strictly file-creation, never file-rewrite, and
+capture provenance lives in PNG text chunks, not sidecar files.
+Landmark names share the collision-checked `@` pool with media
+names.
+
+**Embedded form — resolve in place.** A script may carry its
+landmarks as `landmark <name> { ... }` blocks: the same JSON
+schema as `.rlql` (no second schema, as with embedded media) plus
+inline base64 variant data, so a workflow travels as one
+self-contained source file (U1, U4). Embedded landmarks resolve
+in place: nothing installs and no files sprout. Embedded *media*
+installs so later machine and media commands can use the
+definitions without the script in scope; a landmark has no
+consumer outside its script, so the install step would only
+defeat the single-file shape. Embedded landmarks are
+script-scoped — sharing between scripts uses the catalog form —
+and asset refresh writes `<name>.<n>.png` beside the script, file
+variants ordering after embedded ones, so reliquary never
+rewrites a script. Any duplicate landmark name visible to one
+script — embedded against `.rlql`, or against a media name — is
+an error naming both locations; landmarks never coalesce because
+they never install. Where the blocks sit in a script (the
+declarative header zone, or a trailing assets zone that keeps
+bulk payloads out of the procedure's way — G4) is left to the
+asset spec work.
+
+**Cursor normalization.** Captures and matching always strip the
+mouse cursor — a normalization, never an option:
+
+- Every pointer verb ends by parking the cursor at a fixed
+  per-platform park position; parking is never script surface.
+  For guests that composite the cursor into the framebuffer
+  (software cursors — nothing host-side can erase what the guest
+  drew), parking *is* the stripping mechanism: the guest
+  repaints, and every later capture is clean by construction.
+- The park zone is permanently masked from matching — a built-in
+  ignore region; a declared region overlapping it draws a
+  preflight warning.
+- Where the control plane can capture a cursor-free framebuffer
+  (RFB cursor pseudo-encodings), that is used automatically.
+- While recording, the human drives and cannot be parked — but
+  reliquary is the console, so the cursor position at capture
+  time is always known; proposed assets mask that neighborhood,
+  flagged as a generated comment (U6).
+- Diagnostics capture reality: explicit `screenshot` and failure
+  screenshots never inject a park move — it could dismiss the
+  hover state or menu that explains a failure. In script runs
+  they are cursor-clean anyway, because every pointer action
+  already ended parked.
+
 ## Script authoring by recording
 
 The authoring recorder serves U6: a person performs the task once
@@ -838,7 +935,9 @@ step may honestly take — it flags as generated comments in the
 draft. Text-mode capture comes first and needs no new language
 surface; GUI capture rides the landmark/click work, and a click's
 position seeds its landmark's spot. The draft is ordinary script
-text plus catalog assets, written once and user-owned from then
+text, self-contained by default — landmarks travel as embedded
+resolve-in-place blocks ("Landmarks" above) — with factored
+catalog files on request; written once and user-owned from then
 on, like `import` output.
 
 **Round-trip composes with tailoring — playback is the
@@ -857,10 +956,11 @@ happens. (openQA's interactive mode is the concept precedent —
 concepts only, per AGENTS.md.)
 
 **Two tracks, two write boundaries.** A changed screen for an
-unchanged step is an *asset refresh*: a new landmark variant in
-the catalog, never touching the script — and the catalog is
-shaped so a variant is a new file under its landmark, making
-refresh file-creation, never file-rewrite. New or changed steps
+unchanged step is an *asset refresh*: a new landmark variant,
+never touching the script — the numbered-adjacency variant shape
+(`<name>.<n>.png` beside the declaration, or beside the script
+for an embedded landmark; "Landmarks" above) makes refresh
+file-creation, never file-rewrite. New or changed steps
 are *step capture*: the fragment is emitted beside the script for
 the author to splice in their editor; an explicit opt-in apply
 may perform the surgical insertion at the anchor, touching no
@@ -1955,7 +2055,15 @@ agentless and guest-agent control planes with equivalent results.
   justifies a constrained include mechanism. There is deliberately
   no handler-splicing macro in the initial language; real scripts
   must establish the need and a design that preserves local control
-  flow and transcript provenance.
+  flow and transcript provenance. A named user desire is now on
+  record (owner, 2026-07-21, the bundling wrinkle): complex
+  scripts split into multiple interacting files, like programming
+  source files. Asset *factoring* — several scripts, catalog
+  landmarks, and media definitions referencing each other through
+  one asset root — is already served by authored-asset
+  resolution; what stays open is behavior reuse, and any future
+  include must preserve the static graph (G3), the
+  non-computational surface (G2), and transcript provenance.
 - **Blueprint details**: whether per-drive backend settings are ever
   needed beyond the top-level `backend-settings` scope, and how
   running-machine reconfiguration (hot media changes vs.
@@ -1994,38 +2102,41 @@ agentless and guest-agent control planes with equivalent results.
   declared capabilities).
 - **GUI installer scripting** (an explicit goal: win9x/winnt setup
   GUIs and beyond). Text scraping ends at text mode; GUI guests
-  need screenshot-based matching, for which os-autoinst's needle
-  design is the reference (see AGENTS.md prior art): a reference
-  image plus a JSON sidecar of areas — fuzzy `match` with a
-  similarity threshold, `ocr` for text regions, `exclude` masks
-  for dynamic content — selected by tag, optionally carrying a
-  click point. Open: the needle-like asset format and where the
-  assets live (beside scripts, shared like media definitions?);
-  pointer input, which reliquary currently lacks end to end
-  (machine blueprint pointing-device field, a control-plane input
-  capability, and script verbs — match-and-click with the click
-  point in the asset, following os-autoinst). The input seam
-  should follow os-autoinst's two-layer event model: three
-  portable primitives — pointer move (x, y), button press/release,
-  key press/release — with clicks, drags, chords, and paced typing
-  composed above them, and event pacing owned by the control
-  plane. The primitives are exactly VNC's RFB input vocabulary
-  (PointerEvent, KeyEvent), so a VNC control plane implements them
-  with no translation, and QMP/VBoxManage/WMI input paths reduce
-  to the same three. Synchronization concepts to adopt with them:
-  act-then-confirm (an input step optionally asserting the screen
-  changed), screen-stillness waits, and pointer hygiene (parking
-  or restoring the cursor after clicks so it never perturbs
-  matching). Also open: how `wait` grows an
-  image-match form without weakening the text-first DOS path, and
-  a host-side needle-cropping convenience (a CLI subcommand, never
-  a service). Era note: DOS/9x-era setup GUIs are fixed-mode,
-  fixed-font, animation-free — needle churn should be far below
-  openQA's — and NT-era setup is largely keyboard-drivable, so
-  keyboard-first remains the preferred path where it works.
-  Throughout, os-autoinst is a **concept reference only** — its
-  designs are studied and reimplemented, never its code (see
-  AGENTS.md prior art for the licensing boundary).
+  need screenshot-based matching. The asset shape is settled —
+  see "Landmarks": one declaration plus variant renderings,
+  whole-screen matching with fuzzy/ignore modifier regions,
+  catalog and embedded resolve-in-place forms under
+  authored-asset resolution, and the always-on cursor
+  normalization contract — with os-autoinst's needle design the
+  concept reference behind it (AGENTS.md prior art). Still open:
+  the full asset spec (the `.rlql` JSON schema, the similarity
+  metric, landmark-block placement within a script), and pointer
+  input, which reliquary currently lacks end to end (machine
+  blueprint pointing-device field, a control-plane input
+  capability, and the script verbs — match-and-click with the
+  click point in the asset; click owns its search as an
+  observation-bearing action and needs its timing-matrix row).
+  The input seam should follow os-autoinst's two-layer event
+  model: three portable primitives — pointer move (x, y), button
+  press/release, key press/release — with clicks, drags, chords,
+  and paced typing composed above them, and event pacing owned by
+  the control plane. The primitives are exactly VNC's RFB input
+  vocabulary (PointerEvent, KeyEvent), so a VNC control plane
+  implements them with no translation, and QMP/VBoxManage/WMI
+  input paths reduce to the same three. Synchronization concepts
+  to adopt with them: act-then-confirm (an input step optionally
+  asserting the screen changed) and screen-stillness waits;
+  pointer hygiene has hardened into the landmark normalization
+  contract (pointer actions always end parked). Also open: a
+  host-side landmark-cropping convenience (a CLI subcommand,
+  never a service). Era note: DOS/9x-era setup GUIs are
+  fixed-mode, fixed-font, animation-free — asset churn should be
+  far below openQA's — and NT-era setup is largely
+  keyboard-drivable, so keyboard-first remains the preferred path
+  where it works. Throughout, os-autoinst is a **concept
+  reference only** — its designs are studied and reimplemented,
+  never its code (see AGENTS.md prior art for the licensing
+  boundary).
 - **Distribution-assertion field shape**: the exact field(s) in a
   media definition that assert redistribution licensing for
   built-in URLs (an SPDX identifier? free text naming the

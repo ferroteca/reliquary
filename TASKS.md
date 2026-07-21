@@ -46,7 +46,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       undiverged header option deferred (divergence policy belongs to
       apply, never a script header); response files accept JSONC
     - NOT urgent, deliberately open: landmark namespace scoping, GUI asset
-      format details, error-id index (beta), full spec document restructure
+      format details (asset SHAPE settled 2026-07-21 by the wrinkle round;
+      the .rlql JSON schema + similarity metric remain with the asset spec
+      work), error-id index (beta), full spec document restructure
       (editorial, may trail realignment)
   - timing model: timeout/stable are lexically scoped defaults (innermost wins),
     deadline is a per-activation budget (fresh per phase entry; header deadline
@@ -113,27 +115,53 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     matrix row); store whole source screenshots with pinned dimensions/mode;
     variant invariants (identical spot sets, declared order, per-variant
     failure reporting); no count= (bare number), no read/OCR areas initially,
-    drag deferred; landmarks live only in the catalog, never embedded
-  - OWNER WRINKLE TO SMOOTH (2026-07-21, take up after the spec-craft
-    reorg commits — do not lose):
-    - landmark fuzzy regions: an image asset needs per-region match
-      strictness — e.g. the section of the screen with date/time is
-      fuzzy, the other parts aren't; aligns with the needle reference
-      already noted in ROADMAP's GUI decision (fuzzy match thresholds +
-      exclude masks), but as per-region declarations on one asset
-    - asset bundling: separate image asset files are really ugly —
-      people will usually want everything bundled in a single source
-      file; optionally, complex scripts split into multiple
-      interacting files (like multiple programming source files).
-      TENSIONS to re-argue when taken up: the landmark review decided
-      "landmarks live only in the catalog, never embedded" — this
-      challenges it head-on; and the multiple-interacting-files half
-      reopens the deliberately-open cross-script reuse question, now
-      with a named user desire behind it
-    - cursor stripping: captures and matching ALWAYS strip the mouse
-      cursor — normalization, never an option (extends the
-      pointer-hygiene note: park/restore after clicks so the cursor
-      never perturbs matching)
+    drag deferred; landmarks live only in the catalog, never embedded —
+    AMENDED (owner, 2026-07-21, the wrinkle round below): embedded
+    landmark blocks resolve in place; the catalog remains the only
+    shared/refresh form and reliquary never rewrites a script
+  - OWNER WRINKLE SMOOTHED — DECIDED (owner, 2026-07-21, design round;
+    folded into ROADMAP "Landmarks" + "Authored-asset resolution" +
+    "Cross-script reuse" + the GUI open decision, and USE-CASES U6):
+    - per-region strictness: whole-screen exact match by default;
+      regions are MODIFIERS only — `fuzzy` (explicit similarity=NN%,
+      unit spelled, no implicit default) and `ignore`; selecting/
+      confining regions deferred as additive growth (G7 — the safe
+      failure asymmetry: over-match times out visibly, under-match
+      would click the wrong screen); geometry (regions + named spots,
+      pinned dimensions/mode) declared ONCE at landmark level,
+      variants are renderings sharing it by construction — the
+      identical-spot-sets invariant becomes structural; a layout
+      change is a new landmark, never a variant
+    - bundling: "never embedded" AMENDED — `landmark <name> {}` blocks
+      are first-class script content (same schema as the catalog form,
+      no second schema, + inline base64 variants) and RESOLVE IN
+      PLACE: nothing installs, no files sprout (embedded media
+      installs for consumers outside the script; landmarks have none);
+      script-scoped, sharing uses the catalog form; refresh writes
+      <name>.<n>.png beside the script, never rewriting it; duplicate
+      names error, never coalesce. Catalog form: <name>.rlql (JSONC,
+      FOURTH authored extension, same resolution rules, landmarks/
+      optional dressing) + <name>.<n>.png numbered-adjacency variants,
+      provenance in PNG text chunks (no sidecar files); recorder
+      drafts self-contained by default, catalog form on request;
+      block placement in a script (header zone vs trailing assets
+      zone) left to the asset spec work
+    - multi-file half: asset FACTORING through one asset root is
+      already served by authored-asset resolution; the include
+      question STAYS OPEN with the named desire recorded as evidence
+      under ROADMAP "Cross-script reuse" (any future design preserves
+      G2/G3 + transcript provenance; still gated on real scripts)
+    - cursor stripping: the normalization contract — pointer verbs
+      always end parked (fixed per-platform park position, never
+      script surface; parking IS the strip for guest-composited
+      cursors); park zone permanently masked from matching (region
+      overlap = preflight warning); cursor-free framebuffer capture
+      (RFB cursor pseudo-encoding) used where the control plane
+      offers it; the recorder masks the known live-cursor
+      neighborhood in proposed assets (generated-comment flagged);
+      diagnostics exempt — explicit screenshot and failure
+      screenshots capture unmodified reality (cursor-clean in script
+      runs anyway: every pointer action already ended parked)
   - RUN FEEDBACK, DECIDED SHAPE (five designers, zero new syntax needed):
     one normative run-events.jsonl per run (append-only JSONL; seq/t/elapsed/
     kind; spans mirror the timing-scope tree: run=header deadline,
@@ -320,9 +348,12 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     failure report's "take over from here" suggested next command)
   - round-trip: fragment emission anchored by playback position; opt-in
     surgical apply at the anchor (never regenerate, never text-merge)
-  - landmark catalog shape: variant-as-new-file + capture provenance (feed
-    into the pending landmark spec work); GUI capture rides landmark/click,
-    a click's position seeds its landmark's spot
+  - landmark catalog shape: DECIDED (owner, 2026-07-21, the wrinkle
+    round — ROADMAP "Landmarks"): <name>.rlql declaration +
+    <name>.<n>.png numbered-adjacency variants, provenance in PNG text
+    chunks; refresh stays file-creation-only for embedded landmarks
+    too (variants land beside the script); GUI capture rides
+    landmark/click, a click's position seeds its landmark's spot
   - run-events: handover event kinds (script/human control passing);
     a capture session is one run record with mixed drivers
   - CLI record command family + API twins land together (parity)
