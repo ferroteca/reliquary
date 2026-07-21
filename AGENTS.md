@@ -50,7 +50,8 @@ workflow:
   install script embedding the media definition that its first run installs in the media library. Its README carries
   the status note. Keep the examples synchronized with `planning/design/` when the formats change.
 - `docs/` holds user-facing documentation for implemented features
-  (CLI reference, blueprint guide, DOS automation). Design documents
+  (CLI reference, Python API reference, blueprint guide, DOS
+  automation). Design documents
   and planned interfaces live in `planning/design/` — the directory
   is the classification; file names carry no suffix. Placement rules
   are in `.agents/skills/documentation-rules.md`.
@@ -214,6 +215,11 @@ drive it only through the same public interfaces available to external
 callers.
 
 ## The runner surface
+
+This section is the engineering contract agents must preserve for the
+implemented binding. The user-facing reference is
+`docs/api-reference.md`; the end-goal API design (settled twin names,
+conventions, handles) is `planning/design/api.md`.
 
 `Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a
 `Runner(home=None, config=None)` instance is a configured QEMU test machine bound to one absolute `home`, exposing

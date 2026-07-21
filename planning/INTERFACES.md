@@ -75,8 +75,11 @@ semantic shape that cannot be expressed cleanly across bindings
 is the wrong shape, whatever its elegance in Python. reliquary attaches
 no meaning to guest output; interpretation belongs to the caller.
 In-repo consumers (the media layer, the script runtime) must drive
-the same public interfaces available to external callers. Contract
-for the Python binding: [AGENTS.md](../AGENTS.md) "The runner
+the same public interfaces available to external callers. Design:
+[planning/design/api.md](design/api.md); the implemented Python
+binding is documented in
+[docs/api-reference.md](../docs/api-reference.md), with its
+engineering contract in [AGENTS.md](../AGENTS.md) "The runner
 surface".
 
 ### The scripting language
@@ -206,7 +209,7 @@ Every approved change then lands the same way:
 | Interface | Specification |
 |---|---|
 | CLI | planning/ROADMAP.md "The CLI"; working notes in [planning/design/cli.md](design/cli.md) |
-| Embedding API | [AGENTS.md](../AGENTS.md) "The runner surface" (the Python binding's contract) |
+| Embedding API | [planning/design/api.md](design/api.md); the implemented binding in [docs/api-reference.md](../docs/api-reference.md) |
 | Scripting language | [planning/design/script-spec.md](design/script-spec.md) |
 | Blueprints | [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its [reference](design/machine-blueprint-reference.md) and [cookbook](design/machine-blueprint-cookbook.md) |
 | Media definitions | [planning/design/media-spec.md](design/media-spec.md) |

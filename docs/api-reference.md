@@ -1,0 +1,183 @@
+<!--
+SPDX-FileCopyrightText: 2026 Paul Galbraith
+SPDX-License-Identifier: BSD-3-Clause
+-->
+
+# Python API reference
+
+This is the reference for reliquary's implemented Python surface —
+the first binding of the embedding API. Everything below is
+importable from the `reliquary` package and mirrors the CLI: the
+two are one semantic surface. The end-goal API design, including
+the surface still ahead of implementation and the settled naming
+it realigns to, is in
+[planning/design/api.md](../planning/design/api.md).
+
+reliquary attaches no meaning to guest output; interpreting
+results belongs to the caller.
+
+## Home and paths
+
+- `set_home(path)` - Set the process-global reliquary home.
+- `home()` - Return the effective home (`RELIQUARY_HOME`,
+  `set_home()`, or the platform default under Documents).
+- `documents_dir()` - Resolve the user's platform Documents
+  folder, or `None` when it cannot be determined.
+- Path helpers, each accepting `home=None`: `blueprints_dir`,
+  `media_dir`, `scripts_dir`, `cache_dir`, `downloads_cache_dir`,
+  `media_cache_dir`, `machines_cache_dir`, and the legacy
+  `drives_dir`.
+
+All state lives under the home. An explicit `home=` on an
+individual call overrides the process-global home for that call.
+
+## Cached machines (the blueprint lifecycle)
+
+- `create_from_blueprint(name, *, home=None)` - Materialize a new
+  machine from a blueprint name; returns the machine id
+  (`<blueprint>-<n>`, lowest free number). Seeds codex content on
+  first reference.
+- `create(blueprint, *, home=None, blueprint_name="")` - The
+  same, from an already-parsed `Blueprint`.
+- `list_machines(home=None, blueprint=None)` - List machines.
+- `resolve_machine(*, machine=None, blueprint=None, home=None)` -
+  Resolve CLI-style selectors to exactly one machine id.
+- `start_cached_machine(machine_id, *, display=False, home=None)`
+  - Start a machine; the QMP port and VM identity are recorded in
+  the machine's `vm.json`.
+- `stop_cached_machine(machine_id, home=None)` - Stop a running
+  machine; identity mismatches fail closed.
+- `destroy(machine_id, home=None)` - Delete the machine entirely;
+  frees its number for reuse.
+- `mark_stopped(machine_id, home=None)` - Reconcile the phase of
+  a machine whose QEMU process has gone.
+- `load_machine_state(machine_id, home=None)` - Read the
+  machine's `reliquary-machine.json`.
+- `machine_dir_path(machine_id, home=None)` - The machine's cache
+  directory.
+- `machine_drive_args(machine_id, home=None)` - Render QEMU
+  `-drive` arguments from the machine's state.
+
+These names realign to the settled twins (`create_machine`,
+`start_machine`, `stop_machine`, `destroy_machine`) at the
+implementation realignment — see the
+[design doc](../planning/design/api.md).
+
+Persistent machine-state changes — stopped machines only;
+insert/eject are floppy and cdrom slots; all three survive
+stop/start:
+
+- `insert_media(machine_id, slot, media_name, *, home=None)`
+- `eject_media(machine_id, slot, *, home=None)`
+- `set_boot_order(machine_id, boot_keys, *, home=None)`
+
+## Blueprints
+
+- `parse_blueprint(value, home=None)` /
+  `load_blueprint(path, home=None)` - Parse and validate the
+  milestone-1 blueprint subset, resolving media names through the
+  library; return `Blueprint` (drives as `BlueprintDrive`).
+
+## Media
+
+- `resolve_media(name, home=None)` - Resolve a defined item by
+  name across the media library; returns `ResolvedMedia`.
+- `fetch_media(name, home=None, on_mismatch="fail")` - Return the
+  named item's verified payload path, fetching on demand —
+  cheapest source first: a verifying payload as-is, a verifying
+  cached archive re-extracted, then the definition's URL. Every
+  file is SHA-256-verified before use. `on_mismatch` is `"fail"`
+  (default), `"prompt"` (interactive delete-and-refetch
+  checkpoint), or `"refetch"` (pre-approved deletion); a
+  mismatched file whose definition names no source is always
+  kept.
+- Types: `MediaDefinition`, `MediaItem`, `ResolvedMedia`.
+
+## Scripts and runs
+
+- `parse_script(source, path="<script>")` / `load_script(path)` -
+  Parse a milestone-1 `.rlqs` script into an immutable `Script`;
+  errors raise `ScriptParseError` with source locations.
+- `run_script(label, *, blueprint=None, machine=None, home=None,
+  display=False)` - Resolve the label through the blueprint's
+  `scripts` map, create a machine when the blueprint has none,
+  honor the script's `machine:` header, statically preflight
+  insert/eject/boot targets, and execute with a run record under
+  the machine's `runs/` directory. Returns `ScriptRun`; failures
+  raise `ScriptRuntimeError`.
+- `execute_script(script, *, machine_id, home=None,
+  display=False, run_dir=None, script_path=None)` - Execute an
+  already-parsed script against a specific machine.
+
+## Guest interaction
+
+`Machine(port=None, home=None, deadline=None)` is the
+platform-neutral interaction handle for a running,
+reliquary-owned VM. Every operation verifies VM identity before
+sending anything:
+
+- `Machine.qmp()` - Context manager yielding the
+  identity-verified QMP session (its `cmd()` and `hmp()` remain
+  available).
+- `Machine.screen_text()` /
+  `Machine.wait_text(pattern, timeout=60)` - Read or wait on the
+  80x25 VGA text screen.
+- `Machine.send_keys(combos, delay=0.06)` /
+  `Machine.send_text(text, enter=True)` - Keyboard input.
+- `Machine.cursor_menu_select(item, timeout=30, exclude=())` -
+  Feedback-driven cursor-menu selection.
+- `Machine.screenshot(name="screen")` - PNG screendump.
+
+Module-level equivalents take `port=` / `home=` directly:
+`send_keys`, `send_text`, `screen_text`, `wait_text`,
+`cursor_menu_select`, and `screenshot(name="screen", port=None,
+home=None, directory=None)`.
+
+`GuestExec` is the capability protocol —
+`wait_ready(timeout=90)`, `execute(command, timeout=120)` — and
+`AgentlessGuestExec` is the concrete agentless DOS adapter over a
+`Machine`.
+
+## The legacy runner surface (root-home model)
+
+Superseded by the blueprint machine model at the realignment,
+but still the generic embedding surface for guest-program runs
+today:
+
+- `Runner(home=None, config=None)` - A configured QEMU test
+  machine bound to one absolute home; `run(task, args="")`
+  performs the full stage-boot-run-collect lifecycle and returns
+  the program's redirected output.
+- `MachineConfig` - Frozen configuration dataclass (`platform`,
+  `staged_drive`, `timeout`, `memory`, `qemu`, `qemu_args`,
+  `drives`, `machine`; every field has a working default), with
+  `MachineConfig.from_file(path, **overrides)` and
+  `from_mapping(value, base_dir=None, **overrides)` loading the
+  versioned document shape (`version` must be `1`).
+- `start(machine_config=None, *, display=False, port=None,
+  home=None)` - Start the root-home machine; returns the QMP
+  port.
+- `stop(port=None, home=None)` - Stop it, identity-verified.
+- `run_task(task, machine_config=None, *, display=False,
+  port=None, home=None)` and `run_guest_program(exe_path,
+  args="", machine_config=None, *, port=None, home=None)` -
+  One-shot guest-program lifecycles.
+
+Concurrent runs use distinct `Runner` instances with distinct
+homes; per-home `vm.json` keeps VM ownership sound.
+
+## QEMU helpers
+
+- `find_qemu()` / `find_qemu_img()` - Locate the binaries
+  (`RELIQUARY_QEMU_HOME` / `QEMU_HOME`, then PATH, then
+  well-known install locations).
+- `create_hdd_image(filename, capacity)` - Create a sparse qcow2
+  v3 image; capacity is a qemu-img size string (`"2G"`) or a
+  positive integer MiB value.
+- `Qmp(port)` - Synchronous facade over the official `qemu.qmp`
+  client.
+
+`main(argv=None)` is the CLI entry point.
+
+For the command-line equivalents of everything above, see the
+[CLI reference](cli-reference.md).

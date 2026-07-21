@@ -508,7 +508,14 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      create_from_blueprint → create_machine and the package surface
      machines.start/stop/destroy → start_machine / stop_machine /
      destroy_machine; lifecycle.py's legacy start_machine(config)
-     name collision dies with the root-home model
+     name collision dies with the root-home model. FOLLOW-UP (owner,
+     2026-07-21): the API now has its own documents — the design is
+     consolidated in planning/design/api.md (principles, conventions,
+     the CLI↔API surface index, the two handles, realignment
+     renames) and the implemented binding is documented in
+     docs/api-reference.md; INTERFACES' embedding-API section and
+     spec-homes row point at both, AGENTS "The runner surface"
+     narrows to the engineering contract, README links the reference
   5. the codex-automation trap is unflagged at the point of use: the
      guide advertises implicit seeding "on first reference" with no
      automation caveat, though the residency model (decided

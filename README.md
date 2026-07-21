@@ -19,8 +19,9 @@ ever precious. Editing a blueprint never changes an existing machine by itself; 
 created from. To adopt blueprint edits, destroy the machine and create it again.
 
 Read the [Blueprint guide](docs/blueprint-guide.md) for the implemented
-milestone-1 surface, and the [CLI reference](docs/cli-reference.md) for
-commands. The full design (including fields not yet implemented) is in
+milestone-1 surface, the [CLI reference](docs/cli-reference.md) for
+commands, and the [API reference](docs/api-reference.md) for the
+Python surface. The full design (including fields not yet implemented) is in
 [The machine blueprint](planning/design/machine-blueprint.md) —
 starting with "The model at a glance" and its diagrams — and
 [Machine blueprints and machines](planning/design/instance-model.md).
