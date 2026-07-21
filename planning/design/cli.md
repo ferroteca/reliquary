@@ -352,8 +352,16 @@ the definition is yours.
 Machines are disposable realizations of a blueprint, each identified
 by `<blueprint>-<n>` and stored entirely under
 `cache/machines/<blueprint>-<n>/`. Everything under `cache/` is
-reliquary's and regenerates from blueprints, media definitions, and
-scripts.
+reliquary's and disposable — and, run records excepted, regenerates
+from blueprints, media definitions, and scripts (records are
+evidence: copy out any worth keeping).
+
+Every machine verb has an embedding-API twin under parity, flat
+verb-noun functions: `create_machine`, `start_machine`,
+`stop_machine`, `apply_blueprint`, `destroy_machine`,
+`recreate_machine`, `clone_machine`, `delete_blueprint`, and
+`import_vm` (a bare `import` is a Python keyword); `export`'s
+twin lands with export's still-open shape.
 
 ### Creating a machine
 

@@ -60,17 +60,31 @@ stateDiagram-v2
 the same id; `clone` and `export` act on a Ready (stopped)
 machine. What each verb touches:
 
-| verb       | blueprint file           | the machine (`cache/machines/<id>/`)   |
-|------------|--------------------------|----------------------------------------|
-| `create`   | reads                    | materializes, under a new id           |
-| `start`    | —                        | runs (as its state describes)          |
-| `stop`     | —                        | powers off                             |
-| `apply`    | reads                    | reconciles to edits, new baseline      |
-| `destroy`  | —                        | deletes entirely                       |
-| `recreate` | reads                    | regenerates, same id                   |
-| `clone`    | —                        | new machine, new id, drives copied     |
-| `delete`   | deletes (refuses while machines exist) | —                        |
-| `export`   | —                        | copies out                             |
+| verb       | blueprint file           | the machine (`cache/machines/<id>/`)   | API twin           |
+|------------|--------------------------|----------------------------------------|--------------------|
+| `create`   | reads                    | materializes, under a new id           | `create_machine`   |
+| `start`    | —                        | runs (as its state describes)          | `start_machine`    |
+| `stop`     | —                        | powers off                             | `stop_machine`     |
+| `apply`    | reads                    | reconciles to edits, new baseline      | `apply_blueprint`  |
+| `destroy`  | —                        | deletes entirely                       | `destroy_machine`  |
+| `recreate` | reads                    | regenerates, same id                   | `recreate_machine` |
+| `clone`    | —                        | new machine, new id, drives copied     | `clone_machine`    |
+| `delete`   | deletes (refuses while machines exist) | —                        | `delete_blueprint` |
+| `export`   | —                        | copies out                             | *(with export's shape)* |
+
+Every verb lands on the CLI and the embedding API together
+(planning/INTERFACES.md): the twins are flat functions — the
+shape every binding language can express — taking the same
+selectors the CLI takes (a machine id, or the
+blueprint/machine-number pair, with `resolve_machine()` the
+shared resolution seam) plus the mirrored global keywords
+(`home=`, `assets=`, `assets_only=`). Returns mirror what the
+CLI prints — `create_machine` and `clone_machine` return the new
+machine id — and errors raise by class where the CLI exits by
+code. `import`'s twin is `import_vm`, because a bare `import` is
+a Python keyword in the first binding; `export`'s twin is
+deliberately unnamed until export's own shape settles — a named
+omission, not drift.
 
 Two rules carry the whole model:
 
@@ -483,7 +497,10 @@ any other: from its bases. Translating backend config — memory, drives, contro
 is fine; guessing what OS is inside is not, and no backend
 records it, so `--platform` is required. Use import to run
 scripted, disposable experiments against a copy of a real machine
-without risking the original (U2).
+without risking the original (U2). The API twin is `import_vm` —
+a bare `import` is a Python keyword — its `blueprint`,
+`platform`, `hdd_images`, and `snapshot` parameters mirroring
+the flags.
 
 `delete` takes only `--blueprint`: it removes the blueprint file
 itself and fails closed while any machine of it exists, naming

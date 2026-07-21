@@ -487,13 +487,28 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      runs" (fetch joins the stream-bearing commands + the settled
      fetch-progress paragraph); guiding-principles CLI-contract
      entry updated
-  4. CLI-API parity silent across the lifecycle verbs: the blueprint
-     spec documents create/start/stop/apply/destroy/recreate/clone/
-     export/import/delete exclusively as CLI commands and names no
-     embedding-API twin for any of them — under INTERFACES "the
-     omission is a named decision, not drift" this is drift (the media
-     spec names fetch_media/clean_*, the script spec names
-     run_script/check_script; the blueprint spec names nothing)
+  4. RESOLVED (owner, 2026-07-21, design round) — the lifecycle twins
+     are named: flat verb-noun functions completing the
+     fetch_media/run_script family — create_machine, start_machine,
+     stop_machine, apply_blueprint, destroy_machine,
+     recreate_machine, clone_machine, delete_blueprint, import_vm (a
+     bare import is a Python keyword) — taking the CLI's selectors
+     (machine id or blueprint/number pair; resolve_machine() the
+     shared resolution seam) and the mirrored globals
+     (home=/assets=/assets_only=), returning what the CLI prints
+     (create_machine/clone_machine return the new id), raising by
+     class where the CLI exits by code; export's twin is a NAMED
+     omission — it lands with export's still-open CLI shape. Folded:
+     blueprint guide (verb table gains an API-twin column +
+     conventions paragraph; import passage names import_vm), ROADMAP
+     ("The CLI" twins paragraph; import bullet names import_vm),
+     cli.md (Machines-section parity note — and its stale
+     everything-regenerates claim corrected to item 1's doctrine in
+     passing). Implementation realignment: rename
+     create_from_blueprint → create_machine and the package surface
+     machines.start/stop/destroy → start_machine / stop_machine /
+     destroy_machine; lifecycle.py's legacy start_machine(config)
+     name collision dies with the root-home model
   5. the codex-automation trap is unflagged at the point of use: the
      guide advertises implicit seeding "on first reference" with no
      automation caveat, though the residency model (decided

@@ -408,6 +408,20 @@ entirely (a machine is nothing but its cache directory), and
 `recreate` is `destroy` + `create` as one command under the same
 id. `import` synthesizes a blueprint from a native VM — blueprint
 authoring only; realizing it afterward is an ordinary `create`.
+Each verb's embedding-API twin is settled (owner, 2026-07-21):
+flat verb-noun functions completing the `fetch_media` /
+`run_script` family — `create_machine`, `start_machine`,
+`stop_machine`, `apply_blueprint`, `destroy_machine`,
+`recreate_machine`, `clone_machine`, `delete_blueprint`, and
+`import_vm` (a bare `import` is a Python keyword) — taking the
+CLI's selectors (`resolve_machine()` the shared seam) and the
+mirrored globals (`home=` / `assets=` / `assets_only=`),
+returning what the CLI prints (`create_machine` and
+`clone_machine` return the new id), raising by class where the
+CLI exits by code; `export`'s twin lands with export's open
+shape, a named omission. Implementation realigns the current
+names (`create_from_blueprint`, `machines.start` / `stop` /
+`destroy`) to these.
 
 `--blueprint` and `--machine` are global selectors, given before
 the verb — as are `--assets <dir>` and `--assets-only`, which
@@ -558,7 +572,7 @@ Lifecycle semantics:
   `--no-snapshot` touches nothing, and running the source again
   breaks verification until re-import. Absent on a tty, the flag
   prompts with that tradeoff; noninteractively absent is an
-  error; the API twin's `snapshot=` parameter is required, under
+  error; `import_vm`'s `snapshot=` parameter is required, under
   parity. The
   materialization choice is presented the same way, never
   defaulted (U2):
@@ -569,7 +583,7 @@ Lifecycle semantics:
   afterward; difference: cheapest create, the source must stay
   byte-identical — per-start media verification refuses a
   rewritten source), noninteractively an absent flag is an
-  error; the API twin's `hdd_images=` parameter is required, under
+  error; `import_vm`'s `hdd_images=` parameter is required, under
   parity. A machine created
   from an imported blueprint recreates like any other: from its
   bases. `platform` is not
