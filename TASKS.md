@@ -213,9 +213,30 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     export artifact ("bare image + launch config") is a reliquary-invented
     format with no spec — the default-install-to-VirtualBox journey is
     unresolved
+  - ARTIFACT RESIDENCY (use-case amendment, 2026-07-21 — the cross-
+    cutting split now in INTERFACES.md): for automation, blueprints,
+    media definitions, and scripts are source code — they live in the
+    consuming project's source control, never in the reliquary home;
+    the home fits the manual/library side and keeps caches, machines,
+    and the registry either way. Every settled spec assumes home
+    residency (scripts resolve from <home>/scripts, blueprints from
+    blueprints/<name>.json, media from the home library). Design
+    needed: path-based blueprint/script selection on CLI + API,
+    project-scoped resolution for media/blueprint/script references
+    (definitions beside the artifacts that use them), embedded-block
+    installation semantics when the script is source-resident, and U6
+    drafts saved straight into a source tree. Supersedes the former
+    "U4 repo-clone-to-reliquary-home hand-off" watch item: there is
+    no hand-off — artifacts run in place. CONSTRAINT (owner,
+    2026-07-21): the built-in library is NEVER a resolution tier for
+    automation — a blueprint changing outside project source control
+    breaks the project; the library is at most copied from, the copy
+    committed. Open question for the round: does the same trap
+    exclude the home's own blueprints/media/scripts from
+    source-resident resolution too (the home also changes outside the
+    repo), making project resolution strictly project-scoped?
   - watches (served but strained; re-ask as they harden): live-run progress
-    surface (G4 during the run — ties to run-events); U4's repo-clone-to-
-    reliquary-home hand-off has no named workflow; GUI/landmark
+    surface (G4 during the run — ties to run-events); GUI/landmark
     assets forming a new authored artifact class; published JSON Schemas
     elevating reliquary-machine.json into a public contract
   - RESOLVED (July 2026): hand-placed proprietary payloads vs the "cache is
