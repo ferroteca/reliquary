@@ -331,7 +331,7 @@ above:
 - **`description`** — optional. A one-line human description of
   the definition, read into listings and `search` exactly like a
   blueprint's `description` (see
-  [the built-in library](builtin-library.md)).
+  [the codex](codex.md)).
 - **`notes`** — optional. Free-form prose for anything longer:
   provenance, licensing context, why a particular mirror.
   reliquary never interprets it.
@@ -341,7 +341,7 @@ above:
   is the assertion; reliquary records and displays it but cannot
   verify a license. A built-in definition may carry a `url` only
   when it also carries this field — the
-  [built-in library's licensing rule](builtin-library.md#non-redistributable-media).
+  [codex's licensing rule](codex.md#non-redistributable-media).
 
 ### Derived defaults, worked through
 

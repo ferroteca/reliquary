@@ -251,29 +251,31 @@ current root-level `drives/`, `machine.json`, and `vm.json`
 layout is superseded by the blueprint/cache split; the project
 is pre-release, so this is a replacement, not a migration.
 
-### The built-in library
+### The codex
 
-reliquary ships blueprints, media definitions, and scripts for
-popular open source operating systems — see
-[docs/builtin-library.md](docs/builtin-library.md). The library is
-a **seed, not a resolution tier**: referencing a built-in artifact
+reliquary ships the codex — built-in blueprints, media
+definitions, and scripts for popular open source operating
+systems: see
+[docs/codex.md](docs/codex.md). The codex is
+a **seed, not a resolution tier**: referencing a codex artifact
 that doesn't yet exist in the home copies it out as an ordinary
 user-owned file; a file already present in the home is never
 overwritten, and deleting a copy is how it is refreshed. An index
-maps every built-in artifact to its name, description, and
+maps every codex artifact to its name, description, and
 relationships; `search` queries the index and user files together,
 and listings report provenance (`yes` / `seeded` / user-authored).
 `pull` is the explicit extraction command; implicit extraction on
 first reference makes the common case one command from a clean
-home. A top-priority licensing rule governs the library's media
-definitions: a built-in definition may carry a `url` only
+home. A top-priority licensing rule
+governs its media
+definitions: a codex definition may carry a `url` only
 alongside an explicit assertion that the media's licensing
 permits redistribution, and no change adding a URL is accepted
-without it. The library deliberately covers non-redistributable
+without it. The codex deliberately covers non-redistributable
 operating systems too: those blueprints ship media definitions
 with hashes but no URLs, and materialization fast-fails naming
-the missing media until the user supplies it (adding their own
-`url` or `local-path`, or placing the payload file), with the
+the missing media until the user supplies it by adding their own
+`url` or `local-path` (the cache is never hand-fed), with the
 hash verifying it is the exact build the scripts target. For
 open source systems the lazy path is:
 
@@ -305,7 +307,7 @@ mechanism behind the artifact-residency split (USE-CASES.md).
   disables the fallback entirely, and automation runs with it
   off: resolution is then strictly
   project-scoped, and nothing outside source control — neither
-  home assets nor the built-in library seeded behind them — can
+  home assets nor the codex seeded behind them — can
   reach the run.
 - The home remains reliquary's own ground regardless of asset
   root: machines materialize into the home cache, downloads and
@@ -388,7 +390,7 @@ Property-registry commands put an operation (`list`, `get`,
 The lifecycle vocabulary is two-layered. Blueprints are plain files
 under `blueprints/`: authored, renamed, and removed directly in an
 editor, with `create blueprint` and `import` as authoring
-conveniences, `pull` as extraction from the built-in library, and
+conveniences, `pull` as extraction from the codex, and
 `delete blueprint` as the managed removal. Machine-level verbs act
 on machines: `create` materializes a blueprint as a new machine
 under a new id, `start`/`stop` run it, `destroy` deletes it
@@ -927,7 +929,7 @@ Deliverables:
    `cache/media/`) — enough to feed the FreeDOS LiveCD.
 2. **Blueprint and machine core** (of docs/machine-blueprint.md
    and docs/instance-model.md, QEMU-only): parse and validate the
-   blueprint shape the built-in library needs (`platform`,
+   blueprint shape the codex needs (`platform`,
    `memory`, `drives` with `size` and `media`, `boot`, `name`,
    `description`, `scripts`); machines wholly under
    `cache/machines/<id>/` with `reliquary-machine.json` and
@@ -941,7 +943,7 @@ Deliverables:
    `start`/`stop` — and `script <label>` resolution through the
    blueprint's `scripts` map, creating a machine when the
    blueprint has none.
-4. **The built-in library** (docs/builtin-library.md): the
+4. **The codex** (docs/codex.md): the
    `builtins/` tree (zip-bundled when packaged), copy-out on
    first reference, the never-overwrite rule, and
    `freedos-1.4-plain` — blueprint, media definitions, and

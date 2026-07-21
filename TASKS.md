@@ -221,9 +221,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     home's own layout), falling back to the reliquary home unless an
     explicit no-home option disables it. Automation runs with the
     fallback OFF: strictly project-scoped resolution, so neither home
-    assets nor the built-in library behind them can reach the run
+    assets nor the codex behind them can reach the run
     (answers the former open question — home exclusion is the
-    opt-out, not automatic). The built-in library remains NEVER a
+    opt-out, not automatic). The codex remains NEVER a
     resolution tier for automation; at most copied from, the copy
     committed. DETAILS DECIDED (owner, 2026-07-21) and folded:
     --assets <dir> + --assets-only (API assets= / assets_only=,
@@ -247,8 +247,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     installs, beside the script in a project); folded across the same
     docs plus cli.md, builtin-library, README, CLAUDE.md, examples.
     Remaining:
-    implementation only (resolution module, extension rename in
-    builtins/ and the library index, state field, selection scoping,
+    implementation only (resolution module, extension rename plus the
+    builtins/ → codex/ package-dir rename and the codex index, state
+    field, selection scoping,
     install targeting), at the residency milestone
   - watches (served but strained; re-ask as they harden): live-run progress
     surface (G4 during the run — ties to run-events); GUI/landmark
@@ -258,7 +259,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     not an interface" doctrine — local-path (item- or archive-level) is now
     the only hand-supply path; the cache is never hand-fed; a sourceless
     definition pins hashes but fails resolution naming the definition to
-    edit (specced in media-spec.md + builtin-library.md)
+    edit (specced in media-spec.md + codex.md)
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
   - shared JSONC reader for authored documents (blueprints, standalone
@@ -272,7 +273,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     the edit-the-definition error
   - CLI fetch/clean commands + API parity: fetch_media(script=),
     clean_downloads(), clean_media()
-  - built-in library: teaching comments at blueprint seams once the JSONC
+  - codex: teaching comments at blueprint seams once the JSONC
     reader lands
 - U6 AUTHORING RECORDER (use case in USE-CASES.md; design in
   ROADMAP.md "Script authoring by recording") — work items, in rough
@@ -318,13 +319,20 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   - delete blueprint
   - check if there are linked scripts
   - if they would be orphaned
-    - if they exist (by name) in the built-in library
-      - if there is a script difference between user & built-in
+    - if they exist (by name) in the codex
+      - if there is a script difference between user & codex
         - do not block, do not delete
-        - clearly announce not delete script because it is different from the built-in version
+        - clearly announce not delete script because it is different from the codex version
       - else
         - delete script
-- change "builtin library" concept to "template library" ??
+- RESOLVED (owner, 2026-07-21): the built-in library is named THE
+  CODEX (was "change 'builtin library' concept to 'template
+  library' ??"; "canon" was weighed and rejected — codex is the
+  artifact, a bound volume copied from, where canon is the
+  abstract authority/list) — folded across INTERFACES, USE-CASES, ROADMAP,
+  AGENTS, CONTRIBUTING, cli.md, README, and docs
+  (builtin-library.md renamed codex.md); reliquary/builtins/
+  package dir renames to codex/ at implementation realignment
 - CLI do we need these (from cli help)\
   - --platform
   - --version (should be version with undocumented --version -v alias)

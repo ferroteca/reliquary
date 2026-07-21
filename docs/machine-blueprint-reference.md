@@ -115,10 +115,10 @@ backend machine and resolves the blueprint afresh (see
 Human-readable discovery metadata: a one-line display `name` and a
 longer `description`. Neither affects machine behavior; both feed
 `search`, which matches terms against filename, `name`,
-`description`, and platform (U5). Built-in library blueprints carry
-them through the library index; user blueprints are indexed by
+`description`, and platform (U5). Codex blueprints carry
+them through the codex's index; user blueprints are indexed by
 reading the fields from the file (see
-[the built-in library](builtin-library.md)).
+[the codex](codex.md)).
 
 ```json
 {

@@ -202,7 +202,7 @@ shared personal collection; a `blueprints/` subdirectory is
 optional organizational dressing (ROADMAP.md, "Authored-asset
 resolution"). Blueprints arrive written by hand, seeded
 out of the
-[built-in library](builtin-library.md) (implicitly on first
+[codex](codex.md) (implicitly on first
 reference, or explicitly with `pull`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command —
 then create a machine from it and run it:

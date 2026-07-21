@@ -9,7 +9,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > structure; expected to be short-lived. Settled decisions live in
 > [ROADMAP.md](../ROADMAP.md) ("The CLI" and the milestones);
 > concepts introduced here are documented durably in
-> [builtin-library.md](builtin-library.md) (built-in library,
+> [codex.md](codex.md) (the codex,
 > `pull`, naming conventions, provenance) and the
 > [blueprint field reference](machine-blueprint-reference.md)
 > (`name`, `description`, `scripts`).
@@ -41,24 +41,23 @@ ids are
 Blueprint files describe a kind of machine. They live under
 `blueprints/` alongside companion media definitions (`media/`) and
 scripts (`scripts/`). Author them by hand, scaffold them with
-`create blueprint`, or let reliquary extract them from its built-in
-library.
+`create blueprint`, or let reliquary extract them from its codex.
 
-**The built-in library.** reliquary ships a set of blueprints, media
+**The codex.** reliquary ships a set of blueprints, media
 definitions, and scripts for popular open source operating systems.
 In a source checkout these live as ordinary files under
 `builtins/blueprints/`, `builtins/media/`, and
 `builtins/scripts/`; when packaged for distribution they are bundled
 in a zip archive within the reliquary package. Either way, when you
-reference a built-in artifact that doesn't yet exist in your home,
+reference a codex artifact that doesn't yet exist in your home,
 reliquary copies it out. From that point on it is an ordinary
 user-owned file — edit it, delete it, version it. A file already
-present in your home is never overwritten; the built-in is a seed,
+present in your home is never overwritten; the codex is a seed,
 not a live resolution tier.
 
 Deleting your copy is also how you refresh it: a file in your home
 is never touched, but once you delete it yourself, the next
-reference (or `pull`) extracts the current built-in again. Orphaned
+reference (or `pull`) extracts the current codex copy again. Orphaned
 references — a blueprint naming a media definition or script you
 removed — re-seed the same way.
 
@@ -96,9 +95,9 @@ The labels are the verbs you use with `script`:
 `scripts.install`, finds `freedos-1.4-plain-install`, and runs
 `scripts/freedos-1.4-plain-install.rlqs`.
 
-`name` and `description` are optional in both user and built-in
-blueprints. The built-in library carries an index mapping every
-built-in artifact to its name, description, and relationships;
+`name` and `description` are optional in both user and codex
+blueprints. The codex carries an index mapping every
+codex artifact to its name, description, and relationships;
 user blueprints are indexed by reading these fields from the file.
 
 ### Creating a blueprint
@@ -166,7 +165,7 @@ rlq create blueprint retro-pc --platform dos --backend qemu `
 
 `--hdd <size>` produces a blank disk (`{"size": "20M"}`). For a
 hard disk built on a base image or backed by a media item, edit the
-JSON — or start from a built-in blueprint that already has the
+JSON — or start from a codex blueprint that already has the
 shape you want.
 
 `--cdrom <media>` and `--floppy <media>` produce `media`
@@ -190,25 +189,25 @@ form (`cdrom,hdd`, `floppy,hdd`).
 For drives beyond the first slot, controller types, or anything
 else the scaffolder doesn't cover, edit the JSON file directly.
 
-### Pulling from the built-in library
+### Pulling from the codex
 
 ```
 rlq pull (blueprint | media | script) <name> [--only]
 ```
 
-Extracts artifacts from the built-in library into your home.
+Extracts artifacts from the codex into your home.
 Existing files are never overwritten.
 
 - `rlq pull blueprint <name>` — pulls a blueprint and
   everything it references: its media definitions and all scripts
   named in its `scripts` map. This is the one-stop command to
-  materialize a built-in into your home. `--only` restricts it to
+  materialize a codex artifact into your home. `--only` restricts it to
   the blueprint file itself.
 - `rlq pull media <name>` — pulls a single media definition.
 - `rlq pull script <name>` — pulls a single script.
 
 ```powershell
-# Pull everything for a built-in blueprint
+# Pull everything for a codex blueprint
 rlq pull blueprint freedos-1.4
 
 # Pull individual artifacts
@@ -219,12 +218,12 @@ rlq pull script freedos-1.4-plain-install
 
 After pulling, the files are ordinary user-owned documents — edit
 them, version them, delete them. This is the bridge from "just use
-the built-in" to "I want to tweak it." To reset a copy to the
-current built-in, delete your file and pull again.
+the codex's" to "I want to tweak it." To reset a copy to the
+current codex copy, delete your file and pull again.
 
 ### Naming conventions
 
-Built-in artifacts follow a convention that ties them together by
+Codex artifacts follow a convention that ties them together by
 blueprint and script:
 
 | artifact | pattern | example |
@@ -249,23 +248,23 @@ rlq search blueprints <term>...
 ```
 
 `list blueprints` shows everything in `blueprints/`. `search
-blueprints` queries the built-in index and user blueprint files,
+blueprints` queries the codex index and user blueprint files,
 matching terms against filename, `name`, `description`, and
 platform. Multiple terms are ANDed:
 
 ```powershell
 $ rlq search blueprints dos
-BLUEPRINT              NAME                                MACHINES  BUILT-IN
+BLUEPRINT              NAME                                MACHINES  CODEX
 freedos-1.4-plain      FreeDOS 1.4                         2         seeded
 test-rig               (untitled)                          0
 msdos-622              MS-DOS 6.22 — base install          —         yes
 
 $ rlq search blueprints freedos install
-BLUEPRINT              NAME                                MACHINES  BUILT-IN
+BLUEPRINT              NAME                                MACHINES  CODEX
 freedos-1.4-plain      FreeDOS 1.4                         2         seeded
 ```
 
-The BUILT-IN column tracks provenance by name: `yes` marks a
+The CODEX column tracks provenance by name: `yes` marks a
 library entry not yet in your home; `seeded` marks a user file
 whose name also exists in the library (it was extracted, or shares
 the name); blank marks a purely user-authored file.
@@ -334,7 +333,7 @@ rlq --blueprint <name> create
 ```
 
 Resolves `<name>` to a blueprint in `blueprints/`. If the file
-doesn't exist but is available in the built-in library, it is
+doesn't exist but is available in the codex, it is
 extracted — along with any referenced media definitions and scripts
 not already present. Existing files are never overwritten.
 
@@ -653,12 +652,12 @@ rlq search scripts <term>...
 ```
 
 `list scripts` shows everything in `scripts/`. `search scripts`
-queries the built-in index and user scripts, matching terms against
+queries the codex index and user scripts, matching terms against
 filename, `name`, and `description`:
 
 ```powershell
 $ rlq search scripts freedos
-SCRIPT                        NAME                          BUILT-IN
+SCRIPT                        NAME                          CODEX
 freedos-1.4-plain-install     FreeDOS 1.4 — plain install         seeded
 freedos-1.4-plain-verify      FreeDOS 1.4 — verify boot     yes
 ```
@@ -679,7 +678,7 @@ and `scripts/<label>.rlqs` is run. Label takes priority over bare
 filename.
 
 If a referenced script doesn't exist in `scripts/` but is available
-in the built-in library, it is extracted alongside any missing media
+in the codex, it is extracted alongside any missing media
 definitions before execution. Existing files are never overwritten.
 
 **One-shot install — the common case:**
@@ -690,7 +689,7 @@ rlq --blueprint freedos-1.4-plain script install
 
 Behind the scenes this:
 1. Extracts `blueprints/freedos-1.4-plain.rlqb`, its companion media
-   definitions, and its scripts from the built-in library (skipping
+   definitions, and its scripts from the codex (skipping
    any that already exist).
 2. Creates a machine from the blueprint.
 3. Runs `scripts/freedos-1.4-plain-install.rlqs`, which inserts
@@ -732,7 +731,7 @@ rlq check-script freedos-1.4-plain-install --blueprint freedos-1.4
 
 Media definitions describe installation media — download URLs,
 archive structure, and SHA-256 hashes. Definitions live under
-`media/` and are ordinary user-owned JSON files (the built-in
+`media/` and are ordinary user-owned JSON files (the codex
 library provides seeds that are extracted on first reference;
 existing files are never overwritten).
 
@@ -744,18 +743,18 @@ rlq search media <term>...
 ```
 
 `list media` shows everything in `media/`. `search media` queries
-the built-in index and user media definitions, matching terms
+the codex index and user media definitions, matching terms
 against filename, `name`, and `description`. Multiple terms are
 ANDed:
 
 ```powershell
 $ rlq search media freedos
-MEDIA                   NAME                    BUILT-IN
+MEDIA                   NAME                    CODEX
 freedos-1.4-livecd      FreeDOS 1.4 LiveCD ISO  seeded
 freedos-1.4-bonus       FreeDOS 1.4 Bonus CD    yes
 
 $ rlq search media win98
-MEDIA                   NAME                    BUILT-IN
+MEDIA                   NAME                    CODEX
 win98se                 Windows 98 SE OEM ISO   yes
 ```
 

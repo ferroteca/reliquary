@@ -53,7 +53,7 @@ rlq --help
 rlq --blueprint freedos-1.4-plain script install
 ```
 
-From a clean home, that one command materializes a machine from the built-in `freedos-1.4-plain` blueprint (seeding the
+From a clean home, that one command materializes a machine from the codex's `freedos-1.4-plain` blueprint (seeding the
 blueprint, its scripts, and the LiveCD media definition into your home as ordinary user-owned files), inserts the
 fetched, hash-verified LiveCD to the blueprint's empty CD drive, boots it, and drives the FreeDOS installer end to end —
 language, partitioning, the reboot, the "Plain DOS system" package set — until the guest powers itself off and the

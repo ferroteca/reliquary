@@ -602,7 +602,7 @@ There are no anonymous phases and no implicit phase entry.
 A script may carry media definitions needed by that workflow, but
 never has to: a script's media references resolve through the
 ordinary shared catalog, so definitions that live as separate
-library documents — as the built-in library keeps its own — work
+library documents — as the codex keeps its own — work
 identically. Embedding suits a script distributed as a single
 self-contained file. Each block has a definition label followed by
 the ordinary media-definition JSON object; the outer opening brace

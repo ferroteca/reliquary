@@ -93,7 +93,7 @@ Source of truth:
 
 A blueprint is a reusable, user-owned JSON description of a kind
 of machine: authored directly in an editor, seeded out of the
-built-in library, or synthesized from a native VM by `import` —
+codex, or synthesized from a native VM by `import` —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
 customization (U5). Specification:
@@ -118,11 +118,11 @@ covers them equally:
 - **The property registry** — a user-owned file authored directly
   in an editor, without passing through any primary interface:
   [docs/property-registry.md](docs/property-registry.md).
-- **The built-in library** — the seeded starting content and its
+- **The codex** — reliquary's built-in seed content and its
   index: seed-not-a-resolution-tier semantics, never-overwrite,
-  delete-to-refresh, provenance, and the licensing rule for
-  built-in media URLs:
-  [docs/builtin-library.md](docs/builtin-library.md).
+  delete-to-refresh, provenance, and the licensing rule
+  for shipped media URLs:
+  [docs/codex.md](docs/codex.md).
 - **Recorded outputs** — run records under a machine's `runs/`
   directory: transcripts (with the secret-redaction contract),
   screenshots, and collected outputs. The world reads these;
@@ -205,6 +205,6 @@ Every approved change then lands the same way:
 | Blueprints | [docs/machine-blueprint.md](docs/machine-blueprint.md) with its [reference](docs/machine-blueprint-reference.md) and [cookbook](docs/machine-blueprint-cookbook.md) |
 | Media definitions | [docs/media-spec.md](docs/media-spec.md) |
 | Property registry | [docs/property-registry.md](docs/property-registry.md) |
-| Built-in library | [docs/builtin-library.md](docs/builtin-library.md) |
+| The codex | [docs/codex.md](docs/codex.md) |
 | Home / machines | [docs/instance-model.md](docs/instance-model.md) |
 | Run records | transcript contract in [docs/script-spec.md](docs/script-spec.md) |

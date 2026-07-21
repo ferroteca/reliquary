@@ -30,7 +30,7 @@ and amendments are made deliberately and recorded here.
   and the blueprint and install recipe are easy to find, point
   to, and use. From a clean home this is one short command
   (`rlq --blueprint freedos-1.4-plain script install`): the
-  built-in library seeds the blueprint, media definition, and
+  codex seeds the blueprint, media definition, and
   scripts; media is fetched and hash-verified; the script drives
   the installer end to end — menus, partitioning, reboots, media
   swaps — until the guest is installed.
@@ -90,7 +90,7 @@ and amendments are made deliberately and recorded here.
   automates the testing in it. When truly finished, the developer
   disposes of the large VM and reclaims the disk space.
 - **U5 — Custom installation.** A user wants the German version
-  of Windows. The built-in library will not carry such flavors —
+  of Windows. The codex will not carry such flavors —
   there are too many variants — so it defines one standard
   Windows install. From the CLI the user easily finds that
   standard blueprint, seeds a local blueprint from it, and
@@ -154,11 +154,11 @@ Alongside it runs an artifact-residency split. Assets in the
 reliquary home are a convenience for human CLI interaction: users
 get a convenient home for shared assets — blueprints, media
 definitions, and scripts reused across human-interaction
-scenarios — seeded by the built-in library (U1, U5). The other side of the
+scenarios — seeded by the codex (U1, U5). The other side of the
 coin: for automation, media definitions, scripts, and blueprints
 are source code artifacts — they belong to the consuming project,
 live in its source control, and never live in reliquary's home
-(U3, U4). The built-in library is *never* used for machine
+(U3, U4). The codex is *never* used for machine
 automation — that would be a trap: a blueprint changing outside
 the project's source control breaks the project. For automation
 the library is at most a place to copy a first draft from; the
