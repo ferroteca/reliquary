@@ -25,11 +25,25 @@ The `docs/` directory contains user-facing documentation for **implemented featu
 The `planning/` directory contains maintainer-facing design and planning documents:
 - `planning/ROADMAP.md` — architectural context, open design questions, and implementation milestones
 - `planning/TASKS.md` — small to-do tasks (large tasks belong in the roadmap)
-- `planning/design/` — design documents for interfaces and features (end-goal designs, not current truth), including:
-  - `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule
-  - `planning/USE-CASES.md` — primary use cases that guide interface decisions (may include unimplemented aspirations)
-  - Other design documents for specific interfaces and features
+- `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule
+- `planning/USE-CASES.md` — primary use cases that guide interface decisions (may include unimplemented aspirations)
+- `planning/design/` — design documents for specific interfaces and features (end-goal designs, not current truth)
 - `planning/examples/` — example blueprints and scripts in planned formats
+
+## The CHANGELOG
+
+The CHANGELOG is history, not documentation, and follows its own rule:
+**never retroactively edit previously released history.** Everything under
+a released version header records what was true at release time and stays
+byte-for-byte as released — stale paths, broken links, renamed concepts,
+and superseded wording included; they are the historical record, and
+"fixing" them falsifies it. Corrections and follow-ups get new entries
+under the unreleased section, never edits to released text.
+
+The one exception is removing private or legally problematic content:
+redact minimally — replace or drop the problematic text, never reword or
+modernize around it — and record the redaction as an entry of its own
+release. The unreleased section is freely editable until it ships.
 
 ## When writing or editing documentation
 

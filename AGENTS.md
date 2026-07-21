@@ -344,7 +344,10 @@ task-oriented. Do not move agent instructions, implementation constraints, roadm
 it.
 
 After changing commands, flags, paths, behavior, or Python interfaces, update README.md, CHANGELOG.md, and this file
-wherever affected. Validate documented CLI syntax with `reliquary --help` and subcommand help.
+wherever affected. CHANGELOG updates land under the unreleased section only: released history is never retroactively
+edited — not even for stale paths or renamed concepts (the sole exception, minimal privacy/legal redaction, and the
+full rule live in `.agents/skills/documentation-rules.md`). Validate documented CLI syntax with `reliquary --help` and
+subcommand help.
 
 ## Architecture and prior art
 
