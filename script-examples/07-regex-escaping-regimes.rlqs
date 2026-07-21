@@ -31,8 +31,8 @@ wait "ERROR"            # ...this one starts a comment ->  # like so
 # author must context-switch escaping rules on adjacent lines,
 # and DOS text is backslash-dense in exactly the wrong way.
 #
-# OPEN QUESTIONS: is a raw-regex form worth it (the string world
-# already has r"..." but the regex world has no analogue)? Should
+# OPEN QUESTIONS: is a raw-regex form worth it? (Raw strings were
+# deleted from the language as an unearned token class.) Should
 # the spec instead bless a convention — prefer literal strings for
 # anything containing a path, regexes only for genuinely variable
 # text — and have validation hint when a regex contains \\ runs

@@ -16,7 +16,7 @@ stage "payloads/AUTOTEST.EXE"   # HOST path — resolved against the
 start
 wait  "AUTOTEST.EXE"            # GUEST text — matched on the screen
 enter "AUTOTEST.EXE"            # GUEST text — typed at the prompt
-wait  stopped
+wait  machine=stopped
 
 # One line, two worlds:
 collect "RESULTS.LOG" to="results/"

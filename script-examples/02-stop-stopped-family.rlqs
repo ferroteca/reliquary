@@ -1,45 +1,51 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# PROBLEM: one word family, four constructs — and quoting alone
-# flips a condition's semantic domain.
+# RESOLVED (July 2026, named observation channels) — kept as a
+# regression note.
+#
+# The problem was: one word family, four constructs, with quoting
+# alone flipping a condition's semantic domain —
 #
 #   stop              verb: host-side hard power-off, an action
 #   stopped           bare condition: backend reports not running
 #   machine stopped   header: a precondition, performs nothing
 #   "stopped"         quoted: guest SCREEN TEXT saying "stopped"
+#
+# A reader skimming a column of wait lines could not tell a
+# machine-event wait from a text wait without focusing on the
+# quotes:
+#
+#     wait "Formatting complete"      guest screen
+#     wait stopped                    machine state   (OLD SURFACE)
+#     wait "stopped"                  guest screen again
+#
+# THE FIX: the screen is the default channel and a bare string or
+# regex IS a screen observation (its only spelling); every other
+# channel is named as a prefix, and the bare `stopped` condition
+# no longer exists:
 
-description "The stop/stopped family"
+description "The stop/stopped family — resolved by channels"
 platform    dos
-machine     stopped     # expectation only — no action performed
+machine     stopped     # header: still an inert precondition
 timeout     30s
 
 start                   # verb: acts now
 enter "shutdown"
-wait  stopped           # bare word: observes the MACHINE domain
-# wait "stopped"        # quoted, the SAME word would watch for the
-                        # literal text "stopped" on the guest screen
+wait  "stopped"         # a screen observation: guest text
+wait  machine=stopped   # channel named: unmistakably machine state
+# wait stopped          # ILLEGAL: no bare machine-state condition
 
-# One character class — the quotes — silently moves the condition
-# from the machine domain to the guest-screen domain. A reader
-# skimming a column of wait lines cannot tell a machine-event wait
-# from a text wait without focusing on the quotes:
+# The domains can no longer swap on a quoting slip: the machine
+# domain always carries its channel name, and a quoted word is
+# always the screen. The fix also opened the growth path — image=
+# and console= arrive as new channel names, not new syntax (see
+# the spec's channel table and vocabulary-growth section).
 #
-#     wait "Formatting complete"      guest screen
-#     wait stopped                    machine state
-#     wait "stopped"                  guest screen again
-#
-# The header adds a third reading of the same word: `machine
-# stopped` is inert (a precondition), while `stop` is destructive.
-# The noun-first/verb-first zone rule carries that whole
-# distinction; the words themselves do not.
-#
-# OPEN QUESTION: should machine-state conditions be namespaced so
-# bare condition words cannot shadow screen text in the reader's
-# eye? Sketches (all NOT current syntax):
-#     wait machine=stopped        # property-flavored, verbose
-#     wait <stopped>              # key-token spelling, wrong class
-#     wait stopped                # status quo: contextual keyword
-# The status quo is defensible (one machine-event word today), but
-# each future machine event (paused? rebooted?) widens the bare
-# vocabulary and the collision surface with screen text.
+# RESIDUE (minor, accepted): the word "stopped" still appears in
+# two inert-vs-observed roles — `machine stopped` (header
+# precondition, noun-first zone) and `machine=stopped` (condition
+# value) — and `stop` the verb remains destructive beside both.
+# The zone rule and the channel spelling now carry the
+# distinction; no further fix planned unless real authoring
+# confusion shows up.

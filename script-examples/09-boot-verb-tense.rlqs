@@ -16,7 +16,7 @@ boot cdrom0 hdd0     # does NOT boot anything — it replaces the
 start                # ...THIS boots, using the new order
 wait  "Welcome"
 enter "shutdown"
-wait  stopped
+wait  machine=stopped
 
 # The reordering OUTLIVES this script: the machine keeps booting
 # CD-first until another `boot` — or `apply` — restores it. That

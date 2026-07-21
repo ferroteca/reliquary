@@ -16,7 +16,7 @@ marked), and the themes matter more than end-to-end coherence.
 | file | residual problem |
 |---|---|
 | [01-enter-three-roles.rlqs](01-enter-three-roles.rlqs) | the word "enter" is a verb, a key name, and a key token |
-| [02-stop-stopped-family.rlqs](02-stop-stopped-family.rlqs) | stop/stopped/`machine stopped`/`"stopped"` — quoting flips the semantic domain |
+| [02-stop-stopped-family.rlqs](02-stop-stopped-family.rlqs) | **RESOLVED** by named observation channels (`machine=stopped`, `screen=` shorthand) — kept as a regression note |
 | [03-timing-spellings-and-scope.rlqs](03-timing-spellings-and-scope.rlqs) | `timeout 30s` vs `timeout=5m`; non-local defaults; the stable split; reset asymmetry |
 | [04-on-two-lifecycles.rlqs](04-on-two-lifecycles.rlqs) | one `on` syntax, two lifecycles; invisible fall-through; hidden terminals |
 | [05-strings-two-worlds.rlqs](05-strings-two-worlds.rlqs) | quoted strings are guest text in one verb, host paths in the next |

@@ -63,7 +63,8 @@ phase hd-boot {
 
 phase shutdown {
     enter "fdapm poweroff"
-    wait  stopped timeout=2m
+    wait  machine=stopped timeout=2m    # non-default channel, named;
+                                        # a bare string is the screen
     eject cdrom0
     finish
 }

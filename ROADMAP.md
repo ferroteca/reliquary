@@ -467,7 +467,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 **The July 2026 surface redesign is decided and
 [docs/script-spec.md](docs/script-spec.md) is its source of
 truth** (including the complete typed EBNF), with
-`design-install.rlqs` in the repository root as the reference
+`script-examples/design-install.rlqs` as the reference
 script. Realigning the implementation — parser, runtime, shipped
 scripts — with it is **absolute priority #1**; see the
 realignment milestone below. Pre-beta, the superseded surface is
@@ -503,19 +503,28 @@ screens from repeating destructive input on every poll. Smaller
 phases, rather than statement position, scope which handlers are
 active. There are no anonymous phases or handler-splicing macros.
 
-Text watches are case-sensitive **normalized text matches**:
-screen rows decode to Unicode, trim cell padding, and collapse
-whitespace before literal substring or opt-in regex matching.
-`wait` is the one observation construct, in single-condition and
-branching forms — the branching `wait { on ... }` covers small
-ordered forks, and `on <condition> { }` is the one branch form,
-shared with reactive phases. `stopped` is the machine
-no-longer-running condition; it does not claim that the shutdown
-was graceful. A guest reboot has no reliquary verb or event: the
-script types the guest command, makes a menu choice, or sends the
-appropriate key sequence, then watches for the screen that
-follows. There is likewise no `run` verb: `enter` delivers a
-console line, and completion is a separate explicit observation.
+The guest's screen is the **default observation channel** and is
+unprefixed — a bare string or regex condition *is* a screen
+observation, and that is its only spelling — while every
+non-default channel is named as a prefix: `wait machine=stopped`
+(there is no bare `stopped` condition). Growth rule: a new channel
+names a new non-default observable (`console=`); a new value
+spelling names a new matcher over the screen (a `@landmark`
+reference for image matching). Every condition is preflightable
+against the machine's control planes. Text watches are
+case-sensitive **normalized text matches**: screen rows decode to
+Unicode, trim cell padding, and collapse whitespace before
+literal substring or opt-in regex matching. `wait` is the one
+observation construct, in single-condition and branching forms —
+the branching `wait { on ... }` covers small ordered forks, and
+`on <condition> { }` is the one branch form, shared with reactive
+phases. `machine=stopped` is the machine no-longer-running
+condition; it does not claim that the shutdown was graceful. A
+guest reboot has no reliquary verb or event: the script types the
+guest command, makes a menu choice, or sends the appropriate key
+sequence, then watches for the screen that follows. There is
+likewise no `run` verb: `enter` delivers a console line, and
+completion is a separate explicit observation.
 
 Timing separates two scoping families: `timeout` bounds the time
 to the next observed event and is a lexically scoped default
@@ -533,7 +542,7 @@ Immutable `text`, `media`, and `secret` inputs externalize
 run-specific data without adding decisions or expressions.
 `$name` references (`${name}` inside strings) are bound before
 execution. Each input may name a
-home-wide user property with `property: "<key>"`; an explicit JSON
+home-wide user property with `property="<key>"`; an explicit JSON
 response wins for that invocation, then the property registry, then
 interactive prompting. Missing noninteractive, mistyped, or
 unresolved-media values fail before the machine starts, as do
@@ -586,23 +595,121 @@ surface — it is the proven instruction set the language must cover:
   machine;
 - stage files to and collect files from the guest.
 
-Language design goals:
+### Primary language goals
 
-- **Backend- and control plane-agnostic at the surface.** A script says
-  "wait for this text"; the machine's backend and selected control plane
-  decide how that is observed.
-- **Inspectable and replay-oriented.** The graph is explicit and
-  finite, while guest-selected routes and cycles remain honest.
-  Failures report the step, route, observed state, and screenshot.
-- **Small.** The language exists to sequence guest automation, not
-  to be a general-purpose programming language. Anything
+Every language decision is judged against these. They are numbered
+so later decisions, reviews, and spec sections can cite them, and
+so a proposed feature can be rejected by naming the goal it costs.
+
+- **G1 — Agentless at the guest seam.** The guest is a black box
+  that cannot be configured, only watched and typed at. No feature
+  may depend on guest cooperation. This is a permanent requirement
+  (AGENTS.md), not a current limitation.
+- **G2 — Non-computational.** No expressions, variables,
+  arithmetic, functions, or general-purpose loops. Anything
   computational belongs in Python via the embedding API, which
   remains a first-class surface.
-- **Grows coherently.** Image matching and pointer input extend
-  observation and action without adding a second control-flow
-  model. Before beta, empirical use may still reshape the syntax;
-  after the language is proven, existing forms retain their
-  meanings and new capabilities stay explicit and preflightable.
+- **G3 — Statically inspectable before the machine starts.**
+  Parsing, binding, control-flow analysis, and whole-script
+  capability preflight all complete before the first guest input.
+  The authored graph is explicit and finite even when a run cycles.
+- **G4 — Legible in real time.** A run is usually long, unattended,
+  and watched by someone who wants to know where it is. The
+  language's own structure — named phases, the pending observation,
+  declared budgets — must be sufficient to answer "where am I, what
+  is it waiting for, how long has it got" without extra syntax.
+- **G5 — Backend- and control-plane-agnostic at the surface.** A
+  script says "wait for this text"; the machine's backend and
+  selected control plane decide how that is observed. Verbs stay
+  intent-level, above portable input events.
+- **G6 — Small and unambiguous.** Brevity, succinctness, structure,
+  clarity. One concept, one spelling. Surface area is the scarce
+  resource; deletion is the preferred remedy.
+- **G7 — Grows coherently.** New capabilities extend observation and
+  action without adding a second control-flow model or a second
+  syntax. Growth stays explicit and preflightable.
+
+### Procedural and declarative
+
+The language is deliberately a hybrid, and the seam between its two
+halves is the most load-bearing decision in the design. Naming the
+seam early is what keeps later decisions consistent; most of the
+language's prohibitions exist to keep it clean.
+
+**The governing rule: the script is declarative about everything
+reliquary owns, and procedural at the seam with the guest.**
+
+Everything knowable before the run starts is declared — the
+platform, the machine state the script expects, which phases exist,
+their timing budgets, the media it needs, the inputs it binds.
+Everything the guest dictates is procedural — which key to send,
+what text to wait for, the order its own installer screens arrive
+in. The seam falls where our knowledge ends:
+
+| concern | paradigm | why |
+|---|---|---|
+| machine shape | declarative (the blueprint) | ours, and knowable |
+| which phases exist, their budgets | declarative | ours, and knowable |
+| media, inputs, embedded definitions | declarative | ours, and knowable |
+| keystrokes and observations within a phase | procedural | the guest's installer dictates the order |
+| which route the run takes | procedural choice over a declarative graph | the guest chooses at run time |
+
+**Why not fully declarative.** OS installation has a mature
+declarative form — Kickstart, preseed, AutoYaST, Windows
+`unattend.xml` — in which the author states what the installed
+system should be and the installer does the rest. Where those
+exist they are strictly better, and reliquary should not compete
+with them. It deliberately targets the guests where they do not
+exist: DOS, Win9x, and other systems whose installers accept only
+keystrokes. An answer file is also a form of guest cooperation,
+which G1 forbids depending on. Procedural interaction at the guest
+seam is therefore not a stylistic preference; it is the only thing
+available.
+
+**Why not fully procedural.** A plain imperative script — the
+AutoHotkey or Expect shape — would be shorter to specify and would
+need no phase concept at all. It is rejected because it forfeits
+G3 and G4 together: a straight-line script with ad-hoc loops has
+no statically knowable shape to analyze, and no named units to
+report progress against. The declarative half is what makes a run
+checkable before it starts and legible while it runs.
+
+**The tensions this creates, which we accept.** These are real and
+should not be papered over; several are already catalogued as
+residual problems in `script-examples/`:
+
+- `phase` is a declarative construct whose body is procedural. The
+  hybrid is not hidden; it is the point.
+- A sequential phase is procedural, a reactive phase is
+  declarative, and both are spelled `phase`. The two are forbidden
+  to mix rather than given a combined semantics — a prohibition,
+  not a definition.
+- `on` therefore has one syntax and two lifecycles: a case in a
+  branching `wait` versus a standing rule in a reactive phase
+  (`script-examples/04`). That is the paradigm boundary showing
+  through the syntax.
+- Declarative timing scopes annotate procedural statements, so an
+  observation's effective bound is not locally readable
+  (`script-examples/03`).
+- Procedural `insert`/`eject`/`boot` mutate declarative machine
+  state that outlives the run (`script-examples/09`), deliberately
+  diverging a machine from its blueprint until restored.
+
+**The prohibitions that keep the seam clean.** Each exists to stop
+the procedural half from eroding the declarative half:
+
+- no author-side conditionals — the only decisions that matter are
+  the guest's, expressed as observations of what it actually
+  showed, never as the script author's logic (G2);
+- inputs supply data and may never select a branch, a phase, or a
+  path, so the graph stays static (G3, and the "one script, one
+  target" principle below);
+- no fallthrough and no anonymous phases, so every route is named
+  and searchable (G3, G4);
+- no `sleep` or `delay`, so every pause is justified by an
+  observation rather than a guess about guest speed (G1, G5);
+- no implicit machine teardown, so a failed run leaves state to
+  diagnose rather than a tidied crime scene.
 
 OS installation automation is expressed as install and verify scripts
 attached to machine blueprints. Media acquisition (download, hash-verify,
@@ -967,8 +1074,8 @@ documents is implemented for DOS on QEMU.
 
 The July 2026 script-language redesign
 ([docs/script-spec.md](docs/script-spec.md), with
-`design-install.rlqs` in the repository root as the reference
-script) supersedes the surface milestones 1 and 5 implemented.
+`script-examples/design-install.rlqs` as the reference script)
+supersedes the surface milestones 1 and 5 implemented.
 This milestone gates everything after it: no later milestone
 starts before the tree speaks the new surface. Pre-beta, the old
 surface is deleted, not bridged.
@@ -985,17 +1092,23 @@ Deliverables:
    `->`), `finish` (was `done`); `expect` folded into the
    branching `wait { on ... }` with `on` as the one branch form;
    the `regex` keyword replaced by the regex literal.
-3. The timing model: lexically scoped `timeout`/`stable` defaults
+3. Observation channels, screen-default form: a bare string or
+   regex is the screen observation's only spelling (`screen=`
+   does not exist), `machine=stopped` is the only machine-state
+   spelling (no bare `stopped`), one condition per observation,
+   and unknown or wrong-kind channels as validation errors.
+4. The timing model: lexically scoped `timeout`/`stable` defaults
    (innermost wins), per-activation `deadline` budgets (fresh per
    phase entry; the header `deadline` backstops the run), the
    placement matrix enforced as parse errors, and failure
    diagnostics naming the expired clock and its source scope.
-4. `script_runner.py` retargeted, and `check-script` grown to
+5. `script_runner.py` retargeted, and `check-script` grown to
    report the resolved timing plan (each observation's effective
    timeout and source scope).
-5. The built-in and example scripts converted, and every document
+6. The built-in and example scripts converted, and every document
    that quotes script syntax updated (README, examples/README);
-   `design-install.rlqs` retires into the converted builtins.
+   `script-examples/design-install.rlqs` retires into the
+   converted builtins.
 
 Done when: the FreeDOS install and verify scripts run end to end
 in the new surface, `check-script` reports the timing plan, and

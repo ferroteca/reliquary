@@ -9,13 +9,16 @@ SPDX-License-Identifier: BSD-3-Clause
 > script surface adopted in July 2026. It supersedes the earlier
 > milestone-one syntax (`state`, `->`, `done`, `expect`, `regex`
 > strings, colon headers, comma-separated modifiers, bare media
-> names) completely; pre-beta, there is no compatibility between the
-> two surfaces and none is planned. The implemented parser and
-> runtime (`script.py`, `script_runner.py`) and the shipped built-in
-> and example scripts still speak the earlier surface and will be
-> retargeted wholesale. Embedded media blocks, inputs and property
-> binding, reactive phases, and the full transcript contract remain
-> later milestones; details may still change before first release.
+> names, and the bare `stopped` condition) completely; pre-beta,
+> there is no compatibility between the two surfaces and none is
+> planned. The implemented parser and runtime (`script.py`,
+> `script_runner.py`) and the shipped built-in and example scripts
+> still speak the earlier surface and will be retargeted wholesale.
+> `script-examples/design-install.rlqs` is the reference script, and
+> the other files there catalog known residual rough edges in this
+> surface. Embedded media blocks, inputs and property binding,
+> reactive phases, and the full transcript contract remain later
+> milestones; details may still change before first release.
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
@@ -85,6 +88,23 @@ Three design rules govern the whole surface:
   a verb. The declarative zone precedes the imperative zone, and
   the grammar enforces the boundary.
 
+That third rule reflects a deliberate split: **a script is
+declarative about everything reliquary owns, and procedural at the
+seam with the guest.** What is knowable before the run starts is
+declared — the platform, the expected machine state, which phases
+exist, their budgets, the media and inputs. What the guest dictates
+is procedural — which key to send, what text to wait for, the order
+its own installer screens arrive in. The guest is a black box that
+cannot be configured, only watched and typed at, so interaction
+with it is necessarily a sequence of acts; everything else is a
+description. Several rules below exist to keep that seam intact —
+notably that a phase is either sequential or reactive but never
+both, that inputs may supply data but never select a branch or a
+phase, and that there are no author-side conditionals, because the
+only decisions that matter are the guest's. The reasoning is
+recorded under "Procedural and declarative" in
+[ROADMAP.md](../ROADMAP.md).
+
 The authored control-flow graph is statically finite, but a run may
 be unbounded when transitions form a cycle. Execution is
 inspectable and replay-oriented, not inherently deterministic: the
@@ -114,18 +134,35 @@ they do not add expression or decision syntax.
 - Durations require an explicit unit: `ms`, `s`, `m`, or `h`.
   Values must be positive; fractional values are allowed. Numbers
   never appear without a unit.
+- The grammars below are over **tokens**. A run of spaces or tabs
+  separates tokens and carries no other meaning, including at the
+  start of a line: block indentation and column-aligned headers
+  are alignment, not syntax.
+- Exactly two adjacencies are load-bearing and admit no
+  surrounding space: `name=value` and `key+key` are each one
+  token. `timeout = 5m` is not a property — `timeout` would read
+  as a positional argument — and is a parse error, as is
+  `ctrl + c`.
+- A token ends at whitespace, `{`, `}`, or the line terminator,
+  except that `"..."` and `/.../` end at their closing delimiter.
+  No token spans a line. Tokens are maximal munch: `5ms` is one
+  duration, never `5m` followed by `s`.
+- `eol` is emitted at each line terminator (LF or CRLF) and at end
+  of file, so a final line without a trailing newline parses. A
+  line holding only whitespace and/or a comment emits no `eol` and
+  is invisible to the grammar below.
 
 Every token class has one spelling:
 
 | spelling | meaning | examples |
 |---|---|---|
-| bare word | keyword or script-internal name | `phase`, `goto formatting`, `cdrom0`, `press enter`, `stopped` |
+| bare word | keyword or script-internal name | `phase`, `goto formatting`, `cdrom0`, `press enter`, the `stopped` in `machine=stopped` |
 | `"..."` | literal text crossing the guest boundary, or a host path | `wait "C:\>"`, `enter "fdapm poweroff"`, `stage "payloads/AUTOTEST.EXE"` |
 | `/.../` | regex match | `wait /[0-9]+ files copied/` |
 | `@name` | external reference, resolved from the library | `insert cdrom0 @freedos-1.4-livecd` |
 | `$name` | run-supplied input value | `insert floppy1 $supplemental-disk` |
-| `name=value` | property of the node it follows | `timeout=5m`, `exclude="with sources"` |
-| `5m`, `500ms` | duration | `wait stopped timeout=2m` |
+| `name=value` | property of the node it follows | `timeout=5m`, `machine=stopped`, `exclude="with sources"` |
+| `5m`, `500ms` | duration | `wait machine=stopped timeout=2m` |
 | `<key>` in typed strings | key token | `type "<down><down><enter>"` |
 
 ### Strings
@@ -146,9 +183,10 @@ is written `${name}` and is expanded only where the containing
 argument accepts it; a `$` not followed by `{` is literal. In
 `enter` and `type`, recognized `<key>` tokens produce key input.
 
-The raw form `r"..."` performs no escapes, input expansion, or
-key-token recognition. Its one limitation is that it cannot contain
-a double quote.
+There is no raw-string form. Backslashes are already literal, so a
+raw form would only save the `\<` and `\${` escapes — one token
+class is too high a price for that, and it would break the rule
+that a token is classified by its first character.
 
 Expanded text must be representable by the selected input control
 plane. An unmappable character is a named input error, never a
@@ -164,8 +202,9 @@ wait /installed [0-9]+ of [0-9]+ packages/
 
 `\/` produces a literal slash; every other character, including
 backslashes, passes through to Python's regular-expression syntax
-unchanged. A regex is valid wherever a watch condition is expected.
-Input references are never expanded inside a regex.
+unchanged. A regex is a screen condition; `machine=` accepts
+only a machine-state word. Input references are never expanded
+inside a regex.
 
 ### References
 
@@ -179,24 +218,27 @@ name — are bare identifiers; the sigils mark use sites.
 
 ## Core grammar
 
-The structural grammar is three productions:
+Every line of every script — outside a `media` island — is one
+structural shape:
 
 ```text
-script  = { node } ;
-node    = name , { argument } , { property } , [ block ] , eol ;
-block   = "{" , eol , { node } , "}" , eol ;
-
-property  = name , "=" , value ;
-argument  = string | regex | duration | reference | name ;
-value     = string | regex | duration | reference | name ;
-reference = "@" , name | "$" , name ;
-condition = string | regex | "stopped" ;
+node = name , { argument } , { property } , [ block ] ;   (* informative *)
 ```
 
-One declared island: the block of a `media` node contains a JSON
-object rather than nodes, beginning at its `{` and ending at the
-matching `}`, using JSON lexical rules internally. Script comments
-and input references have no meaning inside it.
+This is the shape a parser recognizes before typing; conformance
+is defined solely by the typed grammar below together with the
+static-validation rules that follow it. The core view is
+structural — what a line looks like; the typed view is normative
+for admissibility.
+
+One declared island: a `media` node's block contains a JSON object
+(RFC 8259) rather than nodes. It is the sole place where the block
+rule in [lexical rules](#lexical-rules) does not apply: the island
+closes at the `}` that closes its JSON object, so a nested `}`
+alone on a line — which the archive form always contains — does
+not close it, and neither does a `}` inside a JSON string. Script
+tokenization is suspended for the interior; comments and input
+references have no meaning there.
 
 A typing layer over the node shape supplies the rest of the
 language definition:
@@ -232,9 +274,9 @@ Statements:
 
 | node | arguments | properties | block |
 |---|---|---|---|
-| `wait` | condition | `timeout`, `stable` | — |
-| `wait` | — | `timeout` | `on` handlers |
-| `on` | condition | `stable` | statements |
+| `wait` | one condition (string/regex, or `machine=` state) | `timeout`, `stable` | — |
+| `wait` | — (no condition; its handlers carry them) | `timeout` | `on` handlers |
+| `on` | one condition | `stable` | statements |
 | `goto` | phase name | — | — |
 | `finish` | — | — | — |
 | `enter` | string | — | — |
@@ -256,11 +298,12 @@ And the phase declaration:
 |---|---|---|---|
 | `phase` | name | `timeout`, `deadline` | statements, or `on` handlers |
 
-### The typed grammar
+### Grammar (normative)
 
 The signature tables above expand into this complete EBNF. Every
-production is an instance of the node shape; a conforming parser
-may implement either view:
+production but `media-def`'s island is an instance of the node
+shape. A parser may parse structurally and then type-check, but
+this grammar and the static rules below decide what is legal:
 
 ```text
 script          = { header } , { media-def } , { input-def } ,
@@ -273,32 +316,37 @@ header          = "description" , string , eol
                 | "timeout" , duration , eol
                 | "deadline" , duration , eol ;
 
-media-def       = "media" , name , json-object ;
+media-def       = "media" , name , json-island ;
+json-island     = "{" , eol , { json-line } , "}" , eol ;
 input-def       = "input" , ( "text" | "media" | "secret" ) ,
                   name , { input-prop } , eol ;
 input-prop      = ( "property" | "prompt" ) , "=" , string ;
 
-linear-body     = { statement } ;
+linear-body     = statement-list ;
 phased-body     = phase , { phase } ;
 phase           = "phase" , name , { timing-prop } , block-open ,
                   ( sequential-body | reactive-body ) ,
                   block-close ;
 timing-prop     = ( "timeout" | "deadline" ) , "=" , duration ;
 
-sequential-body = { statement } , terminal ;
+sequential-body = statement-list ;
 reactive-body   = handler , { handler } ;
-terminal        = ( "goto" , name | "finish" ) , eol ;
+statement-list  = { statement } ;
 
-statement       = observation | action ;
+statement       = observation | action | transfer ;
+transfer        = "goto" , name , eol | "finish" , eol ;
 observation     = "wait" , condition , { watch-prop } , eol
                 | "wait" , [ "timeout" , "=" , duration ] ,
                   block-open , handler , { handler } ,
                   block-close ;
 handler         = "on" , condition ,
                   [ "stable" , "=" , duration ] , block-open ,
-                  { statement } , [ terminal ] , block-close ;
+                  statement-list , block-close ;
 watch-prop      = ( "timeout" | "stable" ) , "=" , duration ;
-condition       = string | regex | "stopped" ;
+
+condition       = string | regex
+                | "machine" , "=" , machine-state ;
+machine-state   = "stopped" ;
 
 action          = "enter" , string , eol
                 | "type" , string , eol
@@ -327,15 +375,52 @@ duration        = number , ( "ms" | "s" | "m" | "h" ) ;
 number          = digit , { digit } ,
                   [ "." , digit , { digit } ]
                 | "." , digit , { digit } ;
-string          = ordinary-string | raw-string ;
-regex           = "/" , { regex-char | "\/" } , "/" ;
+string          = '"' , { str-char | escape | interpolation
+                        | key-token } , '"' ;
+escape          = "\" , ? any character except a line
+                        terminator ? ;
+interpolation   = "${" , name , "}" ;
+key-token       = "<" , key , ">" ;
+regex           = "/" , { regex-char | regex-escape } , "/" ;
+regex-char      = ? any character except "/", "\", and a line
+                    terminator ? ;
+regex-escape    = "\" , ? any character except a line
+                        terminator ? ;
 ```
 
-`json-object` begins with `{`, ends at its matching `}`, and uses
-JSON lexical rules internally, as described above. `slot` and
-`key-name` are `name` tokens whose vocabularies (drive slots, the
-portable key set) are checked by validation, not the grammar.
-Comments and blank lines may appear between grammatical lines.
+`json-line` is any line of the JSON island, tokenized by RFC 8259
+rather than by this grammar; the island closes at the `}` closing
+its object, as described above. `interpolation` and `key-token`
+are recognized only where the argument accepts them — never in a
+regex, `key-token` only in `enter` and `type`. `slot`, `key-name`,
+and `machine-state` values are `name` tokens whose closed
+vocabularies (drive slots, the portable key set, machine states)
+are checked by validation, not the grammar.
+
+### Terminating statements
+
+A statement is *terminating* when it ends the flow of control
+through its statement list. Exactly three are:
+
+1. `goto`;
+2. `finish`;
+3. a branching `wait` in which every handler body ends in a
+   terminating statement.
+
+No other statement is terminating. The recursion in (3) is one
+level deep, because no handler body may contain a branching
+`wait`. A statement list *terminates* when it is non-empty and its
+last statement is terminating.
+
+Two rules follow, checked by static validation:
+
+- A terminating statement is the last statement of its statement
+  list. A statement written after one is unreachable and is an
+  error.
+- The statement list of a sequential phase terminates. A linear
+  script's does not have to: reaching end of file completes the
+  run, and a trailing `finish` states that explicitly. `goto`
+  remains invalid in a linear script.
 
 A small set of constraints is deliberately context-sensitive —
 enforced by static validation over the parse tree rather than
@@ -343,21 +428,34 @@ encoded in the CFG:
 
 - each header appears at most once; `entry` appears exactly in
   phased scripts;
-- a branching `wait` may itself satisfy `terminal` when every one
-  of its handler bodies ends in a terminal;
-- a handler body inside a branching `wait` may not contain another
-  branching `wait`;
+- no node carries the same property name twice; a repeat is a
+  static error, never a last-wins override;
+- an observation carries **exactly one** condition — a bare
+  string/regex condition beside a `machine=` property, or two
+  `machine=` properties, are errors — and the condition precedes
+  any timing property on the same observation;
+- a branching `wait` carries no condition of its own; its
+  handlers do;
+- no handler body contains a branching `wait`. The recursion
+  `handler → statement → observation` is deliberate: the grammar
+  stays context-free and the depth limit is a static rule, not a
+  parse rule;
+- the [terminating-statements rules](#terminating-statements);
 - the [timing placement matrix](#timing): each timing property is
   legal only where the matrix allows it;
 - `goto` names a declared phase and never appears in a linear
   script; media labels are unique; reserved node names are not
   identifiers; durations are positive.
 
-The grammar is line-oriented and LL(1): the lexer classifies every
-token by its first character, and the parser needs one token of
-lookahead. All static validation — terminal-path checking,
-transition targets, capability preflight, timing resolution — runs
-over the typed tree before any machine starts.
+The grammar is line-oriented and LL(1) over the token stream in
+[lexical rules](#lexical-rules), given one lexical rule: a bare
+word immediately followed by `=` is a property-key token. Without
+it the node shape is not LL(1) — an argument and a property key
+are the same token until the `=` is seen, as in
+`phase formatting timeout=5m`. All static validation —
+terminating-statement checking, transition targets, capability
+preflight, timing resolution — runs over the typed tree before any
+machine starts.
 
 ## Header
 
@@ -415,7 +513,7 @@ timeout     2m
 wait "C:\>"
 screenshot booted
 enter "fdapm poweroff"
-wait stopped
+wait machine=stopped
 ```
 
 The first failing statement ends the run. Reaching end of file
@@ -444,9 +542,10 @@ phase partitioning {
 }
 ```
 
-Every reachable path through a sequential phase ends explicitly
-with `goto <phase>` or `finish`; a final branching `wait` is valid
-when every handler body ends that way. Named phases never fall
+A sequential phase's statement list
+[terminates](#terminating-statements): its last statement is a
+`goto <phase>`, a `finish`, or a branching `wait` whose every
+handler body itself terminates. Named phases never fall
 through in textual order. `entry` must name exactly one declared
 phase. Duplicate, missing, and unreachable phases are validation
 errors or warnings as described under
@@ -655,10 +754,54 @@ registry is the normal reusable source for protected values.
 
 ## Observations
 
+### Channels
+
+A **channel** is what an observation watches. The guest's screen
+is the **default channel**, and it is unprefixed: a string or
+regex condition *is* a screen observation, and that is the only
+spelling a screen observation has. Every other channel — the
+machine's own state today; a serial console later — is not the
+default, and is always named as a prefix:
+
+```rlqs
+wait "C:\>"              # the screen: the default, unprefixed
+wait /[0-9]+ files/      # the screen, matched by regex
+wait machine=stopped     # the machine: non-default, always named
+```
+
+| channel | observes | condition spelling |
+|---|---|---|
+| the screen (default) | the guest's visible display | string or regex, unprefixed |
+| `machine=` | machine state reported by the backend | `stopped` |
+
+Machine state has exactly one spelling, `machine=stopped`; there
+is no bare `stopped` condition. This split is deliberate twice
+over: a bare word and a quoted string in the same argument
+position must never mean two different observation domains, so
+the non-default domain is always named — and the default domain
+is *only* unprefixed, because two spellings of one observation
+would be two dialects in miniature.
+
+An observation carries exactly one condition. To wait for the
+first of several, including conditions on different channels, use
+the [branching `wait`](#wait), where each handler carries its
+own:
+
+```rlqs
+wait timeout=5m {
+    on "Press a key..."  { press enter }
+    on machine=stopped   { goto powered-off }
+}
+```
+
+New observables arrive as new channel names, and new matchers as
+new value spellings, rather than as new
+syntax; see [how the vocabulary grows](#how-the-vocabulary-grows).
+
 ### Normalized text matching
 
-A quoted watch pattern is a case-sensitive, normalized literal text
-match against one visible screen row:
+A quoted screen pattern is a case-sensitive, normalized literal
+text match against one visible screen row:
 
 ```rlqs
 wait "Welcome to FreeDOS 1.4 (LiveCD)"
@@ -688,10 +831,10 @@ shadowing; regex overlap cannot generally be proven.
 
 ### Machine state
 
-`stopped` is the initial machine-state condition:
+`machine=stopped` is the initial machine-state condition:
 
 ```rlqs
-wait stopped
+wait machine=stopped
 ```
 
 It means that the backend reports the machine no longer running. It
@@ -700,7 +843,7 @@ guest action supplies that intent:
 
 ```rlqs
 enter "fdapm poweroff"
-wait stopped timeout=2m
+wait machine=stopped timeout=2m
 ```
 
 A guest reboot is not a special event or verb. The script issues
@@ -721,7 +864,7 @@ fails when its timeout expires:
 ```rlqs
 wait "C:\>"
 wait /[0-9]+ files copied/ timeout=5m
-wait stopped
+wait machine=stopped
 ```
 
 A script that needs to know a console command completed waits for
@@ -748,18 +891,25 @@ wait timeout=2m {
 This is the classic Expect semantic — one command covering the
 single- and multi-pattern cases — under one verb. A branching
 `wait` requires at least one handler. An empty handler body is the
-explicit no-action branch. Handler bodies contain ordered
-statements and may end in `goto` or `finish`; they cannot contain
-phases or a nested branching `wait`.
+explicit no-action branch.
 
 ### `on` and reactive phases
 
-`on <condition> { ... }` binds a condition to an action. Its
-lifecycle belongs to its container: inside a branching `wait` the
-first match ends the wait; directly inside a reactive phase every
-handler stays active until the phase transitions. The syntax is
-identical in both places — the language has exactly one branch
-form.
+`on <condition> { ... }` binds a condition to an action, using the
+same condition spellings as `wait` — an unprefixed string or
+regex for the screen, or a named non-default channel such as
+`machine=stopped`. Its lifecycle belongs
+to its container: inside a branching `wait` the first match ends
+the wait; directly inside a reactive phase every handler stays
+active until the phase transitions. The syntax is identical in
+both places — the language has exactly one branch form.
+
+A handler body — in a branching `wait` or in a reactive phase —
+contains ordered statements and single-condition `wait`s, and may
+end in `goto` or `finish`. It may not contain a branching `wait`.
+Branch nesting stops at one level on purpose: further structure
+belongs in the phase graph, where `goto <phase>` and
+`phase <phase>` find it, rather than in indentation depth.
 
 A reactive phase is a set of handlers, all armed from phase entry:
 
@@ -792,9 +942,8 @@ from generating repeated input on every poll. A handler action may
 contain ordered statements, including single-condition `wait`, but
 no handler is dispatched recursively while the action runs.
 
-Handler conditions accept the same normalized text, regex, and
-machine-state forms as `wait`. A `stable` property strengthens the
-condition:
+Handler conditions accept the same channels as `wait`. A `stable`
+property strengthens the condition:
 
 ```rlqs
 on "Installation complete" stable=1s {
@@ -893,7 +1042,7 @@ type "<down><down><enter>"
 
 Types text and recognized `<key>` tokens with no implicit ending.
 Use it for input containing both text and keys. An unrecognized key
-token is a parse error.
+token is a static validation error.
 
 ### `press`
 
@@ -903,9 +1052,27 @@ press down down enter
 press ctrl+c
 ```
 
-Presses a sequence of keys. Names joined by `+` form a chord. The
-portable key vocabulary is shared with `type` tokens and is
-validated before execution.
+Presses a sequence of keys. Names joined by `+` form a chord.
+
+The portable key vocabulary is one closed set, owned by the
+language and shared between `press` and `<key>` tokens:
+
+```text
+enter esc tab space backspace
+up down left right
+insert delete home end pageup pagedown
+f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
+ctrl alt shift
+```
+
+Single printable characters are not key names — they reach the
+guest as text through `type` or `enter`, except as the
+non-modifier member of a chord (`ctrl+c`). The chord production
+`key = key-name , { "+" , key-name }` holds identically inside
+`<...>` in a typed string, so `type "<ctrl+c>"` is legal and means
+the same as `press ctrl+c`. A control plane that cannot deliver a
+listed key is a named capability failure at preflight; the
+vocabulary is never per-platform.
 
 ### `select`
 
@@ -967,8 +1134,11 @@ eject cdrom0
 
 These change what medium occupies a declared **floppy or CD-ROM**
 slot and record the change in the machine's state document, not
-its blueprint. Hard-disk slots are not targets — only
-`floppy[0..1]` and `cdrom[0..3]`. The verbs never create or remove
+its blueprint. Hard-disk slots are never targets: `insert` and
+`eject` address removable slots only. Slot names, ranges, and the
+alias/canonical rule are defined once, in the
+[blueprint field reference](machine-blueprint-reference.md); `boot`
+keys use the same vocabulary. The verbs never create or remove
 the drive itself: drives are guest-visible hardware the blueprint
 declares — an installer-driven blueprint declares the slot empty
 (`"cdrom0": null`) — and an `insert` or `eject` naming a missing
@@ -1080,10 +1250,15 @@ They reject:
   script;
 - mixed linear/phased shapes;
 - mixed sequential/reactive phase contents;
-- sequential phases with any reachable path lacking a final `goto`
-  or `finish`;
-- a branching `wait` with no handlers, or with a nested branching
-  `wait` in a handler body;
+- a sequential phase whose statement list does not terminate, and
+  any statement written after a terminating statement;
+- a branching `wait` with no handlers, or a branching `wait`
+  anywhere inside a handler body;
+- any property name repeated on one node;
+- unknown channel names, an observation carrying no condition or
+  more than one, a condition on a branching `wait` itself, and
+  channel values of the wrong kind (a string for `machine=`, or an
+  unknown machine state);
 - invalid key tokens and invalid typed argument positions;
 - `insert`/`eject` targets that are not floppy or cdrom slots and
   (with a machine in scope) slots the target machine does not
@@ -1137,7 +1312,8 @@ always reported explicitly. A transcript records:
 
 - each executed source line and line number;
 - phase entries, handler firings, branches, and transitions;
-- observations, normalized matches, and elapsed time;
+- observations with their channel, normalized matches, and elapsed
+  time;
 - input names and whether each came from a response, named user
   property, or prompt, but never expanded input values;
 - each media definition installed or found identical, its source
@@ -1166,13 +1342,30 @@ still reshape the language coherently.
 The intended post-beta growth discipline is:
 
 - existing observation forms keep their meanings;
-- new observation and action kinds use explicit sibling forms —
-  `wait image @needle-name` reuses the library-reference spelling
-  for image assets, and future pointer verbs follow the same
-  node shape;
+- **a new channel names a new non-default observable surface; a
+  new value spelling names a new matcher over the default
+  surface.** A serial stream becomes `wait console="login:"` — a
+  new prefixed channel, because it is a different observable.
+  Image matching becomes a landmark reference, `wait @setup-page`
+  — a new value spelling, because it is a different matcher over
+  the same screen. Neither is a new construct or a positional
+  keyword;
+- new action kinds use explicit sibling forms following the same
+  node shape, as future pointer verbs will;
 - new behavior never appears merely because a script omitted a new
   property; and
-- capability requirements remain explicit and preflightable.
+- capability requirements remain explicit and preflightable —
+  at the granularity of the condition, not only the channel: a
+  text condition needs text readback, a landmark reference needs
+  framebuffer capture, and a condition the selected control plane
+  cannot observe is a named capability failure before the first
+  input.
+
+This rule is the reason machine state is spelled `machine=stopped`
+rather than as a bare keyword: the non-default observable is
+always named, so a script that later watches a serial console
+reads the same way as one watching the machine — while the screen,
+the default, keeps exactly one spelling per matcher.
 
 Image matching and pointer input extend observation and action;
 they do not introduce a second control-flow model or any new
@@ -1243,7 +1436,7 @@ phase hd-boot {
 
 phase shutdown {
     enter "fdapm poweroff"
-    wait  stopped timeout=2m
+    wait  machine=stopped timeout=2m
     eject cdrom0
     finish
 }
