@@ -114,6 +114,26 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     variant invariants (identical spot sets, declared order, per-variant
     failure reporting); no count= (bare number), no read/OCR areas initially,
     drag deferred; landmarks live only in the catalog, never embedded
+  - OWNER WRINKLE TO SMOOTH (2026-07-21, take up after the spec-craft
+    reorg commits — do not lose):
+    - landmark fuzzy regions: an image asset needs per-region match
+      strictness — e.g. the section of the screen with date/time is
+      fuzzy, the other parts aren't; aligns with the needle reference
+      already noted in ROADMAP's GUI decision (fuzzy match thresholds +
+      exclude masks), but as per-region declarations on one asset
+    - asset bundling: separate image asset files are really ugly —
+      people will usually want everything bundled in a single source
+      file; optionally, complex scripts split into multiple
+      interacting files (like multiple programming source files).
+      TENSIONS to re-argue when taken up: the landmark review decided
+      "landmarks live only in the catalog, never embedded" — this
+      challenges it head-on; and the multiple-interacting-files half
+      reopens the deliberately-open cross-script reuse question, now
+      with a named user desire behind it
+    - cursor stripping: captures and matching ALWAYS strip the mouse
+      cursor — normalization, never an option (extends the
+      pointer-hygiene note: park/restore after clicks so the cursor
+      never perturbs matching)
   - RUN FEEDBACK, DECIDED SHAPE (five designers, zero new syntax needed):
     one normative run-events.jsonl per run (append-only JSONL; seq/t/elapsed/
     kind; spans mirror the timing-scope tree: run=header deadline,
