@@ -9,9 +9,9 @@ SPDX-License-Identifier: BSD-3-Clause
 > structure; expected to be short-lived. Settled decisions live in
 > [ROADMAP.md](../ROADMAP.md) ("The CLI" and the milestones);
 > concepts introduced here are documented durably in
-> [codex.md](codex-design.md) (the codex,
+> [codex.md](codex.md) (the codex,
 > `pull`, naming conventions, provenance) and the
-> [blueprint field reference](machine-blueprint-reference-design.md)
+> [blueprint field reference](machine-blueprint-reference.md)
 > (`name`, `description`, `scripts`).
 
 Every command maps one-to-one onto a public Python call. The CLI
@@ -293,7 +293,8 @@ exists, listing their ids:
 
 ```
 $ rlq delete blueprint freedos-1.4
-rlq: blueprint 'freedos-1.4-plain' still has 2 machine(s): a1b2c3d4, e5f6a7b8
+rlq: blueprint 'freedos-1.4-plain' still has 2 machine(s):
+  freedos-1.4-plain-0, freedos-1.4-plain-1
 destroy them first, then delete the blueprint
 ```
 
@@ -576,10 +577,10 @@ rlq --blueprint freedos --machine 0 start
 Ambiguous prefixes list candidates:
 
 ```
-$ rlq --machine a1b start
-rlq: 'a1b' matches 2 machines:
-  a1b2c3d4  freedos (ready)
-  a1b3e5f7  msdos (ready)
+$ rlq --machine freedos start
+rlq: 'freedos' matches 2 machines:
+  freedos-0            (ready)
+  freedos-1.4-plain-0  (ready)
 ```
 
 ---

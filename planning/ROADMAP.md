@@ -169,7 +169,8 @@ The blueprint is reliquary's own backend-agnostic format — never a thin
 veneer over one backend's configuration. Two documents, one owner
 each: the **blueprint** (`<name>.rlqb`) is the machine
 shape as the user defined it — authored by hand, by `init`, or by
-`import`; reliquary reads it and never writes it. The **state**
+`import`; reliquary reads it and — once authored — never writes
+it. The **state**
 (`cache/machines/<id>/reliquary-machine.json`) is the machine as
 it actually is — fully resolved (aliases canonicalized, defaults
 materialized, the resolved blueprint digest, the blueprint's

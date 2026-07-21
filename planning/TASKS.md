@@ -516,38 +516,43 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      docs/api-reference.md; INTERFACES' embedding-API section and
      spec-homes row point at both, AGENTS "The runner surface"
      narrows to the engineering contract, README links the reference
-  5. the codex-automation trap is unflagged at the point of use: the
-     guide advertises implicit seeding "on first reference" with no
-     automation caveat, though the residency model (decided
-     2026-07-21) excludes the codex from automation resolution
-     entirely; one sentence in the guide (and in the media spec's
-     home-fallback paragraph) closes it
-  6. the machine-id story didn't land in the guide's examples: settled
-     identity is <blueprint>-<n> (reference #id, instance-model,
-     ROADMAP, AGENTS), but the guide's state example, its mermaid
-     diagram, and the cookbook's state example still show UUID ids
-     ("5fd11917-...", "machine 5fd1..."). Relatedly the guide's
-     machine-directory tree is stale against its own linked model:
-     screenshots/ at the machine root and no runs/ at all, where
-     instance-model and ROADMAP both put runs/ there with screenshots
-     inside run records — tree half RESOLVED with item 1's fold
-     (2026-07-21): the guide's tree now shows runs/; the UUID
-     examples remain this item's work
-  7. "media names are the ONLY cross-boundary reference a blueprint
-     may make (U4)" (reference, #media) is contradicted two sections
-     away: the scripts map references .rlqs files by name and
-     parameters references property-registry keys — scope the
-     sentence (the only reference into machine-entering content, or
-     drive-inventory-only)
-  8. "reliquary reads it and never writes it" appears unqualified in
-     the guide's ownership section, ahead of the format-stability
-     section's import/init write-once qualification and the delete
-     verb that removes the file — state the qualification where the
-     claim is made
-  9. cookbook example 2's media note explains freedos-1.4-livecd
-     though the blueprint shown no longer names it (a leftover from
-     before the empty-slot-plus-insert convention); reanchor or drop
-     the note
+  5. RESOLVED (2026-07-21): the codex-automation caveat now sits at
+     both points of use — the guide's seeding sentence (seeding is
+     the human-convenience half of the residency split; automation
+     runs --assets-only where the codex is never a resolution tier;
+     a project pulls a copy once and commits it) and the media
+     spec's home-fallback paragraph (same statement for definitions)
+  6. RESOLVED (2026-07-21): all stale machine ids replaced with the
+     settled <blueprint>-<n> scheme — the guide's mermaid diagram
+     (freedos-0/-1) and state example (msdos-0,
+     backend-id reliquary-msdos-0), the cookbook's state example,
+     instance-model's state example (freedos-0), and cli.md's two
+     hex-id examples (delete refusal now names
+     freedos-1.4-plain-0/-1; the ambiguous-prefix example now shows
+     'freedos' matching freedos-0 vs freedos-1.4-plain-0). The tree
+     half had already RESOLVED with item 1's fold
+  7. RESOLVED (2026-07-21): the reference's claim is scoped — a
+     media name is the only cross-boundary reference the MACHINE
+     SHAPE may make (the drive inventory reaches the media catalog
+     and nothing else, U4); the scripts map and parameters property
+     references are named as invocation wiring, never machine shape
+  8. RESOLVED (2026-07-21): the guide's ownership bullet now carries
+     the qualification in place — reliquary reads it and never
+     writes it; import/init author one once at the user's request
+     and never touch it again, delete (equally at request) removes
+     it; ROADMAP's parallel phrase reads "reads it and — once
+     authored — never writes it"
+  9. RESOLVED (2026-07-21): cookbook example 2's media note
+     reanchored to the empty-slot convention — the installer medium
+     never appears in the blueprint; the install script inserts
+     @freedos-1.4-livecd and ejects it last; the definition/media
+     block explanation retained
+  QUEUE COMPLETE (2026-07-21): all nine items resolved. Also fixed
+  in the 5-9 sweep: the suffix-drop rename had missed the -design.md
+  cross-links INSIDE the nine renamed design docs (they were
+  untracked when the tracked-files-only sed ran) — now zero remain;
+  and the design docs' relative planning-path citations normalized
+  to the prose convention (planning/ROADMAP.md, ...)
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
   - shared JSONC reader for authored documents (blueprints, standalone

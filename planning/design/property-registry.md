@@ -146,7 +146,7 @@ bind to the same property.
 Binding uses this precedence for each input:
 
 1. A value explicitly supplied in the invocation's response file.
-2. A [blueprint parameter](machine-blueprint-reference-design.md#parameters) of the
+2. A [blueprint parameter](machine-blueprint-reference.md#parameters) of the
    target machine's blueprint — a direct value, or a property reference that
    replaces the input's own binding rather than chaining to it.
 3. The property named by the declaration's `property:` modifier.

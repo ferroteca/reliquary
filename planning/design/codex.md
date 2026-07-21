@@ -85,9 +85,9 @@ Both paths obey the never-overwrite rule.
 
 Codex blueprints and standalone media definitions are JSONC
 documents (see
-[format stability](machine-blueprint-design.md#format-stability-none-yet))
+[format stability](machine-blueprint.md#format-stability-none-yet))
 and use comments deliberately: a codex blueprint annotates its
-[customization seams](machine-blueprint-design.md#customization-seams) —
+[customization seams](machine-blueprint.md#customization-seams) —
 `// this parameter is your registered owner name` — so the
 seeded copy teaches at exactly the point of edit (U5). Extraction
 copies files verbatim, comments included.
@@ -97,7 +97,7 @@ copies files verbatim, comments included.
 **Top-priority rule: a codex media
 definition may carry a
 `url` only when it also carries the
-[`redistributable-under` field](media-spec-design.md#definition-level-fields)
+[`redistributable-under` field](media-spec.md#definition-level-fields)
 — the explicit assertion that the media's own licensing permits
 redistribution, naming the license** (e.g. FreeDOS's
 `"GPL-2.0-or-later"`). The assertion lives in the definition
@@ -126,7 +126,7 @@ definitions are the interface, and a payload the user supplies
 always enters through `local-path`. The SHA-256 hash then
 verifies that what they supplied is the exact media the
 scripts were built for (see
-[media-spec-design.md](media-spec-design.md) for URL-less definitions and
+[media-spec.md](media-spec.md) for URL-less definitions and
 `local-path`).
 
 ## Naming conventions
@@ -153,7 +153,7 @@ not a namespace.
 A blueprint may declare a `scripts` map — short labels naming
 `.rlqs` script files — plus optional `name` and `description`
 fields for discovery (see the
-[field reference](machine-blueprint-reference-design.md)). The labels are
+[field reference](machine-blueprint-reference.md)). The labels are
 the verbs you use with `script`:
 `rlq --blueprint freedos-1.4-plain script install` looks up
 `scripts.install` and runs the script it names, creating a machine

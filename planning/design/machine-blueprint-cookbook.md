@@ -15,8 +15,8 @@ Complete, working blueprints for common machine shapes. Each
 entry shows the blueprint (what you write) and, where instructive,
 the state document reliquary resolves it into.
 Concepts — including the blueprint/state split — are in
-[the guide](machine-blueprint-design.md); every rule is in the
-[field reference](machine-blueprint-reference-design.md).
+[the guide](machine-blueprint.md); every rule is in the
+[field reference](machine-blueprint-reference.md).
 
 Throughout, save the blueprint as `<name>.rlqb` under your asset
 root and create a
@@ -50,13 +50,13 @@ The state after `create` on a host where QEMU was selected:
 
 ```json
 {
-  "id": "5fd11917-147a-4b6b-b7f6-9f4b6d7d1ab2",
+  "id": "msdos-0",
   "blueprint": "msdos",
   "created": "2026-07-19T18:20:11Z",
   "phase": "ready",
   "platform": "dos",
   "backend": "qemu",
-  "backend-id": "reliquary-msdos-8c41",
+  "backend-id": "reliquary-msdos-0",
   "memory": 16,
   "cpus": 1,
   "drives": {
@@ -96,25 +96,27 @@ warning:
 
 rlq creates the hard disk as a 20 MiB dynamically-allocated
 image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
-the [naming and format](machine-blueprint-reference-design.md#image-naming-and-formats)
+the [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
 are reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
 blueprint and state make no claim about the guest's contents. After
 install, the same boot order boots the hard disk. Scripts that need
 a different order can use the
-[`set-boot`](script-spec-design.md#set-boot) verb while the machine is
+[`set-boot`](script-spec.md#set-boot) verb while the machine is
 stopped.
 
-> **Media note:** `freedos-1.4-livecd` names a
-> [media definition](media-spec-design.md)
-> (`freedos-1.4-livecd.rlqm` with the LiveCD's download
-> URL, archive details, and hashes) — every media reference
-> resolves through a definition, fetched and verified on demand.
-> This shared definition lets the machine be operated independently;
-> a script may instead carry it in a labeled `media` block, which
-> installs the definition into the library before resolving the
-> machine and leaves it available to later independent operations.
+> **Media note:** the installer medium never appears in this
+> blueprint — the empty `cdrom` slot is the convention. The
+> install script inserts it (`insert cdrom0 @freedos-1.4-livecd`)
+> and ejects it as its last act. `freedos-1.4-livecd` names a
+> [media definition](media-spec.md) (`freedos-1.4-livecd.rlqm`
+> with the LiveCD's download URL, archive details, and hashes):
+> every media reference — a blueprint's or a script's — resolves
+> through a definition, fetched and verified on demand. The
+> script may carry that definition in a labeled `media` block,
+> installed into the library before the machine resolves and
+> available to later independent operations.
 
 ---
 
@@ -280,7 +282,7 @@ across the board, which is what DOS-era guests want.
 Vendor variants (BusLogic vs. LsiLogic, etc.) are backend-specific
 and go in `backend-settings` when they matter. And note the
 ordering caveat from the
-[reference](machine-blueprint-reference-design.md#controller--optional--string):
+[reference](machine-blueprint-reference.md#controller--optional--string):
 slot order is authoritative within one controller type, so prefer a
 single type per machine when drive lettering matters.
 
@@ -289,7 +291,7 @@ single type per machine when drive lettering matters.
 ## 9. A parameterized install
 
 A blueprint written to be seeded and customized (its
-[customization seams](machine-blueprint-design.md#customization-seams)):
+[customization seams](machine-blueprint.md#customization-seams)):
 the install script declares `owner-name` and `install-key`
 inputs, and the blueprint binds them.
 
@@ -322,7 +324,7 @@ either binding for one invocation
 (`rlq --blueprint win98 script install --responses answers.json`).
 
 Both are value seams. Installing the *German* edition instead is
-a [composition seam](machine-blueprint-design.md#customization-seams):
+a [composition seam](machine-blueprint.md#customization-seams):
 the seeded blueprint's `drives` media reference and `scripts` map
 are pointed at a localized media/script pair, and each script
 stands alone against the installer it was written for.
