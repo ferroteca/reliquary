@@ -128,10 +128,15 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   - SPEC-CRAFT QUEUE, FULLY ADJUDICATED (18 of 24 proposals survive, each
     with a refined right-sized form recorded in the review output —
     workflow wf_ac5f89b4-402 journal):
-    - execution model: define sample / condition-holds-at-a-sample /
-      episode (maximal run of holding samples), restate handler dispatch
-      over them; observation model at the top of §Observations; clock
-      rules; NOT an ISO terms clause
+    - execution model: LANDED in the spec (owner-adjudicated,
+      2026-07-21) — sample / condition-holds-at-a-sample / episode
+      defined, dispatch and stable restated over them, the five-clock
+      table, and the minimum run-events vocabulary designed in.
+      Decisions: severability follows the guest seam (input delivery
+      atomic, host transfers abort at deadline); sampling guarantees
+      are freshness + at-least-one, cadence deliberately unspecified;
+      a fired handler re-arms only after an OBSERVED non-holding
+      sample (episodes exist over dispatch samples only)
     - three enforcement tiers named once: Legality Rules (script text
       alone) / Machine Rules (needs machine in scope) / Dynamic Semantics;
       short §Processing model (lex - parse - desugar - validate);
@@ -177,7 +182,11 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   - U3 run records: only `script` invocations produce a run record — a
     programmatic API/CLI-primitives loop leaves nothing, yet U3 says the
     run record is the product; align with the decided run-events.jsonl
-    normative-stream model (every surface a renderer of it); the
+    normative-stream model (every surface a renderer of it) — the
+    minimum vocabulary is now normative in script-spec.md's execution
+    model (2026-07-21); remaining: records for API/CLI-primitive runs,
+    the full renderer contract (transcript rewrite), per-test result
+    collection; the
     unit-test loop is now IN U3 itself (amended 2026-07-21: the
     canonical journey uses reliquary twice — define and build the test
     VM, then automate testing inside it; detailed per-test results,

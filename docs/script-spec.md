@@ -813,6 +813,157 @@ safe to commit. A response-file string may override a `secret`
 input, but it is still plaintext in that file; the property
 registry is the normal reusable source for protected values.
 
+## Execution model
+
+How a running script behaves is defined over **samples** — the
+control plane's discrete readings of the machine — not over
+continuous time. This section is the language's dynamic
+semantics: what the observation constructs in the sections that
+follow mean at run time, which clocks govern them, and the event
+stream every run emits.
+
+### Samples and episodes
+
+A **sample** is one reading of a channel at one instant: a
+decoded, normalized screen for the default channel; a backend
+state report for `machine=`. The control plane owns when samples
+are taken — polling cadence, like input pacing, is never the
+script's business (G5) — and the language guarantees exactly two
+things about it:
+
+- **Freshness.** An observation consults only samples taken while
+  it is armed. A match can never be satisfied by machine state
+  observed before the observation existed.
+- **At least one.** An observation's timeout cannot expire before
+  at least one sample has been taken for it. A timeout always
+  means "samples were taken and none satisfied the condition,"
+  never "no one looked."
+
+Beyond those, cadence is deliberately unspecified. What happens
+between samples has no semantics: a message the guest shows and
+withdraws entirely between two samples was never shown, as far
+as the script is concerned. The spec is honest about this rather
+than implying continuous observation.
+
+A condition **holds at a sample** when its matcher accepts that
+sample's content — the normalized substring or regex row match
+for the screen, the state word for `machine=`. An **episode** of
+a condition is a maximal run of consecutive samples at which it
+holds: it begins at the first holding sample after a non-holding
+one (or after arming), and ends at the next non-holding sample.
+Episodes are the unit of reaction; every rule below is stated
+over them.
+
+### Dispatch
+
+Execution is single-threaded and run-to-completion. While a
+statement list is executing there is no dispatch: no handler
+fires, and no dispatch samples are taken. Observation happens at
+these points:
+
+- A **single-condition `wait`** arms its condition and samples
+  until a fresh sample holds — success — or its timeout expires.
+  With `stable=`, success requires more: the sample's episode
+  must have lasted at least the stated duration, measured from
+  the episode's first sample. An episode that ends early simply
+  ends; the next episode starts its own hold clock.
+- A **branching `wait`** arms every handler's condition. At each
+  sample, conditions are evaluated in declaration order; the
+  first that holds fires its handler, and the wait is over — the
+  remaining handlers were never anything but candidates.
+- A **reactive phase** arms every `always` handler at phase
+  entry. At each dispatch sample, armed handlers are evaluated
+  in declaration order; the first whose condition holds — and
+  whose `stable` requirement, if any, is met — fires. Its
+  statement list runs to completion, uninterrupted; a `goto` or
+  `finish` in it takes effect immediately; otherwise dispatch
+  resumes in the same phase, at the next sample.
+
+**Firing consumes the handler for its episode.** A fired handler
+re-arms only after a later dispatch sample at which its
+condition does *not* hold; it may fire again at the episode that
+begins after that. Because no dispatch samples are taken during
+a handler's action, an episode that begins and ends entirely
+inside one — the screen flickered while the script was typing —
+was never sampled and never happened: a condition still holding
+at the first post-action sample is conservatively the same
+episode, and the handler stays consumed. What was not sampled
+did not happen. This is what makes a persistent screen safe:
+however long "Insert disk 2" stays displayed, its handler fires
+exactly once per appearance.
+
+`select` is an observation-bearing action: its feedback watches
+(candidate rows, highlight movement) are ordinary observations
+under this model, sampled and clocked like any other, within the
+statement's effective timeout.
+
+### Clocks
+
+Five clocks exist. Each is checked at **boundaries** — dispatch
+samples and statement starts — never mid-delivery:
+
+| clock | starts | satisfied / expires |
+|---|---|---|
+| observation `timeout` | when its observation arms | expires at the first boundary past the duration with no success |
+| `stable` hold | at each episode's first sample | satisfied at the first sample where the episode's age reaches the duration |
+| reactive interval (`timeout` on a reactive phase) | at phase entry, and again each time dispatch resumes after a handler action | expires when the duration passes with no handler firing |
+| phase `deadline` | at each activation (each entry to the phase) | expires when the activation's wall clock exceeds the budget |
+| run `deadline` | at run start | expires when the run's wall clock exceeds the budget |
+
+Expiry produces the failure the [timing section](#timing)
+promises: the diagnostic names the expired clock and the scope
+that supplied it.
+
+**Severability follows the guest seam.** Input delivery is
+atomic: once a verb begins composing events — a `type` string, a
+`press` sequence, a `select` traversal step — the delivery
+completes even if a deadline passes meanwhile; the expiry is
+declared at the next boundary. A torn half-typed command would
+leave the guest in a state no observation could account for.
+Host-side operations are the opposite: a media fetch or a
+`stage`/`collect` transfer crosses no guest seam and aborts
+cleanly at deadline, however long it had run.
+
+### The run event stream
+
+Every run appends one normative event stream,
+`run-events.jsonl`, to its run directory: append-only JSON
+Lines, each event carrying a sequence number, timestamp, elapsed
+time, and kind. Every other presentation of a run — the live
+display, CI output, `transcript.txt`, the embedding API's
+progress reporting, raw JSON — is a *renderer* of this stream;
+no surface records anything the stream does not carry.
+
+Spans in the stream mirror the activation tree the clocks above
+define — a run span (the run deadline's scope), a span per phase
+activation (the phase deadline's scope), a span per observation
+(its timeout's scope). The minimum vocabulary the runtime emits:
+
+- run and phase-activation span starts and ends, and `goto` /
+  `finish` transitions;
+- observation arm, match (with the matched row and elapsed
+  time), and timeout;
+- handler fires, and each action's start and completion — input
+  deliveries, `insert` / `eject` / `set-boot`, `start` / `stop`,
+  `screenshot`;
+- transfer progress only where an honest total exists — media
+  fetch bytes, `stage` / `collect` bytes, `select` traversal
+  steps — never invented denominators: renderers show phases and
+  observations as "elapsed / limit" pairs, not progress bars;
+- embedded-definition installation, with source line and
+  installed path;
+- on failure: the pending condition or action, the expired clock
+  and its source scope, the route taken with phase revisit
+  counts, the nearest-miss screen row, the automatic screenshot
+  reference, and the suggested next command;
+- reserved for the authoring recorder (U6): handover kinds —
+  control passing from script to human and back — so a capture
+  session is one run record with mixed drivers.
+
+Events carry input names and binding-source kinds, never
+expanded values; the secret contract applies to the stream
+exactly as it applies to transcripts.
+
 ## Observations
 
 ### Channels
@@ -923,7 +1074,8 @@ wait "login:"
 ### `wait`
 
 `wait` is the language's one observation construct, in two forms.
-The single-condition form succeeds when its condition matches and
+The single-condition form succeeds when its condition holds at a
+fresh sample and
 fails when its timeout expires:
 
 ```rlqs
@@ -1000,19 +1152,14 @@ phase copying timeout=5m deadline=30m {
 }
 ```
 
-Handlers are evaluated in declaration order. Dispatch is
-single-threaded and run-to-completion:
-
-1. The first matching, armed handler is selected.
-2. That handler is consumed for the current matching episode.
-3. Its action completes without interruption from other handlers.
-4. A `goto` or `finish` takes effect; otherwise dispatch resumes
-   in the same phase.
-5. The handler cannot fire again until its condition has first
-   become unmatched and later matches again.
-
-This edge/episode rule prevents a persistent confirmation screen
-from generating repeated input on every poll. A handler action may
+Handlers are evaluated in declaration order; dispatch is
+single-threaded and run-to-completion, and a fired handler is
+consumed for its episode — re-arming only after a sample at which
+its condition no longer holds, as the
+[execution model](#execution-model) defines precisely. This
+edge/episode rule prevents a persistent confirmation screen
+from generating repeated input on every sample. A handler action
+may
 contain ordered statements, including single-condition `wait`, but
 no handler is dispatched recursively while the action runs.
 
@@ -1030,7 +1177,9 @@ always "Installation complete" stable=1s {
 The timing model in one sentence: **`timeout` bounds the time to
 the next observed event, `deadline` bounds the total wall clock of
 the construct it annotates, `stable` strengthens one observation,
-and there is no `delay`.**
+and there is no `delay`.** When each clock starts, where it is
+checked, and how expiry is declared are defined by the
+[execution model's clock table](#clocks).
 
 The two families scope differently, and placement is the law:
 
@@ -1410,11 +1559,15 @@ Every invocation creates a unique run directory under:
 
 ```text
 cache/machines/<machine_id>/runs/<timestamp>-<run_id>/
+├── run-events.jsonl
 ├── transcript.txt
 ├── screenshots/
 └── output/
 ```
 
+`run-events.jsonl` is the run's normative record — the
+[event stream](#the-run-event-stream) the execution model
+defines; `transcript.txt` is a human-readable rendering of it.
 The CLI may redirect the output root, but transcript paths are
 always reported explicitly. A transcript records:
 

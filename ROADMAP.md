@@ -1246,9 +1246,10 @@ per branching `wait`; the pre-approved validation batch applied;
 `boot` renamed `set-boot`; `machine=running` and an undiverged
 header option deferred with reasons recorded in the spec;
 response files accept JSONC. The execution-model-before-runner
-sequencing rule stands: the spec's execution model (sample /
+sequencing rule is satisfied: the spec's execution model (sample /
 episode / clock table), with the minimum run-events vocabulary,
-is written before `script_runner.py` is retargeted. The reference
+is written — its "Execution model" section — and the runner
+retarget may begin. The reference
 script is valid under the answers.
 
 ### Script-surface realignment — absolute priority #1
