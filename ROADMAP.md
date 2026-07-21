@@ -433,6 +433,7 @@ reliquary (--blueprint <name> | --machine <id>) clone
 reliquary (--blueprint <name> | --machine <id>) export
     [--drive <key>] [<destination>]
 rlq import <source> --blueprint <name> --platform <platform>
+    [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
 reliquary (--blueprint <name> | --machine <id>) script <label>
     [--responses <path>] [--display] [--detach] [--progress <mode>]
 reliquary (--blueprint <name> | --machine <id>) run status [<n>]
@@ -531,10 +532,45 @@ Lifecycle semantics:
   afterward.
 - `import` synthesizes a blueprint from a native backend VM's
   configuration (memory, drives, controllers — translation of
-  backend config, not guest inference), preserving the VM's
-  disks as media items — copied (never moved; the source is not
-  touched) with generated definitions (computed hashes, no URL),
-  the blueprint's drives taking them as `base`. A machine created
+  backend config, not guest inference), capturing the VM's disks
+  as media items in place (owner, 2026-07-21): each disk gets a
+  generated definition — an absolute `local-path` at the file
+  where the native hypervisor keeps it, a computed hash, no URL —
+  and the blueprint's drives take the items as `base`. Import
+  reads only a source at rest (owner, 2026-07-21): a running or
+  suspended source VM fails closed naming the VM and its state —
+  powered off only, because a saved VM's disks are stable but
+  mid-flight guest state, and importing them would bake a
+  yanked-power filesystem into every materialization; state per
+  the backend's own reporting, with image-lock detection the
+  fallback for bare-image sources. Import
+  never copies, moves, or modifies the captured images;
+  relocating an
+  image to more durable ground is the user's own copy/move plus
+  a `local-path` edit in the definition, which is theirs. The
+  source VM itself is modified only with consent (owner,
+  2026-07-21): `--snapshot` has the native hypervisor snapshot
+  the disks first — the definitions pin the frozen extent, the
+  source VM stays free to keep running natively, the snapshot is
+  reliquary-named with provenance recorded in the generated
+  definitions' `notes`, and its later fate in native tooling is
+  the user's (verification reports a lost extent);
+  `--no-snapshot` touches nothing, and running the source again
+  breaks verification until re-import. Absent on a tty, the flag
+  prompts with that tradeoff; noninteractively absent is an
+  error; the API twin's `snapshot=` parameter is required, under
+  parity. The
+  materialization choice is presented the same way, never
+  defaulted (U2):
+  `--hdd-images (duplicate | difference)` selects the generated
+  drives' `base.type`, spelled explicitly in the blueprint — on
+  a tty an absent flag prompts with the tradeoff (duplicate:
+  each create pays a full copy, the machine's drive stands alone
+  afterward; difference: cheapest create, the source must stay
+  byte-identical — per-start media verification refuses a
+  rewritten source), noninteractively an absent flag is an
+  error; the API twin's `hdd_images=` parameter is required, under
+  parity. A machine created
   from an imported blueprint recreates like any other: from its
   bases. `platform` is not
   knowable from any backend configuration, so `import` requires
@@ -2215,9 +2251,12 @@ agentless and guest-agent control planes with equivalent results.
   export or is materialized into it.
 - **`import` scope**: which backend config translates into the
   synthesized blueprint (memory, drives, controllers are clear;
-  what of NICs and other devices the blueprint doesn't model yet), and
+  what of NICs and other devices the blueprint doesn't model yet),
   whether untranslatable configuration fails the import or lands
-  in `backend-settings`.
+  in `backend-settings`, and whether import can target a named
+  native snapshot in a VM's disk chain rather than the current
+  head (the generated definition would point at that snapshot's
+  file).
 - **Blueprint device growth**: firmware/boot semantics (BIOS vs UEFI)
   for post-DOS platforms, and when network, display adapter,
   audio, and USB become first-class blueprint fields (each following

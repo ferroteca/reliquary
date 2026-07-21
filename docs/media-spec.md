@@ -299,7 +299,8 @@ each `items` entry of the archive form:
   file, in place of the default `cache/media/<file>`. Use it when
   a media item should live (or already lives) somewhere else —
   an ISO collection on another drive, licensed media kept in a
-  managed folder:
+  managed folder, a native VM's disk captured in place by
+  `import` (whose generated definitions use exactly this form):
 
   ```json
   {"file": "win98se.iso", "local-path": "D:/isos/win98se.iso"}

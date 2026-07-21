@@ -38,12 +38,26 @@ and amendments are made deliberately and recorded here.
   created a VM natively — in VMware, say — and wants to capture
   it as a reliquary blueprint (`import` synthesizes the
   blueprint; realizing it afterward is an ordinary `create`).
-  The key decision point is where the hard-disk image will live:
-  it can simply remain where VMware keeps it — the *simplest*
-  choice — but that is not very durable; the fuller import
-  copies the image to a more durable location as a `base` image
-  for differencing. The import flow's job is to present that
-  choice, not bury it.
+  Import reads only a source at rest — a running or suspended
+  source VM fails closed naming its state — and the captured
+  disk image stays where the native hypervisor keeps it: import
+  points a generated media definition at it and never copies,
+  moves, or modifies it; a user who wants the image somewhere
+  more durable moves it and repoints the definition, which is
+  theirs. Two decision points are presented, never defaulted.
+  First, whether to take a native snapshot — the one thing
+  import may do to the source VM, and only with this consent:
+  snapshotted, the blueprint pins the frozen extent and the
+  source VM stays free to keep running natively; declined,
+  nothing touches the source, but running it again breaks
+  verification until re-import. Second, how machines materialize
+  from the captured disk: each created machine a full copy of it
+  (`duplicate` — the machine's drive stands alone afterward) or
+  a differencing disk backed by it (`difference` — the cheapest
+  create, but the source must stay byte-identical, and
+  verification refuses a machine whose source has since been
+  rewritten). The import flow's job is to present these choices,
+  not bury them.
 - **U3 — Automated testing of something in a VM.** An agent — a
   test harness, a CI driver, an AI coding agent — starts a
   machine, injects a program, executes it, and observes the

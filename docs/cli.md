@@ -301,20 +301,49 @@ destroy them first, then delete the blueprint
 
 ```
 rlq import <source> --blueprint <name> --platform <platform>
+    [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
 ```
 
 Synthesizes a blueprint from a native backend VM's configuration —
-memory, drives, controllers — preserving the VM's disks as media
-items (copied, never moving the source). `--platform` is required
+memory, drives, controllers — capturing the VM's disks as media
+items in place: each gets a generated definition whose
+`local-path` points at the disk where the native hypervisor
+keeps it (computed hash, no URL); nothing is copied or moved.
+The source must be at rest: a running or suspended VM fails
+closed naming its state — power it off first.
+
+Two choices are presented, never defaulted (U2) — on a terminal
+an absent flag prompts with its tradeoff; noninteractively it is
+an error:
+
+- `--snapshot` has the native hypervisor snapshot the disks
+  first — the one thing import may do to the source VM, and only
+  with this consent: the definitions pin the frozen extent and
+  the source VM stays free to keep running natively. The
+  snapshot is reliquary-named and noted in the generated
+  definitions; its later fate in native tooling is yours
+  (verification reports a lost extent). `--no-snapshot` touches
+  nothing — but running the source VM again breaks verification
+  until re-import.
+- `--hdd-images` sets how machines materialize from the captured
+  disks: `duplicate` copies the image into each created machine,
+  whose drive stands alone afterward; `difference` differences
+  against it (cheapest create, but per-start verification
+  refuses a source rewritten since).
+
+`--platform` is required
 (no backend records the guest OS). Stops at the blueprint; run
 `create` when you want a machine.
 
 ```powershell
-rlq import "C:\VMs\my-dos-box" --blueprint my-dos-box --platform dos
+rlq import "C:\VMs\my-dos-box" --blueprint my-dos-box `
+    --platform dos --hdd-images difference --snapshot
 ```
 
 Machines created from an imported blueprint recreate from their
-bases like any other.
+bases like any other. To move a captured image to more durable
+ground, move the file and repoint the definition's `local-path` —
+the definition is yours.
 
 ---
 

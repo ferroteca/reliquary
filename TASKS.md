@@ -281,10 +281,12 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     also the interaction command family (type/keys/run/text/wait/
     screenshot/menu/hmp) is absent from the settled CLI list though a
     CLI-driving U3 agent lives on it
-  - U2 import: the disk-location choice (leave-in-place vs copy-to-durable-
-    base) is the use case's named key decision point but every settled spec
-    admits only unconditional copy; `local-path` in the media spec is the
-    natural leave-in-place spelling; the CLI shape carries no flag for it
+  - U2 import: RESOLVED (owner, 2026-07-21, design round — see the
+    blueprint-spec queue item 2): import never copies; captured disks
+    stay in place as local-path definitions, and the presented choice
+    is materialization — --hdd-images (duplicate | difference)
+    selecting base.type, prompted on a tty, required
+    noninteractively; U2 amended to match
   - U3 run records: only `script` invocations produce a run record — a
     programmatic API/CLI-primitives loop leaves nothing, yet U3 says the
     run record is the product; align with the decided run-events.jsonl
@@ -409,11 +411,50 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      half of item 6), ROADMAP (both layout claims + "Asynchronous
      runs" retention paragraph + run delete in the family),
      instance-model, cli.md
-  2. U2 import disk-location choice: already queued above (the
-     guiding-principles queue's U2 entry); recorded here too because
-     the blueprint guide's import section is itself a foreclosing
-     surface — it documents unconditional copy only, while the media
-     spec's local-path is the natural leave-in-place spelling
+  2. RESOLVED (owner, 2026-07-21, design round) — U2 import
+     disk-location choice, settled by REFRAMING THE CHOICE: import
+     never copies — every captured disk stays in place, its generated
+     definition an absolute local-path at the native file (computed
+     hash, no URL); relocating an image is the user's own copy/move
+     plus a definition edit (the definition is theirs). The presented
+     choice is materialization: --hdd-images (duplicate | difference)
+     selects the generated drives' base.type, spelled explicitly in
+     the blueprint — prompt with the tradeoff on a tty, error when
+     absent noninteractively, never defaulted; API twin hdd_images=
+     required under parity (named --hdd-images, owner: hdd is the
+     blueprint's own medium token, and the choice covers the hard
+     disks that become base drives, not captured floppy/CD media).
+     Snapshot targeting (point the definition
+     at a named native snapshot in the disk chain) recorded as an
+     open import-scope question in ROADMAP. U2 amended to match (the
+     disk stays put; the decision point is duplicate-vs-difference).
+     Open wrinkle noted, not decided: whether per-start media
+     verification covers a materialized drive's base that is no
+     longer needed (a duplicate machine's) — reconciliation step 2's
+     "every media item the state references" is ambiguous there.
+     Folded: USE-CASES U2, blueprint guide import, ROADMAP import
+     bullet + CLI grammar + import-scope open question, cli.md
+     import section, media-spec local-path cross-link;
+     guiding-principles queue U2 entry closed.
+     FOLLOW-UP ROUND (owner, 2026-07-21): import reads only a source
+     at rest — running or suspended sources fail closed naming the VM
+     and its state (powered off only: a saved VM's disk is mid-flight
+     guest state — the ill-defined machine again), state per backend
+     reporting with image-lock detection the bare-image fallback; and
+     import modifies the source VM only with consent — the --snapshot
+     / --no-snapshot pair (prompted on a tty, required
+     noninteractively, API snapshot= required under parity):
+     snapshot pins the definitions to the frozen extent and leaves
+     the source VM free to keep running natively (reliquary-named
+     snapshot, provenance in the generated definitions' notes, its
+     later fate the user's — verification reports a lost extent);
+     no-snapshot touches nothing but running the source again breaks
+     verification until re-import. Never-modifies became
+     never-modifies-unasked, scoped to the VM's snapshot chain — the
+     captured images themselves are still never copied, moved, or
+     modified. Folded into the same documents; disks that are
+     already snapshot chains remain with the open import-scope
+     question
   3. the feedback split does not reach media fetching: the decided
      run-feedback shape carries media-fetch transfer events INSIDE a
      script run's event stream, but the media spec never references

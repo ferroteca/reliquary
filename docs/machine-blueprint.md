@@ -442,9 +442,40 @@ touch it again.
 **`import <source> --platform <platform>`** goes the other way:
 it produces a *blueprint* from a native backend VM — a blueprint
 synthesized from the backend's machine configuration, with the
-VM's disks preserved as media items (copied, never moving or
-modifying the source; each gets a generated definition with a
-computed hash) that the blueprint's drives take as `base`.
+VM's disks captured as media items *in place*: each gets a
+generated definition — an absolute
+[`local-path`](media-spec.md#item-fields) at the disk where the
+native hypervisor keeps it, a computed hash, no URL — and the
+blueprint's drives take the items as
+[`base`](machine-blueprint-reference.md#base--optional--string-or-object).
+Import reads only a source at rest: a source VM that is running —
+or suspended, its disks stable but full of mid-flight guest
+state — fails closed naming the VM and its state; power it off
+first. The captured images are never copied, moved, or modified;
+the definition is yours, so an image that should live somewhere
+more durable is moved by you and its `local-path` repointed.
+Import presents two choices, never defaulted (U2) — on a
+terminal an absent flag becomes a prompt naming its tradeoff,
+noninteractively it is an error:
+
+- `--snapshot` / `--no-snapshot` — whether the native hypervisor
+  snapshots the disks first: the one thing import may do to the
+  source VM, and only with this consent. Snapshotting pins the
+  definitions to the frozen extent while the source VM stays
+  free to keep running natively; the snapshot is
+  reliquary-named, recorded in the generated definitions'
+  `notes`, and thereafter yours in native tooling (verification
+  reports a lost extent). `--no-snapshot` touches nothing — but
+  running the source VM again rewrites its disks, and
+  verification then refuses resolution until re-import.
+- `--hdd-images (duplicate | difference)` — how machines materialize
+  from the captured disks, spelled explicitly into the generated
+  drives' `base.type`: `duplicate` copies the image into each
+  created machine, whose drive stands alone afterward;
+  `difference` is the cheapest create but keeps depending on the
+  source staying byte-identical — media verification at `start`
+  refuses a machine whose source has since been rewritten.
+
 Import stops
 at the blueprint — it never creates a machine; run `create` when you
 want one. A machine created from an imported blueprint recreates like
