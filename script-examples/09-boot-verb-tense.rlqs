@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: `boot` reads like an immediate action, but it is
+# persistent configuration. Every neighboring verb acts now; this
+# one quietly rewrites machine state that outlives the script.
+
+description "boot: sounds immediate, acts persistent"
+platform    dos
+machine     stopped
+timeout     2m
+
+boot cdrom0 hdd0     # does NOT boot anything — it replaces the
+                     # machine's persistent boot order (stopped
+                     # machines only)...
+start                # ...THIS boots, using the new order
+wait  "Welcome"
+enter "shutdown"
+wait  stopped
+
+# The reordering OUTLIVES this script: the machine keeps booting
+# CD-first until another `boot` — or `apply` — restores it. That
+# persistence matches insert/eject, but those verbs at least read
+# as putting a thing somewhere; compare tenses:
+#
+#     start            act now
+#     stop             act now
+#     insert cdrom0 …  place a thing (persists, but reads that way)
+#     boot cdrom0 hdd0 configure permanently  <- reads like "act now"
+#
+# A reader who knows QEMU's -boot flag will parse it correctly; a
+# reader who knows English will expect the machine to start
+# booting on that line.
+#
+# OPEN QUESTIONS: rename to make the configuration nature audible?
+#     boot-order cdrom0 hdd0    # honest, but noun-first inside the
+                                # imperative zone — bends the
+                                # nouns-declare/verbs-act rule
+#     reorder cdrom0 hdd0       # verb-first, loses the boot domain
+#     set-boot cdrom0 hdd0      # verb-first and domain-bearing
+# Or keep `boot` because scripts rarely need it (the blueprint's
+# fall-through order covers the install pattern) and let its rarity
+# bound the confusion? Weak counterpoint: rare verbs are exactly
+# the ones read cold, without habit to correct the tense.

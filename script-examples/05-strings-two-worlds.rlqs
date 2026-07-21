@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: quoted strings cross two different worlds. The lexical
+# table says "..." is guest-boundary text OR a host path — and that
+# "or" is the mush: the same spelling is host-side in one verb and
+# guest-side in the next, with the direction of travel invisible.
+
+description "One quoting, two worlds"
+platform    dos
+machine     stopped
+timeout     2m
+
+stage "payloads/AUTOTEST.EXE"   # HOST path — resolved against the
+                                # script's directory, forward slashes
+start
+wait  "AUTOTEST.EXE"            # GUEST text — matched on the screen
+enter "AUTOTEST.EXE"            # GUEST text — typed at the prompt
+wait  stopped
+
+# One line, two worlds:
+collect "RESULTS.LOG" to="results/"
+#        ^^^^^^^^^^^^ guest-side file name on the exchange drive
+#                        ^^^^^^^^^^ host-side directory under the
+#                                   run's output root
+
+# Nothing marks which side a string lives on except the verb's
+# signature — and the two sides even prefer different slash
+# conventions (host paths forward, guest DOS paths backward):
+#
+#     stage "payloads/AUTOTEST.EXE"     host, forward slashes
+#     enter "C:\PAYLOADS\AUTOTEST.EXE"  guest, backslashes
+#
+# The redesign fixed this problem for NAMES (@ marks a library
+# ref, $ marks an input) but left paths sharing the guest-text
+# spelling.
+#
+# OPEN QUESTION: do host paths deserve their own spelling — a
+# sigil-prefixed string, or reusing @ for host artifacts — or is
+# per-verb knowledge acceptable because only stage/collect (and
+# collect's to=) ever take host paths? The small, closed set of
+# path positions argues for the status quo; the two-worlds-in-one-
+# line collect argues against.

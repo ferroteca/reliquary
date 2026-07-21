@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: `on` has one syntax and two lifecycles, chosen entirely
+# by its container — plus two control-flow subtleties the shape
+# does not show: invisible fall-through and hidden terminals.
+
+description "One on-syntax, two lifecycles"
+platform    dos
+entry       one-shot
+timeout     30s
+
+phase one-shot {
+    enter "setup"
+    # Inside a branching wait, a handler fires AT MOST ONCE: the
+    # first match wins and the wait is over.
+    wait {
+        on "Format now?"  { select "Yes" }
+        on "Skip format?" { select "No"  }
+    }
+    # INVISIBLE FALL-THROUGH: execution continues HERE when the
+    # matched body did not transition. To know control reaches this
+    # line, the reader must check every body above for the ABSENCE
+    # of goto/finish. Phases never fall through; branching-wait
+    # bodies do — the language's loudest rule (explicit terminals)
+    # has a quiet exception one indent level in.
+    screenshot after-format
+    goto persistent
+}
+
+phase persistent timeout=5m {
+    # Directly inside a reactive phase, the SAME shape re-arms
+    # after every episode and may fire many times; only a
+    # transition exits.
+    on "Insert disk 2"  { press enter }
+    on "Copying files"  { }                # empty body: no action —
+                                           # deliberate, or forgot?
+    on "Setup complete" { goto hidden-end }
+}
+# Identical `on` lines in both phases; only the container tells you
+# whether a handler is a one-shot branch or a persistent, re-arming
+# watcher (the edge/episode rule: a handler cannot refire until its
+# condition unmatches and matches again). The unification bought
+# one branch form — the cost is that the form alone no longer tells
+# you its lifetime.
+
+phase hidden-end {
+    enter "final checks"
+    wait {
+        on "All good" { finish }
+        on "Problems" { goto persistent }
+    }
+}
+# HIDDEN TERMINAL: this phase ends at `}` with no goto/finish
+# visible at its bottom — the terminals are nested inside the wait.
+# Legal exactly when EVERY handler body terminates, so the
+# terminal-on-every-path rule moves from the phase's last line
+# (easy to eyeball) into each body (verified one by one).
+#
+# OPEN QUESTIONS: is the lifecycle polysemy acceptable prior-art
+# behavior (Tcl's expect vs expect_background make the same split
+# by command, not by shape)? Would a distinct keyword for reactive
+# handlers (e.g. `always "..." { }`) buy clarity worth a second
+# branch form? Should a phase ending in a branching wait require a
+# redundant trailing marker so the terminal is visible at the
+# phase's bottom edge?

@@ -5,16 +5,17 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The script spec
 
-> **Status:** Spikes 8–10 implement parsing, the QEMU/DOS runtime
-> (`wait`/`expect`, input verbs, `screenshot`, `start`/`stop`), and
-> `rlq --blueprint|--machine script <label>` wiring with per-invocation
-> run records under `cache/machines/<id>/runs/`. Spike 13 implements
-> the `machine:` header, persistent `insert`/`eject` on
-> blueprint-declared removable slots, and `boot` to reorder boot
-> devices (stopped machines only for now). Embedded media blocks,
-> property-bound inputs, reactive `on`, and the full transcript
-> contract remain later milestones; details may still change before
-> first release.
+> **Status:** This document is the source of truth for the redesigned
+> script surface adopted in July 2026. It supersedes the earlier
+> milestone-one syntax (`state`, `->`, `done`, `expect`, `regex`
+> strings, colon headers, comma-separated modifiers, bare media
+> names) completely; pre-beta, there is no compatibility between the
+> two surfaces and none is planned. The implemented parser and
+> runtime (`script.py`, `script_runner.py`) and the shipped built-in
+> and example scripts still speak the earlier surface and will be
+> retargeted wholesale. Embedded media blocks, inputs and property
+> binding, reactive phases, and the full transcript contract remain
+> later milestones; details may still change before first release.
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
@@ -24,13 +25,13 @@ run against a machine selected with `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:
 
 ```powershell
-rlq script freedos-plain-install --blueprint msdos
+rlq script install --blueprint freedos-1.4-plain
 ```
 
 After preflight, `script` installs embedded media definitions,
-resolves its machine (creating one when `--blueprint` names a blueprint
-with no machine yet), brings it to the state the script's
-[`machine:` header](#header) expects — starting a stopped machine
+resolves its machine (creating one when `--blueprint` names a
+blueprint with no machine yet), brings it to the state the script's
+[`machine` header](#header) expects — starting a stopped machine
 when the script expects `running`, failing when the script expects
 `stopped` but the machine is running — then executes the script. The
 machine stays in whatever state the last executed step left it.
@@ -38,26 +39,27 @@ Failure likewise leaves the machine in its observed state for
 diagnosis; no command implicitly tears it down.
 
 Scripts are authored documents: reliquary reads but never rewrites
-them. They belong in version control beside the machine blueprints and
-media definitions on which they depend.
+them. They belong in version control beside the machine blueprints
+and media definitions on which they depend.
 
 ## The language model
 
 The language is a deliberately constrained, domain-specific
-programming language. It has sequencing, branching, named states,
-and explicit state transitions, but no expressions, mutable
+programming language. It has sequencing, branching, named phases,
+and explicit phase transitions, but no expressions, mutable
 variables, arithmetic, user-defined functions, or general-purpose
 loops. Its job is guest automation, not computation.
 
 The basic rhythm is **observe, then act**:
 
-```rqs
-wait "What is your preferred language"
+```rlqs
+wait   "What is your preferred language"
 select "English (United States)"
 ```
 
 - **Observations** establish that the guest or machine has reached
-  a known state: `wait`, `expect`, and reactive `on` handlers.
+  a known state: `wait`, in its single-condition and branching
+  forms, and reactive `on` handlers.
 - **Actions** deliver intent-level input or perform supporting host
   operations: `enter`, `type`, `press`, `select`, `insert`,
   `eject`, `boot`, `stage`, `collect`, `screenshot`, `start`, and
@@ -68,6 +70,20 @@ means choosing a visible menu entry, not sending a guessed number
 of Down keys. The selected control plane composes the necessary
 key press and release events and owns their pacing. Pointer actions
 will follow the same model when GUI automation arrives.
+
+Three design rules govern the whole surface:
+
+- **One shape.** Every line of a script is a *node*: a name,
+  positional arguments, `name=value` properties, and optionally a
+  block. The entire structural grammar is that one production.
+- **Spelling reveals role.** Every token class has exactly one
+  spelling and every punctuation mark exactly one role; a reader
+  can classify any token without context. See
+  [lexical rules](#lexical-rules).
+- **Nouns declare, verbs act.** Declarative nodes (headers, `media`,
+  `input`, `phase`) begin with a noun; imperative nodes begin with
+  a verb. The declarative zone precedes the imperative zone, and
+  the grammar enforces the boundary.
 
 The authored control-flow graph is statically finite, but a run may
 be unbounded when transitions form a cycle. Execution is
@@ -81,6 +97,307 @@ job from a known machine state, parsing results, and integrating
 with other tools. Inputs supply immutable data to a script;
 they do not add expression or decision syntax.
 
+## Lexical rules
+
+- Files are UTF-8 text. A UTF-8 BOM is accepted but not required;
+  LF and CRLF line endings are equivalent.
+- One node occupies one line. A `{` at the end of a line opens a
+  block; a `}` alone on a line closes it.
+- `#` begins a comment outside a quoted string or regex.
+- Identifiers use ASCII letters, digits, `.`, `_`, and `-`, must
+  start with a letter, and are case-sensitive. Reserved node names
+  (headers, declarations, and verbs) cannot name phases, inputs,
+  or media labels.
+- Properties are written `name=value`, space-separated, after the
+  positional arguments. There are no commas and no colons anywhere
+  in the language.
+- Durations require an explicit unit: `ms`, `s`, `m`, or `h`.
+  Values must be positive; fractional values are allowed. Numbers
+  never appear without a unit.
+
+Every token class has one spelling:
+
+| spelling | meaning | examples |
+|---|---|---|
+| bare word | keyword or script-internal name | `phase`, `goto formatting`, `cdrom0`, `press enter`, `stopped` |
+| `"..."` | literal text crossing the guest boundary, or a host path | `wait "C:\>"`, `enter "fdapm poweroff"`, `stage "payloads/AUTOTEST.EXE"` |
+| `/.../` | regex match | `wait /[0-9]+ files copied/` |
+| `@name` | external reference, resolved from the library | `insert cdrom0 @freedos-1.4-livecd` |
+| `$name` | run-supplied input value | `insert floppy1 $supplemental-disk` |
+| `name=value` | property of the node it follows | `timeout=5m`, `exclude="with sources"` |
+| `5m`, `500ms` | duration | `wait stopped timeout=2m` |
+| `<key>` in typed strings | key token | `type "<down><down><enter>"` |
+
+### Strings
+
+Ordinary strings are double-quoted. Backslashes in DOS and Windows
+paths are literal by default. Four escapes exist for syntax-bearing
+text:
+
+| escape | meaning |
+|---|---|
+| `\"` | literal `"` |
+| `\\` | literal `\` |
+| `\<` | literal `<` rather than the start of a key token |
+| `\${` | literal `${` rather than an input reference |
+
+Any other backslash is literal. Inside a string, an input reference
+is written `${name}` and is expanded only where the containing
+argument accepts it; a `$` not followed by `{` is literal. In
+`enter` and `type`, recognized `<key>` tokens produce key input.
+
+The raw form `r"..."` performs no escapes, input expansion, or
+key-token recognition. Its one limitation is that it cannot contain
+a double quote.
+
+Expanded text must be representable by the selected input control
+plane. An unmappable character is a named input error, never a
+silent replacement.
+
+### Regexes
+
+A regex is written between slashes and cannot span lines:
+
+```rlqs
+wait /installed [0-9]+ of [0-9]+ packages/
+```
+
+`\/` produces a literal slash; every other character, including
+backslashes, passes through to Python's regular-expression syntax
+unchanged. A regex is valid wherever a watch condition is expected.
+Input references are never expanded inside a regex.
+
+### References
+
+`@name` references a media item by its catalog name; it resolves
+through the shared media library (including definitions the script
+itself embeds). `$name` references a declared
+[input](#inputs-properties-and-response-files) and must stand alone
+as a whole argument; inside strings the braced form `${name}` is
+used instead. Definition sites — the `media` label, the `input`
+name — are bare identifiers; the sigils mark use sites.
+
+## Core grammar
+
+The structural grammar is three productions:
+
+```text
+script  = { node } ;
+node    = name , { argument } , { property } , [ block ] , eol ;
+block   = "{" , eol , { node } , "}" , eol ;
+
+property  = name , "=" , value ;
+argument  = string | regex | duration | reference | name ;
+value     = string | regex | duration | reference | name ;
+reference = "@" , name | "$" , name ;
+condition = string | regex | "stopped" ;
+```
+
+One declared island: the block of a `media` node contains a JSON
+object rather than nodes, beginning at its `{` and ending at the
+matching `}`, using JSON lexical rules internally. Script comments
+and input references have no meaning inside it.
+
+A typing layer over the node shape supplies the rest of the
+language definition:
+
+- **Ordering.** Header nodes come first, then `media` and `input`
+  declarations, then either top-level statements (a linear script)
+  or `phase` nodes (a phased script). Mixing the two body kinds is
+  a parse error.
+- **Signatures.** Each node name fixes its argument types, allowed
+  properties, and whether it takes a block. The complete signature
+  tables follow; an argument or property outside a node's
+  signature is a parse error.
+
+Header nodes:
+
+| node | argument | notes |
+|---|---|---|
+| `description` | string | optional human-facing text |
+| `platform` | name | required |
+| `machine` | `running` or `stopped` | expected starting machine state |
+| `entry` | phase name | required in a phased script, forbidden in a linear one |
+| `timeout` | duration | script-wide observation default |
+| `deadline` | duration | wall-clock budget for the whole run |
+
+Declarations:
+
+| node | arguments | properties | block |
+|---|---|---|---|
+| `media` | label | — | JSON media definition |
+| `input` | `text`/`media`/`secret`, name | `property`, `prompt` | — |
+
+Statements:
+
+| node | arguments | properties | block |
+|---|---|---|---|
+| `wait` | condition | `timeout`, `stable` | — |
+| `wait` | — | `timeout` | `on` handlers |
+| `on` | condition | `stable` | statements |
+| `goto` | phase name | — | — |
+| `finish` | — | — | — |
+| `enter` | string | — | — |
+| `type` | string | — | — |
+| `press` | key names | — | — |
+| `select` | string | `exclude` | — |
+| `screenshot` | optional name | — | — |
+| `insert` | slot, `@media` or `$input` | — | — |
+| `eject` | slot | — | — |
+| `boot` | drive keys | — | — |
+| `start` | — | — | — |
+| `stop` | — | — | — |
+| `stage` | path string | — | — |
+| `collect` | path string | `to` | — |
+
+And the phase declaration:
+
+| node | arguments | properties | block |
+|---|---|---|---|
+| `phase` | name | `timeout`, `deadline` | statements, or `on` handlers |
+
+### The typed grammar
+
+The signature tables above expand into this complete EBNF. Every
+production is an instance of the node shape; a conforming parser
+may implement either view:
+
+```text
+script          = { header } , { media-def } , { input-def } ,
+                  ( linear-body | phased-body ) ;
+
+header          = "description" , string , eol
+                | "platform" , name , eol
+                | "machine" , ( "running" | "stopped" ) , eol
+                | "entry" , name , eol
+                | "timeout" , duration , eol
+                | "deadline" , duration , eol ;
+
+media-def       = "media" , name , json-object ;
+input-def       = "input" , ( "text" | "media" | "secret" ) ,
+                  name , { input-prop } , eol ;
+input-prop      = ( "property" | "prompt" ) , "=" , string ;
+
+linear-body     = { statement } ;
+phased-body     = phase , { phase } ;
+phase           = "phase" , name , { timing-prop } , block-open ,
+                  ( sequential-body | reactive-body ) ,
+                  block-close ;
+timing-prop     = ( "timeout" | "deadline" ) , "=" , duration ;
+
+sequential-body = { statement } , terminal ;
+reactive-body   = handler , { handler } ;
+terminal        = ( "goto" , name | "finish" ) , eol ;
+
+statement       = observation | action ;
+observation     = "wait" , condition , { watch-prop } , eol
+                | "wait" , [ "timeout" , "=" , duration ] ,
+                  block-open , handler , { handler } ,
+                  block-close ;
+handler         = "on" , condition ,
+                  [ "stable" , "=" , duration ] , block-open ,
+                  { statement } , [ terminal ] , block-close ;
+watch-prop      = ( "timeout" | "stable" ) , "=" , duration ;
+condition       = string | regex | "stopped" ;
+
+action          = "enter" , string , eol
+                | "type" , string , eol
+                | "press" , key , { key } , eol
+                | "select" , string ,
+                  [ "exclude" , "=" , string ] , eol
+                | "screenshot" , [ name ] , eol
+                | "insert" , slot , ( media-ref | input-ref ) ,
+                  eol
+                | "eject" , slot , eol
+                | "boot" , slot , { slot } , eol
+                | "start" , eol
+                | "stop" , eol
+                | "stage" , string , eol
+                | "collect" , string ,
+                  [ "to" , "=" , string ] , eol ;
+
+block-open      = "{" , eol ;
+block-close     = "}" , eol ;
+media-ref       = "@" , name ;
+input-ref       = "$" , name ;
+key             = key-name , { "+" , key-name } ;
+
+name            = letter , { letter | digit | "." | "_" | "-" } ;
+duration        = number , ( "ms" | "s" | "m" | "h" ) ;
+number          = digit , { digit } ,
+                  [ "." , digit , { digit } ]
+                | "." , digit , { digit } ;
+string          = ordinary-string | raw-string ;
+regex           = "/" , { regex-char | "\/" } , "/" ;
+```
+
+`json-object` begins with `{`, ends at its matching `}`, and uses
+JSON lexical rules internally, as described above. `slot` and
+`key-name` are `name` tokens whose vocabularies (drive slots, the
+portable key set) are checked by validation, not the grammar.
+Comments and blank lines may appear between grammatical lines.
+
+A small set of constraints is deliberately context-sensitive —
+enforced by static validation over the parse tree rather than
+encoded in the CFG:
+
+- each header appears at most once; `entry` appears exactly in
+  phased scripts;
+- a branching `wait` may itself satisfy `terminal` when every one
+  of its handler bodies ends in a terminal;
+- a handler body inside a branching `wait` may not contain another
+  branching `wait`;
+- the [timing placement matrix](#timing): each timing property is
+  legal only where the matrix allows it;
+- `goto` names a declared phase and never appears in a linear
+  script; media labels are unique; reserved node names are not
+  identifiers; durations are positive.
+
+The grammar is line-oriented and LL(1): the lexer classifies every
+token by its first character, and the parser needs one token of
+lookahead. All static validation — terminal-path checking,
+transition targets, capability preflight, timing resolution — runs
+over the typed tree before any machine starts.
+
+## Header
+
+Header nodes precede embedded media definitions, input
+declarations, and executable content:
+
+```rlqs
+description "FreeDOS 1.4 plain install from LiveCD"
+platform    dos
+machine     stopped
+entry       startup
+timeout     30s
+deadline    45m
+```
+
+- `description` is optional human-facing text.
+- `platform` is required. It fails preflight when the target
+  machine declares another platform. A future genuinely
+  platform-neutral script may use an explicitly defined portable
+  platform value; omission never means portable.
+- `machine` declares the machine state the script expects when it
+  starts. The default is `running`: the `script` command starts a
+  stopped machine before executing. `stopped` requires a stopped
+  machine — a running machine fails preflight rather than being
+  implicitly powered off — and the script performs its own explicit
+  `start`, typically after inserting the media it needs. An install
+  script that must insert its installer medium before first boot
+  declares `machine stopped`.
+- `entry` names the phase where a phased script begins. It is
+  required in a phased script and forbidden in a linear one.
+- `timeout` optionally changes the script-wide observation default
+  from `60s`. See [timing](#timing).
+- `deadline` optionally bounds the whole run's wall clock. It is
+  the backstop for legitimate transition cycles — a reboot loop
+  that never converges fails here rather than running forever.
+
+Each header may appear at most once. The file name supplies the
+script name. There is no format-version field before beta because
+the planned format carries no compatibility promise yet.
+
 ## Script shapes
 
 A script uses one of two shapes. Mixing them is a parse error.
@@ -90,10 +407,10 @@ A script uses one of two shapes. Mixing them is a parse error.
 A linear script has top-level statements, executed in order. It is
 the normal form for a known sequence:
 
-```rqs
-description: "Confirm that the installed DOS system boots"
-platform: dos
-timeout: 2m
+```rlqs
+description "Confirm that the installed DOS system boots"
+platform    dos
+timeout     2m
 
 wait "C:\>"
 screenshot booted
@@ -102,82 +419,55 @@ wait stopped
 ```
 
 The first failing statement ends the run. Reaching end of file
-completes it.
+completes it, equivalently to an explicit `finish`. `goto` is
+invalid in a linear script — there are no phases to name.
 
-### State-machine script
+### Phased script
 
-A state-machine script declares named states and an explicit
-initial state. Top-level executable statements are not allowed:
+A phased script declares named phases and an explicit `entry`
+phase. Top-level executable statements are not allowed:
 
-```rqs
-description: "An installer with a reboot loop"
-platform: dos
-initial: cd-boot
-timeout: 30s
+```rlqs
+description "An installer with a reboot loop"
+platform    dos
+entry       cd-boot
+timeout     30s
 
-state cd-boot {
+phase cd-boot {
     # ordered statements
-    -> partitioning
+    goto partitioning
 }
 
-state partitioning {
+phase partitioning {
     # ordered statements
-    done
+    finish
 }
 ```
 
-Every reachable path through a sequential state ends explicitly with
-`-> <state>` or `done`; a final `expect` is valid when every branch
-ends that way. Named states never fall through according to their
-textual order. `initial` must name exactly one declared state.
-Duplicate, missing, and unreachable states are validation errors or
-warnings as described under
+Every reachable path through a sequential phase ends explicitly
+with `goto <phase>` or `finish`; a final branching `wait` is valid
+when every handler body ends that way. Named phases never fall
+through in textual order. `entry` must name exactly one declared
+phase. Duplicate, missing, and unreachable phases are validation
+errors or warnings as described under
 [validation](#validation-and-preflight).
 
-A state is either **sequential** or **reactive**:
+A phase is either **sequential** or **reactive**:
 
-- A sequential state contains ordinary ordered statements and
-  `expect` blocks, ending explicitly in `->` or `done`. It cannot
-  contain `on` handlers.
-- A reactive state contains only `on` handlers. Every handler is
-  active from state entry. A handler may transition, finish the
+- A sequential phase contains ordinary ordered statements,
+  including branching `wait` blocks, ending explicitly in `goto`
+  or `finish`. It cannot contain direct `on` handlers.
+- A reactive phase contains only `on` handlers. Every handler is
+  active from phase entry. A handler may transition, finish the
   script, or complete its action and return to the same reactive
-  state. It cannot contain an interleaved ordered body.
+  phase. It cannot contain an interleaved ordered body.
 
 If a handler should only become relevant later, the script enters a
-smaller state at that point. Handler activation is therefore
-visible in the state graph rather than hidden in statement
+smaller phase at that point. Handler activation is therefore
+visible in the phase graph rather than hidden in statement
 position.
 
-There are no anonymous states and no implicit state entry.
-
-## Header
-
-Header fields precede embedded media definitions, input
-declarations, and executable or state content:
-
-- `description: "..."` is optional human-facing text.
-- `platform: <platform>` is required. It fails preflight when the
-  target machine declares another platform. A future genuinely
-  platform-neutral script may use an explicitly defined portable
-  platform value; omission never means portable.
-- `initial: <state>` is required in a state-machine script and
-  forbidden in a linear script.
-- `machine: running | stopped` declares the machine state the
-  script expects when it starts. The default is `running`: the
-  `script` command starts a stopped machine before executing.
-  `stopped` requires a stopped machine — a running machine fails
-  preflight rather than being implicitly powered off — and the
-  script performs its own explicit `start`, typically after
-  inserting the media it needs. An install script that must insert
-  its installer medium before first boot declares
-  `machine: stopped`.
-- `timeout: <duration>` optionally changes the script-wide
-  observation default from `60s`.
-
-The file name supplies the script name. There is no format-version
-field before beta because the planned format carries no compatibility
-promise yet.
+There are no anonymous phases and no implicit phase entry.
 
 ## Embedded media definitions
 
@@ -186,12 +476,11 @@ never has to: a script's media references resolve through the
 ordinary shared catalog, so definitions that live as separate
 library documents — as the built-in library keeps its own — work
 identically. Embedding suits a script distributed as a single
-self-contained file. Each
-block has a definition label followed by the ordinary
-media-definition JSON object; the outer opening brace becomes
-`media <label> {`:
+self-contained file. Each block has a definition label followed by
+the ordinary media-definition JSON object; the outer opening brace
+becomes the node's block:
 
-```rqs
+```rlqs
 media freedos-livecd {
   "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
   "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
@@ -207,8 +496,9 @@ media freedos-livecd {
 
 The label is an identifier and determines the installed file name:
 the block above installs as `media/freedos-livecd.json`. It labels
-the definition, not an item; an archive definition may still contain
-several independently named items.
+the definition, not an item; an archive definition may still
+contain several independently named items, each referenced by
+`@<item-name>`.
 
 The body uses exactly the item or archive form documented by the
 [media spec](media-spec.md); scripts do not get a second media
@@ -240,9 +530,9 @@ Installation is fail-closed and non-overwriting:
    definition fails with both locations named; scripts never replace
    or override library definitions.
 4. All new definitions are written in canonical JSON formatting by
-   temp-and-replace. Installation is transactional across the blocks:
-   an I/O failure removes files created by that attempt before the
-   script proceeds.
+   temp-and-replace. Installation is transactional across the
+   blocks: an I/O failure removes files created by that attempt
+   before the script proceeds.
 5. The library is rescanned, then ordinary resolution, fetching, and
    machine startup begin. Definitions remain installed even if a
    later download or guest step fails; installing them is a durable
@@ -275,18 +565,18 @@ naming both definition locations and the colliding media item.
 
 ## Inputs, properties, and response files
 
-Inputs externalize run-specific data while keeping control flow fixed.
-Three input types exist initially:
+Inputs externalize run-specific data while keeping control flow
+fixed. Three input types exist initially:
 
-```rqs
-input text owner-name, property: "identity.full-name", prompt: "Registered owner"
-input media supplemental-disk, prompt: "Supplemental disk"
-input secret product-key, property: "products.windows-98.install-key"
+```rlqs
+input text owner-name property="identity.full-name" prompt="Registered owner"
+input media supplemental-disk prompt="Supplemental disk"
+input secret product-key property="products.windows-98.install-key"
 ```
 
 - `text` is immutable text supplied to action arguments such as
   `enter`, `type`, and `select`. It cannot parameterize watch
-  conditions, state names, paths, or control flow.
+  conditions, phase names, paths, or control flow.
 - `media` is the name of a defined media item. It is valid only
   where a media argument is expected, such as `insert`.
 - `secret` is protected immutable text. It may be expanded only in
@@ -298,20 +588,21 @@ input secret product-key, property: "products.windows-98.install-key"
 - `prompt` is optional user-facing text; the input name is used
   when it is omitted.
 
-References use `${name}`:
+References use `$name` as a whole argument and `${name}` inside
+strings:
 
-```rqs
+```rlqs
 enter "setup /owner=${owner-name}"
-insert floppy1 ${supplemental-disk}
+insert floppy1 $supplemental-disk
 type "${product-key}"
 ```
 
 A `media` input must occupy the whole media argument; it cannot be
 interpolated into text. A `text` input may appear more than once in
-an ordinary quoted input string. Input references are
-not expressions and cannot control `expect`, transitions, or state
-selection. A `secret` input follows the text interpolation rules
-only inside `enter` and `type`.
+an ordinary quoted input string. Input references are not
+expressions and cannot control watch conditions, transitions, or
+phase selection. A `secret` input follows the text interpolation
+rules only inside `enter` and `type`.
 
 Values can be supplied explicitly in a JSON response file:
 
@@ -331,24 +622,24 @@ rejects unknown keys, and binds each input from the first
 available source:
 
 1. an explicit response-file value;
-2. the property named by `property:`; or
+2. the property named by `property=`; or
 3. an interactive prompt.
 
 Without an interactive terminal, a still-missing value fails before
 execution. Response files therefore override personal registry
-defaults for one invocation. Prompted values are not written back to
-the registry. A media value is resolved after binding, and a media
-prompt lists the embedded and existing library names valid for that
-response.
+defaults for one invocation. Prompted values are not written back
+to the registry. A media value is resolved after binding, and a
+media prompt lists the embedded and existing library names valid
+for that response.
 
 Ordinary properties are strings. Secret properties keep only a
-marker in `properties.json`; their values live in the host credential
-store. `text` and `media` inputs require ordinary properties, while
-`secret` requires a secret property. Kind mismatches fail
-rather than silently downgrading protected data. See the
-[property-registry specification](property-registry.md) for its file
-format, maintenance commands, precise failure rules, and security
-boundary.
+marker in `properties.json`; their values live in the host
+credential store. `text` and `media` inputs require ordinary
+properties, while `secret` requires a secret property. Kind
+mismatches fail rather than silently downgrading protected data.
+See the [property-registry specification](property-registry.md) for
+its file format, maintenance commands, precise failure rules, and
+security boundary.
 
 The transcript records input references and source kinds, never
 expanded values. For a `secret`, it also omits the entire expanded
@@ -358,118 +649,9 @@ requested screenshot and the guest's own display, logs, or command
 history remain capable of exposing guest-entered data.
 
 Response files may contain sensitive text and should not be assumed
-safe to commit. A response-file string may override a `secret` input,
-but it is still plaintext in that file; the property
+safe to commit. A response-file string may override a `secret`
+input, but it is still plaintext in that file; the property
 registry is the normal reusable source for protected values.
-
-## Lexical and structural rules
-
-- Files are UTF-8 text. A UTF-8 BOM is accepted but not required;
-  LF and CRLF line endings are equivalent.
-- One statement occupies one line. A `{` at the end of a line opens
-  a block and a `}` alone closes it.
-- `#` begins a comment outside a quoted string.
-- Identifiers use ASCII letters, digits, `.`, `_`, and `-`, must start
-  with a letter, and are case-sensitive.
-- Reserved verbs and header names cannot be used as state or input
-  names.
-- A colon binds a named setting to its value. A comma separates
-  positional arguments from modifiers and separates subsequent
-  modifiers. When a block verb has no positional argument, its first
-  modifier follows the verb directly:
-
-  ```rqs
-  wait "Copying files", timeout: 10m, stable: 500ms
-  state formatting, timeout: 5m, deadline: 20m {
-  expect timeout: 2m {
-  ```
-
-  Block modifiers always appear on the opening line, never after
-  the closing brace.
-- Durations require an explicit unit: `ms`, `s`, `m`, or `h`.
-  Values must be positive; fractional values are allowed.
-- Paths and human text are quoted. Bare arguments are restricted to
-  identifiers, key names, drive slots, state names, input
-  references, and machine-event keywords.
-
-### Strings
-
-Ordinary strings are double-quoted. Backslashes in DOS and Windows
-paths are literal by default. Four escapes exist for syntax-bearing
-text:
-
-| escape | meaning |
-|---|---|
-| `\"` | literal `"` |
-| `\\` | literal `\` |
-| `\<` | literal `<` rather than the start of a key token |
-| `\${` | literal `${` rather than an input reference |
-
-Any other backslash is literal. Input references are expanded
-only where the containing argument accepts them. In `enter` and
-`type`, recognized `<key>` tokens produce key input.
-
-The raw form `r"..."` performs no escapes, input expansion, or
-key-token recognition. Its one limitation is that it cannot contain
-a double quote.
-
-Expanded text must be representable by the selected input control
-plane. An unmappable character is a named input error, never a
-silent replacement.
-
-### Core grammar
-
-This EBNF fixes the structural grammar; individual verb sections
-define their typed arguments and allowed modifiers:
-
-```text
-script          = headers, media-definitions, inputs,
-                  (linear-body | state-body) ;
-headers         = header, { header } ;
-header          = description | platform | initial | machine
-                | timeout ;
-description     = "description:", string, newline ;
-platform        = "platform:", identifier, newline ;
-initial         = "initial:", identifier, newline ;
-machine         = "machine:", ("running" | "stopped"), newline ;
-timeout         = "timeout:", duration, newline ;
-
-media-definitions = { media-definition } ;
-media-definition  = "media", identifier, json-object-body, newline ;
-
-inputs          = { input } ;
-input           = "input", ("text" | "media" | "secret"), identifier,
-                   [ comma-modifiers ], newline ;
-
-linear-body     = { statement } ;
-state-body      = state, { state } ;
-state           = "state", identifier, [ comma-modifiers ], "{",
-                  newline, (sequential-body | reactive-body), "}",
-                  newline ;
-sequential-body = { ordered-statement }, terminal ;
-reactive-body   = on-handler, { on-handler } ;
-
-on-handler      = "on", condition, [ comma-modifiers ], "{", newline,
-                  { ordered-statement }, [ terminal ], "}", newline ;
-expect          = "expect", [ direct-modifiers ], "{", newline,
-                  branch, { branch }, "}", newline ;
-branch          = condition, ":", "{", newline,
-                  { ordered-statement }, [ terminal ], "}", newline ;
-
-condition       = string | "regex", string | "stopped" ;
-terminal        = ("->", identifier | "done"), newline ;
-```
-
-`initial` is present exactly in `state-body` scripts. Comments and
-blank lines may appear between grammatical lines. An `expect` may be
-the final element of a sequential body when control-flow analysis
-proves every branch terminal; this is the structured equivalent of
-the final `terminal` production.
-
-`json-object-body` begins with `{`, ends at its matching `}`, and
-uses JSON lexical rules internally. Script comments and input
-references have no meaning inside it. Media-definition labels must
-be unique within the script.
 
 ## Observations
 
@@ -478,7 +660,7 @@ be unique within the script.
 A quoted watch pattern is a case-sensitive, normalized literal text
 match against one visible screen row:
 
-```rqs
+```rlqs
 wait "Welcome to FreeDOS 1.4 (LiveCD)"
 ```
 
@@ -491,26 +673,24 @@ This is deliberately called a **normalized text match**, not an
 exact or fully literal screen match. It ignores layout padding but
 does not ignore case or punctuation.
 
-Regular expressions are opt-in:
+Regular expressions are opt-in through the regex literal:
 
-```rqs
-wait regex "installed [0-9]+ of [0-9]+ packages"
+```rlqs
+wait /installed [0-9]+ of [0-9]+ packages/
 ```
 
-Regex uses Python's regular-expression syntax and runs against each
-normalized row. The first matching row satisfies the condition.
-Regex strings use the same string rules; raw strings are useful for
-backslash-heavy patterns.
+A regex runs against each normalized row. The first matching row
+satisfies the condition.
 
-When several `expect` branches or reactive handlers match the same
-screen snapshot, the first declaration wins. Validation warns about
-obvious literal shadowing; regex overlap cannot generally be proven.
+When several `on` handlers could match the same screen snapshot,
+the first declaration wins. Validation warns about obvious literal
+shadowing; regex overlap cannot generally be proven.
 
 ### Machine state
 
 `stopped` is the initial machine-state condition:
 
-```rqs
+```rlqs
 wait stopped
 ```
 
@@ -518,67 +698,46 @@ It means that the backend reports the machine no longer running. It
 does not by itself prove that shutdown was graceful; the preceding
 guest action supplies that intent:
 
-```rqs
+```rlqs
 enter "fdapm poweroff"
-wait stopped, timeout: 2m
+wait stopped timeout=2m
 ```
 
-A guest reboot is not a special event or verb. The script issues the
-guest's own command or input and watches for the screen that follows:
+A guest reboot is not a special event or verb. The script issues
+the guest's own command or input and watches for the screen that
+follows:
 
-```rqs
+```rlqs
 enter "reboot"
 wait "login:"
 ```
 
-### Timing
-
-Three settings have distinct meanings:
-
-- `timeout` bounds one observation. At script scope it supplies the
-  default for each `wait`, `expect`, or reactive state's next
-  handler firing. A statement or state modifier overrides it.
-- `deadline` bounds total elapsed time in a state or block and never
-  resets when progress occurs.
-- `stable` requires a watch condition to remain matched for the
-  stated duration before succeeding.
-
-Screen polling and input-event pacing remain control-plane-owned;
-the script does not tune them. There is no generic sleep or delay
-verb. `stable` strengthens an observation rather than blindly
-pausing after it.
-
-In a reactive state, `timeout` is the maximum interval with no
-handler firing and resets after a handler action completes.
-`deadline` always continues from state entry. In a sequential state,
-handler activity cannot alter a pending timeout because sequential
-states have no handlers.
-
 ### `wait`
 
-```rqs
+`wait` is the language's one observation construct, in two forms.
+The single-condition form succeeds when its condition matches and
+fails when its timeout expires:
+
+```rlqs
 wait "C:\>"
-wait regex "[0-9]+ files copied", timeout: 5m
+wait /[0-9]+ files copied/ timeout=5m
 wait stopped
 ```
 
-`wait` succeeds when its condition matches and fails when its
-timeout expires. A script that needs to know a console command
-completed waits for output uniquely produced by that command or for
-the resulting guest state; `enter` itself makes no completion claim.
+A script that needs to know a console command completed waits for
+output uniquely produced by that command or for the resulting guest
+state; `enter` itself makes no completion claim.
 
-### `expect`
+The branching form waits for the first of several conditions,
+executes that handler's body, then continues after the block unless
+the body ends in `goto` or `finish`:
 
-`expect` waits for the first matching branch, executes that branch,
-then continues after the block unless the branch transitions or
-finishes:
-
-```rqs
-expect timeout: 2m {
-    "Drive C: is formatted": {
+```rlqs
+wait timeout=2m {
+    on "Drive C: is formatted" {
         press enter
     }
-    "does not appear to be formatted": {
+    on "does not appear to be formatted" {
         select "Yes"
         wait "Press a key..."
         press enter
@@ -586,74 +745,148 @@ expect timeout: 2m {
 }
 ```
 
-An empty block is the explicit no-action branch. Branches may
-contain ordered statements and may end in `->` or `done`; they
-cannot contain states, handlers, or nested `expect` blocks.
-Branch conditions accept the same normalized text, `regex`, and
-machine-state forms as `wait`.
+This is the classic Expect semantic — one command covering the
+single- and multi-pattern cases — under one verb. A branching
+`wait` requires at least one handler. An empty handler body is the
+explicit no-action branch. Handler bodies contain ordered
+statements and may end in `goto` or `finish`; they cannot contain
+phases or a nested branching `wait`.
 
-### `on` and reactive states
+### `on` and reactive phases
 
-A reactive state is a set of condition-action handlers. Handler
-actions are always braced; there is no separate inline form:
+`on <condition> { ... }` binds a condition to an action. Its
+lifecycle belongs to its container: inside a branching `wait` the
+first match ends the wait; directly inside a reactive phase every
+handler stays active until the phase transitions. The syntax is
+identical in both places — the language has exactly one branch
+form.
 
-```rqs
-state copying, timeout: 5m, deadline: 30m {
+A reactive phase is a set of handlers, all armed from phase entry:
+
+```rlqs
+phase copying timeout=5m deadline=30m {
     on "Please insert disk 2" {
-        insert floppy ${supplemental-disk}
+        insert floppy1 $supplemental-disk
         press enter
     }
     on "Installation complete" {
         select "Reboot"
-        -> first-boot
+        goto first-boot
     }
 }
 ```
 
-All handlers are active from state entry and evaluated in
-declaration order. Dispatch is single-threaded and run-to-completion:
+Handlers are evaluated in declaration order. Dispatch is
+single-threaded and run-to-completion:
 
 1. The first matching, armed handler is selected.
 2. That handler is consumed for the current matching episode.
 3. Its action completes without interruption from other handlers.
-4. A transition or `done` takes effect; otherwise dispatch resumes
-   in the same state.
-5. The handler cannot fire again until its condition has first become
-   unmatched and later matches again.
+4. A `goto` or `finish` takes effect; otherwise dispatch resumes
+   in the same phase.
+5. The handler cannot fire again until its condition has first
+   become unmatched and later matches again.
 
 This edge/episode rule prevents a persistent confirmation screen
 from generating repeated input on every poll. A handler action may
-contain ordered statements, including `wait`, but no handler is
-dispatched recursively while the action runs.
+contain ordered statements, including single-condition `wait`, but
+no handler is dispatched recursively while the action runs.
 
-Handler conditions accept the same normalized text, `regex`, and
-machine-state forms as `wait`. Observation modifiers appear after
-the condition and before the opening brace:
+Handler conditions accept the same normalized text, regex, and
+machine-state forms as `wait`. A `stable` property strengthens the
+condition:
 
-```rqs
-on "Installation complete", stable: 1s {
-    -> first-boot
+```rlqs
+on "Installation complete" stable=1s {
+    goto first-boot
 }
 ```
+
+## Timing
+
+The timing model in one sentence: **`timeout` bounds the time to
+the next observed event, `deadline` bounds the total wall clock of
+the construct it annotates, `stable` strengthens one observation,
+and there is no `delay`.**
+
+The two families scope differently, and placement is the law:
+
+- **Per-observation settings (`timeout`, `stable`) are lexically
+  scoped.** An observation bound is a parameter of an observation,
+  so writing `timeout` on a container sets the default for every
+  observation the container lexically contains. Resolution is
+  innermost-wins, decided entirely at parse time:
+
+  ```text
+  statement > branching wait > phase > header > built-in 60s
+  ```
+
+  A reactive phase's `timeout` bounds each interval with no handler
+  firing — still the time to the next observed event.
+- **A budget (`deadline`) is dynamically scoped to one
+  activation.** It applies exactly where written, is never
+  inherited, and never resets on progress. Each entry to a phase
+  starts a fresh budget, so a legitimately revisited phase is
+  budgeted per visit; the header `deadline` is the backstop that
+  bounds the whole run, cycles included.
+
+Where each word may appear, and what it means there — any other
+placement is a parse error:
+
+| written on | `timeout` | `deadline` | `stable` |
+|---|---|---|---|
+| header | default for all observations | budget for the run | error |
+| `phase` | default within the phase | budget per phase entry | error |
+| single-condition `wait` | bound on this observation | error | hold requirement on this match |
+| branching `wait` | bound on reaching the first match | error | error — put it on the `on` |
+| `on` | error — the container owns the waiting | error | hold requirement on this condition |
+
+Two placements are rejected deliberately rather than tolerated:
+`deadline` on a single observation would be an exact synonym for
+`timeout` (a scope containing one observation has identical bound
+and budget), and a language should refuse two spellings for one
+meaning; `stable` on a container is meaningless because only a
+match can be required to hold.
+
+Because per-observation resolution is fully lexical, the effective
+timeout of every observation is computable at parse time:
+`check-script` reports the resolved timing plan, and a timing
+failure names which clock expired and the scope that supplied it —
+an observation timeout from a statement, a phase deadline from its
+declaration, or the run deadline from the header.
+
+`stable` requires a watch condition to remain matched for the
+stated duration before succeeding:
+
+```rlqs
+wait "Formatting" stable=2s
+```
+
+There is no generic sleep or delay verb, on principle: a blind
+pause encodes a guess about guest speed that will be wrong on
+another host. Every pause must be justified by an observation;
+`stable` strengthens one rather than blindly pausing after it.
+Screen polling and input-event pacing remain control-plane-owned;
+the script does not tune them.
 
 ## Input verbs
 
 ### `enter`
 
-```rqs
+```rlqs
 enter "fdapm poweroff"
 enter "setup /owner=${owner-name}"
 ```
 
-Types the expanded string and presses Enter. It sends input only; it
-does not assert that a command started, completed, or succeeded.
+Types the expanded string and presses Enter. It sends input only;
+it does not assert that a command started, completed, or succeeded.
 Completion is an explicit subsequent observation.
 
 `enter "..."` is equivalent to `type "...<enter>"`.
 
 ### `type`
 
-```rqs
+```rlqs
 type "A:"
 type "<down><down><enter>"
 ```
@@ -664,7 +897,7 @@ token is a parse error.
 
 ### `press`
 
-```rqs
+```rlqs
 press enter
 press down down enter
 press ctrl+c
@@ -676,9 +909,9 @@ validated before execution.
 
 ### `select`
 
-```rqs
+```rlqs
 select "Install to harddisk"
-select "Plain DOS system", exclude: "with sources"
+select "Plain DOS system" exclude="with sources"
 ```
 
 Selects an entry in a cursor-key menu by normalized visible label.
@@ -688,31 +921,33 @@ Zero candidates, multiple remaining candidates, an undetectable
 highlight, or traversal without progress are named failures; the
 verb never guesses.
 
-## State transitions
+## Phase transitions
 
-`-> <state>` is a standalone statement. In a sequential state it
-must be the final reachable statement. In a reactive handler or
-`expect` branch it ends the action immediately:
+`goto <phase>` transfers control to a declared phase. In a
+sequential phase it must be the final reachable statement. In an
+`on` body it ends the action immediately:
 
-```rqs
--> formatting
+```rlqs
+goto formatting
 ```
 
-`done` successfully ends the script:
+`finish` successfully ends the script:
 
-```rqs
-done
+```rlqs
+finish
 ```
 
 There is no implicit fallthrough and no transition attached to the
-end of another action. Keeping transitions on their own lines makes
-the state graph searchable and removes precedence ambiguity.
+end of another action. Keeping transitions as explicit statements
+makes the phase graph searchable — `goto formatting` finds every
+entry into a phase, `phase formatting` finds its declaration — and
+removes precedence ambiguity.
 
 ## Supporting operations
 
 ### `screenshot`
 
-```rqs
+```rlqs
 screenshot
 screenshot after-package-selection
 ```
@@ -724,9 +959,9 @@ Failing observations capture a screenshot automatically.
 
 ### `insert` and `eject`
 
-```rqs
-insert cdrom0 freedos-1.4-livecd
-insert floppy1 ${supplemental-disk}
+```rlqs
+insert cdrom0 @freedos-1.4-livecd
+insert floppy1 $supplemental-disk
 eject cdrom0
 ```
 
@@ -738,13 +973,13 @@ the drive itself: drives are guest-visible hardware the blueprint
 declares — an installer-driven blueprint declares the slot empty
 (`"cdrom0": null`) — and an `insert` or `eject` naming a missing
 or non-removable slot fails static preflight, before any guest
-input. `insert` accepts a literal
-defined-media name or a `media` input. By execution time every
-embedded definition has been installed, so resolution uses the
-ordinary shared catalog, then fetches and hash-verifies the item as
-needed. Both verbs work on a running machine (a media change the
-guest observes) and on a stopped one (the medium present at the
-next `start`).
+input. `insert` accepts a media reference (`@name`) or a `media`
+input (`$name`); bare media names are not valid. By execution time
+every embedded definition has been installed, so resolution uses
+the ordinary shared catalog, then fetches and hash-verifies the
+item as needed. Both verbs work on a running machine (a media
+change the guest observes) and on a stopped one (the medium present
+at the next `start`).
 
 **Insertions are definitive machine state.** An `insert` persists
 across `stop`/`start` exactly like an installer's writes to a hard
@@ -761,7 +996,7 @@ blueprint shape.
 
 ### `boot`
 
-```rqs
+```rlqs
 boot hdd0 cdrom0
 boot cdrom0
 ```
@@ -784,22 +1019,22 @@ different order than the blueprint's default.
 
 ### `stage` and `collect`
 
-```rqs
+```rlqs
 stop
 stage "payloads/AUTOTEST.EXE"
 start
 
 # guest runs and shuts down
-collect "RESULTS.LOG", to: "results/"
+collect "RESULTS.LOG" to="results/"
 ```
 
 `stage` places a host file on the declared exchange drive;
 `collect` copies a guest-produced file from it. Both require the
 machine to be stopped on every control plane. This uniform contract
 preserves agentless virtual-FAT snapshot and write-back semantics.
-Future live guest-agent transfer, if added, will use different verbs
-with an explicitly stronger capability rather than silently changing
-these verbs' lifecycle behavior.
+Future live guest-agent transfer, if added, will use different
+verbs with an explicitly stronger capability rather than silently
+changing these verbs' lifecycle behavior.
 
 Stage sources resolve relative to the script directory. Collection
 destinations resolve beneath the run's output directory, never the
@@ -808,7 +1043,7 @@ script paths cannot escape it.
 
 ### `start` and `stop`
 
-```rqs
+```rlqs
 stop
 start
 ```
@@ -829,20 +1064,26 @@ reconciliation behavior visible.
 
 ## Validation and preflight
 
-Parsing and static validation finish before the machine starts. They
-reject:
+Parsing and static validation finish before the machine starts.
+They reject:
 
-- malformed syntax, unknown verbs or modifiers, and unbalanced
-  blocks;
-- duplicate or invalid names and unknown input references;
+- malformed syntax, unknown node names, and unbalanced blocks;
+- arguments, properties, or blocks outside a node's signature,
+  including every illegal timing placement in the
+  [placement table](#timing);
+- duplicate or invalid names, reserved words used as names, and
+  unknown `$` input references;
 - conflicting embedded or shared media definitions and definition
   labels whose target files already contain different content;
-- a missing or invalid `initial` state;
-- transitions to undeclared states;
-- mixed linear/state-machine shapes;
-- mixed sequential/reactive state contents;
-- sequential states with any reachable path lacking an explicit
-  transition or `done`;
+- a missing or invalid `entry` phase;
+- `goto` targets naming undeclared phases, and `goto` in a linear
+  script;
+- mixed linear/phased shapes;
+- mixed sequential/reactive phase contents;
+- sequential phases with any reachable path lacking a final `goto`
+  or `finish`;
+- a branching `wait` with no handlers, or with a nested branching
+  `wait` in a handler body;
 - invalid key tokens and invalid typed argument positions;
 - `insert`/`eject` targets that are not floppy or cdrom slots and
   (with a machine in scope) slots the target machine does not
@@ -855,9 +1096,9 @@ reject:
   and required secret credentials unavailable from a secure host
   store.
 
-Static analysis warns about unreachable states, reactive states with
-no possible exit, obvious shadowed literal conditions, and inputs
-that are declared but unused.
+Static analysis warns about unreachable phases, reactive phases
+with no possible exit, obvious shadowed literal conditions, and
+inputs that are declared but unused.
 
 After binding inputs, preflight computes every capability the
 script may require and compares the complete set with the machine's
@@ -872,11 +1113,13 @@ rlq check-script <script_name>
 ```
 
 performs parsing, prospective embedded-media validation, and static
-analysis without executing the script, changing the user property
-registry, accessing secret values, or writing to `media/`. Supplying
-a machine and response file also performs typed binding and capability
-preflight. Registry-aware checking reports property presence and kind;
-it never reveals a property value.
+analysis — including the resolved timing plan, each observation's
+effective timeout, and its source scope — without executing the
+script, changing the user property registry, accessing secret
+values, or writing to `media/`. Supplying a machine and response
+file also performs typed binding and capability preflight.
+Registry-aware checking reports property presence and kind; it
+never reveals a property value.
 
 ## Failure, runs, and transcripts
 
@@ -889,11 +1132,11 @@ cache/machines/<machine_id>/runs/<timestamp>-<run_id>/
 └── output/
 ```
 
-The CLI may redirect the output root, but transcript paths are always
-reported explicitly. A transcript records:
+The CLI may redirect the output root, but transcript paths are
+always reported explicitly. A transcript records:
 
 - each executed source line and line number;
-- state entries, handler firings, branches, and transitions;
+- phase entries, handler firings, branches, and transitions;
 - observations, normalized matches, and elapsed time;
 - input names and whether each came from a response, named user
   property, or prompt, but never expanded input values;
@@ -902,9 +1145,10 @@ reported explicitly. A transcript records:
 - the selected backend and control plane for each operation; and
 - every produced screenshot or collected-file path.
 
-On failure it adds the pending condition or action, timeout versus
-deadline distinction, final observed screen text, machine state,
-and an automatic screenshot when available.
+On failure it adds the pending condition or action, the clock that
+expired and the scope that supplied it (statement timeout, phase
+deadline, or run deadline), final observed screen text, machine
+state, and an automatic screenshot when available.
 
 There is no automatic retry. Re-running an installation against a
 partially modified disk is not generally safe and is not described
@@ -922,75 +1166,86 @@ still reshape the language coherently.
 The intended post-beta growth discipline is:
 
 - existing observation forms keep their meanings;
-- new observation and action kinds use explicit sibling forms, such
-  as `wait image <asset>` and future pointer verbs;
+- new observation and action kinds use explicit sibling forms —
+  `wait image @needle-name` reuses the library-reference spelling
+  for image assets, and future pointer verbs follow the same
+  node shape;
 - new behavior never appears merely because a script omitted a new
-  modifier; and
+  property; and
 - capability requirements remain explicit and preflightable.
 
-Image matching and pointer input extend observation and action; they
-do not introduce a second control-flow model.
+Image matching and pointer input extend observation and action;
+they do not introduce a second control-flow model or any new
+punctuation role.
 
 ## Complete FreeDOS install example
 
-```rqs
-description: "FreeDOS 1.4 plain install from LiveCD"
-platform: dos
-machine: stopped
-initial: insert-cd
-timeout: 30s
+```rlqs
+description "FreeDOS 1.4 plain install from LiveCD"
+platform    dos
+machine     stopped
+entry       startup
+timeout     30s
 
-state insert-cd {
-    insert cdrom0 freedos-1.4-livecd
+phase startup {
+    insert cdrom0 @freedos-1.4-livecd
     start
-    -> cd-boot
+    goto cd-boot
 }
 
-state cd-boot {
-    wait "Welcome to FreeDOS 1.4 (LiveCD)"
+phase cd-boot {
+    wait   "Welcome to FreeDOS 1.4 (LiveCD)"
     select "Install to harddisk"
-    wait "What is your preferred language"
-    select "English (United States)"
-    wait "Welcome to the FreeDOS 1.4 installation program"
-    press enter
+    wait   "What is your preferred language"
+    select "English"
+    wait   "Welcome to the FreeDOS 1.4 installation program"
+    press  enter
 
-    expect {
-        "Drive C: does not appear to be partitioned.": {
+    wait {
+        on "Drive C: does not appear to be partitioned." {
             select "Yes"
-            -> partitioning
+            goto partitioning
         }
-        "Drive C: does not appear to be formatted.": {
+        on "Drive C: does not appear to be formatted." {
             select "Yes"
-            -> formatting
+            goto formatting
         }
     }
 }
 
-state partitioning {
-    wait "You must reboot your computer"
+phase partitioning {
+    wait   "You must reboot your computer"
     select "Yes"
-    -> cd-boot
+    goto cd-boot
 }
 
-state formatting, timeout: 5m, deadline: 20m {
-    wait "Press a key..."
-    press enter
-    wait "Please select your keyboard layout"
-    press enter
-    wait "What FreeDOS packages do you want to install?"
-    select "Plain DOS system", exclude: "with sources"
-    wait "We are now ready to install FreeDOS 1.4."
+phase formatting timeout=5m deadline=20m {
+    wait   "Press a key..."
+    press  enter
+    wait   "Please select your keyboard layout"
+    select "US English (Default)"
+    wait   "What FreeDOS packages do you want to install?"
+    select "Plain DOS system" exclude="with sources"
+    wait   "We are now ready to install FreeDOS 1.4."
     select "Yes"
-    wait "Installation of FreeDOS 1.4 is now complete."
+    wait   "Installation of FreeDOS 1.4 is now complete."
     select "Yes"
-    wait "Load FreeDOS with JEMMEX (more compatible)"
-    press enter
-    wait "C:\>"
+    goto hd-boot
+}
+
+phase hd-boot {
+    wait   "Load FreeDOS"
+    select "Load FreeDOS with JEMMEX (more compatible)"
+    wait   "C:\>"
     screenshot installed
+    goto shutdown
+}
+
+phase shutdown {
     enter "fdapm poweroff"
-    wait stopped, timeout: 2m
+    wait  stopped timeout=2m
     eject cdrom0
-    done
+    finish
 }
 ```
 
@@ -1000,16 +1255,16 @@ blank hard disk fails to boot, so the opening `insert` makes the
 machine fall through to the LiveCD, and the closing `eject`
 returns the machine to its default shape — the same boot order
 thereafter boots the installed hard disk. No `boot` verb is needed.
-The second visit to `cd-boot` reaches the other `expect` branch
-because the disk has been partitioned. The guest-driven reboot is
-expressed by the installer selection and the resulting screen, not
-by a reliquary reboot command.
+The second visit to `cd-boot` reaches the other branch of its
+closing `wait` because the disk has been partitioned. The
+guest-driven reboot is expressed by the installer selection and the
+resulting screen, not by a reliquary reboot command.
 
 Verification is a separate script needing no machine
 reconfiguration at all: after the install script's final `eject`,
 the machine is back in its blueprint shape and simply boots the
 installed hard disk. The verify script declares
-`machine: stopped` too and issues a plain `start`. If an
+`machine stopped` too and issues a plain `start`. If an
 interrupted install run left the CD attached, `apply` restores the
 blueprint shape (or the HD-first order boots the installed disk
 anyway while the CD remains attached).
@@ -1017,12 +1272,13 @@ anyway while the CD remains attached).
 ## Sharing
 
 A shareable blueprint/script bundle consists of its script, machine
-blueprint, any separate shared media definitions, and an example response
-file containing only non-sensitive illustrative values. Media definitions
-embedded in a script are installed into the recipient's shared library on
-first run. Definitions already reused by several scripts may be
-distributed directly under `media/` instead. The user property registry,
-personal or secret response files, and staged payloads stay out of the
-bundle and version control. A script may recommend property keys, but
-every recipient supplies their own values. Media remains hash-pinned and
+blueprint, any separate shared media definitions, and an example
+response file containing only non-sensitive illustrative values.
+Media definitions embedded in a script are installed into the
+recipient's shared library on first run. Definitions already reused
+by several scripts may be distributed directly under `media/`
+instead. The user property registry, personal or secret response
+files, and staged payloads stay out of the bundle and version
+control. A script may recommend property keys, but every recipient
+supplies their own values. Media remains hash-pinned and
 independently fetched.

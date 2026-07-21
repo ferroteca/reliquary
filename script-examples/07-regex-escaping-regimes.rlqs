@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: the same screen text needs different escapes in the two
+# condition spellings. Strings keep backslashes literal (a DOS
+# kindness); regexes are raw Python re, where a backslash is an
+# operator. The two regimes sit side by side in every DOS script.
+
+description "Two escaping regimes, one screen"
+platform    dos
+timeout     30s
+
+wait "C:\>"          # string rule: backslash LITERAL by default
+wait /C:\\>/         # regex rule: backslash must be DOUBLED
+
+# The same path, both ways:
+wait "A:\GAMES\README.TXT"      # literal text — reads like DOS
+wait /A:\\GAMES\\.*\.TXT/       # pattern — every \ doubles, except
+                                # the \. which is a regex escape;
+                                # three backslash meanings, one line
+
+# Subtlety at the boundary: the slash delimiter's ONLY escape is
+# \/ — every other backslash passes through to Python re. And #
+# is pattern text inside the fences but a comment outside them:
+wait /ERROR #[0-9]+/    # this # matches a literal #...
+wait "ERROR"            # ...this one starts a comment ->  # like so
+
+# The redesign made regexes instantly RECOGNIZABLE (/.../ vs the
+# old regex-keyword string), which was the CLARITY goal — but it
+# did not make them consistently WRITABLE next to strings: the
+# author must context-switch escaping rules on adjacent lines,
+# and DOS text is backslash-dense in exactly the wrong way.
+#
+# OPEN QUESTIONS: is a raw-regex form worth it (the string world
+# already has r"..." but the regex world has no analogue)? Should
+# the spec instead bless a convention — prefer literal strings for
+# anything containing a path, regexes only for genuinely variable
+# text — and have validation hint when a regex contains \\ runs
+# that a literal match would serve? Any auto-normalizing of
+# backslashes inside /.../ was rejected: it would fork reliquary's
+# regex dialect from Python's, a worse inconsistency than this one.

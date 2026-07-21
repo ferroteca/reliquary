@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: the word "enter" carries three roles — a verb, a key
+# name, and a key token. One concept (the Enter key), three
+# spellings, and the same action writable three ways.
+
+description "The three spellings of the Enter key"
+platform    dos
+timeout     30s
+
+# Role 1 — the verb: type guest text, then press the Enter key.
+enter "dir"
+
+# Role 2 — the key name: a bare word in press's key vocabulary.
+press enter
+
+# Role 3 — the key token: quoted markup inside a typed string.
+type "<enter>"
+
+# By definition, these two lines are the same action:
+enter "cls"
+type  "cls<enter>"
+
+# The collision at a glance: three consecutive lines, and the
+# reader must know that the first IMPLIES the key, the second NAMES
+# it, and the third QUOTES it —
+enter "exit"        # guest text + the key
+press enter         # just the key
+type  "<enter>"     # also just the key
+
+# The asymmetry runs deeper: `enter` is reserved as an identifier
+# (no phase may be named enter), yet it is an ordinary word in the
+# key namespace one token after `press`. Reserved in one namespace,
+# plain in another (see 08-bare-word-namespaces.rlqs).
+#
+# OPEN QUESTION: rename the verb so "enter" appears in exactly one
+# lexical class? Candidates: `submit "dir"` (verb-first, honest
+# about the implied keypress), `line "dir"`, or dropping the verb
+# entirely — `type "dir<enter>"` is only three characters longer
+# and single-role. The verb earns its keep only if install scripts
+# use it constantly (they do — see design-install.rlqs `shutdown`).

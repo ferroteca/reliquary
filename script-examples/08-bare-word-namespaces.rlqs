@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: "bare word = internal name" is one spelling covering at
+# least six namespaces, distinguished only by argument position —
+# and the namespaces have different validation strength and
+# different reservation rules.
+
+description "Six namespaces, one spelling"
+platform    dos          # 1. platform name
+machine     stopped      # 2. state keyword
+entry       install      # 3. phase name
+timeout     30s
+
+phase install {
+    insert cdrom0 @boot-cd   # 4. drive slot (cdrom0)
+    start
+    press  enter             # 5. key name
+    wait   "C:\>"
+    screenshot installed     # 6. artifact name — a NEW namespace
+    goto   finished          #    phase name again
+}
+
+phase finished {
+    eject cdrom0
+    finish
+}
+
+# The sharpest contrast is these two, grammatically identical:
+#
+#     screenshot installed      names an artifact to CREATE
+#     goto       finished       names a phase that must EXIST
+#
+# A mistyped phase name fails parse (undeclared target); a mistyped
+# artifact name silently creates a differently named file. Same
+# shape, opposite failure behavior.
+#
+# Reservation asymmetry: verbs and header nouns are reserved as
+# identifiers — a phase may not be named `enter` or `timeout` — yet
+# `enter` is an ordinary word in the key namespace:
+#
+#     press enter          # legal: key namespace admits it
+#     # phase enter { }    # ILLEGAL: identifier namespace reserves it
+#
+# So whether "enter" is a valid bare word depends on which of the
+# six namespaces the position selects (see 01-enter-three-roles).
+# Slots have the same shadow in miniature: `cdrom0` is valid after
+# insert/eject/boot but is an ordinary (confusing) identifier
+# anywhere else — nothing stops `phase cdrom0` or
+# `screenshot cdrom0`.
+#
+# OPEN QUESTIONS: accept position-typed bare words as the price of
+# a sigil-light language (the linguist's answer: this IS how
+# keyword-in-context grammars work), or reserve the small closed
+# vocabularies (key names, slot names) globally so they can never
+# name a phase or artifact? Reserving them costs little — who names
+# a phase `cdrom0`? — and would make every bare word's namespace
+# recoverable from spelling plus one global list, not from
+# position.

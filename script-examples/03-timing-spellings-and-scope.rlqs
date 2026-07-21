@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM 1: one setting, two spellings. At the top level, timeout
+# and deadline are declaration nodes; on a construct they are
+# properties. The rule is consistent (properties always use "=",
+# top-level settings are declarations) — but the same word wears
+# two grammatical costumes a few lines apart.
+
+description "Timing: two spellings, non-local defaults, reset rules"
+platform    dos
+entry       fast
+timeout     30s          # node spelling
+deadline    45m          # node spelling — the run budget
+
+phase fast {
+    wait "ready"         # effective bound: 30s (header, 1 scope up)
+    goto slow
+}
+
+phase slow timeout=5m deadline=20m {    # property spelling
+    # PROBLEM 2: the effective bound of a wait is not locally
+    # readable. Nothing on the next line says 5m — the reader must
+    # scan outward through phase, then header, then the built-in
+    # 60s, applying innermost-wins on the way:
+    wait "Formatting"               # bound: 5m  (phase)
+    wait "Verifying" timeout=15m    # bound: 15m (statement wins)
+    wait "Done" stable=2s           # bound: 5m, AND must hold 2s
+    goto split
+}
+
+phase split timeout=2m {
+    # PROBLEM 3: the stable split. The single-condition form
+    # carries both settings on one line —
+    wait "Choice?" timeout=90s stable=1s
+    # — but the branching form separates the pair: timeout stays on
+    # the wait (the container owns the waiting) while stable moves
+    # onto each condition (the condition owns the holding):
+    wait timeout=90s {
+        on "Choice A" stable=1s { }
+        on "Choice B"           { }
+    }
+    # The placement rule is mechanical, but the same two settings
+    # land on one line in one form and two lines in the other.
+    goto watchful
+}
+
+phase watchful timeout=5m deadline=30m {
+    on "Insert disk 2"  { press enter }
+    on "Setup complete" { finish }
+}
+# PROBLEM 4: reset asymmetry, invisible in the syntax. In this
+# reactive phase the timeout bounds each QUIET INTERVAL and resets
+# after every handler firing; the deadline runs from phase entry
+# and never resets. Two clocks declared side by side on the same
+# line, opposite reset behavior — rule knowledge, not visible form.
+#
+# OPEN QUESTIONS: is the node/property dual spelling worth a fix
+# (e.g. header lines also using "=", at the cost of the noun-first
+# declaration style)? Should tooling, rather than syntax, carry
+# problem 2 (check-script already reports the resolved timing plan
+# per observation)? Problems 3 and 4 look inherent to placement-
+# equals-scope — the cure (repeating settings everywhere) seems
+# worse than the disease.

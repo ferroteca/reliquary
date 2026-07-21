@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# PROBLEM: one word family, four constructs — and quoting alone
+# flips a condition's semantic domain.
+#
+#   stop              verb: host-side hard power-off, an action
+#   stopped           bare condition: backend reports not running
+#   machine stopped   header: a precondition, performs nothing
+#   "stopped"         quoted: guest SCREEN TEXT saying "stopped"
+
+description "The stop/stopped family"
+platform    dos
+machine     stopped     # expectation only — no action performed
+timeout     30s
+
+start                   # verb: acts now
+enter "shutdown"
+wait  stopped           # bare word: observes the MACHINE domain
+# wait "stopped"        # quoted, the SAME word would watch for the
+                        # literal text "stopped" on the guest screen
+
+# One character class — the quotes — silently moves the condition
+# from the machine domain to the guest-screen domain. A reader
+# skimming a column of wait lines cannot tell a machine-event wait
+# from a text wait without focusing on the quotes:
+#
+#     wait "Formatting complete"      guest screen
+#     wait stopped                    machine state
+#     wait "stopped"                  guest screen again
+#
+# The header adds a third reading of the same word: `machine
+# stopped` is inert (a precondition), while `stop` is destructive.
+# The noun-first/verb-first zone rule carries that whole
+# distinction; the words themselves do not.
+#
+# OPEN QUESTION: should machine-state conditions be namespaced so
+# bare condition words cannot shadow screen text in the reader's
+# eye? Sketches (all NOT current syntax):
+#     wait machine=stopped        # property-flavored, verbose
+#     wait <stopped>              # key-token spelling, wrong class
+#     wait stopped                # status quo: contextual keyword
+# The status quo is defensible (one machine-event word today), but
+# each future machine event (paused? rebooted?) widens the bare
+# vocabulary and the collision surface with screen text.

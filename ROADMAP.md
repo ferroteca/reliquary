@@ -464,53 +464,75 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 `rlq script <script_name>` against a machine selected with
 `--machine <id>` or `--blueprint <name>`.
 
-**Decided shape: a line-oriented, constrained DSL.** A script is
-a UTF-8 text file (`scripts/<name>.rlqs`): header directives, then
-one statement per line — a verb, arguments, and comma-separated
-`key: value` modifiers — with `#` comments and brace blocks. It
-is a domain-specific programming language with sequencing,
-branching, named states, and explicit transitions, but no
-expressions, mutable variables, functions, arithmetic, or
-general-purpose loop construct. Computational orchestration
-belongs in Python.
+**The July 2026 surface redesign is decided and
+[docs/script-spec.md](docs/script-spec.md) is its source of
+truth** (including the complete typed EBNF), with
+`design-install.rlqs` in the repository root as the reference
+script. Realigning the implementation — parser, runtime, shipped
+scripts — with it is **absolute priority #1**; see the
+realignment milestone below. Pre-beta, the superseded surface is
+deleted, not bridged.
+
+**Decided shape: a line-oriented, constrained DSL with one
+grammatical form.** A script is a UTF-8 text file
+(`scripts/<name>.rlqs`) in which every line is a *node*: a name,
+positional arguments, `name=value` properties, and optionally a
+brace block — with `#` comments and no commas or colons anywhere.
+Spelling reveals role: `"..."` is guest-boundary text, `/.../` a
+regex, `@name` a library reference, `$name` a run-supplied input,
+bare words are keywords and script-internal names. Declarative
+nodes (headers, `media`, `input`, `phase`) begin with a noun and
+precede imperative verb-first statements. It is a domain-specific
+programming language with sequencing, branching, named phases,
+and explicit transitions, but no expressions, mutable variables,
+functions, arithmetic, or general-purpose loop construct.
+Computational orchestration belongs in Python.
 
 A script has one of two non-mixing shapes. A **linear script** is
-an ordered top-level sequence. A **state-machine script** declares
-an explicit `initial` state and named states; every sequential
-state ends in a standalone `-> <state>` or `done`, with no
-textual fallthrough. A state is either sequential (ordered
-statements and `expect`) or reactive (only `on` handlers, all
+an ordered top-level sequence. A **phased script** declares an
+explicit `entry` phase and named phases; every sequential phase
+ends in `goto <phase>` or `finish`, with no textual fallthrough.
+A phase is either sequential (ordered statements, including
+branching `wait` blocks) or reactive (only `on` handlers, all
 active from entry), never the former hybrid of an ordered body
 and positionally armed ambient handlers. Reactive dispatch is
 single-threaded and run-to-completion. A handler fires once per
 matching episode and cannot fire again until its condition has
 become unmatched and later matches again, preventing persistent
 screens from repeating destructive input on every poll. Smaller
-states, rather than statement position, scope which handlers are
-active. There are no anonymous states or handler-splicing macros.
+phases, rather than statement position, scope which handlers are
+active. There are no anonymous phases or handler-splicing macros.
 
 Text watches are case-sensitive **normalized text matches**:
 screen rows decode to Unicode, trim cell padding, and collapse
-whitespace before literal substring or opt-in Python-regex
-matching. `expect` covers small ordered forks. `stopped` is the
-machine no-longer-running condition; it does not claim that the
-shutdown was graceful. A guest reboot has no reliquary verb or
-event: the script types the guest command, makes a menu choice, or
-sends the appropriate key sequence, then watches for the screen
-that follows. There is likewise no `run` verb: `enter` delivers a
+whitespace before literal substring or opt-in regex matching.
+`wait` is the one observation construct, in single-condition and
+branching forms — the branching `wait { on ... }` covers small
+ordered forks, and `on <condition> { }` is the one branch form,
+shared with reactive phases. `stopped` is the machine
+no-longer-running condition; it does not claim that the shutdown
+was graceful. A guest reboot has no reliquary verb or event: the
+script types the guest command, makes a menu choice, or sends the
+appropriate key sequence, then watches for the screen that
+follows. There is likewise no `run` verb: `enter` delivers a
 console line, and completion is a separate explicit observation.
 
-Timing separates three meanings: `timeout` bounds one
-observation (or a reactive state's inactivity), `deadline` bounds
-total state/block time without resetting, and `stable` requires a
-condition to remain matched. Polling and input pacing belong to
-the control plane; the language has no `delay` or sleep. Duration
-literals carry units (`500ms`, `30s`, `20m`). Block modifiers are
-written on the opening line.
+Timing separates two scoping families: `timeout` bounds the time
+to the next observed event and is a lexically scoped default
+(statement over branching wait over phase over header, innermost
+wins), while `deadline` is a wall-clock budget dynamically scoped
+to one activation of the construct it annotates — fresh per phase
+entry, with the header `deadline` backstopping the whole run —
+and `stable` requires a condition to remain matched. Illegal
+placements are parse errors per the spec's placement matrix.
+Polling and input pacing belong to the control plane; the
+language has no `delay` or sleep. Duration literals carry units
+(`500ms`, `30s`, `20m`).
 
 Immutable `text`, `media`, and `secret` inputs externalize
-run-specific data without adding decisions or expressions. `${name}`
-references are bound before execution. Each input may name a
+run-specific data without adding decisions or expressions.
+`$name` references (`${name}` inside strings) are bound before
+execution. Each input may name a
 home-wide user property with `property: "<key>"`; an explicit JSON
 response wins for that invocation, then the property registry, then
 interactive prompting. Missing noninteractive, mistyped, or
@@ -547,9 +569,10 @@ machine blueprint and `stop` is visibly a host hard power-off.
 There is no `restart`: a hard power cycle is the explicit pair,
 and a guest reboot remains guest input. Parsing, response binding,
 whole-script capability preflight, and static control-flow checks
-all finish before the first guest input. User documentation
-(planned format, written ahead of implementation):
-[docs/script-spec.md](docs/script-spec.md).
+all finish before the first guest input. User documentation and
+source of truth: [docs/script-spec.md](docs/script-spec.md)
+(the July 2026 redesign; the implementation still speaks the
+superseded surface until the realignment milestone lands).
 
 The primitive vocabulary already exists in today's CLI and Python
 surface — it is the proven instruction set the language must cover:
@@ -589,17 +612,22 @@ the script.
 
 ## Milestones
 
-**DOS under QEMU is the top priority, and blueprints are the
-extremely high priority within it.** Milestone 1 is a vertical
-slice: the north-star command working end to end from a clean
-home. Milestones 2–5 then complete the documented design — the
-media library, the instance model and machine blueprint, the
-property registry, and the scripting language, i.e. everything in
-`docs/` — for the DOS platform on the QEMU backend alone. Only
-then does the design generalize: the adapter seam is extracted
-from working code (6), proven by a second backend (7), and
-extended with machine mobility (8), guest agents (9), and the VNC
-control plane (10).
+**Absolute priority #1 is the script-surface realignment** (its
+own milestone below): retargeting the implementation to the
+redesigned script spec before any other milestone work proceeds.
+**Within the larger arc, DOS under QEMU is the top priority, and
+blueprints are the extremely high priority within it.**
+Milestone 1 is a vertical slice: the north-star command working
+end to end from a clean home. Milestones 2–5 then complete the
+documented design — the media library, the instance model and
+machine blueprint, the property registry, and the scripting
+language, i.e. everything in `docs/` — for the DOS platform on
+the QEMU backend alone. The script-surface realignment then
+retargets the language implementation to the July 2026 redesign.
+Only then does the design generalize: the adapter seam is
+extracted from working code (6), proven by a second backend (7),
+and extended with machine mobility (8), guest agents (9), and the
+VNC control plane (10).
 
 Each milestone is independently shippable: the tree builds, the
 test suite passes, and the FreeDOS install keeps working end to
@@ -882,11 +910,13 @@ CLI with no secret material ever in the file, and interrupting an
 update cannot produce a plaintext value or a marker whose
 credential was reported bound but is absent.
 
-### Milestone 5 — The scripting language (complete)
+### Milestone 5 — The scripting language (complete, on the superseded surface)
 
-The remainder of [docs/script-spec.md](docs/script-spec.md)
-beyond milestone 1's core, completing the documented design for
-DOS on QEMU.
+The remainder of the script spec beyond milestone 1's core,
+completing the then-documented design for DOS on QEMU. The
+deliverables below record what was built; the July 2026 spec
+redesign supersedes their syntax, and the realignment milestone
+that follows retargets them.
 
 Deliverables:
 
@@ -932,6 +962,44 @@ exercise the full language (states, inputs, embedded media
 blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `docs/`
 documents is implemented for DOS on QEMU.
+
+### Script-surface realignment — absolute priority #1
+
+The July 2026 script-language redesign
+([docs/script-spec.md](docs/script-spec.md), with
+`design-install.rlqs` in the repository root as the reference
+script) supersedes the surface milestones 1 and 5 implemented.
+This milestone gates everything after it: no later milestone
+starts before the tree speaks the new surface. Pre-beta, the old
+surface is deleted, not bridged.
+
+Deliverables:
+
+1. Retarget `script.py` to the node grammar and typed EBNF: the
+   three-production skeleton plus per-node signatures; no colons
+   or commas, `name=value` properties, `/regex/` literals, `@`
+   media references, `$`/`${}` input references, and the
+   colon-free noun-first headers with `entry` and the run-level
+   `deadline`.
+2. The renamed vocabulary: `phase` (was `state`), `goto` (was
+   `->`), `finish` (was `done`); `expect` folded into the
+   branching `wait { on ... }` with `on` as the one branch form;
+   the `regex` keyword replaced by the regex literal.
+3. The timing model: lexically scoped `timeout`/`stable` defaults
+   (innermost wins), per-activation `deadline` budgets (fresh per
+   phase entry; the header `deadline` backstops the run), the
+   placement matrix enforced as parse errors, and failure
+   diagnostics naming the expired clock and its source scope.
+4. `script_runner.py` retargeted, and `check-script` grown to
+   report the resolved timing plan (each observation's effective
+   timeout and source scope).
+5. The built-in and example scripts converted, and every document
+   that quotes script syntax updated (README, examples/README);
+   `design-install.rlqs` retires into the converted builtins.
+
+Done when: the FreeDOS install and verify scripts run end to end
+in the new surface, `check-script` reports the timing plan, and
+no old-surface syntax parses anywhere.
 
 ### Milestone 6 — The backend adapter seam
 
