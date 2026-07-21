@@ -24,6 +24,11 @@ machines). reliquary is not a VM manager for machines you keep;
 every design choice may assume machines are cheap to destroy and
 rebuild.
 
+[INTERFACES.md](INTERFACES.md) names the interfaces through which
+the world drives reliquary — the CLI, the embedding API, and the
+scripting language — the primary use cases they serve, and the
+vetting rule every interface-changing decision must follow.
+
 The unit of design is the **operation** performed against a
 machine: start it, stop it, insert media, send input, run a guest
 command, read the screen, transfer a file, take a screenshot. Two
@@ -149,8 +154,9 @@ copies of.
 
 ### Blueprint and state
 
-User documentation (planned format, written ahead of
-implementation): [docs/machine-blueprint.md](docs/machine-blueprint.md) with
+User documentation (the milestone-1 core is implemented; the
+remaining format is written ahead of implementation):
+[docs/machine-blueprint.md](docs/machine-blueprint.md) with
 its [field reference](docs/machine-blueprint-reference.md) and
 [cookbook](docs/machine-blueprint-cookbook.md), and the ownership,
 locking, and recovery model in
@@ -285,6 +291,23 @@ creation and selection, lifecycle, `apply`, scripting, media,
 properties — and nothing is CLI-only. Where the CLI resolves a
 selector, the API takes the same identifiers (a blueprint name, a
 machine id); where the CLI prints an id, the API returns it.
+Keeping the two in sync is extraordinarily important: a change to
+the shared surface lands on both presentations in the same
+change, never deferred (a required invariant — AGENTS.md).
+
+The API expects native bindings in multiple languages; Python is
+the first. Any other language that wants reliquary automation but
+has no native binding automates via the CLI. The CLI therefore
+serves programs as well as people, and the one-to-one mapping is
+what keeps that fallback complete: a capability missing from the
+CLI would be unreachable from every language without a binding.
+The binding expectation constrains API design: the API must never
+make working in a common binding language (C, Java) difficult —
+a shape that is elegant in Python but awkward to bind is the
+wrong shape. The same constraint binds the CLI: as the fallback
+for every unbound language, it must never make driving it from a
+common language difficult — clean to invoke, observe, and parse
+from a program, never interactive-only.
 
 Blueprints and machines are selected by explicit flags, never by
 position: `--blueprint <name>` (short `-b`) names a blueprint,
@@ -930,7 +953,7 @@ once its deletion is approved and is kept intact when it is not;
 `clean` reclaims only restorable files; the install script passes
 on the completed layer.
 
-### Milestone 3 — The instance model and machine blueprints (complete)
+### Milestone 3 — The instance model and machine blueprints
 
 The whole machine model beyond milestone 1's core —
 [docs/instance-model.md](docs/instance-model.md)
