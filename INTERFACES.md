@@ -171,7 +171,15 @@ deliberately and recorded here.
   finally closes the VM. The loop is driven programmatically,
   through a native binding or the CLI; computation and result
   interpretation stay on the agent's side of the seam, and
-  reliquary stays ignorant of who builds on it. This case is
+  reliquary stays ignorant of who builds on it. The canonical
+  journey uses reliquary twice: first to define and build the
+  test VM (U4), then again to automate the testing inside it.
+  Concretely: a unit-test suite runs in the guest while the
+  host-side automator captures detailed per-test results,
+  possibly updates a test object, and re-runs a specific test or
+  the entire suite — a tight edit-and-rerun loop, so granular
+  results and selective re-run are first-class demands, not
+  conveniences. This case is
   probably best served by a native guest-side agent (QGA, VMware
   Tools, Guest Additions, Hyper-V's integration services) — fast
   injection, execution, and observation as a structured control
@@ -195,7 +203,9 @@ deliberately and recorded here.
   VM, the media hashes verifying theirs is the exact build the
   scripts target. The machine is somewhat expensive to build, so
   the developer keeps it for the duration of the work cycle
-  rather than tossing it eagerly — and when truly finished,
+  rather than tossing it eagerly; day to day, the tests run
+  inside it through U3's loop — the same tool that built the rig
+  automates the testing in it. When truly finished, the developer
   disposes of the large VM and reclaims the disk space.
 - **U5 — Custom installation.** A user wants the German version
   of Windows. The built-in library will not carry such flavors —
