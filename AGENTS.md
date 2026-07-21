@@ -40,19 +40,19 @@ workflow:
   media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
-- `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
-- `INTERFACES.md` is the governing document for reliquary's world-facing interfaces: it names the interface
+- `planning/ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
+- `planning/INTERFACES.md` is the governing document for reliquary's world-facing interfaces: it names the interface
   inventory (CLI, embedding API, scripting language, machine blueprints, and media definitions, plus the
   property registry, recorded outputs, and the home layout) and the
   vetting rule every interface-changing decision must follow. The numbered primary use cases — the decision
-  surface that rule weighs against — live in `USE-CASES.md`.
-- `examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
+  surface that rule weighs against — live in `planning/USE-CASES.md`.
+- `planning/examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
   install script embedding the media definition that its first run installs in the media library. Its README carries
-  the status note. Keep the examples synchronized with `docs/` when the formats change.
-- `docs/` contains detailed user documentation, currently a mix of implemented cores and planned interfaces written
-  ahead of implementation (e.g. the machine blueprint: `docs/machine-blueprint.md` guide, `-reference.md`,
-  `-cookbook.md`, each carrying a status note until fully implemented). ROADMAP.md holds the architectural context
-  and open design questions and links into `docs/`; keep design discussion out of `docs/` user pages.
+  the status note. Keep the examples synchronized with `planning/design/` when the formats change.
+- `docs/` holds user-facing documentation for implemented features
+  (CLI reference, blueprint guide, DOS automation). Design documents
+  and planned interfaces live in `planning/design/` with `-design.md`
+  suffixes. Placement rules are in `.agents/skills/documentation-rules.md`.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no
@@ -74,11 +74,11 @@ and users recreate them. Compatibility guarantees, if any, will be defined no ea
 The CLI, the embedding API, the scripting language, the machine blueprint, and the media definition are
 reliquary's primary interfaces to the world; the property registry, recorded outputs (run records,
 transcripts), and the home layout are world-facing contracts alongside them. Any decision that
-changes one follows the rule in [INTERFACES.md](INTERFACES.md): requests triage by their impact on the
-numbered primary use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
+changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
+numbered primary use cases ([planning/USE-CASES.md](planning/USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
 work starting only after the amendment lands — then the change is named across every surface it touches
-and landed coherently on all of them. Where ROADMAP.md and INTERFACES.md or USE-CASES.md disagree, the
+and landed coherently on all of them. Where planning/ROADMAP.md and planning/INTERFACES.md or planning/USE-CASES.md disagree, the
 principles and use cases govern; the roadmap is realigned to them.
 
 ### CLI–API parity
@@ -248,7 +248,7 @@ Invariants to preserve: all state for an instance lives under its resolved const
 distinct `Runner` instances with distinct homes (per-home `vm.json` keeps VM ownership
 sound); the stored home must never fall back to the process-global home (`test_runner.py` guards this by making
 `home()` unreachable). The project is pre-release; prefer a coherent interface over compatibility shims when its
-architecture changes. The embedding API expects native bindings beyond Python (INTERFACES.md; ROADMAP.md "The
+architecture changes. The embedding API expects native bindings beyond Python (planning/INTERFACES.md; planning/ROADMAP.md "The
 CLI"): when shaping the public surface, never adopt a design that would be difficult to express in a common
 binding language such as C or Java. The CLI is under the same constraint as the fallback binding for unbound
 languages — never make it difficult to drive from a program.

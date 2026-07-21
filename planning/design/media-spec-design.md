@@ -20,7 +20,7 @@ boot floppies, and driver disks. Definitions are authored assets —
 `.rlqm` files, identified by extension and discovered anywhere
 under the invocation's asset root (the current directory by
 default), falling back to the reliquary home unless
-`--assets-only` disables the fallback (ROADMAP.md,
+`--assets-only` disables the fallback (../../planning/ROADMAP.md,
 "Authored-asset resolution"); a `media/` subdirectory is optional
 organizational dressing, the home's own convention included. The
 home library is the human
@@ -29,7 +29,7 @@ interactive scenarios. A rlq script may also
 embed definitions, installed on first run as `<label>.rlqm`
 beside the script — or into the home's `media/` when the script
 resolved from the home. Machines reference media by name (the
-[`media` drive field](machine-blueprint-reference.md#media--optional--string)),
+[`media` drive field](machine-blueprint-reference-design.md#media--optional--string)),
 and every media item is described by a **definition** stating
 where its file comes from and how it is verified.
 
@@ -104,19 +104,19 @@ definition do not participate. Any difference is a collision error
 naming both locations and the item. Embedded definitions never
 override library files. The complete installation rules, including
 mixed partially redundant blocks, are in the
-[script spec](script-spec.md#installation-into-the-media-library).
+[script spec](script-spec-design.md#installation-into-the-media-library).
 
 ## The definition format
 
 A definition comes in two forms. There is no version field in
 either
-([no backward compatibility before beta](machine-blueprint.md#format-stability-none-yet)).
+([no backward compatibility before beta](machine-blueprint-design.md#format-stability-none-yet)).
 Both library JSON files and embedded `media` blocks use these exact
 forms. In a script, `media <label> {` replaces the JSON object's
 outer opening brace; the block body otherwise follows JSON syntax and
 closes with the object's `}`. The label determines the installed
 file name, `<label>.rlqm`, and carries no item meaning. See
-[the script spec](script-spec.md#embedded-media-definitions) for
+[the script spec](script-spec-design.md#embedded-media-definitions) for
 scope and resolution rules.
 
 Library definition files are authored documents and accept the
@@ -332,7 +332,7 @@ above:
 - **`description`** — optional. A one-line human description of
   the definition, read into listings and `search` exactly like a
   blueprint's `description` (see
-  [the codex](codex.md)).
+  [the codex](codex-design.md)).
 - **`notes`** — optional. Free-form prose for anything longer:
   provenance, licensing context, why a particular mirror.
   reliquary never interprets it.
@@ -342,7 +342,7 @@ above:
   is the assertion; reliquary records and displays it but cannot
   verify a license. A built-in definition may carry a `url` only
   when it also carries this field — the
-  [codex's licensing rule](codex.md#non-redistributable-media).
+  [codex's licensing rule](codex-design.md#non-redistributable-media).
 
 ### Derived defaults, worked through
 
@@ -445,7 +445,7 @@ are the mirror URLs tried.
 The embedding API counterpart is
 `fetch_media(name, home=None, script=None, on_mismatch="fail")`,
 with `script` mirroring `--script` — the CLI and the API move
-together (INTERFACES.md).
+together (planning/INTERFACES.md).
 
 Verification is not optional: an item is never used without its
 `sha256` matching, and a failed download or hash mismatch is a

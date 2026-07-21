@@ -16,7 +16,7 @@ SPDX-License-Identifier: BSD-3-Clause
 Every reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create
 many machines. The detailed ownership, state, locking, and recovery
-model is in [Machine blueprints and machines](instance-model.md).
+model is in [Machine blueprints and machines](instance-model-design.md).
 
 ## The model at a glance
 
@@ -128,7 +128,7 @@ cache no re-run reproduces. The machine is never the product —
 often the run record is (U3): the point was to run some tests,
 and the record is copied out as plain files when it should
 outlive the machine
-([the record contract](script-spec.md#failure-runs-and-transcripts)).
+([the record contract](script-spec-design.md#failure-runs-and-transcripts)).
 When the durable thing is bigger, `export` it — either a media
 image (a disk image taken out of the machine) or the entire
 machine, handed to a hypervisor built for long-lived machines.
@@ -137,7 +137,7 @@ reliquary is not the place to keep a machine you care about.
 The same ownership line runs through the whole reliquary home:
 everything outside `cache/` is durable data you own. Machine
 blueprints, media definitions, and scripts are small, shareable,
-and worth versioning. The [user property registry](property-registry.md)
+and worth versioning. The [user property registry](property-registry-design.md)
 is also durable but personal and normally not shared or committed. A
 media definition may initially be installed from an embedded script
 block, after which its library copy is likewise user-owned. Everything
@@ -147,21 +147,21 @@ machine's life and never regenerable, so copy out any record that
 should outlive its machine. There is no dropping
 of pre-created files into cache directories; inputs enter machines
 through the blueprint —
-[`media` references](machine-blueprint-reference.md#media--optional--string)
+[`media` references](machine-blueprint-reference-design.md#media--optional--string)
 and [starting-point
-images](machine-blueprint-reference.md#base--optional--string-or-object)
+images](machine-blueprint-reference-design.md#base--optional--string-or-object)
 that machine drives are differenced from, or copies of.
 
 This page explains the format and how these documents behave
 through a machine's life. Companion pages:
 
-- **[Field reference](machine-blueprint-reference.md)** — every field,
+- **[Field reference](machine-blueprint-reference-design.md)** — every field,
   every rule.
-- **[Cookbook](machine-blueprint-cookbook.md)** — complete worked
+- **[Cookbook](machine-blueprint-cookbook-design.md)** — complete worked
   examples.
-- **[The media spec](media-spec.md)** — the media library, including
+- **[The media spec](media-spec-design.md)** — the media library, including
   definitions that scripts can install before machine resolution.
-- **[The user property registry](property-registry.md)** — reusable
+- **[The user property registry](property-registry-design.md)** — reusable
   personal values and protected secrets bound to script inputs.
 
 ## What the blueprint format is
@@ -171,7 +171,7 @@ machine on any supported virtualization backend — QEMU,
 VirtualBox, VMware Workstation, or Hyper-V. Nothing in the core
 format is a QEMU option or a VirtualBox setting in disguise. The
 one deliberate exception is the
-[`backend-settings`](machine-blueprint-reference.md#backend-settings)
+[`backend-settings`](machine-blueprint-reference-design.md#backend-settings)
 field, an explicitly scoped escape hatch; a blueprint that
 doesn't use it is portable by construction — one checked-in
 blueprint serves every developer's host (U4).
@@ -179,7 +179,7 @@ blueprint serves every developer's host (U4).
 **A blueprint and its state are not the same format.** The blueprint is the
 portable JSON document you author. The reliquary-owned machine
 state wraps its resolved form with identity, lifecycle, and
-backend facts. See [the instance model](instance-model.md).
+backend facts. See [the instance model](instance-model-design.md).
 
 **Blueprints have names; machines have ids.** A blueprint's name is its file
 stem (`<name>.rlqb`). A machine's identity is `<blueprint>-<n>` — commands take
@@ -189,7 +189,7 @@ exactly one exists. Destroy frees the number for reuse on the next
 `create`. Selection by name is scoped to the invocation's
 resolution: a machine matches only when the name resolves —
 through the asset root — to the same blueprint file the machine
-[records](machine-blueprint-reference.md#blueprint-source), so
+[records](machine-blueprint-reference-design.md#blueprint-source), so
 same-named blueprints in different projects never select each
 other's machines.
 
@@ -209,10 +209,10 @@ A minimal blueprint that boots a DOS floppy image:
 Save it as `msdos.rlqb` anywhere under your asset root — the
 current directory by default, or the reliquary home for the
 shared personal collection; a `blueprints/` subdirectory is
-optional organizational dressing (ROADMAP.md, "Authored-asset
+optional organizational dressing (../planning/ROADMAP.md, "Authored-asset
 resolution"). Blueprints arrive written by hand, seeded
 out of the
-[codex](codex.md) (implicitly on first
+[codex](codex-design.md) (implicitly on first
 reference, or explicitly with `pull`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command —
 then create a machine from it and run it:
@@ -248,7 +248,7 @@ Omissions are preserved, not baked in: a blueprint that omits
 changes in a later reliquary.
 
 A blueprint may not contain
-[state-only fields](machine-blueprint-reference.md#state-only-fields);
+[state-only fields](machine-blueprint-reference-design.md#state-only-fields);
 `create` rejects a document carrying them.
 
 **Editing the blueprint is the supported way to reconfigure a
@@ -332,7 +332,7 @@ runs as; the baseline enters only through `create` and `apply`:
 2. Every media item the state references — including media a script
    attached — is resolved from the visible media catalog and
    hash-verified (and fetched if missing or stale — see
-   [the media spec](media-spec.md)); the machine never boots
+   [the media spec](media-spec-design.md)); the machine never boots
    against silently changed media. A script installs its embedded
    definitions into the library before this reconciliation.
 3. The state is compared with the actual backend machine (verified
@@ -401,7 +401,7 @@ touches the blueprint; `create` makes a fresh machine from the
 blueprint whenever one is wanted again. `recreate` is exactly
 `destroy` + `create` as one command, reusing the same id. Drives
 regenerate the way they were declared: `size` drives come back
-blank, [`base` drives](machine-blueprint-reference.md#base--optional--string-or-object)
+blank, [`base` drives](machine-blueprint-reference-design.md#base--optional--string-or-object)
 come back as fresh differencing disks (or fresh copies) of their
 base images. An installed system that only lives in the
 cached drive image is gone after `recreate` — which is the point;
@@ -444,10 +444,10 @@ it produces a *blueprint* from a native backend VM — a blueprint
 synthesized from the backend's machine configuration, with the
 VM's disks captured as media items *in place*: each gets a
 generated definition — an absolute
-[`local-path`](media-spec.md#item-fields) at the disk where the
+[`local-path`](media-spec-design.md#item-fields) at the disk where the
 native hypervisor keeps it, a computed hash, no URL — and the
 blueprint's drives take the items as
-[`base`](machine-blueprint-reference.md#base--optional--string-or-object).
+[`base`](machine-blueprint-reference-design.md#base--optional--string-or-object).
 Import reads only a source at rest: a source VM that is running —
 or suspended, its disks stable but full of mid-flight guest
 state — fails closed naming the VM and its state; power it off
@@ -527,11 +527,11 @@ author designs the seams in, and they come in two kinds.
 
 **Value seams** carry data into the blueprint's scripts: a user
 name, a license key, which supplemental disk. The
-[`parameters` field](machine-blueprint-reference.md#parameters)
+[`parameters` field](machine-blueprint-reference-design.md#parameters)
 binds [script
-inputs](script-spec.md#inputs-properties-and-response-files) by
+inputs](script-spec-design.md#inputs-properties-and-response-files) by
 name — fixing a value directly in the blueprint, or referring to
-a [user property](property-registry.md) each user defines
+a [user property](property-registry-design.md) each user defines
 locally, so a license key is retrievable at use yet never checked
 in.
 
@@ -542,9 +542,9 @@ script to watch, which no value can parameterize: script inputs
 deliberately never reach watch conditions, so the control-flow
 graph stays static. That seam is compositional, and the blueprint
 already owns both halves: its
-[`drives`](machine-blueprint-reference.md#drives) media
+[`drives`](machine-blueprint-reference-design.md#drives) media
 references name the vendor media, and its
-[`scripts`](machine-blueprint-reference.md#scripts) map names the
+[`scripts`](machine-blueprint-reference-design.md#scripts) map names the
 scripts that drive it. A customized blueprint points both at the
 localized pair, and each script stands alone against the media it
 was written for.
@@ -556,7 +556,7 @@ silently degrades it. Two kinds of checks apply:
 
 **Format checks** reject malformed documents outright: unknown
 fields, bad values, clashing drive slots, state-only fields in a
-blueprint. See the [field reference](machine-blueprint-reference.md)
+blueprint. See the [field reference](machine-blueprint-reference-design.md)
 for each field's rules.
 
 **Capability checks** compare the blueprint against what the
@@ -619,10 +619,10 @@ is strict canonical JSON, always.
 
 ## Where to next
 
-- [Field reference](machine-blueprint-reference.md) — `platform`,
+- [Field reference](machine-blueprint-reference-design.md) — `platform`,
   `backend`, `drives` (including starting-point `base` images),
   `boot`, `control-planes`, `parameters`, `backend-settings`, and
   the state-only fields, with every rule and per-field examples.
-- [Cookbook](machine-blueprint-cookbook.md) — complete blueprints for
+- [Cookbook](machine-blueprint-cookbook-design.md) — complete blueprints for
   common machine shapes, with the state documents they resolve
   into.

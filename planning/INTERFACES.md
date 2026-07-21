@@ -8,11 +8,11 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** reliquary's guiding principles, and the governing
 > document. It names the world-facing interfaces, the primary use
 > cases they serve — the numbered list itself lives in
-> [USE-CASES.md](USE-CASES.md) — and the rule every
+> [planning/USE-CASES.md](USE-CASES.md) — and the rule every
 > interface-changing decision must follow. Settled design decisions
-> live in [ROADMAP.md](ROADMAP.md) and the user-facing contracts in
-> `docs/`; this document says where every other interface decision
-> must be weighed. When these documents and ROADMAP.md disagree,
+> live in [planning/ROADMAP.md](ROADMAP.md) and the user-facing contracts in
+> `planning/`; this document says where every other interface decision
+> must be weighed. When these documents and planning/ROADMAP.md disagree,
 > the guiding principles and use cases govern: the roadmap is
 > realigned to them, never the other way around.
 
@@ -30,7 +30,7 @@ reliquary meets the world through its primary interfaces:
 They are deliberately not independent designs. The CLI and
 the API are two presentations of one semantic surface: every
 command maps one-to-one onto a public API call with the same
-semantics, and nothing is CLI-only (ROADMAP.md, "The CLI").
+semantics, and nothing is CLI-only (planning/ROADMAP.md, "The CLI").
 Keeping the two in sync is extraordinarily important — a change
 to the surface lands on both in the same change, never deferred —
 and this parity is a required invariant (AGENTS.md). The
@@ -59,7 +59,7 @@ the CLI serves programs as well as people — and, like the API, it
 must never make working from a common language difficult: a
 program in any language must be able to invoke it, observe it,
 and parse what it prints cleanly. Settled decisions:
-ROADMAP.md "The CLI"; working notes: [docs/cli.md](docs/cli.md).
+planning/ROADMAP.md "The CLI"; working notes: [planning/design/cli-design.md](design/cli-design.md).
 
 ### The embedding API
 
@@ -76,7 +76,7 @@ is the wrong shape, whatever its elegance in Python. reliquary attaches
 no meaning to guest output; interpretation belongs to the caller.
 In-repo consumers (the media layer, the script runtime) must drive
 the same public interfaces available to external callers. Contract
-for the Python binding: [AGENTS.md](AGENTS.md) "The runner
+for the Python binding: [AGENTS.md](../AGENTS.md) "The runner
 surface".
 
 ### The scripting language
@@ -84,10 +84,10 @@ surface".
 `.rlqs` scripts are the authored automation surface: declarative
 about resources, imperative about guest interaction, statically
 inspectable before the machine starts, and governed by numbered
-language goals (G1–G7; ROADMAP.md, "Primary language goals").
+language goals (G1–G7; planning/ROADMAP.md, "Primary language goals").
 Source of truth:
-[docs/script-spec.md](docs/script-spec.md), with
-[script-examples/](script-examples/) as reference material.
+[planning/design/script-spec-design.md](design/script-spec-design.md), with
+[script-examples/](../script-examples/) as reference material.
 
 ### The machine blueprint
 
@@ -97,9 +97,9 @@ codex, or synthesized from a native VM by `import` —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
 customization (U5). Specification:
-[docs/machine-blueprint.md](docs/machine-blueprint.md) with its
-[reference](docs/machine-blueprint-reference.md) and
-[cookbook](docs/machine-blueprint-cookbook.md).
+[planning/design/machine-blueprint-design.md](design/machine-blueprint-design.md) with its
+[reference](design/machine-blueprint-reference-design.md) and
+[cookbook](design/machine-blueprint-cookbook-design.md).
 
 ### The media definition
 
@@ -107,7 +107,7 @@ A media definition names installation media and pins it: where a
 payload may be acquired, and the hashes that verify the exact
 build the scripts target. Hash-pinned definitions are what let a
 repository refer precisely to media it cannot distribute (U4).
-Specification: [docs/media-spec.md](docs/media-spec.md).
+Specification: [planning/design/media-spec-design.md](design/media-spec-design.md).
 
 ## Supporting world-facing contracts
 
@@ -117,12 +117,12 @@ covers them equally:
 
 - **The property registry** — a user-owned file authored directly
   in an editor, without passing through any primary interface:
-  [docs/property-registry.md](docs/property-registry.md).
+  [planning/design/property-registry-design.md](design/property-registry-design.md).
 - **The codex** — reliquary's built-in seed content and its
   index: seed-not-a-resolution-tier semantics, never-overwrite,
   delete-to-refresh, provenance, and the licensing rule
   for shipped media URLs:
-  [docs/codex.md](docs/codex.md).
+  [planning/design/codex-design.md](design/codex-design.md).
 - **Recorded outputs** — run records under a machine's `runs/`
   directory: transcripts (with the secret-redaction contract),
   screenshots, and collected outputs. The world reads these;
@@ -132,16 +132,16 @@ covers them equally:
   record is evidence, not reconstructible; durability beyond the
   machine is the consumer's claim — the record directory is
   self-contained, and copying it out is the sanctioned way to
-  keep one ([docs/script-spec.md](docs/script-spec.md)).
+  keep one ([planning/design/script-spec-design.md](design/script-spec-design.md)).
 - **The home layout** — where users place payload files, find
   caches, and locate everything above:
-  [docs/instance-model.md](docs/instance-model.md).
+  [planning/design/instance-model-design.md](design/instance-model-design.md).
 
 ## Primary use cases
 
 The numbered primary use cases — the decision surface every
 interface decision is weighed against — live in
-[USE-CASES.md](USE-CASES.md), together with the cross-cutting
+[planning/USE-CASES.md](USE-CASES.md), together with the cross-cutting
 principles that run through them: the ephemeral-machine
 principle, the control-plane arc, and the artifact-residency
 split. They are numbered so a decision, review, or spec section
@@ -150,7 +150,7 @@ be rejected by naming the use case it costs.
 
 ## The interface-change rule
 
-The use-case list ([USE-CASES.md](USE-CASES.md)) is where
+The use-case list ([planning/USE-CASES.md](USE-CASES.md)) is where
 interface changes are argued. A change
 to an interfacing aspect of reliquary is significant precisely
 when approving it requires the primary use cases to be adjusted;
@@ -178,7 +178,7 @@ Requests triage by their use-case impact:
   change in good faith would require reliquary's primary use
   cases to change, so the use-case amendment — not the feature —
   is what gets argued. The workflow is strict: make the argument;
-  if the argument wins, amend the use cases in USE-CASES.md; only
+  if the argument wins, amend the use cases in planning/USE-CASES.md; only
   then does work start. A misaligned change that can propose no amendment
   has nothing to argue and is rejected, regardless of its
   elegance.
@@ -197,20 +197,20 @@ Every approved change then lands the same way:
    does not make the decision cheap — nothing downstream cushions
    a wrong one.
 3. **Record it.** Use-case amendments land in
-   [USE-CASES.md](USE-CASES.md); settled decisions go to their
-   ROADMAP.md sections; user-facing contracts to their `docs/`
-   specs; examples stay synchronized.
+   [planning/USE-CASES.md](USE-CASES.md); settled decisions go to their
+   planning/ROADMAP.md sections; user-facing contracts to their `planning/`
+   design specs; examples stay synchronized.
 
 ## Specification homes
 
 | Interface | Specification |
 |---|---|
-| CLI | ROADMAP.md "The CLI"; working notes in [docs/cli.md](docs/cli.md) |
-| Embedding API | [AGENTS.md](AGENTS.md) "The runner surface" (the Python binding's contract) |
-| Scripting language | [docs/script-spec.md](docs/script-spec.md) |
-| Blueprints | [docs/machine-blueprint.md](docs/machine-blueprint.md) with its [reference](docs/machine-blueprint-reference.md) and [cookbook](docs/machine-blueprint-cookbook.md) |
-| Media definitions | [docs/media-spec.md](docs/media-spec.md) |
-| Property registry | [docs/property-registry.md](docs/property-registry.md) |
-| The codex | [docs/codex.md](docs/codex.md) |
-| Home / machines | [docs/instance-model.md](docs/instance-model.md) |
-| Run records | transcript contract in [docs/script-spec.md](docs/script-spec.md) |
+| CLI | planning/ROADMAP.md "The CLI"; working notes in [planning/design/cli-design.md](design/cli-design.md) |
+| Embedding API | [AGENTS.md](../AGENTS.md) "The runner surface" (the Python binding's contract) |
+| Scripting language | [planning/design/script-spec-design.md](design/script-spec-design.md) |
+| Blueprints | [planning/design/machine-blueprint-design.md](design/machine-blueprint-design.md) with its [reference](design/machine-blueprint-reference-design.md) and [cookbook](design/machine-blueprint-cookbook-design.md) |
+| Media definitions | [planning/design/media-spec-design.md](design/media-spec-design.md) |
+| Property registry | [planning/design/property-registry-design.md](design/property-registry-design.md) |
+| The codex | [planning/design/codex-design.md](design/codex-design.md) |
+| Home / machines | [planning/design/instance-model-design.md](design/instance-model-design.md) |
+| Run records | transcript contract in [planning/design/script-spec-design.md](design/script-spec-design.md) |

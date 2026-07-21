@@ -8,7 +8,7 @@ SPDX-License-Identifier: BSD-3-Clause
 Small to-do tasks.  Large tasks belong in the roadmap.
 
 - ABSOLUTE PRIORITY #1: realign the implementation with the redesigned script language
-  - the July 2026 redesign is decided; docs/script-spec.md is the source of truth
+  - the July 2026 redesign is decided; planning/design/script-spec-design.md is the source of truth
     (full typed EBNF included) and script-examples/design-install.rlqs is the
     reference script
   - the redesign resolves the old "clunky/awkward" critiques: one node shape
@@ -21,7 +21,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     the only machine-state spelling; console= later as a new channel,
     @landmark later as a new matcher spelling)
   - MILESTONE ZERO — DECIDED (owner, 2026-07-21), folded into the spec
-    (see ROADMAP.md "Milestone zero — settle the surface"; evidence in
+    (see ./ROADMAP.md "Milestone zero — settle the surface"; evidence in
     workflow journals wf_ac5f89b4-402 / wf_1a266a6b-ff8):
     1. enter/key-tokens: (b) — <key> tokens DELETED, enter/press kept;
        keys live only after press, the \< escape is gone, enter stays a
@@ -58,8 +58,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       comma, expect, ->, and regex-keyword handling all disappear)
     - retarget script_runner.py; failure diagnostics name the expired clock
       and its source scope; check-script reports the resolved timing plan
-    - convert builtin scripts and examples/ scripts to the new surface
-    - update every doc that quotes script syntax (README, examples/README)
+    - convert builtin scripts and planning/examples/ scripts to the new surface
+    - update every doc that quotes script syntax (README, planning/examples/README)
     - no backward compatibility: delete the old surface entirely
   - residual language problems catalogued in script-examples/*.rlqs (see its
     README) — best-guess priority, fix-cost order, NOT validated against real
@@ -85,7 +85,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     - note: several of these are the procedural/declarative seam showing
       through the syntax ([04] especially, [03] and [09] partly) — see
       "Primary language goals" (G1-G7) and "Procedural and declarative" in
-      ROADMAP.md before proposing fixes, and judge any fix against the goals
+      ./ROADMAP.md before proposing fixes, and judge any fix against the goals
       it costs rather than in isolation
   - APPLIED (July 2026 spec review, adversarially adjudicated): one normative
     grammar (typed EBNF; node shape demoted to informative); terminating-
@@ -260,7 +260,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     imports: container-determined semantics rule (hits [04] — a construct's
     lifetime should be recoverable from its own text), reserve future
     keyword space now, naming freeze is free before v1 and never after
-- GUIDING-PRINCIPLES GAP QUEUE (INTERFACES.md necessity/sufficiency panel,
+- GUIDING-PRINCIPLES GAP QUEUE (planning/INTERFACES.md necessity/sufficiency panel,
   adversarially walked per use case; evidence in workflow journal
   wf_92864b8e-623) — verdict: the five primary interfaces are necessary and
   minimal; every gap below is a spec lagging the principles, and this queue
@@ -337,7 +337,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     unresolved
   - ARTIFACT RESIDENCY (use-case amendment 2026-07-21, the split in
     USE-CASES.md; resolution model DECIDED owner 2026-07-21, recorded
-    in ROADMAP.md "Authored-asset resolution"): every invocation
+    in ./ROADMAP.md "Authored-asset resolution"): every invocation
     names where authored assets live — the asset root — defaulting to
     the current directory (blueprints/ media/ scripts/ subdirs, the
     home's own layout), falling back to the reliquary home unless an
@@ -386,7 +386,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     definition pins hashes but fails resolution naming the definition to
     edit (specced in media-spec.md + codex.md)
 - BLUEPRINT-SPEC GAP QUEUE (owner-requested review, 2026-07-21: the media
-  and blueprint specs walked against INTERFACES.md / USE-CASES.md; the
+  and blueprint specs walked against planning/INTERFACES.md / planning/USE-CASES.md; the
   media spec tracks the principles closely — the gaps cluster in the
   blueprint spec: machine-blueprint.md + -reference.md + -cookbook.md):
   1. RESOLVED (owner, 2026-07-21, design round) — run records vs
@@ -517,8 +517,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     clean_downloads(), clean_media()
   - codex: teaching comments at blueprint seams once the JSONC
     reader lands
-- U6 AUTHORING RECORDER (use case in USE-CASES.md; design in
-  ROADMAP.md "Script authoring by recording") — work items, in rough
+- U6 AUTHORING RECORDER (use case in planning/USE-CASES.md; design in
+  ./ROADMAP.md "Script authoring by recording") — work items, in rough
   dependency order:
   - reliquary-owned console viewer over the vnc control plane (recording
     prerequisite: backend display-window input is invisible to reliquary)

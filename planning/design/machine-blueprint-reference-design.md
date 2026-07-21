@@ -17,8 +17,8 @@ Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`<name>.rlqb`, yours) and each
 machine's **state** (`cache/machines/<id>/reliquary-machine.json`,
 reliquary's). For the blueprint/state model, read
-[the guide](machine-blueprint.md) first; for complete examples, see
-the [cookbook](machine-blueprint-cookbook.md).
+[the guide](machine-blueprint-design.md) first; for complete examples, see
+the [cookbook](machine-blueprint-cookbook-design.md).
 
 Each field is marked with where it may appear:
 
@@ -32,7 +32,7 @@ Each field is marked with where it may appear:
 All fields are present in the state unless noted otherwise.
 
 There is no version field — see
-[Format stability](machine-blueprint.md#format-stability-none-yet).
+[Format stability](machine-blueprint-design.md#format-stability-none-yet).
 Blueprints accept comments and trailing commas — the JSONC
 dialect — per the same section; the state is strict canonical
 JSON, always.
@@ -54,7 +54,7 @@ for:
 
 The platform selects workflow behavior (boot readiness detection,
 command syntax, prompt handling) and the
-[platform defaults](machine-blueprint.md#platform-defaults) for omitted
+[platform defaults](machine-blueprint-design.md#platform-defaults) for omitted
 fields. The list is extended deliberately, one platform workflow at
 a time.
 
@@ -100,7 +100,7 @@ VM registration — is not portable between hypervisors, so the
 assignment never changes underneath a machine; moving to another
 backend is done with `recreate`, which discards the state and
 backend machine and resolves the blueprint afresh (see
-[the guide](machine-blueprint.md#destroying-and-recreating-a-machine)).
+[the guide](machine-blueprint-design.md#destroying-and-recreating-a-machine)).
 
 ```json
 {"backend": "virtualbox"}
@@ -118,7 +118,7 @@ longer `description`. Neither affects machine behavior; both feed
 `description`, and platform (U5). Codex blueprints carry
 them through the codex's index; user blueprints are indexed by
 reading the fields from the file (see
-[the codex](codex.md)).
+[the codex](codex-design.md)).
 
 ```json
 {
@@ -158,9 +158,9 @@ Labels are conventionally short verbs — `install`, `verify`,
 **blueprint (optional) · object · not carried in the state**
 
 Values the blueprint supplies to [script
-inputs](script-spec.md#inputs-properties-and-response-files) — the
+inputs](script-spec-design.md#inputs-properties-and-response-files) — the
 blueprint's half of the customization seams its author designs in
-(U5; see [the guide](machine-blueprint.md#customization-seams)).
+(U5; see [the guide](machine-blueprint-design.md#customization-seams)).
 Keys are input names. Each value is one of the two bindings the
 use case names:
 
@@ -170,7 +170,7 @@ use case names:
   editing the value.
 - a **property reference** — `{"property": "<key>"}`: the
   parameter is only *referred to* here and defined externally, in
-  the [user property registry](property-registry.md). This is the
+  the [user property registry](property-registry-design.md). This is the
   form for values that must never enter the blueprint — a license
   key is the canonical example.
 
@@ -219,7 +219,7 @@ Rules, checked at blueprint validation and script preflight:
 Like the `scripts` map, `parameters` is read from the blueprint
 at script invocation: it configures script binding, not machine
 shape. It never appears in the machine's state, takes no part in
-[`apply`](machine-blueprint.md#applying-blueprint-edits) or the
+[`apply`](machine-blueprint-design.md#applying-blueprint-edits) or the
 baseline digest, and an edit is live on the next script run — the
 U5 loop is edit the blueprint, run the script.
 
@@ -232,7 +232,7 @@ them is rejected. (The state document also carries the machine's
 bookkeeping — its blueprint's name, creation time, and lifecycle
 phase — which is outside the blueprint field set entirely; script
 outcomes live in run records. See
-[the instance model](instance-model.md).)
+[the instance model](instance-model-design.md).)
 
 ### `id`
 
@@ -269,7 +269,7 @@ The absolute path of the blueprint file this machine resolved
 from at `create` (re-recorded by `apply`). Selection by
 `--blueprint <name>` matches only machines whose recorded source
 equals the invocation's own resolution of that name — through its
-asset root (ROADMAP.md, "Authored-asset resolution") — so
+asset root (../planning/ROADMAP.md, "Authored-asset resolution") — so
 same-named blueprints in different projects never select each
 other's machines, and `apply` can never adopt another project's
 blueprint: a selection or reconciliation whose resolution
@@ -281,7 +281,7 @@ paths.
 **state-only · string**
 
 The digest of the resolved blueprint snapshot this machine was created
-from (or last [`apply`](machine-blueprint.md#applying-blueprint-edits)-d
+from (or last [`apply`](machine-blueprint-design.md#applying-blueprint-edits)-d
 to). This is the machine's baseline. Operation may diverge the
 state from it — script `insert`/`eject` persists in the state —
 and `apply` is what reconciles the machine back to (or forward to
@@ -377,7 +377,7 @@ The slot exists as guest-visible hardware with no medium inserted.
 This is the normal shape for a drive that scripts occupy
 temporarily — an install script inserts the installer medium into
 the empty slot and ejects it as its final step (U1; see
-[the script spec](script-spec.md#insert-and-eject)). Declaring
+[the script spec](script-spec-design.md#insert-and-eject)). Declaring
 the slot is required: `insert` only places media into hardware
 the blueprint declares, and never creates the drive itself — the
 blueprint alone determines machine topology, so capability
@@ -402,7 +402,7 @@ The name of a defined media item:
 {"media": "freedos-1.4-livecd"}
 ```
 
-The name resolves to a [defined media item](media-spec.md), fetched
+The name resolves to a [defined media item](media-spec-design.md), fetched
 and hash-verified on demand. Definitions live in the shared
 `<reliquary_home>/media` library; scripts may install embedded
 definitions there before resolving their target machine. A name no
@@ -447,7 +447,7 @@ first `start`. As an object it has two fields — `media` (required)
 and `type` (how to materialize, optional). `base.media` names an
 defined item in the media catalog, exactly like the
 [`media` field](#media--optional--string): the name must resolve to a
-[media definition](media-spec.md) in the library, possibly installed
+[media definition](media-spec-design.md) in the library, possibly installed
 from the current script before machine resolution, and the item is
 fetched and hash-verified on demand. The difference is what happens
 next —
@@ -589,7 +589,7 @@ format.
 
 `media` drives attach the media payload file itself, whose format
 is declared by its
-[cached file name's extension](media-spec.md) in the media
+[cached file name's extension](media-spec-design.md) in the media
 library. A media payload in a format the machine's backend cannot
 attach is a capability error naming both.
 
@@ -613,7 +613,7 @@ to the next entry. This is the standard install pattern —
 falls through to the installer CD while a script has one attached,
 and boots the installed hard disk afterward, with no boot-order
 change needed. Scripts may still reorder boot devices with the
-[`boot`](script-spec.md#boot) verb while the machine is stopped.
+[`boot`](script-spec-design.md#boot) verb while the machine is stopped.
 When omitted, the default order is: the slot-0 floppy image if
 declared, else the slot-0 hard disk, else the first CD-ROM; the
 resolved order appears in the state.

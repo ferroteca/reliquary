@@ -26,7 +26,7 @@ across the VM seam. Scripts are authored assets — `.rlqs` files,
 identified by extension and discovered anywhere under the
 invocation's asset root (the current directory by default),
 falling back to the reliquary home unless `--assets-only`
-disables the fallback (ROADMAP.md, "Authored-asset resolution");
+disables the fallback (../planning/ROADMAP.md, "Authored-asset resolution");
 a `scripts/` subdirectory is optional organizational dressing.
 One `<name>.rlqs` file per script; a run selects its machine with
 `--machine <id>` or, when the
@@ -50,7 +50,7 @@ CLI–API parity.
 
 Scripts are authored documents: reliquary reads but never rewrites
 them — with one named exception: the authoring recorder's opt-in
-fragment apply (U6; [ROADMAP.md](../ROADMAP.md), "Script authoring
+fragment apply (U6; [../planning/ROADMAP.md](../ROADMAP.md), "Script authoring
 by recording") inserts a captured fragment at its playback anchor
 and touches no other byte. They belong in version control beside
 the machine blueprints and media definitions on which they depend.
@@ -113,7 +113,7 @@ both, that inputs may supply data but never select a branch or a
 phase, and that there are no author-side conditionals, because the
 only decisions that matter are the guest's. The reasoning is
 recorded under "Procedural and declarative" in
-[ROADMAP.md](../ROADMAP.md).
+[../planning/ROADMAP.md](../ROADMAP.md).
 
 The authored control-flow graph is statically finite, but a run may
 be unbounded when transitions form a cycle. Execution is
@@ -447,7 +447,7 @@ rather than by this grammar; the island closes at the `}` closing
 its object, as described above. The island is strict JSON — the
 JSONC affordances library definition files accept (comments,
 trailing commas; see
-[the media spec](media-spec.md#the-definition-format)) are not
+[the media spec](media-spec-design.md#the-definition-format)) are not
 legal here: a comment could carry an unbalanced brace past the
 island's brace tracking, and installation writes the library
 copy in canonical strict JSON, which would silently drop them.
@@ -712,7 +712,7 @@ contain several independently named items, each referenced by
 `@<item-name>`.
 
 The body uses exactly the item or archive form documented by the
-[media spec](media-spec.md); scripts do not get a second media
+[media spec](media-spec-design.md); scripts do not get a second media
 schema. Several distinctly labeled `media` blocks are allowed. They
 appear after the header and before input declarations.
 
@@ -798,7 +798,7 @@ input secret product-key property="products.windows-98.install-key"
   `enter` and `type`; its value and expanded argument are omitted
   from transcripts and diagnostics.
 - `property` optionally binds the input to a key in the
-  [user property registry](property-registry.md). The quoted key is
+  [user property registry](property-registry-design.md). The quoted key is
   literal and cannot contain an input reference.
 - `prompt` is optional user-facing text; the input name is used
   when it is omitted.
@@ -827,7 +827,7 @@ by the machine blueprint, which selects the media/script pair;
 value seams (blueprint parameters, properties, responses) supply
 data only, and each script stands alone against the guest it was
 written for (U5; see [customization
-seams](machine-blueprint.md#customization-seams)).
+seams](machine-blueprint-design.md#customization-seams)).
 
 Values can be supplied explicitly in a JSON response file:
 
@@ -845,7 +845,7 @@ rlq script freedos-plain-install --blueprint freedos --responses answers.json
 A response file is an authored document reliquary only reads, so
 it accepts the JSONC dialect — comments and trailing commas,
 exactly as [library definition
-files](media-spec.md#the-definition-format) do. A harness that
+files](media-spec-design.md#the-definition-format) do. A harness that
 generates one emits strict JSON and is unaffected: strict JSON is
 a JSONC subset.
 
@@ -855,7 +855,7 @@ available source:
 
 1. an explicit response-file value;
 2. a [blueprint
-   parameter](machine-blueprint-reference.md#parameters) of the
+   parameter](machine-blueprint-reference-design.md#parameters) of the
    target machine's blueprint — a direct value, or a property
    reference that *replaces* the input's own `property=` binding
    rather than chaining to it;
@@ -881,9 +881,9 @@ properties, while `secret` requires a secret property. Kind
 mismatches fail rather than silently downgrading protected data.
 Blueprint parameters follow the same kind rules, and a `secret`
 input never takes a direct blueprint value — the [field
-reference](machine-blueprint-reference.md#parameters) states the
+reference](machine-blueprint-reference-design.md#parameters) states the
 blueprint-side rules.
-See the [property-registry specification](property-registry.md) for
+See the [property-registry specification](property-registry-design.md) for
 its file format, maintenance commands, precise failure rules, and
 security boundary.
 
@@ -1463,7 +1463,7 @@ slot and record the change in the machine's state document, not
 its blueprint. Hard-disk slots are never targets: `insert` and
 `eject` address removable slots only. Slot names, ranges, and the
 alias/canonical rule are defined once, in the
-[blueprint field reference](machine-blueprint-reference.md);
+[blueprint field reference](machine-blueprint-reference-design.md);
 `set-boot` keys use the same vocabulary. The verbs never create or remove
 the drive itself: drives are guest-visible hardware the blueprint
 declares — an installer-driven blueprint declares the slot empty
@@ -1484,7 +1484,7 @@ at the next `start`).
 across `stop`/`start` exactly like an installer's writes to a hard
 disk: the machine has diverged from its blueprint, and stays
 diverged until a later `insert`/`eject` changes the slot again or
-[`apply`](machine-blueprint.md#applying-blueprint-edits) returns
+[`apply`](machine-blueprint-design.md#applying-blueprint-edits) returns
 the machine to its blueprint. A script that changes machine state
 it should not leave behind — an install script's installer CD —
 ends by explicitly restoring it, conventionally with `eject` as
@@ -1509,7 +1509,7 @@ declares; duplicates are rejected. The machine must be stopped —
 the new order takes effect on the next `start`. Like
 `insert`/`eject`, the change diverges the machine from its
 blueprint until a later `set-boot`, or
-[`apply`](machine-blueprint.md#applying-blueprint-edits), restores
+[`apply`](machine-blueprint-design.md#applying-blueprint-edits), restores
 it.
 
 Most install scripts never need this: a blueprint that boots

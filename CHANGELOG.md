@@ -192,7 +192,7 @@ leaves the machine stopped with the CD ejected.
   images for `size` drives, and media payload paths for `media`
   drives; `machine_drive_args()` renders QEMU `-drive` tokens from
   that state.
-- Media definitions per docs/media-spec.md: `parse_definition` /
+- Media definitions per planning/design/media-spec-design.md: `parse_definition` /
   `load_definition` validate both the item (direct-download) form and
   the archive form (one source archive itemizing payloads, single
   URL), and `resolve_media(name, home=None)` resolves an item by name

@@ -15,8 +15,8 @@ Complete, working blueprints for common machine shapes. Each
 entry shows the blueprint (what you write) and, where instructive,
 the state document reliquary resolves it into.
 Concepts — including the blueprint/state split — are in
-[the guide](machine-blueprint.md); every rule is in the
-[field reference](machine-blueprint-reference.md).
+[the guide](machine-blueprint-design.md); every rule is in the
+[field reference](machine-blueprint-reference-design.md).
 
 Throughout, save the blueprint as `<name>.rlqb` under your asset
 root and create a
@@ -96,18 +96,18 @@ warning:
 
 rlq creates the hard disk as a 20 MiB dynamically-allocated
 image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
-the [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
+the [naming and format](machine-blueprint-reference-design.md#image-naming-and-formats)
 are reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
 blueprint and state make no claim about the guest's contents. After
 install, the same boot order boots the hard disk. Scripts that need
 a different order can use the
-[`set-boot`](script-spec.md#set-boot) verb while the machine is
+[`set-boot`](script-spec-design.md#set-boot) verb while the machine is
 stopped.
 
 > **Media note:** `freedos-1.4-livecd` names a
-> [media definition](media-spec.md)
+> [media definition](media-spec-design.md)
 > (`freedos-1.4-livecd.rlqm` with the LiveCD's download
 > URL, archive details, and hashes) — every media reference
 > resolves through a definition, fetched and verified on demand.
@@ -280,7 +280,7 @@ across the board, which is what DOS-era guests want.
 Vendor variants (BusLogic vs. LsiLogic, etc.) are backend-specific
 and go in `backend-settings` when they matter. And note the
 ordering caveat from the
-[reference](machine-blueprint-reference.md#controller--optional--string):
+[reference](machine-blueprint-reference-design.md#controller--optional--string):
 slot order is authoritative within one controller type, so prefer a
 single type per machine when drive lettering matters.
 
@@ -289,7 +289,7 @@ single type per machine when drive lettering matters.
 ## 9. A parameterized install
 
 A blueprint written to be seeded and customized (its
-[customization seams](machine-blueprint.md#customization-seams)):
+[customization seams](machine-blueprint-design.md#customization-seams)):
 the install script declares `owner-name` and `install-key`
 inputs, and the blueprint binds them.
 
@@ -322,7 +322,7 @@ either binding for one invocation
 (`rlq --blueprint win98 script install --responses answers.json`).
 
 Both are value seams. Installing the *German* edition instead is
-a [composition seam](machine-blueprint.md#customization-seams):
+a [composition seam](machine-blueprint-design.md#customization-seams):
 the seeded blueprint's `drives` media reference and `scripts` map
 are pointed at a localized media/script pair, and each script
 stands alone against the installer it was written for.

@@ -7,10 +7,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the primary use-case list — the decision surface of
 > reliquary's guiding principles,
-> [INTERFACES.md](INTERFACES.md). Interface decisions are weighed
+> [planning/INTERFACES.md](INTERFACES.md). Interface decisions are weighed
 > against this list under the interface-change rule there;
 > amendments are argued through that rule and land here. When
-> this list and ROADMAP.md disagree, the guiding principles and
+> this list and planning/ROADMAP.md disagree, the guiding principles and
 > this list govern.
 
 Interface decisions are weighed against these. They are numbered
@@ -152,7 +152,7 @@ and amendments are made deliberately and recorded here.
 
 Beneath them all sits the ephemeral-machine principle: machines
 are cheap to destroy and rebuild, and the machine is never the
-product (ROADMAP.md, "Vision"). Across them runs a control-plane
+product (planning/ROADMAP.md, "Vision"). Across them runs a control-plane
 arc: agentless operation is at its most useful preparing a
 machine — installing the OS (U1) and bringing the guest to the
 point where an agent exists inside it — and for testing

@@ -18,9 +18,12 @@ the blueprint (with media definitions and scripts) is always enough to rebuild o
 ever precious. Editing a blueprint never changes an existing machine by itself; a machine keeps the snapshot it was
 created from. To adopt blueprint edits, destroy the machine and create it again.
 
-Read [The machine blueprint](docs/machine-blueprint.md) — starting with
-"The model at a glance" and its diagrams — and
-[Machine blueprints and machines](docs/instance-model.md) for the full lifecycle.
+Read the [Blueprint guide](docs/blueprint-guide.md) for the implemented
+milestone-1 surface, and the [CLI reference](docs/cli-reference.md) for
+commands. The full design (including fields not yet implemented) is in
+[The machine blueprint](planning/design/machine-blueprint-design.md) —
+starting with "The model at a glance" and its diagrams — and
+[Machine blueprints and machines](planning/design/instance-model-design.md).
 
 > **Status:** milestone-1 blueprint materialization, lifecycle CLI
 > (`create` / `start` / `stop` / `destroy` / `list machines`), and

@@ -10,9 +10,9 @@ path = [
     "AGENTS.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
-    "examples/**/*.json",
-    "examples/**/*.rlqb",
-    "examples/**/*.rlqm",
+    "planning/examples/**/*.json",
+    "planning/examples/**/*.rlqb",
+    "planning/examples/**/*.rlqm",
     "reliquary/builtins/**/*.json",
 ]
 precedence = "aggregate"

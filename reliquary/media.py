@@ -61,7 +61,7 @@ class MediaItem:
 
 @dataclass(frozen=True)
 class MediaDefinition:
-    """A parsed and validated media definition (docs/media-spec.md).
+    """A parsed and validated media definition (planning/design/media-spec-design.md).
 
     The item form downloads its single payload directly and carries
     no archive fields; the archive form names a source archive whose
@@ -320,7 +320,7 @@ def fetch_media(name, home=None, on_mismatch="fail"):
     """Return the named item's verified payload path, fetching it on
     demand.
 
-    Sources are tried cheapest first (docs/media-spec.md): an
+    Sources are tried cheapest first (planning/design/media-spec-design.md): an
     existing payload that verifies is returned untouched; otherwise a
     cached source archive that verifies is re-extracted; only then is
     the definition's url downloaded. Archives land in

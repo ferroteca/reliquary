@@ -9,9 +9,9 @@ SPDX-License-Identifier: BSD-3-Clause
 > structure; expected to be short-lived. Settled decisions live in
 > [ROADMAP.md](../ROADMAP.md) ("The CLI" and the milestones);
 > concepts introduced here are documented durably in
-> [codex.md](codex.md) (the codex,
+> [codex.md](codex-design.md) (the codex,
 > `pull`, naming conventions, provenance) and the
-> [blueprint field reference](machine-blueprint-reference.md)
+> [blueprint field reference](machine-blueprint-reference-design.md)
 > (`name`, `description`, `scripts`).
 
 Every command maps one-to-one onto a public Python call. The CLI

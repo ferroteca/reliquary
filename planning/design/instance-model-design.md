@@ -32,7 +32,7 @@ have ids.
 ```
 
 A blueprint's name is its file stem — `<name>.rlqb`, anywhere
-under whichever asset root supplies it (ROADMAP.md,
+under whichever asset root supplies it (../planning/ROADMAP.md,
 "Authored-asset resolution"); the machine's state records which
 file it resolved from, and name selection matches only machines
 of the invocation's own resolution. A machine's
@@ -146,7 +146,7 @@ is intentionally not implicit in clone.
 ## The machine state
 
 The blueprint remains the plain machine JSON object described by the
-[machine blueprint](machine-blueprint.md). The machine's one document is
+[machine blueprint](machine-blueprint-design.md). The machine's one document is
 `cache/machines/<id>/reliquary-machine.json` — the resolved
 blueprint fields plus the machine's own bookkeeping, not a second
 spelling of the blueprint schema:

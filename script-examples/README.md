@@ -6,7 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 # Script-language residual problems, by example
 
 Design-review artifacts for the July 2026 script surface
-([docs/script-spec.md](../docs/script-spec.md)). Each file
+([planning/design/script-spec-design.md](../planning/design/script-spec-design.md)). Each file
 isolates one **remaining** soft spot — mushiness, inconsistency,
 or ambiguity that survived the redesign — and shows it through
 contrasting examples with commentary. These are not runnable
