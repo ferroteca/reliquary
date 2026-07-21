@@ -25,9 +25,8 @@ every design choice may assume machines are cheap to destroy and
 rebuild.
 
 [INTERFACES.md](INTERFACES.md) names the interfaces through which
-the world drives reliquary — the CLI, the embedding API, and the
-scripting language — the primary use cases they serve, and the
-vetting rule every interface-changing decision must follow.
+the world drives reliquary, the primary use cases they serve, and
+the vetting rule every interface-changing decision must follow.
 
 The unit of design is the **operation** performed against a
 machine: start it, stop it, insert media, send input, run a guest

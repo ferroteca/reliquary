@@ -42,9 +42,9 @@ workflow:
 - `CHANGELOG.md` records release-facing changes.
 - `ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
 - `INTERFACES.md` is the governing document for reliquary's world-facing interfaces: it names the interface
-  inventory (CLI, embedding API, scripting language, plus the authored document formats, recorded outputs,
-  and the home layout), the numbered primary use cases, and the vetting rule every
-  interface-changing decision must follow.
+  inventory (CLI, embedding API, scripting language, machine blueprints, and media definitions, plus the
+  property registry, recorded outputs, and the home layout), the numbered primary use cases, and the
+  vetting rule every interface-changing decision must follow.
 - `examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
   install script embedding the media definition that its first run installs in the media library. Its README carries
   the status note. Keep the examples synchronized with `docs/` when the formats change.
@@ -70,9 +70,9 @@ and users recreate them. Compatibility guarantees, if any, will be defined no ea
 
 ### Interface changes are vetted
 
-The CLI, the embedding API, and the scripting language are reliquary's primary interfaces to the world; the
-authored document formats (blueprints, media definitions, the property registry), recorded outputs (run
-records, transcripts), and the home layout are world-facing contracts alongside them. Any decision that
+The CLI, the embedding API, the scripting language, the machine blueprint, and the media definition are
+reliquary's primary interfaces to the world; the property registry, recorded outputs (run records,
+transcripts), and the home layout are world-facing contracts alongside them. Any decision that
 changes one follows the rule in [INTERFACES.md](INTERFACES.md): requests triage by their impact on the
 numbered primary use cases — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with

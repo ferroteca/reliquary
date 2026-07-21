@@ -16,14 +16,18 @@ SPDX-License-Identifier: BSD-3-Clause
 > governs: the roadmap is realigned to the guiding principles and
 > use cases here, never the other way around.
 
-reliquary meets the world through three primary interfaces:
+reliquary meets the world through its primary interfaces:
 
 1. **The CLI** — the `rlq` / `reliquary` command.
 2. **The embedding API** — native language bindings (Python is
    the first).
 3. **The scripting language** — `.rlqs` scripts.
+4. **The machine blueprint** — the authored machine-definition
+   document.
+5. **The media definition** — the authored media-acquisition
+   document.
 
-They are deliberately not three independent designs. The CLI and
+They are deliberately not independent designs. The CLI and
 the API are two presentations of one semantic surface: every
 command maps one-to-one onto a public API call with the same
 semantics, and nothing is CLI-only (ROADMAP.md, "The CLI").
@@ -32,7 +36,11 @@ to the surface lands on both in the same change, never deferred —
 and this parity is a required invariant (AGENTS.md). The
 scripting language sits above both — invoked through either — and
 is deliberately non-computational, so that anything computational
-belongs to the API (language goal G2). A capability that appears
+belongs to the API (language goal G2). The two document formats
+are authored directly in an editor and consumed through every
+other surface: the CLI and API resolve and materialize
+blueprints, and scripts reference — and may embed — media
+definitions. A capability that appears
 on one surface appears on the others wherever it is meaningful;
 where it does not, the omission is a named decision, not drift.
 
@@ -81,19 +89,40 @@ Source of truth:
 [docs/script-spec.md](docs/script-spec.md), with
 [script-examples/](script-examples/) as reference material.
 
+### The machine blueprint
+
+A blueprint is a reusable, user-owned JSON description of a kind
+of machine: authored directly in an editor, seeded out of the
+built-in library, or synthesized from a native VM by `import` —
+the durable artifact from which machines are materialized, and
+the home of the parameter seams its author designs in for
+customization (U5). Specification:
+[docs/machine-blueprint.md](docs/machine-blueprint.md) with its
+[reference](docs/machine-blueprint-reference.md) and
+[cookbook](docs/machine-blueprint-cookbook.md).
+
+### The media definition
+
+A media definition names installation media and pins it: where a
+payload may be acquired, and the hashes that verify the exact
+build the scripts target. Hash-pinned definitions are what let a
+repository refer precisely to media it cannot distribute (U4).
+Specification: [docs/media-spec.md](docs/media-spec.md).
+
 ## Supporting world-facing contracts
 
-The three primary interfaces do not exhaust what the world
-touches. These contracts are world-facing too, and the vetting
-rule below covers them equally:
+The primary interfaces do not exhaust what the world touches.
+These contracts are world-facing too, and the vetting rule below
+covers them equally:
 
-- **Authored document formats** — machine blueprints, media
-  definitions, and the property registry are user-owned files
-  authored directly in an editor, without passing through any of
-  the three primary interfaces. Their specs live in
-  [docs/machine-blueprint-reference.md](docs/machine-blueprint-reference.md),
-  [docs/media-spec.md](docs/media-spec.md), and
+- **The property registry** — a user-owned file authored directly
+  in an editor, without passing through any primary interface:
   [docs/property-registry.md](docs/property-registry.md).
+- **The built-in library** — the seeded starting content and its
+  index: seed-not-a-resolution-tier semantics, never-overwrite,
+  delete-to-refresh, provenance, and the licensing rule for
+  built-in media URLs:
+  [docs/builtin-library.md](docs/builtin-library.md).
 - **Recorded outputs** — run records under a machine's `runs/`
   directory: transcripts (with the secret-redaction contract),
   screenshots, and collected outputs. The world reads these;
@@ -143,9 +172,11 @@ deliberately and recorded here.
   through a native binding or the CLI; computation and result
   interpretation stay on the agent's side of the seam, and
   reliquary stays ignorant of who builds on it. This case is
-  probably best served by a guest-side agent — fast injection,
-  execution, and observation as a structured control plane —
-  while agentless operation remains the permanent fallback for
+  probably best served by a native guest-side agent (QGA, VMware
+  Tools, Guest Additions, Hyper-V's integration services) — fast
+  injection, execution, and observation as a structured control
+  plane — while agentless operation remains the permanent
+  fallback for
   guests that cannot cooperate, because the thing under test may
   be the very driver that would provide that communication.
   Often nothing durable remains: the run record is the product.
@@ -196,7 +227,10 @@ installations themselves, openQA-style, where the install is the
 thing under test and the screen is the assertion surface. Once a
 guest holds an agent, that agent is the better work plane (U3);
 agentless remains the permanent fallback for guests that can
-never cooperate.
+never cooperate. reliquary consumes native guest agents and
+never builds its own: agents may not exist for some operating
+systems, but writing one would be a whole project unto itself,
+outside reliquary's scope.
 
 ## The interface-change rule
 
@@ -259,5 +293,6 @@ Every approved change then lands the same way:
 | Blueprints | [docs/machine-blueprint.md](docs/machine-blueprint.md) with its [reference](docs/machine-blueprint-reference.md) and [cookbook](docs/machine-blueprint-cookbook.md) |
 | Media definitions | [docs/media-spec.md](docs/media-spec.md) |
 | Property registry | [docs/property-registry.md](docs/property-registry.md) |
+| Built-in library | [docs/builtin-library.md](docs/builtin-library.md) |
 | Home / machines | [docs/instance-model.md](docs/instance-model.md) |
 | Run records | transcript contract in [docs/script-spec.md](docs/script-spec.md) |
