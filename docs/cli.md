@@ -666,6 +666,7 @@ freedos-1.4-plain-verify      FreeDOS 1.4 — verify boot     yes
 
 ```
 reliquary (--blueprint <name> | --machine <id>) script <label>
+    [--responses <path>] [--display] [--detach] [--progress <mode>]
 rlq check-script <script_name>
     [--blueprint <name> | --machine <id>] [--responses <path>]
 ```
@@ -713,6 +714,14 @@ when the script expects `running` (the default), failing when a
 steps. `--display` shows the backend's console
 window; `--responses` binds a JSON file of input values.
 
+`--progress (auto | tty | plain | rawjson)` selects the rendering
+(default `auto`: tty detection). `rawjson` is the programmatic
+synchronous form: stdout carries the run's event stream as JSON
+lines and nothing else — the last line is the terminal event, the
+machine-readable result — diagnostics go to stderr, and the exit
+code carries the outcome. `plain` and `rawjson` never prompt: a
+missing input value fails preflight instead of hanging a program.
+
 `check-script` runs preflight only: parsing, static control-flow
 checks, capability preflight. With a machine selector, also binds
 responses and checks media resolution — read-only, no guest steps.
@@ -720,9 +729,47 @@ responses and checks media resolution — read-only, no guest steps.
 ```powershell
 rlq --blueprint freedos-1.4-plain script install --display
 rlq --blueprint freedos-1.4-plain script install --responses answers.json
+rlq --blueprint freedos-1.4-plain script install --progress rawjson
 
 rlq check-script freedos-1.4-plain-install
 rlq check-script freedos-1.4-plain-install --blueprint freedos-1.4
+```
+
+### Detached runs
+
+```
+reliquary (--blueprint <name> | --machine <id>) script <label> --detach
+reliquary (--blueprint <name> | --machine <id>) run status [<n>]
+reliquary (--blueprint <name> | --machine <id>) run tail [<n>]
+reliquary (--blueprint <name> | --machine <id>) run wait [<n>]
+reliquary (--blueprint <name> | --machine <id>) run cancel [<n>] [--stop]
+rlq list runs [--blueprint <name> | --machine <id>]
+```
+
+A foreground `script` run is start-plus-attach: it streams its
+own progress until the run ends, and Ctrl-C cancels the run.
+`--detach` completes parsing, binding, and preflight in the
+foreground — those failures land on the invoking command's exit
+code — then hands off at the machine boundary and prints the
+run id.
+
+Runs number monotonically per machine (`<machine-id>/<n>`); the
+`run` operations take the number positionally and default to the
+machine's latest run. `run tail` renders live progress
+(`--progress` as on `script`: pretty on a tty, `plain` or
+`rawjson` for programs) and Ctrl-C stops
+tailing without touching the run; `run wait` blocks until the
+terminal event and exits with the run's own outcome code, so a
+shell script or unbound language gets the result by waiting;
+`run cancel` ends the run at the next event boundary and leaves
+the machine as-is — `--stop` also hard powers it off.
+
+```powershell
+rlq --blueprint freedos-1.4-plain script install --detach
+# → freedos-1.4-plain-1/4
+rlq --blueprint freedos-1.4-plain run tail
+rlq --blueprint freedos-1.4-plain run wait; echo $LASTEXITCODE
+rlq --machine freedos-1.4-plain-1 run cancel 4 --stop
 ```
 
 ---

@@ -412,7 +412,8 @@ command word is an error, never a script lookup (`script <label>`
 is the tightest form).
 
 ```text
-rlq list (blueprints | machines [--blueprint <name>] | scripts | media)
+rlq list (blueprints | machines [--blueprint <name>] | scripts | media
+    | runs [--blueprint <name> | --machine <id>])
 rlq search (blueprints | scripts | media) <term>... [--verbose]
 rlq create blueprint <name> [flags]
 rlq pull (blueprint | media | script) <name> [--only]
@@ -428,7 +429,12 @@ reliquary (--blueprint <name> | --machine <id>) export
     [--drive <key>] [<destination>]
 rlq import <source> --blueprint <name> --platform <platform>
 reliquary (--blueprint <name> | --machine <id>) script <label>
-    [--responses <path>] [--display]
+    [--responses <path>] [--display] [--detach] [--progress <mode>]
+reliquary (--blueprint <name> | --machine <id>) run status [<n>]
+reliquary (--blueprint <name> | --machine <id>) run tail [<n>]
+    [--progress <mode>]
+reliquary (--blueprint <name> | --machine <id>) run wait [<n>]
+reliquary (--blueprint <name> | --machine <id>) run cancel [<n>] [--stop]
 rlq check-script <script_name> [--blueprint <name> | --machine <id>]
     [--responses <path>]
 rlq fetch <media_name> [--script <script_name>]
@@ -468,6 +474,11 @@ Lifecycle semantics:
   fails closed while any machine of it exists, naming the machine
   ids — `destroy` them first. (Removing a machine is `destroy`'s
   job.)
+- runs are machine-scoped — monotonic numbers, never reused; the
+  `run` operations take the number positionally and default to
+  the machine's latest run. A foreground `script` is
+  start-plus-attach; `--detach` returns the run id after
+  foreground preflight ("Asynchronous runs" below).
 
 - `script` completes preflight, installs missing embedded media
   definitions, resolves its machine (creating one when `--blueprint`
@@ -978,6 +989,95 @@ capture session is one run record with mixed drivers. The
 together, under parity. Blueprints and media definitions are
 untouched: a session runs on an ordinary machine, and media swaps
 are already `insert`/`eject`.
+
+## Asynchronous runs
+
+A script run can be started without blocking and observed while
+it goes — the consumer story for the feedback split (USE-CASES):
+a person leaves an hour-long install and checks back (U1), an
+automating program follows machine-readable events as they
+happen (U3). Settled design (owner, 2026-07-21):
+
+**The stream is written live.** `run-events.jsonl` is appended
+event by event, flushed at each event boundary, from the first
+preflight event to a terminal event stating the outcome. The
+file is the update channel: every async affordance below is a
+follower of the stream the run already produces, which keeps the
+contract binding-clean (any language that can read lines can
+follow a run — the C/Java constraint) and keeps daemons and
+services permanently out of the picture. A record whose writer
+died without a terminal event is detectably a *crashed* run.
+
+**Sync is async plus attach.** A foreground `script` run is
+defined as: start the run, immediately attach the live renderer.
+One semantic, one code path — and a run started in one terminal
+can be observed from another. Ctrl-C on a foreground run cancels
+the run; Ctrl-C on a later reattach merely stops tailing.
+
+**Detach hands off at the machine boundary.** `script --detach`
+completes parsing, binding, and static and capability preflight
+in the foreground (G3 — those failures belong to the invoker's
+exit code, never buried in a record), then spawns the runner and
+prints the run id. The detached runner is an owned child exactly
+as QEMU is: the run record carries writer identity (pid plus
+start time), liveness checks verify identity before any command
+targets the run, and stale records fail closed — the vm.json
+doctrine applied to the runner.
+
+**Cancel ends the run, not the machine.** `run cancel` requests
+a stop; the runner ends at the next event boundary (input
+deliveries are atomic, host transfers abort — the execution
+model's severability), writes a `cancelled` terminal event, and
+leaves the machine as-is per the no-implicit-teardown rule;
+`--stop` opts into the visible hard power-off. Cancelled exits
+with its own code (`5`): deliberately neither success nor RUN
+FAILURE.
+
+**Run identity is machine-scoped.** Runs number monotonically
+per machine, never reused; the record lives at
+`cache/machines/<machine-id>/runs/<n>/` and `<machine-id>/<n>`
+is a run's full identity. The `run` operations take the number
+as an ordinary positional argument (the property-family
+precedent), defaulting to the machine's latest run, with the
+machine chosen by the ordinary `--machine` / `--blueprint`
+selectors.
+
+**Two presentations, under parity.** The CLI carries
+`script --detach`, the `run` noun family — `run status`,
+`run tail` (rendering per the decided progress vocabulary:
+pretty on a tty, plain and rawjson for programs), `run wait`
+(its exit code mirrors the run's outcome, so unbound languages
+get results by waiting), and `run cancel [--stop]` — and
+`list runs`. The embedding API's twins: `run_script()` stays the
+blocking form; `start_script()` returns a run handle —
+`status()`, `events(follow=)` as a blocking iterator,
+`wait(timeout=)`, `cancel(stop_machine=)` — and an attach-by-id
+call reopens a handle from a fresh process. The handle is
+pull-only: no callbacks, nothing a common binding language
+cannot express directly. A caller wanting concurrency without
+any of this still runs the blocking form on its own thread —
+computation stays on the caller's side of the seam.
+
+**Synchronous programmatic runs — the blessed divergence.** The
+sync forms are twins in capability but divergent in presentation
+— a named decision, not drift: `run_script()` returns a typed
+result and raises by error class, while the foreground `script`
+command speaks the stream and its exit code. Rendering is
+selected explicitly with `--progress (auto | tty | plain |
+rawjson)` (default `auto`, tty detection — the decided BuildKit
+vocabulary) on the stream-bearing commands, `script` and
+`run tail`. Under `rawjson`, stdout carries the event stream as
+JSON lines and nothing else, ever — diagnostics go to stderr —
+and because the stream ends with the terminal event, the last
+line is the machine-readable result: no separate result mode
+exists. Prompting is confined to interactive contexts (a tty
+under `auto`/`tty`); `plain`/`rawjson` runs are noninteractive,
+so a missing input value is a PREFLIGHT ERROR before the machine
+starts and a program can never hang on a hidden prompt. This
+settles renderer selection and rawjson stdout purity for the
+stream-bearing commands now; the general stdout/stderr
+discipline and output-stability contract across every command
+remains queued (TASKS).
 
 ## Milestones
 

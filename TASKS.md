@@ -172,7 +172,53 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     text pair, never a bar); transfer events only where an honest total
     exists (media fetch bytes, stage/collect, select traversal); failure
     report includes route+revisits, expired clock + source scope, nearest-
-    miss row, screenshot, and the suggested next command
+    miss row, screenshot, and the suggested next command; use-case backing
+    recorded (owner, 2026-07-21): the USE-CASES feedback split — human CLI
+    sessions get pretty, timely progress, automated sessions get
+    machine-readable output just as timely, two renderings of one run,
+    neither scraped from the other — the renderer model's demand-side
+    anchor
+  - ASYNC RUNS, DECIDED SHAPE (owner, 2026-07-21, design round —
+    ROADMAP "Asynchronous runs"; all three forks settled on the
+    recommendations):
+    - the stream is written LIVE — append + flush per event, first
+      preflight event to a terminal event stating the outcome; writer
+      death without one = crashed run; the live-write clause and run
+      identity are now NORMATIVE in script-spec.md "Failure, runs, and
+      transcripts" (run dir renamed runs/<n>/, was <timestamp>-<run_id>)
+    - sync script = start + attach (one code path; Ctrl-C on a
+      foreground run cancels the run, Ctrl-C on a reattach only stops
+      tailing); script --detach preflights in the foreground (G3,
+      failures on the invoker's exit code) then hands off at the
+      machine boundary and prints the run id
+    - the detached runner is an owned child under the vm.json identity
+      doctrine: writer pid + start time in the run record, identity
+      verified before any command targets the run, stale records fail
+      closed
+    - run cancel ends at an event boundary (severability per the
+      execution model), machine left as-is (no implicit teardown),
+      --stop opts into power-off; exit code 5 = cancelled (spec
+      error-classes updated; neither success nor RUN FAILURE 4)
+    - run identity machine-scoped: monotonic per machine, never
+      reused, <machine-id>/<n>; run ops take the number positionally,
+      defaulting to latest, machine via the ordinary selectors
+    - CLI: script --detach + run (status|tail|wait|cancel) + list
+      runs; API: run_script stays blocking, start_script returns the
+      pull-only handle (status / events iterator / wait / cancel) +
+      attach by id — no callbacks (the C/Java binding constraint)
+    - SYNC PROGRAMMATIC (owner, 2026-07-21, follow-up round): the
+      CLI/API divergence is BLESSED as a named decision, not drift —
+      run_script returns a typed result / raises by class, the
+      foreground script command speaks stream + exit code; --progress
+      (auto|tty|plain|rawjson) on script and run tail (the decided
+      BuildKit vocabulary); rawjson stdout is pure event JSON, last
+      line = terminal event = the result (no separate result mode);
+      plain/rawjson are noninteractive — prompting needs a tty under
+      auto/tty, missing values fail preflight (spec inputs section
+      updated, cli.md updated)
+    - implementation at the run-records milestone, behind the
+      realignment like everything else (script_runner.py still writes
+      the superseded runs/<timestamp>-<run_id>/ layout until then)
   - SPEC-CRAFT QUEUE, FULLY ADJUDICATED (18 of 24 proposals survive, each
     with a refined right-sized form recorded in the review output —
     workflow wf_ac5f89b4-402 journal):
@@ -223,8 +269,15 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     rests on it): exit codes, stdout/stderr discipline, output stability, a
     machine-readable mode — error classes + exit codes are now homed in
     script-spec.md "Error classes and exit codes" and the run-events
-    minimum in its execution model (2026-07-21); still unhomed: stdout/
-    stderr discipline, output stability, the rawjson renderer contract;
+    minimum in its execution model (2026-07-21); --progress renderer
+    selection, rawjson stdout purity (pure event JSON, terminal event =
+    the result), and the plain/rawjson no-prompt rule are settled for
+    the stream-bearing commands (2026-07-21, ROADMAP "Asynchronous
+    runs"); still unhomed: the general stdout/stderr discipline and
+    output stability across every command, the rawjson event-schema
+    stability contract
+    (the machine-readable mode is now demanded directly by the USE-CASES
+    feedback split, 2026-07-21);
     also the interaction command family (type/keys/run/text/wait/
     screenshot/menu/hmp) is absent from the settled CLI list though a
     CLI-driving U3 agent lives on it
@@ -237,7 +290,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     run record is the product; align with the decided run-events.jsonl
     normative-stream model (every surface a renderer of it) — the
     minimum vocabulary is now normative in script-spec.md's execution
-    model (2026-07-21); remaining: records for API/CLI-primitive runs,
+    model (2026-07-21); async consumption settled (2026-07-21, ROADMAP
+    "Asynchronous runs": live-write, script --detach, the run family,
+    start_script/attach handles); remaining: records for API/CLI-primitive runs,
     the full renderer contract (transcript rewrite), per-test result
     collection; the
     unit-test loop is now IN U3 itself (amended 2026-07-21: the
@@ -314,8 +369,11 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     field, selection scoping,
     install targeting), at the residency milestone
   - watches (served but strained; re-ask as they harden): live-run progress
-    surface (G4 during the run — ties to run-events); GUI/landmark
-    assets forming a new authored artifact class; published JSON Schemas
+    surface (G4 during the run — ties to run-events; the USE-CASES
+    feedback split, 2026-07-21, now names the demand); GUI/landmark
+    assets forming a new authored artifact class (hardened 2026-07-21:
+    .rlql is the fourth authored extension — the INTERFACES listing is
+    due at the asset-spec/realignment pass); published JSON Schemas
     elevating reliquary-machine.json into a public contract
   - RESOLVED (July 2026): hand-placed proprietary payloads vs the "cache is
     not an interface" doctrine — local-path (item- or archive-level) is now
@@ -358,6 +416,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     a capture session is one run record with mixed drivers
   - CLI record command family + API twins land together (parity)
 - install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
+  - this is the human half of the USE-CASES feedback split (2026-07-21);
+    render it from the run-events stream per the decided shape above
 - "rlq script install --blueprint freedos-1.4-plain" should be our north star
   - "rlq --blueprint freedos-1.4-plain script install" is identical 
 - allow specifying cache location outside of home dir

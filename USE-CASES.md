@@ -171,3 +171,13 @@ reliquary's own ground — caches, machines, the personal property
 registry — so a project's artifacts must work in place: runnable
 from the source tree, with nothing copied into a home to make
 them usable.
+
+Alongside these runs a feedback split. reliquary's runs are
+long, and whoever drives one gets timely progress — presented
+for the driver. A person at the CLI (U1, U5) gets pretty,
+legible, real-time progress; an automating program (U3, U4) gets
+machine-readable output that is just as timely. The two are
+renderings of the same run, and neither is derived by scraping
+the other: the pretty rendering is never what a program parses,
+and the machine rendering is never what a person is left to
+read.

@@ -862,8 +862,11 @@ available source:
 3. the property named by `property=`; or
 4. an interactive prompt.
 
-Without an interactive terminal, a still-missing value fails before
-execution. A response file therefore overrides everything for one
+Prompting requires an interactive context: a terminal, under the
+interactive progress renderings (`auto`/`tty`). Without one — no
+terminal, or an explicit `plain`/`rawjson` progress selection — a
+still-missing value fails before
+execution, so a program can never hang on a hidden prompt. A response file therefore overrides everything for one
 invocation, while a blueprint's designed values override personal
 registry defaults — a blueprint that fixes its user name as
 "testuser" keeps it fixed on every machine of it (U5). Prompted
@@ -1615,7 +1618,9 @@ capability preflight.
 Registry-aware checking reports property presence and kind; it
 never reveals a property value. Its two modes are the two
 checkable tiers of the [processing model](#processing-model);
-the embedding API's twins are `run_script` and `check_script`,
+the embedding API's twins are `run_script` and `check_script` —
+`start_script` joins them as `script --detach`'s twin, returning
+the run handle whose operations the CLI `run` family mirrors —
 taking the same identifiers under CLI–API parity.
 
 ### Error classes and exit codes
@@ -1630,7 +1635,10 @@ classes, matching the enforcement tiers:
 | RUN FAILURE | dynamic semantics | 4 |
 
 `0` is success; `1` is reserved for reliquary's own unexpected
-faults. The classes are the CLI's exit codes and the API's
+faults; `5` is a cancelled run — a deliberate `run cancel` (API
+`cancel()`) that ended the run at an event boundary with a
+`cancelled` terminal event, neither success nor RUN FAILURE. The
+classes are the CLI's exit codes and the API's
 exception taxonomy — one mapping, under parity. Every diagnostic
 carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
@@ -1641,16 +1649,26 @@ across the classes, and the full id index is deferred to beta.
 Every invocation creates a unique run directory under:
 
 ```text
-cache/machines/<machine_id>/runs/<timestamp>-<run_id>/
+cache/machines/<machine_id>/runs/<n>/
 ├── run-events.jsonl
 ├── transcript.txt
 ├── screenshots/
 └── output/
 ```
 
+Runs number monotonically per machine and a number is never
+reused; `<machine_id>/<n>` is a run's full identity.
+
 `run-events.jsonl` is the run's normative record — the
 [event stream](#the-run-event-stream) the execution model
 defines; `transcript.txt` is a human-readable rendering of it.
+The stream is written live: appended event by event, flushed at
+each event boundary, from the first preflight event to a
+terminal event stating the outcome (success, a failure class, or
+cancelled). Every follower — the live display, `run tail`, the
+embedding API's event iterator — reads the same growing file; a
+record whose writer terminated without a terminal event is a
+crashed run.
 The CLI may redirect the output root, but transcript paths are
 always reported explicitly. A transcript records:
 
