@@ -7,6 +7,54 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Small to-do tasks.  Large tasks belong in the roadmap.
 
+- scripting language, feels clunky/awkward
+  - current design thoughts, but not law:
+  - see docs/script-spec.md for current design thoughts, those are LESS IMPORTANT THAN THESE:
+    - Forget pleasing me, redesign it to make sense and please an experienced computer linguist!!!
+      - can it be given a formalized definition (BKNF?) that can be parsed?
+      - could a compiler be written? is the language 'spec' too loose?
+      - FOLLOW MODERN BEST LANGUAGE DESIGN PRINCIPLES
+        - facts:
+          - we're trying to manipulate guest operating systems that (possibly) don't know about us
+          - we need to be able to script these things:
+            - we need to be able to observe identify states where the guest is waiting for us to provide input
+              - maybe from gui screen polling & analysis
+              - maybe from text screen polling & analysis
+              - maybe from direct console text stream
+              - other ??
+            - we need to be able to provide input
+              - maybe direct console stream / keyboard
+              - maybe mount position/click
+              - other ??
+      - critical concepts:
+        - BREVITY, simple to understand
+        - SUCCINT, not overly verbose
+        - STRUCTURED, 
+          - clear linear steps vs. declarative delineation (we have both, make them distinct)
+          - where is the boundary?
+        - CLARITY
+          - clearly visible identifiation of: 
+           - what is an external name/file ref
+           - what is an internal identifier 
+           - what is just text for in/out matching
+           - what is a regex
+      - specific critiques
+        - comma, colon, quoting discipline seems weak and inconsistent
+        - I do like the header block 
+        - 'stage' should be 'phase'? 
+        - the -> on a standalone line is particularly ugly, maybe for that case "phase -> <new_phase>"?
+        - quoting feels inconsistent
+        - is the expect construct consistent with prior art (i.e. tcl) for an indeterminate wait condition?
+        - shouldn't the timeout/dealy be a clear parm of wait()?  
+    - can it be given a formalized definition (BKNF?) that can be parsed?
+    - commas / colons arbitrarily used in awkward places
+    - I do like the header block 
+    - inconsisent quoting of strings that refer to external-from-script items
+    - I prefer 'phase' to 'state'
+    - -> on standalone lines is really ugly
+      - maybe "phase -> next_phase" for standalone lines?   
+    - is our use of 'expect' consistent with prior art?
+      - can it be a little closer to C enum?
 - install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
 - "rlq script install --blueprint freedos-1.4-plain" should be our north star
   - "rlq --blueprint freedos-1.4-plain script install" is identical 
