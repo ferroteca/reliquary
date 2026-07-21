@@ -29,7 +29,7 @@ class ScriptParserTests(unittest.TestCase):
                          "done")
 
     def test_parses_the_shipped_linear_verify_script(self):
-        result = parse_script(self._builtin("freedos-1.4-plain-verify.rlqs"))
+        result = parse_script(self._builtin("freedos-1.4-verify.rlqs"))
         self.assertEqual(result.initial, None)
         self.assertEqual(result.machine, "stopped")
         self.assertEqual([statement.verb for statement in result.statements],

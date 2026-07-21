@@ -204,7 +204,8 @@ class RunScriptWiringTests(unittest.TestCase):
     def test_run_script_resolves_label_and_records_run(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch(
-                    "reliquary.script_runner.execute_script") as execute:
+                    "reliquary.script_runner.execute_script",
+                    return_value=("done", "ready")) as execute:
             result = run_script(
                 "install", blueprint="plain", home=self.home)
         self.assertIsInstance(result, ScriptRun)
@@ -212,6 +213,8 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertTrue(result.script_path.endswith(
             "install-script.rlqs"))
         self.assertTrue(os.path.isdir(result.run_dir))
+        self.assertEqual(result.final_state, "done")
+        self.assertEqual(result.machine_phase, "ready")
         execute.assert_called_once()
         kwargs = execute.call_args.kwargs
         self.assertEqual(kwargs["machine_id"], result.machine_id)
@@ -226,7 +229,9 @@ class RunScriptWiringTests(unittest.TestCase):
                   encoding="utf-8", newline="\n") as handle:
             handle.write("platform: dos\n")
         with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch("reliquary.script_runner.execute_script"):
+                mock.patch(
+                    "reliquary.script_runner.execute_script",
+                    return_value=("-", "ready")):
             result = run_script(
                 "extra", blueprint="plain", home=self.home)
         self.assertTrue(result.script_path.endswith("extra.rlqs"))
@@ -245,7 +250,9 @@ class RunScriptWiringTests(unittest.TestCase):
                 mock.patch(
                     "reliquary.script_runner.seed_script",
                     side_effect=fake_seed) as seed, \
-                mock.patch("reliquary.script_runner.execute_script"):
+                mock.patch(
+                    "reliquary.script_runner.execute_script",
+                    return_value=("-", "ready")):
             result = run_script(
                 "install", blueprint="plain", home=self.home)
         seed.assert_called_once_with("install-script", home=self.home)
@@ -266,7 +273,8 @@ class RunScriptWiringTests(unittest.TestCase):
     def test_run_script_forwards_display(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch(
-                    "reliquary.script_runner.execute_script") as execute:
+                    "reliquary.script_runner.execute_script",
+                    return_value=("-", "ready")) as execute:
             run_script(
                 "install", blueprint="plain", home=self.home,
                 display=True)

@@ -2,24 +2,24 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 description: "FreeDOS 1.4 plain install from LiveCD"
-platform: dos
-machine: stopped
-initial: insert-cd
-timeout: 30s
+platform:   dos
+machine:    stopped                 # script begins with a stopped machine
+initial:    startup                 # initial state
+timeout:    30s
 
-state insert-cd {
+state startup {
     insert cdrom0 freedos-1.4-livecd
-    start
+    start                           # startup the machine
     -> cd-boot
 }
 
 state cd-boot {
-    wait "Welcome to FreeDOS 1.4 (LiveCD)"
-    select "Install to harddisk"
-    wait "What is your preferred language"
-    select "English"
-    wait "Welcome to the FreeDOS 1.4 installation program"
-    press enter
+    wait    "Welcome to FreeDOS 1.4 (LiveCD)"
+    select  "Install to harddisk"
+    wait    "What is your preferred language"
+    select  "English"
+    wait    "Welcome to the FreeDOS 1.4 installation program"
+    press   enter
 
     expect {
         "Drive C: does not appear to be partitioned.": {
@@ -40,22 +40,30 @@ state partitioning {
 }
 
 state formatting, timeout: 5m, deadline: 20m {
-    wait "Press a key..."
-    press enter
-    wait "Please select your keyboard layout"
-    select "US English (Default)"
-    wait "What FreeDOS packages do you want to install?"
-    select "Plain DOS system", exclude: "with sources"
-    wait "We are now ready to install FreeDOS 1.4."
-    select "Yes"
-    wait "Installation of FreeDOS 1.4 is now complete."
-    select "Yes"
-    wait "Load FreeDOS with JEMMEX (more compatible)"
-    press enter
-    wait "C:\>"
+    wait    "Press a key..."
+    press   enter
+    wait    "Please select your keyboard layout"
+    select  "US English (Default)"
+    wait    "What FreeDOS packages do you want to install?"
+    select  "Plain DOS system", exclude: "with sources"
+    wait    "We are now ready to install FreeDOS 1.4."
+    select  "Yes"
+    wait    "Installation of FreeDOS 1.4 is now complete."
+    select  "Yes"
+    -> hd-boot
+}
+
+state hd-boot {
+    wait    "Load FreeDOS"
+    select  "Load FreeDOS with JEMMEX (more compatible)"
+    wait    "C:\>"
     screenshot installed
-    enter "fdapm poweroff"
-    wait stopped, timeout: 2m
-    eject cdrom0
+    -> shutdown
+}
+
+state shutdown {
+    enter   "fdapm poweroff"
+    wait    stopped, timeout: 2m
+    eject   cdrom0
     done
 }

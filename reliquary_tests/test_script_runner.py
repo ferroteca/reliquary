@@ -736,7 +736,7 @@ class EmptyScriptTests(unittest.TestCase):
         script = parse_script('platform: dos\n')
         result = execute_script(
             script, machine_id="abcd" * 8, home="/tmp/home")
-        self.assertIsNone(result)
+        self.assertEqual(result, ("-", "-"))
 
 
 class ExecutePreflightTests(unittest.TestCase):

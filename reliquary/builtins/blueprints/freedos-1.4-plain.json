@@ -10,6 +10,6 @@
   "boot": ["hdd0", "cdrom0"],
   "scripts": {
     "install": "freedos-1.4-plain-install",
-    "verify": "freedos-1.4-plain-verify"
+    "verify": "freedos-1.4-verify"
   }
 }

@@ -5,6 +5,7 @@
 import dataclasses
 import os
 import re
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -67,6 +68,74 @@ def _normalize_screen_text(screen):
     return [_normalize_row(row) for row in screen]
 
 
+_HEARTBEAT_INTERVAL = 5.0
+_SPINNER = "|/-\\"
+_BAR_WIDTH = 20
+
+
+class _Progress:
+    """Live progress for a ``wait``/``expect`` poll loop.
+
+    Two audiences, one clock:
+
+    * An attached terminal gets a colored, in-place spinner + bar
+      that redraws every poll (every couple of seconds) — good for
+      someone watching the session live.
+    * Everyone else — a redirected log a user is ``tail -f``-ing
+      against a headless/backgrounded VM, and the transcript file
+      itself — gets a plain heartbeat line every
+      :data:`_HEARTBEAT_INTERVAL` seconds, so progress is visible
+      without needing a live terminal.
+    """
+
+    def __init__(self):
+        self.isatty = sys.stdout.isatty()
+        self._active = False
+        self._last_heartbeat = None
+        self._tick = 0
+
+    @staticmethod
+    def _bar(fraction):
+        fraction = min(1.0, max(0.0, fraction))
+        filled = round(fraction * _BAR_WIDTH)
+        return "#" * filled + "." * (_BAR_WIDTH - filled)
+
+    def _render(self, state, step, description, elapsed, remaining, timeout):
+        fraction = elapsed / timeout if timeout > 0 else 1.0
+        return (
+            f"[{state}] step {step}: {description}  "
+            f"[{self._bar(fraction)}] "
+            f"{elapsed:0.0f}s elapsed, {remaining:0.0f}s to timeout"
+        )
+
+    def tick(self, state, step, description, deadline, timeout):
+        """Advance the animation; return a heartbeat line, or None."""
+        remaining = max(0.0, deadline - time.monotonic())
+        elapsed = max(0.0, timeout - remaining)
+        line = self._render(
+            state, step, description, elapsed, remaining, timeout)
+        if self.isatty:
+            spin = _SPINNER[self._tick % len(_SPINNER)]
+            self._tick += 1
+            sys.stdout.write(f"\r\x1b[K\033[36m{spin} {line}\033[0m")
+            sys.stdout.flush()
+            self._active = True
+        now = time.monotonic()
+        if (self._last_heartbeat is None
+                or now - self._last_heartbeat >= _HEARTBEAT_INTERVAL):
+            self._last_heartbeat = now
+            return line
+        return None
+
+    def clear(self):
+        if self._active:
+            sys.stdout.write("\r\x1b[K")
+            sys.stdout.flush()
+            self._active = False
+        self._last_heartbeat = None
+        self._tick = 0
+
+
 class ScriptRuntimeError(RuntimeError):
     """An error that occurred during script execution."""
 
@@ -90,6 +159,8 @@ class ScriptRun:
     run_dir: str
     script_path: str
     created_machine: bool = False
+    final_state: str = "-"
+    machine_phase: str = "-"
 
 
 class _ScriptEngine:
@@ -105,7 +176,11 @@ class _ScriptEngine:
         self._port = None
         self._display = False
         self._current_state = script.initial
+        self._last_state = None
         self._step = 0
+        self._status = _Progress()
+        self.final_state = None
+        self.final_phase = None
 
     @property
     def _default_timeout(self):
@@ -118,10 +193,44 @@ class _ScriptEngine:
             message, statement=statement, path=self._script_path)
 
     def _log(self, message):
+        self._status.clear()
         print(message)
         if self._transcript is not None:
             self._transcript.write(message + "\n")
             self._transcript.flush()
+
+    def _progress(self, deadline, timeout, description):
+        state = self._current_state or "-"
+        heartbeat = self._status.tick(
+            state, self._step, description, deadline, timeout)
+        if heartbeat is not None:
+            if self._transcript is not None:
+                self._transcript.write(heartbeat + "\n")
+                self._transcript.flush()
+            if not self._status.isatty:
+                print(heartbeat)
+
+    def _read_phase(self):
+        try:
+            state = _machines.load_machine_state(
+                self._machine_id, self._home)
+            return state.get("phase", "-")
+        except FileNotFoundError:
+            return "-"
+
+    def _report_final(self):
+        """Record and, when a transcript is active, log the final
+        script state and machine phase.
+
+        Called on every exit path — success, script error, or
+        unexpected exception — so it is always clear what state the
+        machine is left in, not just what happened along the way.
+        """
+        self.final_phase = self._read_phase()
+        self.final_state = self._last_state or "-"
+        if self._transcript is not None:
+            self._log(f"final script state: {self.final_state}")
+            self._log(f"machine phase: {self.final_phase}")
 
     def run(self, display=False):
         self._display = display
@@ -175,6 +284,7 @@ class _ScriptEngine:
         try:
             if self._current_state is not None:
                 while self._current_state is not None:
+                    self._last_state = self._current_state
                     if self._transcript is not None:
                         self._log(f"state: {self._current_state}")
                     state = self._script.states[self._current_state]
@@ -182,10 +292,12 @@ class _ScriptEngine:
                     self._execute_block(state.statements, block_mods)
             else:
                 self._execute_block(self._script.statements, {})
+            self._report_final()
             if self._transcript is not None:
                 self._log("result: ok")
         except (ScriptRuntimeError, TimeoutError, RuntimeError,
                 ValueError) as exc:
+            self._report_final()
             if self._transcript is not None:
                 self._log(f"result: failed")
                 self._log(f"error: {exc}")
@@ -193,6 +305,7 @@ class _ScriptEngine:
                 exc.path = self._script_path
             raise
         except Exception as exc:
+            self._report_final()
             if self._transcript is not None:
                 self._log("result: failed")
                 self._log(f"error: {exc}")
@@ -285,9 +398,11 @@ class _ScriptEngine:
         deadline = time.monotonic() + timeout
         stable_deadline = None
         last_match = False
+        description = f"wait {_describe_condition(condition)}"
         with self._session() as qmp:
             console = self._console(qmp)
             while time.monotonic() < deadline:
+                self._progress(deadline, timeout, description)
                 screen = console.screen_text()
                 line, matched = self._match_condition(
                     screen, condition)
@@ -302,10 +417,12 @@ class _ScriptEngine:
                         if time.monotonic() < stable_deadline:
                             time.sleep(1)
                             continue
+                    self._status.clear()
                     return
                 else:
                     last_match = False
                 time.sleep(2)
+        self._status.clear()
         raise self._error(
             f"timed out after {timeout}s waiting for "
             f"{_describe_condition(condition)}",
@@ -314,10 +431,13 @@ class _ScriptEngine:
     def _wait_stopped(self, timeout):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            self._progress(deadline, timeout, "wait stopped")
             if self._is_stopped():
+                self._status.clear()
                 self._mark_stopped()
                 return
             time.sleep(2)
+        self._status.clear()
         raise self._error(
             f"timed out after {timeout}s waiting for machine to stop")
 
@@ -351,6 +471,7 @@ class _ScriptEngine:
         with self._session() as qmp:
             console = self._console(qmp)
             while time.monotonic() < deadline:
+                self._progress(deadline, timeout, "expect")
                 screen = console.screen_text()
                 matched = None
                 for branch in branches:
@@ -375,6 +496,7 @@ class _ScriptEngine:
                 else:
                     last_matched_branch = None
                 time.sleep(2)
+        self._status.clear()
         if chosen is None:
             raise self._error(
                 f"timed out after {timeout}s waiting for any expect "
@@ -708,9 +830,17 @@ def execute_script(script, *, machine_id, home=None, display=False,
 
     When ``run_dir`` is set, a transcript is written there and
     screenshots land under ``run_dir/screenshots/``.
+
+    Returns a ``(final_state, machine_phase)`` pair reporting the
+    script state and machine phase the run finished in.
     """
     if not script.states and not script.statements:
-        return
+        try:
+            phase = _machines.load_machine_state(
+                machine_id, home).get("phase", "-")
+        except FileNotFoundError:
+            phase = "-"
+        return "-", phase
 
     _preflight_media_slots(
         script, _machines.load_machine_state(machine_id, home),
@@ -720,6 +850,7 @@ def execute_script(script, *, machine_id, home=None, display=False,
         script, machine_id, home, machine_home,
         run_dir=run_dir, script_path=script_path)
     engine.run(display=display)
+    return engine.final_state, engine.final_phase
 
 
 def run_script(label, *, blueprint=None, machine=None, home=None,
@@ -738,7 +869,7 @@ def run_script(label, *, blueprint=None, machine=None, home=None,
     script_path = _ensure_script_path(stem, home=home)
     script = load_script(script_path)
     run_dir = _create_run_dir(machine_id, home=home)
-    execute_script(
+    final_state, machine_phase = execute_script(
         script, machine_id=machine_id, home=home, display=display,
         run_dir=run_dir, script_path=script_path)
     return ScriptRun(
@@ -746,4 +877,6 @@ def run_script(label, *, blueprint=None, machine=None, home=None,
         run_dir=run_dir,
         script_path=script_path,
         created_machine=created,
+        final_state=final_state,
+        machine_phase=machine_phase,
     )

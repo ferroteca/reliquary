@@ -245,6 +245,8 @@ def _script(arguments):
         print(f"created machine {result.machine_id}")
     print(f"ran {os.path.basename(result.script_path)} "
           f"on machine {result.machine_id}")
+    print(f"final script state: {result.final_state}")
+    print(f"machine phase: {result.machine_phase}")
     print(f"run: {result.run_dir}")
     return 0
 
