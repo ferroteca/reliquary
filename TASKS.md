@@ -240,6 +240,23 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     clean_downloads(), clean_media()
   - built-in library: teaching comments at blueprint seams once the JSONC
     reader lands
+- U6 AUTHORING RECORDER (use case amended into INTERFACES.md; design in
+  ROADMAP.md "Script authoring by recording") — work items, in rough
+  dependency order:
+  - reliquary-owned console viewer over the vnc control plane (recording
+    prerequisite: backend display-window input is invisible to reliquary)
+  - text-mode recorder first (no new language surface: waits from VGA
+    scrapes, type/press actions, generated-comment uncertainty flags)
+  - runner run-to-point / breakpoint / human-takeover machinery (also the
+    failure report's "take over from here" suggested next command)
+  - round-trip: fragment emission anchored by playback position; opt-in
+    surgical apply at the anchor (never regenerate, never text-merge)
+  - landmark catalog shape: variant-as-new-file + capture provenance (feed
+    into the pending landmark spec work); GUI capture rides landmark/click,
+    a click's position seeds its landmark's spot
+  - run-events: handover event kinds (script/human control passing);
+    a capture session is one run record with mixed drivers
+  - CLI record command family + API twins land together (parity)
 - install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
 - "rlq script install --blueprint freedos-1.4-plain" should be our north star
   - "rlq --blueprint freedos-1.4-plain script install" is identical 

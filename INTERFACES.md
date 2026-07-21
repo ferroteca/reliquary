@@ -226,6 +226,32 @@ deliberately and recorded here.
   either way: an automated-testing blueprint may fix its user
   name as "testuser", while "paul" is a value its owner would
   never check in.
+- **U6 — Author a script by doing the task once.** A user
+  performs the task by hand — going through a Windows install,
+  say — in a console session reliquary supervises, and ends with
+  a draft script and the image assets (landmarks) to reproduce
+  it. reliquary follows the session — every keystroke, click,
+  and media swap, and the screen states between them — and
+  drafts the wait conditions and actions, capturing the source
+  screenshots landmarks crop from. The output is a *draft*:
+  ordinary script text plus catalog assets, owned and edited
+  like anything hand-written — recording cannot know which
+  screen features are load-bearing or how long a step may
+  honestly take, so the person tailors what reliquary proposes.
+  Tailoring is not a one-way exit: authoring round-trips. When
+  the task changes or coverage grows, a later session captures
+  the new screens and steps *against the tailored script* —
+  playback carries the machine to the point of change, the
+  person takes over and demonstrates, and reliquary proposes
+  the new fragment and assets without disturbing what the
+  author wrote. A changed screen for an unchanged step is an
+  asset refresh — a new landmark variant in the catalog — and
+  touches the script not at all. The session machine is as
+  disposable as any other; the script and assets are the
+  product. (The authoring parallel to U2: import captures a
+  machine built by hand; recording captures a procedure
+  performed by hand.) This use case is dense and will likely be
+  broken out into finer use cases as it settles.
 
 Beneath them all sits the ephemeral-machine principle: machines
 are cheap to destroy and rebuild, and the machine is never the
