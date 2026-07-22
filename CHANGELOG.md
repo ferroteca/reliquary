@@ -18,6 +18,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   related design pages, and `docs/` quote `run-script`, the
   colon-free `machine` header, and `insert`/`eject`/`set-boot`
   rather than the superseded spellings.
+- The old script surface and superseded CLI/API names are gone
+  from the live tree. `reliquary_tests.test_old_surface_purge`
+  fails the suite if they reappear in the package, tests, docs,
+  README, AGENTS, examples, or shipped codex scripts.
 
 - CLI/API twin-name identity (ROADMAP milestone 4, task 9): every
   command is its API twin's name, dash-separated. Lifecycle verbs are
@@ -114,8 +118,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   surface; the `State` and `ExpectBranch` exports are replaced by
   `Phase`, `Handler`, and `Property`. Scripts written for the old
   surface do not parse — rewrite them; there is no bridge.
-- `ScriptRun.final_state` is `ScriptRun.final_phase`, and `rlq script`
-  prints `final script phase:`.
+- `ScriptRun.final_state` is `ScriptRun.final_phase`, and
+  `rlq run-script` prints `final script phase:`.
 - Scripts no longer carry embedded JSON. The `media <label> { ... }`
   block is deleted from the language, along with the planned
   `landmark <name> { ... }` block, the install-on-first-run model
@@ -135,13 +139,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   dependencies. It also underpins the planned landmark image assets:
   decode normalization, pixel comparison, and PNG text chunks for
   capture provenance.
-- `rlq list machines` and `rlq list blueprints` report an explicit
+- `rlq list-machines` and `rlq list-blueprints` report an explicit
   `(no ...)` message on an empty result instead of a column header
-  over zero rows, matching `list scripts`, which already did.
+  over zero rows, matching `list-scripts`, which already did.
   (`#5`)
-- `rlq list scripts --blueprint <name>` heads its first column
+- `rlq list-scripts --blueprint <name>` heads its first column
   `LABEL`, naming what it lists: the blueprint scripts-map labels used
-  as `run-script` verbs. The bare `rlq list scripts` listing keeps
+  as `run-script` verbs. The bare `rlq list-scripts` listing keeps
   `NAME`, which is what it lists: script file stems.
 - Scrubbed private project-history references from release-facing
   documentation and package metadata.

@@ -193,7 +193,7 @@ class RunScriptWiringTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch(
                     "reliquary.script_runner.execute_script",
-                    return_value=("done", "ready")) as execute:
+                    return_value=("-", "ready")) as execute:
             result = run_script(
                 "install", blueprint="plain", home=self.home)
         self.assertIsInstance(result, ScriptRun)
@@ -201,7 +201,7 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertTrue(result.script_path.endswith(
             "install-script.rlqs"))
         self.assertTrue(os.path.isdir(result.run_dir))
-        self.assertEqual(result.final_phase, "done")
+        self.assertEqual(result.final_phase, "-")
         self.assertEqual(result.machine_phase, "ready")
         execute.assert_called_once()
         kwargs = execute.call_args.kwargs
@@ -268,8 +268,8 @@ class RunScriptWiringTests(unittest.TestCase):
                 display=True)
         self.assertTrue(execute.call_args.kwargs["display"])
 
-    def test_spike_10_cli_invokes_runtime_end_to_end(self):
-        """Exit criterion: rlq --blueprint … script install wires through."""
+    def test_cli_run_script_invokes_runtime_end_to_end(self):
+        """rlq run-script install --blueprint … wires through."""
         stdout = io.StringIO()
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch(

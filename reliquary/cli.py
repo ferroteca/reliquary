@@ -286,19 +286,19 @@ def main(argv=None):
 
     # list-*
     command = subcommands.add_parser(
-        "list-blueprints", help="list blueprints")
+        "list-blueprints", help="list blueprint names")
     _add_home(command)
     command.add_argument("--builtin", action="store_true")
 
     command = subcommands.add_parser(
-        "list-machines", help="list machines")
+        "list-machines", help="list materialized machines")
     _add_home(command)
     command.add_argument(
         "--blueprint", default=None,
         help="filter to one blueprint")
 
     command = subcommands.add_parser(
-        "list-scripts", help="list scripts")
+        "list-scripts", help="list script stems or labels")
     _add_selectors(command)
 
     # clean-*

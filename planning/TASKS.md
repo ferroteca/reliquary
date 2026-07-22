@@ -204,6 +204,16 @@ the parser stack validates scripts; 10–12 close out:
     spellings (state, ->, done, expect, bare stopped, <key>
     tokens, boot, superseded command names) — none survive
     anywhere.
+    LANDED (2026-07-22): tests speak the twin-name CLI and the
+    redesigned surface; `test_old_surface_purge.py` enforces the
+    live-tree sweep (package, tests, docs, README, AGENTS,
+    planning/examples, shipped codex scripts) — superseded API
+    names and CLI commands are absent, old-surface samples fail
+    to parse, and forbidden spellings do not appear outside the
+    intentional negative-test fixtures. Released CHANGELOG,
+    DECISIONS, completed ROADMAP notes, and
+    planning/design/script-examples regression notes remain
+    historical and are outside the live sweep.
 12. Milestone gate: the FreeDOS install and verify scripts
     run end to end on the new surface and check-script
     reports the timing plan (ROADMAP milestone 4's "Done
