@@ -3,7 +3,6 @@
 """Media definitions and hash-verified acquisition of OS media."""
 
 import hashlib
-import json
 import os
 import re
 import shutil
@@ -14,6 +13,7 @@ from typing import Optional, Tuple
 from urllib.request import urlopen
 from urllib.parse import urlparse
 
+from . import jsonc
 from .home import downloads_cache_dir, media_cache_dir, media_dir
 
 _CHUNK = 1024 * 1024
@@ -212,7 +212,7 @@ def load_definition(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Media definition not found: {path}")
     with open(path, "r", encoding="utf-8") as handle:
-        data = json.load(handle)
+        data = jsonc.load(handle)
     return parse_definition(data)
 
 
@@ -229,12 +229,12 @@ def scan_media_definitions(library, name):
     if not os.path.isdir(library):
         return matches
     for filename in sorted(os.listdir(library)):
-        if not filename.endswith(".json"):
+        if not (filename.endswith(".rlqm") or filename.endswith(".json")):
             continue
         filepath = os.path.join(library, filename)
         try:
             definition = load_definition(filepath)
-        except (json.JSONDecodeError, ValueError, KeyError):
+        except (ValueError, KeyError):
             continue
         for item in definition.items:
             if item.name == name:
@@ -437,3 +437,23 @@ def _extract_item(archive, item, destination):
             f"SHA-256 {actual}, expected {item.sha256}")
     os.replace(partial, destination)
     return destination
+
+
+def clean_downloads(home=None):
+    """Delete all files in the downloads cache."""
+    cache = downloads_cache_dir(home)
+    if not os.path.isdir(cache):
+        return
+    for entry in os.scandir(cache):
+        if entry.is_file():
+            os.remove(entry.path)
+
+
+def clean_media(home=None):
+    """Delete all files in the media cache."""
+    cache = media_cache_dir(home)
+    if not os.path.isdir(cache):
+        return
+    for entry in os.scandir(cache):
+        if entry.is_file():
+            os.remove(entry.path)

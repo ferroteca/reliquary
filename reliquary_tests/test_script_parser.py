@@ -13,7 +13,7 @@ from reliquary.script_parser import parse_script
 # data so these tests run against an installed artifact too.
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.abspath(reliquary.__file__)),
-    "builtins", "scripts", "freedos-1.4-plain-install.rlqs")
+    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
 
 _HEAD = "platform dos\n"
 

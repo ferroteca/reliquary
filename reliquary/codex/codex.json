@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "blueprints": {
+        "freedos-1.4-plain": {
+            "description": "FreeDOS 1.4 plain installation"
+        }
+    },
+    "media": {
+        "freedos-1.4-livecd": {
+            "description": "FreeDOS 1.4 LiveCD"
+        }
+    }
+}

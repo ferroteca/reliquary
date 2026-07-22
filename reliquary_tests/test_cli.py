@@ -36,6 +36,22 @@ class CliEmptyListingTests(unittest.TestCase):
         self.assertNotIn("BLUEPRINT", output)
         self.assertIn("no machines", output)
 
+    def test_list_machines_dashed_alias(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "list-machines"])
+        self.assertEqual(result, 0)
+        self.assertIn("no machines", stdout.getvalue())
+
+    def test_flag_position_independence(self):
+        """Global flags like --home work before or after the command."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            # After command
+            result = cli.main(["list-machines", "--home", self.home])
+        self.assertEqual(result, 0)
+        self.assertIn("no machines", stdout.getvalue())
+
     def test_list_machines_reports_no_machines_for_blueprint(self):
         """Filtering by a blueprint with no machines names the blueprint."""
         os.makedirs(os.path.join(self.home, "blueprints"))
@@ -74,6 +90,124 @@ class CliEmptyListingTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertNotIn("NAME", output)
         self.assertIn("no scripts", output)
+
+    def test_text_accepts_home_after_command(self):
+        with mock.patch("reliquary.cli.screen_text",
+                        return_value=["hello"]) as screen, \
+                contextlib.redirect_stdout(io.StringIO()) as stdout:
+            result = cli.main(["text", "--home", self.home])
+        self.assertEqual(result, 0)
+        screen.assert_called_once_with(None)
+        self.assertEqual(stdout.getvalue(), "hello\n")
+
+
+class CliCodexAndPropertyTests(unittest.TestCase):
+    """CLI coverage for the new codex and property command families."""
+
+    def setUp(self):
+        saved = home._home
+        self.addCleanup(setattr, home, "_home", saved)
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+
+    def test_seed_blueprint_command_copies_codex_closure(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home,
+                "seed-blueprint", "freedos-1.4-plain",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("seeded blueprint freedos-1.4-plain",
+                      stdout.getvalue())
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "blueprints", "freedos-1.4-plain.rlqb")))
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "media", "freedos-1.4-livecd.rlqm")))
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "scripts", "freedos-1.4-plain-install.rlqs")))
+
+    def test_seed_media_and_script_commands_report_no_match(self):
+        for command, expected in [
+                ("seed-media", "media no-such already exists or not found"),
+                ("seed-script", "script no-such already exists or not found"),
+        ]:
+            with self.subTest(command=command):
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    result = cli.main([
+                        "--home", self.home, command, "no-such",
+                    ])
+                self.assertEqual(result, 0)
+                self.assertIn(expected, stdout.getvalue())
+
+    def test_property_commands_round_trip_and_list_sorted(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main([
+                "--home", self.home, "set-property", "zeta", "last",
+            ]), 0)
+            self.assertEqual(cli.main([
+                "--home", self.home, "set-property", "alpha", "first",
+                "--secret",
+            ]), 0)
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "get-property", "alpha",
+            ])
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout.getvalue(), "first\n")
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "list-properties"])
+        self.assertEqual(result, 0)
+        self.assertLess(
+            stdout.getvalue().index("alpha"),
+            stdout.getvalue().index("zeta"))
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main([
+                "--home", self.home, "unset-property", "alpha",
+            ]), 0)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "get-property", "alpha",
+            ])
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout.getvalue(), "")
+
+    def test_new_blueprint_command_writes_jsonc_scaffold(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "new-blueprint", "scratch",
+                "--platform", "win9x",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("created blueprint scratch", stdout.getvalue())
+        with open(os.path.join(self.home, "blueprints", "scratch.rlqb"),
+                  encoding="utf-8") as handle:
+            content = handle.read()
+        self.assertIn("// Machine blueprint for scratch", content)
+        self.assertIn('"platform": "win9x"', content)
+
+    def test_fetch_media_command_reports_requested_item(self):
+        stdout = io.StringIO()
+        with mock.patch("reliquary.cli.fetch_media",
+                        return_value="payload.iso") as fetch, \
+                contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "fetch-media",
+                "freedos-1.4-livecd",
+            ])
+        self.assertEqual(result, 0)
+        fetch.assert_called_once_with(
+            "freedos-1.4-livecd", home=self.home)
+        self.assertIn("fetched freedos-1.4-livecd", stdout.getvalue())
 
 
 class CliMachineLifecycleTests(unittest.TestCase):

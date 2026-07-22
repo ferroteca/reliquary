@@ -296,7 +296,7 @@ machine-layer notes below); `rlq install` no longer exists.
   syntax and static-validation errors.
 
 - The built-in library seed: blueprints, media definitions, and
-  scripts ship inside the package under `reliquary/builtins/`
+  scripts ship inside the package under `reliquary/codex/`
   (included in wheels and sdists, readable from zip-bundled
   installs) and are copied out into the home on first reference —
   resolving an unknown blueprint via `create` seeds

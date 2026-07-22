@@ -3,13 +3,13 @@
 """Machine blueprint parsing and media-reference resolution."""
 
 import collections.abc
-import json
 import os
 import re
 import types
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple
 
+from . import jsonc
 from .media import ResolvedMedia, resolve_media
 
 
@@ -259,5 +259,42 @@ def load_blueprint(path, home=None):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Machine blueprint not found: {path}")
     with open(path, "r", encoding="utf-8") as handle:
-        value = json.load(handle)
+        value = jsonc.load(handle)
     return parse_blueprint(value, home=home)
+
+
+def new_blueprint(name, *, platform="dos", home=None):
+    """Create a new blueprint file with reasonable defaults.
+
+    Returns the path to the created file. Raises FileExistsError if
+    the blueprint already exists.
+    """
+    from .home import blueprints_dir
+    path = os.path.join(blueprints_dir(home), f"{name}.rlqb")
+    if os.path.exists(path):
+        raise FileExistsError(f"blueprint already exists: {path}")
+    # Check for legacy home .json
+    if os.path.exists(os.path.join(blueprints_dir(home), f"{name}.json")):
+        raise FileExistsError(f"legacy blueprint already exists: {name}.json")
+
+    # Scaffolding default (ROADMAP milestone 5)
+    # In a future step, this could load a template based on the platform.
+    data = {
+        "version": 1,
+        "platform": platform,
+        "memory": 16 if platform == "dos" else 64,
+        "drives": {
+            "hdd": {"size": "256M"}
+        },
+        "scripts": {}
+    }
+
+    import json
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        # Add a helpful header comment if the user is using it as a template
+        handle.write("// Machine blueprint for " + name + "\n")
+        json.dump(data, handle, indent=4)
+        handle.write("\n")
+
+    return path

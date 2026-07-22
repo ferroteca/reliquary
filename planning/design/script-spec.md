@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > planned. The parser, the static rules, the timing plan, and the
 > runtime speak this surface, and so do the shipped built-in and
 > example scripts:
-> `reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` is
+> `reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` is
 > the reference script, and the files under
 > `planning/design/script-examples/` catalog known residual rough
 > edges in this surface. Properties and their binding and the full

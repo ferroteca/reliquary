@@ -187,16 +187,21 @@ def create(blueprint, *, home=None, blueprint_name=""):
 
 
 def create_machine(name, *, home=None):
-    """Load ``blueprints/<name>.json`` and materialize one machine.
+    """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
     built-in library on this first reference, along with the media
     definitions and scripts it references (never overwriting user
     files).
     """
-    path = os.path.join(blueprints_dir(home), f"{name}.json")
-    if not os.path.exists(path):
+    from .library import locate_blueprint
+    paths = [
+        os.path.join(blueprints_dir(home), f"{name}.rlqb"),
+        os.path.join(blueprints_dir(home), f"{name}.json"),
+    ]
+    if not any(os.path.exists(path) for path in paths):
         seed_blueprint(name, home=home)
+    path = locate_blueprint(name, home=home)
     blueprint = load_blueprint(path, home=home)
     return create(blueprint, home=home, blueprint_name=name)
 

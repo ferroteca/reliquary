@@ -15,7 +15,7 @@ Realign the implementation with the redesigned script language
 and the July 2026 decisions (DECISIONS.md).
 planning/design/script-spec.md is the source of truth (full
 typed EBNF) with
-reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs the
+reliquary/codex/scripts/freedos-1.4-plain-install.rlqs the
 reference script; ROADMAP milestone 4 owns this work, and no
 later milestone starts before it lands. No backward
 compatibility: the old surface is deleted entirely, not
@@ -121,7 +121,7 @@ the parser stack validates scripts; 10–12 close out:
    - properties parse but do not bind: ${key} and insert $key
      raise a named runtime error until the property family
      (milestone 6).
-   - NOT YET: the shipped builtins and planning/examples scripts
+   - NOT YET: the shipped codex and planning/examples scripts
      are old-surface and no longer parse — task 7.
 6. Diagnostics and check-script: failure diagnostics name
    the expired clock and its source scope; check-script
@@ -133,11 +133,11 @@ the parser stack validates scripts; 10–12 close out:
    `format_plan()` (defaults, phase budgets, every observation's
    timeout and source scope), and with a machine selector also
    run media-slot preflight. Static errors exit 2.
-7. Convert the shipped scripts: the builtins
+7. Convert the shipped scripts: the codex scripts
    (freedos-1.4-plain-install, freedos-1.4-verify) and
    planning/examples/scripts/ move to the new surface;
    planning/design/script-examples/design-install.rlqs
-   retires into the converted builtins.
+   retires into the converted codex scripts.
    LANDED (owner, 2026-07-22): all four scripts converted and
    parsing; design-install.rlqs deleted, and
    freedos-1.4-plain-install.rlqs IS the reference script now

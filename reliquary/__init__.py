@@ -3,7 +3,7 @@
 """OS installation scripting over agentless QEMU guest automation."""
 
 from .blueprint import (Blueprint, BlueprintDrive, load_blueprint,
-                        parse_blueprint)
+                        parse_blueprint, new_blueprint)
 from .cli import main
 from .home import (blueprints_dir, cache_dir, documents_dir,
                    downloads_cache_dir, drives_dir, home, machines_cache_dir,
@@ -22,7 +22,10 @@ from .machines import (create, create_machine, destroy_machine,
                        start_machine,
                        stop_machine)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
-                    fetch_media, resolve_media)
+                    fetch_media, resolve_media, clean_downloads,
+                    clean_media)
+from .properties import (get_property, set_property, unset_property,
+                         list_properties)
 from .script_nodes import ScriptParseError
 from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
@@ -62,13 +65,17 @@ __all__ = [
     "ResolvedMedia",
     "blueprints_dir",
     "cache_dir",
+    "clean_downloads",
+    "clean_media",
     "documents_dir",
     "downloads_cache_dir",
     "drives_dir",
     "find_qemu",
     "find_qemu_img",
+    "get_property",
     "home",
     "list_machines",
+    "list_properties",
     "load_blueprint",
     "load_script",
     "load_machine_state",
@@ -79,6 +86,7 @@ __all__ = [
     "mark_stopped",
     "media_cache_dir",
     "media_dir",
+    "new_blueprint",
     "parse_blueprint",
     "parse_script",
     "resolve_machine",
@@ -91,10 +99,12 @@ __all__ = [
     "send_text",
     "set_boot_order",
     "set_home",
+    "set_property",
     "start",
     "start_machine",
     "stop",
     "stop_machine",
+    "unset_property",
     "wait_text",
     "execute_script",
     "check_script",

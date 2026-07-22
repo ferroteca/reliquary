@@ -57,8 +57,8 @@ scripts (`scripts/`). Author them by hand, scaffold them with
 **The codex.** reliquary ships a set of blueprints, media
 definitions, and scripts for popular open source operating systems.
 In a source checkout these live as ordinary files under
-`builtins/blueprints/`, `builtins/media/`, and
-`builtins/scripts/`; when packaged for distribution they are bundled
+`codex/blueprints/`, `codex/media/`, and
+`codex/scripts/`; when packaged for distribution they are bundled
 in a zip archive within the reliquary package. Either way, when you
 reference a codex artifact that doesn't yet exist in your home,
 reliquary copies it out. From that point on it is an ordinary

@@ -285,5 +285,34 @@ class LoadBlueprintTests(BlueprintTestCase):
         self.assertIn(path, str(caught.exception))
 
 
+class NewBlueprintTests(BlueprintTestCase):
+    def test_new_blueprint_creates_rlqb_with_scaffolding(self):
+        from reliquary.blueprint import new_blueprint
+        new_blueprint("test-bp", home=self.home)
+        path = os.path.join(self.home, "blueprints", "test-bp.rlqb")
+        self.assertTrue(os.path.exists(path))
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn("// Machine blueprint for test-bp", content)
+            data = json.loads("\n".join(line for line in content.splitlines() if not line.strip().startswith("//")))
+            self.assertEqual(data["version"], 1)
+            self.assertEqual(data["platform"], "dos")
+
+    def test_new_blueprint_already_exists_raises(self):
+        from reliquary.blueprint import new_blueprint
+        new_blueprint("test-bp", home=self.home)
+        with self.assertRaises(FileExistsError):
+            new_blueprint("test-bp", home=self.home)
+
+    def test_new_blueprint_legacy_json_exists_raises(self):
+        from reliquary.blueprint import new_blueprint
+        path = os.path.join(self.home, "blueprints", "test-bp.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f: f.write("{}")
+        with self.assertRaises(FileExistsError) as caught:
+            new_blueprint("test-bp", home=self.home)
+        self.assertIn("legacy blueprint already exists", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

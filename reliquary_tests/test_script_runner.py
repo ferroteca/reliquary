@@ -18,6 +18,13 @@ from reliquary.script_runner import (ScriptRuntimeError, _normalize_row,
                                      execute_script)
 from reliquary.script_validation import PORTABLE_KEY_NAMES
 
+# The reference script is a shipped builtin, resolved as package
+# data so these tests run against an installed artifact too.
+import reliquary
+_REFERENCE = os.path.join(
+    os.path.dirname(os.path.abspath(reliquary.__file__)),
+    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
+
 _HEAD = "platform dos\n"
 
 

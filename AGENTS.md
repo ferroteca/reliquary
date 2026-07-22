@@ -15,7 +15,7 @@ workflow:
   its media references, `drives.py` parses declared drives, `media.py` owns media definitions
   (parsing, name resolution) and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
-  (`reliquary/builtins/` package data, to be renamed `codex/` at realignment: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
+  (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
   `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse and a per-blueprint allocation lock) and persistent machine-state mutations

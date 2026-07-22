@@ -4,25 +4,25 @@
 
 The library is a seed, not a resolution tier (planning/design/codex.md).
 Blueprints, media definitions, and scripts ship inside the package
-under ``reliquary/builtins/``; referencing one that does not yet
+under ``reliquary/codex/``; referencing one that does not yet
 exist in the home copies it out as an ordinary user-owned file. A
 file already present in the home is never overwritten — deleting a
 copy is how it is refreshed.
 """
 
 import collections.abc
-import json
 import os
 import re
 from importlib import resources
 
+from . import jsonc
 from .home import blueprints_dir, media_dir, scripts_dir
 from .media import parse_definition, scan_media_definitions
 
 
 def _builtins_root():
     """Return the packaged built-in library tree (a Traversable)."""
-    return resources.files(__package__) / "builtins"
+    return resources.files(__package__) / "codex"
 
 
 def _copy_out(source, destination):
@@ -66,37 +66,65 @@ def _referenced_scripts(blueprint_data):
 
 def list_builtin_blueprints():
     """Yield the stem names of blueprints shipped in the built-in library."""
+    try:
+        data = jsonc.loads((_builtins_root() / "codex.json").read_text(encoding="utf-8"))
+        blueprints = data.get("blueprints", {})
+        for name in sorted(blueprints.keys()):
+            yield name
+        return
+    except (FileNotFoundError, ValueError):
+        pass
+
+    # Fallback to directory scan
     root = _builtins_root() / "blueprints"
     if not root.is_dir():
         return
     for entry in sorted(root.iterdir(), key=lambda item: item.name):
-        if entry.name.endswith(".json"):
+        if entry.name.endswith(".rlqb"):
+            yield entry.name[:-5]
+        elif entry.name.endswith(".json"):
             yield entry.name[:-5]
 
 
 def seed_blueprint(name, home=None):
-    """Seed ``blueprints/<name>.json`` from the built-in library.
+    """Seed ``blueprints/<name>.rlqb`` from the built-in library.
 
     A home blueprint of that name already exists, or no builtin
     does: nothing happens. Otherwise the blueprint is copied out
     along with the media definitions and scripts it references
     (each obeying the never-overwrite rule), and True is returned.
     """
-    destination = os.path.join(blueprints_dir(home), f"{name}.json")
+    source = _builtins_root() / "blueprints" / f"{name}.rlqb"
+    if not source.is_file():
+        source = _builtins_root() / "blueprints" / f"{name}.json"
+        if not source.is_file():
+            return False
+
+    # Check for existing destination before creating directory
+    destination = os.path.join(blueprints_dir(home), source.name)
     if os.path.exists(destination):
         return False
-    source = _builtins_root() / "blueprints" / f"{name}.json"
-    if not source.is_file():
-        return False
+
+    # Check for legacy home .json IF seeding a .rlqb
+    if source.name.endswith(".rlqb"):
+        if os.path.exists(os.path.join(blueprints_dir(home), f"{name}.json")):
+            return False
+
+    # Pre-read to catch referenced media/scripts
     try:
-        data = json.loads(source.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        text = source.read_text(encoding="utf-8")
+        data = jsonc.loads(text)
+    except (ValueError, UnicodeDecodeError):
         # A malformed builtin still copies out; loading it reports
         # the real parse error against the user's file.
         data = {}
+
+    os.makedirs(blueprints_dir(home), exist_ok=True)
     if not _copy_out(source, destination):
         return False
+
     if isinstance(data, collections.abc.Mapping):
+        # Resolve everything relative to the home this seed is into
         for media_name in _referenced_media(data):
             seed_media(media_name, home=home)
         for stem in _referenced_scripts(data):
@@ -118,16 +146,17 @@ def seed_media(name, home=None):
     if not root.is_dir():
         return False
     for entry in sorted(root.iterdir(), key=lambda item: item.name):
-        if not entry.name.endswith(".json"):
+        if not (entry.name.endswith(".rlqm") or entry.name.endswith(".json")):
             continue
         try:
             definition = parse_definition(
-                json.loads(entry.read_text(encoding="utf-8")))
-        except (json.JSONDecodeError, UnicodeDecodeError,
-                ValueError, KeyError):
+                jsonc.loads(entry.read_text(encoding="utf-8")))
+        except (ValueError, UnicodeDecodeError, KeyError):
             continue
         if any(item.name == name for item in definition.items):
-            destination = os.path.join(media_dir(home), entry.name)
+            stem = entry.name.rsplit(".", 1)[0]
+            os.makedirs(media_dir(home), exist_ok=True)
+            destination = os.path.join(media_dir(home), f"{stem}.rlqm")
             return _copy_out(entry, destination)
     return False
 
@@ -155,6 +184,7 @@ def seed_script(stem, home=None):
     source = _builtins_root() / "scripts" / f"{stem}.rlqs"
     if not source.is_file():
         return False
+    os.makedirs(scripts_dir(home), exist_ok=True)
     destination = os.path.join(scripts_dir(home), f"{stem}.rlqs")
     if not _copy_out(source, destination):
         return False
@@ -187,12 +217,18 @@ def locate_script(stem, home=None):
 
 def locate_blueprint(name, home=None):
     """Return an existing blueprint path without seeding."""
-    destination = os.path.join(blueprints_dir(home), f"{name}.json")
-    if os.path.isfile(destination):
-        return destination
+    for ext in [".rlqb", ".json"]:
+        path = os.path.join(blueprints_dir(home), f"{name}{ext}")
+        if os.path.isfile(path):
+            return path
+
+    source = _builtins_root() / "blueprints" / f"{name}.rlqb"
+    if source.is_file():
+        return os.fspath(source)
     source = _builtins_root() / "blueprints" / f"{name}.json"
     if source.is_file():
         return os.fspath(source)
+
     raise FileNotFoundError(
-        f"blueprint not found: {name}.json\n"
+        f"blueprint not found: {name}.rlqb\n"
         f"expected under {blueprints_dir(home)}")

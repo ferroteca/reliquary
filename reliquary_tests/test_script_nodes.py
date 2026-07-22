@@ -13,7 +13,7 @@ from reliquary.script_nodes import (Interpolation, ScriptParseError,
 # data so these tests run against an installed artifact too.
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.abspath(reliquary.__file__)),
-    "builtins", "scripts", "freedos-1.4-plain-install.rlqs")
+    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
 
 
 def _kinds(text):

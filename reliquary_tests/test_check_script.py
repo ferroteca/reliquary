@@ -15,7 +15,7 @@ from reliquary.script_timing import format_plan, resolve
 
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.abspath(reliquary.__file__)),
-    "builtins", "scripts", "freedos-1.4-plain-install.rlqs")
+    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
 
 _HEAD = "platform dos\n"
 

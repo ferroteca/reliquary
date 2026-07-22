@@ -844,7 +844,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 **The July 2026 surface redesign is decided and
 [planning/design/script-spec.md](design/script-spec.md) is its source of
 truth** (including the complete typed EBNF), with
-`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` as the
+`reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
 reference script. Realigning the implementation — parser, runtime, shipped
 scripts — with it is **milestone 4, the next work in the arc**;
 see the milestones below. Pre-beta, the superseded surface is
@@ -1392,7 +1392,7 @@ Deliverables:
    blueprint's `scripts` map, creating a machine when the
    blueprint has none.
 4. **The codex** (planning/design/codex.md): the
-   `builtins/` tree (zip-bundled when packaged), copy-out on
+   `codex/` tree (zip-bundled when packaged), copy-out on
    first reference, the never-overwrite rule, and
    `freedos-1.4-plain` — blueprint, media definitions, and
    install/verify scripts — as its first entries.
@@ -1441,7 +1441,7 @@ semantics reach into `start` reconciliation).
    `--machine` prefix. Exit: start/stop a created
    FreeDOS-shaped machine from the CLI. Out: `apply`,
    interaction subcommands, multi-backend.
-7. **Builtins seed (complete)** — `builtins/` tree + copy-out on first
+7. **Codex seed (complete)** — `codex/` tree + copy-out on first
    reference + never-overwrite (+ packaging zip path). Exit:
    `--blueprint freedos-1.4-plain` seeds home files once;
    second call leaves them alone. Out: `pull`, provenance
@@ -1462,9 +1462,9 @@ semantics reach into `start` reconciliation).
     embedded media blocks, property-bound inputs.
 11. **Author `freedos-1.4-plain` (complete)** — blueprint + media
     definition (URL + license assertion) + install/verify
-    scripts in `builtins/`. Exit: artifacts resolve and the
+    scripts in `codex/`. Exit: artifacts resolve and the
     install script matches the LiveCD flow. Out: other OS
-    builtins.
+    codex entries.
 12. **Verify path (complete)** — `script verify` boots the
     installed HDD through spike 13's model (blueprint boots
     `hdd0` then `cdrom0`; install script's final `eject` leaves
@@ -1604,7 +1604,7 @@ documents is implemented for DOS on QEMU.
 
 The July 2026 script-language redesign
 ([planning/design/script-spec.md](design/script-spec.md), with
-`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` as the
+`reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
 reference script)
 supersedes the surface milestones 1 and 3 implemented.
 This milestone gates everything after it: no later milestone
@@ -1654,7 +1654,7 @@ Deliverables:
 6. The built-in and example scripts converted, and every document
    that quotes script syntax updated (README, planning/examples/README);
    the reference script now IS the converted builtin
-   (`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs`).
+   (`reliquary/codex/scripts/freedos-1.4-plain-install.rlqs`).
 7. The CLI/API surface renames the July 2026 queues decided
    (planning/DECISIONS.md): the twin-name identity sweep —
    `run-script`, `fetch-media`, the `seed-` family,

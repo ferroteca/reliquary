@@ -19,12 +19,16 @@ from .lifecycle import stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .home import blueprints_dir, scripts_dir, set_home
-from .library import list_builtin_blueprints, seed_blueprint
+from .library import (list_builtin_blueprints, seed_blueprint,
+                      seed_media, seed_script)
 from . import blueprint as blueprint_mod
 from .machines import (create_machine, destroy_machine, list_machines,
                        resolve_machine, split_machine_id,
                        start_machine,
                        stop_machine)
+from .media import (fetch_media, clean_downloads, clean_media)
+from .properties import (get_property, set_property, unset_property,
+                         list_properties)
 from .script_runner import (ScriptRuntimeError, check_script, run_script)
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
@@ -45,13 +49,13 @@ def _cli_start_overrides(arguments):
 
 def _require_machine_selector(arguments):
     """Return a resolved machine id from global selectors."""
-    if not arguments.blueprint and not arguments.machine:
+    if not getattr(arguments, "blueprint", None) and not getattr(arguments, "machine", None):
         raise ValueError(
             "select a machine with --blueprint or --machine")
     return resolve_machine(
-        machine=arguments.machine,
-        blueprint=arguments.blueprint,
-        home=arguments.home,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None),
+        home=getattr(arguments, "home", None),
     )
 
 
@@ -59,158 +63,217 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="rlq",
         description="OS installation scripting over QEMU guest "
-                    "automation (DOS by default)")
+                    "automation (DOS by default)",
+        conflict_handler="resolve")
     parser.add_argument(
         "--version", action="version",
         version="%(prog)s " + _version)
-    parser.add_argument("--home", help="reliquary home directory (drives/, "
-                        "screenshots/); default: $RELIQUARY_HOME, then "
-                        "Documents/reliquary")
-    parser.add_argument(
-        "--blueprint",
-        help="select a blueprint's sole machine, or combine with "
-             "--machine <n>; names the blueprint for create / list")
-    parser.add_argument(
-        "--machine",
-        help="select a machine by id (<blueprint>-<n>), unambiguous "
-             "id prefix, or number with --blueprint")
-    parser.add_argument("--port", type=int,
-                        help="QMP port (legacy interaction commands; "
-                             "new lifecycle stores port per machine)")
-    parser.add_argument("--qemu", help="path to the QEMU binary (default: "
-                        "$RELIQUARY_QEMU_HOME, then $QEMU_HOME, then PATH, "
-                        "then well-known install locations)")
-    parser.add_argument("--platform", default=None,
-                        help="guest platform adapter (default: dos; other "
-                             "platform workflows are not implemented yet)")
-    parser.add_argument("--timeout", type=int, help="seconds to wait "
-                        "(defaults: run 120, wait 60)")
+
+    # Global-ish flags that we want to accept before the subcommand
+    parser.add_argument("--home", help=argparse.SUPPRESS)
+    parser.add_argument("--blueprint", help=argparse.SUPPRESS)
+    parser.add_argument("--machine", help=argparse.SUPPRESS)
+    parser.add_argument("--port", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--qemu", help=argparse.SUPPRESS)
+    parser.add_argument("--platform", help=argparse.SUPPRESS)
+    parser.add_argument("--timeout", type=int, help=argparse.SUPPRESS)
+
     subcommands = parser.add_subparsers(dest="command", required=True)
 
+    def add_common(cmd_parser):
+        cmd_parser.add_argument(
+            "--home", default=argparse.SUPPRESS,
+            help="reliquary home directory")
+        cmd_parser.add_argument(
+            "--blueprint", default=argparse.SUPPRESS,
+            help="select blueprint")
+        cmd_parser.add_argument(
+            "--machine", default=argparse.SUPPRESS,
+            help="select machine")
+        return cmd_parser
+
+    # create-machine
     command = subcommands.add_parser(
         "create-machine",
-        help="materialize a machine from a blueprint")
-    command.add_argument("--home", default=argparse.SUPPRESS,
-                         help="reliquary home directory")
-    command.add_argument(
-        "--blueprint", default=argparse.SUPPRESS,
-        help="select a blueprint's sole machine, or combine with "
-             "--machine <n>")
-    command.add_argument(
-        "--machine", default=argparse.SUPPRESS,
-        help="select machine number with --blueprint")
+        help="materialize a machine from a blueprint",
+        conflict_handler="resolve")
+    add_common(command)
 
-
+    # start-machine
     command = subcommands.add_parser(
         "start-machine",
-        help="start a machine (--blueprint/--machine, or legacy "
-             "root-home machine.json)")
-    command.add_argument("--home", default=argparse.SUPPRESS,
-                         help="reliquary home directory")
-    command.add_argument(
-        "--blueprint", default=argparse.SUPPRESS,
-        help="select a blueprint's sole machine, or combine with "
-             "--machine <n>")
-    command.add_argument(
-        "--machine", default=argparse.SUPPRESS,
-        help="select by id (<blueprint>-<n>), prefix, or number "
-             "with --blueprint")
+        help="start a machine",
+        conflict_handler="resolve")
+    add_common(command)
     command.add_argument("--display", action="store_true")
-    command.add_argument(
-        "qemu_args", nargs="*",
-        help=argparse.SUPPRESS)
+    command.add_argument("--port", type=int, default=argparse.SUPPRESS, help="QMP port")
+    command.add_argument("--qemu", default=argparse.SUPPRESS, help="QEMU path")
+    command.add_argument("--platform", default=argparse.SUPPRESS, help="guest platform")
+    command.add_argument("qemu_args", nargs="*", help=argparse.SUPPRESS)
 
+    # stop-machine
     command = subcommands.add_parser(
         "stop-machine",
-        help="stop a machine (--blueprint/--machine, or legacy "
-             "root-home vm.json)")
-    command.add_argument("--home", default=argparse.SUPPRESS,
-                         help="reliquary home directory")
-    command.add_argument(
-        "--blueprint", default=argparse.SUPPRESS,
-        help="select a blueprint's sole machine, or combine with "
-             "--machine <n>")
-    command.add_argument(
-        "--machine", default=argparse.SUPPRESS,
-        help="select by id (<blueprint>-<n>), prefix, or number "
-             "with --blueprint")
+        help="stop a machine",
+        conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("--port", type=int, default=argparse.SUPPRESS, help="QMP port")
+
+    # destroy-machine
     command = subcommands.add_parser(
         "destroy-machine",
-        help="delete a stopped machine "
-             "(requires --blueprint or --machine)")
-    command.add_argument("--home", default=argparse.SUPPRESS,
-                         help="reliquary home directory")
-    command.add_argument(
-        "--blueprint", default=argparse.SUPPRESS,
-        help="select a blueprint's sole machine, or combine with "
-             "--machine <n>")
-    command.add_argument(
-        "--machine", default=argparse.SUPPRESS,
-        help="select by id (<blueprint>-<n>), prefix, or number "
-             "with --blueprint")
+        help="delete a stopped machine",
+        conflict_handler="resolve")
+    add_common(command)
 
+    # run-script
     command = subcommands.add_parser(
         "run-script",
-        help="run a labeled .rlqs script against a machine "
-             "(creates one when --blueprint has none)")
-    command.add_argument(
-        "label",
-        help="blueprint scripts-map label, or bare script stem")
-    command.add_argument(
-        "--display", action="store_true",
-        help="show the QEMU window during guest steps")
+        help="run a labeled .rlqs script",
+        conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("label", help="script label or stem")
+    command.add_argument("--display", action="store_true")
 
+    # check-script
     command = subcommands.add_parser(
         "check-script",
-        help="parse and statically check a script; print its "
-             "resolved timing plan (read-only)")
-    command.add_argument(
-        "name",
-        help="blueprint scripts-map label, or bare script stem")
+        help="check a script",
+        conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("name", help="script name")
 
-    list_command = subcommands.add_parser(
-        "list", help="list blueprints or machines")
+    # fetch-media
+    command = subcommands.add_parser(
+        "fetch-media",
+        help="fetch media",
+        conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("name", help="media name")
+
+    # seed-*
+    for kind in ["blueprint", "media", "script"]:
+        command = subcommands.add_parser(
+            f"seed-{kind}",
+            help=f"copy built-in {kind} to home",
+            conflict_handler="resolve")
+        add_common(command)
+        command.add_argument("name", help=f"built-in {kind} name")
+
+    # new-blueprint
+    command = subcommands.add_parser(
+        "new-blueprint",
+        help="create new blueprint",
+        conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("name", help="blueprint name")
+    command.add_argument("--platform", help="guest platform")
+
+    # property family
+    command = subcommands.add_parser("get-property", help="get property",
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("key")
+
+    command = subcommands.add_parser("set-property", help="set property",
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("key")
+    command.add_argument("value")
+    command.add_argument("--secret", action="store_true")
+
+    command = subcommands.add_parser("unset-property", help="unset property",
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("key")
+
+    command = subcommands.add_parser("list-properties", help="list properties",
+                                     conflict_handler="resolve")
+    add_common(command)
+
+    # import-vm
+    command = subcommands.add_parser("import-vm", help="import VM",
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("source")
+    command.add_argument("--name", required=True)
+
+    # list
+    list_command = subcommands.add_parser("list", help="list things",
+                                          conflict_handler="resolve")
+    add_common(list_command)
     list_sub = list_command.add_subparsers(dest="list_what", required=True)
-    list_bps_parser = list_sub.add_parser(
-        "blueprints", aliases=["blueprint"],
-        help="list available blueprints")
-    list_bps_parser.add_argument(
-        "--builtin", action="store_true",
-        help="list only built-in blueprints")
-    list_machines_parser = list_sub.add_parser(
-        "machines", aliases=["machine"],
-        help="list materialized machines")
-    list_machines_parser.add_argument(
-        "--blueprint", dest="filter_blueprint",
-        help="show only machines of this blueprint")
-    list_scripts_parser = list_sub.add_parser(
-        "scripts", aliases=["script"],
-        help="list scripts (shared scripts/ by default; "
-             "--blueprint lists a blueprint's own scripts)")
-    list_scripts_parser.add_argument(
-        "--blueprint", dest="list_scripts_blueprint",
-        help="blueprint whose scripts to list (omit for shared "
-             "scripts/)")
 
-    command = subcommands.add_parser("type")
+    list_bps = list_sub.add_parser("blueprints", aliases=["blueprint"],
+                                   conflict_handler="resolve")
+    list_bps.add_argument("--builtin", action="store_true")
+
+    list_machines = list_sub.add_parser("machines", aliases=["machine"],
+                                        conflict_handler="resolve")
+    list_machines.add_argument("--blueprint", dest="filter_blueprint")
+
+    list_scripts = list_sub.add_parser("scripts", aliases=["script"],
+                                       conflict_handler="resolve")
+    list_scripts.add_argument("--blueprint", dest="list_scripts_blueprint")
+
+    # dashed list aliases
+    command = subcommands.add_parser("list-blueprints", help=argparse.SUPPRESS,
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("--builtin", action="store_true")
+
+    command = subcommands.add_parser("list-machines", help=argparse.SUPPRESS,
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("--blueprint", dest="filter_blueprint")
+
+    command = subcommands.add_parser("list-scripts", help=argparse.SUPPRESS,
+                                     conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("--blueprint", dest="list_scripts_blueprint")
+
+    # interaction
+    command = subcommands.add_parser("type", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("text")
-    command = subcommands.add_parser("run")
+    command.add_argument("--port", type=int)
+
+    command = subcommands.add_parser("run", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("dos_command")
-    command = subcommands.add_parser("keys")
+    command.add_argument("--port", type=int)
+    command.add_argument("--timeout", type=int)
+
+    command = subcommands.add_parser("keys", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("names", nargs="+")
-    command = subcommands.add_parser("menu")
+    command.add_argument("--port", type=int)
+
+    command = subcommands.add_parser("menu", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("item")
-    command.add_argument("--exclude", action="append", default=[],
-                         metavar="TEXT",
-                         help="never select rows containing TEXT "
-                              "(repeatable)")
-    subcommands.add_parser("text")
-    command = subcommands.add_parser("wait")
+    command.add_argument("--exclude", action="append", default=[])
+    command.add_argument("--port", type=int)
+    command.add_argument("--timeout", type=int)
+
+    command = subcommands.add_parser("text", conflict_handler="resolve")
+    add_common(command)
+    command.add_argument("--port", type=int)
+    command = subcommands.add_parser("wait", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("pattern")
-    command = subcommands.add_parser("screenshot")
+    command.add_argument("--port", type=int)
+    command.add_argument("--timeout", type=int)
+
+    command = subcommands.add_parser("screenshot", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("name", nargs="?", default="screen")
-    command = subcommands.add_parser("hmp")
+    command.add_argument("--port", type=int)
+
+    command = subcommands.add_parser("hmp", conflict_handler="resolve")
+    add_common(command)
     command.add_argument("line")
+    command.add_argument("--port", type=int)
 
     arguments = parser.parse_args(argv)
     if arguments.home:
@@ -235,27 +298,30 @@ def main(argv=None):
 
 
 def _create(arguments):
-    if not arguments.blueprint:
+    blueprint_name = getattr(arguments, "blueprint", None)
+    if not blueprint_name:
         raise ValueError("create-machine requires --blueprint")
-    if arguments.machine:
+    if getattr(arguments, "machine", None):
         raise ValueError(
             "create-machine allocates the machine number; "
             "do not pass --machine")
     machine_id = create_machine(
-        arguments.blueprint, home=arguments.home)
+        blueprint_name, home=arguments.home)
     print(f"created machine {machine_id}")
     return 0
 
 
 def _script(arguments):
-    if not arguments.blueprint and not arguments.machine:
+    blueprint_name = getattr(arguments, "blueprint", None)
+    machine_selector = getattr(arguments, "machine", None)
+    if not blueprint_name and not machine_selector:
         raise ValueError(
             "run-script requires --blueprint or --machine")
     try:
         result = run_script(
             arguments.label,
-            blueprint=arguments.blueprint,
-            machine=arguments.machine,
+            blueprint=blueprint_name,
+            machine=machine_selector,
             home=arguments.home,
             display=arguments.display,
         )
@@ -275,8 +341,8 @@ def _script(arguments):
 def _check_script(arguments):
     result = check_script(
         arguments.name,
-        blueprint=arguments.blueprint,
-        machine=arguments.machine,
+        blueprint=getattr(arguments, "blueprint", None),
+        machine=getattr(arguments, "machine", None),
         home=arguments.home,
     )
     print(result.report, end="")
@@ -309,7 +375,7 @@ def _list_blueprints(arguments):
 def _list_machines(arguments):
     filter_blueprint = (
         getattr(arguments, "filter_blueprint", None)
-        or arguments.blueprint)
+        or getattr(arguments, "blueprint", None))
     machines = list_machines(
         home=arguments.home, blueprint=filter_blueprint)
     if not machines:
@@ -351,7 +417,7 @@ def _description(script):
 
 def _list_scripts(arguments):
     blueprint_name = (getattr(arguments, "list_scripts_blueprint", None)
-                      or arguments.blueprint)
+                      or getattr(arguments, "blueprint", None))
     if blueprint_name:
         bp_path = os.path.join(blueprints_dir(arguments.home),
                                f"{blueprint_name}.json")
@@ -408,14 +474,119 @@ def _print_scripts_in_dir(scripts_path):
     return 0
 
 
+def _fetch_media(arguments):
+    fetch_media(arguments.name, home=arguments.home)
+    print(f"fetched {arguments.name}")
+    return 0
+
+
+def _seed_blueprint(arguments):
+    if seed_blueprint(arguments.name, home=arguments.home):
+        print(f"seeded blueprint {arguments.name}")
+    else:
+        print(f"blueprint {arguments.name} already exists or not found")
+    return 0
+
+
+def _seed_media(arguments):
+    if seed_media(arguments.name, home=arguments.home):
+        print(f"seeded media {arguments.name}")
+    else:
+        print(f"media {arguments.name} already exists or not found")
+    return 0
+
+
+def _seed_script(arguments):
+    if seed_script(arguments.name, home=arguments.home):
+        print(f"seeded script {arguments.name}")
+    else:
+        print(f"script {arguments.name} already exists or not found")
+    return 0
+
+
+def _new_blueprint(arguments):
+    path = blueprint_mod.new_blueprint(
+        arguments.name, platform=arguments.platform or "dos",
+        home=arguments.home)
+    print(f"created blueprint {arguments.name} at {path}")
+    return 0
+
+
+def _get_property(arguments):
+    value = get_property(arguments.key, home=arguments.home)
+    if value is not None:
+        print(value)
+    return 0
+
+
+def _set_property(arguments):
+    set_property(
+        arguments.key, arguments.value, secret=arguments.secret,
+        home=arguments.home)
+    return 0
+
+
+def _unset_property(arguments):
+    unset_property(arguments.key, home=arguments.home)
+    return 0
+
+
+def _list_properties(arguments):
+    properties = list_properties(home=arguments.home)
+    if not properties:
+        return 0
+    key_width = max(len(key) for key in properties)
+    for key, value in sorted(properties.items()):
+        print(f"{key:<{key_width}}  {value}")
+    return 0
+
+
+def _import_vm(arguments):
+    raise NotImplementedError("import-vm is not yet implemented")
+
+
 def _dispatch(arguments):
-    platform = arguments.platform or "dos"
+    platform = getattr(arguments, "platform", None) or "dos"
+    port = getattr(arguments, "port", None)
+    timeout = getattr(arguments, "timeout", None)
+    home = getattr(arguments, "home", None)
+    blueprint = getattr(arguments, "blueprint", None)
+    machine = getattr(arguments, "machine", None)
+
     if arguments.command == "create-machine":
         return _create(arguments)
     if arguments.command == "run-script":
         return _script(arguments)
     if arguments.command == "check-script":
         return _check_script(arguments)
+    if arguments.command == "fetch-media":
+        return _fetch_media(arguments)
+    if arguments.command == "seed-blueprint":
+        return _seed_blueprint(arguments)
+    if arguments.command == "seed-media":
+        return _seed_media(arguments)
+    if arguments.command == "seed-script":
+        return _seed_script(arguments)
+    if arguments.command == "new-blueprint":
+        return _new_blueprint(arguments)
+    if arguments.command == "get-property":
+        return _get_property(arguments)
+    if arguments.command == "set-property":
+        return _set_property(arguments)
+    if arguments.command == "unset-property":
+        return _unset_property(arguments)
+    if arguments.command == "list-properties":
+        return _list_properties(arguments)
+    if arguments.command == "import-vm":
+        return _import_vm(arguments)
+    if arguments.command in ("list-blueprints", "list-machines", "list-scripts"):
+        arguments.list_what = arguments.command.split("-")[1]
+        if arguments.list_what == "blueprints":
+            return _list_blueprints(arguments)
+        if arguments.list_what == "machines":
+            return _list_machines(arguments)
+        if arguments.list_what == "scripts":
+            return _list_scripts(arguments)
     if arguments.command == "list":
         if arguments.list_what in ("blueprints", "blueprint"):
             return _list_blueprints(arguments)
@@ -425,54 +596,54 @@ def _dispatch(arguments):
             return _list_scripts(arguments)
         raise ValueError(f"unknown list target: {arguments.list_what}")
     if arguments.command == "start-machine":
-        if arguments.blueprint or arguments.machine:
+        if blueprint or machine:
             machine_id = _require_machine_selector(arguments)
             start_machine(
-                machine_id, display=arguments.display,
-                home=arguments.home)
+                machine_id, display=getattr(arguments, "display", False),
+                home=home)
             return 0
         # Legacy root-home start (MachineConfig / machine.json).
         config = _cli_machine_config(
-            None, arguments.home,
+            None, home,
             **_cli_start_overrides(arguments))
         start_legacy(
-            config, display=arguments.display, port=arguments.port)
+            config, display=getattr(arguments, "display", False), port=port)
         return 0
     if arguments.command == "stop-machine":
-        if arguments.blueprint or arguments.machine:
+        if blueprint or machine:
             machine_id = _require_machine_selector(arguments)
-            stop_machine(machine_id, home=arguments.home)
+            stop_machine(machine_id, home=home)
             return 0
-        stop_legacy(arguments.port)
+        stop_legacy(port)
         return 0
     if arguments.command == "destroy-machine":
         machine_id = _require_machine_selector(arguments)
-        destroy_machine(machine_id, home=arguments.home)
+        destroy_machine(machine_id, home=home)
         print(f"destroyed machine {machine_id}")
         return 0
     if arguments.command == "type":
-        send_text(arguments.text, arguments.port)
+        send_text(arguments.text, port)
     elif arguments.command == "run":
         if platform != "dos":
             raise NotImplementedError("run requires platform='dos'")
-        AgentlessGuestExec(Machine(arguments.port)).execute(
-            arguments.dos_command, arguments.timeout or 120)
+        AgentlessGuestExec(Machine(port)).execute(
+            arguments.dos_command, timeout or 120)
     elif arguments.command == "keys":
-        send_keys([[key] for key in arguments.names], arguments.port)
+        send_keys([[key] for key in arguments.names], port)
     elif arguments.command == "menu":
         selected = cursor_menu_select(
-            arguments.item, arguments.timeout or 30,
-            arguments.exclude, arguments.port)
+            arguments.item, timeout or 30,
+            getattr(arguments, "exclude", []), port)
         print(f"selected: {selected}")
     elif arguments.command == "text":
-        print("\n".join(screen_text(arguments.port)))
+        print("\n".join(screen_text(port)))
     elif arguments.command == "wait":
-        wait_text(arguments.pattern, arguments.timeout or 60,
-                  arguments.port)
+        wait_text(arguments.pattern, timeout or 60,
+                  port)
         print("matched.")
     elif arguments.command == "screenshot":
-        screenshot(arguments.name, arguments.port)
+        screenshot(arguments.name, port)
     elif arguments.command == "hmp":
-        with Machine(arguments.port).qmp() as qmp:
+        with Machine(port).qmp() as qmp:
             print(qmp.hmp(arguments.line))
     return 0

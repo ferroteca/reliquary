@@ -307,6 +307,20 @@ class LoadDefinitionTests(unittest.TestCase):
         self.assertEqual(result.items[0].name, "test-media")
         self.assertEqual(result.items[0].file, "test.img")
 
+    def test_loads_jsonc_rlqm_file(self):
+        """Media definitions accept the authored JSONC format."""
+        filepath = os.path.join(self.workdir.name, "test.rlqm")
+        with open(filepath, "w", encoding="utf-8") as handle:
+            handle.write(
+                "{\n"
+                '  "name": "test-media", // item name\n'
+                '  "file": "test.img",\n'
+                f'  "sha256": "{PAYLOAD_SHA256}",\n'
+                "}\n")
+        result = load_definition(filepath)
+        self.assertEqual(result.items[0].name, "test-media")
+        self.assertEqual(result.items[0].file, "test.img")
+
     def test_nonexistent_file_raises_filenotfound(self):
         """A missing file raises FileNotFoundError."""
         filepath = os.path.join(self.workdir.name, "missing.json")
@@ -812,6 +826,48 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
         urlopen.assert_not_called()
         with open(result, "rb") as handle:
             self.assertEqual(handle.read(), ISO_BYTES)
+
+
+class CleanupTests(MediaHomeTestCase):
+    def test_clean_downloads(self):
+        cache = os.path.join(self.home, "cache", "downloads")
+        os.makedirs(cache)
+        file_path = os.path.join(cache, "some-download.zip")
+        with open(file_path, "w") as f:
+            f.write("content")
+
+        media.clean_downloads(home=self.home)
+        self.assertFalse(os.path.exists(file_path))
+        self.assertTrue(os.path.exists(cache))
+
+    def test_clean_media(self):
+        cache = os.path.join(self.home, "cache", "media")
+        os.makedirs(cache)
+        file_path = os.path.join(cache, "some-media.img")
+        with open(file_path, "w") as f:
+            f.write("content")
+
+        media.clean_media(home=self.home)
+        self.assertFalse(os.path.exists(file_path))
+        self.assertTrue(os.path.exists(cache))
+
+    def test_clean_downloads_leaves_subdirectories(self):
+        cache = os.path.join(self.home, "cache", "downloads")
+        os.makedirs(cache)
+        directory = os.path.join(cache, "expanded")
+        os.makedirs(directory)
+        file_path = os.path.join(cache, "archive.zip")
+        with open(file_path, "w") as f:
+            f.write("content")
+
+        media.clean_downloads(home=self.home)
+        self.assertFalse(os.path.exists(file_path))
+        self.assertTrue(os.path.isdir(directory))
+
+    def test_clean_empty_missing_dirs(self):
+        # Should not crash if dir doesn't exist
+        media.clean_downloads(home=self.home)
+        media.clean_media(home=self.home)
 
 
 if __name__ == "__main__":
