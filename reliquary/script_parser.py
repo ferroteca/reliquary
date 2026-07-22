@@ -21,6 +21,7 @@ from lark.exceptions import UnexpectedInput, VisitError
 from lark.lexer import Lexer
 
 from .script_nodes import ScriptParseError, StringLiteral, tokenize
+from .script_validation import validate
 
 # Node names, reserved everywhere a script-internal name may appear
 # (S5). Recognized as keywords only in node-name position: `enter`
@@ -35,9 +36,12 @@ KEYWORDS = (
 )
 
 # Each node's allowed modifiers. The transformer reports anything
-# else naming the node and what it accepts.
+# else naming the node and what it accepts. Observation nodes list
+# their timing modifiers only: every other modifier on an
+# observation names a channel (script-spec.md, "Channels"), which
+# S7 checks in the validation layer.
 _SIGNATURES = {
-    "wait_one": ("timeout", "stable", "machine"),
+    "wait_one": ("timeout", "stable"),
     "wait_branching": ("timeout",),
     "on_handler": ("stable",),
     "always_handler": ("stable",),
@@ -57,8 +61,15 @@ _DISPLAY = {
     "set_boot": "set-boot", "property_def": "property",
 }
 
-# Modifiers whose value must be a duration.
+# Modifiers whose value must be a duration. They are also the
+# closed timing set that separates an observation's own modifiers
+# from the channels it observes.
 _DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable"})
+# A modifier value's terminal, as the condition kind it spells.
+_CONDITION_KINDS = {
+    "STRING": "text", "REGEX": "regex", "NAME": "state",
+    "DURATION": "duration", "MEDIA_REF": "media", "PROP_REF": "property",
+}
 _PROPERTY_KINDS = ("text", "media", "secret")
 _GRAMMAR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "script_grammar.lark")
@@ -66,37 +77,57 @@ _GRAMMAR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 @dataclass(frozen=True)
 class Condition:
-    """One observation condition on one channel."""
+    """One observation condition on one channel.
 
-    channel: str                  # "screen" or "machine"
-    kind: str                     # "text", "regex", or "state"
+    ``channel`` is ``None`` for a bare word, which spells no
+    condition at all; the parser types it anyway so S7 can name
+    what the author wrote. ``named`` distinguishes a channel the
+    author named with a modifier from the unprefixed screen
+    default, which S7 also checks.
+    """
+
+    channel: Optional[str]        # "screen", "machine", or None
+    kind: str                     # "text", "regex", "state", ...
     value: object                 # StringLiteral, pattern text, or word
     line: int = 0
+    column: int = 1
+    named: bool = False
+
+
+class _Observed:
+    """The one-condition view S7 guarantees over the authored ones."""
+
+    @property
+    def condition(self):
+        """The single condition, or ``None`` when none was written."""
+        return self.conditions[0] if self.conditions else None
 
 
 @dataclass(frozen=True)
-class Handler:
+class Handler(_Observed):
     """An ``on`` case or an ``always`` standing rule."""
 
     keyword: str                  # "on" or "always"
-    condition: Optional[Condition]
+    conditions: Tuple[Condition, ...]
     statements: Tuple["Statement", ...]
     stable: Optional[str] = None
     line: int = 0
+    column: int = 1
 
 
 @dataclass(frozen=True)
-class Statement:
+class Statement(_Observed):
     """One executable node of the authored surface."""
 
     verb: str
     arguments: Tuple[object, ...] = ()
-    condition: Optional[Condition] = None
+    conditions: Tuple[Condition, ...] = ()
     handlers: Tuple[Handler, ...] = ()
     timeout: Optional[str] = None
     stable: Optional[str] = None
     exclude: Optional[StringLiteral] = None
     line: int = 0
+    column: int = 1
 
 
 @dataclass(frozen=True)
@@ -107,6 +138,7 @@ class Property:
     kind: str = "text"
     prompt: Optional[StringLiteral] = None
     line: int = 0
+    column: int = 1
 
 
 @dataclass(frozen=True)
@@ -119,6 +151,7 @@ class Phase:
     timeout: Optional[str] = None
     deadline: Optional[str] = None
     line: int = 0
+    column: int = 1
 
 
 @dataclass(frozen=True)
@@ -195,11 +228,18 @@ def _line(token):
     return getattr(token, "line", 0) or 0
 
 
+def _column(token):
+    return getattr(token, "column", 1) or 1
+
+
 def _modifiers(node, items):
     """Split a node's trailing modifiers, checking its signature."""
     allowed = _SIGNATURES[node]
     found = {}
     for name, value, line, column in items:
+        if name in found:
+            raise ScriptParseError(
+                line, f"duplicate modifier: {name}", column)
         if name not in allowed:
             listing = ", ".join(allowed) if allowed else "none"
             raise ScriptParseError(
@@ -210,6 +250,30 @@ def _modifiers(node, items):
                 line, f"{name} must be a duration", column)
         found[name] = value
     return found
+
+
+def _observation(node, items):
+    """Split an observation's modifiers from the channels it names.
+
+    The timing set is closed, so every other modifier on an
+    observation names a channel. Whether that channel exists and
+    carries a value of the right kind is S7's, in the validation
+    layer, where the diagnostic can say so.
+    """
+    timing = [item for item in items if item[0] in _DURATION_MODIFIERS]
+    channels = tuple(_channel(item) for item in items
+                     if item[0] not in _DURATION_MODIFIERS)
+    return _modifiers(node, timing), channels
+
+
+def _channel(item):
+    """Type one ``channel=value`` modifier as a condition."""
+    name, value, line, column = item
+    kind = _CONDITION_KINDS.get(value.type, "word")
+    decoded = getattr(value, "reliquary", None)
+    return Condition(name, kind,
+                     decoded.value if decoded is not None else str(value),
+                     line, column, named=True)
 
 
 class _Builder(Transformer):
@@ -259,42 +323,47 @@ class _Builder(Transformer):
             raise ScriptParseError(line, "prompt must be a string",
                                    words[0].column)
         return Property(key, kind,
-                        prompt.reliquary.value if prompt else None, line)
+                        prompt.reliquary.value if prompt else None, line,
+                        words[0].column)
 
     # -- conditions ----------------------------------------------
     def screen_text(self, children):
-        token = children[0]
-        return Condition("screen", "text", token.reliquary.value,
-                         _line(token))
+        return self._screen("text", children[0])
 
     def screen_regex(self, children):
+        return self._screen("regex", children[0])
+
+    def _screen(self, kind, token):
+        return Condition("screen", kind, token.reliquary.value,
+                         _line(token), _column(token))
+
+    def bare_condition(self, children):
+        # No channel: a bare word spells no condition at all. S7
+        # names it, so the grammar admits it rather than failing
+        # here with an unexpected-token diagnostic.
         token = children[0]
-        return Condition("screen", "regex", token.reliquary.value,
-                         _line(token))
+        return Condition(None, "word", str(token), _line(token),
+                         _column(token))
 
     # -- observations --------------------------------------------
     def wait_one(self, children):
         conditions = [c for c in children if isinstance(c, Condition)]
-        modifiers = _modifiers(
+        modifiers, channels = _observation(
             "wait_one", [c for c in children if isinstance(c, tuple)])
-        line = _line(children[0])
-        machine = modifiers.pop("machine", None)
-        if machine is not None:
-            conditions.append(
-                Condition("machine", "state", str(machine), line))
         return Statement(
-            "wait", condition=conditions[0] if conditions else None,
-            arguments=tuple(conditions),
+            "wait", conditions=tuple(conditions) + channels,
             timeout=_duration(modifiers.get("timeout")),
-            stable=_duration(modifiers.get("stable")), line=line)
+            stable=_duration(modifiers.get("stable")),
+            line=_line(children[0]), column=_column(children[0]))
 
     def wait_branching(self, children):
         handlers = tuple(c for c in children if isinstance(c, Handler))
-        modifiers = _modifiers(
+        modifiers, channels = _observation(
             "wait_branching", [c for c in children if isinstance(c, tuple)])
-        return Statement("wait", handlers=handlers,
+        return Statement("wait", conditions=channels, handlers=handlers,
                          timeout=_duration(modifiers.get("timeout")),
-                         line=_line(children[0]))
+                         line=_line(children[0]),
+                         column=_column(children[0]))
 
     def on_handler(self, children):
         return self._handler("on", "on_handler", children)
@@ -303,26 +372,29 @@ class _Builder(Transformer):
         return self._handler("always", "always_handler", children)
 
     def _handler(self, keyword, node, children):
-        condition = next(
-            (c for c in children if isinstance(c, Condition)), None)
-        modifiers = _modifiers(
+        conditions = tuple(c for c in children if isinstance(c, Condition))
+        modifiers, channels = _observation(
             node, [c for c in children if isinstance(c, tuple)])
         return Handler(
-            keyword, condition,
+            keyword, conditions + channels,
             tuple(c for c in children if isinstance(c, Statement)),
-            _duration(modifiers.get("stable")), _line(children[0]))
+            _duration(modifiers.get("stable")), _line(children[0]),
+            _column(children[0]))
 
     # -- transfers and actions -----------------------------------
     def goto(self, children):
         return Statement("goto", (str(children[1]),),
-                         line=_line(children[0]))
+                         line=_line(children[0]),
+                         column=_column(children[0]))
 
     def finish(self, children):
-        return Statement("finish", line=_line(children[0]))
+        return Statement("finish", line=_line(children[0]),
+                         column=_column(children[0]))
 
     def _simple(self, verb, node, children, arguments):
         _modifiers(node, [c for c in children if isinstance(c, tuple)])
-        return Statement(verb, arguments, line=_line(children[0]))
+        return Statement(verb, arguments, line=_line(children[0]),
+                         column=_column(children[0]))
 
     def enter(self, children):
         return self._simple("enter", "enter", children,
@@ -347,7 +419,8 @@ class _Builder(Transformer):
                                    children[0].column)
         return Statement(
             "select", (children[1].reliquary.value,),
-            exclude=exclude.reliquary.value if exclude else None, line=line)
+            exclude=exclude.reliquary.value if exclude else None, line=line,
+            column=_column(children[0]))
 
     def screenshot(self, children):
         names = tuple(str(c) for c in children[1:]
@@ -386,7 +459,8 @@ class _Builder(Transformer):
             tuple(c for c in children if isinstance(c, Statement)),
             tuple(c for c in children if isinstance(c, Handler)),
             _duration(modifiers.get("timeout")),
-            _duration(modifiers.get("deadline")), _line(children[0]))
+            _duration(modifiers.get("deadline")), _line(children[0]),
+            _column(children[0]))
 
     def phased_body(self, children):
         return ("phased", tuple(children))
@@ -429,18 +503,20 @@ _PARSER = Lark.open(_GRAMMAR, parser="lalr", lexer=ReliquaryLexer,
 
 
 def parse_document(source, path="<script>"):
-    """Parse a ``.rlqs`` document into its typed tree.
+    """Parse and statically validate a ``.rlqs`` document.
 
     Applies the lexical rules, the node signatures, and header
-    uniqueness. The S-numbered rules over the tree — script shape,
-    observation channels, timing placement, control flow — are the
-    validation layer's, above this one.
+    uniqueness here, then the S-numbered rules over the typed tree
+    in :mod:`reliquary.script_validation` — script shape,
+    observation channels, control flow.
     """
     if not isinstance(source, str):
         raise TypeError("script source must be text")
     source = source.lstrip(chr(0xFEFF))
     try:
-        return _Builder().transform(_PARSER.parse(source))
+        script = _Builder().transform(_PARSER.parse(source))
+        validate(script)
+        return script
     except VisitError as error:
         # The transformer's own diagnostics arrive wrapped.
         if isinstance(error.orig_exc, ScriptParseError):

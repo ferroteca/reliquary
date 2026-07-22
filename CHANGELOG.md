@@ -26,6 +26,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   their authored wording — `lark` joins the runtime dependencies.
   The runtime still consumes the superseded surface; wiring it over
   is ROADMAP milestone 4's runner retarget.
+- Static validation of the redesigned surface:
+  `reliquary.script_validation` checks the legality rules the
+  grammar deliberately does not carry, and each diagnostic names the
+  construct and cites its rule id — the two script shapes and what
+  belongs to each (S3, S10), unique phase names (S5), one condition
+  per observation on a known channel of the right kind (S7), the
+  branching `wait`'s shape and depth limit (S8), sequential-or-
+  reactive phases (S9), and the terminating-statement rules (S11).
+  Parsing a document now applies them. The timing model's rules
+  (S2's placement matrix, S12) follow with the timing retarget.
 
 ### Removed
 

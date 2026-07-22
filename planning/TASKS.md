@@ -58,11 +58,26 @@ the parser stack validates scripts; 10–12 close out:
    machine=stopped the only machine spelling — no bare
    stopped); one condition per observation; unknown or
    wrong-kind channels are validation errors.
+   LANDED as script_validation.py (owner, 2026-07-22): the
+   rules the grammar deliberately does not carry, checked over
+   the typed tree, each diagnostic naming the construct and
+   citing its id — S3/S10 (the shapes, entry, goto targets), S5
+   (unique phase names), S7 (one condition, known channel, right
+   kind), S8 (the branching wait's shape and its one-level depth
+   limit), S9 (sequential or reactive, on vs always), S11 (the
+   terminating-statement rules). Two grammar consequences: a
+   handler's condition became optional so `on machine=stopped`
+   parses (the normative EBNF always allowed it — the channel is
+   part of `condition`, not a modifier) and a bare word is
+   admitted as a condition so S7 can name it (`wait stopped`).
+   Non-timing modifiers on an observation are channels, not
+   signature errors; the timing set stays the node's own.
 4. Static validation, timing model: lexically scoped
    timeout/stable defaults (innermost wins), per-activation
    deadline budgets (fresh per phase entry; the header
-   deadline backstops the run), and the placement matrix
-   enforced as parse errors.
+   deadline backstops the run, and S12 requires one of a
+   cyclable phase graph), and the placement matrix enforced as
+   parse errors.
 5. Runner retarget: rebuild script_runner.py on the new
    graph — phase transitions, branching-wait dispatch,
    reactive run-to-completion dispatch with the

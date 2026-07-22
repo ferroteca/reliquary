@@ -29,7 +29,10 @@ workflow:
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
   `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `script.py`
   parses the milestone-1 `.rlqs` subset (including the `machine: running|stopped` header and
-  `insert`/`eject`/`boot`), `script_runner.py` executes scripts against cached machines and
+  `insert`/`eject`/`boot`) until the runner retarget replaces it with the redesigned surface's three-layer
+  stack — `script_nodes.py` (the lexer and its diagnostics), `script_parser.py` with
+  `script_grammar.lark` (the typed tree, node signatures), and `script_validation.py` (the S-numbered
+  static rules, each diagnostic citing its id) — `script_runner.py` executes scripts against cached machines and
   wires `script <label>` (resolve via blueprint map, create-if-none, the machine-state header, static
   preflight of insert/eject/boot drive keys, run records under
   `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and `__main__.py`

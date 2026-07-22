@@ -42,15 +42,22 @@ phase: KW_PHASE NAME modifier* _open phase_item+ _close
 observation: KW_WAIT condition? modifier* _NL           -> wait_one
            | KW_WAIT modifier* _open handler+ _close    -> wait_branching
 
+// A handler's condition is optional here for the same reason a
+// wait's is: it may arrive as a named channel (on machine=stopped),
+// and S7 owns the count either way.
 ?handler: on_handler | always_handler
-on_handler: KW_ON condition modifier* _open statement+ _close
-always_handler: KW_ALWAYS condition modifier* _open statement+ _close
+on_handler: KW_ON condition? modifier* _open statement+ _close
+always_handler: KW_ALWAYS condition? modifier* _open statement+ _close
 
 // A bare string or regex is the screen observation -- its only
 // spelling. Every other channel arrives as a modifier (machine=),
-// and S7 checks that exactly one condition is present.
+// and S7 checks that exactly one condition is present. A bare word
+// is admitted only so that S7 can say what is wrong with it (the
+// superseded `wait stopped`): it names no channel and never
+// validates.
 condition: STRING                       -> screen_text
          | REGEX                        -> screen_regex
+         | NAME                         -> bare_condition
 
 transfer: KW_GOTO NAME _NL              -> goto
         | KW_FINISH _NL                 -> finish
