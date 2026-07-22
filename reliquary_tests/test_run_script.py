@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Tests for labeled script wiring (milestone-1 spike 10)."""
+"""Tests for labeled script wiring: run records and the CLI."""
 
 import contextlib
 import io
@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 from reliquary import cli
-from reliquary.script import parse_script
+from reliquary.script_parser import parse_script
 from reliquary.script_runner import (
     ScriptRun, _ScriptEngine, _create_run_dir,
     _resolve_or_create_machine, _resolve_script_stem, run_script,
@@ -130,38 +130,26 @@ class TranscriptTests(unittest.TestCase):
         run_dir = os.path.join(machine_home, "runs", "t-1")
         os.makedirs(os.path.join(run_dir, "screenshots"))
         os.makedirs(os.path.join(run_dir, "output"))
-        script = parse_script("""
-            platform: dos
-            wait "Hello"
-        """.strip())
+        script = parse_script('platform dos\nentry only\n'
+                              'phase only {\n    wait "Hello"\n'
+                              "    finish\n}\n")
         engine = _ScriptEngine(
             script, machine_id, home, machine_home,
             run_dir=run_dir, script_path="/tmp/demo.rlqs")
         engine._port = 5555
 
-        class _Qmp:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *exc):
-                pass
-
+        class _Console:
             def screen_text(self):
                 return ["Hello"]
 
-        class _Console:
-            def __init__(self, qmp):
-                self._qmp = qmp
+        @contextlib.contextmanager
+        def console():
+            yield _Console()
 
-            def screen_text(self):
-                return self._qmp.screen_text()
+        engine._console = console
 
         with mock.patch(
                 "reliquary.script_runner._machines") as machines, \
-                mock.patch.object(
-                    engine, "_session", return_value=_Qmp()), \
-                mock.patch.object(
-                    engine, "_console", side_effect=_Console), \
                 contextlib.redirect_stdout(io.StringIO()):
             machines.load_machine_state.return_value = {
                 "phase": "running"}
@@ -198,8 +186,8 @@ class RunScriptWiringTests(unittest.TestCase):
             }, handle)
         with open(os.path.join(scripts, "install-script.rlqs"), "w",
                   encoding="utf-8", newline="\n") as handle:
-            handle.write("platform: dos\n")
-            handle.write('wait "ready", timeout: 1s\n')
+            handle.write("platform dos\n")
+            handle.write('wait "ready" timeout=1s\n')
 
     def test_run_script_resolves_label_and_records_run(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
@@ -213,7 +201,7 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertTrue(result.script_path.endswith(
             "install-script.rlqs"))
         self.assertTrue(os.path.isdir(result.run_dir))
-        self.assertEqual(result.final_state, "done")
+        self.assertEqual(result.final_phase, "done")
         self.assertEqual(result.machine_phase, "ready")
         execute.assert_called_once()
         kwargs = execute.call_args.kwargs
@@ -227,7 +215,7 @@ class RunScriptWiringTests(unittest.TestCase):
         scripts = os.path.join(self.home, "scripts")
         with open(os.path.join(scripts, "extra.rlqs"), "w",
                   encoding="utf-8", newline="\n") as handle:
-            handle.write("platform: dos\n")
+            handle.write("platform dos\n")
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch(
                     "reliquary.script_runner.execute_script",
@@ -243,7 +231,7 @@ class RunScriptWiringTests(unittest.TestCase):
         def fake_seed(stem, home=None):
             path = os.path.join(self.home, "scripts", f"{stem}.rlqs")
             with open(path, "w", encoding="utf-8") as handle:
-                handle.write("platform: dos\n")
+                handle.write("platform dos\n")
             return True
 
         with mock.patch("reliquary.machines.create_hdd_image"), \

@@ -6,7 +6,7 @@ import os
 import unittest
 
 from reliquary.script_nodes import ScriptParseError
-from reliquary.script_parser import parse_document
+from reliquary.script_parser import parse_script
 from reliquary.script_timing import parse_duration, resolve
 
 _REFERENCE = os.path.join(
@@ -27,7 +27,7 @@ class DurationTests(unittest.TestCase):
                        _HEAD + "timeout 0ms\nstart\n",
                        _HEAD + 'wait "x" stable=0s\n'):
             with self.assertRaises(ScriptParseError, msg=source) as caught:
-                parse_document(source)
+                parse_script(source)
             self.assertIn("must be a positive duration",
                           caught.exception.message)
             self.assertIn("S5", caught.exception.message)
@@ -38,7 +38,7 @@ class PlacementMatrixTests(unittest.TestCase):
 
     def rejects(self, source, reason):
         with self.assertRaises(ScriptParseError, msg=source) as caught:
-            parse_document(source)
+            parse_script(source)
         self.assertIn(reason, caught.exception.message, msg=source)
         self.assertIn("S2", caught.exception.message, msg=source)
 
@@ -69,7 +69,7 @@ class PlacementMatrixTests(unittest.TestCase):
                      "a phase has no condition of its own")
 
     def test_the_matrix_admits_what_it_allows(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\ntimeout 30s\ndeadline 45m\n"
             "phase a timeout=5m deadline=20m {\n"
             '    wait "x" timeout=90s stable=2s\n'
@@ -83,7 +83,7 @@ class TimingPlanTests(unittest.TestCase):
     """Resolution is innermost-wins and entirely a parse-time question."""
 
     def plan(self, source):
-        return resolve(parse_document(source))
+        return resolve(parse_script(source))
 
     def test_the_built_in_default_bounds_an_unadorned_script(self):
         plan = self.plan(_HEAD + 'wait "x"\n')
@@ -156,14 +156,14 @@ class TimingPlanTests(unittest.TestCase):
                          ("select", "20s"))
 
     def test_a_plan_entry_is_found_from_its_parsed_node(self):
-        script = parse_document(_HEAD + 'wait "x" timeout=90s\n')
+        script = parse_script(_HEAD + 'wait "x" timeout=90s\n')
         plan = resolve(script)
         entry = plan.at(script.statements[0])
         self.assertEqual(entry.timeout.seconds, 90.0)
 
     def test_the_reference_script_resolves(self):
         with open(_REFERENCE, encoding="utf-8") as handle:
-            plan = resolve(parse_document(handle.read(), path=_REFERENCE))
+            plan = resolve(parse_script(handle.read(), path=_REFERENCE))
         self.assertEqual(plan.default.spelling, "30s")
         self.assertEqual(plan.run_deadline.spelling, "45m")
         self.assertEqual(plan.phase_deadlines["formatting"].spelling, "20m")
@@ -179,7 +179,7 @@ class CycleTests(unittest.TestCase):
 
     def rejects(self, source, route):
         with self.assertRaises(ScriptParseError, msg=source) as caught:
-            parse_document(source)
+            parse_script(source)
         self.assertIn(f"the phase graph can cycle ({route})",
                       caught.exception.message)
         self.assertIn("S12", caught.exception.message)
@@ -202,19 +202,19 @@ class CycleTests(unittest.TestCase):
             '    always "x" {\n        goto a\n    }\n}\n', "a -> a")
 
     def test_a_header_deadline_admits_the_cycle(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\ndeadline 45m\nphase a {\n    goto a\n}\n")
         self.assertEqual(len(script.phases), 1)
 
     def test_an_acyclic_graph_needs_no_deadline(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\nphase a {\n    goto b\n}\n"
             "phase b {\n    goto c\n}\n"
             "phase c {\n    finish\n}\n")
         self.assertEqual(len(script.phases), 3)
 
     def test_a_diamond_is_not_a_cycle(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\nphase a {\n    wait {\n"
             '        on "x" {\n            goto b\n        }\n'
             '        on "y" {\n            goto c\n        }\n    }\n}\n'
@@ -226,7 +226,7 @@ class CycleTests(unittest.TestCase):
     def test_an_unreachable_cycle_is_not_budgeted(self):
         # Unreachable phases are static analysis's warning, not a
         # run the deadline has to bound.
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\nphase a {\n    finish\n}\n"
             "phase b {\n    goto c\n}\n"
             "phase c {\n    goto b\n}\n")

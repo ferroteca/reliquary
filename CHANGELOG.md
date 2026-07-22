@@ -51,8 +51,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `deadline` (S12), the diagnostic naming the route that closes
   the cycle.
 
+- The script runtime executes the redesigned surface. `.rlqs` runs now
+  walk the phase graph from `entry` to `finish`, dispatch branching
+  `wait` blocks by declaration order, and run reactive phases' standing
+  `always` handlers to completion — a fired handler consumed for its
+  episode, re-arming only after a sample at which its condition no
+  longer holds, so a persistent confirmation screen produces input once
+  per appearance rather than on every sample. Every clock comes from the
+  parse-time timing plan, so a timing failure names the clock that
+  expired and the scope that supplied it, and observation timeouts,
+  reactive intervals, per-activation phase budgets, and the run deadline
+  are all enforced at sample and statement boundaries.
+- Script sessions are identity-verified. Every sample and input verb
+  opens its own QMP session through `Machine.qmp()`, so the runtime can
+  no longer drive a VM it has not confirmed is the one this home
+  started, and no session is held while a handler body runs.
+
 ### Removed
 
+- The milestone-one script parser (`reliquary.script`) is gone, with the
+  surface it parsed: `state`/`->`/`done`/`expect`, colon headers, comma
+  modifiers, the `regex` keyword, bare `stopped`, `<key>` tokens inside
+  `type`, and the `boot` verb (now `set-boot`). `parse_script` and
+  `load_script` live in `reliquary.script_parser` and speak the new
+  surface; the `State` and `ExpectBranch` exports are replaced by
+  `Phase`, `Handler`, and `Property`. Scripts written for the old
+  surface do not parse — rewrite them; there is no bridge.
+- `ScriptRun.final_state` is `ScriptRun.final_phase`, and `rlq script`
+  prints `final script phase:`.
 - Scripts no longer carry embedded JSON. The `media <label> { ... }`
   block is deleted from the language, along with the planned
   `landmark <name> { ... }` block, the install-on-first-run model

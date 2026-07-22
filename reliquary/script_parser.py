@@ -535,7 +535,7 @@ _PARSER = Lark.open(_GRAMMAR, parser="lalr", lexer=ReliquaryLexer,
                     start="script", propagate_positions=True)
 
 
-def parse_document(source, path="<script>"):
+def parse_script(source, path="<script>"):
     """Parse and statically validate a ``.rlqs`` document.
 
     Applies the lexical rules, the node signatures, and header
@@ -561,6 +561,17 @@ def parse_document(source, path="<script>"):
         raise
     except UnexpectedInput as error:
         raise _diagnose(error, source, path) from None
+
+
+def load_script(path):
+    """Load and parse a UTF-8 ``.rlqs`` file with path-aware
+    diagnostics."""
+    path = os.path.abspath(os.fspath(path))
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return parse_script(handle.read(), path=path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Script not found: {path}") from None
 
 
 def _diagnose(error, source, path):

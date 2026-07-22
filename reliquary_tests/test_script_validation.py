@@ -5,7 +5,7 @@
 import unittest
 
 from reliquary.script_nodes import ScriptParseError
-from reliquary.script_parser import parse_document
+from reliquary.script_parser import parse_script
 
 _HEAD = "platform dos\n"
 
@@ -14,7 +14,7 @@ class _ValidationCase(unittest.TestCase):
     def rejects(self, source, message, rule):
         """Assert that a script fails, naming its problem and rule."""
         with self.assertRaises(ScriptParseError, msg=source) as caught:
-            parse_document(source)
+            parse_script(source)
         self.assertIn(message, caught.exception.message, msg=source)
         self.assertIn(rule, caught.exception.message, msg=source)
         return caught.exception
@@ -59,7 +59,7 @@ class ScriptShapeTests(_ValidationCase):
             "finish is invalid in a linear script", "S10")
 
     def test_a_linear_script_needs_no_terminator(self):
-        script = parse_document(_HEAD + 'wait "C:\\\\>"\nscreenshot booted\n')
+        script = parse_script(_HEAD + 'wait "C:\\\\>"\nscreenshot booted\n')
         self.assertEqual([s.verb for s in script.statements],
                          ["wait", "screenshot"])
 
@@ -93,7 +93,7 @@ class PhaseShapeTests(_ValidationCase):
         self.assertEqual(error.line, 4)
 
     def test_a_branching_wait_terminates_when_every_handler_does(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\ndeadline 10m\nphase a {\n    wait {\n"
             '        on "x" {\n            finish\n        }\n'
             '        on "y" {\n            goto a\n        }\n    }\n}\n')
@@ -113,7 +113,7 @@ class PhaseShapeTests(_ValidationCase):
         self.assertEqual(error.line, 5)
 
     def test_a_reactive_phase_needs_no_terminator(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\ndeadline 10m\nphase a {\n"
             '    always "x" {\n        press enter\n    }\n}\n')
         self.assertEqual(len(script.phases[0].handlers), 1)
@@ -157,7 +157,7 @@ class BranchingWaitTests(_ValidationCase):
         # The grammar requires a statement in a handler body; the
         # explicit no-action branch is the spec's, not S8's.
         with self.assertRaises(ScriptParseError):
-            parse_document(
+            parse_script(
                 _HEAD + 'wait {\n    on "x" {\n    }\n'
                 '    on "y" {\n        press enter\n    }\n}\n')
 
@@ -210,7 +210,7 @@ class ObservationChannelTests(_ValidationCase):
             "unknown observation channel: disk", "S7")
 
     def test_a_handler_names_a_non_default_channel(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + "entry a\ndeadline 10m\nphase a {\n    wait timeout=5m {\n"
             '        on "Press a key..." {\n            press enter\n'
             "        }\n"
@@ -227,7 +227,7 @@ class ObservationChannelTests(_ValidationCase):
             "always requires a condition", "S7")
 
     def test_the_screen_and_machine_channels_validate(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + 'wait "C:\\\\>"\nwait /[0-9]+ files/\n'
             "wait machine=stopped timeout=2m\n")
         self.assertEqual(
@@ -241,7 +241,7 @@ class DiagnosticContextTests(_ValidationCase):
 
     def test_a_static_error_renders_its_source_line(self):
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + "wait stopped\n", path="verify.rlqs")
+            parse_script(_HEAD + "wait stopped\n", path="verify.rlqs")
         rendered = str(caught.exception)
         self.assertIn("verify.rlqs:2:6: error:", rendered)
         self.assertIn("wait stopped", rendered)

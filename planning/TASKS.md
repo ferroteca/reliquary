@@ -99,6 +99,30 @@ the parser stack validates scripts; 10–12 close out:
    task 4's scoping. Run records keep the superseded
    <timestamp>-<run_id>/ layout (the runs/<n>/ move is
    milestone 7's, run records).
+   LANDED (owner, 2026-07-22): script_runner.py rebuilt on the
+   typed tree — the phase graph, branching-wait dispatch,
+   reactive run-to-completion with the once-per-episode rearm,
+   and the clocks read from the parse-time plan, so failures
+   already name the expired clock and its source scope (task 6's
+   first half falls out of the model). Consequences:
+   - script.py is deleted, not bridged; parse_script and
+     load_script moved onto the new stack in script_parser.py
+     and the exports follow (State/ExpectBranch out,
+     Phase/Handler/Property in). test_script.py went with it.
+   - a sample reads every channel together, so a branching wait
+     can mix screen and machine=stopped handlers; a sample whose
+     session is gone IS the stopped observation, and it
+     reconciles the machine phase.
+   - sessions go through Machine.qmp(), so the runtime verifies
+     VM identity (the old runner opened a raw Qmp(port)) and
+     never holds a session while a statement list runs.
+   - the engine takes an injected clock/sleep: the dispatch
+     tests are deterministic and the suite no longer sleeps.
+   - properties parse but do not bind: ${key} and insert $key
+     raise a named runtime error until the property family
+     (milestone 6).
+   - NOT YET: the shipped builtins and planning/examples scripts
+     are old-surface and no longer parse — task 7.
 6. Diagnostics and check-script: failure diagnostics name
    the expired clock and its source scope; check-script
    grows to report the resolved timing plan (each

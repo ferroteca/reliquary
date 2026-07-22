@@ -23,9 +23,9 @@ from .machines import (create, create_from_blueprint, destroy,
                        stop as stop_cached_machine)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
                     fetch_media, resolve_media)
-from .script import (Condition, ExpectBranch, Script,
-                     ScriptParseError, State, Statement, load_script,
-                     parse_script)
+from .script_nodes import ScriptParseError
+from .script_parser import (Condition, Handler, Phase, Property, Script,
+                            Statement, load_script, parse_script)
 from .script_runner import (ScriptRun, ScriptRuntimeError,
                             execute_script, run_script)
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
@@ -35,7 +35,7 @@ __all__ = [
     "Blueprint",
     "BlueprintDrive",
     "Condition",
-    "ExpectBranch",
+    "Handler",
     "Machine",
     "Qmp",
     "Runner",
@@ -43,7 +43,8 @@ __all__ = [
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
-    "State",
+    "Phase",
+    "Property",
     "Statement",
     "MachineConfig",
     "AgentlessGuestExec",

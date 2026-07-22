@@ -6,7 +6,7 @@ import os
 import unittest
 
 from reliquary.script_nodes import ScriptParseError
-from reliquary.script_parser import parse_document
+from reliquary.script_parser import parse_script
 
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -20,7 +20,7 @@ class ReferenceScriptTests(unittest.TestCase):
 
     def setUp(self):
         with open(_REFERENCE, encoding="utf-8") as handle:
-            self.script = parse_document(handle.read(), path=_REFERENCE)
+            self.script = parse_script(handle.read(), path=_REFERENCE)
 
     def test_headers_carry_their_values(self):
         self.assertEqual(self.script.platform, "dos")
@@ -89,7 +89,7 @@ class VocabularyTests(unittest.TestCase):
     def test_a_keyword_is_a_plain_name_outside_node_position(self):
         # `enter` is a verb at the start of a line and a key name
         # after `press`; `insert` and `type` likewise.
-        script = parse_document(
+        script = parse_script(
             _HEAD + "press enter\npress ctrl+alt+delete\n"
             "press insert\nset-boot hdd0 cdrom0\n")
         self.assertEqual([s.verb for s in script.statements],
@@ -99,7 +99,7 @@ class VocabularyTests(unittest.TestCase):
                           ("hdd0", "cdrom0")])
 
     def test_the_renamed_vocabulary_parses(self):
-        script = parse_document(
+        script = parse_script(
             "platform dos\nentry go\n"
             "phase go {\n    goto next\n}\n"
             "phase next {\n    finish\n}\n")
@@ -108,7 +108,7 @@ class VocabularyTests(unittest.TestCase):
         self.assertEqual(script.phases[1].statements[0].verb, "finish")
 
     def test_a_reactive_phase_holds_always_handlers(self):
-        script = parse_document(
+        script = parse_script(
             "platform dos\nentry watch\ndeadline 10m\n"
             "phase watch {\n"
             "    always /copied [0-9]+ files/ stable=2s {\n"
@@ -127,7 +127,7 @@ class VocabularyTests(unittest.TestCase):
         self.assertEqual(phase.handlers[0].stable, "2s")
 
     def test_property_declarations_type_their_kind_and_prompt(self):
-        script = parse_document(
+        script = parse_script(
             _HEAD + 'property windows.user\n'
             'property secret windows.license-key prompt="License key"\n'
             'start\n')
@@ -138,7 +138,7 @@ class VocabularyTests(unittest.TestCase):
 
     def test_an_unknown_property_kind_is_named(self):
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + "property txt some.key\nstart\n")
+            parse_script(_HEAD + "property txt some.key\nstart\n")
         self.assertIn("unknown property kind: 'txt'",
                       str(caught.exception))
 
@@ -146,7 +146,7 @@ class VocabularyTests(unittest.TestCase):
 class SignatureTests(unittest.TestCase):
     def test_a_node_rejects_a_modifier_outside_its_signature(self):
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + 'enter "x" timeout=5m\n')
+            parse_script(_HEAD + 'enter "x" timeout=5m\n')
         self.assertIn("enter does not accept the modifier 'timeout'",
                       str(caught.exception))
         self.assertIn("accepts: none", str(caught.exception))
@@ -155,24 +155,24 @@ class SignatureTests(unittest.TestCase):
         # Only the timing set is a wait's own; every other modifier
         # names a channel, and S7 owns that diagnostic.
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + 'wait "x" exclude="y"\n')
+            parse_script(_HEAD + 'wait "x" exclude="y"\n')
         self.assertIn("unknown observation channel: exclude",
                       str(caught.exception))
 
     def test_a_timing_modifier_requires_a_duration(self):
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + 'wait "x" timeout=soon\n')
+            parse_script(_HEAD + 'wait "x" timeout=soon\n')
         self.assertIn("timeout must be a duration", str(caught.exception))
 
     def test_select_accepts_only_exclude(self):
-        script = parse_document(_HEAD + 'select "a" exclude="b"\n')
+        script = parse_script(_HEAD + 'select "a" exclude="b"\n')
         self.assertEqual(script.statements[0].exclude.text, "b")
         with self.assertRaises(ScriptParseError):
-            parse_document(_HEAD + 'select "a" stable=2s\n')
+            parse_script(_HEAD + 'select "a" stable=2s\n')
 
     def test_a_repeated_header_is_rejected(self):
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document("platform dos\nplatform win9x\nstart\n")
+            parse_script("platform dos\nplatform win9x\nstart\n")
         self.assertIn("platform may appear only once",
                       str(caught.exception))
 
@@ -185,7 +185,7 @@ class LexicalDiagnosticsTests(unittest.TestCase):
                        _HEAD + "phase p timeout = 5m {\n}\n",
                        _HEAD + 'select "a" exclude = "b"\n'):
             with self.assertRaises(ScriptParseError, msg=source) as caught:
-                parse_document(source)
+                parse_script(source)
             self.assertIn("modifiers are written name=value",
                           str(caught.exception))
 
@@ -193,19 +193,19 @@ class LexicalDiagnosticsTests(unittest.TestCase):
         for source in (_HEAD + 'wait "x" timeout=30\n',
                        _HEAD + "deadline 45\n"):
             with self.assertRaises(ScriptParseError, msg=source) as caught:
-                parse_document(source)
+                parse_script(source)
             self.assertIn("durations carry a unit", str(caught.exception))
 
     def test_an_unterminated_string_keeps_its_message(self):
         for source in (_HEAD + 'wait "unclosed\n',
                        _HEAD + 'type "unclosed\n'):
             with self.assertRaises(ScriptParseError, msg=source) as caught:
-                parse_document(source)
+                parse_script(source)
             self.assertIn("unterminated string", str(caught.exception))
 
     def test_a_syntax_error_reports_a_line_and_renders_a_caret(self):
         with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + "goto\n", path="x.rlqs")
+            parse_script(_HEAD + "goto\n", path="x.rlqs")
         self.assertEqual(caught.exception.line, 2)
         self.assertIn("x.rlqs:2:", str(caught.exception))
         self.assertIn("^", str(caught.exception))
@@ -229,7 +229,7 @@ class SupersededSurfaceTests(unittest.TestCase):
                 ("bare stopped", "platform dos\nwait stopped\n"),
                 ("boot verb", "platform dos\nboot hdd0\n")):
             with self.assertRaises(ScriptParseError, msg=label):
-                parse_document(source)
+                parse_script(source)
 
 
 if __name__ == "__main__":

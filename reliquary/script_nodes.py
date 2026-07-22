@@ -91,6 +91,17 @@ class StringLiteral:
             raise ValueError("string carries a property reference")
         return "".join(self.parts)
 
+    @property
+    def spelling(self):
+        """The literal as authored, references left unresolved.
+
+        For displaying a string no run has bound values for -- a
+        listing, a diagnostic -- where :attr:`text` would refuse.
+        """
+        return "".join(
+            part if isinstance(part, str) else "${" + part.key + "}"
+            for part in self.parts)
+
 
 @dataclass(frozen=True)
 class Token:

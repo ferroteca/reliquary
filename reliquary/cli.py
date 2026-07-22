@@ -26,7 +26,8 @@ from .machines import (create_from_blueprint, destroy, list_machines,
                        start as start_machine,
                        stop as stop_machine)
 from .script_runner import ScriptRuntimeError, run_script
-from .script import ScriptParseError, load_script
+from .script_nodes import ScriptParseError
+from .script_parser import load_script
 from .workflows import _cli_machine_config, start as start_legacy
 
 
@@ -245,7 +246,7 @@ def _script(arguments):
         print(f"created machine {result.machine_id}")
     print(f"ran {os.path.basename(result.script_path)} "
           f"on machine {result.machine_id}")
-    print(f"final script state: {result.final_state}")
+    print(f"final script phase: {result.final_phase}")
     print(f"machine phase: {result.machine_phase}")
     print(f"run: {result.run_dir}")
     return 0
@@ -308,6 +309,15 @@ def _list_machines(arguments):
     return 0
 
 
+def _description(script):
+    """A script's description as one line of listing text."""
+    if script.description is None:
+        return "-"
+    # A listing binds no properties, so any reference is shown as
+    # the author wrote it.
+    return script.description.spelling
+
+
 def _list_scripts(arguments):
     blueprint_name = (getattr(arguments, "list_scripts_blueprint", None)
                       or arguments.blueprint)
@@ -333,7 +343,7 @@ def _list_scripts(arguments):
             except (FileNotFoundError, ScriptParseError) as error:
                 description = f"(error: {error})"
             else:
-                description = script.description or "-"
+                description = _description(script)
             print(f"{label:<{label_width}}  {description}")
         return 0
     _print_scripts_in_dir(scripts_dir(arguments.home))
@@ -362,7 +372,7 @@ def _print_scripts_in_dir(scripts_path):
         except (FileNotFoundError, ScriptParseError) as error:
             description = f"(error: {error})"
         else:
-            description = script.description or "-"
+            description = _description(script)
         print(f"{stem:<{label_width}}  {description}")
     return 0
 

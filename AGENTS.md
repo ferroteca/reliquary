@@ -27,17 +27,17 @@ workflow:
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
-  `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs, `script.py`
-  parses the milestone-1 `.rlqs` subset (including the `machine: running|stopped` header and
-  `insert`/`eject`/`boot`) until the runner retarget replaces it with the redesigned surface's three-layer
-  stack — `script_nodes.py` (the lexer and its diagnostics), `script_parser.py` with
-  `script_grammar.lark` (the typed tree, node signatures), `script_validation.py` (the S-numbered
-  static rules, each diagnostic citing its id), and `script_timing.py` (durations, and the timing plan
-  resolved at parse time: every observation's effective timeout and the scope that supplied it) — `script_runner.py` executes scripts against cached machines and
-  wires `script <label>` (resolve via blueprint map, create-if-none, the machine-state header, static
-  preflight of insert/eject/boot drive keys, run records under
-  `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and `__main__.py`
-  preserves `python -m reliquary` execution.
+  `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs. The
+  `.rlqs` language is four layers: `script_nodes.py` (the lexer and its diagnostics),
+  `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
+  `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
+  and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
+  effective timeout and the scope that supplied it). `script_runner.py` executes that tree against
+  cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
+  the clocks the plan resolved — and wires `script <label>` (resolve via blueprint map,
+  create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys, run
+  records under `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and
+  `__main__.py` preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.
 - `reliquary_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
@@ -201,6 +201,23 @@ writes should be read after QEMU stops so write-back has completed.
 
 Staged directories are declared under `drives/` like any other drive: `hdd[_<n>]` attaches as a vvfat hard disk,
 `floppy[_<n>]` as a vvfat 1.44M FAT12 floppy, each at its named slot.
+
+### Script dispatch
+
+The `.rlqs` runtime's semantics are defined over **samples** (discrete readings of the machine) and the
+**episodes** a condition's consecutive holding samples form — planning/design/script-spec.md, "Execution
+model". Preserve these when touching `script_runner.py`:
+
+- Dispatch is single-threaded and run to completion: no sample is taken while a statement list executes, so
+  a screen that appeared and vanished inside a handler action never happened.
+- A fired handler is consumed for its episode and re-arms only after a sample at which its condition does
+  not hold. This is what makes a persistent confirmation screen fire input exactly once per appearance.
+- An observation's timeout can never expire before at least one sample has been taken for it: a timeout
+  always means samples were taken and none satisfied the condition.
+- Clocks are checked only at boundaries — statement starts and dispatch samples — and every bound comes
+  from the parse-time plan, never re-derived here, so a failure can name the scope that supplied it.
+- No QMP session is ever held while a statement list runs: QEMU's QMP server admits one client at a time,
+  so every sample and every input verb opens its own identity-verified session.
 
 ## Guest program runs
 
