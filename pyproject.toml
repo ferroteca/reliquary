@@ -27,6 +27,9 @@ classifiers = [
 ]
 dependencies = ["lark", "pillow", "qemu.qmp"]
 
+[project.urls]
+Homepage = "https://github.com/ferroteca/reliquary"
+
 [dependency-groups]
 dev = ["build", "twine"]
 

@@ -11,6 +11,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.1.0.dev2 (unreleased)
 
+### Added
+
+- Packaging metadata now declares the project homepage
+  (`https://github.com/ferroteca/reliquary`) so PyPI can link to
+  the repository.
+
 ## 0.1.0.dev1 - 2026-07-22
 
 ### Added
