@@ -253,15 +253,24 @@ def _script(arguments):
 
 def _list_blueprints(arguments):
     if getattr(arguments, "builtin", False):
-        for name in list_builtin_blueprints():
+        names = list_builtin_blueprints()
+        if not names:
+            print("(no built-in blueprints)")
+            return 0
+        for name in names:
             print(name)
         return 0
     blueprints_path = blueprints_dir(arguments.home)
-    if not os.path.exists(blueprints_path):
+    names = []
+    if os.path.exists(blueprints_path):
+        names = sorted(
+            entry[:-5] for entry in os.listdir(blueprints_path)
+            if entry.endswith(".json"))
+    if not names:
+        print(f"(no blueprints in {blueprints_path})")
         return 0
-    for entry in sorted(os.listdir(blueprints_path)):
-        if entry.endswith(".json"):
-            print(entry[:-5])
+    for name in names:
+        print(name)
     return 0
 
 
@@ -271,6 +280,12 @@ def _list_machines(arguments):
         or arguments.blueprint)
     machines = list_machines(
         home=arguments.home, blueprint=filter_blueprint)
+    if not machines:
+        if filter_blueprint:
+            print(f"(no machines for blueprint {filter_blueprint})")
+        else:
+            print("(no machines)")
+        return 0
     bp_width = max(
         [9] + [len(state.get("blueprint") or "-")
                 for state in machines],

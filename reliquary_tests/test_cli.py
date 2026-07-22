@@ -16,6 +16,66 @@ home = importlib.import_module("reliquary.home")
 from reliquary import cli
 
 
+class CliEmptyListingTests(unittest.TestCase):
+    """list machines/blueprints/scripts report absence, not a bare header."""
+
+    def setUp(self):
+        saved = home._home
+        self.addCleanup(setattr, home, "_home", saved)
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+
+    def test_list_machines_reports_no_machines(self):
+        """An empty machine list says so instead of a headerless table."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "list", "machines"])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("BLUEPRINT", output)
+        self.assertIn("no machines", output)
+
+    def test_list_machines_reports_no_machines_for_blueprint(self):
+        """Filtering by a blueprint with no machines names the blueprint."""
+        os.makedirs(os.path.join(self.home, "blueprints"))
+        with open(os.path.join(self.home, "blueprints", "plain.json"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({
+                "platform": "dos",
+                "drives": {"hdd": {"size": "20M"}},
+            }, handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list", "machines",
+                "--blueprint", "plain",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("BLUEPRINT", output)
+        self.assertIn("no machines", output)
+        self.assertIn("plain", output)
+
+    def test_list_blueprints_reports_none_found(self):
+        """An empty blueprints directory says so, not silently nothing."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "list", "blueprints"])
+        self.assertEqual(result, 0)
+        self.assertIn("no blueprints", stdout.getvalue())
+
+    def test_list_scripts_reports_none_found(self):
+        """An empty scripts directory says so, not a bare header."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "list", "scripts"])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("NAME", output)
+        self.assertIn("no scripts", output)
+
+
 class CliMachineLifecycleTests(unittest.TestCase):
     """create / start / stop / destroy / list machines CLI."""
 

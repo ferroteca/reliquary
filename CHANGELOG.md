@@ -18,6 +18,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `rlq list machines` and `rlq list blueprints` report an explicit
+  `(no ...)` message on an empty result instead of a column header
+  over zero rows, matching `list scripts`, which already did.
+  (`#5`)
 - `rlq list scripts --blueprint <name>` heads its first column
   `LABEL`, naming what it lists: the blueprint scripts-map labels used
   as `run-script` verbs. The bare `rlq list scripts` listing keeps
