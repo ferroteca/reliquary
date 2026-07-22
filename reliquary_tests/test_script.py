@@ -21,11 +21,12 @@ class ScriptParserTests(unittest.TestCase):
         self.assertIsInstance(result, Script)
         self.assertEqual(result.platform, "dos")
         self.assertEqual(result.machine, "stopped")
-        self.assertEqual(result.initial, "insert-cd")
+        self.assertEqual(result.initial, "startup")
         self.assertEqual(
             tuple(result.states),
-            ("insert-cd", "cd-boot", "partitioning", "formatting"))
-        self.assertEqual(result.states["formatting"].statements[-1].verb,
+            ("startup", "cd-boot", "partitioning", "formatting",
+             "hd-boot", "shutdown"))
+        self.assertEqual(result.states["shutdown"].statements[-1].verb,
                          "done")
 
     def test_parses_the_shipped_linear_verify_script(self):
@@ -146,9 +147,9 @@ class FreeDOSInstallFlowTests(unittest.TestCase):
         with open(path, encoding="utf-8") as handle:
             cls.script = parse_script(handle.read())
 
-    def test_insert_cd_inserts_livecd_then_starts(self):
-        """insert-cd supplies the installer medium, then boots into it."""
-        stmts = self.script.states["insert-cd"].statements
+    def test_startup_inserts_livecd_then_starts(self):
+        """startup supplies the installer medium, then boots into it."""
+        stmts = self.script.states["startup"].statements
         self.assertEqual(stmts[0].verb, "insert")
         self.assertEqual(stmts[0].argument,
                          ("cdrom0", "freedos-1.4-livecd"))
@@ -195,8 +196,8 @@ class FreeDOSInstallFlowTests(unittest.TestCase):
         self.assertEqual(stmts[-1].verb, "transition")
         self.assertEqual(stmts[-1].argument, "cd-boot")
 
-    def test_formatting_completes_install_then_powers_off(self):
-        """formatting runs the full install sequence and shuts the guest down."""
+    def test_formatting_completes_the_install_sequence(self):
+        """formatting runs the installer through to completion."""
         stmts = self.script.states["formatting"].statements
         waits = [s.argument.value for s in stmts
                  if s.verb == "wait" and s.argument.kind == "text"]
@@ -205,11 +206,30 @@ class FreeDOSInstallFlowTests(unittest.TestCase):
         self.assertIn("packages", waits[2])
         self.assertIn("ready to install", waits[3])
         self.assertIn("complete", waits[4])
-        self.assertIn("JEMMEX", waits[5])
-        self.assertIn("C:\\>", waits[6])
         pkg = next(s for s in stmts
                    if s.verb == "select" and "Plain DOS" in s.argument)
         self.assertIn("sources", pkg.modifiers.get("exclude", ""))
+        self.assertEqual(stmts[-1].verb, "transition")
+        self.assertEqual(stmts[-1].argument, "hd-boot")
+
+    def test_hd_boot_loads_the_installed_system(self):
+        """hd-boot boots from disk and records the installed screen."""
+        stmts = self.script.states["hd-boot"].statements
+        waits = [s.argument.value for s in stmts
+                 if s.verb == "wait" and s.argument.kind == "text"]
+        self.assertIn("Load FreeDOS", waits[0])
+        self.assertIn("C:\\>", waits[1])
+        jemmex = next(s for s in stmts if s.verb == "select")
+        self.assertIn("JEMMEX", jemmex.argument)
+        self.assertTrue(any(s.verb == "screenshot" for s in stmts))
+        self.assertEqual(stmts[-1].verb, "transition")
+        self.assertEqual(stmts[-1].argument, "shutdown")
+
+    def test_shutdown_powers_off_then_ejects(self):
+        """shutdown powers the guest off and removes the installer medium."""
+        stmts = self.script.states["shutdown"].statements
+        self.assertEqual(stmts[0].verb, "enter")
+        self.assertIn("poweroff", stmts[0].argument)
         self.assertEqual(stmts[-1].verb, "done")
         self.assertEqual(stmts[-2].verb, "eject")
         self.assertEqual(stmts[-2].argument, "cdrom0")

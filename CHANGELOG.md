@@ -18,6 +18,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `rlq list scripts --blueprint <name>` heads its first column
+  `LABEL`, naming what it lists: the blueprint scripts-map labels used
+  as `run-script` verbs. The bare `rlq list scripts` listing keeps
+  `NAME`, which is what it lists: script file stems.
 - Scrubbed private project-history references from release-facing
   documentation and package metadata.
 - Removed obsolete references to a superseded installation abstraction;

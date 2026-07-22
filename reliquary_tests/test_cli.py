@@ -264,7 +264,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
-        self.assertIn("LABEL", output)
+        self.assertIn("NAME", output)
         self.assertIn("DESCRIPTION", output)
         self.assertIn("alpha", output)
         self.assertIn("Alpha script", output)

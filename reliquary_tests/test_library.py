@@ -16,7 +16,7 @@ from reliquary.media import parse_definition, resolve_media
 
 BLUEPRINT = "freedos-1.4-plain"
 MEDIA = "freedos-1.4-livecd"
-SCRIPTS = ("freedos-1.4-plain-install", "freedos-1.4-plain-verify")
+SCRIPTS = ("freedos-1.4-plain-install", "freedos-1.4-verify")
 
 
 class SeedingTest(unittest.TestCase):

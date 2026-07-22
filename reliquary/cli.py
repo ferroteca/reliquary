@@ -307,9 +307,9 @@ def _list_scripts(arguments):
             print(f"(blueprint {blueprint_name} declares no scripts)")
             return 0
         label_width = max(
-            [4] + [len(label) for label in scripts],
-            default=4)
-        print(f"{'NAME':<{label_width}}  DESCRIPTION")
+            [5] + [len(label) for label in scripts],
+            default=5)
+        print(f"{'LABEL':<{label_width}}  DESCRIPTION")
         for label, stem in scripts.items():
             script_path = os.path.join(scripts_dir(arguments.home),
                                        f"{stem}.rlqs")
