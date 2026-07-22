@@ -784,9 +784,11 @@ freedos-1.4-plain-verify      Boot the installed disk and verify       yes
 
 ```
 rlq run-script <label> (--blueprint <name> | --machine <id>)
-    [--responses <path>] [--display] [--detach] [--progress <mode>]
+    [--property <key>=<value>]... [--properties <path>]
+    [--display] [--detach] [--progress <mode>]
 rlq check-script <label-or-name>
-    [--blueprint <name> | --machine <id>] [--responses <path>]
+    [--blueprint <name> | --machine <id>]
+    [--property <key>=<value>]... [--properties <path>]
 ```
 
 A script is a `.rlqs` file under `scripts/`. `run-script <label>`
@@ -830,7 +832,19 @@ script's `machine:` header expects — starting a stopped machine
 when the script expects `running` (the default), failing when a
 `machine: stopped` script finds it running — then executes guest
 steps. `--display` shows the backend's console
-window; `--responses` binds a JSON file of input values.
+window. A repeatable `--property <key>=<value>` supplies an
+explicit value for a script-declared property — the twins'
+in-memory `properties=` mapping under parity — at the top of the
+[property source order](script-spec.md#the-property-sources): it
+beats even blueprint-fixed parameters, a key given twice is an
+error, an undeclared key fails preflight, and a secret-typed key
+is refused (argv enters process listings and shell history — the
+`set-property` rule; use the environment or the credential
+store). `RELIQUARY_PROPERTY_*` environment variables supply
+standing values below the blueprint, and `--properties <path>`
+selects the properties file, replacing the home's
+`user.properties` for the invocation
+([script properties](script-properties.md#property-sources)).
 
 `--progress (auto | pretty | plain | jsonl)` selects the rendering
 (default `auto`: tty detection; `pretty` forces the live tty
@@ -839,20 +853,20 @@ is the programmatic
 synchronous form: stdout carries the run's event stream as JSON
 lines and nothing else — the last line is the terminal event, the
 machine-readable result — diagnostics go to stderr, and the exit
-code carries the outcome. `plain` and `jsonl` never prompt: a
-missing input value fails preflight instead of hanging a program.
+code carries the outcome. `plain` and `jsonl` never prompt: an
+unbound property fails preflight instead of hanging a program.
 
 `check-script` runs preflight only: parsing, static control-flow
 checks, capability preflight. With a machine selector, its
 argument resolves exactly as `run-script`'s — label first, then
-bare script name — and it also binds responses and checks media
+bare script name — and it also binds properties and checks media
 resolution; without a selector there is no `scripts` map to
 consult, so the argument is a bare script name. Read-only, no
 guest steps.
 
 ```powershell
 rlq run-script install --blueprint freedos-1.4-plain --display
-rlq run-script install --blueprint freedos-1.4-plain --responses answers.json
+rlq run-script install --blueprint freedos-1.4-plain --property identity.full-name="Paul Galbraith"
 rlq run-script install --blueprint freedos-1.4-plain --progress jsonl
 
 rlq check-script freedos-1.4-plain-install
@@ -1009,11 +1023,17 @@ rlq set-property <key> --secret
 rlq unset-property <key>
 ```
 
-Maintains the home-wide personal registry in `properties.json` —
+Maintains the home-wide [user properties
+file](script-properties.md),
+`user.properties` —
 API twins `get_property`, `set_property`, `unset_property`,
 `list_properties` under the identity rule.
 Ordinary values are strings; secret values live only in the host's
-protected credential store, with a marker in the file.
+protected credential store, with a marker in the file. Every
+property command accepts `--properties <path>` (twin parameter
+`properties_file=`), selecting the file it maintains in place of
+the home's `user.properties` — so a project-controlled file's
+secret markers are provisioned like any other.
 
 ```powershell
 rlq set-property username "paul"
@@ -1069,7 +1089,7 @@ guest-console family `type`, `enter`, `press`, `exec`, `select`,
 `screen`, `wait`, `screenshot`, `hmp`) at least one is required;
 `run-script` auto-creates a machine when `--blueprint` names a
 blueprint with none yet. `check-script` uses a selector for label
-resolution and response binding when one is given. Commands that
+resolution and property binding when one is given. Commands that
 don't operate on a machine (`list-*`, `search-*`, `fetch-media`,
 the property family, `clean-*`, `new-blueprint`,
 `delete-blueprint`, `seed-*`, `import-vm`) ignore them.
@@ -1111,8 +1131,9 @@ Rules:
   `fetch-media`) reject `--json`, naming `--progress jsonl`: a
   live run is an event stream, not a document — one flag, one
   meaning each.
-- Secret property values never serialize; the marker
-  (`{"secret": true}`) stands in, exactly as in `properties.json`.
+- Secret property values never serialize; the JSON marker
+  (`{"secret": true}`) stands in — the marker's `--json`
+  spelling; the properties file spells it `@secret`.
 - `--verbose` is a pretty-rendering concern: `--json` always
   carries the full record and never combines with it.
 

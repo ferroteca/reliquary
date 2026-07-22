@@ -266,8 +266,9 @@ once the state format settles.
 ├── landmarks/           landmark declarations and their variant
 │                        renderings, <name>.rlql + <name>.<n>.png
 │                        (see "Landmarks")
-├── properties.json      personal property registry (ordinary values
-│                        and markers for host-stored secrets)
+├── user.properties      personal user properties (line-based
+│                        key = value; ordinary values and @secret
+│                        markers for host-stored secrets)
 ├── media/               shared media definitions (mirror URLs, archive
 │                        and payload SHA-256; one definition per
 │                        source archive can itemize several named
@@ -351,8 +352,9 @@ mechanism behind the artifact-residency split (planning/USE-CASES.md).
   reach the run.
 - The home remains reliquary's own ground regardless of asset
   root: machines materialize into the home cache, downloads and
-  payloads use the home caches, and the personal property
-  registry stays home-side (a license key never enters the repo —
+  payloads use the home caches, and the personal
+  user-properties file stays home-side (a license key never
+  enters the repo —
   U5).
 - `--assets <dir>` names the root and `--assets-only` disables
   the home fallback — global flags, mirrored by the API
@@ -555,7 +557,8 @@ rlq export (--blueprint <name> | --machine <id>)
 rlq import-vm <source> --name <name> --platform <platform>
     [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
 rlq run-script <label> (--blueprint <name> | --machine <id>)
-    [--responses <path>] [--display] [--detach] [--progress <mode>]
+    [--property <key>=<value>]... [--properties <path>]
+    [--display] [--detach] [--progress <mode>]
 rlq run status [<n>] (--blueprint <name> | --machine <id>)
 rlq run tail [<n>] (--blueprint <name> | --machine <id>)
     [--progress <mode>]
@@ -578,7 +581,7 @@ rlq eject-media <slot> (--blueprint <name> | --machine <id>)
 rlq set-boot-order <key>... (--blueprint <name> | --machine <id>)
 rlq hmp <line> (--blueprint <name> | --machine <id>)
 rlq check-script <label-or-name> [--blueprint <name> | --machine <id>]
-    [--responses <path>]
+    [--property <key>=<value>]... [--properties <path>]
 rlq fetch-media <media_name> [--script <script_name>]
 rlq list-properties [<prefix>]
 rlq get-property <key>
@@ -638,16 +641,18 @@ Lifecycle semantics:
   definitions before fetching, without executing guest steps.
 - the property family (`get-property`, `set-property`,
   `unset-property`, `list-properties`) maintains the home-wide
-  personal registry described in
-  planning/design/property-registry.md. Ordinary strings live in
-  `properties.json`; secret values live only in a protected host
+  user properties file described in
+  planning/design/script-properties.md. Ordinary strings live in
+  `user.properties`; secret values live only in a protected host
   credential store, with a marker in the file. Listing and getting
   secrets never reveal them, and secret setting takes no value
   argument (process listings and shell history are not credential
   stores): on a tty it prompts with no echo; otherwise it reads
   the value from stdin (to EOF, one trailing newline stripped,
   empty is an error — owner, 2026-07-21), keeping the CLI a
-  complete binding for programs.
+  complete binding for programs. Every property command accepts
+  `--properties <path>`, maintaining a selected file in place of
+  the home's `user.properties`.
 - `clean-downloads` / `clean-media` reclaim the two caches:
   cached source archives, and payload files reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
@@ -833,32 +838,38 @@ Polling and input pacing belong to the control plane; the
 language has no `delay` or sleep. Duration literals carry units
 (`500ms`, `30s`, `20m`).
 
-Immutable `text`, `media`, and `secret` inputs externalize
-run-specific data without adding decisions or expressions.
-`$name` references (`${name}` inside strings) are bound before
-execution. Each input may name a
-home-wide user property with `property="<key>"`; an explicit JSON
-response wins for that invocation, then the machine blueprint's
-`parameters` binding (a direct value, or a property reference
-replacing the input's own), then the property registry, then
-interactive prompting. Locale-class customization that would
+Immutable `text`, `media`, and `secret` properties externalize
+run-specific data without adding decisions or expressions:
+`property [type] <key> [prompt="..."]` declares one, its name the
+user-property key itself, and `$key` references (`${key}` inside
+strings) are bound before
+execution. Every source speaks the same keys and answers in one
+flattened order: an explicit `--property` value
+wins for that invocation, then the machine blueprint's
+`parameters` binding (a direct value, or a redirect resolving
+another key), then `RELIQUARY_PROPERTY_*` environment
+variables, then the selected properties file, then — one ask per
+key — interactive prompting. Locale-class customization that would
 change watch conditions is never a value binding: it is the
 blueprint's composition seam — selecting the media/script pair —
 per U5 (planning/design/machine-blueprint.md, "Customization seams"). Missing noninteractive, mistyped, or
 unresolved-media values fail before the machine starts, as do
 ordinary/secret kind mismatches.
 
-The registry is a flat, user-owned `properties.json` map of dotted
-names to strings or `{"secret": true}` markers. Secret values never
+The user properties file (`user.properties`) is a flat, user-owned
+file of
+dotted `key = value` lines, secrets kept as `@secret` markers, with
+comments preserved through property commands. Secret values never
 enter that file: they live in the host's protected credential store,
-scoped by reliquary home and property name, with no plaintext fallback.
-`secret` inputs may expand only in `enter` and `type`. Transcripts
-record input references and source kinds, never values or expanded
+scoped by properties-file path and property name, with no plaintext
+fallback.
+`secret` properties may expand only in `enter` and `type`. Transcripts
+record property keys and supplying sources, never values or expanded
 secret-bearing arguments; textual diagnostics redact known secret
 values, and automatic failure screenshots are suppressed after secret
-input. This protects reliquary's records, not guest logs, history, or
+entry. This protects reliquary's records, not guest logs, history, or
 an explicitly requested screenshot. The complete planned contract is
-in [planning/design/property-registry.md](design/property-registry.md).
+in [planning/design/script-properties.md](design/script-properties.md).
 
 Scripts may also embed ordinary media-definition JSON objects in
 top-level, labeled `media <label> { ... }` blocks. After full
@@ -876,7 +887,7 @@ control plane; future live transfers get distinct verbs rather
 than backend-dependent semantics. `start` reconciles the authored
 machine blueprint and `stop` is visibly a host hard power-off.
 There is no `restart`: a hard power cycle is the explicit pair,
-and a guest reboot remains guest input. Parsing, response binding,
+and a guest reboot remains guest input. Parsing, property binding,
 whole-script capability preflight, and static control-flow checks
 all finish before the first guest input. User documentation and
 source of truth: [planning/design/script-spec.md](design/script-spec.md)
@@ -1346,7 +1357,7 @@ blueprints are the extremely high priority within it.**
 Milestone 1 is a vertical slice: the north-star command working
 end to end from a clean home. Milestones 2–5 then complete the
 documented design — the media library, the instance model and
-machine blueprint, the property registry, and the scripting
+machine blueprint, the script properties, and the scripting
 language, i.e. everything in `planning/` — for the DOS platform on
 the QEMU backend alone. The script-surface realignment then
 retargets the language implementation to the July 2026 redesign.
@@ -1360,7 +1371,8 @@ test suite passes, and the FreeDOS install keeps working end to
 end on whichever surface that milestone provides. Within 2–5 the
 order is dependency-driven — the media library before blueprints
 fully exploit it, the machine model before scripts fully drive
-it, the property registry before script inputs can bind to it.
+it, the property sources before script declarations bind through
+them.
 Within a milestone the listed deliverables are ordered but may
 land in separate commits.
 
@@ -1620,26 +1632,34 @@ alone; a process killed mid-operation is detected and recovered
 per the instance model; blueprint edits round-trip through
 `apply-blueprint` with drive-regenerating changes failing closed.
 
-### Milestone 4 — The property registry
+### Milestone 4 — Script properties
 
-All of [planning/design/property-registry.md](design/property-registry.md),
-landed ahead of the scripting language because script inputs bind
-to it. Small and independently useful.
+All of [planning/design/script-properties.md](design/script-properties.md),
+landed ahead of the scripting language because script-declared
+properties bind
+through its sources. Small and independently useful.
 
 Deliverables:
 
-1. `properties.json` as a flat user-owned map of dotted names to
-   strings or `{"secret": true}` markers, with name validation
-   and canonical atomic writes.
+1. `user.properties` as a flat user-owned line-based
+   `key = value` file (dotted names; `@secret` markers), with
+   name validation, comment-preserving surgical edits, and
+   atomic writes.
 2. `rlq get-property` / `set-property` / `unset-property` /
    `list-properties`: secret values held
-   only in the host's protected credential store (scoped by home
+   only in the host's protected credential store (scoped by
+   properties-file path
    and property name), set via no-echo prompt on a tty and from
    stdin otherwise, never revealed by
    list/get; kind changes require `unset-property` first.
 3. The fail-safe update order (store credential before marker,
    remove marker before credential), with orphaned-credential
    reporting and cleanup guidance — never a plaintext fallback.
+4. The layered property sources: repeatable `--property`
+   (refusing secret-bound keys), `RELIQUARY_PROPERTY_*` with the
+   mangling rule and fail-closed collision preflight,
+   and `--properties <path>` selecting the maintained/consulted
+   file in place of the home's (credentials scoped by file path).
 
 Done when: ordinary and secret properties round-trip through the
 CLI with no secret material ever in the file, and interrupting an
@@ -1671,9 +1691,11 @@ Deliverables:
    the blueprint — surviving stop/start per spike 13's model),
    stopped-only `stage`/`collect` with contained paths, and
    `start`/`stop`.
-4. Inputs and response files: `text`/`media`/`secret` with
-   `${name}` binding by the response → property → prompt
-   precedence, kind mismatches and missing noninteractive values
+4. Property declarations: `property [type] <key>` with
+   `${key}` binding by the flattened source order — explicit
+   `--property` value → blueprint parameter (direct or
+   redirect) → environment → file → the once-per-key interactive
+   ask — kind mismatches and unbound noninteractive keys
    failing before the machine starts, and the secret contract
    (expansion only in `enter`/`type`, transcript omission,
    diagnostic redaction, failure-screenshot suppression).
@@ -1689,12 +1711,12 @@ Deliverables:
    embedded
    media installation, implicit create/start) and
    `rlq check-script` (read-only, with optional machine
-   and response binding for capability preflight).
+   and property binding for capability preflight).
 8. `list scripts`, `search scripts` (built-in index plus user
    files, with provenance), and `pull script <name>`.
 
 Done when: the FreeDOS install and verification scripts
-exercise the full language (states, inputs, embedded media
+exercise the full language (states, properties, embedded media
 blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `planning/`
 documents is implemented for DOS on QEMU.
@@ -1712,7 +1734,9 @@ scripts (end of file is the one ending) and two handlers minimum
 per branching `wait`; the pre-approved validation batch applied;
 `boot` renamed `set-boot`; `machine=running` and an undiverged
 header option deferred with reasons recorded in the spec;
-response files accept JSONC. The execution-model-before-runner
+response files accepted JSONC (the response concept later
+dissolved into property values — the property rounds). The
+execution-model-before-runner
 sequencing rule is satisfied: the spec's execution model (sample /
 episode / clock table), with the minimum run-events vocabulary,
 is written — its "Execution model" section — and the runner
@@ -1933,8 +1957,9 @@ the VGA-scraping results on the same screens.
   precious — no feature should exist solely to nurse a long-lived
   machine.
 - **One script, one target.** Each OS version and edition gets one
-  install script. Immutable text, media, and secret inputs supply
-  that target's run-specific data from responses, user properties, or
+  install script. Immutable text, media, and secret properties supply
+  that target's run-specific data from explicit values, blueprint
+  parameters, user properties, or
   prompting; they do not select branches or turn a script into a
   flag-driven mega-script.
 - **Installation media is input, disk images are output.** Install
@@ -2434,13 +2459,15 @@ agentless and guest-agent control planes with equivalent results.
   `$schema` as a versioned URL: one field declaring the document's
   format version and binding editors to the matching published
   schema.
-- **Script spec details** (the control-flow and response-file shape
+- **Script spec details** (the control-flow and property-binding
+  shape
   are decided — see "The scripting language" and
   planning/design/script-spec.md): the portable key-name vocabulary for
   `press`/`<key>` tokens is published in the spec as a closed set;
-  confirm it at realignment. Literal input defaults are resolved:
+  confirm it at realignment. Literal value defaults are resolved:
   they live in the blueprint `parameters` field (U5's
-  blueprint-held seam), never in input declarations — a default in
+  blueprint-held seam), never in property declarations — a default
+  in
   the script would undercut the blueprint as the customization
   surface.
 - **Cross-script reuse**: whether repeated behavior eventually

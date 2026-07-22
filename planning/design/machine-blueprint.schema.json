@@ -23,7 +23,7 @@
       "additionalProperties": {"type": "string", "minLength": 1}
     },
     "parameters": {
-      "description": "Blueprint-supplied script-input bindings: keys are input names; each value is a direct string value or a {\"property\": \"<key>\"} reference into the user property registry. Secret inputs never take direct values (a rule beyond this schema).",
+      "description": "Blueprint-supplied answers for script-declared properties: keys are property keys the blueprint's scripts declare; each value is a direct string value or a {\"property\": \"<key>\"} redirect resolving another key through the non-blueprint property sources. Secret-typed properties never take direct values (a rule beyond this schema).",
       "type": "object",
       "propertyNames": {"minLength": 1},
       "additionalProperties": {
@@ -33,7 +33,7 @@
             "type": "object",
             "properties": {
               "property": {
-                "description": "The user-property key the parameter refers to; defined externally in the property registry.",
+                "description": "The property key the redirect resolves instead of the declared key; answered by the non-blueprint property sources.",
                 "type": "string",
                 "minLength": 1
               }

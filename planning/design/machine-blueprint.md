@@ -156,7 +156,8 @@ reliquary is not the place to keep a machine you care about.
 The same ownership line runs through the whole reliquary home:
 everything outside `cache/` is durable data you own. Machine
 blueprints, media definitions, and scripts are small, shareable,
-and worth versioning. The [user property registry](property-registry.md)
+and worth versioning. The [user properties
+file](script-properties.md)
 is also durable but personal and normally not shared or committed. A
 media definition may initially be installed from an embedded script
 block, after which its library copy is likewise user-owned. Everything
@@ -180,8 +181,9 @@ through a machine's life. Companion pages:
   examples.
 - **[The media spec](media-spec.md)** — the media library, including
   definitions that scripts can install before machine resolution.
-- **[The user property registry](property-registry.md)** — reusable
-  personal values and protected secrets bound to script inputs.
+- **[Script properties](script-properties.md)** — how scripts
+  consume values: the source order, and the user file holding
+  reusable personal values and protected secrets.
 
 ## What the blueprint format is
 
@@ -554,17 +556,17 @@ author designs the seams in, and they come in two kinds.
 **Value seams** carry data into the blueprint's scripts: a user
 name, a license key, which supplemental disk. The
 [`parameters` field](machine-blueprint-reference.md#parameters)
-binds [script
-inputs](script-spec.md#inputs-properties-and-response-files) by
-name — fixing a value directly in the blueprint, or referring to
-a [user property](property-registry.md) each user defines
+answers [script-declared
+properties](script-spec.md#properties) by
+key — fixing a value directly in the blueprint, or redirecting to
+a [user property](script-properties.md) each user defines
 locally, so a license key is retrievable at use yet never checked
 in.
 
 **Composition seams** change what the guest itself shows.
 Installing the German edition of Windows means German vendor
 media and German installer screens — different text for the
-script to watch, which no value can parameterize: script inputs
+script to watch, which no value can parameterize: script properties
 deliberately never reach watch conditions, so the control-flow
 graph stays static. That seam is compositional, and the blueprint
 already owns both halves: its

@@ -164,62 +164,75 @@ Labels are conventionally short verbs — `install`, `verify`,
 
 **blueprint (optional) · object · not carried in the state**
 
-Values the blueprint supplies to [script
-inputs](script-spec.md#inputs-properties-and-response-files) — the
+Values the blueprint supplies to [script-declared
+properties](script-spec.md#properties) — the
 blueprint's half of the customization seams its author designs in
 (U5; see [the guide](machine-blueprint.md#customization-seams)).
-Keys are input names. Each value is one of the two bindings the
+Keys are property keys its scripts declare. Each value is one of
+the two bindings the
 use case names:
 
 - a **direct value** — a JSON string: the parameter is specified
   in the blueprint itself. An automated-testing blueprint fixes
   its user name as `"testuser"`; a seeded copy is customized by
   editing the value.
-- a **property reference** — `{"property": "<key>"}`: the
-  parameter is only *referred to* here and defined externally, in
-  the [user property registry](property-registry.md). This is the
+- a **redirect** — `{"property": "<key>"}`: the declared key is
+  answered by resolving *another* key through the remaining
+  [property sources](script-spec.md#the-property-sources) — so a
+  generic script's key can be wired to a specific personal one,
+  and automation can satisfy it from the environment. This is the
   form for values that must never enter the blueprint — a license
   key is the canonical example.
 
 ```json
 {
   "parameters": {
-    "owner-name": "testuser",
-    "install-key": {"property": "products.windows-98.install-key"},
+    "identity.full-name": "testuser",
+    "os.install-key": {"property": "products.windows-98.install-key"},
     "supplemental-disk": "freedos-1.4-bonus"
   }
 }
 ```
 
 When a script runs against a machine of this blueprint (or
-creates one), each input the script declares binds from the first
-available source: an explicit response-file value, then the
-blueprint parameter, then the property named by the input's own
-`property=`, then an interactive prompt. The blueprint therefore
-overrides the personal registry — a value the blueprint fixes
-stays fixed for every machine of it — while a response file still
-overrides everything for one invocation. A property reference
-*replaces* the input's own `property=` binding rather than
-chaining to it: if the referenced key is unset, binding falls
-through to prompting (or fails noninteractively) — never to a
-different key than the one the author chose.
+creates one), each declared property binds from the first source
+that answers: an explicit `--property` value, then the
+blueprint parameter, then the environment, the properties file,
+and — interactively — the ask (normative in the [script
+spec](script-spec.md#the-property-sources)). The
+blueprint therefore
+overrides the person's standing values — a value the blueprint
+fixes
+stays fixed for every machine of it — while an explicit CLI value
+overrides even the blueprint for one invocation. A redirect
+*replaces* resolution of the declared key entirely: the target
+key resolves through the
+non-blueprint sources — the interactive ask last — or fails
+noninteractively; parameters never chain through other
+parameters, and resolution never falls back to the key the
+author redirected away from.
 
 Rules, checked at blueprint validation and script preflight:
 
 - A value is a string or a `{"property": "<key>"}` object —
-  nothing else. Keys must be valid input names and property keys
-  valid registry names.
-- A `secret` input never takes a direct value: blueprints are
+  nothing else. Keys and redirect targets must be valid property
+  names.
+- A `secret`-typed property never takes a direct value:
+  blueprints are
   written to be shared and versioned (U4), and a secret in one is
   plaintext in source control. A secret parameter uses the
-  property-reference form, the referenced property must be a
-  secret property, and ordinary (`text`, `media`) inputs require
-  ordinary properties — kind mismatches fail rather than
+  redirect form, its target obeys the secret rules of whichever
+  source answers it (a secret property at the file, the warned
+  plaintext class in the environment, never argv), and ordinary
+  (`text`, `media`) declarations require
+  ordinary values — kind mismatches fail rather than
   downgrading protected data.
-- A parameter naming no input of the *running* script is unused
+- A parameter naming no property of the *running* script is
+  unused
   for that run: one blueprint's parameters serve every script in
   its [`scripts`](#scripts) map, and each script binds only the
-  inputs it declares. A parameter matching no input of *any*
+  properties it declares. A parameter matching no declared
+  property of *any*
   script in the map draws a validation warning — it is probably a
   typo.
 

@@ -982,6 +982,276 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      ("Backend adapters" doctrine paragraph, agentless-display
      recognizer sentence, milestone 6 intro), the
      guiding-principles watch list
+- THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
+  the docker-comparison round; all three forks on the
+  recommendations). The docker model largely CONFIRMS the design
+  (marker-file + host credential store = credential helpers;
+  stdin secret entry = docker secret create -; secrets as a
+  separate channel with different physics = the build-arg-leak
+  lesson; reject-unknown response keys stricter than docker's
+  warn); the round's changes:
+  1. RENAMED: "the property registry" → USER PROPERTIES — the
+     concept name only; properties.json and the property command
+     family are untouched. "Registry" reads as a remote
+     artifact-distribution service (docker/npm/OCI) and stays
+     free for any future sharing service; the settled command
+     vocabulary already says properties. property-registry.md →
+     user-properties.md (git mv). Folded: INTERFACES (supporting
+     contract + spec homes), AGENTS, ROADMAP (home layout, assets
+     rule, property bullet, script section, milestone ordering +
+     milestone 4 heading, milestone 5 deliverable 4), USE-CASES
+     (spelling only — no use-case change), script-spec, blueprint
+     guide + reference + schema descriptions, api.md contract
+     home, cli.md Properties. Historical records (released
+     CHANGELOG, closed TASKS items) keep the old name per the
+     documentation rules
+  2. INLINE RESPONSES: run-script/check-script gain a repeatable
+     `--respond <name>=<value>` beside `--responses <path>`
+     (docker -e / helm --set / terraform -var precedent — a
+     one-value override no longer requires authoring JSON: U1
+     ease, and argv-clean quoting for CLI-driving programs,
+     U3/U4). File + inline build ONE responses mapping — the
+     twins' `responses=` parameter, so CLI–API parity is the
+     identity, not a translation; inline overrides the file for
+     its name (the more explicit spelling), a name repeated
+     inline is an error, and a `secret` input never binds from
+     `--respond` (argv is not a credential store — the
+     set-property rule) while the response file's warned
+     plaintext allowance stands (the API's in-memory mapping
+     legitimately carries secret values — the set_property
+     precedent, and refusing only the CLI file would break
+     parity). Folded: script-spec (responses paragraphs +
+     check-script synopsis), cli.md (synopses, prose, example),
+     ROADMAP (both synopses, script section, milestone 5)
+  3. WIRING LOCUS CONFIRMED: the script may suggest a key
+     (input property=) and a blueprint parameter REPLACES it —
+     the compose-style blueprint-only wiring was weighed and
+     declined (every blueprint would re-wire universal keys like
+     identity.full-name, and a bare codex script run would lose
+     personal defaults and fall to prompting — U1; scripts stand
+     alone, the embedded-media precedent). No doc change — the
+     committed shape stands
+  4. THE OWNERSHIP FRAMING recorded and the binding order
+     CONSOLIDATED: each source answers for a different owner —
+     the caller (this invocation), the design (every machine of
+     the blueprint), the person (durable), then the prompt —
+     and precedence follows ownership, specific-and-short-lived
+     first. script-spec "Inputs, properties, and response files"
+     is the chain's one normative home; user-properties.md and
+     the blueprint reference now summarize and link instead of
+     restating (the docker-compose precedence-table lesson:
+     drift-prone restatement is what made docker's env story
+     confusing)
+  5. NO AMBIENT CHANNEL named: an input value never binds from a
+     process environment variable — a caller interpolates one
+     into a response explicitly; recorded in script-spec so a
+     future env-channel proposal argues against a decision, not
+     a gap (docker's silent -e NAME inheritance and .env
+     interpolation are the counterexample)
+  - fixed in passing: user-properties.md's stale "property set"
+    command spelling → set-property; script-spec's stale
+    "rlq script" example spelling → run-script
+  FOLLOW-UP ROUND (owner, 2026-07-21, the layering round; all
+  four forks on the recommendations):
+  6. HOME PROPERTIES CONFIRMED FOR AUTOMATION — the
+     uncontrolled-source worry resolves: unlike the codex (banned
+     from automation because artifacts changing outside source
+     control break a project), properties carry exactly what MUST
+     NOT be checked in (U4's license, U5's mechanism), reach a
+     run only where a source-controlled artifact names the key
+     (input property= / blueprint reference), and fail preflight
+     loudly when absent — the control is versioned, only the
+     values are personal
+  7. THE LAYERED PROPERTY STACK — the property step of the
+     binding order resolves through layered sources, nearest
+     first: --property <key>=<value> (repeatable; API
+     properties=) > RELIQUARY_PROPERTY_* environment > the
+     selected properties file. The stack lives INSIDE binding
+     step 3: a response or blueprint parameter beats every layer,
+     so a stray env var never overrides a designed value (the
+     docker -e footgun stays dead); env satisfies blueprint
+     property references too — CI injects a license key with no
+     pre-provisioned home. Normative home: user-properties.md
+     "Property sources"
+  8. ENV SPELLING: prefix form RELIQUARY_PROPERTY_<KEY> (the
+     TF_VAR_/NPM_CONFIG_ convention; suffix form
+     RELIQUARY_<KEY>_PROPERTY weighed and declined — grep-able
+     common prefix, self-evident reserved namespace); mangling
+     uppercases and folds `.`/`-`/`_` to `_`; a mangle collision
+     between two CONSULTED keys is a fail-closed preflight error
+     naming both
+  9. --properties <path> SELECTS the properties file, REPLACING
+     the home's for the invocation (layer-above-home weighed and
+     declined — project defaults are blueprint parameters' job;
+     replacement is the hermeticity tool: a project-controlled
+     file means nothing personal reaches the run, the
+     --assets-only instinct applied to values). Env
+     RELIQUARY_PROPERTIES; API properties_file=. Property
+     commands maintain the selected file (so project-file secret
+     markers are provisioned normally) — the settled property
+     twins gain properties_file= ADDITIVELY (item 6 of the api
+     gap queue stands otherwise); credential scoping GENERALIZED
+     from absolute-home to absolute properties-file path (the
+     home's file is <home>/properties.json — a strict
+     generalization)
+  10. SECRET RULES PER LAYER: --property never satisfies a
+     secret-bound key (argv — the set-property rule, as
+     --respond); env MAY (the CI secret-injection path, named
+     the same warned plaintext class as a response-file secret;
+     ordinary-only env weighed and declined as a refusal that
+     gets worked around); the file layer alone holds markers and
+     kinds. Item 5's no-ambient refusal NARROWED (superseded in
+     place — this round is uncommitted): nothing binds by INPUT
+     NAME from the environment and nothing reaches an input
+     without a source-controlled artifact naming its key; the
+     declared RELIQUARY_PROPERTY_* layer is the one environment
+     channel, inside step 3. Transcripts/check-script name the
+     supplying layer (flag/environment/file), never values.
+     Folded: user-properties.md (Property sources — normative —
+     + maintaining/secret-storage/checking), script-spec
+     (binding step 3, the narrowed uninvited rule, transcript
+     provenance, check-script), cli.md (synopses, run-script
+     prose, Properties), ROADMAP (synopses, property bullet,
+     script section, milestone 4 deliverable 4, milestone 5),
+     blueprint reference (property-reference bullet)
+  SECOND FOLLOW-UP ROUND (owner, 2026-07-21, the format round):
+  11. ASK IS THE FINAL LAYER — interactively the property stack
+     ends by asking the user: flag > env > file > ask. One ask
+     per unresolved key per run (presented with the first
+     requesting input's prompt text), its answer satisfying
+     every input bound to that key — the
+     duplicate-prompt-inconsistent-answers hole closes; answers
+     stay invocation-local, never written back. The input
+     chain's own prompt step remains only for propertyless
+     inputs; noninteractive behavior unchanged (the stack
+     exhausts, preflight fails). Blueprint property references
+     resolve through the full stack, ask included — never a
+     different key
+  12. THE FILE FORMAT — strict JSON → the reliquary line format
+     (fork on the recommendation): one key = value per line,
+     # full-line comments and blank lines PRESERVED through
+     property commands (surgical line edits — the
+     canonical-rewrite rationale for the comment ban dies with
+     the canonical rewrite), values verbatim-trimmed with no
+     quoting/escapes/continuations, @-prefixed value-kind
+     tokens (@secret the first; @@ spells a literal leading @;
+     the deliberate seam for future kinds), duplicate keys and
+     bad lines fail closed naming file and line, UTF-8, atomic
+     writes. Keeping JSON weighed and declined (the file was
+     already the JSON family's odd member, and since the
+     layering round every other property layer speaks
+     key=value); TOML declined (dotted keys nest, rewrite
+     fidelity needs a dependency). The API/--json marker
+     spelling {"secret": true} STANDS — returns stay JSON-shaped
+     under the value-union rule; @secret is file syntax only
+  13. FILENAME (owner — AGAINST the recommendation):
+     user.properties, the Java-association name for instant
+     editor key=value recognition; properties.rlqp (the format
+     family) and bare "properties" (git-config style) weighed
+     and declined. The spec NAMES the caveat: the format is not
+     Java properties — no unicode escapes, no continuations.
+     Folded: user-properties.md (names-and-values rewritten,
+     sources layer 4, filename throughout), script-spec (chain
+     steps 3/4 + prompting paragraph + marker sentence), cli.md
+     (Properties, --json marker rule, run-script prose), ROADMAP
+     (home layout, property bullet, script section, milestone 4
+     deliverables 1-2 — scoping fixed to file path — and
+     milestone 5), blueprint reference (reference resolution),
+     the realignment JSONC work item (user properties leave the
+     strict-JSON set)
+  THIRD FOLLOW-UP ROUND (owner, 2026-07-21, the property-construct
+  round — "design this well"; the namespace and caller-flag forks
+  settled by the owner, the flag fork with a corrected mental
+  picture: "blueprint is a property source, CLI overrides it"):
+  14. THE PROPERTY DECLARATION — `input` is replaced by the
+     `property` node: `property [text|media|secret] <key>
+     [prompt="..."]`, type optional defaulting to text, the three
+     type words reserved in type position (a key so spelled is
+     rejected), prompt= feeding the interactive ask, one
+     declaration per key per script (a duplicate is a static
+     error; the multi-inputs-share-a-key machinery and round 3's
+     first-requester tie-break die — reference the key instead).
+     References $key / ${key} accept dotted keys (the `name`
+     token already did); grammar input-def → property-def,
+     input-ref → property-ref, S5/S6 updated
+  15. ONE NAMESPACE (fork on the recommendation): the declared
+     name IS the user-property key — the input-name keyspace, the
+     property= bridge, and round 1 item 3's script-suggests
+     wiring spelling are superseded (the semantic — the script
+     names a key, the blueprint may re-wire — survives as
+     declaration + redirect). Short undotted keys are legal,
+     script-scoped by convention; dotted keys join the shared
+     vocabulary. Blueprint parameters re-key by property key;
+     their reference form is renamed the REDIRECT: resolves the
+     target key through the NON-blueprint sources (parameters
+     never chain), never falling back to the redirected key
+  16. THE FLATTENED SOURCE ORDER (the owner's picture): everything
+     is a property source, one normative list in script-spec "The
+     property sources" — explicit --property value (caller) >
+     blueprint parameter (design) > RELIQUARY_PROPERTY_* env
+     (session) > the selected properties file (person) > the
+     once-per-key interactive ask. The binding-chain-plus-stack
+     two-axis model dies; U5's guarantee survives as
+     design-beats-standing (env/file), explicit-CLI-beats-design;
+     env stays below the blueprint (round 2's named refusal — an
+     ambient variable never silently overrides a designed value;
+     the flag is the override path). The input-level prompt step
+     is gone: every declaration is property-keyed, the ask IS the
+     prompt
+  17. THE RESPONSE CONCEPT DELETED: --respond/--responses, the
+     JSONC response file, and the responses= mapping are removed
+     (rounds 1-2's inline-responses additions superseded, same
+     working tree). The caller channel is --property (repeatable;
+     twice is an error; keys must be declared by the running
+     script — stores may hold extras, explicit answers may not) +
+     the API properties= mapping; --properties <path> and
+     properties_file= keep the round-2 store-selection semantics.
+     The per-run plaintext-secret FILE channel dies with response
+     files: secrets per run travel via env (warned class), the
+     in-memory API mapping, or the no-echo ask — argv never. A
+     tier-1 bulk values file was weighed and declined (repeatable
+     flags and the API mapping cover it; growth stays additive)
+  18. NODE-SYNTAX RENAME: the construct collision (a `property`
+     node in a grammar whose name=value tokens were also called
+     "properties") is cleared by renaming the syntactic concept
+     MODIFIERS throughout the spec (tables' column, S2/S4/S7,
+     timing/watch productions -prop → -mod, the LL(1)
+     modifier-name token, "timing modifier"). Folded: script-spec
+     (Properties section rewritten as the normative home, node
+     tables, grammar, S-rules, lexical rules, references,
+     transcript/event provenance, check-script, sharing,
+     validation lists), user-properties.md (intro, Property
+     sources flattened, Binding script properties, Secret
+     properties at runtime, checking, sharing), cli.md (synopses,
+     run-script prose, examples, selector note), ROADMAP (both
+     synopses, script section, principles bullet, milestones 4-5,
+     milestone-zero JSONC note marked dissolved, decisions-still-
+     needed), blueprint guide + reference (parameters re-keyed,
+     redirect) + cookbook + schema descriptions, the realignment
+     JSONC work item, script-examples/06 (input → property)
+  FOURTH FOLLOW-UP ROUND (owner, 2026-07-21, the naming round):
+  19. THE MECHANISM IS NAMED SCRIPT PROPERTIES; "user properties"
+     names one source — the person's durable file,
+     user.properties. The owner's read: the property-construct
+     round had already moved the mechanism's normative home into
+     script-spec, leaving a doc called "User properties"
+     documenting mostly non-user sources. user-properties.md →
+     script-properties.md (git mv, second rename in this
+     uncommitted set), titled "Script properties"; INTERFACES
+     supporting contract renamed (its authored world-facing
+     surfaces named: the user.properties file and the
+     RELIQUARY_PROPERTY_* spelling), AGENTS contract mentions,
+     ROADMAP (property bullet, script section, milestone list +
+     ordering, milestone 4 heading), api.md contract home,
+     cli.md, blueprint guide companion list, script-spec links,
+     USE-CASES spelling ("the personal user-properties file")
+  20. ONE PACKED ENV VAR weighed and DECLINED (owner floated and
+     retracted in the same message): a single RELIQUARY_PROPERTIES
+     holding name-value pairs would need a quoting grammar for
+     pair packing, collides with the settled RELIQUARY_PROPERTIES
+     file-selection variable, loses one-secret-one-var CI
+     injection, and sits inside platform environment-block size
+     limits; per-key RELIQUARY_PROPERTY_<KEY> stands
 - JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
   design round; all three forks settled on the recommendations):
   - planning/design/machine-blueprint.schema.json +
@@ -1016,10 +1286,12 @@ Small to-do tasks.  Large tasks belong in the roadmap.
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
   - shared JSONC reader for authored documents (blueprints, standalone
-    media definitions, response files): RFC 8259 + // and /* */ comments + trailing commas,
+    media definitions): RFC 8259 + // and /* */ comments + trailing commas,
     nothing more (no JSON5 features); string-aware tokenizer, comments
-    replaced by spaces so error line/col survive; JSON islands in scripts,
-    the property registry, and every machine-written file stay strict JSON
+    replaced by spaces so error line/col survive; JSON islands in scripts
+    and every machine-written file stay strict JSON (the user properties
+    left the JSON family for their own line format, and response files
+    were deleted outright — the format and property-construct rounds)
   - new media definition surface: definition-level description / notes /
     redistributable-under (the built-in URL licensing-assertion field),
     archive-level local-path; sourceless definitions fail resolution with

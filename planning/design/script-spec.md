@@ -16,7 +16,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > still speak the earlier surface and will be retargeted wholesale.
 > `script-examples/design-install.rlqs` is the reference script, and
 > the other files there catalog known residual rough edges in this
-> surface. Embedded media blocks, inputs and property binding,
+> surface. Embedded media blocks, properties and their binding,
 > reactive phases, and the full transcript contract remain later
 > milestones; details may still change before first release.
 
@@ -94,7 +94,7 @@ Three design rules govern the whole surface:
   can classify any token without context. See
   [lexical rules](#lexical-rules).
 - **Nouns declare, verbs act.** Declarative nodes (headers, `media`,
-  `input`, `phase`) begin with a noun; imperative nodes begin with
+  `property`, `phase`) begin with a noun; imperative nodes begin with
   a verb. The declarative zone precedes the imperative zone, and
   the grammar enforces the boundary.
 
@@ -102,14 +102,14 @@ That third rule reflects a deliberate split: **a script is
 declarative about everything reliquary owns, and procedural at the
 seam with the guest.** What is knowable before the run starts is
 declared — the platform, the expected machine state, which phases
-exist, their budgets, the media and inputs. What the guest dictates
+exist, their budgets, the media and properties. What the guest dictates
 is procedural — which key to send, what text to wait for, the order
 its own installer screens arrive in. The guest is a black box that
 cannot be configured, only watched and typed at, so interaction
 with it is necessarily a sequence of acts; everything else is a
 description. Several rules below exist to keep that seam intact —
 notably that a phase is either sequential or reactive but never
-both, that inputs may supply data but never select a branch or a
+both, that properties may supply data but never select a branch or a
 phase, and that there are no author-side conditionals, because the
 only decisions that matter are the guest's. The reasoning is
 recorded under "Procedural and declarative" in
@@ -122,9 +122,9 @@ guest and the timing of observable states can choose among declared
 routes. The transcript records the route actually taken.
 
 Anything computational belongs around scripts in Python: choosing
-which script to run, deriving response values, repeating a failed
+which script to run, deriving property values, repeating a failed
 job from a known machine state, parsing results, and integrating
-with other tools. Inputs supply immutable data to a script;
+with other tools. Properties supply immutable data to a script;
 they do not add expression or decision syntax.
 
 ## Processing model
@@ -146,9 +146,9 @@ tiers:
   Violations are STATIC ERRORs.
 - **Machine rules** — need something beyond the text in scope:
   the visible media catalog, the filesystem, a machine or
-  blueprint, a response set. Capability preflight, slot and
-  drive existence, input binding, and media reconciliation live
-  here ([validation and preflight](#validation-and-preflight)).
+  blueprint, explicit property values. Capability preflight, slot
+  and drive existence, property binding, and media reconciliation
+  live here ([validation and preflight](#validation-and-preflight)).
   Violations are PREFLIGHT ERRORs, raised before any guest
   input.
 - **Dynamic semantics** — the meaning of execution itself
@@ -159,7 +159,7 @@ tiers:
 without a machine it applies every legality rule plus the
 prospective embedded-media validation the visible catalog
 allows; with `--machine`/`--blueprint` (and optionally
-`--responses`) it adds the machine rules. Dynamic semantics are
+explicit property values) it adds the machine rules. Dynamic semantics are
 exercised only by a run. See
 [error classes](#error-classes-and-exit-codes) for how the tiers
 surface to callers.
@@ -173,9 +173,9 @@ surface to callers.
 - `#` begins a comment outside a quoted string or regex.
 - Identifiers use ASCII letters, digits, `.`, `_`, and `-`, must
   start with a letter, and are case-sensitive. Reserved node names
-  (headers, declarations, and verbs) cannot name phases, inputs,
-  or media labels.
-- Properties are written `name=value`, space-separated, after the
+  (headers, declarations, and verbs) cannot name phases, property
+  keys, or media labels.
+- Modifiers are written `name=value`, space-separated, after the
   positional arguments. There are no commas and no colons anywhere
   in the language.
 - Durations require an explicit unit: `ms`, `s`, `m`, or `h`.
@@ -187,7 +187,7 @@ surface to callers.
   are alignment, not syntax.
 - Exactly two adjacencies are load-bearing and admit no
   surrounding space: `name=value` and `key+key` are each one
-  token. `timeout = 5m` is not a property — `timeout` would read
+  token. `timeout = 5m` is not a modifier — `timeout` would read
   as a positional argument — and is a parse error, as is
   `ctrl + c`.
 - A token ends at whitespace, `{`, `}`, or the line terminator,
@@ -207,8 +207,8 @@ Every token class has one spelling:
 | `"..."` | literal text crossing the guest boundary, or a host path | `wait "C:\>"`, `enter "fdapm poweroff"`, `stage "payloads/AUTOTEST.EXE"` |
 | `/.../` | regex match | `wait /[0-9]+ files copied/` |
 | `@name` | external reference, resolved from the library | `insert cdrom0 @freedos-1.4-livecd` |
-| `$name` | run-supplied input value | `insert floppy1 $supplemental-disk` |
-| `name=value` | property of the node it follows | `timeout=5m`, `machine=stopped`, `exclude="with sources"` |
+| `$key` | a declared property's bound value | `insert floppy1 $supplemental-disk` |
+| `name=value` | modifier of the node it follows | `timeout=5m`, `machine=stopped`, `exclude="with sources"` |
 | `5m`, `500ms` | duration | `wait machine=stopped timeout=2m` |
 
 ### Strings
@@ -221,10 +221,10 @@ text:
 |---|---|
 | `\"` | literal `"` |
 | `\\` | literal `\` |
-| `\${` | literal `${` rather than an input reference |
+| `\${` | literal `${` rather than a property reference |
 
-Any other backslash is literal. Inside a string, an input reference
-is written `${name}` and is expanded only where the containing
+Any other backslash is literal. Inside a string, a property reference
+is written `${key}` and is expanded only where the containing
 argument accepts it; a `$` not followed by `{` is literal. String
 content is text and only text: keys never travel inside a string —
 they are `press`'s job.
@@ -252,18 +252,19 @@ dialect is Python's `re` syntax — named deliberately as the
 language's contract rather than inherited as an implementation
 detail: an implementation in another language must provide this
 dialect, not substitute its host's. A regex is a screen condition;
-`machine=` accepts only a machine-state word. Input references are
+`machine=` accepts only a machine-state word. Property references are
 never expanded inside a regex.
 
 ### References
 
 `@name` references a media item by its catalog name; it resolves
 through the shared media library (including definitions the script
-itself embeds). `$name` references a declared
-[input](#inputs-properties-and-response-files) and must stand alone
-as a whole argument; inside strings the braced form `${name}` is
-used instead. Definition sites — the `media` label, the `input`
-name — are bare identifiers; the sigils mark use sites.
+itself embeds). `$key` references a declared
+[property](#properties) and must stand alone
+as a whole argument; inside strings the braced form `${key}` is
+used instead, and dotted keys are valid in both forms. Definition
+sites — the `media` label, the `property`
+key — are bare names; the sigils mark use sites.
 
 ## Core grammar
 
@@ -271,7 +272,7 @@ Every line of every script — outside a `media` island — is one
 structural shape:
 
 ```text
-node = name , { argument } , { property } , [ block ] ;   (* informative *)
+node = name , { argument } , { modifier } , [ block ] ;   (* informative *)
 ```
 
 This is the shape a parser recognizes before typing; conformance
@@ -286,19 +287,20 @@ rule in [lexical rules](#lexical-rules) does not apply: the island
 closes at the `}` that closes its JSON object, so a nested `}`
 alone on a line — which the archive form always contains — does
 not close it, and neither does a `}` inside a JSON string. Script
-tokenization is suspended for the interior; comments and input
+tokenization is suspended for the interior; comments and property
 references have no meaning there.
 
 A typing layer over the node shape supplies the rest of the
 language definition:
 
-- **Ordering.** Header nodes come first, then `media` and `input`
+- **Ordering.** Header nodes come first, then `media` and
+  `property`
   declarations, then either top-level statements (a linear script)
   or `phase` nodes (a phased script). Mixing the two body kinds is
   a parse error.
 - **Signatures.** Each node name fixes its argument types, allowed
-  properties, and whether it takes a block. The complete signature
-  tables follow; an argument or property outside a node's
+  modifiers, and whether it takes a block. The complete signature
+  tables follow; an argument or modifier outside a node's
   signature is a parse error. The tables are informative
   summaries — the typed grammar and the
   [syntactic restrictions](#syntactic-restrictions) govern.
@@ -316,14 +318,14 @@ Header nodes:
 
 Declarations:
 
-| node | arguments | properties | block |
+| node | arguments | modifiers | block |
 |---|---|---|---|
 | `media` | label | — | JSON media definition |
-| `input` | `text`/`media`/`secret`, name | `property`, `prompt` | — |
+| `property` | optional `text`/`media`/`secret`, key | `prompt` | — |
 
 Statements:
 
-| node | arguments | properties | block |
+| node | arguments | modifiers | block |
 |---|---|---|---|
 | `wait` | one condition (string/regex, or `machine=` state) | `timeout`, `stable` | — |
 | `wait` | — (no condition; its handlers carry them) | `timeout` | `on` handlers |
@@ -336,7 +338,7 @@ Statements:
 | `press` | key names | — | — |
 | `select` | string | `exclude` | — |
 | `screenshot` | optional name | — | — |
-| `insert` | slot, `@media` or `$input` | — | — |
+| `insert` | slot, `@media` or `$property` | — | — |
 | `eject` | slot | — | — |
 | `set-boot` | drive keys | — | — |
 | `start` | — | — | — |
@@ -346,7 +348,7 @@ Statements:
 
 And the phase declaration:
 
-| node | arguments | properties | block |
+| node | arguments | modifiers | block |
 |---|---|---|---|
 | `phase` | name | `timeout`, `deadline` | statements, or `always` handlers |
 
@@ -358,7 +360,7 @@ shape. A parser may parse structurally and then type-check, but
 this grammar and the static rules below decide what is legal:
 
 ```text
-script          = { header } , { media-def } , { input-def } ,
+script          = { header } , { media-def } , { property-def } ,
                   ( linear-body | phased-body ) ;
 
 header          = "description" , string , eol
@@ -370,16 +372,16 @@ header          = "description" , string , eol
 
 media-def       = "media" , name , json-island ;
 json-island     = "{" , eol , { json-line } , "}" , eol ;
-input-def       = "input" , ( "text" | "media" | "secret" ) ,
-                  name , { input-prop } , eol ;
-input-prop      = ( "property" | "prompt" ) , "=" , string ;
+property-def    = "property" , [ "text" | "media" | "secret" ] ,
+                  property-key , [ prompt-mod ] , eol ;
+prompt-mod      = "prompt" , "=" , string ;
 
 linear-body     = statement-list ;
 phased-body     = phase , { phase } ;
-phase           = "phase" , name , { timing-prop } , block-open ,
+phase           = "phase" , name , { timing-mod } , block-open ,
                   ( sequential-body | reactive-body ) ,
                   block-close ;
-timing-prop     = ( "timeout" | "deadline" ) , "=" , duration ;
+timing-mod      = ( "timeout" | "deadline" ) , "=" , duration ;
 
 sequential-body = statement-list ;
 reactive-body   = always-handler , { always-handler } ;
@@ -390,14 +392,14 @@ statement-list  = { statement } ;
 
 statement       = observation | action | transfer ;
 transfer        = "goto" , name , eol | "finish" , eol ;
-observation     = "wait" , condition , { watch-prop } , eol
+observation     = "wait" , condition , { watch-mod } , eol
                 | "wait" , [ "timeout" , "=" , duration ] ,
                   block-open , handler , handler , { handler } ,
                   block-close ;
 handler         = "on" , condition ,
                   [ "stable" , "=" , duration ] , block-open ,
                   statement-list , block-close ;
-watch-prop      = ( "timeout" | "stable" ) , "=" , duration ;
+watch-mod       = ( "timeout" | "stable" ) , "=" , duration ;
 
 condition       = string | regex
                 | "machine" , "=" , machine-state ;
@@ -409,7 +411,7 @@ action          = "enter" , string , eol
                 | "select" , string ,
                   [ "exclude" , "=" , string ] , eol
                 | "screenshot" , [ name ] , eol
-                | "insert" , slot , ( media-ref | input-ref ) ,
+                | "insert" , slot , ( media-ref | property-ref ) ,
                   eol
                 | "eject" , slot , eol
                 | "set-boot" , slot , { slot } , eol
@@ -422,7 +424,8 @@ action          = "enter" , string , eol
 block-open      = "{" , eol ;
 block-close     = "}" , eol ;
 media-ref       = "@" , name ;
-input-ref       = "$" , name ;
+property-ref    = "$" , name ;
+property-key    = name ;
 key             = key-name , { "+" , key-name } ;
 
 name            = letter , { letter | digit | "." | "_" | "-" } ;
@@ -455,7 +458,9 @@ copy in canonical strict JSON, which would silently drop them.
 never in a regex. `slot`, `key-name`,
 and `machine-state` values are `name` tokens whose closed
 vocabularies (drive slots, the portable key set, machine states)
-are checked by validation, not the grammar.
+are checked by validation, not the grammar; `property-key` values
+are `name` tokens whose dot-separated segment structure (each
+segment starting with a letter) is likewise validation's rule.
 
 ### Terminating statements
 
@@ -490,21 +495,22 @@ the CFG. Each has a stable id; diagnostics cite them:
 
 - **S1** — syntax is well formed: no unknown node names, no
   unbalanced blocks.
-- **S2** — every argument, property, and block fits its node's
-  signature, including each timing property's placement per the
+- **S2** — every argument, modifier, and block fits its node's
+  signature, including each timing modifier's placement per the
   [placement matrix](#timing).
 - **S3** — each header appears at most once; `entry` appears
   exactly in phased scripts.
-- **S4** — no node carries the same property name twice; a
+- **S4** — no node carries the same modifier name twice; a
   repeat is an error, never a last-wins override.
 - **S5** — names are valid and unique in their namespaces:
   reserved node names are not identifiers, media labels are
-  unique, durations are positive.
-- **S6** — every `$` reference names a declared input.
+  unique, property keys are declared once per script and are not
+  spelled `text`, `media`, or `secret`, durations are positive.
+- **S6** — every `$` reference names a declared property.
 - **S7** — an observation carries **exactly one** condition — a
-  bare string/regex beside a `machine=` property, or two
-  `machine=` properties, are errors — the condition precedes any
-  timing property, the channel is known, and its value is of the
+  bare string/regex beside a `machine=` modifier, or two
+  `machine=` modifiers, are errors — the condition precedes any
+  timing modifier, the channel is known, and its value is of the
   right kind (a state word for `machine=`, never a string).
 - **S8** — a branching `wait` carries no condition of its own,
   has at least two handlers, and appears nowhere inside a
@@ -530,8 +536,8 @@ the CFG. Each has a stable id; diagnostics cite them:
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
-word immediately followed by `=` is a property-key token. Without
-it the node shape is not LL(1) — an argument and a property key
+word immediately followed by `=` is a modifier-name token. Without
+it the node shape is not LL(1) — an argument and a modifier name
 are the same token until the `=` is seen, as in
 `phase formatting timeout=5m`. All static validation —
 terminating-statement checking, transition targets, capability
@@ -561,7 +567,7 @@ surface — the source line as written, never the rewritten core.
 
 ## Header
 
-Header nodes precede embedded media definitions, input
+Header nodes precede embedded media definitions, property
 declarations, and executable content:
 
 ```rlqs
@@ -714,7 +720,7 @@ contain several independently named items, each referenced by
 The body uses exactly the item or archive form documented by the
 [media spec](media-spec.md); scripts do not get a second media
 schema. Several distinctly labeled `media` blocks are allowed. They
-appear after the header and before input declarations.
+appear after the header and before property declarations.
 
 ### Installation into the media library
 
@@ -731,7 +737,7 @@ after the first run without needing the script in scope.
 
 Installation is fail-closed and non-overwriting:
 
-1. Reliquary parses the whole script, binds responses and user
+1. Reliquary parses the whole script, binds its declared
    properties, completes static and capability preflight, and
    validates every embedded definition against the entire shared
    library in memory. No file has been written yet.
@@ -765,8 +771,9 @@ before comparison or serialization, so the installed JSON contains
 an absolute path and retains the same meaning outside the script.
 Downloads and extracted payloads use the ordinary shared caches.
 
-Inputs are not expanded inside a media definition. Sources and
-hashes are authored, reproducible inputs; a `media` input chooses
+Property references are not expanded inside a media definition.
+Sources and
+hashes are authored, reproducible inputs; a `media` property chooses
 among names supplied by embedded definitions and the existing
 library.
 
@@ -778,126 +785,152 @@ unrelated sibling items in the same archive definition do not affect
 the comparison. Any difference is an error before installation,
 naming both definition locations and the colliding media item.
 
-## Inputs, properties, and response files
+## Properties
 
-Inputs externalize run-specific data while keeping control flow
-fixed. Three input types exist initially:
+A script declares the properties it consumes; references supply
+their bound values to statements while control flow stays fixed.
+The declared name *is* the property key every
+[source](script-properties.md) speaks — there is no separate input namespace
+(owner, 2026-07-21 — the property-construct round): a dotted key
+joins the shared personal vocabulary, an undotted key is
+script-scoped by convention, and every supply source speaks the
+same keys.
 
 ```rlqs
-input text owner-name property="identity.full-name" prompt="Registered owner"
-input media supplemental-disk prompt="Supplemental disk"
-input secret product-key property="products.windows-98.install-key"
+property identity.full-name prompt="Registered owner"
+property media supplemental-disk prompt="Supplemental disk"
+property secret products.windows-98.install-key
 ```
 
-- `text` is immutable text supplied to action arguments such as
+A declaration is `property [type] <key>` with an optional
+`prompt=` modifier. The type is one of three:
+
+- `text` — immutable text supplied to action arguments such as
   `enter`, `type`, and `select`. It cannot parameterize watch
-  conditions, phase names, paths, or control flow.
-- `media` is the name of a defined media item. It is valid only
-  where a media argument is expected, such as `insert`.
-- `secret` is protected immutable text. It may be expanded only in
+  conditions, phase names, paths, or control flow. `text` is the
+  default when the type is omitted.
+- `media` — the name of a defined media item, valid only where a
+  media argument is expected, such as `insert`.
+- `secret` — protected immutable text. It may be expanded only in
   `enter` and `type`; its value and expanded argument are omitted
   from transcripts and diagnostics.
-- `property` optionally binds the input to a key in the
-  [user property registry](property-registry.md). The quoted key is
-  literal and cannot contain an input reference.
-- `prompt` is optional user-facing text; the input name is used
-  when it is omitted.
 
-References use `$name` as a whole argument and `${name}` inside
-strings:
+The three type words are reserved in the type position; a key
+spelled exactly `text`, `media`, or `secret` is rejected with a
+named diagnostic. `prompt=` is the user-facing text the
+interactive ask presents; the key is shown when it is omitted. A
+key is declared once per script — a duplicate declaration is a
+static error — and referenced as often as needed, so one bound
+value serves every use of the key.
+
+References use `$key` as a whole argument and `${key}` inside
+strings; dotted keys are valid in both forms:
 
 ```rlqs
-enter "setup /owner=${owner-name}"
+enter "setup /owner=${identity.full-name}"
 insert floppy1 $supplemental-disk
-type "${product-key}"
+type "${products.windows-98.install-key}"
 ```
 
-A `media` input must occupy the whole media argument; it cannot be
-interpolated into text. A `text` input may appear more than once in
-an ordinary quoted input string. Input references are not
+A `media` property must occupy the whole media argument; it
+cannot be interpolated into text. A `text` property may appear
+more than once in an ordinary quoted string. Property references
+are not
 expressions and cannot control watch conditions, transitions, or
-phase selection. A `secret` input follows the text interpolation
-rules only inside `enter` and `type`.
+phase selection. A `secret` property follows the text
+interpolation rules only inside `enter` and `type`.
 
-That prohibition also bounds what any binding source can
-customize: no input — whatever supplies it — can retarget a
+That prohibition also bounds what any source can
+customize: no property — whatever supplies it — can retarget a
 script at a different-language installer, whose every screen
 differs. Locale-class customization is a *composition* seam owned
 by the machine blueprint, which selects the media/script pair;
-value seams (blueprint parameters, properties, responses) supply
+value seams supply
 data only, and each script stands alone against the guest it was
 written for (U5; see [customization
 seams](machine-blueprint.md#customization-seams)).
 
-Values can be supplied explicitly in a JSON response file:
+### The property sources
 
-```json
-{
-  "owner-name": "Paul Galbraith",
-  "supplemental-disk": "freedos-1.4-bonus"
-}
-```
+Before the machine starts, reliquary binds each declared property
+from the first source that answers. Everything that can answer is
+a property source, in one flattened order; each source answers
+for a different owner (owner, 2026-07-21 — the property-construct
+round). This list is normative; other documents summarize it and
+link here:
 
-```powershell
-rlq script freedos-plain-install --blueprint freedos --responses answers.json
-```
+1. **An explicit CLI value** — *the caller's* answer for this
+   invocation: a repeatable `--property <key>=<value>`; the API
+   twins take the same values as their in-memory `properties=`
+   mapping under parity. It beats everything, the design
+   included. A key given twice is an error, and every explicitly
+   supplied key must be declared by the running script — an
+   unknown key is a preflight error, never a silent ignore.
+2. **A [blueprint
+   parameter](machine-blueprint-reference.md#parameters)** —
+   *the design's* answer, for every machine of the blueprint: a
+   direct value, or a *redirect* (`{"property": "<key>"}`) that
+   resolves another key through the remaining sources below.
+   Parameters never chain through other parameters, and a
+   redirect replaces resolution of the declared key entirely —
+   never falling back to it.
+3. **The environment** — `RELIQUARY_PROPERTY_*` ([spelling and
+   mangling](script-properties.md#property-sources)): *the
+   session's* standing values, the CI injection path. An ambient
+   variable never overrides a designed value; the explicit flag
+   above is the override path.
+4. **The user properties file** — `user.properties`, or the file
+   selected by `--properties <path>`: *the person's* durable
+   values and secret markers
+   ([script properties](script-properties.md)).
+5. **The interactive ask** — one ask per unresolved key,
+   presented with the declaration's `prompt=` text; the answer
+   serves every reference to the key and is invocation-local,
+   never written back.
 
-A response file is an authored document reliquary only reads, so
-it accepts the JSONC dialect — comments and trailing commas,
-exactly as [library definition
-files](media-spec.md#the-definition-format) do. A harness that
-generates one emits strict JSON and is unaffected: strict JSON is
-a JSONC subset.
+Nothing binds uninvited (owner, 2026-07-21, restated by this
+round): no value reaches a script unless a declaration names its
+key, and the one environment channel is the declared
+`RELIQUARY_PROPERTY_*` spelling, sitting below the design.
 
-Before the machine starts, reliquary validates the response file,
-rejects unknown keys, and binds each input from the first
-available source:
-
-1. an explicit response-file value;
-2. a [blueprint
-   parameter](machine-blueprint-reference.md#parameters) of the
-   target machine's blueprint — a direct value, or a property
-   reference that *replaces* the input's own `property=` binding
-   rather than chaining to it;
-3. the property named by `property=`; or
-4. an interactive prompt.
-
-Prompting requires an interactive context: a terminal, under the
+Asking requires an interactive context: a terminal, under the
 interactive progress renderings (`auto`/`pretty`). Without one — no
 terminal, or an explicit `plain`/`jsonl` progress selection — a
-still-missing value fails before
-execution, so a program can never hang on a hidden prompt. A response file therefore overrides everything for one
-invocation, while a blueprint's designed values override personal
-registry defaults — a blueprint that fixes its user name as
-"testuser" keeps it fixed on every machine of it (U5). Prompted
-values are not written back to the registry. A media value is resolved after binding, and a
-media prompt lists the embedded and existing library names valid
-for that response.
+still-unbound property fails before
+execution, so a program can never hang on a hidden prompt. A
+blueprint's designed values override personal standing defaults —
+a blueprint that fixes its user name as
+"testuser" keeps it fixed on every machine of it — while an
+explicit `--property` overrides even the design for one run
+(U5). A media value is resolved after binding, and a
+media ask lists the embedded and existing library names valid
+for that property.
 
 Ordinary properties are strings. Secret properties keep only a
-marker in `properties.json`; their values live in the host
-credential store. `text` and `media` inputs require ordinary
-properties, while `secret` requires a secret property. Kind
+marker in the properties file; their values live in the host
+credential store. `text` and `media` declarations require
+ordinary stored values, while `secret` requires a secret
+property. Kind
 mismatches fail rather than silently downgrading protected data.
 Blueprint parameters follow the same kind rules, and a `secret`
-input never takes a direct blueprint value — the [field
+declaration never takes a direct blueprint value — the [field
 reference](machine-blueprint-reference.md#parameters) states the
-blueprint-side rules.
-See the [property-registry specification](property-registry.md) for
-its file format, maintenance commands, precise failure rules, and
+blueprint-side rules. A secret never travels through
+`--property` — argv leaks into process listings and shell
+history, exactly the `set-property` rule; the environment may
+supply one (the warned plaintext class), the API mapping may (an
+in-memory value), and the ask enters one without echo.
+See the [script-properties specification](script-properties.md) for
+the file format, maintenance commands, precise failure rules, and
 security boundary.
 
-The transcript records input references and source kinds, never
-expanded values. For a `secret`, it also omits the entire expanded
-input argument, redacts the value from textual diagnostics, and
+The transcript records property keys, redirect targets, and
+supplying sources (flag, parameter, environment, file, or ask) —
+never values. For a `secret`, it also omits the entire expanded
+argument, redacts the value from textual diagnostics, and
 suppresses later automatic failure screenshots. An explicitly
 requested screenshot and the guest's own display, logs, or command
 history remain capable of exposing guest-entered data.
-
-Response files may contain sensitive text and should not be assumed
-safe to commit. A response-file string may override a `secret`
-input, but it is still plaintext in that file; the property
-registry is the normal reusable source for protected values.
 
 ## Execution model
 
@@ -1046,8 +1079,8 @@ activation (the phase deadline's scope), a span per observation
   control passing from script to human and back — so a capture
   session is one run record with mixed drivers.
 
-Events carry input names and binding-source kinds, never
-expanded values; the secret contract applies to the stream
+Events carry property keys and supplying sources, never
+bound values; the secret contract applies to the stream
 exactly as it applies to transcripts.
 
 ## Observations
@@ -1250,7 +1283,7 @@ contain ordered statements, including single-condition `wait`, but
 no handler is dispatched recursively while the action runs.
 
 Handler conditions accept the same channels as `wait`. A `stable`
-property strengthens the condition:
+modifier strengthens the condition:
 
 ```rlqs
 always "Installation complete" stable=1s {
@@ -1473,7 +1506,7 @@ input. `insert` into an occupied slot, and `eject` from an empty
 one, are run errors: media state is explicit, and a swap is
 written as `eject` then `insert`. `insert` accepts a media
 reference (`@name`) or a `media`
-input (`$name`); bare media names are not valid. By execution time
+property (`$key`); bare media names are not valid. By execution time
 every embedded definition has been installed, so resolution uses
 the ordinary shared catalog, then fetches and hash-verifies the
 item as needed. Both verbs work on a running machine (a media
@@ -1578,24 +1611,27 @@ scope, preflight further rejects, naming what it needed:
   directory (the filesystem);
 - `insert`/`eject` slots and `set-boot` drives the target
   machine does not declare (a machine);
-- unknown response keys, missing noninteractive responses, and
-  response values of the wrong type (a response set);
+- explicit `--property` keys the running script does not declare,
+  keys given twice, and still-unbound noninteractive properties
+  (the explicit values);
 - malformed blueprint parameters, direct blueprint values on
-  `secret` inputs, and parameter/input kind mismatches (a
+  `secret` properties, and parameter kind mismatches (a
   blueprint);
-- malformed property bindings, input/property kind mismatches,
-  and required secret credentials unavailable from a secure host
-  store (the registry).
+- environment-name collisions between consulted keys, kind
+  mismatches at the file source, and required secret credentials
+  unavailable from a secure host
+  store (the property sources).
 
 Static analysis warns about unreachable phases, reactive phases
 with no possible exit, obvious shadowed literal conditions, a
 regex containing no regex metacharacters (write the string form),
-inputs
-that are declared but unused, and — with a blueprint in scope —
-blueprint parameters matching no input of any script in its
-`scripts` map.
+properties
+that are declared but unreferenced, and — with a blueprint in
+scope —
+blueprint parameters matching no declared property of any script
+in its `scripts` map.
 
-After binding inputs, preflight computes every capability the
+After binding properties, preflight computes every capability the
 script may require and compares the complete set with the machine's
 configured backend and control planes. Capability failure occurs
 before the first input, naming every unsupported verb and required
@@ -1604,18 +1640,22 @@ later statement is impossible.
 
 ```text
 rlq check-script <script_name>
-    [--machine <id> | --blueprint <name>] [--responses <path>]
+    [--machine <id> | --blueprint <name>]
+    [--property <key>=<value>]... [--properties <path>]
 ```
 
 performs parsing, prospective embedded-media validation, and static
 analysis — including the resolved timing plan, each observation's
 effective timeout, and its source scope — without executing the
-script, changing the user property registry, accessing secret
-values, or writing to `media/`. Supplying a machine and response
-file also performs typed binding — reporting each input's binding
-source (response, blueprint parameter, property, or prompt) — and
+script, changing the user's properties, accessing secret
+values, or writing to `media/`. Supplying a machine (and any
+explicit values) also performs typed binding — reporting each
+declared property's supplying
+source (flag, blueprint parameter — direct or redirect —
+environment, file, or ask) — and
 capability preflight.
-Registry-aware checking reports property presence and kind; it
+Source-aware checking reports property presence, kind, and
+supplying source; it
 never reveals a property value. Its two modes are the two
 checkable tiers of the [processing model](#processing-model);
 the embedding API's twins are `run_script` and `check_script` —
@@ -1709,9 +1749,9 @@ always reported explicitly. A transcript records:
 - phase entries, handler firings, branches, and transitions;
 - observations with their channel, normalized matches, and elapsed
   time;
-- input names and whether each came from a response, a blueprint
-  parameter, a blueprint-referenced or input-named user property,
-  or a prompt, but never expanded input values;
+- declared property keys, each one's supplying source (flag,
+  blueprint parameter, environment, file, or ask) and any
+  redirect target, but never bound values;
 - each media definition installed or found identical, its source
   script line and shared-library path, and verified hashes;
 - the selected backend and control plane for each operation; and
@@ -1749,7 +1789,7 @@ The intended post-beta growth discipline is (G7):
 - new action kinds use explicit sibling forms following the same
   node shape, as future pointer verbs will;
 - new behavior never appears merely because a script omitted a new
-  property; and
+  modifier; and
 - capability requirements remain explicit and preflightable —
   at the granularity of the condition, not only the channel: a
   text condition needs text readback, a landmark reference needs
@@ -1863,14 +1903,15 @@ anyway while the CD remains attached).
 ## Sharing
 
 A shareable blueprint/script bundle consists of its script, machine
-blueprint, any separate shared media definitions, and an example
-response file containing only non-sensitive illustrative values.
+blueprint, any separate shared media definitions, and optionally an
+example properties file containing only non-sensitive illustrative
+values.
 Media definitions embedded in a script are installed on first
 run — into the recipient's home `media/`, or beside the script in
 a project. Definitions already reused
 by several scripts may be distributed directly under `media/`
-instead. The user property registry, personal or secret response
-files, and staged payloads stay out of the bundle and version
-control. A script may recommend property keys, but every recipient
-supplies their own values. Media remains hash-pinned and
+instead. The user's own properties file, secret values, and
+staged payloads stay out of the bundle and version
+control. A script's declarations name its property keys, but every
+recipient supplies their own values. Media remains hash-pinned and
 independently fetched.

@@ -308,20 +308,21 @@ inputs, and the blueprint binds them.
     "verify": "win98-verify"
   },
   "parameters": {
-    "owner-name": "testuser",
-    "install-key": {"property": "products.windows-98.install-key"}
+    "identity.full-name": "testuser",
+    "os.install-key": {"property": "products.windows-98.install-key"}
   }
 }
 ```
 
-`owner-name` is specified directly — every machine installs as
-`testuser` until you edit the value. `install-key` is only
-referred to: each user stores their own key once
+`identity.full-name` is specified directly — every machine installs
+as
+`testuser` until you edit the value. `os.install-key` is
+redirected: each user stores their own key once
 (`rlq set-property products.windows-98.install-key --secret`) and
 the script retrieves it at use; the key never enters the
-blueprint or version control. A response file still overrides
+blueprint or version control. An explicit value still overrides
 either binding for one invocation
-(`rlq run-script install --blueprint win98 --responses answers.json`).
+(`rlq run-script install --blueprint win98 --property identity.full-name="Paul Galbraith"`).
 
 Both are value seams. Installing the *German* edition instead is
 a [composition seam](machine-blueprint.md#customization-seams):

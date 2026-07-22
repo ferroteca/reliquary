@@ -25,7 +25,7 @@ media freedos-livecd {
 # label:  freedos-livecd      -> installs media/freedos-livecd.json
 # item:   freedos-1.4-livecd  -> what @ can actually reference
 
-input media supplemental-disk prompt="Supplemental disk"
+property media supplemental-disk prompt="Supplemental disk"
 
 insert cdrom0 @freedos-1.4-livecd   # the ITEM name — correct
 # insert cdrom0 @freedos-livecd     # the LABEL — WRONG: resolves
@@ -41,18 +41,19 @@ wait "Welcome to FreeDOS 1.4 (LiveCD)"
 #
 #     insert cdrom0  @freedos-1.4-livecd    exactly this catalog item
 #     insert floppy1 $supplemental-disk     whichever item the run
-#                                           supplies (response file,
-#                                           property, or prompt)
+#                                           supplies (an explicit
+#                                           value, parameter,
+#                                           property, or ask)
 #
 # @ promises a specific item; $ defers the choice to run time. Both
 # look equally definite on the page, and both resolve to "a media
-# item" — the reader must recall the input declaration to know one
-# insert is fixed and the other is a variable.
+# item" — the reader must recall the property declaration to know
+# one insert is fixed and the other is a variable.
 #
 # OPEN QUESTIONS: should a single-item definition default its
 # label to its item name (removing the gap in the common case)?
 # Should validation warn when a label is @-referenced and no item
 # shares its spelling (the near-miss above)? The $-definiteness
-# point is likely inherent — inputs exist to defer choices — but a
-# transcript line naming the resolved item at insert time would
-# close the observability half of it.
+# point is likely inherent — properties exist to defer choices —
+# but a transcript line naming the resolved item at insert time
+# would close the observability half of it.

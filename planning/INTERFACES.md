@@ -122,9 +122,12 @@ The primary interfaces do not exhaust what the world touches.
 These contracts are world-facing too, and the vetting rule below
 covers them equally:
 
-- **The property registry** — a user-owned file authored directly
-  in an editor, without passing through any primary interface:
-  [planning/design/property-registry.md](design/property-registry.md).
+- **Script properties** — the mechanism through which scripts
+  consume values. Its authored surfaces face the world without
+  passing through any primary interface: the user-owned
+  `user.properties` file, edited directly in an editor, and the
+  `RELIQUARY_PROPERTY_*` environment spelling:
+  [planning/design/script-properties.md](design/script-properties.md).
 - **The codex** — reliquary's built-in seed content and its
   index: seed-not-a-resolution-tier semantics, never-overwrite,
   delete-to-refresh, provenance, and the licensing rule
@@ -217,7 +220,7 @@ Every approved change then lands the same way:
 | Scripting language | [planning/design/script-spec.md](design/script-spec.md) |
 | Blueprints | [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its [reference](design/machine-blueprint-reference.md) and [cookbook](design/machine-blueprint-cookbook.md) |
 | Media definitions | [planning/design/media-spec.md](design/media-spec.md) |
-| Property registry | [planning/design/property-registry.md](design/property-registry.md) |
+| Script properties | [planning/design/script-properties.md](design/script-properties.md) |
 | The codex | [planning/design/codex.md](design/codex.md) |
 | Home / machines | [planning/design/instance-model.md](design/instance-model.md) |
 | Run records | transcript contract in [planning/design/script-spec.md](design/script-spec.md) |
