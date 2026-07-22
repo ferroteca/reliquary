@@ -847,8 +847,12 @@ selects the properties file, replacing the home's
 ([script properties](script-properties.md#property-sources)).
 
 `--progress (auto | pretty | plain | jsonl)` selects the rendering
-(default `auto`: tty detection; `pretty` forces the live tty
-rendering elsewhere — CI logs that render ANSI, a pager). `jsonl`
+(default `auto`: resolved by whether stderr is a tty; `pretty`
+forces the live tty
+rendering elsewhere — CI logs that render ANSI, a pager). The
+human modes render everything — live progress, the outcome, the
+failure report — to stderr and leave stdout empty: the outcome
+travels by exit code, run record, and `jsonl`. `jsonl`
 is the programmatic
 synchronous form: stdout carries the run's event stream as JSON
 lines and nothing else — the last line is the terminal event, the
@@ -1102,6 +1106,25 @@ seconds. The API twins take numeric seconds natively — the
 literal is CLI presentation, a named divergence like exit codes
 beside exceptions.
 
+### Output discipline
+
+The result is stdout; everything else is stderr (owner,
+2026-07-22). A result-bearing command's pretty stdout is exactly
+the human rendering of what its twin returns — the same value
+`--json` serializes — so tables, screen text, and printed ids
+pipe clean with no flags. Progress, narration, warnings, prompt
+text, and error reports live on stderr; stream-bearing commands'
+human modes render everything there and leave stdout empty
+(`jsonl` is the named exception: its stdout events *are* the
+result). Prompting requires stdin and stderr to both be ttys —
+prompt text on stderr, the answer from stdin. Diagnostics are
+`rlq: <message>` with detail lines indented beneath, warnings
+`rlq: warning: <message>`, and errors name the next command
+where one exists. ANSI and color are emitted per stream, only
+when that stream is a tty; `NO_COLOR` is honored; there is no
+`--color` flag — `--progress pretty` forces live rendering at a
+non-tty.
+
 ### Machine-readable output
 
 `--json` is the global machine-readable switch for result-bearing
@@ -1138,9 +1161,13 @@ Rules:
   carries the full record and never combines with it.
 
 Field names are part of the CLI contract and land with each
-twin's return contract; pre-beta the shapes are closed, and the
-output-stability promise arrives with the general
-programmatic-contract work.
+twin's return contract. The stability contract is settled
+(owner, 2026-07-22): the machine surfaces — exit codes, `--json`
+documents, the `jsonl` event stream, run-record files — grow
+additively only from beta (an existing field never changes type
+or meaning; consumers ignore unknown kinds and fields); pretty
+and plain output are explicitly uncontracted, and pre-beta
+nothing is promised.
 
 There is no bare-script shorthand: an unrecognized command word is
 an error, never a script lookup. `run-script <label>` is the

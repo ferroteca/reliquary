@@ -893,7 +893,10 @@ round): no value reaches a script unless a declaration names its
 key, and the one environment channel is the declared
 `RELIQUARY_PROPERTY_*` spelling, sitting below the design.
 
-Asking requires an interactive context: a terminal, under the
+Asking requires an interactive context: stdin and stderr both
+ttys — prompt text writes to stderr, the answer reads from
+stdin (the CLI output discipline, planning/ROADMAP.md "The
+CLI") — under the
 interactive progress renderings (`auto`/`pretty`). Without one — no
 terminal, or an explicit `plain`/`jsonl` progress selection — a
 still-unbound property fails before
@@ -1082,6 +1085,17 @@ activation (the phase deadline's scope), a span per observation
 Events carry property keys and supplying sources, never
 bound values; the secret contract applies to the stream
 exactly as it applies to transcripts.
+
+The stream is a contracted machine surface (owner, 2026-07-22):
+from beta it grows additively only — new event kinds and new
+fields may appear in any release, an existing field never
+changes type or meaning, and a removal or rename is a breaking
+change — and consumers must ignore unknown event kinds and
+unknown fields. Pre-beta the shapes track this spec with no
+stability promise. The human renderings (`pretty`/`plain`) are
+deliberately uncontracted; the machine surfaces are this
+stream, `--json` documents, exit codes, and the run record's
+files (planning/ROADMAP.md "The CLI").
 
 ## Observations
 

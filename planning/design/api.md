@@ -83,7 +83,12 @@ SPDX-License-Identifier: BSD-3-Clause
   value's string but a secret's marker, exactly as `--json`
   serializes — while a value-or-handle union is never allowed: a
   handle is not a value, which is why a `detach=` mode flag on
-  the blocking twins was declined.
+  the blocking twins was declined. Return shapes are contracted
+  additively from beta (owner, 2026-07-22): new fields may
+  appear, an existing field never changes type or meaning, and a
+  removal or rename is a breaking change — consumers tolerate
+  unknown fields; pre-beta the shapes may change with the specs
+  (the CLI stability contract, planning/ROADMAP.md "The CLI").
 - **Errors — the taxonomy is named** (owner, 2026-07-21):
   blocking forms raise by error class under one root. Python
   spells the root `ReliquaryError` — every deliberate reliquary

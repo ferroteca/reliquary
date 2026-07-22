@@ -277,10 +277,10 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     phases of bare machine ops rendering the same events (2026-07-21,
     blueprint-spec queue item 3); query output is homed (2026-07-21,
     CLI queue item 4: global --json prints the API twin's return as
-    one JSON document — the twin's-return rule); still unhomed: the
-    general stdout/stderr discipline for pretty output across every
-    command, and the stability contracts for the rawjson event
-    schema and the --json shapes
+    one JSON document — the twin's-return rule); the discipline and
+    stability halves CLOSED (2026-07-22, gap-closure queue item 1:
+    the result-is-stdout doctrine + the four contract surfaces) —
+    every half of this entry is now homed
     (the machine-readable mode is now demanded directly by the USE-CASES
     feedback split, 2026-07-21);
     the interaction command family is now IN the settled CLI list
@@ -982,6 +982,81 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      ("Backend adapters" doctrine paragraph, agentless-display
      recognizer sentence, milestone 6 intro), the
      guiding-principles watch list
+- GAP-CLOSURE DESIGN QUEUE (owner-requested, 2026-07-21: the five gaps
+  left standing in the guiding-principles queue above once the
+  blueprint-spec, CLI, API, and property queues closed — itemized for
+  design rounds, in leverage order; everything else open is
+  deliberately parked in ROADMAP "Decisions still needed"):
+  1. RESOLVED (owner, 2026-07-22, design round — all five forks on
+     the recommendations): THE OUTPUT DISCIPLINE — the result is
+     stdout, everything else is stderr: a result-bearing command's
+     pretty stdout is exactly the human rendering of what its twin
+     returns (the same value --json serializes — the parity rule
+     extended to channel placement); progress, narration, warnings,
+     prompt text, and error reports live on stderr, so tables and
+     printed ids pipe clean and announcement lines never pollute a
+     pipe. Stream-bearing commands' human modes (pretty/plain)
+     render EVERYTHING to stderr — stdout stays empty (the outcome
+     travels by exit code, run record, and jsonl, whose stdout
+     events remain the settled exception; an outcome line on stdout
+     was declined as scraper bait); --detach's printed run id stays
+     a result. --progress auto resolves by stderr-is-a-tty (the
+     stream progress renders on); prompting requires stdin AND
+     stderr ttys — prompt text on stderr, answer from stdin
+     (console-device direct access declined: a platform seam, and
+     unsuppressable by redirection). Diagnostics codified:
+     rlq: <message> / rlq: warning: <message>, detail indented,
+     errors name the next command. Color per-stream tty only,
+     NO_COLOR honored, no --color flag (YAGNI as --format). THE
+     STABILITY CONTRACT: the contract surfaces are exactly four —
+     exit codes, --json documents, the jsonl event stream,
+     run-record files; pretty/plain are explicitly uncontracted
+     (the named refusal that keeps scrapers off); growth from beta
+     is additive-only (new kinds/fields may appear; an existing
+     field never changes type or meaning; removal/rename breaks)
+     with consumers ignoring unknown kinds and fields (the
+     BuildKit/LSP lesson); pre-beta no promise, CHANGELOG records
+     shape changes; the version-field spelling stays with the beta
+     format-versioning decision. Folded: ROADMAP "The CLI" (the
+     discipline + stability paragraphs), script-spec (event-stream
+     stability + the precise interactive-context tty definition),
+     api.md returns convention (return-shape stability), cli.md
+     (Output discipline section, --progress prose, --json
+     stability paragraph), media-spec fetch-progress (stderr
+     rendering; its stale "as on `script`" spelling fixed to
+     run-script in passing); per-noun field contracts stay with
+     each noun's spec (api-queue item 5 hybrid). The
+     guiding-principles CLI-contract entry is CLOSED — all four
+     halves homed
+  2. RUN RECORDS FOR PRIMITIVE RUNS, THE RENDERER CONTRACT, AND
+     PER-TEST RESULTS (parent: the U3 run-records entry): whether and
+     how an API/CLI-primitives interaction loop leaves a run record
+     (today only run-script writes one, yet U3 names the record the
+     product); the full renderer contract — transcript.txt respecified
+     as a rendering of run-events.jsonl; and per-test result
+     collection for U3's unit-test loop (granular results the
+     automator parses, selective re-run)
+  3. THE STAGE/COLLECT EXCHANGE MODEL (parent: the U3 stage/collect
+     entry): the declared exchange drive cannot be declared — the
+     blueprint drive vocabulary has no directory-backed kind, the CLI
+     has no file-exchange commands, and only the superseded legacy
+     Runner/root-home surface serves injection; design the model end
+     to end: blueprint vocabulary, the script verbs' backing, CLI
+     commands and API twins under the identity rule
+  4. EXPORT MECHANICS (parent: the U1 export entry + the ROADMAP open
+     decision): the two targets (single-drive media image vs
+     whole-machine native registration), the exact CLI shape and
+     command name, format conversion or not, whether a
+     media-referenced drive blocks whole-machine export or
+     materializes into it, the cross-backend story for U1's
+     install-once-export-to-VirtualBox journey, and the API twin
+     (api.md's named omission — name and twin land together)
+  5. U5 STATUS CLOSEOUT (parent: the U5 blueprint-parameterization
+     entry, "owner adjudication pending"): the recorded design
+     predates the property-construct rounds (parameters re-keyed by
+     property key, references renamed redirects, the response concept
+     deleted); verify the landed shape covers the original gap text
+     and close the entry — expected bookkeeping, not new design
 - THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
   the docker-comparison round; all three forks on the
   recommendations). The docker model largely CONFIRMS the design

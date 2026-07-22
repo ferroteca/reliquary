@@ -519,7 +519,10 @@ and verification event kinds the run-event stream defines
   followers of the run see the fetch as part of it.
 - **Standalone `fetch-media`** renders them itself. `--progress
   (auto | pretty | plain | jsonl)` selects the rendering exactly
-  as on `script`: pretty, live progress on a tty under `auto`;
+  as on `run-script`: pretty, live progress under `auto` when
+  stderr is a tty, the human modes drawing entirely on stderr
+  with stdout left empty (the CLI output discipline,
+  planning/ROADMAP.md "The CLI");
   under `jsonl`, stdout carries the event stream as JSON lines
   and nothing else, the last line the terminal event stating the
   outcome. The stream is ephemeral — media has no state document

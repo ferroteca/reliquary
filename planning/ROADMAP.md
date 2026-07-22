@@ -531,8 +531,51 @@ an event stream, not a document; one flag, one meaning each.
 Secret property values serialize as their marker, never their
 value, and `--verbose` remains pretty-rendering only. Field
 names land with each twin's return contract
-(planning/design/api.md); the output-stability promise stays
-with the general programmatic-contract work.
+(planning/design/api.md).
+
+Output discipline (owner, 2026-07-22): **the result is stdout;
+everything else is stderr**. A result-bearing command's pretty
+stdout is exactly the human rendering of what its twin returns —
+the same value `--json` serializes, on the same stream — so the
+two presentations are two renderings of one value and the parity
+rule extends to channel placement. Progress, narration,
+warnings, prompt text, and error reports live on stderr: tables,
+screen text, and printed ids pipe clean with no flags, and
+announcement lines (a resolved directory header, narration)
+never pollute a pipe. Stream-bearing commands' human modes
+render everything — live progress, the outcome, the failure
+report — to stderr and leave stdout empty: the machine paths are
+`--progress jsonl` (whose stdout events are the result — the
+settled exception) and the run record, and the outcome is the
+exit code; `--detach`'s printed run id remains a result.
+`--progress auto` resolves by whether *stderr* is a tty — the
+stream progress renders on — so piping stdout never degrades the
+live display and redirecting stderr to a log gets `plain`
+automatically. Prompting requires stdin and stderr to both be
+ttys: prompt text writes to stderr, the answer reads from stdin
+(direct console-device access was declined — a platform seam,
+and unsuppressable by redirection). Diagnostics are
+`rlq: <message>` with detail lines indented beneath, warnings
+`rlq: warning: <message>`, and errors name the next command
+where one exists. ANSI and color are emitted per stream, only
+when that stream is a tty; `NO_COLOR` is honored; there is no
+`--color` flag (`--progress pretty` remains the way to force
+live rendering at a non-tty).
+
+The stability contract (owner, 2026-07-22): the machine
+surfaces are exactly four — exit codes (the error classes),
+`--json` documents, the `jsonl` event stream, and run-record
+files. Pretty and plain output are explicitly uncontracted —
+free to change any release: machine consumers get machine
+surfaces, and nobody freezes the human rendering by depending
+on it. From beta the machine surfaces grow additively only —
+new event kinds and new fields may appear in any release, an
+existing field never changes type or meaning, and a removal or
+rename is a breaking change — and consumers must ignore unknown
+event kinds and unknown fields. Pre-beta there is no stability
+promise; shapes track the specs and the CHANGELOG records
+changes. The version-field spelling stays with the beta
+format-versioning decision ("Decisions still needed").
 
 ```text
 rlq list-blueprints
