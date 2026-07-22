@@ -98,7 +98,7 @@ the parser stack validates scripts; 10–12 close out:
    once-per-episode rearm rule, the timing runtime honoring
    task 4's scoping. Run records keep the superseded
    <timestamp>-<run_id>/ layout (the runs/<n>/ move is
-   milestone 7's, run records).
+   milestone 8's, run records).
    LANDED (owner, 2026-07-22): script_runner.py rebuilt on the
    typed tree — the phase graph, branching-wait dispatch,
    reactive run-to-completion with the once-per-episode rearm,
@@ -120,7 +120,7 @@ the parser stack validates scripts; 10–12 close out:
      tests are deterministic and the suite no longer sleeps.
    - properties parse but do not bind: ${key} and insert $key
      raise a named runtime error until the property family
-     (milestone 6).
+     (milestone 7).
    - NOT YET: the shipped codex and planning/examples scripts
      are old-surface and no longer parse — task 7.
 6. Diagnostics and check-script: failure diagnostics name
@@ -230,20 +230,20 @@ the parser stack validates scripts; 10–12 close out:
 Realignment items riding later milestones (kept here so the
 umbrella list stays complete; not milestone 4):
 
-- the static-conformance fixture corpus (ROADMAP milestone 5,
+- the static-conformance fixture corpus (ROADMAP milestone 6,
   deliverable 6): valid and invalid documents, run against
   both the parsers and the authored JSON Schemas
   (DECISIONS.md, the schema round)
-- the error taxonomy under parity (ROADMAP milestone 7):
+- the error taxonomy under parity (ROADMAP milestone 8):
   ReliquaryError the root; StaticError(2) / PreflightError(3) /
   RunFailure(4) / RunCancelled(5)
-- authored-asset residency (ROADMAP milestone 5): the resolution
+- authored-asset residency (ROADMAP milestone 6): the resolution
   module (--assets / --assets-only), the extension renames
   (.rlqb / .rlqm), the builtins/ → codex/ package-dir rename and
   the codex index, the state blueprint-source field, and
   selection scoping
 - shared JSONC reader for authored documents (ROADMAP
-  milestone 5) — blueprints, standalone media definitions:
+  milestone 6) — blueprints, standalone media definitions:
   RFC 8259 + // and /* */
   comments + trailing commas, nothing more (no JSON5 features);
   string-aware tokenizer, comments replaced by spaces so error
@@ -253,20 +253,20 @@ umbrella list stays complete; not milestone 4):
   features the spec excludes) or position-losing, and the
   comments-become-spaces rule that keeps error line/col exact is
   the unusual requirement to check them against
-- new media definition surface (ROADMAP milestone 5):
+- new media definition surface (ROADMAP milestone 6):
   definition-level description /
   notes / redistributable-under (the built-in URL
   licensing-assertion field), archive-level local-path;
   sourceless definitions fail resolution with the
   edit-the-definition error
-- CLI fetch/clean commands + API parity (ROADMAP milestone 5):
+- CLI fetch/clean commands + API parity (ROADMAP milestone 6):
   fetch_media(), clean_downloads(), clean_media()
 - codex: teaching comments at blueprint seams once the JSONC
-  reader lands (ROADMAP milestone 5)
+  reader lands (ROADMAP milestone 6)
 - the hostdir drive content source (vvfat on the QEMU
-  adapter — ROADMAP milestone 5)
+  adapter — ROADMAP milestone 6)
 - user.properties and the property command family (ROADMAP
-  milestone 6) — use the `keyring` package for the protected host
+  milestone 7) — use the `keyring` package for the protected host
   credential store rather than hand-rolling Windows Credential
   Manager / macOS Keychain / Secret Service backends; its
   (service, username) model takes the spec's scoping directly,
@@ -345,7 +345,7 @@ dependency order:
 - published JSON Schemas elevating reliquary-machine.json into a
   public contract (the blueprint and media-definition schemas
   are authored — DECISIONS.md; the state schema and its
-  public-contract elevation stay with milestone 5)
+  public-contract elevation stay with milestone 6)
 - the adapter API becoming world-facing
   (planning/design/backend-adapter.md is INTERNAL by decision,
   owner 2026-07-21 — a real third-party adapter story elevates

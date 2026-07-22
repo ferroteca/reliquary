@@ -130,7 +130,7 @@ planning/TASKS.md); adapters own drive-image materialization in
 their native formats; adapters provide carriers and control planes
 compose them (one shared fixed-font recognizer serves text
 readback where no native text carrier exists). The doctrine is
-settled ahead; signatures land with the milestone-8 extraction,
+settled ahead; signatures land with the milestone-9 extraction,
 defined by the working code.
 
 ## The machine model
@@ -253,7 +253,7 @@ both parser and schema at realignment, keeps the two aligned.
 Documents carry no `$schema` field pre-beta — editors bind the
 schemas by file association — with `$schema` as the leading
 candidate spelling of the version field at beta ("Decisions
-still needed"). The machine-state schema lands at milestone 5,
+still needed"). The machine-state schema lands at milestone 6,
 once the state format settles.
 
 ### Home layout
@@ -1052,13 +1052,18 @@ in. The seam falls where our knowledge ends:
 declarative form — Kickstart, preseed, AutoYaST, Windows
 `unattend.xml` — in which the author states what the installed
 system should be and the installer does the rest. Where those
-exist they are strictly better, and reliquary should not compete
-with them. It deliberately targets the guests where they do not
-exist: DOS, Win9x, and other systems whose installers accept only
-keystrokes. An answer file is also a form of guest cooperation,
-which G1 forbids depending on. Procedural interaction at the guest
-seam is therefore not a stylistic preference; it is the only thing
-available.
+exist they are strictly better: reliquary does not invent a
+competing declarative install language. For guests that accept
+them, it serves the answer file the way Packer does today — a
+local HTTP server the installer fetches from (milestone 5;
+[planning/design/http-serve.md](design/http-serve.md)).
+Procedural keystroke scripting remains for the guests where
+answer files do not exist: DOS, Win9x, and similar. G1's
+agentless requirement is about the control plane — no dependence
+on a guest agent or other cooperating software for observation
+and input — not a ban on an installer's native answer-file
+path. Using Kickstart (or its kin) is that path; it is not a
+substitute for agentless scripting on guests that lack one.
 
 **Why not fully procedural.** A plain imperative script — the
 AutoHotkey or Expect shape — would be shorter to specify and would
@@ -1123,7 +1128,7 @@ by construction; whole-screen exact match with `fuzzy`/`ignore`
 modifier regions; the `.rlql` catalog form under authored-asset
 resolution — declarations are files, never script content; and the
 always-on cursor normalization contract. What remains open is
-milestone 12's "Decide first" round.
+milestone 13's "Decide first" round.
 
 ## Script authoring by recording
 
@@ -1331,16 +1336,17 @@ whole arc runs from text-mode DOS on QEMU to the GUI era ending
 on Hyper-V. Milestones 1–3 are history: the north-star vertical
 slice, the media library, and the scripting language on its
 first, now-superseded surface. Milestone 4 is complete: the
-tree speaks the July 2026 redesign. Milestones 5–7 complete the
-documented design — the instance model and machine blueprints
-with authored-asset residency, the script properties, and run
-records with asynchronous runs — still for the DOS platform on
-the QEMU backend alone. Only then does the design generalize:
-the adapter seam is extracted from working code (8), proven by a
-second backend (9), and extended with machine mobility (10) and
-native guest agents (11); the arc ends at the GUI era (12) —
-the VNC control plane, GUI installer scripting, and the last
-backends, Hyper-V deliberately last.
+tree speaks the July 2026 redesign. Milestone 5 adds Packer's
+local HTTP server for installer answer files. Milestones 6–8
+complete the documented design — the instance model and machine
+blueprints with authored-asset residency, the script properties,
+and run records with asynchronous runs — still for the DOS
+platform on the QEMU backend alone. Only then does the design
+generalize: the adapter seam is extracted from working code (9),
+proven by a second backend (10), and extended with machine
+mobility (11) and native guest agents (12); the arc ends at the
+GUI era (13) — the VNC control plane, GUI installer scripting,
+and the last backends, Hyper-V deliberately last.
 
 A milestone that needs decisions opens with them: its "Decide
 first" block is the design round to run before its deliverables
@@ -1467,7 +1473,7 @@ semantics reach into `start` reconciliation).
     installed HDD through spike 13's model (blueprint boots
     `hdd0` then `cdrom0`; install script's final `eject` leaves
     a plain `start` booting the hard disk). Exit: north-star done
-    criteria green. Out: full milestone-5 `apply` semantics.
+    criteria green. Out: full milestone-6 `apply` semantics.
 13. **Media-in-script model (complete)** — the machine-state design for
     install media: blueprints declare empty removable drives
     (`"cdrom0": null`) and no installer media — the blueprint
@@ -1486,7 +1492,7 @@ semantics reach into `start` reconciliation).
     inserts the LiveCD into an empty blueprint slot, installs,
     ejects, and a subsequent plain `start` boots the hard
     disk. Out: `apply` (recovery for diverged machines is
-    milestone 5), embedded media blocks, hot-swap polish beyond
+    milestone 6), embedded media blocks, hot-swap polish beyond
     what the install needs. Runs before spike 12, which
     consumes it.
 
@@ -1669,7 +1675,79 @@ in the new surface, `check-script` reports the timing plan, and
 no old-surface syntax or superseded command spelling survives
 anywhere.
 
-### Milestone 5 — The instance model and machine blueprints
+### Milestone 5 — Local HTTP server for installer answer files
+
+Packer's host-side pattern for serving Kickstart, preseed,
+AutoYaST, `unattend.xml`, and kin: during a run, reliquary
+starts an ephemeral local HTTP server that exposes authored
+answer files to the guest installer over the VM network, then
+tears the server down when the run ends. This is how guests
+that already have a declarative installer path consume it —
+not a competing declarative language, and not a replacement for
+agentless keystroke scripting on guests that lack one
+("Procedural and declarative" above;
+[planning/design/http-serve.md](design/http-serve.md)).
+
+Interface triage (planning/INTERFACES.md): strong alignment with
+U1 (unattended install from vendor media) and with U4/U5 where
+Windows and Linux answer files are the installer's native path.
+Surfaces touched: scripting language (declare what is served;
+bind the server's address into typed/entered installer
+arguments), CLI/API (server lifetime bound to the run), and
+authored-asset layout (where the files live). Distinct from the
+deleted property-binding "response file" concept
+(planning/DECISIONS.md) — these are installer answer files only.
+
+Decide first:
+
+- Authored shape: Packer's mutually exclusive
+  `http_directory` (serve a tree) vs `http_content` (path→body
+  map) — which, or both, and where they are declared (script
+  header, blueprint field, sibling asset directory).
+- Address binding: how scripts obtain the host IP and port the
+  guest must fetch (Packer's `{{ .HTTPIP }}` / `{{ .HTTPPort }}`
+  equivalents) without becoming computational (G2) or selecting
+  control flow (G3).
+- Guest reachability on QEMU: which network configuration makes
+  the host server reachable from the guest, and whether that
+  requires a first-class blueprint NIC field now or a
+  QEMU-default / backend-settings interim.
+- Port selection: Packer's random free port in a configurable
+  min/max range (default 8000–9000); pin-to-one-port by
+  setting min=max.
+- Secrets in answer files (product keys, passwords): whether
+  bodies may be property-expanded at serve time, and how
+  transcripts avoid leaking them.
+
+Deliverables:
+
+1. Design recorded in
+   [planning/design/http-serve.md](design/http-serve.md): the
+   Packer-parity contract, the decided authored shape, address
+   binding, lifetime, and network reachability rules.
+2. The ephemeral HTTP server: serve a directory and/or an
+   in-memory path→content map; pick a free port in the
+   configured range; bind only for the run; tear down on every
+   terminal path (success, failure, cancel, crash of the run
+   process).
+3. Script/CLI/API surface for declaring the served content and
+   obtaining the live address for `type`/`enter` (and any boot
+   argument path the decided binding uses), with CLI–API parity.
+4. QEMU guest reachability for the FreeDOS-era networking
+   defaults the milestone settles on — enough that a guest
+   installer can `GET` an answer file from the host server.
+5. A worked example (Kickstart or preseed shape is enough):
+   authored answer file, script that points the installer at
+   `http://<ip>:<port>/…`, and a Done-when path that proves the
+   fetch.
+
+Done when: a scripted install fetches its answer file from
+reliquary's local HTTP server exactly as under Packer — server
+up for the run, address available to the script, file served,
+server gone afterward — and the FreeDOS keystroke install is
+untouched.
+
+### Milestone 6 — The instance model and machine blueprints
 
 The whole machine model beyond milestone 1's core —
 [planning/design/instance-model.md](design/instance-model.md)
@@ -1678,7 +1756,7 @@ plus the [machine blueprint](design/machine-blueprint.md) with its
 [cookbook](design/machine-blueprint-cookbook.md) — still scoped to
 one backend. The `backend` field is parsed and validated in full,
 but with QEMU the only implementation, assignment is trivial; the
-adapter seam that makes it real is milestone 8. Capability checks
+adapter seam that makes it real is milestone 9. Capability checks
 are real from the start, derived from what the QEMU
 implementation can actually do.
 
@@ -1775,7 +1853,7 @@ alone; a process killed mid-operation is detected and recovered
 per the instance model; blueprint edits round-trip through
 `apply-blueprint` with drive-regenerating changes failing closed.
 
-### Milestone 6 — Script properties
+### Milestone 7 — Script properties
 
 All of [planning/design/script-properties.md](design/script-properties.md)
 — the sources script-declared properties bind through. Small and
@@ -1811,7 +1889,7 @@ CLI with no secret material ever in the file, and interrupting an
 update cannot produce a plaintext value or a marker whose
 credential was reported bound but is absent.
 
-### Milestone 7 — Run records and asynchronous runs
+### Milestone 8 — Run records and asynchronous runs
 
 The implementation of "Asynchronous runs" above — the run-events
 stream and everything that renders it — completing the feedback
@@ -1852,7 +1930,7 @@ session; and a failure report names the route and revisits, the
 expired clock and its source scope, the nearest miss, the
 screenshot, and the suggested next command.
 
-### Milestone 8 — The backend adapter seam
+### Milestone 9 — The backend adapter seam
 
 Extract the adapter API from the now-complete QEMU implementation
 — the only adapter with a full control plane set — so the seam is
@@ -1890,7 +1968,7 @@ Deliverables:
 Done when: all QEMU interaction flows through the adapter API and
 the FreeDOS install script passes unchanged.
 
-### Milestone 9 — Second backend: VirtualBox
+### Milestone 10 — Second backend: VirtualBox
 
 The first non-QEMU adapter end to end, proving the adapter API
 against a genuinely different hypervisor. VirtualBox is the
@@ -1915,7 +1993,7 @@ Deliverables:
 Done when: the FreeDOS install script runs unmodified on both
 backends from the same blueprint (minus a pinned backend field).
 
-### Milestone 10 — Machine mobility: clone, export, import
+### Milestone 11 — Machine mobility: clone, export, import
 
 The durable-artifact exits, once two backends make them
 meaningful. Export's design is settled (owner, 2026-07-22).
@@ -1958,7 +2036,7 @@ Done when: an exported FreeDOS machine boots under the backend's
 own tooling, and a machine created from an imported blueprint
 recreates from its bases like any authored machine.
 
-### Milestone 11 — Guest agent communication
+### Milestone 12 — Guest agent communication
 
 Native guest agents as control planes, per
 [planning/design/guest-communication.md](design/guest-communication.md):
@@ -1998,7 +2076,7 @@ Done when: a guest command runs through QGA on QEMU with
 truthful capability reporting, and the agentless suite still
 passes byte-for-byte.
 
-### Milestone 12 — The GUI era: VNC, GUI scripting, and the last backends
+### Milestone 13 — The GUI era: VNC, GUI scripting, and the last backends
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,
@@ -2059,7 +2137,7 @@ Deliverables:
    framebuffer capture, key events, pointer events — behind the
    same input and screen capabilities as agentless display,
    reusing the pixel-level text recognition built for the
-   VirtualBox display plane in milestone 9.
+   VirtualBox display plane in milestone 10.
    `control-planes: ["vnc"]` honored end to end, with a
    capability error naming Hyper-V where it cannot exist.
 2. The three portable input primitives exposed at the
@@ -2092,7 +2170,7 @@ VNC and on Hyper-V through its decided screen strategy.
   round-trip fragments, and the `record` command family (work
   items in planning/TASKS.md).
 - `fork-blueprint` (a fire-and-forget authoring convenience;
-  `new-blueprint` scaffolding lands in milestone 5).
+  `new-blueprint` scaffolding lands in milestone 6).
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.
@@ -2110,7 +2188,7 @@ VNC and on Hyper-V through its decided screen strategy.
   `get-files`' destination default are that round's to settle).
   Value concentrates where out-of-band access thins — non-QEMU
   backends (no `hostdir`) and non-FAT guest filesystems — so
-  sequence at or soon after milestone 9's second backend.
+  sequence at or soon after milestone 10's second backend.
 - Media commands beyond `fetch-media` (verify, remove).
 - A `pytest-reliquary` plugin (per AGENTS.md prior art).
 
@@ -2150,8 +2228,8 @@ lifecycle rules — is consolidated in
 [planning/design/guest-communication.md](design/guest-communication.md).
 The `GuestExec` protocol, the isolated agentless adapter, and
 its use by the DOS workflow are implemented; native-agent
-control planes land at milestone 11 and the VNC plane at
-milestone 12. Agentless DOS operation remains the permanent base
+control planes land at milestone 12 and the VNC plane at
+milestone 13. Agentless DOS operation remains the permanent base
 no milestone may weaken.
 
 ## Roadmap constraints

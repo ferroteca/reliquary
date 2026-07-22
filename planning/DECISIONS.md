@@ -19,6 +19,30 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- MILESTONE INJECTION: LOCAL HTTP SERVER FOR INSTALLER ANSWER
+  FILES — DECIDED (owner, 2026-07-22). A new ROADMAP milestone 5
+  lands Packer's ephemeral local HTTP server for Kickstart /
+  preseed / AutoYaST / `unattend.xml` and kin
+  (planning/design/http-serve.md). Former milestones 5–12 renumber
+  to 6–13. Interface triage (planning/INTERFACES.md): strong
+  alignment with U1 and with U4/U5 where those answer files are
+  the installer's native path — easy approval; no use-case
+  amendment. Surfaces named: scripting language, CLI/API (run-
+  scoped server lifetime), authored-asset layout. Distinct from
+  the deleted property-binding "response file" concept (same
+  file, THE RESPONSE CONCEPT DELETED). The "Procedural and
+  declarative" ROADMAP prose is amended: where answer files
+  exist they are served Packer-style rather than competed with;
+  G1 remains the agentless control-plane rule, not a ban on the
+  installer's own answer-file path. Historical DECISIONS entries
+  keep the milestone numbers of their time; forward-looking
+  pointers in ROADMAP, TASKS, and design status notes move with
+  the renumber. Folded: ROADMAP (synopsis, procedural/declarative,
+  milestones 5–13, Horizon, guest-communication closing),
+  planning/design/http-serve.md (new), TASKS forward refs,
+  backend-adapter / guest-communication / landmarks status
+  banners.
+
 - PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
   2026-07-22), following the no-JSON-in-scripts round that made it
   possible. The grammar lives in reliquary/script_grammar.lark,

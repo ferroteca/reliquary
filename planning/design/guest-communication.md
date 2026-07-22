@@ -16,8 +16,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > backend-neutral: `GuestExec` and the control-plane vocabulary
 > apply to every backend adapter
 > ([backend-adapter.md](backend-adapter.md)). Native-agent
-> control planes land at planning/ROADMAP.md milestone 11, the
-> VNC plane at milestone 12. This document does not by itself
+> control planes land at planning/ROADMAP.md milestone 12, the
+> VNC plane at milestone 13. This document does not by itself
 > authorize further implementation.
 
 ## Purpose

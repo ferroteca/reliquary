@@ -12,9 +12,9 @@ SPDX-License-Identifier: BSD-3-Clause
 > this is recorded in planning/TASKS.md). This document settles the
 > seam's shape: the layering, the seam inventory, the capability
 > and ownership doctrines, and the non-goals. Method signatures and
-> exact types are deliberately absent: they land at the milestone-8
+> exact types are deliberately absent: they land at the milestone-9
 > extraction, defined by the working QEMU implementation per that
-> milestone's own doctrine (planning/ROADMAP.md "Milestone 8 — The
+> milestone's own doctrine (planning/ROADMAP.md "Milestone 9 — The
 > backend adapter seam").
 
 ## What the adapter API is
@@ -196,7 +196,7 @@ materialization.
 
 ## Extraction map
 
-The milestone-8 work, stated as movements of working code:
+The milestone-9 work, stated as movements of working code:
 
 - `lifecycle.py` discovery, launch, QMP session, and
   identity-verification code → the QEMU adapter.
