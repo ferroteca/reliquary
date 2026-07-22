@@ -372,8 +372,6 @@ dependency order:
 ## Wishlist
 
 - allow specifying the cache location outside the home dir
-- 'list-blueprints' should announce the blueprints directory on
-  its top line (instead of the home-dir announcement)
 - new command diff-blueprint <name>: diff the user blueprint
   against the codex blueprint of the same name
 - CLI, from cli help: --version should be `version` with an

@@ -195,16 +195,81 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--builtin must not include local blueprints")
 
     def test_list_blueprints_default_is_local(self):
-        """Default list-blueprints shows only local blueprints."""
+        """Default list-blueprints shows the local blueprint and its path."""
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
                 "--home", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
-        output = stdout.getvalue().strip().splitlines()
-        self.assertIn("plain", output,
-                      "default must include local blueprint 'plain'")
+        output = stdout.getvalue()
+        self.assertIn("plain", output)
+        self.assertIn(
+            os.path.join(self.home, "blueprints", "plain.json"), output)
+        header = output.splitlines()[0]
+        self.assertTrue(header.startswith("NAME"))
+        self.assertTrue(header.endswith("PATH"))
+
+    def test_list_blueprints_empty_has_no_column_headers(self):
+        """An empty home reports absence, not a headerless table."""
+        empty_home = tempfile.TemporaryDirectory()
+        self.addCleanup(empty_home.cleanup)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", empty_home.name, "list-blueprints",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("NAME", output)
+        self.assertIn("no blueprints", output)
+
+    def test_list_blueprints_scans_home_recursively(self):
+        """A blueprint nested outside blueprints/ is still found."""
+        nested = os.path.join(self.home, "archive", "nested")
+        os.makedirs(nested)
+        nested_path = os.path.join(nested, "nested.rlqb")
+        with open(nested_path, "w", encoding="utf-8") as handle:
+            json.dump({
+                "platform": "dos",
+                "drives": {"hdd": {"size": "20M"}},
+            }, handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list-blueprints",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn(nested_path, stdout.getvalue())
+
+    def test_list_blueprints_ignores_cache_dir(self):
+        """A JSON file under cache/ is never reported as a blueprint."""
+        cache_machine_dir = os.path.join(
+            self.home, "cache", "machines", "plain-0")
+        os.makedirs(cache_machine_dir)
+        with open(os.path.join(cache_machine_dir, "state.json"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({"platform": "dos"}, handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list-blueprints",
+            ])
+        self.assertEqual(result, 0)
+        self.assertNotIn("cache", stdout.getvalue())
+
+    def test_list_blueprints_ignores_unrelated_json(self):
+        """A same-extension file without a platform field is skipped."""
+        with open(os.path.join(self.home, "blueprints", "notes.json"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({"items": {}}, handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list-blueprints",
+            ])
+        self.assertEqual(result, 0)
+        self.assertNotIn("notes", stdout.getvalue())
 
     def test_delete_blueprint(self):
         stdout = io.StringIO()

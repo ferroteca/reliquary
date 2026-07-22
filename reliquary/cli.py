@@ -18,7 +18,9 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import read_vm_state, stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .home import blueprints_dir, media_dir, scripts_dir, set_home
+from . import jsonc
+from .home import (blueprints_dir, cache_dir, effective_home, media_dir,
+                   scripts_dir, set_home)
 from .library import (list_builtin_blueprints, list_builtin_media,
                       seed_blueprint, seed_media, seed_script)
 from . import blueprint as blueprint_mod
@@ -487,18 +489,52 @@ def _list_blueprints(arguments):
         for name in names:
             print(name)
         return 0
-    blueprints_path = blueprints_dir(arguments.home)
-    names = []
-    if os.path.exists(blueprints_path):
-        names = sorted(
-            entry[:-5] for entry in os.listdir(blueprints_path)
-            if entry.endswith(".json"))
-    if not names:
-        print(f"(no blueprints in {blueprints_path})")
+    home_path = effective_home(arguments.home)
+    cache_path = cache_dir(arguments.home)
+    found = []
+    for root, dirs, files in os.walk(home_path):
+        if os.path.abspath(root) == cache_path:
+            dirs[:] = []
+            continue
+        if os.path.abspath(root) == home_path and "cache" in dirs:
+            dirs.remove("cache")
+        for entry in files:
+            if entry.endswith(".rlqb"):
+                found.append(os.path.join(root, entry))
+            elif entry.endswith(".json") and _looks_like_blueprint(
+                    os.path.join(root, entry)):
+                found.append(os.path.join(root, entry))
+    if not found:
+        print("(no blueprints)")
         return 0
-    for name in names:
-        print(name)
+    rows = []
+    for path in sorted(found):
+        stem = os.path.basename(path)
+        for extension in (".rlqb", ".json"):
+            if stem.endswith(extension):
+                stem = stem[:-len(extension)]
+                break
+        rows.append((stem, path))
+    name_width = max([4] + [len(name) for name, _ in rows])
+    print(f"{'NAME':<{name_width}}  PATH")
+    for name, path in rows:
+        print(f"{name:<{name_width}}  {path}")
     return 0
+
+
+def _looks_like_blueprint(path):
+    """Whether a legacy ``.json`` file's top level looks like a blueprint.
+
+    A cheap discriminator only, so a recursive home scan does not
+    mistake a same-extension media definition for a blueprint;
+    actual loading still validates fully.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            value = jsonc.load(handle)
+    except (OSError, ValueError):
+        return False
+    return isinstance(value, dict) and "platform" in value
 
 
 def _list_media(arguments):

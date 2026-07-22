@@ -27,6 +27,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   install script using OpenBSD autoinstall over the run-scoped HTTP
   server.
 
+### Changed
+
+- `list-blueprints` (local listing) now scans the whole reliquary
+  home recursively instead of only `blueprints/`, skipping
+  `cache/`, and reports each blueprint's name alongside its full
+  path.
+
 ## 0.1.0.dev1 - 2026-07-22
 
 ### Added
