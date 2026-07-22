@@ -507,9 +507,9 @@ and verification event kinds the run-event stream defines
 - **Inside a script run**, the events ride the run's own stream;
   followers of the run see the fetch as part of it.
 - **Standalone `fetch-media`** renders them itself. `--progress
-  (auto | tty | plain | rawjson)` selects the rendering exactly
+  (auto | pretty | plain | jsonl)` selects the rendering exactly
   as on `script`: pretty, live progress on a tty under `auto`;
-  under `rawjson`, stdout carries the event stream as JSON lines
+  under `jsonl`, stdout carries the event stream as JSON lines
   and nothing else, the last line the terminal event stating the
   outcome. The stream is ephemeral — media has no state document
   and there is no fetch record: nothing persists, and there is
@@ -527,9 +527,9 @@ source names them, hashing and extraction render as elapsed-only
 phases with no invented denominators, and each mirror attempt is
 its own event, so a follower sees the walk. The renderer modes
 are noninteractive exactly as on `script`: under `plain` and
-`rawjson` the [mismatched-file checkpoint](#mismatched-files)
+`jsonl` the [mismatched-file checkpoint](#mismatched-files)
 below never prompts — an unapproved mismatch fails fast, the
-documented programmatic behavior — while `auto`/`tty` map it to
+documented programmatic behavior — while `auto`/`pretty` map it to
 the interactive checkpoint.
 
 ### Mismatched files

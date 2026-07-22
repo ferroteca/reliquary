@@ -510,7 +510,7 @@ the two presentations cannot drift. A twin that returns nothing
 prints `{}` on success, letting a program pass `--json`
 unconditionally; stream-bearing commands (`run-script`,
 `run tail`, `fetch-media`) reject `--json` naming
-`--progress rawjson` — a run is
+`--progress jsonl` — a run is
 an event stream, not a document; one flag, one meaning each.
 Secret property values serialize as their marker, never their
 value, and `--verbose` remains pretty-rendering only. Field
@@ -552,11 +552,11 @@ rlq type <text> (--blueprint <name> | --machine <id>)
 rlq enter <line> (--blueprint <name> | --machine <id>)
 rlq press <key>... (--blueprint <name> | --machine <id>)
 rlq exec <command> (--blueprint <name> | --machine <id>)
-    [--timeout <seconds>]
+    [--timeout <duration>]
 rlq select <item> (--blueprint <name> | --machine <id>)
-    [--exclude <text>]... [--timeout <seconds>]
+    [--exclude <text>]... [--timeout <duration>]
 rlq wait <condition> (--blueprint <name> | --machine <id>)
-    [--timeout <seconds>]
+    [--timeout <duration>]
 rlq screen (--blueprint <name> | --machine <id>)
 rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
 rlq insert-media <slot> <media> (--blueprint <name> | --machine <id>)
@@ -1242,7 +1242,7 @@ in USE-CASES (the artifact-residency split) and INTERFACES
 **Two presentations, under parity.** The CLI carries
 `run-script --detach`, the `run` noun family — `run status`,
 `run tail` (rendering per the decided progress vocabulary:
-pretty on a tty, plain and rawjson for programs), `run wait`
+pretty on a tty, plain and jsonl for programs), `run wait`
 (its exit code mirrors the run's outcome, so unbound languages
 get results by waiting), `run cancel [--stop]`, and
 `run delete <n> [<n> ...]` — and
@@ -1263,18 +1263,18 @@ sync forms are twins in capability but divergent in presentation
 result and raises by error class, while the foreground
 `run-script` command speaks the stream and its exit code.
 Rendering is
-selected explicitly with `--progress (auto | tty | plain |
-rawjson)` (default `auto`, tty detection — the decided BuildKit
+selected explicitly with `--progress (auto | pretty | plain |
+jsonl)` (default `auto`, tty detection — the decided BuildKit
 vocabulary) on the stream-bearing commands — `run-script`,
-`run tail`, and `fetch-media`. Under `rawjson`, stdout carries the event stream as
+`run tail`, and `fetch-media`. Under `jsonl`, stdout carries the event stream as
 JSON lines and nothing else, ever — diagnostics go to stderr —
 and because the stream ends with the terminal event, the last
 line is the machine-readable result: no separate result mode
 exists. Prompting is confined to interactive contexts (a tty
-under `auto`/`tty`); `plain`/`rawjson` runs are noninteractive,
+under `auto`/`pretty`); `plain`/`jsonl` runs are noninteractive,
 so a missing input value is a PREFLIGHT ERROR before the machine
 starts and a program can never hang on a hidden prompt. This
-settles renderer selection and rawjson stdout purity for the
+settles renderer selection and jsonl stdout purity for the
 stream-bearing commands now; the general stdout/stderr
 discipline and output-stability contract across every command
 remains queued (TASKS).
@@ -1284,10 +1284,10 @@ movement emits the same transfer and verification event kinds
 wherever it happens; only where they land differs. Inside a
 script run they ride the run's stream (the transfer events
 above). Standalone `fetch-media` renders them itself under the same
-`--progress` vocabulary — rawjson stdout purity and the
+`--progress` vocabulary — jsonl stdout purity and the
 no-prompt rule included, so the mismatched-file checkpoint
-prompts only under `auto`/`tty` and fails fast under
-`plain`/`rawjson`. The stream is ephemeral: media has no state
+prompts only under `auto`/`pretty` and fails fast under
+`plain`/`jsonl`. The stream is ephemeral: media has no state
 document and there is no fetch record — nothing persists,
 nothing reattaches; run records remain the only recorded
 outputs. Machine operations that fetch implicitly outside a run

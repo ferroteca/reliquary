@@ -240,10 +240,10 @@ blueprint and script:
 
 | artifact | pattern | example |
 |---|---|---|
-| blueprint | `<name>.json` | `freedos-1.4-plain.json` |
+| blueprint | `<name>.rlqb` | `freedos-1.4-plain.rlqb` |
 | script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
-| script-aligned media | `<blueprint>-<script-id>-<drive>.json` | `freedos-1.4-plain-install-cdrom.json` |
-| shared media | `<name>.json` | `freedos-1.4-livecd.json` |
+| script-aligned media | `<blueprint>-<script-id>-<drive>.rlqm` | `freedos-1.4-plain-install-cdrom.rlqm` |
+| shared media | `<name>.rlqm` | `freedos-1.4-livecd.rlqm` |
 
 A media definition that is specific to one script's step — the
 installer CD that script inserts, a driver disk it stages — uses the
@@ -529,7 +529,10 @@ rlq export (--blueprint <name> | --machine <id>)
 
 Takes a durable artifact out of an ephemeral machine. (Export's
 shape is still open; under the identity rule its final command
-name and API twin land together when it settles.) Two targets:
+name and API twin land together when it settles.) With `--drive`,
+`<destination>` is required — nothing is guessed about filename
+or format; whole-machine export defaults to the backend's native
+machine location. Two targets:
 
 - **A media image** — a single drive taken out as a standalone image:
   `rlq export --drive hdd0 D:\exports\dos-disk.qcow2 --blueprint freedos`
@@ -635,7 +638,7 @@ rlq press ctrl+alt+delete -m freedos-0
 ### Executing guest commands
 
 ```
-rlq exec <command> (--blueprint <name> | --machine <id>) [--timeout <seconds>]
+rlq exec <command> (--blueprint <name> | --machine <id>) [--timeout <duration>]
 ```
 
 `exec` is the composite convenience: `enter` plus the platform
@@ -656,7 +659,7 @@ rlq exec "dir C:\*.exe" -b freedos --timeout 120
 
 ```
 rlq screen (--blueprint <name> | --machine <id>)
-rlq wait <condition> (--blueprint <name> | --machine <id>) [--timeout <seconds>]
+rlq wait <condition> (--blueprint <name> | --machine <id>) [--timeout <duration>]
 rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
 ```
 
@@ -687,7 +690,7 @@ rlq screenshot boot-menu -b freedos
 
 ```
 rlq select <item> (--blueprint <name> | --machine <id>)
-    [--exclude <text>]... [--timeout <seconds>]
+    [--exclude <text>]... [--timeout <duration>]
 ```
 
 `select` picks an entry in a cursor-key menu by its normalized
@@ -828,12 +831,14 @@ when the script expects `running` (the default), failing when a
 steps. `--display` shows the backend's console
 window; `--responses` binds a JSON file of input values.
 
-`--progress (auto | tty | plain | rawjson)` selects the rendering
-(default `auto`: tty detection). `rawjson` is the programmatic
+`--progress (auto | pretty | plain | jsonl)` selects the rendering
+(default `auto`: tty detection; `pretty` forces the live tty
+rendering elsewhere — CI logs that render ANSI, a pager). `jsonl`
+is the programmatic
 synchronous form: stdout carries the run's event stream as JSON
 lines and nothing else — the last line is the terminal event, the
 machine-readable result — diagnostics go to stderr, and the exit
-code carries the outcome. `plain` and `rawjson` never prompt: a
+code carries the outcome. `plain` and `jsonl` never prompt: a
 missing input value fails preflight instead of hanging a program.
 
 `check-script` runs preflight only: parsing, static control-flow
@@ -847,7 +852,7 @@ guest steps.
 ```powershell
 rlq run-script install --blueprint freedos-1.4-plain --display
 rlq run-script install --blueprint freedos-1.4-plain --responses answers.json
-rlq run-script install --blueprint freedos-1.4-plain --progress rawjson
+rlq run-script install --blueprint freedos-1.4-plain --progress jsonl
 
 rlq check-script freedos-1.4-plain-install
 rlq check-script install --blueprint freedos-1.4-plain
@@ -880,7 +885,7 @@ Runs number monotonically per machine (`<machine-id>/<n>`); the
 `run` operations take the number positionally and default to the
 machine's latest run. `run tail` renders live progress
 (`--progress` as on `run-script`: pretty on a tty, `plain` or
-`rawjson` for programs) and Ctrl-C stops
+`jsonl` for programs) and Ctrl-C stops
 tailing without touching the run; `run wait` blocks until the
 terminal event and exits with the run's own outcome code, so a
 shell script or unbound language gets the result by waiting;
@@ -953,19 +958,28 @@ standalone convenience.
 `--script` installs that script's embedded definitions before
 fetching, without executing guest steps. `--progress` selects
 rendering as on `run-script` — pretty live progress on a tty under
-`auto`; `rawjson` emits pure event JSON on stdout, the last line
-the terminal event stating the outcome. `plain` and `rawjson`
+`auto`; `jsonl` emits pure event JSON on stdout, the last line
+the terminal event stating the outcome. `plain` and `jsonl`
 never prompt: a hash mismatch without `--refetch-mismatched`
 fails fast.
 
+The media name is always required — exactly the twin
+`fetch_media(name, script=)`; `--script` supplies definitions,
+it never selects what to fetch (a fetch-everything-for-a-script
+convenience would be its own named growth if real use demands
+one).
+
 ```powershell
 rlq fetch-media freedos-1.4-livecd
-rlq fetch-media --script freedos-plain-install
+rlq fetch-media freedos-1.4-livecd --script freedos-plain-install
 ```
 
 `clean-downloads` reclaims cached source archives under
 `cache/downloads/`. `clean-media` reclaims fetched payload files
-under `cache/media/` that reliquary can re-fetch. Nothing
+under `cache/media/` that reliquary can re-fetch. The `clean-`
+noun names the cache directory it reclaims, never an artifact
+class — `list-media` lists definitions in `media/`, `clean-media`
+reclaims `cache/media/`. Nothing
 irreplaceable — definitions, `local-path` files, sourceless
 payloads — is cleanable.
 
@@ -1021,7 +1035,7 @@ ordinary or vice versa — require `unset-property` first.
 
 ```
 rlq <command> [args...] [--home <path>] [--blueprint <name>]
-    [--machine <id>] [--timeout <seconds>] [--json]
+    [--machine <id>] [--timeout <duration>] [--json]
 ```
 
 Flags are the command's parameters, mirroring its API twin's
@@ -1051,8 +1065,13 @@ don't operate on a machine (`list-*`, `search-*`, `fetch-media`,
 the property family, `clean-*`, `new-blueprint`,
 `delete-blueprint`, `seed-*`, `import-vm`) ignore them.
 
-`--timeout` sets a per-command timeout in seconds where applicable
-(runtime defaults vary by command).
+`--timeout` sets a per-command timeout where applicable (runtime
+defaults vary by command). It accepts the script language's
+duration literals (`500ms`, `30s`, `20m` — one duration
+vocabulary, defined in the script spec); a bare integer means
+seconds. The API twins take numeric seconds natively — the
+literal is CLI presentation, a named divergence like exit codes
+beside exceptions.
 
 ### Machine-readable output
 
@@ -1080,7 +1099,7 @@ Rules:
   a program may pass `--json` unconditionally on any
   result-bearing command.
 - Stream-bearing commands (`run-script`, `run tail`,
-  `fetch-media`) reject `--json`, naming `--progress rawjson`: a
+  `fetch-media`) reject `--json`, naming `--progress jsonl`: a
   live run is an event stream, not a document — one flag, one
   meaning each.
 - Secret property values never serialize; the marker

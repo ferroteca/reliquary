@@ -704,28 +704,45 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       two spellings are identical, synopses canonically show
       flags after the command; the cli.py SUPPRESS workaround
       retires at implementation realignment
-  11. progress-mode names (revisits a settled spelling — flagged,
-      not decided): `rawjson` emits JSON lines, and `jsonl` is the
-      precise term; `tty` as the forced-pretty mode is odd since
-      forcing is wanted precisely when off-tty — `pretty` says what
-      it does (auto|pretty|plain|jsonl)
-  12. cli.md staleness the blueprint-queue item-6 sweep missed: hex
-      ids `a1b2` (start/stop, apply error, recreate, keys, and hmp
-      examples) and `f3e4d5c6` (clone); the naming-conventions table
-      still shows blueprints and media as `.json` (settled: .rlqb /
-      .rlqm); synopsis lines alternate `rlq` and `reliquary` — pick
-      `rlq` throughout
-  13. small underspecifications, one sweep: `--timeout` takes bare
-      seconds while the language's durations carry units (30s, 20m)
-      — accept the same literals; `fetch`'s synopsis makes
-      <media_name> required but the `fetch --script ...` example
-      omits it — spell the grammar; `export --drive` doesn't say
-      whether <destination> is required or what it defaults to;
-      `hmp` is a QEMU-specific top-level verb in a four-backend
-      design (the interaction family is already marked open — home
-      it as an explicitly backend-scoped escape hatch when that
-      settles); `clean media` (payloads) vs `list media`
-      (definitions) overloads the noun — note or rename
+  11. RESOLVED (owner, 2026-07-21 — rename both, on the
+      recommendation; a settled spelling knowingly reopened
+      pre-implementation): the progress modes are
+      `--progress (auto | pretty | plain | jsonl)` — `jsonl`
+      names the JSON-Lines stream honestly (and self-distinguishes
+      from the `--json` single-document flag), `pretty` names the
+      forced live rendering by what it emits rather than the tty
+      whose absence is the reason to force it. Folded: cli.md,
+      ROADMAP "Asynchronous runs" + --json paragraph, media-spec
+      #fetch-progress, script-spec noninteractive clauses
+      (historical decision records in TASKS keep the old names)
+  12. RESOLVED (2026-07-21): the naming-conventions table now
+      shows `.rlqb` / `.rlqm`; the stray hex ids and the
+      rlq/reliquary synopsis alternation had already fallen to
+      the item-14 fold's rewrites
+  13. RESOLVED (owner, 2026-07-21, one sweep): `--timeout`
+      accepts the language's duration literals (500ms/30s/20m;
+      bare integer = seconds; API twins keep numeric seconds — a
+      named presentation divergence); `fetch-media`'s
+      <media_name> is always required, exactly the twin
+      fetch_media(name, script=) — --script supplies definitions,
+      never selects what to fetch (the no-name example was the
+      error; fetch-all-for-a-script stays possible future
+      growth); `export --drive` requires <destination>, nothing
+      guessed, whole-machine export defaulting to the backend's
+      native location (the rest of export stays open); `hmp`'s
+      backend-scoped rehoming was already recorded at items 1-3
+      (pending the control-plane design); the media noun overload
+      is NAMED, not renamed — `clean-` names the cache directory
+      it reclaims, never an artifact class (the settled
+      clean_media twin and the clean-<cache-dir> symmetry both
+      kept; rename weighed and declined)
+  QUEUE COMPLETE (2026-07-21): all fourteen items resolved — 1-3
+  (interaction vocabulary), 4 (--json), 5-7 (seed / new-blueprint /
+  import-vm --name / check-script), 8 (secret stdin), 9 (id-only
+  selectors), 10 (uniform flag position), 11 (progress-mode
+  names), 12 (staleness), 13 (the underspecification sweep), 14
+  (the twin-name identity rule). Implementation follows at the
+  realignment milestone; docs/ and README follow with it
   14. TWIN-NAME IDENTITY — RESOLVED (owner, 2026-07-21; agreed in
       principle, then the design round settled both remaining
       forks on the recommendations and the fold landed): a CLI

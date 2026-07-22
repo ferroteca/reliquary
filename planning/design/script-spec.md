@@ -863,8 +863,8 @@ available source:
 4. an interactive prompt.
 
 Prompting requires an interactive context: a terminal, under the
-interactive progress renderings (`auto`/`tty`). Without one — no
-terminal, or an explicit `plain`/`rawjson` progress selection — a
+interactive progress renderings (`auto`/`pretty`). Without one — no
+terminal, or an explicit `plain`/`jsonl` progress selection — a
 still-missing value fails before
 execution, so a program can never hang on a hidden prompt. A response file therefore overrides everything for one
 invocation, while a blueprint's designed values override personal
