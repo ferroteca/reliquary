@@ -11,8 +11,8 @@ import time
 
 from .home import drives_dir, effective_home, home
 from .interaction_agentless import AgentlessGuestExec
-from .lifecycle import (normalize_machine, normalize_memory, start_machine,
-                        stop)
+from .lifecycle import (normalize_machine, normalize_memory,
+                        _start_configured_machine, stop)
 from .machine import Machine
 from .drives import (boot_guess, check_staged_drive, drive_key,
                     normalize_drive_specs, resolve_media, staged_hdd_plan)
@@ -76,7 +76,7 @@ def start(machine_config=None, *, display=False, port=None, home=None):
 
 def _start_configured(config, display=False, port=None, home=None):
     """Launch one validated machine configuration."""
-    return start_machine(config, display=display, port=port, home=home)
+    return _start_configured_machine(config, display=display, port=port, home=home)
 
 
 def run_task(task, machine_config=None, *, display=False, port=None,

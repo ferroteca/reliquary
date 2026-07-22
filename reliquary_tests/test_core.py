@@ -805,7 +805,7 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321) as start, \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
@@ -844,7 +844,7 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
@@ -879,7 +879,7 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
@@ -909,7 +909,7 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
         specs = {"hdd": source}
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321) as start, \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
@@ -929,7 +929,7 @@ class GuestProgramTests(unittest.TestCase):
     def test_staged_drive_c_is_rejected_behind_a_hdd_boot_image(self):
         self._stage_hdd_boot_image()
 
-        with mock.patch.object(workflows_module, "start_machine") \
+        with mock.patch.object(workflows_module, "_start_configured_machine") \
                 as start:
             with self.assertRaisesRegex(ValueError, "claim C:"):
                 config = reliquary.MachineConfig(staged_drive="C")
@@ -952,7 +952,7 @@ class GuestProgramTests(unittest.TestCase):
 
         guest.execute.side_effect = run_guest_command
 
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",
@@ -969,7 +969,7 @@ class GuestProgramTests(unittest.TestCase):
     def test_guest_program_stops_when_guest_command_fails(self):
         guest = mock.Mock()
         guest.execute.side_effect = RuntimeError("guest failed")
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321), \
                 mock.patch.object(
                     workflows_module, "AgentlessGuestExec",

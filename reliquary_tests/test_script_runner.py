@@ -493,9 +493,9 @@ class MachineOperationTests(_RuntimeCase):
         engine = self.engine("stop\nstart\n", port=5555)
         with mock.patch(
                 "reliquary.script_runner._machines") as machines:
-            machines.start.return_value = 9999
+            machines.start_machine.return_value = 9999
             self.run_linear(engine)
-            machines.stop.assert_called_once_with(
+            machines.stop_machine.assert_called_once_with(
                 "plain-0", home="/tmp/home")
         self.assertEqual(engine._port, 9999)
 
@@ -616,7 +616,7 @@ class ExecutePreflightTests(unittest.TestCase):
             }
             execute_script(script, machine_id=self.machine_id,
                            home=self.home)
-            machines.start.assert_not_called()
+            machines.start_machine.assert_not_called()
             machines.insert_media.assert_called_once()
 
 

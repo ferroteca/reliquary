@@ -521,7 +521,7 @@ class RunnerRunTests(unittest.TestCase):
 
         guest = mock.Mock()
         guest.execute.side_effect = run_guest_command
-        with mock.patch.object(workflows_module, "start_machine",
+        with mock.patch.object(workflows_module, "_start_configured_machine",
                                return_value=54321) as start, \
                 mock.patch.object(workflows_module, "AgentlessGuestExec",
                                   return_value=guest), \
@@ -581,7 +581,7 @@ class RunnerRunTests(unittest.TestCase):
                 home_module, "home",
                 side_effect=AssertionError(
                     "process-global home was consulted")), \
-                mock.patch.object(workflows_module, "start_machine",
+                mock.patch.object(workflows_module, "_start_configured_machine",
                                   return_value=54321) as start, \
                 mock.patch.object(workflows_module, "AgentlessGuestExec",
                                   return_value=guest), \

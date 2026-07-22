@@ -417,7 +417,7 @@ class _ScriptEngine:
                     f"machine {self._machine_id} cannot execute a "
                     f"script (phase: {phase})")
         elif phase == "ready":
-            self._port = _machines.start(
+            self._port = _machines.start_machine(
                 self._machine_id, display=display, home=self._home)
         elif phase == "running":
             from .lifecycle import read_vm_state
@@ -759,12 +759,12 @@ class _ScriptEngine:
 
     def _start(self, statement):
         self._log(f"line {statement.line}: start")
-        self._port = _machines.start(
+        self._port = _machines.start_machine(
             self._machine_id, display=self._display, home=self._home)
 
     def _stop(self, statement):
         self._log(f"line {statement.line}: stop")
-        _machines.stop(self._machine_id, home=self._home)
+        _machines.stop_machine(self._machine_id, home=self._home)
         self._port = None
 
 
@@ -876,7 +876,7 @@ def _resolve_or_create_machine(*, machine=None, blueprint=None,
             machine=machine, blueprint=blueprint, home=home), False
     matches = _machines.list_machines(home, blueprint=blueprint)
     if not matches:
-        machine_id = _machines.create_from_blueprint(
+        machine_id = _machines.create_machine(
             blueprint, home=home)
         return machine_id, True
     return _machines.resolve_machine(

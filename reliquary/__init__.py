@@ -14,13 +14,13 @@ from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
                         stop)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .machines import (create, create_from_blueprint, destroy,
+from .machines import (create, create_machine, destroy_machine,
                        eject_media, insert_media, list_machines,
                        load_machine_state, machine_dir_path,
                        machine_drive_args, mark_stopped, resolve_machine,
                        set_boot_order,
-                       start as start_cached_machine,
-                       stop as stop_cached_machine)
+                       start_machine,
+                       stop_machine)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
                     fetch_media, resolve_media)
 from .script_nodes import ScriptParseError
@@ -51,10 +51,10 @@ __all__ = [
     "AgentlessGuestExec",
     "GuestExec",
     "create",
-    "create_from_blueprint",
     "create_hdd_image",
+    "create_machine",
     "cursor_menu_select",
-    "destroy",
+    "destroy_machine",
     "eject_media",
     "insert_media",
     "MediaDefinition",
@@ -92,9 +92,9 @@ __all__ = [
     "set_boot_order",
     "set_home",
     "start",
-    "start_cached_machine",
+    "start_machine",
     "stop",
-    "stop_cached_machine",
+    "stop_machine",
     "wait_text",
     "execute_script",
     "check_script",

@@ -21,10 +21,10 @@ from .machine import (Machine, cursor_menu_select, screen_text,
 from .home import blueprints_dir, scripts_dir, set_home
 from .library import list_builtin_blueprints, seed_blueprint
 from . import blueprint as blueprint_mod
-from .machines import (create_from_blueprint, destroy, list_machines,
+from .machines import (create_machine, destroy_machine, list_machines,
                        resolve_machine, split_machine_id,
-                       start as start_machine,
-                       stop as stop_machine)
+                       start_machine,
+                       stop_machine)
 from .script_runner import (ScriptRuntimeError, check_script, run_script)
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
@@ -88,15 +88,23 @@ def main(argv=None):
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     command = subcommands.add_parser(
-        "create",
+        "create-machine",
         help="materialize a machine from a blueprint")
+    command.add_argument("--home", default=argparse.SUPPRESS,
+                         help="reliquary home directory")
+    command.add_argument(
+        "--blueprint", default=argparse.SUPPRESS,
+        help="select a blueprint's sole machine, or combine with "
+             "--machine <n>")
+    command.add_argument(
+        "--machine", default=argparse.SUPPRESS,
+        help="select machine number with --blueprint")
+
 
     command = subcommands.add_parser(
-        "start",
+        "start-machine",
         help="start a machine (--blueprint/--machine, or legacy "
              "root-home machine.json)")
-    # SUPPRESS keeps an omitted subcommand --home from clobbering the
-    # already-parsed global --home in the shared namespace.
     command.add_argument("--home", default=argparse.SUPPRESS,
                          help="reliquary home directory")
     command.add_argument(
@@ -113,7 +121,7 @@ def main(argv=None):
         help=argparse.SUPPRESS)
 
     command = subcommands.add_parser(
-        "stop",
+        "stop-machine",
         help="stop a machine (--blueprint/--machine, or legacy "
              "root-home vm.json)")
     command.add_argument("--home", default=argparse.SUPPRESS,
@@ -127,7 +135,7 @@ def main(argv=None):
         help="select by id (<blueprint>-<n>), prefix, or number "
              "with --blueprint")
     command = subcommands.add_parser(
-        "destroy",
+        "destroy-machine",
         help="delete a stopped machine "
              "(requires --blueprint or --machine)")
     command.add_argument("--home", default=argparse.SUPPRESS,
@@ -142,7 +150,7 @@ def main(argv=None):
              "with --blueprint")
 
     command = subcommands.add_parser(
-        "script",
+        "run-script",
         help="run a labeled .rlqs script against a machine "
              "(creates one when --blueprint has none)")
     command.add_argument(
@@ -228,11 +236,12 @@ def main(argv=None):
 
 def _create(arguments):
     if not arguments.blueprint:
-        raise ValueError("create requires --blueprint")
+        raise ValueError("create-machine requires --blueprint")
     if arguments.machine:
         raise ValueError(
-            "create allocates the machine number; do not pass --machine")
-    machine_id = create_from_blueprint(
+            "create-machine allocates the machine number; "
+            "do not pass --machine")
+    machine_id = create_machine(
         arguments.blueprint, home=arguments.home)
     print(f"created machine {machine_id}")
     return 0
@@ -241,7 +250,7 @@ def _create(arguments):
 def _script(arguments):
     if not arguments.blueprint and not arguments.machine:
         raise ValueError(
-            "script requires --blueprint or --machine")
+            "run-script requires --blueprint or --machine")
     try:
         result = run_script(
             arguments.label,
@@ -401,9 +410,9 @@ def _print_scripts_in_dir(scripts_path):
 
 def _dispatch(arguments):
     platform = arguments.platform or "dos"
-    if arguments.command == "create":
+    if arguments.command == "create-machine":
         return _create(arguments)
-    if arguments.command == "script":
+    if arguments.command == "run-script":
         return _script(arguments)
     if arguments.command == "check-script":
         return _check_script(arguments)
@@ -415,7 +424,7 @@ def _dispatch(arguments):
         if arguments.list_what in ("scripts", "script"):
             return _list_scripts(arguments)
         raise ValueError(f"unknown list target: {arguments.list_what}")
-    if arguments.command == "start":
+    if arguments.command == "start-machine":
         if arguments.blueprint or arguments.machine:
             machine_id = _require_machine_selector(arguments)
             start_machine(
@@ -429,16 +438,16 @@ def _dispatch(arguments):
         start_legacy(
             config, display=arguments.display, port=arguments.port)
         return 0
-    if arguments.command == "stop":
+    if arguments.command == "stop-machine":
         if arguments.blueprint or arguments.machine:
             machine_id = _require_machine_selector(arguments)
             stop_machine(machine_id, home=arguments.home)
             return 0
         stop_legacy(arguments.port)
         return 0
-    if arguments.command == "destroy":
+    if arguments.command == "destroy-machine":
         machine_id = _require_machine_selector(arguments)
-        destroy(machine_id, home=arguments.home)
+        destroy_machine(machine_id, home=arguments.home)
         print(f"destroyed machine {machine_id}")
         return 0
     if arguments.command == "type":

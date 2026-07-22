@@ -10,12 +10,12 @@ from unittest import mock
 
 from reliquary.blueprint import parse_blueprint
 from reliquary.machines import (insert_media, create,
-                                create_from_blueprint, destroy,
+                                create_machine, destroy_machine,
                                 eject_media, list_machines,
                                 load_machine_state, machine_dir_path,
                                 machine_drive_args, mark_stopped,
                                 resolve_machine, set_boot_order,
-                                start, stop)
+                                start_machine, stop_machine)
 
 
 SHA256 = "1" * 64
@@ -269,7 +269,7 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertEqual(second, "plain-1")
         self.assertEqual(other, "other-0")
 
-        destroy(second, home=self.home)
+        destroy_machine(second, home=self.home)
         with mock.patch("reliquary.machines.create_hdd_image"):
             reused = create(blueprint, home=self.home,
                             blueprint_name="plain")
@@ -285,10 +285,10 @@ class MachineMaterializationTests(unittest.TestCase):
     def test_create_exposes_public_surface(self):
         """The module's public functions are importable and callable."""
         import reliquary.machines as machines_module
-        for name in ("create", "create_from_blueprint", "destroy",
+        for name in ("create", "create_machine", "destroy_machine",
                      "list_machines", "load_machine_state",
                      "machine_dir_path", "machine_drive_args",
-                     "resolve_machine", "start", "stop"):
+                     "resolve_machine", "start_machine", "stop_machine"):
             self.assertTrue(hasattr(machines_module, name), name)
 
     def _create_ready(self, blueprint_name="test-bp", **fields):
@@ -316,7 +316,7 @@ class MachineMaterializationTests(unittest.TestCase):
         self._create_ready("plain")
         self._create_ready("plain")
         self._create_ready("plain")
-        destroy("plain-1", home=self.home)
+        destroy_machine("plain-1", home=self.home)
         ordered = [state["id"] for state in list_machines(
             home=self.home, blueprint="plain")]
         self.assertEqual(ordered, ["plain-0", "plain-2"])
@@ -407,7 +407,7 @@ class MachineMaterializationTests(unittest.TestCase):
                            return_value=self.iso_path) as fetch, \
                 mock.patch("reliquary.machines.launch_owned_qemu",
                            return_value=4444) as launch:
-            port = start(machine_id, home=self.home)
+            port = start_machine(machine_id, home=self.home)
 
         self.assertEqual(port, 4444)
         fetch.assert_called_with("freedos-1.4-livecd", home=self.home)
@@ -435,7 +435,7 @@ class MachineMaterializationTests(unittest.TestCase):
                   encoding="utf-8") as handle:
             json.dump(state, handle)
         with self.assertRaises(RuntimeError) as caught:
-            start(machine_id, home=self.home)
+            start_machine(machine_id, home=self.home)
         self.assertIn("already running", str(caught.exception))
 
     def test_stop_returns_phase_to_ready(self):
@@ -449,7 +449,7 @@ class MachineMaterializationTests(unittest.TestCase):
             json.dump(state, handle)
 
         with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
-            stop(machine_id, home=self.home)
+            stop_machine(machine_id, home=self.home)
 
         stop_qemu.assert_called_once_with(
             home=machine_dir_path(machine_id, self.home))
@@ -486,7 +486,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 side_effect=RuntimeError("QMP identity mismatch")):
             with self.assertRaisesRegex(RuntimeError,
                                         "identity mismatch"):
-                stop(machine_id, home=self.home)
+                stop_machine(machine_id, home=self.home)
 
         self.assertEqual(
             load_machine_state(machine_id, self.home)["phase"],
@@ -509,7 +509,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 side_effect=RuntimeError("no longer reachable")):
             with self.assertRaisesRegex(RuntimeError,
                                         "no longer reachable"):
-                stop(machine_id, home=self.home)
+                stop_machine(machine_id, home=self.home)
 
         self.assertEqual(
             load_machine_state(machine_id, self.home)["phase"],
@@ -520,7 +520,7 @@ class MachineMaterializationTests(unittest.TestCase):
         machine_id = self._create_ready()
         root = machine_dir_path(machine_id, self.home)
         self.assertTrue(os.path.isdir(root))
-        destroy(machine_id, home=self.home)
+        destroy_machine(machine_id, home=self.home)
         self.assertFalse(os.path.exists(root))
         self.assertEqual(list_machines(home=self.home), [])
 
@@ -532,11 +532,11 @@ class MachineMaterializationTests(unittest.TestCase):
         with mock.patch("reliquary.machines.shutil.rmtree",
                         side_effect=PermissionError("locked output")):
             with self.assertRaises(PermissionError):
-                destroy(machine_id, home=self.home)
+                destroy_machine(machine_id, home=self.home)
 
         self.assertEqual(load_machine_state(machine_id, self.home)["phase"],
                          "ready")
-        destroy(machine_id, home=self.home)
+        destroy_machine(machine_id, home=self.home)
         self.assertFalse(os.path.exists(root))
 
     def test_destroy_retries_a_previously_interrupted_destroy(self):
@@ -549,7 +549,7 @@ class MachineMaterializationTests(unittest.TestCase):
         with open(state_path, "w", encoding="utf-8") as handle:
             json.dump(state, handle)
 
-        destroy(machine_id, home=self.home)
+        destroy_machine(machine_id, home=self.home)
         self.assertFalse(os.path.exists(machine_dir_path(machine_id,
                                                          self.home)))
 
@@ -563,11 +563,11 @@ class MachineMaterializationTests(unittest.TestCase):
                   encoding="utf-8") as handle:
             json.dump(state, handle)
         with self.assertRaises(RuntimeError) as caught:
-            destroy(machine_id, home=self.home)
-        self.assertIn("stop it before destroy", str(caught.exception))
+            destroy_machine(machine_id, home=self.home)
+        self.assertIn("stop it before destroying", str(caught.exception))
 
-    def test_create_from_blueprint_loads_blueprints_dir(self):
-        """create_from_blueprint reads blueprints/<name>.json."""
+    def test_create_machine_loads_blueprints_dir(self):
+        """create_machine reads blueprints/<name>.json."""
         blueprints = os.path.join(self.home, "blueprints")
         os.makedirs(blueprints)
         with open(os.path.join(blueprints, "plain.json"), "w",
@@ -577,7 +577,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 "drives": {"hdd": {"size": "20M"}},
             }, handle)
         with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create_from_blueprint("plain", home=self.home)
+            machine_id = create_machine("plain", home=self.home)
         state = load_machine_state(machine_id, self.home)
         self.assertEqual(state["blueprint"], "plain")
 
@@ -697,7 +697,7 @@ class MediaInsertionTests(unittest.TestCase):
                         return_value="qemu"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
                            return_value=4444) as launch:
-            start(machine_id, home=self.home)
+            start_machine(machine_id, home=self.home)
         args = launch.call_args.args[0]
         self.assertIn("-boot", args)
         self.assertIn("order=cd", args)
@@ -713,7 +713,7 @@ class MediaInsertionTests(unittest.TestCase):
                             return_value="qemu"), \
                     mock.patch("reliquary.machines.launch_owned_qemu",
                                return_value=4444) as launch:
-                start(machine_id, home=self.home)
+                start_machine(machine_id, home=self.home)
         args = launch.call_args.args[0]
         cdrom_arg = [a for a in args if "media=cdrom" in a]
         self.assertEqual(len(cdrom_arg), 1)

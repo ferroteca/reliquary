@@ -186,7 +186,7 @@ def create(blueprint, *, home=None, blueprint_name=""):
     return machine_id
 
 
-def create_from_blueprint(name, *, home=None):
+def create_machine(name, *, home=None):
     """Load ``blueprints/<name>.json`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
@@ -303,7 +303,7 @@ def _resolve_by_blueprint_number(blueprint, machine, home):
     if not os.path.isfile(path):
         raise ValueError(
             f"no machine {machine_id!r}\n"
-            f"create one: rlq --blueprint {blueprint} create")
+            f"create one: rlq --blueprint {blueprint} create-machine")
     state = load_machine_state(machine_id, home)
     if state.get("blueprint") != blueprint:
         raise ValueError(
@@ -344,7 +344,7 @@ def _resolve_by_blueprint(name, home):
     if not matches:
         raise ValueError(
             f"no machine exists for blueprint {name!r}\n"
-            f"create one: rlq --blueprint {name} create")
+            f"create one: rlq --blueprint {name} create-machine")
     if len(matches) > 1:
         lines = [
             f"blueprint {name!r} has {len(matches)} machines; "
@@ -376,7 +376,7 @@ def _set_phase(machine_id, phase, home=None):
     return state
 
 
-def start(machine_id, *, display=False, home=None):
+def start_machine(machine_id, *, display=False, home=None):
     """Start a ready machine and return its QMP port.
 
     Re-verifies every media hash, launches QEMU under the machine's
@@ -419,7 +419,7 @@ def start(machine_id, *, display=False, home=None):
     return port
 
 
-def stop(machine_id, home=None):
+def stop_machine(machine_id, home=None):
     """Stop a running machine and return it to phase ``ready``."""
     state = load_machine_state(machine_id, home)
     phase = state.get("phase")
@@ -549,7 +549,7 @@ def mark_stopped(machine_id, home=None):
     _set_phase(machine_id, "ready", home)
 
 
-def destroy(machine_id, home=None):
+def destroy_machine(machine_id, home=None):
     """Delete a stopped machine's cache directory entirely.
 
     A deletion interrupted by a host lock can be retried.  New failed
@@ -561,7 +561,7 @@ def destroy(machine_id, home=None):
     if phase == "running":
         raise RuntimeError(
             f"machine {machine_id} is running; "
-            "stop it before destroy")
+            "stop it before destroying")
     if phase not in ("ready", "destroying"):
         raise RuntimeError(
             f"machine {machine_id} cannot be destroyed "

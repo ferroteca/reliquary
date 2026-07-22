@@ -460,7 +460,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     return port
 
 
-def start_machine(config, display=False, port=None, home=None):
+def _start_configured_machine(config, display=False, port=None, home=None):
     """Start an owned QEMU process described by one machine config.
 
     ``config`` is a validated machine configuration (the workflow

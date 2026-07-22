@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Paul Galbraith
+﻿# SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 """Tests for the reliquary command-line interface."""
 
@@ -102,19 +102,19 @@ class CliMachineLifecycleTests(unittest.TestCase):
             result = cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
         self.assertEqual(result, 0)
         self.assertRegex(stdout.getvalue(),
                          r"created machine plain-0")
 
     def test_create_requires_blueprint(self):
-        """create without --blueprint fails cleanly."""
+        """create-machine without --blueprint fails cleanly."""
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
-            result = cli.main(["--home", self.home, "create"])
+            result = cli.main(["--home", self.home, "create-machine"])
         self.assertEqual(result, 1)
-        self.assertIn("create requires --blueprint", stderr.getvalue())
+        self.assertIn("create-machine requires --blueprint", stderr.getvalue())
 
     def test_list_machines_shows_created_machine(self):
         """list machines prints blueprint, number, phase, and backend."""
@@ -123,7 +123,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -185,7 +185,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
         stdout_plural = io.StringIO()
         with contextlib.redirect_stdout(stdout_plural):
@@ -203,7 +203,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -232,7 +232,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
         decoy = os.path.join(self.home, "elsewhere")
         home._home = decoy
@@ -240,7 +240,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
-                "start",
+                "start-machine",
                 "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
@@ -252,7 +252,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
-                "stop",
+                "stop-machine",
                 "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
@@ -267,14 +267,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
         machine_id = stdout.getvalue().split()[-1].strip()
-        with mock.patch("reliquary.cli.destroy") as destroy, \
+        with mock.patch("reliquary.cli.destroy_machine") as destroy, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
-                "destroy",
+                "destroy-machine",
                 "--machine", machine_id,
             ])
         self.assertEqual(result, 0)
@@ -287,20 +287,20 @@ class CliMachineLifecycleTests(unittest.TestCase):
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
             cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "create",
+                "create-machine",
             ])
-        with mock.patch("reliquary.cli.destroy") as destroy, \
+        with mock.patch("reliquary.cli.destroy_machine") as destroy, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
                 "--machine", "1",
-                "destroy",
+                "destroy-machine",
             ])
         self.assertEqual(result, 0)
         destroy.assert_called_once_with("plain-1", home=self.home)
@@ -395,7 +395,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout_singular):
             cli.main([
-                "--home", self.home, "list", "script",
+                "--home", self.home, "list", "scripts",
             ])
         self.assertEqual(
             stdout_plural.getvalue(), stdout_singular.getvalue())
@@ -404,7 +404,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         """Bare start still loads the root-home MachineConfig path."""
         with mock.patch("reliquary.cli.start_legacy") as start, \
                 contextlib.redirect_stdout(io.StringIO()):
-            result = cli.main(["--home", self.home, "start"])
+            result = cli.main(["--home", self.home, "start-machine"])
         self.assertEqual(result, 0)
         start.assert_called_once()
 

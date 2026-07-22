@@ -10,7 +10,7 @@ from unittest import mock
 
 import reliquary
 from reliquary.library import seed_blueprint, seed_media, seed_script
-from reliquary.machines import (create_from_blueprint,
+from reliquary.machines import (create_machine,
                                 load_machine_state)
 from reliquary.media import parse_definition, resolve_media
 
@@ -117,12 +117,12 @@ class FirstReferenceTest(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             resolve_media("no-such-media", home=self.home)
 
-    def test_create_from_blueprint_seeds_and_honors_edits(self):
+    def test_create_machine_seeds_and_honors_edits(self):
         """create seeds once; a user edit governs later creates."""
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch("reliquary.machines.fetch_media",
                            return_value="payload.iso"):
-            machine_id = create_from_blueprint(BLUEPRINT,
+            machine_id = create_machine(BLUEPRINT,
                                                home=self.home)
             blueprint_path = os.path.join(
                 self.home, "blueprints", f"{BLUEPRINT}.json")
@@ -133,16 +133,16 @@ class FirstReferenceTest(unittest.TestCase):
             with open(blueprint_path, "w",
                       encoding="utf-8") as handle:
                 json.dump(data, handle)
-            second_id = create_from_blueprint(BLUEPRINT,
+            second_id = create_machine(BLUEPRINT,
                                               home=self.home)
         first = load_machine_state(machine_id, home=self.home)
         second = load_machine_state(second_id, home=self.home)
         self.assertEqual(first["memory"], 32)
         self.assertEqual(second["memory"], 64)
 
-    def test_create_from_blueprint_unknown_name_errors(self):
+    def test_create_machine_unknown_name_errors(self):
         with self.assertRaises(FileNotFoundError):
-            create_from_blueprint("no-such-blueprint", home=self.home)
+            create_machine("no-such-blueprint", home=self.home)
 
 
 class BuiltinMediaDefinitionTests(unittest.TestCase):

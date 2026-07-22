@@ -84,10 +84,10 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
         self.assertEqual(resolved, machine_id)
 
     def test_blueprint_and_number_resolves(self):
-        from reliquary.machines import create_from_blueprint
+        from reliquary.machines import create_machine
         with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create_from_blueprint("plain", home=self.home)
-            second = create_from_blueprint("plain", home=self.home)
+            first = create_machine("plain", home=self.home)
+            second = create_machine("plain", home=self.home)
         resolved, created = _resolve_or_create_machine(
             blueprint="plain", machine="1", home=self.home)
         self.assertFalse(created)
@@ -289,7 +289,7 @@ class RunScriptWiringTests(unittest.TestCase):
             result = cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "script", "install",
+                "run-script", "install",
             ])
         self.assertEqual(result, 0)
         run.assert_called_once_with(
@@ -308,7 +308,7 @@ class RunScriptWiringTests(unittest.TestCase):
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             result = cli.main([
-                "--home", self.home, "script", "install",
+                "--home", self.home, "run-script", "install",
             ])
         self.assertEqual(result, 1)
         self.assertIn("--blueprint or --machine", stderr.getvalue())
@@ -325,7 +325,7 @@ class RunScriptWiringTests(unittest.TestCase):
             result = cli.main([
                 "--home", self.home,
                 "--blueprint", "plain",
-                "script", "install",
+                "run-script", "install",
                 "--display",
             ])
         self.assertEqual(result, 0)
