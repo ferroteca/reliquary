@@ -1064,7 +1064,7 @@ win98se                 Windows 98 SE OEM installation ISO       yes
 ### Fetching and cleaning
 
 ```
-rlq fetch-media <media_name> [--script <script_name>]
+rlq fetch-media <media_name>
     [--progress <mode>] [--on-mismatch (fail | refetch)]
 rlq clean-downloads
 rlq clean-media
@@ -1073,9 +1073,9 @@ rlq clean-media
 `fetch-media` downloads, extracts, and hash-verifies a defined
 media item. Machine operations resolving a `media` reference to a
 fetchable definition fetch implicitly; `fetch-media` is the
-standalone convenience.
-`--script` installs that script's embedded definitions before
-fetching, without executing guest steps. `--progress` selects
+standalone convenience. Every definition is an authored `.rlqm`
+file, so there is nothing a script would supply that the catalog
+does not already have. `--progress` selects
 rendering as on `run-script` — pretty live progress on a tty under
 `auto`; `jsonl` emits pure event JSON on stdout, the last line
 the terminal event stating the outcome. `plain` and `jsonl`
@@ -1087,14 +1087,11 @@ forces the noninteractive failure even on a tty; an interactive
 run without the flag gets the checkpoint prompt.
 
 The media name is always required — exactly the twin
-`fetch_media(name, script=)`; `--script` supplies definitions,
-it never selects what to fetch (a fetch-everything-for-a-script
-convenience would be its own named growth if real use demands
-one).
+`fetch_media(name)` (a fetch-everything-for-a-script convenience
+would be its own named growth if real use demands one).
 
 ```powershell
 rlq fetch-media freedos-1.4-livecd
-rlq fetch-media freedos-1.4-livecd --script freedos-plain-install
 ```
 
 `clean-downloads` reclaims cached source archives under

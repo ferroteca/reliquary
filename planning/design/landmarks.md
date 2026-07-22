@@ -54,28 +54,22 @@ beside the declaration, ordered numerically — so a U6 asset
 refresh is strictly file-creation, never file-rewrite, and
 capture provenance lives in PNG text chunks, not sidecar files.
 Landmark names share the collision-checked `@` pool with media
-names.
+names; any duplicate visible to one script — `.rlql` against
+`.rlql`, or against a media name — is an error naming both
+locations.
 
-**Embedded form — resolve in place.** A script may carry its
-landmarks as `landmark <name> { ... }` blocks: the same JSON
-schema as `.rlql` (no second schema, as with embedded media) plus
-inline base64 variant data, so a workflow travels as one
-self-contained source file (U1, U4). Embedded landmarks resolve
-in place: nothing installs and no files sprout. Embedded *media*
-installs so later machine and media commands can use the
-definitions without the script in scope; a landmark has no
-consumer outside its script, so the install step would only
-defeat the single-file shape. Embedded landmarks are
-script-scoped — sharing between scripts uses the catalog form —
-and asset refresh writes `<name>.<n>.png` beside the script, file
-variants ordering after embedded ones, so reliquary never
-rewrites a script. Any duplicate landmark name visible to one
-script — embedded against `.rlql`, or against a media name — is
-an error naming both locations; landmarks never coalesce because
-they never install. Where the blocks sit in a script (the
-declarative header zone, or a trailing assets zone that keeps
-bulk payloads out of the procedure's way — G4) is left to the
-asset spec work.
+**Declarations are files, never script content.** A script
+references landmarks and never carries them: there is no
+embedded `landmark` block, as there is no embedded `media`
+block (owner, 2026-07-22 — planning/DECISIONS.md, the
+no-JSON-in-scripts round). A script is UTF-8 text, so an
+embedded rendering would have to be base64 — thousands of
+lines of payload around a hundred lines of procedure, and a
+permanent freeze on the asset format, since anything embedded
+in a text script can never become non-text. Keeping the
+declaration in its own file leaves `.rlql` free to grow a
+non-text form later, keeps scripts legible (G4), and makes
+one rule serve all four authored extensions.
 
 **Cursor normalization.** Captures and matching always strip the
 mouse cursor — a normalization, never an option:

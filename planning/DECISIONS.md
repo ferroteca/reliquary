@@ -19,6 +19,109 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
+  2026-07-22), following the no-JSON-in-scripts round that made it
+  possible. The grammar lives in reliquary/script_grammar.lark,
+  mirroring script-spec.md's normative EBNF; reliquary's own
+  tokenizer feeds it through a custom lark lexer. Evidence from
+  three probes:
+  - a lark grammar carries the whole typed EBNF — headers,
+    property declarations, phases, branching waits, reactive
+    phases, every action — in ~45 lines under LALR(1). Before the
+    island was deleted it could not parse a script at all, which
+    is what changed the answer
+  - lark's OWN lexer was WEIGHED AND DECLINED: its diagnostics are
+    terminal-level ("No terminal matches '4'" where reliquary's
+    says "invalid duration: '45' (durations carry a unit: ms, s,
+    m, or h)"), and on one case it mislabelled `timeout` as a
+    keypress name. match_examples recovered only 4 of 7 authored
+    messages, failing whenever the same mistake followed a
+    different verb — it matches parser state, so the corpus grows
+    as mistakes × contexts and degrades silently in the gaps
+  - the hybrid keeps both: verified that all lexical diagnostics
+    survive verbatim through the lark layer
+  - `press enter` broke the first attempt — `enter` is both a verb
+    and a key name, and a context-free lexer must type it before
+    the parser knows it is in `press`'s arguments. Keywords are
+    therefore recognized only in node-name position, which is what
+    script-spec.md already prescribes ("slot, key-name, and
+    machine-state values are name tokens whose closed vocabularies
+    are checked by validation, not the grammar")
+  - RULE ADOPTED: the grammar owns node names and positional
+    argument types; modifiers are uniform in the grammar and
+    checked against per-node signatures in the transformer, which
+    can name the node and list what it accepts; the S-numbered
+    rules stay above the grammar. Encoding S8's two-handler
+    minimum in the CFG was tried and reverted — the error became
+    "Unexpected token _BLOCK_CLOSE" at the closing brace instead
+    of naming the wait. script-spec.md's choice to enforce S-rules
+    "over the parse tree rather than encoded in the CFG" is what
+    protects the diagnostics, not an implementation detail
+
+- NO JSON IN SCRIPTS — DECIDED (owner, 2026-07-22): a script
+  carries no embedded assets. The `media <label> { ... }` block
+  and the `landmark <name> { ... }` block are both deleted;
+  media definitions (`.rlqm`) and landmark declarations (`.rlql`
+  plus `<name>.<n>.png` renderings) are authored files of their
+  own, resolved beside the script under authored-asset
+  resolution and referenced by `@name`. Folded into
+  script-spec.md (the "Embedded media definitions" and
+  "Installation into the media library" sections deleted, the
+  island removed from the core grammar and the normative EBNF),
+  media-spec.md, landmarks.md (the embedded form deleted),
+  ROADMAP, INTERFACES, USE-CASES U6 (amended), and the
+  implementation (the parser's media handling, `EmbeddedMedia`,
+  and the node layer's island machinery deleted). The round
+  records:
+  - the trigger: the install model read as an awkward bolt-on.
+    Three separable costs were named — the JSON island as the
+    sole exception to the lexical model, the install protocol
+    (five-step transactional write, collision and coalescing
+    rules, partial-overlap errors, `fetch-media --script`), and
+    the label/item split (residual problem [06], where the label
+    named an installed file and `@` named an item inside it)
+  - deleting media blocks alone was WEIGHED AND DECLINED: it
+    would not have removed the island, since embedded landmark
+    blocks (landmarks.md, "the same JSON schema as `.rlql` plus
+    inline base64 variant data") reinstate it at milestone 12,
+    and it would have left two analogous authored assets with
+    opposite bundling policies
+  - deleting the install while keeping the blocks was WEIGHED
+    AND DECLINED for the same reason: it removes the protocol
+    but keeps the lexical exception
+  - the decisive arguments for deleting both: the island is the
+    only carve-out in the node grammar and its removal makes the
+    surface uniform and LL(1) end to end; a script is UTF-8
+    text, so an embedded rendering must be base64 — measured at
+    roughly 12:1 to 100:1 payload-to-procedure for a
+    twenty-landmark GUI workflow, and the design had already
+    flinched at this with its open "trailing assets zone"
+    question; and embedding permanently freezes the asset
+    format, since anything carried in a text script can never
+    become non-text (the `.rlql` non-text form stays possible
+    only if declarations live in files)
+  - the "no second schema" justification for embedding was found
+    already broken in the small: `.rlqm` files are JSONC while
+    the embedded island was strict JSON, because brace tracking
+    could not survive a comment — the host format had already
+    forced the embedded form to accept less than the file form
+  - the single-file-workflow property is GIVEN UP knowingly. Its
+    cited support did not hold: U4 describes "the repository
+    carries only blueprints, media definitions, and reliquary
+    scripts", a side-by-side repository, and U1's one-command
+    path seeds three separate codex artifacts. The real loss is
+    casual sharing (pasting a whole workflow into a gist or an
+    issue), which was already lost for anything with landmarks;
+    a bundle format outside the language stays available as
+    additive growth (G7)
+  - consequences folded: the label loses its only job, closing
+    residual problem [06]; `fetch-media --script` and
+    `fetch_media(script=)` are deleted; check-script's
+    prospective embedded-media validation and its "writing to
+    `media/`" carve-out go; ROADMAP milestone 5 loses
+    embedded-install targeting; the recorder emits its draft as
+    script plus asset files, one mode instead of two
+
 - THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED;
   planning/design/script-spec.md is the source of truth (full typed
   EBNF included) and planning/design/script-examples/design-install.rlqs

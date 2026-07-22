@@ -7,29 +7,13 @@ import dataclasses
 import difflib
 import os
 import re
-import struct
 import time
-import zlib
 
+from PIL import Image
 from qemu.qmp import ExecuteError
 
 from .home import effective_home
 from .lifecycle import qmp_session
-
-
-def _write_png(path, width, height, rgb):
-    def chunk(kind, payload):
-        output = struct.pack(">I", len(payload)) + kind + payload
-        return output + struct.pack(">I", zlib.crc32(kind + payload))
-
-    raw = b"".join(b"\x00" + rgb[row * width * 3:(row + 1) * width * 3]
-                   for row in range(height))
-    with open(path, "wb") as png_file:
-        png_file.write(b"\x89PNG\r\n\x1a\n")
-        png_file.write(chunk(
-            b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)))
-        png_file.write(chunk(b"IDAT", zlib.compress(raw)))
-        png_file.write(chunk(b"IEND", b""))
 
 
 def validate_screenshot_name(name):
@@ -66,25 +50,13 @@ def screenshot(name="screen", port=None, home=None, directory=None):
             pass
         qmp.cmd("screendump", filename=ppm.replace("\\", "/"))
     time.sleep(0.3)
-    with open(ppm, "rb") as ppm_file:
-        data = ppm_file.read()
-    tokens = []
-    position = 0
-    while len(tokens) < 4:
-        while chr(data[position]).isspace():
-            position += 1
-        end = position
-        while not chr(data[end]).isspace():
-            end += 1
-        tokens.append(data[position:end].decode())
-        position = end
-    position += 1
-    if tokens[0] != "P6":
-        raise ValueError("unexpected screendump format")
-    width, height = int(tokens[1]), int(tokens[2])
     png = os.path.join(screenshots, f"{name}.png")
-    _write_png(png, width, height,
-               data[position:position + width * height * 3])
+    try:
+        with Image.open(ppm) as image:
+            image.save(png)
+    except OSError as error:
+        raise ValueError(
+            f"unexpected screendump format in {ppm}: {error}") from error
     os.remove(ppm)
     print(f"saved {png}")
 

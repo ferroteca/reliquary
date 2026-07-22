@@ -17,7 +17,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > `planning/design/script-examples/design-install.rlqs` is the
 > reference script, and
 > the other files there catalog known residual rough edges in this
-> surface. Embedded media blocks, properties and their binding,
+> surface. Properties and their binding,
 > reactive phases, and the full transcript contract remain later
 > milestones; details may still change before first release.
 
@@ -37,8 +37,8 @@ blueprint has exactly one machine, `--blueprint <name>`:
 rlq script install --blueprint freedos-1.4-plain
 ```
 
-After preflight, `script` installs embedded media definitions,
-resolves its machine (creating one when `--blueprint` names a
+After preflight, `script` resolves its machine
+(creating one when `--blueprint` names a
 blueprint with no machine yet), brings it to the state the script's
 [`machine` header](#header) expects — starting a stopped machine
 when the script expects `running`, failing when the script expects
@@ -93,7 +93,7 @@ Three design rules govern the whole surface:
   spelling and every punctuation mark exactly one role; a reader
   can classify any token without context. See
   [lexical rules](#lexical-rules).
-- **Nouns declare, verbs act.** Declarative nodes (headers, `media`,
+- **Nouns declare, verbs act.** Declarative nodes (headers,
   `property`, `phase`) begin with a noun; imperative nodes begin with
   a verb. The declarative zone precedes the imperative zone, and
   the grammar enforces the boundary.
@@ -102,7 +102,7 @@ That third rule reflects a deliberate split: **a script is
 declarative about everything reliquary owns, and procedural at the
 seam with the guest.** What is knowable before the run starts is
 declared — the platform, the expected machine state, which phases
-exist, their budgets, the media and properties. What the guest dictates
+exist, their budgets, the properties it binds. What the guest dictates
 is procedural — which key to send, what text to wait for, the order
 its own installer screens arrive in. The guest is a black box that
 cannot be configured, only watched and typed at, so interaction
@@ -156,9 +156,8 @@ tiers:
   here is a RUN FAILURE.
 
 `check-script` has exactly two modes, one per checkable tier:
-without a machine it applies every legality rule plus the
-prospective embedded-media validation the visible catalog
-allows; with `--machine`/`--blueprint` (and optionally
+without a machine it applies every legality rule; with
+`--machine`/`--blueprint` (and optionally
 explicit property values) it adds the machine rules. Dynamic semantics are
 exercised only by a run. See
 [error classes](#error-classes-and-exit-codes) for how the tiers
@@ -173,8 +172,8 @@ surface to callers.
 - `#` begins a comment outside a quoted string or regex.
 - Identifiers use ASCII letters, digits, `.`, `_`, and `-`, must
   start with a letter, and are case-sensitive. Reserved node names
-  (headers, declarations, and verbs) cannot name phases, property
-  keys, or media labels.
+  (headers, declarations, and verbs) cannot name phases or
+  property keys.
 - Modifiers are written `name=value`, space-separated, after the
   positional arguments. There are no commas and no colons anywhere
   in the language.
@@ -258,18 +257,18 @@ never expanded inside a regex.
 ### References
 
 `@name` references a media item by its catalog name; it resolves
-through the shared media library (including definitions the script
-itself embeds). `$key` references a declared
+through the shared media library — definitions are authored
+`.rlqm` files resolved beside the script or in the home, never
+carried in the script. `$key` references a declared
 [property](#properties) and must stand alone
 as a whole argument; inside strings the braced form `${key}` is
-used instead, and dotted keys are valid in both forms. Definition
-sites — the `media` label, the `property`
-key — are bare names; the sigils mark use sites.
+used instead, and dotted keys are valid in both forms. The
+`property` key is a bare name at its declaration site; the
+sigils mark use sites.
 
 ## Core grammar
 
-Every line of every script — outside a `media` island — is one
-structural shape:
+Every line of every script is one structural shape:
 
 ```text
 node = name , { argument } , { modifier } , [ block ] ;   (* informative *)
@@ -281,20 +280,16 @@ static-validation rules that follow it. The core view is
 structural — what a line looks like; the typed view is normative
 for admissibility.
 
-One declared island: a `media` node's block contains a JSON object
-(RFC 8259) rather than nodes. It is the sole place where the block
-rule in [lexical rules](#lexical-rules) does not apply: the island
-closes at the `}` that closes its JSON object, so a nested `}`
-alone on a line — which the archive form always contains — does
-not close it, and neither does a `}` inside a JSON string. Script
-tokenization is suspended for the interior; comments and property
-references have no meaning there.
+Every block holds nodes. A script carries no JSON: media
+definitions and landmark declarations are authored files of their
+own, resolved beside the script (planning/ROADMAP.md,
+"Authored-asset resolution"), so the block rule admits no
+exception and tokenization never suspends.
 
 A typing layer over the node shape supplies the rest of the
 language definition:
 
-- **Ordering.** Header nodes come first, then `media` and
-  `property`
+- **Ordering.** Header nodes come first, then `property`
   declarations, then either top-level statements (a linear script)
   or `phase` nodes (a phased script). Mixing the two body kinds is
   a parse error.
@@ -320,7 +315,6 @@ Declarations:
 
 | node | arguments | modifiers | block |
 |---|---|---|---|
-| `media` | label | — | JSON media definition |
 | `property` | optional `text`/`media`/`secret`, key | `prompt` | — |
 
 Statements:
@@ -353,12 +347,12 @@ And the phase declaration:
 ### Grammar (normative)
 
 The signature tables above expand into this complete EBNF. Every
-production but `media-def`'s island is an instance of the node
-shape. A parser may parse structurally and then type-check, but
+production is an instance of the node shape. A parser may parse
+structurally and then type-check, but
 this grammar and the static rules below decide what is legal:
 
 ```text
-script          = { header } , { media-def } , { property-def } ,
+script          = { header } , { property-def } ,
                   ( linear-body | phased-body ) ;
 
 header          = "description" , string , eol
@@ -368,8 +362,6 @@ header          = "description" , string , eol
                 | "timeout" , duration , eol
                 | "deadline" , duration , eol ;
 
-media-def       = "media" , name , json-island ;
-json-island     = "{" , eol , { json-line } , "}" , eol ;
 property-def    = "property" , [ "text" | "media" | "secret" ] ,
                   property-key , [ prompt-mod ] , eol ;
 prompt-mod      = "prompt" , "=" , string ;
@@ -440,15 +432,6 @@ regex-escape    = "\" , ? any character except a line
                         terminator ? ;
 ```
 
-`json-line` is any line of the JSON island, tokenized by RFC 8259
-rather than by this grammar; the island closes at the `}` closing
-its object, as described above. The island is strict JSON — the
-JSONC affordances library definition files accept (comments,
-trailing commas; see
-[the media spec](media-spec.md#the-definition-format)) are not
-legal here: a comment could carry an unbalanced brace past the
-island's brace tracking, and installation writes the library
-copy in canonical strict JSON, which would silently drop them.
 `interpolation` is recognized only where the argument accepts it —
 never in a regex. `slot`, `key-name`,
 and `machine-state` values are `name` tokens whose closed
@@ -498,9 +481,9 @@ the CFG. Each has a stable id; diagnostics cite them:
 - **S4** — no node carries the same modifier name twice; a
   repeat is an error, never a last-wins override.
 - **S5** — names are valid and unique in their namespaces:
-  reserved node names are not identifiers, media labels are
-  unique, property keys are declared once per script and are not
-  spelled `text`, `media`, or `secret`, durations are positive.
+  reserved node names are not identifiers, property keys are
+  declared once per script and are not spelled `text`, `media`,
+  or `secret`, durations are positive.
 - **S6** — every `$` reference names a declared property.
 - **S7** — an observation carries **exactly one** condition — a
   bare string/regex beside a `machine=` modifier, or two
@@ -562,8 +545,8 @@ surface — the source line as written, never the rewritten core.
 
 ## Header
 
-Header nodes precede embedded media definitions, property
-declarations, and executable content:
+Header nodes precede property declarations and executable
+content:
 
 ```rlqs
 description "FreeDOS 1.4 plain install from LiveCD"
@@ -680,105 +663,6 @@ visible in the phase graph rather than hidden in statement
 position.
 
 There are no anonymous phases and no implicit phase entry.
-
-## Embedded media definitions
-
-A script may carry media definitions needed by that workflow, but
-never has to: a script's media references resolve through the
-ordinary shared catalog, so definitions that live as separate
-library documents — as the codex keeps its own — work
-identically. Embedding suits a script distributed as a single
-self-contained file. Each block has a definition label followed by
-the ordinary media-definition JSON object; the outer opening brace
-becomes the node's block:
-
-```rlqs
-media freedos-livecd {
-  "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
-  "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
-  "items": [
-    {
-      "name": "freedos-1.4-livecd",
-      "file": "FD14LIVE.iso",
-      "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
-    }
-  ]
-}
-```
-
-The label is an identifier and determines the installed file name:
-the block above installs as `freedos-livecd.rlqm`. It labels
-the definition, not an item; an archive definition may still
-contain several independently named items, each referenced by
-`@<item-name>`.
-
-The body uses exactly the item or archive form documented by the
-[media spec](media-spec.md); scripts do not get a second media
-schema. Several distinctly labeled `media` blocks are allowed. They
-appear after the header and before property declarations.
-
-### Installation into the media library
-
-Checking a script treats its embedded definitions as a prospective
-addition to the shared catalog but remains read-only. Running a
-script installs them as `<label>.rlqm`, following reliquary's
-write convention — into the home's `media/` for a home-resolved
-script, beside the script file itself for a source-resident one,
-where the new file is source its author
-commits — before fetching
-media, reconciling the target machine, or delivering guest input.
-Consequently, machine and media commands can use the definitions
-after the first run without needing the script in scope.
-
-Installation is fail-closed and non-overwriting:
-
-1. Reliquary parses the whole script, binds its declared
-   properties, completes static and capability preflight, and
-   validates every embedded definition against the entire shared
-   library in memory. No file has been written yet.
-2. If every item in a block is already defined identically anywhere
-   in the library, that block is already installed and needs no new
-   file. If only some items overlap, installation fails and asks the
-   author to split the new and already-shared items into separate
-   blocks; writing the mixed block would create duplicate names.
-3. Otherwise the label's target path must not exist and none of the
-   block's item names may conflict. A differing target file or item
-   definition fails with both locations named; scripts never replace
-   or override library definitions.
-4. All new definitions are written in canonical JSON formatting by
-   temp-and-replace. Installation is transactional across the
-   blocks: an I/O failure removes files created by that attempt
-   before the script proceeds.
-5. The library is rescanned, then ordinary resolution, fetching, and
-   machine startup begin. Definitions remain installed even if a
-   later download or guest step fails; installing them is a durable
-   successful pre-run action.
-
-If an embedded definition changes after it has been installed, the
-next run fails rather than overwriting the library copy. The user
-explicitly removes or edits the shared definition before adopting
-the new one. Once installed, definitions are ordinary user-owned
-library documents; reliquary never updates or deletes them
-implicitly.
-
-A relative `local-path` is resolved from the script's directory
-before comparison or serialization, so the installed JSON contains
-an absolute path and retains the same meaning outside the script.
-Downloads and extracted payloads use the ordinary shared caches.
-
-Property references are not expanded inside a media definition.
-Sources and
-hashes are authored, reproducible inputs; a `media` property chooses
-among names supplied by embedded definitions and the existing
-library.
-
-Name collisions never create an override. An embedded item whose
-normalized descriptor is identical to a shared or earlier embedded
-item coalesces harmlessly. The descriptor includes its payload name
-and hash plus its complete direct-source or archive-source context;
-unrelated sibling items in the same archive definition do not affect
-the comparison. Any difference is an error before installation,
-naming both definition locations and the colliding media item.
 
 ## Properties
 
@@ -901,7 +785,7 @@ a blueprint that fixes its user name as
 "testuser" keeps it fixed on every machine of it — while an
 explicit `--property` overrides even the design for one run
 (U5). A media value is resolved after binding, and a
-media ask lists the embedded and existing library names valid
+media ask lists the library names valid
 for that property.
 
 Ordinary properties are strings. Secret properties keep only a
@@ -1069,8 +953,6 @@ activation (the phase deadline's scope), a span per observation
   fetch bytes, `select` traversal
   steps — never invented denominators: renderers show phases and
   observations as "elapsed / limit" pairs, not progress bars;
-- embedded-definition installation, with source line and
-  installed path;
 - on failure: the pending condition or action, the expired clock
   and its source scope, the route taken with phase revisit
   counts, the nearest-miss screen row, the automatic screenshot
@@ -1083,9 +965,8 @@ activation (the phase deadline's scope), a span per observation
 
 Events carry their originating statement's source line and
 number wherever one exists (owner, 2026-07-22) — action,
-observation, and transition events name the line they execute,
-as embedded-install events already did — so a transcript line
-can always cite its source.
+observation, and transition events name the line they execute —
+so a transcript line can always cite its source.
 Events carry property keys and supplying sources, never
 bound values; the secret contract applies to the stream
 exactly as it applies to transcripts.
@@ -1524,8 +1405,7 @@ input. `insert` into an occupied slot, and `eject` from an empty
 one, are run errors: media state is explicit, and a swap is
 written as `eject` then `insert`. `insert` accepts a media
 reference (`@name`) or a `media`
-property (`$key`); bare media names are not valid. By execution time
-every embedded definition has been installed, so resolution uses
+property (`$key`); bare media names are not valid. Resolution uses
 the ordinary shared catalog, then fetches and hash-verifies the
 item as needed. Both verbs work on a running machine (a media
 change the guest observes) and on a stopped one (the medium present
@@ -1620,9 +1500,8 @@ Parsing and static validation enforce the legality rules — the
 the script text alone, before the machine starts. With more in
 scope, preflight further rejects, naming what it needed:
 
-- conflicting embedded or shared media definitions, and
-  definition labels whose target files already contain different
-  content (the visible catalog);
+- media references (`@name`) naming no item the visible catalog
+  defines (the visible catalog);
 - `insert`/`eject` slots and `set-boot` drives the target
   machine does not declare (a machine);
 - explicit `--property` keys the running script does not declare,
@@ -1658,11 +1537,11 @@ rlq check-script <script_name>
     [--property <key>=<value>]... [--properties <path>]
 ```
 
-performs parsing, prospective embedded-media validation, and static
+performs parsing and static
 analysis — including the resolved timing plan, each observation's
 effective timeout, and its source scope — without executing the
 script, changing the user's properties, accessing secret
-values, or writing to `media/`. Supplying a machine (and any
+values, or writing any file. Supplying a machine (and any
 explicit values) also performs typed binding — reporting each
 declared property's supplying
 source (flag, blueprint parameter — direct or redirect —
@@ -1970,14 +1849,14 @@ anyway while the CD remains attached).
 ## Sharing
 
 A shareable blueprint/script bundle consists of its script, machine
-blueprint, any separate shared media definitions, and optionally an
+blueprint, the media definitions and landmark declarations it
+references, and optionally an
 example properties file containing only non-sensitive illustrative
-values.
-Media definitions embedded in a script are installed on first
-run — into the recipient's home `media/`, or beside the script in
-a project. Definitions already reused
-by several scripts may be distributed directly under `media/`
-instead. The user's own properties file, secret values, and
+values. Every authored asset is a file of its own — a script
+carries none of them — so a bundle is a small set of files beside
+each other rather than a single document. Definitions reused
+by several scripts are shared exactly the same way.
+The user's own properties file, secret values, and
 host payload files exchanged with machines stay out of the
 bundle and version control. A script's declarations name its property keys, but every
 recipient supplies their own values. Media remains hash-pinned and

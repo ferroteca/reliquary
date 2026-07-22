@@ -130,8 +130,10 @@ and amendments are made deliberately and recorded here.
   and media swap, and the screen states between them — and
   drafts the wait conditions and actions, capturing the source
   screenshots landmarks crop from. The output is a *draft*:
-  ordinary script text (self-contained with its landmarks
-  embedded by default, or with factored catalog assets), owned
+  ordinary script text beside the landmark declarations and
+  renderings it references — separate authored files, since a
+  script carries no embedded assets (amended 2026-07-22; see
+  planning/DECISIONS.md) — owned
   and edited like anything hand-written — recording cannot know
   which screen features are load-bearing or how long a step may
   honestly take, so the person tailors what reliquary proposes.

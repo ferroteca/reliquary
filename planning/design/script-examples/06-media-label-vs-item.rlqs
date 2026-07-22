@@ -1,42 +1,45 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# PROBLEM: a media definition has TWO name spaces and one sigil.
-# The block's LABEL names the installed library file; `@`
-# references an ITEM inside it. They can differ — and for archive
-# definitions they usually do.
+# RESOLVED (owner, 2026-07-22 — planning/DECISIONS.md, no JSON in
+# scripts). Kept as a regression note.
+#
+# THE PROBLEM WAS: a media definition embedded in a script had TWO
+# name spaces and one sigil. The block's LABEL named the installed
+# library file; `@` referenced an ITEM inside it. They could
+# differ — and for archive definitions they usually did:
+#
+#     media freedos-livecd {            <- label: names the file
+#       "url": "...FD14-LiveCD.zip",       installed as
+#       "items": [                         freedos-livecd.rlqm
+#         { "name": "freedos-1.4-livecd",  <- item: what @ takes
+#           "file": "FD14LIVE.iso" } ]
+#     }
+#
+#     insert cdrom0 @freedos-1.4-livecd   # the ITEM — correct
+#     insert cdrom0 @freedos-livecd       # the LABEL — WRONG
+#
+# THE RESOLUTION: embedded media blocks are deleted outright, so
+# the label is gone with them. A definition is an authored `.rlqm`
+# file whose stem is its own name and carries no item meaning; `@`
+# names an item, and there is no second spelling to confuse it
+# with. The remaining half — warning when an `@`-reference matches
+# no known item — stays open in planning/TASKS.md.
 
-description "Media labels are not item names"
+description "Media references name items, not files"
 platform    dos
 machine     stopped
 timeout     2m
 
-media freedos-livecd {
-  "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
-  "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
-  "items": [
-    {
-      "name": "freedos-1.4-livecd",
-      "file": "FD14LIVE.iso",
-      "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
-    }
-  ]
-}
-# label:  freedos-livecd      -> installs media/freedos-livecd.json
-# item:   freedos-1.4-livecd  -> what @ can actually reference
-
 property media supplemental-disk prompt="Supplemental disk"
 
-insert cdrom0 @freedos-1.4-livecd   # the ITEM name — correct
-# insert cdrom0 @freedos-livecd     # the LABEL — WRONG: resolves
-                                    # only if some item happens to
-                                    # share the label's spelling.
-                                    # The definition site sits ten
-                                    # lines up and still misleads.
+insert cdrom0 @freedos-1.4-livecd   # an item in the shared catalog,
+                                    # defined by a .rlqm file beside
+                                    # this script or in the home
 start
 wait "Welcome to FreeDOS 1.4 (LiveCD)"
 
-# A second, related mush: the same argument slot accepts two sigils
+# THE SURVIVING MUSH: the same argument slot accepts two sigils
 # with different definiteness —
 #
 #     insert cdrom0  @freedos-1.4-livecd    exactly this catalog item
@@ -50,10 +53,7 @@ wait "Welcome to FreeDOS 1.4 (LiveCD)"
 # item" — the reader must recall the property declaration to know
 # one insert is fixed and the other is a variable.
 #
-# OPEN QUESTIONS: should a single-item definition default its
-# label to its item name (removing the gap in the common case)?
-# Should validation warn when a label is @-referenced and no item
-# shares its spelling (the near-miss above)? The $-definiteness
-# point is likely inherent — properties exist to defer choices —
-# but a transcript line naming the resolved item at insert time
-# would close the observability half of it.
+# OPEN QUESTION: the $-definiteness point is likely inherent —
+# properties exist to defer choices — but a transcript line naming
+# the resolved item at insert time would close the observability
+# half of it.

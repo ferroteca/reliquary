@@ -2,14 +2,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Parser for the milestone-one subset of reliquary scripts."""
 
-import json
 import os
 import re
 import types
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple
 
-from .media import MediaDefinition, parse_definition
+from .script_nodes import ScriptParseError
 
 
 _IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*$")
@@ -24,34 +23,6 @@ _REMOVABLE_SLOT = re.compile(r"(floppy|cdrom)([0-9]+)?$")
 _REMOVABLE_LIMITS = {"floppy": 2, "cdrom": 4}
 _DRIVE_SLOT = re.compile(r"(floppy|hdd|cdrom)([0-9]+)?$")
 _DRIVE_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4}
-
-
-class ScriptParseError(ValueError):
-    """A script syntax or static-validation error with a source line."""
-
-    def __init__(self, line, message, column=1):
-        super().__init__(message)
-        self.line = line
-        self.column = column
-        self.message = message
-        self.path = None
-        self.source_line = None
-
-    def _set_context(self, path, source_lines):
-        """Attach source context once the top-level parser knows it."""
-        self.path = path
-        if 1 <= self.line <= len(source_lines):
-            self.source_line = source_lines[self.line - 1]
-
-    def __str__(self):
-        """Render an actionable compiler-style diagnostic."""
-        location = f"{self.path or '<script>'}:{self.line}:{self.column}"
-        result = f"{location}: error: {self.message}"
-        if self.source_line is not None:
-            gutter = f"{self.line} | "
-            caret = " " * (len(gutter) + self.column - 1) + "^"
-            result = f"{result}\n{gutter}{self.source_line}\n{caret}"
-        return result
 
 
 @dataclass(frozen=True)
@@ -84,13 +55,6 @@ class State:
 
 
 @dataclass(frozen=True)
-class EmbeddedMedia:
-    label: str
-    definition: MediaDefinition
-    line: int = 0
-
-
-@dataclass(frozen=True)
 class Script:
     """An immutable parsed linear or state-machine ``.rlqs`` document."""
 
@@ -99,7 +63,6 @@ class Script:
     timeout: Optional[str] = None
     initial: Optional[str] = None
     machine: str = "running"
-    media: Tuple[EmbeddedMedia, ...] = ()
     statements: Tuple[Statement, ...] = ()
     states: Mapping[str, State] = field(default_factory=dict)
 
@@ -385,41 +348,10 @@ class _Parser:
     def parse(self):
         headers = {}
         header_lines = {}
-        media = []
         states = {}
         linear = []
         while (item := self._next()) is not None:
             line, text = item
-            if text.startswith("media "):
-                if states or linear:
-                    raise ScriptParseError(
-                        line,
-                        "media definitions must precede executable content")
-                label, separator, payload = text[6:].strip().partition(" ")
-                _identifier(label, line, "media label")
-                if not separator or not payload.startswith("{"):
-                    raise ScriptParseError(
-                        line, "media requires a JSON object")
-                chunks = [payload]
-                depth = payload.count("{") - payload.count("}")
-                while depth > 0:
-                    next_item = self._next()
-                    if next_item is None:
-                        raise ScriptParseError(
-                            line, "unclosed media JSON object")
-                    chunks.append(next_item[1])
-                    depth += next_item[1].count("{") - next_item[1].count("}")
-                try:
-                    definition = parse_definition(
-                        json.loads("\n".join(chunks)))
-                except (json.JSONDecodeError, KeyError, ValueError) as error:
-                    raise ScriptParseError(
-                        line, f"invalid media definition: {error}") from error
-                if any(entry.label == label for entry in media):
-                    raise ScriptParseError(
-                        line, f"duplicate media label: {label}")
-                media.append(EmbeddedMedia(label, definition, line))
-                continue
             if text.startswith("state "):
                 if linear:
                     raise ScriptParseError(
@@ -446,7 +378,7 @@ class _Parser:
                 text)
             if match:
                 key, value = match.groups()
-                if states or linear or media or key in headers:
+                if states or linear or key in headers:
                     raise ScriptParseError(
                         line, f"{key} must appear once in the header")
                 if key in {"description"}:
@@ -494,7 +426,7 @@ class _Parser:
         return Script(headers["platform"], headers.get("description"),
                       headers.get("timeout"), headers.get("initial"),
                       headers.get("machine", "running"),
-                      tuple(media), tuple(linear), _freeze(states))
+                      tuple(linear), _freeze(states))
 
 
 def parse_script(source, path="<script>"):

@@ -7,12 +7,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the blueprint and the machine model these scripts use
 > (empty removable slots, the `machine:` header, persistent
-> `insert`/`eject`) are implemented. The install script's embedded
-> `media` block uses the planned self-contained-script format
-> ([planning/design/script-spec.md](../design/script-spec.md)), which is not
-> installed on first run yet; until that lands, also copy the media
-> definition as a separate library document (the built-in
-> `freedos-1.4-plain` artifacts ship it that way).
+> `insert`/`eject`) are implemented. The scripts still speak the
+> superseded milestone-one surface
+> ([planning/design/script-spec.md](../design/script-spec.md) is the
+> redesigned one); ROADMAP milestone 4 converts them.
 
 A complete, shareable FreeDOS 1.4 plain-install blueprint bundle in
 reliquary's document formats. Assets are identified by extension,
@@ -21,16 +19,16 @@ reliquary home's convention; use the bundle in place as an asset
 root, or copy the files into your home:
 
 ```text
-blueprints/freedos.rlqb             the install machine blueprint
-scripts/freedos-plain-install.rlqs   install script + LiveCD definition
+blueprints/freedos.rlqb              the install machine blueprint
+media/freedos-1.4-livecd.rlqm        the LiveCD definition
+scripts/freedos-plain-install.rlqs   install script
 scripts/freedos-plain-verify.rlqs    boot the result, confirm C:\>
 ```
 
-The install script embeds the LiveCD definition. Its first run
-installs that block as `freedos-1.4-livecd.rlqm` before creating
-the machine, so the verification script and later independent
-machine commands resolve the same media through the ordinary
-catalog.
+The LiveCD definition is its own file: a script references media by
+name and never carries a definition, so both scripts and any later
+independent machine command resolve the same item through the
+ordinary catalog.
 
 Then:
 

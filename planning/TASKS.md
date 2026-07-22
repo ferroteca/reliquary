@@ -40,6 +40,15 @@ the parser stack validates scripts; 10–12 close out:
    (was boot), no <key> tokens (key names only after press);
    the colon-free noun-first headers with entry and the
    run-level deadline; per-node signature validation.
+   LANDED as own-lexer + lark parser (owner, 2026-07-22 —
+   DECISIONS.md): script_grammar.lark mirrors the normative
+   EBNF, reliquary's tokenizer feeds it through a custom lark
+   lexer so the lexical diagnostics stay authored, and
+   script_parser.py's transformer checks per-node modifier
+   signatures and builds the typed tree. The grammar stays
+   permissive where an S-rule owns the diagnostic (S8's
+   two-handler minimum, S9's phase purity, S11's terminators),
+   so tasks 3-4 can cite ids and name the problem.
 3. Static validation, shapes and observation channels: the
    two non-mixing script shapes; phases sequential or
    reactive, never hybrid; every sequential phase ends in
@@ -112,16 +121,19 @@ umbrella list stays complete; not milestone 4):
 - authored-asset residency (ROADMAP milestone 5): the resolution
   module (--assets / --assets-only), the extension renames
   (.rlqb / .rlqm), the builtins/ → codex/ package-dir rename and
-  the codex index, the state blueprint-source field, selection
-  scoping, and embedded-install targeting
+  the codex index, the state blueprint-source field, and
+  selection scoping
 - shared JSONC reader for authored documents (ROADMAP
   milestone 5) — blueprints, standalone media definitions:
   RFC 8259 + // and /* */
   comments + trailing commas, nothing more (no JSON5 features);
   string-aware tokenizer, comments replaced by spaces so error
-  line/col survive; JSON islands in scripts and every
-  machine-written file stay strict JSON (user properties speak
-  their own line format)
+  line/col survive; every machine-written file stays strict JSON
+  (user properties speak their own line format); survey PyPI first, but the published
+  JSONC/JSON5 readers looked either too permissive (JSON5
+  features the spec excludes) or position-losing, and the
+  comments-become-spaces rule that keeps error line/col exact is
+  the unusual requirement to check them against
 - new media definition surface (ROADMAP milestone 5):
   definition-level description /
   notes / redistributable-under (the built-in URL
@@ -129,13 +141,18 @@ umbrella list stays complete; not milestone 4):
   sourceless definitions fail resolution with the
   edit-the-definition error
 - CLI fetch/clean commands + API parity (ROADMAP milestone 5):
-  fetch_media(script=), clean_downloads(), clean_media()
+  fetch_media(), clean_downloads(), clean_media()
 - codex: teaching comments at blueprint seams once the JSONC
   reader lands (ROADMAP milestone 5)
 - the hostdir drive content source (vvfat on the QEMU
   adapter — ROADMAP milestone 5)
 - user.properties and the property command family (ROADMAP
-  milestone 6)
+  milestone 6) — use the `keyring` package for the protected host
+  credential store rather than hand-rolling Windows Credential
+  Manager / macOS Keychain / Secret Service backends; its
+  (service, username) model takes the spec's scoping directly,
+  with the properties-file path as the service and the property
+  name as the username
 
 ## Language
 
@@ -148,8 +165,9 @@ umbrella list stays complete; not milestone 4):
      drive slots) globally so they can't shadow phase/artifact
      names — mechanical, no spec redesign, also closes most of
      [01]'s asymmetry
-  2. [06] default a single-item media block's label to its item
-     name; warn when an @-reference doesn't match any known item
+  2. [06]'s remaining half: warn when an `@`-reference matches no
+     known item (the label/item split itself is gone with the
+     media block — DECISIONS.md, no JSON in scripts)
   - [03], [05], [07] — provisionally leave as documented
     tradeoffs, not bugs: boundary tax (guest-text escaping) or
     placement-equals-scope consequences, where a "fix" mostly

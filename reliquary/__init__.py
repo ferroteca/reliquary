@@ -23,7 +23,7 @@ from .machines import (create, create_from_blueprint, destroy,
                        stop as stop_cached_machine)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
                     fetch_media, resolve_media)
-from .script import (Condition, EmbeddedMedia, ExpectBranch, Script,
+from .script import (Condition, ExpectBranch, Script,
                      ScriptParseError, State, Statement, load_script,
                      parse_script)
 from .script_runner import (ScriptRun, ScriptRuntimeError,
@@ -35,7 +35,6 @@ __all__ = [
     "Blueprint",
     "BlueprintDrive",
     "Condition",
-    "EmbeddedMedia",
     "ExpectBranch",
     "Machine",
     "Qmp",

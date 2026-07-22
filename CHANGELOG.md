@@ -16,8 +16,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Accept `rlq list machine` and `rlq list blueprint` as singular
   aliases for `rlq list machines` and `rlq list blueprints`. (`#3`)
 
+### Added
+
+- The redesigned script surface now has a typed parser:
+  `reliquary/script_grammar.lark` mirrors the normative EBNF in
+  `planning/design/script-spec.md`, and `reliquary.script_parser`
+  builds the typed tree from it. reliquary's own lexer feeds lark's
+  LALR(1) parser through a custom lexer, so lexical diagnostics keep
+  their authored wording — `lark` joins the runtime dependencies.
+  The runtime still consumes the superseded surface; wiring it over
+  is ROADMAP milestone 4's runner retarget.
+
+### Removed
+
+- Scripts no longer carry embedded JSON. The `media <label> { ... }`
+  block is deleted from the language, along with the planned
+  `landmark <name> { ... }` block, the install-on-first-run model
+  they implied, and `fetch-media --script`. Media definitions
+  (`.rlqm`) and landmark declarations (`.rlql`) are authored files
+  of their own, resolved beside the script and referenced by
+  `@name`. A script that contains a `media` block no longer parses;
+  move the definition into its own file beside the script. The
+  parser's `EmbeddedMedia` model and the `reliquary.EmbeddedMedia`
+  export are gone. Rationale and what was weighed:
+  `planning/DECISIONS.md`.
+
 ### Changed
 
+- Screenshot conversion uses Pillow in place of a hand-written PNG
+  encoder and PPM header parser, so `pillow` joins the runtime
+  dependencies. It also underpins the planned landmark image assets:
+  decode normalization, pixel comparison, and PNG text chunks for
+  capture provenance.
 - `rlq list machines` and `rlq list blueprints` report an explicit
   `(no ...)` message on an empty result instead of a column header
   over zero rows, matching `list scripts`, which already did.

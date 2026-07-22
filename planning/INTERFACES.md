@@ -39,8 +39,9 @@ is deliberately non-computational, so that anything computational
 belongs to the API (language goal G2). The two document formats
 are authored directly in an editor and consumed through every
 other surface: the CLI and API resolve and materialize
-blueprints, and scripts reference — and may embed — media
-definitions. A capability that appears
+blueprints, and scripts reference media definitions and landmark
+declarations, which are authored files of their own — a script
+carries no JSON. A capability that appears
 on one surface appears on the others wherever it is meaningful;
 where it does not, the omission is a named decision, not drift.
 

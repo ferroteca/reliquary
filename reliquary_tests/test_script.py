@@ -52,10 +52,9 @@ class ScriptParserTests(unittest.TestCase):
 
     def test_identifiers_allow_periods_after_the_first_character(self):
         result = parse_script(
-            'platform: dos\nmedia freedos-1.4-livecd {\n'
-            '"name": "freedos", "file": "freedos.iso",\n'
-            '"sha256": "' + "0" * 64 + '"\n}\n')
-        self.assertEqual(result.media[0].label, "freedos-1.4-livecd")
+            'platform: dos\ninsert cdrom0 freedos-1.4-livecd\n')
+        self.assertEqual(result.statements[0].argument,
+                         ("cdrom0", "freedos-1.4-livecd"))
 
     def test_unknown_verbs_and_invalid_durations_fail(self):
         for statement in ('launch now', 'wait "ready", timeout: 3'):

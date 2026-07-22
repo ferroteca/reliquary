@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: System :: Emulators",
     "Topic :: System :: Installation/Setup",
 ]
-dependencies = ["qemu.qmp"]
+dependencies = ["lark", "pillow", "qemu.qmp"]
 
 [dependency-groups]
 dev = ["build", "twine"]
@@ -39,6 +39,7 @@ include = ["reliquary*", "reliquary_tests"]
 
 [tool.setuptools.package-data]
 reliquary = [
+    "*.lark",
     "builtins/blueprints/*.json",
     "builtins/media/*.json",
     "builtins/scripts/*.rlqs",

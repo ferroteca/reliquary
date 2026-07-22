@@ -268,8 +268,9 @@ languages — never make it difficult to drive from a program.
 - Runtime dependencies are welcome when they pull their weight; declare
   them under `[project].dependencies` in `pyproject.toml`. Prefer the
   stdlib only when it serves the need equally well.
-- The hand-written PNG fallback predates this policy; replacing it with
-  a maintained image library is acceptable if that simplifies the code.
+- Pillow is the image library: screenshot conversion uses it, and the
+  planned landmark assets (decode normalization, pixel comparison, PNG
+  text chunks) build on it rather than on hand-written encoders.
 - Support Python 3.9 and newer.
 - Keep lines near 79 columns and match existing formatting.
 - Prefer small public interfaces with lifecycle complexity kept behind them.

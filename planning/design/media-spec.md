@@ -8,9 +8,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** the definition core is implemented: both forms with
 > their derived defaults, `file-extension`, `local-path`, library
 > scanning with duplicate detection, and hash-verified fetching
-> and extraction with the mismatched-file contract. Embedded
-> `media` blocks parse in scripts; their installation into the
-> library, mirror URL lists, the `fetch-media` and `clean-` commands,
+> and extraction with the mismatched-file contract. Mirror URL
+> lists, the `fetch-media` and `clean-` commands,
 > JSONC acceptance, and the definition-level annotation fields
 > are not implemented yet; details may still change before first
 > release.
@@ -29,10 +28,9 @@ interactive scenarios. Automation disables the fallback
 (`--assets-only`) and resolves strictly project-scoped: neither
 home definitions nor the codex behind them can reach an automated
 run — a project commits its own copies (the artifact-residency
-split, planning/USE-CASES.md). A rlq script may also
-embed definitions, installed on first run as `<label>.rlqm`
-beside the script — or into the home's `media/` when the script
-resolved from the home. Machines reference media by name (the
+split, planning/USE-CASES.md). A definition is always a file of
+its own: scripts reference definitions and never carry them.
+Machines reference media by name (the
 [`media` drive field](machine-blueprint-reference.md#media--optional--string)),
 and every media item is described by a **definition** stating
 where its file comes from and how it is verified.
@@ -54,16 +52,12 @@ sharing and versioning — while its sibling `cache/` holds the files:
 `cache/downloads/` the source archives, cached separately from the
 media items themselves. A project asset root organizes its
 `.rlqm` files however it likes; the caches stay under the home
-either way. A definition embedded in a script remains in
-that authored script and is also copied into the library on first
-run; its downloaded artifacts use the same shared caches.
+either way.
 
 ## Media items
 
-**Every media item has a definition** — a `.rlqm` file, possibly
-installed from a labeled `media <label> { ... }` block in a script.
-During read-only script checking, embedded blocks are treated as
-prospective library additions. A definition declares the item's
+**Every media item has a definition** — a `.rlqm` file. A
+definition declares the item's
 payload file name, where to download it from, how to extract it if it
 arrives inside an archive, and the hashes that verify it. reliquary
 can fetch, extract, and verify defined media on demand, and one
@@ -84,10 +78,9 @@ Resolution fails naming the missing media and the definition to
 edit; supplying the payload means adding a `url` or `local-path`
 to the definition, never placing files in the cache.
 
-A media name referenced from a machine blueprint resolves to the
-defined item of that name. A script run validates and installs all
-its embedded definitions before its machine is created or started,
-then uses the ordinary shared catalog. A name no definition provides
+A media name referenced from a machine blueprint or a script's
+`insert` resolves to the defined item of that name through the
+ordinary shared catalog. A name no definition provides
 is an error, and a resolved item whose payload is missing or fails
 verification is fetched when its definition allows, and is otherwise
 an error.
@@ -99,29 +92,21 @@ references, fetching, or
 starting a machine. Two files in one root with the same item name
 are an error; across roots the asset root shadows the home
 (identical descriptors coalesce, and run records name which root
-supplied each item). Before installing embedded definitions, reliquary compares
-their prospective items with the library and one another. An item may
-coincide only when its normalized descriptor is identical. The
+supplied each item). An item may coincide across roots only when
+its normalized descriptor is identical. The
 descriptor includes the payload identity and its direct-source or
 archive-source context; unrelated sibling items in an archive
 definition do not participate. Any difference is a collision error
-naming both locations and the item. Embedded definitions never
-override library files. The complete installation rules, including
-mixed partially redundant blocks, are in the
-[script spec](script-spec.md#installation-into-the-media-library).
+naming both locations and the item.
 
 ## The definition format
 
 A definition comes in two forms. There is no version field in
 either
 ([no backward compatibility before beta](machine-blueprint.md#format-stability-none-yet)).
-Both library JSON files and embedded `media` blocks use these exact
-forms. In a script, `media <label> {` replaces the JSON object's
-outer opening brace; the block body otherwise follows JSON syntax and
-closes with the object's `}`. The label determines the installed
-file name, `<label>.rlqm`, and carries no item meaning. See
-[the script spec](script-spec.md#embedded-media-definitions) for
-scope and resolution rules.
+A definition file's stem is its own name and carries no item
+meaning: an archive definition itemizes several independently
+named files, and `@` references name items, never the file.
 
 Library definition files are authored documents and accept the
 JSONC dialect: JSON (RFC 8259) plus `//` and `/* */` comments
@@ -136,14 +121,6 @@ field. A definition without comments remains valid strict JSON;
 one with them is not parseable by strict JSON tooling — a
 deliberate trade.
 
-Embedded `media` blocks are strict JSON: no comments, no
-trailing commas. The divergence from library files is a named
-decision with two reasons — the script grammar closes the JSON
-island by tracking its braces, which a comment containing a
-brace would break, and installation writes the library copy in
-canonical strict JSON, so block comments would silently vanish
-from the installed file.
-
 `sha256` values, at every level, are hexadecimal and accepted in
 either case; reliquary's canonical writes use lowercase.
 
@@ -156,9 +133,8 @@ authoring (U4). This prose remains normative, and schema validity
 never implies definition validity: library-wide name uniqueness,
 cross-definition archive agreement, defaults derived from URL
 file names, and every resolution rule live beyond the schema. One
-schema covers both homes of a definition — the library file and
-the embedded block use the same forms, and the schema validates
-the parsed document, so the JSONC dialect is invisible to it.
+The schema validates the parsed document, so the JSONC dialect
+is invisible to it.
 Editors bind it to `.rlqm` by file association; a definition
 carries no `$schema` field pre-beta
 ([format stability](machine-blueprint.md#format-stability-none-yet)).
@@ -335,10 +311,8 @@ each `items` entry of the archive form:
   omitted alongside `local-path`. A custom local path is outside
   `cache/`, so `clean-media` never touches it — the file is the
   user's, wherever it is.
-  A relative path in a library definition resolves from that
-  definition file's directory. An embedded definition resolves it
-  from the containing script's directory and installs the resulting
-  absolute path, preserving its meaning after the copy.
+  A relative path in a definition resolves from that
+  definition file's directory.
 - **`path`** — optional in `items` entries, defaulting to `file`
   (the common case: the archive entry already has the name you
   want to keep). Not valid in the item form, which downloads
@@ -447,7 +421,7 @@ either exists and verifies, or it doesn't.
 ## Fetching
 
 ```text
-rlq fetch-media <media_name> [--script <script_name>]
+rlq fetch-media <media_name>
 ```
 
 fetches a defined item explicitly: downloads (if missing or failing
@@ -455,10 +429,8 @@ verification), extracts, verifies, reports. Machine operations that
 resolve a media reference to a fetchable definition do the same
 implicitly, so `fetch-media` is a convenience for warming the library —
 an install script's media is fetched before the machine boots
-either way. Without `--script`, `fetch-media` sees the shared library.
-With it, fetch validates and installs that script's embedded
-definitions using the same rules as script execution, then fetches
-the named item; it does not execute guest steps or start a machine.
+either way. `fetch-media` sees the shared library: every
+definition is a file, so there is nothing a script would add.
 
 Fetch prefers what is already on disk, cheapest source first: a
 payload that verifies is used as-is; otherwise a cached (or
@@ -466,8 +438,8 @@ payload that verifies is used as-is; otherwise a cached (or
 are the mirror URLs tried.
 
 The embedding API counterpart is
-`fetch_media(name, home=None, script=None, on_mismatch="fail")`,
-with `script` mirroring `--script` — the CLI and the API move
+`fetch_media(name, home=None, on_mismatch="fail")` — the CLI and
+the API move
 together (planning/INTERFACES.md). `fetch_media` is the blocking
 form: a typed result, errors raised by class. Its asynchronous
 twin `start_fetch(...)` (same parameters) returns a pull-only
@@ -564,8 +536,7 @@ how reliquary is running:
   on commands that fetch media — the flag mirrors the twin's
   parameter under the twin-name identity rule — or the embedding
   API's `on_mismatch="refetch"` option
-  (`fetch_media(name, home=None, script=None,
-  on_mismatch="fail")`; the CLI accepts `fail | refetch`
+  (`fetch_media(name, home=None, on_mismatch="fail")`; the CLI accepts `fail | refetch`
   explicitly and maps interactive runs without the flag to
   `"prompt"`).
 
@@ -612,9 +583,8 @@ counterparts are `clean_downloads(home=None)` and
 ## Sharing
 
 Media definitions travel well: they are small, hash-pinned, and
-machine-independent. A definition may be distributed directly under
-`media/` or embedded in a script and installed into the recipient's
-library on first run. The latter produces a more self-contained
-script bundle without changing the persistent catalog, cache, or
-verification model. Either form gives everyone the same verified
+machine-independent. A definition travels as its own `.rlqm`
+file — under `media/` in a home, or beside the script and
+blueprint that reference it in a project, where it is committed
+source. That gives everyone the same verified
 inputs without shipping the payloads themselves (U4).

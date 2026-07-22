@@ -370,14 +370,13 @@ selection matches only machines whose recorded source equals the
 invocation's own resolution of that name, so same-named
 blueprints in different projects never select — and `apply` never
 adopts — each other's machines. **reliquary reads by
-extension and writes by convention**: embedded media blocks
-install as `<label>.rlqm` — into the home's `media/` for a
-home-resolved script, beside the script file itself for a
-source-resident one — a new source file its author commits;
-installation is idempotent by identity, so a committed definition
-means no further writes and a clean CI tree. U6's recorder
-likewise emits its drafts into the asset root the session ran
-with.
+extension and writes by convention**: U6's recorder emits its
+drafts — the script, its landmark declarations, and their variant
+renderings — into the asset root the session ran with, as new
+source files their author commits. Nothing else writes an
+authored asset: a script carries no definitions to install, so an
+ordinary run leaves the asset root untouched and a CI tree
+clean.
 
 ## The CLI
 
@@ -646,7 +645,7 @@ rlq get-machine-dir (--blueprint <name> | --machine <id>)
 rlq hmp <line> (--blueprint <name> | --machine <id>)
 rlq check-script <label-or-name> [--blueprint <name> | --machine <id>]
     [--property <key>=<value>]... [--properties <path>]
-rlq fetch-media <media_name> [--script <script_name>]
+rlq fetch-media <media_name>
 rlq list-properties [<prefix>]
 rlq get-property <key>
 rlq set-property <key> <value>
@@ -665,9 +664,8 @@ Lifecycle semantics:
   (a `.rlqb` file — written by hand, by `new-blueprint`, or by
   `import-vm`), materializes a new machine under a new id — state,
   drives, backend object — and prints that id.
-  Blueprints are authored documents. Media definitions are likewise
-  user-owned, though a script can seed missing library
-  definitions from its embedded blocks before its first run.
+  Blueprints are authored documents, and media definitions are
+  likewise user-owned files a script references but never carries.
 - `apply-blueprint` adopts the current blueprint into a stopped
   machine: it
   re-resolves the blueprint, reconciles the machine to the new
@@ -691,18 +689,17 @@ Lifecycle semantics:
   start-plus-attach; `--detach` returns the run id after
   foreground preflight ("Asynchronous runs" below).
 
-- `run-script` completes preflight, installs missing embedded media
-  definitions, resolves its machine (creating one when `--blueprint`
-  names a blueprint with no machine yet), and starts it if it is not
-  already running before executing guest steps.
+- `run-script` completes preflight, resolves its machine (creating
+  one when `--blueprint` names a blueprint with no machine yet), and
+  starts it if it is not already running before executing guest
+  steps.
 - `fetch-media` downloads, extracts, and hash-verifies a defined
   media
   item (see planning/design/media-spec.md). It is a convenience: machine
   operations resolving a `media` reference to a fetchable
   definition fetch implicitly. Source archives are cached under
   `cache/downloads/`, separate from the payloads in
-  `cache/media/`. `--script` installs that script's embedded
-  definitions before fetching, without executing guest steps.
+  `cache/media/`.
 - the property family (`get-property`, `set-property`,
   `unset-property`, `list-properties`) maintains the home-wide
   user properties file described in
@@ -953,16 +950,17 @@ entry. This protects reliquary's records, not guest logs, history, or
 an explicitly requested screenshot. The complete planned contract is
 in [planning/design/script-properties.md](design/script-properties.md).
 
-Scripts may also embed ordinary media-definition JSON objects in
-top-level, labeled `media <label> { ... }` blocks. After full
-preflight but before machine resolution, running the script installs
-each missing definition as `<label>.rlqm`; `fetch-media --script`
-does the same without executing guest steps. Existing definitions are
-never overwritten: wholly identical blocks are already installed,
-while differing targets, item collisions, and partially overlapping
-blocks fail with both locations named. New files use canonical JSON
-and become ordinary user-owned library documents. Fetched and
-extracted artifacts use the common caches.
+A script carries no JSON (owner, 2026-07-22). Media definitions
+and landmark declarations are authored files of their own — `.rlqm`
+and `.rlql` resolved beside the script under authored-asset
+resolution — referenced by `@name` and never embedded. The
+`media <label> { ... }` and `landmark <name> { ... }` block forms
+are deleted, and with them the install-on-first-run model: a run
+writes no authored asset, the node grammar has no JSON island, and
+one rule covers all four extensions. The cost is that a workflow
+travels as a small set of files rather than one — which is what U4
+already describes, a repository carrying blueprints, media
+definitions, and scripts side by side.
 
 The language has no file-exchange verbs (owner, 2026-07-22 —
 the run-collection model was dropped): files cross the boundary
@@ -989,8 +987,7 @@ surface — it is the proven instruction set the language must cover:
   state, or a stable observation, with timeout/deadline bounds;
 - select an entry in a cursor-key menu by visible feedback;
 - take a screenshot;
-- define embedded media, insert/eject it, and start/stop the
-  machine.
+- insert and eject defined media, and start/stop the machine.
 
 ### Primary language goals
 
@@ -1047,7 +1044,7 @@ in. The seam falls where our knowledge ends:
 |---|---|---|
 | machine shape | declarative (the blueprint) | ours, and knowable |
 | which phases exist, their budgets | declarative | ours, and knowable |
-| media, inputs, embedded definitions | declarative | ours, and knowable |
+| media and property references | declarative | ours, and knowable |
 | keystrokes and observations within a phase | procedural | the guest's installer dictates the order |
 | which route the run takes | procedural choice over a declarative graph | the guest chooses at run time |
 
@@ -1123,8 +1120,8 @@ recorder captures — are designed in
 [planning/design/landmarks.md](design/landmarks.md): one
 declaration owning geometry, with variant renderings sharing it
 by construction; whole-screen exact match with `fuzzy`/`ignore`
-modifier regions; the `.rlql` catalog form and embedded
-resolve-in-place blocks under authored-asset resolution; and the
+modifier regions; the `.rlql` catalog form under authored-asset
+resolution — declarations are files, never script content; and the
 always-on cursor normalization contract. What remains open is
 milestone 12's "Decide first" round.
 
@@ -1549,7 +1546,13 @@ The remainder of the script spec beyond milestone 1's core,
 completing the then-documented design for DOS on QEMU. The
 deliverables below record what was built; the July 2026 spec
 redesign supersedes their syntax, and milestone 4 retargets
-them.
+them. Two exceptions to "what was built", left standing as the
+record: the embedded-media parts of deliverables 5 and 7
+(installation rules, `fetch --script`) and the Done-when clause
+naming embedded media blocks were planned but never implemented —
+`media` blocks parsed and nothing consumed them — and the
+2026-07-22 no-JSON-in-scripts decision deleted the feature
+outright rather than completing it (planning/DECISIONS.md).
 
 Deliverables:
 
@@ -1751,13 +1754,12 @@ Deliverables:
    the resolution module (`--assets` / `--assets-only`), the
    `.rlqb` / `.rlqm` extension renames, the `builtins/` →
    `codex/` package rename and the codex index, the
-   blueprint-source state field, selection scoping, and
-   embedded-install targeting.
+   blueprint-source state field, and selection scoping.
 9. The shared JSONC reader for authored documents (RFC 8259 plus
    `//` and `/* */` comments and trailing commas, nothing more;
    string-aware, comments replaced by spaces so error positions
-   survive; JSON islands in scripts and every machine-written
-   file stay strict JSON), the remaining media-definition
+   survive; every machine-written file stays strict JSON), the
+   remaining media-definition
    surface (definition-level `description` / `notes` /
    `redistributable-under`, archive-level `local-path`,
    sourceless definitions failing resolution naming the
@@ -2065,7 +2067,7 @@ Deliverables:
    control-plane seam, with pacing control-plane-owned.
 3. Landmarks implemented per
    [planning/design/landmarks.md](design/landmarks.md): the `.rlql`
-   catalog and embedded resolve-in-place forms, `@landmark`
+   catalog form, `@landmark`
    matching with fuzzy/ignore modifier regions, the cursor
    normalization contract, and the match-and-click verbs
    composed on the primitives.
@@ -2110,9 +2112,7 @@ VNC and on Hyper-V through its decided screen strategy.
   Value concentrates where out-of-band access thins — non-QEMU
   backends (no `hostdir`) and non-FAT guest filesystems — so
   sequence at or soon after milestone 9's second backend.
-- Media commands beyond `fetch-media` (verify, remove), and
-  whether each can select embedded definitions through
-  `--script`.
+- Media commands beyond `fetch-media` (verify, remove).
 - A `pytest-reliquary` plugin (per AGENTS.md prior art).
 
 ## Design principles
