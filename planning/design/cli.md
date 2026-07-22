@@ -12,7 +12,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > [codex.md](codex.md) (the codex,
 > `seed`, naming conventions, provenance) and the
 > [blueprint field reference](machine-blueprint-reference.md)
-> (`name`, `description`, `scripts`).
+> (`description`, `scripts`).
 
 Every command maps one-to-one onto a public API call — and is
 **named by it**: a command is its twin's name, dash-separated
@@ -81,12 +81,12 @@ first use.
 ### Named scripts
 
 A blueprint may declare a `scripts` map — short labels that name
-`.rlqs` script files. It may also carry optional `name` and
-`description` fields for discovery:
+`.rlqs` script files. It may also carry an optional
+`description` field for discovery (the file stem is the
+blueprint's one name):
 
 ```json
 {
-  "name": "FreeDOS 1.4 — Plain DOS system",
   "description": "Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set.",
   "platform": "dos",
   "scripts": {
@@ -106,10 +106,10 @@ The labels are the verbs you use with `run-script`:
 `scripts.install`, finds `freedos-1.4-plain-install`, and runs
 `scripts/freedos-1.4-plain-install.rlqs`.
 
-`name` and `description` are optional in both user and codex
+`description` is optional in both user and codex
 blueprints. The codex carries an index mapping every
-codex artifact to its name, description, and relationships;
-user blueprints are indexed by reading these fields from the file.
+codex artifact to its description and relationships;
+user blueprints are indexed by reading the field from the file.
 
 ### Scaffolding a blueprint
 
@@ -261,19 +261,20 @@ rlq search-blueprints <term>...
 
 `list-blueprints` shows everything in `blueprints/`.
 `search-blueprints` queries the codex index and user blueprint files,
-matching terms against filename, `name`, `description`, and
-platform. Multiple terms are ANDed:
+matching terms against filename, `description`, and
+platform (the file stem is the blueprint's one name — there is no
+display-name field). Multiple terms are ANDed:
 
 ```powershell
 $ rlq search-blueprints dos
-BLUEPRINT              NAME                                MACHINES  CODEX
-freedos-1.4-plain      FreeDOS 1.4                         2         seeded
-test-rig               (untitled)                          0
-msdos-622              MS-DOS 6.22 — base install          —         yes
+BLUEPRINT              DESCRIPTION                              MACHINES  CODEX
+freedos-1.4-plain      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
+test-rig                                                        0
+msdos-622              Installs MS-DOS 6.22 from three flop...  —         yes
 
 $ rlq search-blueprints freedos install
-BLUEPRINT              NAME                                MACHINES  CODEX
-freedos-1.4-plain      FreeDOS 1.4                         2         seeded
+BLUEPRINT              DESCRIPTION                              MACHINES  CODEX
+freedos-1.4-plain      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
 ```
 
 The CODEX column tracks provenance by name: `yes` marks a
@@ -281,12 +282,11 @@ library entry not yet in your home; `seeded` marks a user file
 whose name also exists in the library (it was extracted, or shares
 the name); blank marks a purely user-authored file.
 
-`--verbose` adds the description line:
+`--verbose` shows the full record:
 
 ```powershell
 $ rlq search-blueprints freedos --verbose
 BLUEPRINT              freedos-1.4-plain
-NAME                   FreeDOS 1.4 — Plain DOS system
 DESCRIPTION            Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set.
 PLATFORM               dos
 SCRIPTS                install → freedos-1.4-plain-install
@@ -766,13 +766,14 @@ rlq search-scripts <term>...
 
 `list-scripts` shows everything in `scripts/`. `search-scripts`
 queries the codex index and user scripts, matching terms against
-filename, `name`, and `description`:
+filename and the script's `description` header (scripts have no
+name field; the filename is the name):
 
 ```powershell
 $ rlq search-scripts freedos
-SCRIPT                        NAME                          CODEX
-freedos-1.4-plain-install     FreeDOS 1.4 — plain install         seeded
-freedos-1.4-plain-verify      FreeDOS 1.4 — verify boot     yes
+SCRIPT                        DESCRIPTION                              CODEX
+freedos-1.4-plain-install     Unattended FreeDOS 1.4 plain install     seeded
+freedos-1.4-plain-verify      Boot the installed disk and verify       yes
 ```
 
 ### Running scripts
@@ -920,18 +921,19 @@ rlq search-media <term>...
 
 `list-media` shows everything in `media/`. `search-media` queries
 the codex index and user media definitions, matching terms
-against filename, `name`, and `description`. Multiple terms are
-ANDed:
+against filename, item `name`s (the identifiers machine drives
+reference — semantic, not display metadata), and `description`.
+Multiple terms are ANDed:
 
 ```powershell
 $ rlq search-media freedos
-MEDIA                   NAME                    CODEX
-freedos-1.4-livecd      FreeDOS 1.4 LiveCD ISO  seeded
-freedos-1.4-bonus       FreeDOS 1.4 Bonus CD    yes
+MEDIA                   DESCRIPTION                              CODEX
+freedos-1.4-livecd      The FreeDOS 1.4 LiveCD installer ISO     seeded
+freedos-1.4-bonus       The FreeDOS 1.4 BonusCD package ISO      yes
 
 $ rlq search-media win98
-MEDIA                   NAME                    CODEX
-win98se                 Windows 98 SE OEM ISO   yes
+MEDIA                   DESCRIPTION                              CODEX
+win98se                 Windows 98 SE OEM installation ISO       yes
 ```
 
 `--verbose` adds the description and source URL.

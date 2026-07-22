@@ -12,12 +12,8 @@
       "description": "The virtualization backend hosting the machine. Omitted, the backend is assigned at materialization; declared, it pins the choice and fails rather than falling back.",
       "enum": ["qemu", "virtualbox", "vmware", "hyperv"]
     },
-    "name": {
-      "description": "Human-readable one-line display name. No effect on machine behavior; feeds search.",
-      "type": "string"
-    },
     "description": {
-      "description": "Longer human-readable description. No effect on machine behavior; feeds search.",
+      "description": "Human-readable description. No effect on machine behavior; feeds search. The blueprint's one name is its file stem; there is no display-name field.",
       "type": "string"
     },
     "scripts": {

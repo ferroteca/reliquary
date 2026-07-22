@@ -6,7 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 # The machine blueprint
 
 > **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
-> `size`/`media` and empty removable slots (`null`), `boot`, `name`,
+> `size`/`media` and empty removable slots (`null`), `boot`,
 > `description`, and `scripts`) is implemented: parsing, validation,
 > media-name resolution, machine materialization, and persistent
 > script-driven `insert`/`eject`. The remaining fields, and JSONC

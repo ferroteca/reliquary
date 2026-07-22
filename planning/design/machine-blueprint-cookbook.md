@@ -6,7 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 # Machine blueprint — cookbook
 
 > **Status:** examples using only the milestone-1 subset (`platform`,
-> `memory`, `drives` with `size`/`media`, `boot`, `name`, `description`,
+> `memory`, `drives` with `size`/`media`, `boot`, `description`,
 > and `scripts`) can now be parsed, validated, and resolved. Machine
 > materialization and the remaining fields are not implemented yet; details
 > may still change before first release.

@@ -52,7 +52,7 @@ Two rules carry the model:
 ## The index and provenance
 
 The codex carries an index mapping every codex artifact to
-its `name`, `description`, and relationships (which media
+its `description` and relationships (which media
 definitions and scripts a blueprint references). User-owned files
 are indexed by reading the same optional fields from the file.
 `search` queries both.
@@ -153,7 +153,7 @@ not a namespace.
 ## Named scripts on blueprints
 
 A blueprint may declare a `scripts` map — short labels naming
-`.rlqs` script files — plus optional `name` and `description`
+`.rlqs` script files — plus an optional `description`
 fields for discovery (see the
 [field reference](machine-blueprint-reference.md)). The labels are
 the verbs you use with `run-script`:

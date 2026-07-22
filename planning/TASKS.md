@@ -865,8 +865,25 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       - can be in item needed at runtime
     - when 'cleaning'
       - ?? 
-- 'list blueprints' should have a 'NAME' column and announce that these are scripts in <home_script_dir> (top line 
-  instead of home dir announcement)
+- BLUEPRINT `name` FIELD DROPPED — DECIDED (owner, 2026-07-21,
+  digression round during the CLI queue): the blueprint's one name
+  is its file stem; `description` is the single discovery-prose
+  field, uniform across the authored formats (scripts already had
+  no name header; media's item `name` is a different, load-bearing
+  concept — the identifier drives reference — and is untouched).
+  Rationale: a display name is never an identifier, drifts from
+  the stem unvalidated, and adds nothing over the description;
+  listings become STEM | DESCRIPTION (truncated) and search
+  matches stem/description/platform. Folded: blueprint reference
+  (§description), guide + reference + cookbook status notes,
+  machine-blueprint.schema.json, cli.md (named-scripts example,
+  index prose, all three list/search sections — including fixing
+  the stale claim that script search matches a `name` scripts
+  never had), codex.md (index prose), ROADMAP (blueprint fields,
+  codex index). This supersedes the old wishlist ask for a NAME
+  column in 'list blueprints'; its other half survives below
+- 'list-blueprints' should announce the blueprints directory on its
+  top line (instead of the home-dir announcement)
 - new command 'diff blueprint <name>' should diff the user blueprint to the built-in blueprint of the same name
 - new 'delete <blueprint>' command
   - warn if there are active child machines (wait for confirm or block)

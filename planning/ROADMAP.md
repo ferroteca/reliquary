@@ -215,8 +215,9 @@ of a differencing disk by default, or copied), `boot`, `control-planes` (the ord
 policy), and `backend-settings` (the scoped non-portable escape
 hatch applied only when its named backend is selected; it never
 selects that backend by itself).
-Discovery and scripting fields: optional `name` and `description`
-(indexed by `search`), the `scripts` map — short labels naming
+Discovery and scripting fields: an optional `description`
+(indexed by `search`; the file stem is the blueprint's one name —
+a display-name field was weighed and dropped, owner 2026-07-21), the `scripts` map — short labels naming
 `.rlqs` files, the verbs used with `run-script`
 (`rlq run-script install --blueprint freedos-1.4-plain`) — and the
 `parameters` map: blueprint-supplied script-input bindings, each
@@ -287,7 +288,7 @@ a **seed, not a resolution tier**: referencing a codex artifact
 that doesn't yet exist in the home copies it out as an ordinary
 user-owned file; a file already present in the home is never
 overwritten, and deleting a copy is how it is refreshed. An index
-maps every codex artifact to its name, description, and
+maps every codex artifact to its description and
 relationships; `search` queries the index and user files together,
 and listings report provenance (`yes` / `seeded` / user-authored).
 The `seed-` family is the explicit extraction command; implicit extraction on

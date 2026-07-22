@@ -6,7 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 # Machine blueprint — field reference
 
 > **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
-> `size`/`media` and empty removable slots (`null`), `boot`, `name`,
+> `size`/`media` and empty removable slots (`null`), `boot`,
 > `description`, and `scripts`) is implemented: parsing, validation,
 > media-name resolution, machine materialization, and persistent
 > script-driven `insert`/`eject`. The remaining fields, and JSONC
@@ -113,21 +113,22 @@ backend machine and resolves the blueprint afresh (see
 
 ---
 
-## `name` and `description`
+## `description`
 
 **blueprint (optional) · string**
 
-Human-readable discovery metadata: a one-line display `name` and a
-longer `description`. Neither affects machine behavior; both feed
-`search`, which matches terms against filename, `name`,
-`description`, and platform (U5). Codex blueprints carry
-them through the codex's index; user blueprints are indexed by
-reading the fields from the file (see
-[the codex](codex.md)).
+Human-readable discovery prose. It does not affect machine
+behavior; it feeds `search`, which matches terms against
+filename, `description`, and platform (U5). The blueprint's one
+name is its file stem — there is no display-name field (a
+`name` field was weighed and dropped, owner 2026-07-21: a second
+name drifts from the stem and adds nothing over the
+description). Codex blueprints carry the description through the
+codex's index; user blueprints are indexed by reading the field
+from the file (see [the codex](codex.md)).
 
 ```json
 {
-  "name": "FreeDOS 1.4 — Plain DOS system",
   "description": "Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set."
 }
 ```
