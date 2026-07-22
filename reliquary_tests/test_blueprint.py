@@ -146,6 +146,11 @@ class ParseBlueprintTests(BlueprintTestCase):
             self.parse({"platform": "linux"})
         self.assertIn("platform", str(caught.exception))
 
+    def test_openbsd_platform_is_recognized(self):
+        result = self.parse({"platform": "openbsd", "memory": "512M"})
+        self.assertEqual(result.platform, "openbsd")
+        self.assertEqual(result.memory, 512)
+
     def test_unknown_top_level_field_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
             self.parse({"platform": "dos", "backend": "qemu"})

@@ -236,6 +236,108 @@ class ObservationChannelTests(_ValidationCase):
             [("screen", "text"), ("screen", "regex"), ("machine", "state")])
 
 
+class HttpValidationTests(_ValidationCase):
+    """Milestone 5 HTTP declarations are statically checkable."""
+
+    def test_content_paths_are_absolute_and_normalized(self):
+        self.rejects(
+            _HEAD + 'http {\n    content answer "answer.txt" """\n'
+            '        one\n    """\n}\nstart\n',
+            "content path must begin with '/'", "content")
+        self.rejects(
+            _HEAD + 'http {\n    content answer "/../answer.txt" """\n'
+            '        one\n    """\n}\nstart\n',
+            "content path may not contain . or ..", "content")
+
+    def test_content_paths_are_unique(self):
+        self.rejects(
+            _HEAD + 'http {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n    content other "/answer.txt" """\n'
+            '        two\n    """\n}\nstart\n',
+            "duplicate content path: /answer.txt", "content")
+
+    def test_content_names_are_unique_within_one_set(self):
+        self.rejects(
+            _HEAD + 'http {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n    content answer "/other.txt" """\n'
+            '        two\n    """\n}\nstart\n',
+            "duplicate content name: answer", "content")
+        self.rejects(
+            _HEAD + 'http start {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n    content answer "/other.txt" """\n'
+            '        two\n    """\n}\n',
+            "duplicate content name: answer", "content")
+
+    def test_content_body_may_not_be_empty(self):
+        self.rejects(
+            _HEAD + 'http {\n    content answer "/answer.txt" """\n'
+            '    """\n}\nstart\n',
+            "has an empty body", "content")
+
+    def test_port_range_is_checked(self):
+        self.rejects(
+            _HEAD + 'http port-min=9000 port-max=8000 {\n'
+            '    content answer "/answer.txt" """\n        one\n    """\n'
+            '}\nstart\n',
+            "port-min must be less than or equal to port-max", "port")
+        self.rejects(
+            _HEAD + 'http port-min=70000 {\n'
+            '    content answer "/answer.txt" """\n        one\n    """\n'
+            '}\nstart\n',
+            "port-min is not a TCP port", "port")
+
+    def test_reserved_property_namespaces_are_rejected(self):
+        self.rejects(_HEAD + "property rlq.http.url\nstart\n",
+                     "rlq namespace", "S5")
+        self.rejects(_HEAD + "property reliquary.http.url\nstart\n",
+                     "reliquary namespace", "S5")
+
+    def test_rlq_http_reference_requires_http_block(self):
+        self.rejects(_HEAD + 'enter "${rlq.http.url}/answer.txt"\n',
+                     "rlq.http.* properties require an http block", "S6")
+
+    def test_http_start_requires_declared_content(self):
+        self.rejects(_HEAD + "http start\n",
+                     "http start requires declared or inline content",
+                     "http")
+
+    def test_http_action_names_are_closed(self):
+        self.rejects(
+            _HEAD + 'http {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n}\nhttp begin\n',
+            "http action must be start or stop", "http")
+
+    def test_http_stop_is_allowed_without_declared_content(self):
+        script = parse_script(_HEAD + "http stop\n")
+        self.assertEqual(script.statements[0].arguments, ("stop",))
+
+    def test_http_start_names_declared_content(self):
+        self.rejects(
+            _HEAD + 'http {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n}\nhttp start missing\n',
+            "http start names undeclared content: missing", "http")
+
+    def test_http_start_can_define_inline_content_without_declaration(self):
+        script = parse_script(
+            _HEAD + 'http start {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n}\n'
+            'enter "${rlq.http.url}/answer.txt"\n')
+        self.assertEqual(script.statements[0].contents[0].name, "answer")
+
+    def test_http_start_can_redefine_declared_content_inline(self):
+        script = parse_script(
+            _HEAD + 'http {\n    content answer "/answer.txt" """\n'
+            '        one\n    """\n}\n'
+            'http start {\n    content answer "/answer.txt" """\n'
+            '        two\n    """\n}\n')
+        self.assertEqual(script.statements[0].contents[0].body.text,
+                         "two\n")
+
+    def test_http_stop_takes_no_names_or_block(self):
+        self.rejects(_HEAD + "http stop answer\n",
+                     "http stop takes no content names", "http")
+
+
 class PortableKeyTests(_ValidationCase):
     """S14: ``press`` uses the language's closed portable key set."""
 

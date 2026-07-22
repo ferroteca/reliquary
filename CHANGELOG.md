@@ -16,6 +16,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Packaging metadata now declares the project homepage
   (`https://github.com/ferroteca/reliquary`) so PyPI can link to
   the repository.
+- ROADMAP milestone 5 is complete: `.rlqs` scripts can declare a
+  run-scoped HTTP server for installer answer files, serve named
+  inline or script-relative `from=` content, start selected or
+  redefined content at `http start`, use the reserved
+  `rlq.http.ip` / `rlq.http.port` / `rlq.http.url` bindings, and
+  rely on explicit or implied `http stop` teardown.
+- Built-in OpenBSD 7.9 amd64 codex assets: an
+  `openbsd-7.9-amd64` blueprint, install ISO media definition, and
+  install script using OpenBSD autoinstall over the run-scoped HTTP
+  server.
 
 ## 0.1.0.dev1 - 2026-07-22
 

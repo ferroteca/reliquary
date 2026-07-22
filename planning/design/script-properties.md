@@ -65,8 +65,12 @@ A property name consists of dot-separated script identifiers. Segments use
 ASCII letters, digits, `_`, and `-`, must start with a letter, and are
 case-sensitive. Lowercase names are recommended. Names such as
 `identity.full-name`, `products.<product>.install-key`, and
-`accounts.<purpose>.password` make ownership clear, but reliquary reserves no
-top-level namespace.
+`accounts.<purpose>.password` make ownership clear. The top-level
+`rlq` and `reliquary` namespaces are reserved for reliquary-owned
+run facts and future system properties; user-authored properties,
+blueprint parameters, environment bindings, and property-file
+entries may not use `rlq`, `rlq.*`, `reliquary`, or any
+`reliquary.*` key.
 
 Whitespace around `=` is trimmed; the value is the trimmed
 remainder of the line, verbatim — no quoting, no escapes, no line

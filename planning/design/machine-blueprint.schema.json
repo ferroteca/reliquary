@@ -6,7 +6,7 @@
   "properties": {
     "platform": {
       "description": "The guest platform — the operating-system family the machine is for. Required; never inferred.",
-      "enum": ["dos", "win9x", "winnt"]
+      "enum": ["dos", "openbsd", "win9x", "winnt"]
     },
     "backend": {
       "description": "The virtualization backend hosting the machine. Omitted, the backend is assigned at materialization; declared, it pins the choice and fails rather than falling back.",

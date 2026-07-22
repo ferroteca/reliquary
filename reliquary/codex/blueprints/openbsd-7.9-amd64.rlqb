@@ -1,0 +1,13 @@
+{
+  "platform": "openbsd",
+  "memory": "512M",
+  "description": "OpenBSD 7.9 amd64 installed from install79.iso using autoinstall over reliquary's run-scoped HTTP server",
+  "drives": {
+    "hdd0": {"size": "4G"},
+    "cdrom0": null
+  },
+  "boot": ["hdd0", "cdrom0"],
+  "scripts": {
+    "install": "openbsd-7.9-install"
+  }
+}

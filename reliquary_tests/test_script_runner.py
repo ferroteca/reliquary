@@ -3,9 +3,11 @@
 """Tests for the .rlqs runtime: dispatch, episodes, and clocks."""
 
 import contextlib
+import http.client
 import io
 import json
 import os
+import socket
 import tempfile
 import unittest
 from unittest import mock
@@ -14,7 +16,8 @@ from qemu.qmp import ConnectError
 
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (ScriptRuntimeError, _normalize_row,
-                                     _resolve_key, _ScriptEngine,
+                                     _resolve_key, _HttpResponse,
+                                     _HttpService, _ScriptEngine,
                                      execute_script)
 from reliquary.script_validation import PORTABLE_KEY_NAMES
 
@@ -71,17 +74,49 @@ class _FakeConsole:
         self.commands.append(("select", item, timeout, exclude))
 
 
+class _FakeHttpService:
+    """A fake run-scoped HTTP service for lifecycle tests."""
+
+    guest_ip = "10.0.2.2"
+    instances = []
+
+    def __init__(self, responses, port_min=8000, port_max=9000):
+        self.responses = tuple(responses)
+        self.port_min = port_min
+        self.port_max = port_max
+        self.port = None
+        self.started = 0
+        self.stopped = 0
+        _FakeHttpService.instances.append(self)
+
+    @property
+    def url(self):
+        if self.port is None:
+            return None
+        return f"http://{self.guest_ip}:{self.port}"
+
+    def start(self):
+        self.started += 1
+        self.port = self.port_min
+
+    def stop(self):
+        self.stopped += 1
+        self.port = None
+
+
 class _RuntimeCase(unittest.TestCase):
     """Builds engines over a fake console and a controlled clock."""
 
     def engine(self, source, screens=(), port=5555, fail=False,
                run_dir=None):
+        _FakeHttpService.instances = []
         script = parse_script(_HEAD + source)
         clock = _Clock()
         engine = _ScriptEngine(
             script, "plain-0", "/tmp/home",
             "/tmp/home/cache/machines/plain-0", run_dir=run_dir,
-            script_path="demo.rlqs", clock=clock, sleep=clock.sleep)
+            script_path="demo.rlqs", clock=clock, sleep=clock.sleep,
+            http_service_factory=_FakeHttpService)
         engine._port = port
         self.console = _FakeConsole(screens, fail)
         self.clock = clock
@@ -559,6 +594,227 @@ class MachineOperationTests(_RuntimeCase):
         with mock.patch("reliquary.script_runner.Machine") as machine:
             self.run_linear(engine)
         machine.return_value.screenshot.assert_called_once_with("step-1")
+
+
+class HttpLifecycleTests(_RuntimeCase):
+    """Run-scoped HTTP starts, stops, and cleans up predictably."""
+
+    def test_http_start_serves_declared_content_and_binds_url(self):
+        engine = self.engine(
+            "http port-min=8123 port-max=8123 {\n"
+            '    content answer "/answer.txt" """\n'
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start answer\n"
+            'enter "${rlq.http.url}/answer.txt"\n')
+        self.run_linear(engine)
+        service = _FakeHttpService.instances[0]
+        self.assertEqual(service.port_min, 8123)
+        self.assertEqual([response.path for response in service.responses],
+                         ["/answer.txt"])
+        self.assertEqual(service.responses[0].body, b"one\n")
+        self.assertIn(("send_text",
+                       "http://10.0.2.2:8123/answer.txt", True),
+                      self.console.commands)
+
+    def test_http_stop_is_noop_when_already_stopped(self):
+        engine = self.engine("http stop\n")
+        self.run_linear(engine)
+        self.assertEqual(_FakeHttpService.instances, [])
+        self.assertEqual(engine._bindings, {})
+
+    def test_http_stop_clears_runtime_bindings(self):
+        engine = self.engine(
+            "http {\n"
+            '    content answer "/answer.txt" """\n'
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start\n"
+            "http stop\n"
+            'enter "${rlq.http.url}/answer.txt"\n')
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            self.run_linear(engine)
+        self.assertIn("${rlq.http.url} has no bound value",
+                      str(caught.exception))
+        self.assertEqual(_FakeHttpService.instances[0].stopped, 1)
+
+    def test_http_start_without_names_serves_all_declared_content(self):
+        engine = self.engine(
+            "http {\n"
+            '    content one "/one.txt" """\n        one\n    """\n'
+            '    content two "/two.txt" """\n        two\n    """\n'
+            "}\n"
+            "http start\n")
+        self.run_linear(engine)
+        self.assertEqual(
+            [response.path for response in _FakeHttpService.instances[0]
+             .responses],
+            ["/one.txt", "/two.txt"])
+
+    def test_http_start_names_only_selected_content(self):
+        engine = self.engine(
+            "http {\n"
+            '    content one "/one.txt" """\n        one\n    """\n'
+            '    content two "/two.txt" """\n        two\n    """\n'
+            "}\n"
+            "http start two\n")
+        self.run_linear(engine)
+        self.assertEqual(
+            [response.path for response in _FakeHttpService.instances[0]
+             .responses],
+            ["/two.txt"])
+
+    def test_http_start_redefines_specific_content_for_that_start(self):
+        engine = self.engine(
+            "http {\n"
+            '    content answer "/answer.txt" """\n'
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start {\n"
+            '    content answer "/answer.txt" """\n'
+            "        two\n"
+            "    \"\"\"\n"
+            "}\n")
+        self.run_linear(engine)
+        self.assertEqual(
+            _FakeHttpService.instances[0].responses[0].body, b"two\n")
+
+    def test_http_redefinition_must_leave_final_paths_unique(self):
+        engine = self.engine(
+            "http {\n"
+            '    content one "/one.txt" """\n        one\n    """\n'
+            '    content two "/two.txt" """\n        two\n    """\n'
+            "}\n"
+            "http start {\n"
+            '    content one "/two.txt" """\n'
+            "        replacement\n"
+            "    \"\"\"\n"
+            "}\n")
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            self.run_linear(engine)
+        self.assertIn("duplicate path: /two.txt", str(caught.exception))
+
+    def test_http_restart_stops_the_previous_server(self):
+        engine = self.engine(
+            "http {\n"
+            '    content answer "/answer.txt" """\n'
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start\n"
+            "http start\n")
+        self.run_linear(engine)
+        self.assertEqual(len(_FakeHttpService.instances), 2)
+        self.assertEqual(_FakeHttpService.instances[0].stopped, 1)
+        self.assertEqual(_FakeHttpService.instances[1].started, 1)
+
+    def test_http_is_implied_stopped_when_engine_run_succeeds(self):
+        engine = self.engine(
+            "http {\n"
+            '    content answer "/answer.txt" """\n'
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start\n")
+        with mock.patch.object(engine, "_establish_machine"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            engine.run()
+        self.assertEqual(_FakeHttpService.instances[0].stopped, 1)
+        self.assertEqual(engine._bindings, {})
+
+    def test_http_is_implied_stopped_when_engine_run_fails(self):
+        engine = self.engine(
+            "http {\n"
+            '    content answer "/answer.txt" """\n'
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start\n"
+            'enter "${missing.value}"\n')
+        with mock.patch.object(engine, "_establish_machine"), \
+                self.assertRaises(ScriptRuntimeError), \
+                contextlib.redirect_stdout(io.StringIO()):
+            engine.run()
+        self.assertEqual(_FakeHttpService.instances[0].stopped, 1)
+        self.assertEqual(engine._bindings, {})
+
+
+class HttpServiceIntegrationTests(unittest.TestCase):
+    """The real HTTP service serves the response map over a socket."""
+
+    def tearDown(self):
+        service = getattr(self, "service", None)
+        if service is not None:
+            service.stop()
+        blocker = getattr(self, "blocker", None)
+        if blocker is not None:
+            blocker.close()
+
+    def test_get_head_and_404(self):
+        port = self._free_port()
+        self.service = _HttpService((
+            _HttpResponse("answer", "/answer.txt", b"hello\n"),
+        ), port, port)
+        self.service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", self.service.port, timeout=5)
+        try:
+            connection.request("GET", "/answer.txt")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.read(), b"hello\n")
+            self.assertEqual(response.getheader("Content-Length"), "6")
+
+            connection.request("HEAD", "/answer.txt")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.read(), b"")
+            self.assertEqual(response.getheader("Content-Length"), "6")
+
+            connection.request("GET", "/missing.txt")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 404)
+            response.read()
+        finally:
+            connection.close()
+
+    def test_port_selection_skips_occupied_ports(self):
+        first, second = self._free_adjacent_pair()
+        self.blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.blocker.bind(("", first))
+        self.blocker.listen(1)
+
+        self.service = _HttpService((
+            _HttpResponse("answer", "/answer.txt", b"hello\n"),
+        ), first, second)
+        self.service.start()
+
+        self.assertEqual(self.service.port, second)
+
+    def _free_port(self):
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.bind(("127.0.0.1", 0))
+                port = sock.getsockname()[1]
+            if port < 65535:
+                return port
+
+    def _free_adjacent_pair(self):
+        for _ in range(100):
+            first = self._free_port()
+            second_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                second_sock.bind(("127.0.0.1", first + 1))
+                return first, first + 1
+            except OSError:
+                continue
+            finally:
+                second_sock.close()
+        self.fail("could not find adjacent free TCP ports")
 
 
 class ExecutePreflightTests(unittest.TestCase):

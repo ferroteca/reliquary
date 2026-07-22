@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: BSD-3-Clause
+
+description "OpenBSD 7.9 amd64 install with autoinstall over HTTP"
+platform    openbsd
+machine     stopped
+timeout     30s
+deadline    45m
+
+http {
+    content install-conf "/install.conf" """
+        System hostname? (short form, e.g. 'foo') = openbsd
+        DNS domain name = local
+        Password for root account = vagrant
+        Allow root ssh login = yes
+        Location of sets = cd0
+        Directory does not contain SHA256.sig. Continue without verification = yes
+    """
+}
+
+insert cdrom0 @openbsd-7.9-amd64-install
+start
+wait "boot>"
+enter "a"
+wait "Response file location?"
+http start install-conf
+enter "${rlq.http.url}/install.conf"
+wait "CONGRATULATIONS! Your OpenBSD install has been successfully completed!"
+http stop
+stop
+eject cdrom0

@@ -61,6 +61,8 @@ def validate(script):
     first violation. Source context is attached by the caller that
     knows the document's path.
     """
+    _properties(script)
+    _http(script)
     _durations(script)
     _keys(script)
     if script.phases:
@@ -70,6 +72,192 @@ def validate(script):
 
 
 # -- durations (S5) ----------------------------------------------
+
+def _properties(script):
+    """Property names are unique and outside reserved namespaces."""
+    seen = {}
+    for prop in script.properties:
+        _property_key(prop.key, prop.line, prop.column)
+        if prop.key in seen:
+            raise ScriptParseError(
+                prop.line, f"duplicate property: {prop.key} (S5)",
+                prop.column)
+        seen[prop.key] = prop
+
+
+def _property_key(key, line, column):
+    if key in ("text", "media", "secret"):
+        raise ScriptParseError(
+            line, f"{key!r} is reserved in property declarations (S5)",
+            column)
+    if key == "rlq" or key.startswith("rlq."):
+        raise ScriptParseError(
+            line,
+            "property keys in the rlq namespace are reserved for "
+            "reliquary-owned run facts (S5)", column)
+    if key == "reliquary" or key.startswith("reliquary."):
+        raise ScriptParseError(
+            line,
+            "property keys in the reliquary namespace are reserved (S5)",
+            column)
+
+
+# -- HTTP declarations -------------------------------------------
+
+def _http(script):
+    _http_statements(script)
+    if script.http is None:
+        if not _has_inline_http_start(script):
+            _forbid_http_refs(script)
+        return
+    if not script.http.contents:
+        raise ScriptParseError(
+            script.http.line, "http requires at least one content entry",
+            script.http.column)
+    _ports(script.http)
+    _content_set(script.http.contents)
+
+
+def _content_set(contents):
+    names = {}
+    paths = {}
+    for content in contents:
+        if content.name in names:
+            raise ScriptParseError(
+                content.line, f"duplicate content name: {content.name}",
+                content.column)
+        names[content.name] = content
+        path = _plain(content.path, "content path", content.line,
+                      content.column)
+        if not path.startswith("/"):
+            raise ScriptParseError(
+                content.line,
+                f"content path must begin with '/': {path!r}",
+                content.column)
+        segments = path.split("/")
+        if any(segment in (".", "..") for segment in segments):
+            raise ScriptParseError(
+                content.line,
+                f"content path may not contain . or ..: {path!r}",
+                content.column)
+        if path in paths:
+            raise ScriptParseError(
+                content.line, f"duplicate content path: {path}",
+                content.column)
+        paths[path] = content
+        if content.body.spelling == "":
+            raise ScriptParseError(
+                content.line, f"content path {path!r} has an empty body",
+                content.column)
+
+
+def _http_statements(script):
+    declared = set()
+    if script.http is not None:
+        declared = {content.name for content in script.http.contents}
+    for statement in _all_statements(script):
+        if statement.verb != "http":
+            continue
+        command = statement.arguments[0]
+        if command not in ("start", "stop"):
+            raise ScriptParseError(
+                statement.line,
+                f"http action must be start or stop: {command!r}",
+                statement.column)
+        if command == "start" and script.http is None \
+                and not statement.contents:
+            raise ScriptParseError(
+                statement.line,
+                "http start requires declared or inline content",
+                statement.column)
+        if command == "start":
+            _content_set(statement.contents)
+            for name in statement.arguments[1:]:
+                if name not in declared:
+                    raise ScriptParseError(
+                        statement.line,
+                        f"http start names undeclared content: {name}",
+                        statement.column)
+        elif len(statement.arguments) > 1 or statement.contents:
+            raise ScriptParseError(
+                statement.line, "http stop takes no content names or block",
+                statement.column)
+
+
+def _has_inline_http_start(script):
+    return any(statement.verb == "http"
+               and statement.arguments[0] == "start"
+               and statement.contents
+               for statement in _all_statements(script))
+
+
+def _ports(http):
+    for name in ("port_min", "port_max"):
+        spelling = getattr(http, name)
+        if spelling is None:
+            continue
+        port = int(spelling)
+        if port < 1 or port > 65535:
+            raise ScriptParseError(
+                http.line, f"{name.replace('_', '-')} is not a TCP port: "
+                f"{port}", http.column)
+    if http.port_min is not None and http.port_max is not None:
+        if int(http.port_min) > int(http.port_max):
+            raise ScriptParseError(
+                http.line, "port-min must be less than or equal to port-max",
+                http.column)
+
+
+def _plain(literal, what, line, column):
+    try:
+        return literal.text
+    except ValueError:
+        raise ScriptParseError(
+            line, f"{what} may not contain property references", column)
+
+
+def _forbid_http_refs(script):
+    for literal, line, column in _text_literals(script):
+        for key in literal.keys:
+            if key.startswith("rlq.http."):
+                raise ScriptParseError(
+                    line,
+                    "rlq.http.* properties require an http block (S6)",
+                    column)
+
+
+def _text_literals(script):
+    for prop in script.properties:
+        if prop.prompt is not None:
+            yield prop.prompt, prop.line, prop.column
+    for statement in _walk(script.statements):
+        yield from _statement_literals(statement)
+    for phase in script.phases:
+        for statement in _walk(phase.statements, phase.handlers):
+            yield from _statement_literals(statement)
+    if script.http is not None:
+        for content in script.http.contents:
+            yield content.body, content.line, content.column
+    for statement in _all_statements(script):
+        for content in statement.contents:
+            yield content.body, content.line, content.column
+
+
+def _all_statements(script):
+    yield from _walk(script.statements)
+    for phase in script.phases:
+        yield from _walk(phase.statements, phase.handlers)
+
+
+def _statement_literals(statement):
+    for arg in statement.arguments:
+        if hasattr(arg, "parts"):
+            yield arg, statement.line, statement.column
+    if statement.exclude is not None:
+        yield statement.exclude, statement.line, statement.column
+    for condition in statement.conditions:
+        if hasattr(condition.value, "parts"):
+            yield condition.value, condition.line, condition.column
 
 def _durations(script):
     """Every written duration is positive.

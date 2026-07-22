@@ -17,12 +17,16 @@ up and can name the scope that supplied it when a clock expires.
 
 import contextlib
 import dataclasses
+import mimetypes
 import os
 import re
 import sys
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 
 from qemu.qmp import ConnectError
 
@@ -119,6 +123,117 @@ def _literal(value):
     if value.interpolated:
         raise _PropertyUnbound(value.keys[0])
     return value.text
+
+
+def _render_literal(value, bindings):
+    """Render an authored string with runtime-owned bindings."""
+    if isinstance(value, str):
+        return value
+    rendered = []
+    for part in value.parts:
+        if isinstance(part, str):
+            rendered.append(part)
+            continue
+        try:
+            rendered.append(bindings[part.key])
+        except KeyError:
+            raise _PropertyUnbound(part.key) from None
+    return "".join(rendered)
+
+
+@dataclasses.dataclass(frozen=True)
+class _HttpResponse:
+    """One response body the run-scoped HTTP service can serve."""
+
+    name: str
+    path: str
+    body: bytes
+
+
+class _HttpService:
+    """Run-scoped static HTTP service for installer answer files."""
+
+    guest_ip = "10.0.2.2"
+
+    def __init__(self, responses, port_min=8000, port_max=9000):
+        self._responses = {response.path: response for response in responses}
+        self._port_min = port_min
+        self._port_max = port_max
+        self._server = None
+        self._thread = None
+        self.port = None
+
+    @property
+    def url(self):
+        if self.port is None:
+            return None
+        return f"http://{self.guest_ip}:{self.port}"
+
+    def start(self):
+        """Bind a free port in range and start serving responses."""
+        if self._server is not None:
+            self.stop()
+        handler = self._handler()
+        last_error = None
+        for port in range(self._port_min, self._port_max + 1):
+            try:
+                server = ThreadingHTTPServer(("", port), handler)
+            except OSError as error:
+                last_error = error
+                continue
+            self._server = server
+            self.port = port
+            self._thread = threading.Thread(
+                target=server.serve_forever, daemon=True)
+            self._thread.start()
+            return
+        detail = f": {last_error}" if last_error is not None else ""
+        raise RuntimeError(
+            f"no free HTTP port in range {self._port_min}-"
+            f"{self._port_max}{detail}")
+
+    def stop(self):
+        """Stop the server; harmless when it is already stopped."""
+        server = self._server
+        if server is None:
+            self.port = None
+            return
+        self._server = None
+        self.port = None
+        server.shutdown()
+        server.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+            self._thread = None
+
+    def _handler(self):
+        responses = self._responses
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self._serve(send_body=True)
+
+            def do_HEAD(self):
+                self._serve(send_body=False)
+
+            def log_message(self, format, *args):
+                return
+
+            def _serve(self, send_body):
+                path = urlsplit(self.path).path
+                response = responses.get(path)
+                if response is None:
+                    self.send_error(404)
+                    return
+                ctype = mimetypes.guess_type(path)[0] or "text/plain"
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(response.body)))
+                self.end_headers()
+                if send_body:
+                    self.wfile.write(response.body)
+
+        return Handler
 
 
 class _PropertyUnbound(Exception):
@@ -290,7 +405,8 @@ class _ScriptEngine:
 
     def __init__(self, script, machine_id, home, machine_home,
                  run_dir=None, script_path=None, plan=None,
-                 clock=time.monotonic, sleep=time.sleep):
+                 clock=time.monotonic, sleep=time.sleep,
+                 http_service_factory=_HttpService):
         self._script = script
         self._plan = plan if plan is not None else resolve_timing(script)
         self._phases = {phase.name: phase for phase in script.phases}
@@ -306,6 +422,9 @@ class _ScriptEngine:
         self._sleep = sleep
         self._step = 0
         self._status = _Progress()
+        self._http_service_factory = http_service_factory
+        self._http = None
+        self._bindings = {}
         self._phase = None
         self._run_started = None
         self._phase_started = None
@@ -397,6 +516,7 @@ class _ScriptEngine:
                 self._log(f"error: {exc}")
             raise self._error(f"unexpected error: {exc}") from exc
         finally:
+            self._http_stop()
             if self._transcript is not None:
                 self._transcript.close()
                 self._transcript = None
@@ -502,6 +622,8 @@ class _ScriptEngine:
                 self._eject(statement)
             elif verb == "set-boot":
                 self._set_boot(statement)
+            elif verb == "http":
+                self._http_control(statement)
             elif verb == "start":
                 self._start(statement)
             elif verb == "stop":
@@ -684,14 +806,14 @@ class _ScriptEngine:
     # -- input verbs ---------------------------------------------
 
     def _enter(self, statement):
-        text = _literal(statement.arguments[0])
+        text = _render_literal(statement.arguments[0], self._bindings)
         self._log(f"line {statement.line}: enter {text!r}")
         self._requires_running(statement)
         with self._console() as console:
             console.send_text(text, True)
 
     def _type(self, statement):
-        text = _literal(statement.arguments[0])
+        text = _render_literal(statement.arguments[0], self._bindings)
         self._log(f"line {statement.line}: type {text!r}")
         self._requires_running(statement)
         with self._console() as console:
@@ -713,8 +835,9 @@ class _ScriptEngine:
             console.send_keys(combos)
 
     def _select(self, statement):
-        item = _literal(statement.arguments[0])
-        exclude = (_literal(statement.exclude),) if statement.exclude else ()
+        item = _render_literal(statement.arguments[0], self._bindings)
+        exclude = ((_render_literal(statement.exclude, self._bindings),)
+                   if statement.exclude else ())
         detail = f"select {item!r}"
         if exclude:
             detail += f" (exclude: {exclude[0]!r})"
@@ -774,6 +897,70 @@ class _ScriptEngine:
         self._log(f"line {statement.line}: stop")
         _machines.stop_machine(self._machine_id, home=self._home)
         self._port = None
+
+    # -- run-scoped HTTP -----------------------------------------
+
+    def _http_control(self, statement):
+        command = statement.arguments[0]
+        self._log(f"line {statement.line}: http {command}")
+        if command == "start":
+            self._http_start(statement)
+        elif command == "stop":
+            self._http_stop()
+        else:
+            raise self._error(f"unknown http action: {command}", statement)
+
+    def _http_start(self, statement):
+        self._http_stop()
+        responses = self._http_responses(statement)
+        plan = self._script.http
+        port_min = int(plan.port_min) if plan and plan.port_min else 8000
+        port_max = int(plan.port_max) if plan and plan.port_max else 9000
+        service = self._http_service_factory(responses, port_min, port_max)
+        try:
+            service.start()
+        except RuntimeError as exc:
+            raise self._error(str(exc), statement) from exc
+        self._http = service
+        self._bindings.update({
+            "rlq.http.ip": service.guest_ip,
+            "rlq.http.port": str(service.port),
+            "rlq.http.url": service.url,
+        })
+
+    def _http_stop(self):
+        if self._http is not None:
+            self._http.stop()
+            self._http = None
+        for key in ("rlq.http.ip", "rlq.http.port", "rlq.http.url"):
+            self._bindings.pop(key, None)
+
+    def _http_responses(self, statement):
+        selected = {}
+        if self._script.http is not None:
+            declared = {content.name: content
+                        for content in self._script.http.contents}
+            names = statement.arguments[1:] or tuple(declared)
+            selected.update((name, declared[name]) for name in names)
+        for content in statement.contents:
+            selected[content.name] = content
+        responses = []
+        paths = set()
+        for content in selected.values():
+            response = self._http_response(content)
+            if response.path in paths:
+                raise self._error(
+                    f"http content produces duplicate path: "
+                    f"{response.path}", statement)
+            paths.add(response.path)
+            responses.append(response)
+        return tuple(responses)
+
+    def _http_response(self, content):
+        path = _literal(content.path)
+        body = _render_literal(content.body, self._bindings)
+        return _HttpResponse(
+            content.name, path, body.encode("utf-8"))
 
 
 def _walk(script):

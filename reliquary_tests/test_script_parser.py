@@ -16,6 +16,8 @@ _REFERENCE = os.path.join(
     "codex", "scripts", "freedos-1.4-plain-install.rlqs")
 
 _HEAD = "platform dos\n"
+_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "fixtures")
 
 
 class ReferenceScriptTests(unittest.TestCase):
@@ -143,6 +145,174 @@ class VocabularyTests(unittest.TestCase):
         with self.assertRaises(ScriptParseError) as caught:
             parse_script(_HEAD + "property txt some.key\nstart\n")
         self.assertIn("unknown property kind: 'txt'",
+                      str(caught.exception))
+
+
+class HttpContentTests(unittest.TestCase):
+    def test_content_bodies_dedent_by_default(self):
+        script = parse_script(
+            _HEAD +
+            "http {\n"
+            "    content answer \"/answer.txt\" \"\"\"\n"
+            "        one\n"
+            "          two\n"
+            "    \"\"\"\n"
+            "}\n"
+            "start\n")
+        content = script.http.contents[0]
+        self.assertEqual(content.name, "answer")
+        self.assertEqual(content.path.text, "/answer.txt")
+        self.assertEqual(content.indent, "dedent")
+        self.assertEqual(content.body.text, "one\n  two\n")
+
+    def test_content_can_preserve_literal_indentation(self):
+        script = parse_script(
+            _HEAD +
+            "http {\n"
+            "    content answer \"/answer.txt\" indent=literal \"\"\"\n"
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "start\n")
+        self.assertEqual(script.http.contents[0].body.text,
+                         "        one\n")
+
+    def test_content_bodies_record_property_references(self):
+        script = parse_script(
+            _HEAD +
+            "property identity.name\n"
+            "http {\n"
+            "    content answer \"/answer.txt\" \"\"\"\n"
+            "        name=${identity.name}\n"
+            "        literal=\\${identity.name}\n"
+            "    \"\"\"\n"
+            "}\n"
+            "start\n")
+        body = script.http.contents[0].body
+        self.assertEqual(body.keys, ("identity.name",))
+        self.assertEqual(body.spelling,
+                         "name=${identity.name}\nliteral=${identity.name}\n")
+
+    def test_content_can_load_from_relative_file(self):
+        script_path = os.path.join(_FIXTURES, "script.rlqs")
+        script = parse_script(
+            _HEAD +
+            "property identity.name\n"
+            "http {\n"
+            "    content answer \"/answer.txt\" "
+            "from=\"http-answer.txt\"\n"
+            "}\n"
+            "start\n",
+            path=script_path)
+        content = script.http.contents[0]
+        self.assertEqual(content.source_path,
+                         os.path.join(_FIXTURES, "http-answer.txt"))
+        self.assertEqual(content.body.keys, ("identity.name",))
+        self.assertEqual(content.body.spelling,
+                         "name=${identity.name}\nliteral=${identity.name}\n")
+
+    def test_file_content_rejects_missing_or_dynamic_source_paths(self):
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD + 'http {\n    content answer "/answer.txt" '
+                'from="missing.txt"\n}\nstart\n',
+                path=os.path.join(_FIXTURES, "script.rlqs"))
+        self.assertIn("content source file not found",
+                      str(caught.exception))
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD + 'http {\n    content answer "/answer.txt" '
+                'from="${source.path}"\n}\nstart\n')
+        self.assertIn("from path may not contain property references",
+                      str(caught.exception))
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD + 'http {\n    content answer "/answer.txt" '
+                'from="/tmp/answer.txt"\n}\nstart\n')
+        self.assertIn("from path must be relative to the script file",
+                      str(caught.exception))
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD + 'http {\n    content answer "/answer.txt" '
+                'from="../answer.txt"\n}\nstart\n')
+        self.assertIn("from path may not contain . or .. segments",
+                      str(caught.exception))
+
+    def test_file_content_has_no_heredoc_indentation_modifiers(self):
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD + 'http {\n    content answer "/answer.txt" '
+                'indent=literal from="http-answer.txt"\n}\nstart\n',
+                path=os.path.join(_FIXTURES, "script.rlqs"))
+        self.assertIn("indent applies only to triple-quoted content bodies",
+                      str(caught.exception))
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD + 'http {\n    content answer "/answer.txt" '
+                'from="http-answer.txt" """\n        one\n    """\n'
+                '}\nstart\n',
+                path=os.path.join(_FIXTURES, "script.rlqs"))
+        self.assertIn("may not combine from= with a triple-quoted body",
+                      str(caught.exception))
+
+    def test_http_port_modifiers_are_typed(self):
+        script = parse_script(
+            _HEAD +
+            "http port-min=8000 port-max=8000 {\n"
+            "    content answer \"/answer.txt\" \"\"\"\n"
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "start\n")
+        self.assertEqual(script.http.port_min, "8000")
+        self.assertEqual(script.http.port_max, "8000")
+
+    def test_http_start_and_stop_are_statements(self):
+        script = parse_script(
+            _HEAD +
+            "http {\n"
+            "    content answer \"/answer.txt\" \"\"\"\n"
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start answer\n"
+            "enter \"${rlq.http.url}/answer.txt\"\n"
+            "http stop\n")
+        self.assertEqual([s.verb for s in script.statements],
+                         ["http", "enter", "http"])
+        self.assertEqual([s.arguments for s in script.statements
+                          if s.verb == "http"],
+                         [("start", "answer"), ("stop",)])
+
+    def test_http_start_can_redefine_inline_content(self):
+        script = parse_script(
+            _HEAD +
+            "http {\n"
+            "    content answer \"/answer.txt\" \"\"\"\n"
+            "        one\n"
+            "    \"\"\"\n"
+            "}\n"
+            "http start {\n"
+            "    content answer \"/answer.txt\" \"\"\"\n"
+            "        two\n"
+            "    \"\"\"\n"
+            "}\n")
+        start = script.statements[0]
+        self.assertEqual(start.arguments, ("start",))
+        self.assertEqual(start.contents[0].name, "answer")
+        self.assertEqual(start.contents[0].body.text, "two\n")
+
+    def test_content_rejects_unknown_modifiers(self):
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(
+                _HEAD +
+                "http {\n"
+                "    content answer \"/answer.txt\" mode=raw \"\"\"\n"
+                "        one\n"
+                "    \"\"\"\n"
+                "}\n"
+                "start\n")
+        self.assertIn("content does not accept the modifier 'mode'",
                       str(caught.exception))
 
 

@@ -3,11 +3,17 @@
     "blueprints": {
         "freedos-1.4-plain": {
             "description": "FreeDOS 1.4 plain installation"
+        },
+        "openbsd-7.9-amd64": {
+            "description": "OpenBSD 7.9 amd64 installation using autoinstall over HTTP"
         }
     },
     "media": {
         "freedos-1.4-livecd": {
             "description": "FreeDOS 1.4 LiveCD"
+        },
+        "openbsd-7.9-amd64-install": {
+            "description": "OpenBSD 7.9 amd64 install ISO"
         }
     }
 }

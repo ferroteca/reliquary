@@ -54,9 +54,9 @@ meaning:
    the management interface while execution goes through a guest
    agent.
 3. **Guest platform** — the operating system family inside the
-   machine: dos, win9x, winnt, and later others. Platform workflows
-   own OS meaning: provisioning, readiness, command syntax,
-   completion, and result collection.
+   machine: dos, openbsd, win9x, winnt, and later others. Platform
+   workflows own OS meaning: provisioning, readiness, command
+   syntax, completion, and result collection.
 
 A machine blueprint names its guest platform and (optionally) its backend;
 neither is ever inferred from an image or a running guest.
@@ -1675,7 +1675,7 @@ in the new surface, `check-script` reports the timing plan, and
 no old-surface syntax or superseded command spelling survives
 anywhere.
 
-### Milestone 5 — Local HTTP server for installer answer files
+### Milestone 5 — Local HTTP server for installer answer files (complete)
 
 Packer's host-side pattern for serving Kickstart, preseed,
 AutoYaST, `unattend.xml`, and kin: during a run, reliquary
@@ -1698,26 +1698,30 @@ authored-asset layout (where the files live). Distinct from the
 deleted property-binding "response file" concept
 (planning/DECISIONS.md) — these are installer answer files only.
 
-Decide first:
+Settled design:
 
-- Authored shape: Packer's mutually exclusive
-  `http_directory` (serve a tree) vs `http_content` (path→body
-  map) — which, or both, and where they are declared (script
-  header, blueprint field, sibling asset directory).
-- Address binding: how scripts obtain the host IP and port the
-  guest must fetch (Packer's `{{ .HTTPIP }}` / `{{ .HTTPPort }}`
-  equivalents) without becoming computational (G2) or selecting
-  control flow (G3).
-- Guest reachability on QEMU: which network configuration makes
-  the host server reachable from the guest, and whether that
-  requires a first-class blueprint NIC field now or a
-  QEMU-default / backend-settings interim.
-- Port selection: Packer's random free port in a configurable
-  min/max range (default 8000–9000); pin-to-one-port by
-  setting min=max.
-- Secrets in answer files (product keys, passwords): whether
-  bodies may be property-expanded at serve time, and how
-  transcripts avoid leaking them.
+- Scripts declare the run-scoped server with one declarative
+  `http` block, not a blueprint field. Milestone 5 serves named
+  generated content entries, each with a guest-visible path; the
+  response body may be inline or read from one explicit file.
+  Serving sibling directories is a later asset-distribution item.
+- The live address binds as reserved run properties:
+  `$rlq.http.ip`, `$rlq.http.port`, and `$rlq.http.url`, usable
+  only where text property expansion is legal. The whole `rlq.*`
+  and `reliquary.*` property namespaces are reserved for
+  reliquary-owned run facts and future system properties.
+- QEMU uses user-mode networking as the milestone-5 interim
+  reachability path, with `$rlq.http.ip` resolving to the
+  guest-visible host gateway `10.0.2.2`; richer portable NIC
+  modeling waits for the backend/device milestones.
+- Port selection follows Packer's random free port in a configurable
+  inclusive min/max range, defaulting to 8000-9000; min=max pins a
+  single port.
+- Generated content may expand script properties, including
+  secrets. Rendered bodies are never recorded, secret-bearing
+  responses are redacted in progress/records, diagnostics redact
+  exact secret values, and automatic screenshots are suppressed
+  after serving a secret-bearing response.
 
 Deliverables:
 
@@ -1725,14 +1729,15 @@ Deliverables:
    [planning/design/http-serve.md](design/http-serve.md): the
    Packer-parity contract, the decided authored shape, address
    binding, lifetime, and network reachability rules.
-2. The ephemeral HTTP server: serve a directory and/or an
-   in-memory path→content map; pick a free port in the
-   configured range; bind only for the run; tear down on every
-   terminal path (success, failure, cancel, crash of the run
-   process).
-3. Script/CLI/API surface for declaring the served content and
-   obtaining the live address for `type`/`enter` (and any boot
-   argument path the decided binding uses), with CLI–API parity.
+2. The ephemeral HTTP server: serve a selected in-memory map of
+   named content to guest-visible paths; pick a free port in the
+   configured range when `http start` executes; stop on `http stop`
+   and tear down on every terminal path (success, failure, cancel,
+   crash of the run process).
+3. Script/CLI/API surface for declaring named served content,
+   selecting or redefining content at `http start`, and obtaining
+   the live address for `type`/`enter` (and any boot argument path
+   the decided binding uses), with CLI–API parity.
 4. QEMU guest reachability for the FreeDOS-era networking
    defaults the milestone settles on — enough that a guest
    installer can `GET` an answer file from the host server.
@@ -1746,6 +1751,15 @@ reliquary's local HTTP server exactly as under Packer — server
 up for the run, address available to the script, file served,
 server gone afterward — and the FreeDOS keystroke install is
 untouched.
+
+Completed 2026-07-22. The `.rlqs` language accepts a declarative
+`http` block with named served content, inline triple-quoted bodies
+or script-relative `from=` files, selected or redefined by
+`http start`. The runtime starts the server at `http start`, binds
+`rlq.http.ip` / `rlq.http.port` / `rlq.http.url`, stops explicitly
+on `http stop`, and implies teardown on terminal paths. The shipped
+OpenBSD 7.9 amd64 install blueprint exercises the response-file
+path, while the FreeDOS keystroke install remains unchanged.
 
 ### Milestone 6 — The instance model and machine blueprints
 

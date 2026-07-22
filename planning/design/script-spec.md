@@ -280,19 +280,23 @@ static-validation rules that follow it. The core view is
 structural — what a line looks like; the typed view is normative
 for admissibility.
 
-Every block holds nodes. A script carries no JSON: media
+Every block holds nodes. Milestone 5's HTTP `content` declaration
+does not use a block: it attaches either a raw triple-quoted body
+or a `from=` source file whose lines are served as an installer
+answer file
+([http-serve.md](http-serve.md)). A script carries no JSON: media
 definitions and landmark declarations are authored files of their
 own, resolved beside the script (planning/ROADMAP.md,
-"Authored-asset resolution"), so the block rule admits no
-exception and tokenization never suspends.
+"Authored-asset resolution"), and answer files are `content`
+entries with inline or file-backed bodies.
 
 A typing layer over the node shape supplies the rest of the
 language definition:
 
 - **Ordering.** Header nodes come first, then `property`
-  declarations, then either top-level statements (a linear script)
-  or `phase` nodes (a phased script). Mixing the two body kinds is
-  a parse error.
+  declarations, then planned `http` declarations, then either
+  top-level statements (a linear script) or `phase` nodes (a phased
+  script). Mixing the two body kinds is a parse error.
 - **Signatures.** Each node name fixes its argument types, allowed
   modifiers, and whether it takes a block. The complete signature
   tables follow; an argument or modifier outside a node's
@@ -316,6 +320,8 @@ Declarations:
 | node | arguments | modifiers | block |
 |---|---|---|---|
 | `property` | optional `text`/`media`/`secret`, key | `prompt` | — |
+| `http` | — | `port-min`, `port-max` | `content` entries |
+| `content` | name, string URL path, optional `"""` opener | `indent`, `from` | text body, or — with `from` |
 
 Statements:
 
@@ -327,6 +333,7 @@ Statements:
 | `always` | one condition | `stable` | statements |
 | `goto` | phase name | — | — |
 | `finish` | — | — | — |
+| `http` | `start` plus optional content names, or `stop` | — | optional `content` entries for `start` |
 | `enter` | string | — | — |
 | `type` | string | — | — |
 | `press` | key names | — | — |
@@ -352,7 +359,7 @@ structurally and then type-check, but
 this grammar and the static rules below decide what is legal:
 
 ```text
-script          = { header } , { property-def } ,
+script          = { header } , { property-def } , { http-def } ,
                   ( linear-body | phased-body ) ;
 
 header          = "description" , string , eol
@@ -365,6 +372,18 @@ header          = "description" , string , eol
 property-def    = "property" , [ "text" | "media" | "secret" ] ,
                   property-key , [ prompt-mod ] , eol ;
 prompt-mod      = "prompt" , "=" , string ;
+
+http-def        = "http" , { http-mod } , block-open ,
+                  content-def , { content-def } , block-close ;
+http-mod        = ( "port-min" | "port-max" ) , "=" , port ;
+content-def     = "content" , name , string ,
+                  ( { inline-content-mod } , triple , content-text ,
+                    triple , eol
+                  | from-mod , eol ) ;
+inline-content-mod
+                = "indent" , "=" , ( "dedent" | "literal" ) ;
+from-mod        = "from" , "=" , string ;
+port            = digit , { digit } ;
 
 linear-body     = statement-list ;
 phased-body     = phase , { phase } ;
@@ -397,6 +416,10 @@ machine-state   = "stopped" ;
 
 action          = "enter" , string , eol
                 | "type" , string , eol
+                | "http" , ( "start" , { name } | "stop" ) ,
+                  eol
+                | "http" , "start" , block-open ,
+                  content-def , { content-def } , block-close
                 | "press" , key , { key } , eol
                 | "select" , string ,
                   [ "exclude" , "=" , string ] , eol
@@ -483,8 +506,12 @@ the CFG. Each has a stable id; diagnostics cite them:
 - **S5** — names are valid and unique in their namespaces:
   reserved node names are not identifiers, property keys are
   declared once per script and are not spelled `text`, `media`,
-  or `secret`, durations are positive.
-- **S6** — every `$` reference names a declared property.
+  or `secret`, user-declared property keys do not use the
+  reserved `rlq` or `reliquary` namespaces, durations are
+  positive.
+- **S6** — every `$` reference names a declared property or a
+  reliquary-owned run property in a reserved namespace made
+  available by the script's declarations.
 - **S7** — an observation carries **exactly one** condition — a
   bare string/regex beside a `machine=` modifier, or two
   `machine=` modifiers, are errors — the condition precedes any

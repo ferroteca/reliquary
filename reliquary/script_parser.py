@@ -13,6 +13,8 @@ The S-numbered static rules live above this layer.
 """
 
 import os
+import re
+import textwrap
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple
 
@@ -20,7 +22,8 @@ from lark import Lark, Token as LarkToken, Transformer
 from lark.exceptions import UnexpectedInput, VisitError
 from lark.lexer import Lexer
 
-from .script_nodes import ScriptParseError, StringLiteral, tokenize
+from .script_nodes import (
+    Interpolation, ScriptParseError, StringLiteral, tokenize)
 from .script_validation import validate
 
 # Node names, reserved everywhere a script-internal name may appear
@@ -30,9 +33,9 @@ from .script_validation import validate
 # validation, not the grammar).
 KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
-    "property", "phase", "wait", "on", "always", "goto", "finish",
-    "enter", "type", "press", "select", "screenshot", "insert", "eject",
-    "set-boot", "start", "stop",
+    "property", "http", "content", "phase", "wait", "on", "always",
+    "goto", "finish", "enter", "type", "press", "select", "screenshot",
+    "insert", "eject", "set-boot", "start", "stop",
 )
 
 # Each node's allowed modifiers. The transformer reports anything
@@ -47,6 +50,9 @@ _SIGNATURES = {
     "always_handler": ("stable",),
     "phase": ("timeout", "deadline"),
     "property_def": ("prompt",),
+    "http_def": ("port-min", "port-max"),
+    "content_def": ("indent", "from"),
+    "http_control": (),
     "select": ("exclude",),
     "enter": (), "type_text": (), "press": (), "screenshot": (),
     "insert": (), "eject": (), "set_boot": (), "start": (), "stop": (),
@@ -59,6 +65,8 @@ _DISPLAY = {
     "wait_one": "wait", "wait_branching": "wait", "on_handler": "on",
     "always_handler": "always", "type_text": "type",
     "set_boot": "set-boot", "property_def": "property",
+    "http_def": "http", "content_def": "content",
+    "http_control": "http",
 }
 
 # Modifiers whose value must be a duration. They are also the
@@ -100,6 +108,7 @@ _CONDITION_KINDS = {
 _PROPERTY_KINDS = ("text", "media", "secret")
 _GRAMMAR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "script_grammar.lark")
+_PROPERTY_REF = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
 
 
 @dataclass(frozen=True)
@@ -153,6 +162,7 @@ class Statement(_Observed):
     timeout: Optional[str] = None
     stable: Optional[str] = None
     exclude: Optional[StringLiteral] = None
+    contents: Tuple["HttpContent", ...] = ()
     line: int = 0
     column: int = 1
 
@@ -182,6 +192,30 @@ class Phase:
 
 
 @dataclass(frozen=True)
+class HttpContent:
+    """One run-served HTTP response body declared by a script."""
+
+    name: str
+    path: StringLiteral
+    body: StringLiteral
+    indent: str = "dedent"
+    source_path: Optional[str] = None
+    line: int = 0
+    column: int = 1
+
+
+@dataclass(frozen=True)
+class Http:
+    """The script's run-scoped HTTP answer-file server plan."""
+
+    contents: Tuple[HttpContent, ...]
+    port_min: Optional[str] = None
+    port_max: Optional[str] = None
+    line: int = 0
+    column: int = 1
+
+
+@dataclass(frozen=True)
 class Script:
     """A parsed ``.rlqs`` document, before the S-rule checks."""
 
@@ -192,6 +226,7 @@ class Script:
     timeout: Optional[str] = None
     deadline: Optional[str] = None
     properties: Tuple[Property, ...] = ()
+    http: Optional[Http] = None
     statements: Tuple[Statement, ...] = ()
     phases: Tuple[Phase, ...] = ()
     headers: Mapping[str, int] = field(default_factory=dict)
@@ -222,13 +257,26 @@ class ReliquaryLexer(Lexer):
         pass
 
     def lex(self, data):
-        for number, text in enumerate(data.splitlines(), 1):
+        lines = data.splitlines()
+        index = 0
+        while index < len(lines):
+            number = index + 1
+            text = lines[index]
             tokens = tokenize(text, number)
+            index += 1
             if not tokens:
                 continue
-            for index, token in enumerate(tokens):
-                yield from self._convert(token, number, index == 0)
+            for position, token in enumerate(tokens):
+                yield from self._convert(token, number, position == 0)
             yield LarkToken("_NL", "\n", line=number, column=1)
+            if _opens_content_body(tokens):
+                body, closing = _collect_content_body(lines, index, number)
+                body_token = _Token("CONTENT_TEXT", body, line=number + 1,
+                                    column=1)
+                body_token.reliquary = body
+                yield body_token
+                yield LarkToken("_NL", "\n", line=closing, column=1)
+                index = closing
 
     def _convert(self, token, number, leading):
         if token.kind == "modifier":
@@ -241,6 +289,7 @@ class ReliquaryLexer(Lexer):
             "open": "_BLOCK_OPEN", "close": "_BLOCK_CLOSE",
             "string": "STRING", "regex": "REGEX", "duration": "DURATION",
             "media": "MEDIA_REF", "property": "PROP_REF",
+            "triple": "TRIPLE",
         }.get(token.kind)
         if kind is None:
             kind = (_KEYWORD_TERMINALS.get(token.value, "NAME")
@@ -309,8 +358,74 @@ def _channel(item):
                      line, column, named=True)
 
 
+def _opens_content_body(tokens):
+    """Whether a tokenized line begins a raw ``content`` body."""
+    return (tokens and tokens[0].kind == "word"
+            and tokens[0].value == "content"
+            and tokens[-1].kind == "triple")
+
+
+def _collect_content_body(lines, start, opener_line):
+    """Collect raw body lines through the next trimmed ``\"\"\"``."""
+    body = []
+    for index in range(start, len(lines)):
+        if lines[index].strip() == '"""':
+            return "\n".join(body), index + 1
+        body.append(lines[index])
+    raise ScriptParseError(opener_line, "unterminated content body")
+
+
+def _content_literal(text, indent, line, column):
+    """Build a content body literal after applying indentation policy."""
+    if indent == "dedent":
+        text = textwrap.dedent(text)
+    if text == "":
+        return StringLiteral(())
+    return _content_template(text.rstrip("\r\n") + "\n", line, column)
+
+
+def _content_template(text, line, column):
+    """Parse ``${key}`` references inside a content body."""
+    parts = []
+    chunk = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "\\" and text[index + 1:index + 3] == "${":
+            chunk.append("${")
+            index += 3
+            continue
+        if char == "$" and text[index + 1:index + 2] == "{":
+            closing = text.find("}", index + 2)
+            if closing < 0:
+                raise ScriptParseError(
+                    line, "unclosed property reference in content body",
+                    column)
+            key = text[index + 2:closing]
+            if not _PROPERTY_REF.fullmatch(key):
+                raise ScriptParseError(
+                    line,
+                    f"invalid property reference in content body: {key!r}",
+                    column)
+            if chunk:
+                parts.append("".join(chunk))
+                chunk = []
+            parts.append(Interpolation(key))
+            index = closing + 1
+            continue
+        chunk.append(char)
+        index += 1
+    if chunk:
+        parts.append("".join(chunk))
+    return StringLiteral(tuple(parts))
+
+
 class _Builder(Transformer):
     """Build the typed tree from lark's parse tree."""
+
+    def __init__(self, base_dir=None):
+        super().__init__()
+        self.base_dir = base_dir
 
     def modifier(self, children):
         name, value = children
@@ -358,6 +473,102 @@ class _Builder(Transformer):
         return Property(key, kind,
                         prompt.reliquary.value if prompt else None, line,
                         words[0].column)
+
+    def http_def(self, children):
+        modifiers = _modifiers(
+            "http_def", [c for c in children if isinstance(c, tuple)])
+        for name, token in modifiers.items():
+            if token.type != "NAME" or not str(token).isdigit():
+                raise ScriptParseError(
+                    token.line, f"{name} must be a decimal TCP port",
+                    token.column)
+        return Http(
+            tuple(c for c in children if isinstance(c, HttpContent)),
+            str(modifiers["port-min"]) if "port-min" in modifiers else None,
+            str(modifiers["port-max"]) if "port-max" in modifiers else None,
+            _line(children[0]), _column(children[0]))
+
+    def content_def(self, children):
+        modifiers = _modifiers(
+            "content_def", [c for c in children if isinstance(c, tuple)])
+        name = str(children[1])
+        path = children[2]
+        indent = "dedent"
+        if "indent" in modifiers:
+            value = modifiers["indent"]
+            if value.type != "NAME" or str(value) not in ("dedent",
+                                                          "literal"):
+                raise ScriptParseError(
+                    value.line,
+                    "indent must be dedent or literal", value.column)
+            indent = str(value)
+        text = next((c for c in children if isinstance(c, LarkToken)
+                     and c.type == "CONTENT_TEXT"), None)
+        source = modifiers.get("from")
+        if source is not None and source.type != "STRING":
+            raise ScriptParseError(
+                source.line, "from must be a string", source.column)
+        if source is not None and text is not None:
+            raise ScriptParseError(
+                source.line,
+                "content may not combine from= with a triple-quoted body",
+                source.column)
+        if source is None and text is None:
+            raise ScriptParseError(
+                _line(children[0]),
+                "content requires a triple-quoted body or from=",
+                _column(children[0]))
+        if source is not None and "indent" in modifiers:
+            raise ScriptParseError(
+                modifiers["indent"].line,
+                "indent applies only to triple-quoted content bodies",
+                modifiers["indent"].column)
+        if source is not None:
+            source_path, body = self._content_file(
+                source.reliquary.value, _line(children[0]),
+                _column(children[0]))
+        else:
+            source_path = None
+            body = _content_literal(str(text), indent,
+                                    _line(children[0]),
+                                    _column(children[0]))
+        return HttpContent(name, path.reliquary.value, body, indent,
+                           source_path, _line(children[0]),
+                           _column(children[0]))
+
+    def _content_file(self, literal, line, column):
+        try:
+            spelling = literal.text
+        except ValueError:
+            raise ScriptParseError(
+                line, "from path may not contain property references",
+                column)
+        if spelling == "" or os.path.isabs(spelling) \
+                or spelling.startswith(("/", "\\")):
+            raise ScriptParseError(
+                line, "from path must be relative to the script file",
+                column)
+        segments = re.split(r"[\\/]+", spelling)
+        if any(segment in (".", "..") for segment in segments):
+            raise ScriptParseError(
+                line, "from path may not contain . or .. segments",
+                column)
+        base_dir = self.base_dir or os.getcwd()
+        source_path = os.path.abspath(os.path.join(base_dir, spelling))
+        try:
+            with open(source_path, encoding="utf-8") as handle:
+                text = handle.read()
+        except FileNotFoundError:
+            raise ScriptParseError(
+                line, f"content source file not found: {source_path}",
+                column) from None
+        except OSError as error:
+            raise ScriptParseError(
+                line,
+                f"content source file cannot be read: {source_path}: "
+                f"{error}", column) from None
+        return source_path, _content_template(
+            text.rstrip("\r\n") + "\n" if text else "", line, column)
 
     # -- conditions ----------------------------------------------
     def screen_text(self, children):
@@ -442,6 +653,16 @@ class _Builder(Transformer):
                      if isinstance(c, LarkToken) and c.type == "NAME")
         return self._simple("press", "press", children, keys)
 
+    def http_control(self, children):
+        _modifiers("http_control",
+                   [c for c in children if isinstance(c, tuple)])
+        names = tuple(str(c) for c in children[2:]
+                      if isinstance(c, LarkToken) and c.type == "NAME")
+        contents = tuple(c for c in children if isinstance(c, HttpContent))
+        return Statement("http", (str(children[1]),) + names,
+                         contents=contents, line=_line(children[0]),
+                         column=_column(children[0]))
+
     def select(self, children):
         modifiers = _modifiers(
             "select", [c for c in children if isinstance(c, tuple)])
@@ -503,10 +724,15 @@ class _Builder(Transformer):
 
     def script(self, children):
         headers, lines = {}, {}
-        properties, statements, phases = [], [], []
+        properties, statements, phases, http = [], [], [], None
         for child in children:
             if isinstance(child, Property):
                 properties.append(child)
+            elif isinstance(child, Http):
+                if http is not None:
+                    raise ScriptParseError(
+                        child.line, "http may appear only once")
+                http = child
             elif isinstance(child, tuple) and child[0] in ("linear",
                                                            "phased"):
                 if child[0] == "linear":
@@ -524,7 +750,7 @@ class _Builder(Transformer):
             headers.get("platform"), headers.get("description"),
             headers.get("machine"), headers.get("entry"),
             headers.get("timeout"), headers.get("deadline"),
-            tuple(properties), tuple(statements), tuple(phases), lines)
+            tuple(properties), http, tuple(statements), tuple(phases), lines)
 
 
 def _duration(token):
@@ -546,8 +772,11 @@ def parse_script(source, path="<script>"):
     if not isinstance(source, str):
         raise TypeError("script source must be text")
     source = source.lstrip(chr(0xFEFF))
+    base_dir = None
+    if path != "<script>":
+        base_dir = os.path.dirname(os.path.abspath(os.fspath(path)))
     try:
-        script = _Builder().transform(_PARSER.parse(source))
+        script = _Builder(base_dir).transform(_PARSER.parse(source))
         validate(script)
         return script
     except VisitError as error:

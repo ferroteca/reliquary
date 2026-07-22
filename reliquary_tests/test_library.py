@@ -19,6 +19,9 @@ from reliquary.media import parse_definition, resolve_media
 BLUEPRINT = "freedos-1.4-plain"
 MEDIA = "freedos-1.4-livecd"
 SCRIPTS = ("freedos-1.4-plain-install", "freedos-1.4-verify")
+OPENBSD_BLUEPRINT = "openbsd-7.9-amd64"
+OPENBSD_MEDIA = "openbsd-7.9-amd64-install"
+OPENBSD_SCRIPT = "openbsd-7.9-install"
 
 BLUEPRINT_EXT = ".rlqb"
 MEDIA_EXT = ".rlqm"
@@ -117,6 +120,14 @@ class SeedingTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(
             self._path("media", f"{MEDIA}{MEDIA_EXT}")))
 
+    def test_seed_script_brings_its_referenced_openbsd_media(self):
+        """The OpenBSD script seeds the ISO its install inserts."""
+        self.assertTrue(seed_script(OPENBSD_SCRIPT, home=self.home))
+        self.assertTrue(os.path.isfile(
+            self._path("scripts", f"{OPENBSD_SCRIPT}.rlqs")))
+        self.assertTrue(os.path.isfile(
+            self._path("media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")))
+
 
 class FirstReferenceTest(unittest.TestCase):
     """Implicit seeding through the resolution seams."""
@@ -205,6 +216,36 @@ class BuiltinMediaDefinitionTests(unittest.TestCase):
             "6ef2deb0477f81fb")
 
 
+class BuiltinOpenBsdDefinitionTests(unittest.TestCase):
+    """The shipped OpenBSD 7.9 definition pins the official ISO."""
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(
+            os.path.dirname(reliquary.__file__),
+            "codex", "media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")
+        from reliquary import jsonc
+        with open(path, encoding="utf-8") as handle:
+            cls._raw = jsonc.load(handle)
+        cls._parsed = parse_definition(cls._raw)
+
+    def test_url_carrying_definition_has_redistribution_assertion(self):
+        self.assertIn("url", self._raw)
+        self.assertIn("redistribution", self._raw)
+        self.assertIsInstance(self._raw["redistribution"], str)
+        self.assertTrue(self._raw["redistribution"].strip())
+
+    def test_install_iso_item_identifies_correct_file(self):
+        self.assertEqual(self._parsed.items[0].name, OPENBSD_MEDIA)
+        self.assertEqual(self._parsed.items[0].file, "install79.iso")
+
+    def test_install_iso_sha256_matches_openbsd_7_9_amd64(self):
+        self.assertEqual(
+            self._parsed.items[0].sha256,
+            "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102"
+            "cf8a5130449f")
+
+
 class BuiltinCodexTests(unittest.TestCase):
     """The packaged codex index and files agree."""
 
@@ -215,6 +256,16 @@ class BuiltinCodexTests(unittest.TestCase):
         for name in list_builtin_blueprints():
             self.assertTrue(os.path.isfile(
                 os.path.join(root, "blueprints", f"{name}{BLUEPRINT_EXT}")))
+
+    def test_openbsd_blueprint_seed_copies_closure(self):
+        with tempfile.TemporaryDirectory() as home:
+            self.assertTrue(seed_blueprint(OPENBSD_BLUEPRINT, home=home))
+            self.assertTrue(os.path.isfile(os.path.join(
+                home, "blueprints", f"{OPENBSD_BLUEPRINT}{BLUEPRINT_EXT}")))
+            self.assertTrue(os.path.isfile(os.path.join(
+                home, "scripts", f"{OPENBSD_SCRIPT}.rlqs")))
+            self.assertTrue(os.path.isfile(os.path.join(
+                home, "media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")))
 
 
 if __name__ == "__main__":

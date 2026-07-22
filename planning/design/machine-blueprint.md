@@ -626,6 +626,7 @@ the resolved values appear in the state:
 | platform | memory (MiB) | cpus | control-planes            |
 |----------|--------------|------|---------------------------|
 | `dos`    | 16           | 1    | `["agentless-display"]`   |
+| `openbsd` | 512         | 1    | `["agentless-display"]`   |
 | `win9x`  | 64           | 1    | `["agentless-display"]`   |
 | `winnt`  | 256          | 1    | `["agentless-display"]`   |
 

@@ -10,6 +10,9 @@ This module implements the lexical rules and that shape only --
 what a line *looks like*. Typing (which node names exist, what
 arguments and modifiers each admits) and the S-numbered static
 rules belong to the layer above, in :mod:`reliquary.script`.
+The milestone-5 ``content`` declaration has one structural
+extension: a trailing ``\"\"\"`` opens a raw body that is skipped
+until its closing ``\"\"\"`` line.
 
 Source of truth: planning/design/script-spec.md, "Lexical rules"
 and "Core grammar".
@@ -108,8 +111,8 @@ class Token:
     """One lexed token: its class, source spelling, and position.
 
     ``kind`` is one of ``word``, ``duration``, ``string``,
-    ``regex``, ``media``, ``property``, ``modifier``, ``open``, or
-    ``close``. ``value`` is the decoded payload -- a
+    ``regex``, ``media``, ``property``, ``modifier``, ``open``,
+    ``close``, or ``triple``. ``value`` is the decoded payload -- a
     :class:`StringLiteral` for ``string``, the pattern text for
     ``regex``, the referenced name for ``media`` and ``property``,
     a :class:`Modifier` for ``modifier``, and the spelling itself
@@ -241,9 +244,11 @@ def _scan_word(text, start, stop_at_equals):
     return text[start:index], index
 
 
-def _scan_value(text, start, number):
+def _scan_value(text, start, number, bare_number=False):
     """Scan one non-modifier token beginning at ``start``."""
     char = text[start]
+    if text[start:start + 3] == '"""':
+        return Token("triple", '"""', '"""', number, start + 1), start + 3
     if char == '"':
         literal, end = _scan_string(text, start, number)
         return Token("string", text[start:end], literal, number,
@@ -263,6 +268,8 @@ def _scan_value(text, start, number):
     word, end = _scan_word(text, start, False)
     if char.isdigit() or char == ".":
         if not _DURATION.fullmatch(word):
+            if bare_number and word.isdigit():
+                return Token("word", word, word, number, start + 1), end
             raise ScriptParseError(
                 number,
                 f"invalid duration: {word!r} (durations carry a unit: "
@@ -302,7 +309,9 @@ def tokenize(text, number):
                     raise ScriptParseError(
                         number, f"modifier {name!r} requires a value with no "
                         "spaces around '='", index + 1)
-                value, end = _scan_value(text, end + 1, number)
+                value, end = _scan_value(
+                    text, end + 1, number,
+                    bare_number=name in ("port-min", "port-max"))
                 tokens.append(Token("modifier", text[index:end],
                                     Modifier(name, value, number, index + 1),
                                     number, index + 1))
@@ -362,6 +371,8 @@ def _parse(lines):
         node, opens = _node(tokens, number)
         if not opens:
             (stack[-1][1] if stack else roots).append(node)
+            if _opens_content_body(node):
+                index = _skip_content_body(lines, index, number)
             continue
         stack.append((node, [], number))
     if stack:
@@ -370,6 +381,18 @@ def _parse(lines):
             stack[-1][2], f"unclosed block opened by {node.name!r}",
             node.column)
     return tuple(roots)
+
+
+def _opens_content_body(node):
+    return (node.name == "content" and node.arguments
+            and node.arguments[-1].kind == "triple")
+
+
+def _skip_content_body(lines, start, opener_line):
+    for index in range(start, len(lines)):
+        if lines[index].strip() == '"""':
+            return index + 1
+    raise ScriptParseError(opener_line, "unterminated content body")
 
 
 def _node(tokens, number):

@@ -20,6 +20,7 @@ from .media import fetch_media
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 _PLATFORM_MEMORY = {
     "dos": 16,
+    "openbsd": 512,
     "win9x": 64,
     "winnt": 256,
 }

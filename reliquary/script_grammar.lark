@@ -20,7 +20,7 @@
 // splits them), a branching wait takes one or more handlers (S8
 // requires two), and a phase body need not terminate (S11).
 
-script: header* property_def* body?
+script: header* property_def* http_def* body?
 
 header: KW_DESCRIPTION STRING _NL       -> h_description
       | KW_PLATFORM NAME _NL            -> h_platform
@@ -30,6 +30,9 @@ header: KW_DESCRIPTION STRING _NL       -> h_description
       | KW_DEADLINE DURATION _NL        -> h_deadline
 
 property_def: KW_PROPERTY NAME NAME? modifier* _NL
+http_def: KW_HTTP modifier* _open content_def+ _close
+content_def: KW_CONTENT NAME STRING modifier* TRIPLE _NL CONTENT_TEXT _NL
+           | KW_CONTENT NAME STRING modifier* _NL
 
 ?body: phase+                           -> phased_body
      | statement+                       -> linear_body
@@ -64,6 +67,8 @@ transfer: KW_GOTO NAME _NL              -> goto
 
 action: KW_ENTER STRING modifier* _NL                   -> enter
       | KW_TYPE STRING modifier* _NL                    -> type_text
+      | KW_HTTP NAME NAME* modifier* _NL                -> http_control
+      | KW_HTTP NAME NAME* modifier* _open content_def+ _close -> http_control
       | KW_PRESS NAME+ modifier* _NL                    -> press
       | KW_SELECT STRING modifier* _NL                  -> select
       | KW_SCREENSHOT NAME? modifier* _NL               -> screenshot
@@ -82,8 +87,8 @@ _open: _BLOCK_OPEN _NL
 _close: _BLOCK_CLOSE _NL
 
 %declare KW_DESCRIPTION KW_PLATFORM KW_MACHINE KW_ENTRY KW_TIMEOUT
-%declare KW_DEADLINE KW_PROPERTY KW_PHASE KW_WAIT KW_ON KW_ALWAYS
+%declare KW_DEADLINE KW_PROPERTY KW_HTTP KW_CONTENT KW_PHASE KW_WAIT KW_ON KW_ALWAYS
 %declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT
 %declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_START KW_STOP
-%declare NAME STRING REGEX DURATION MEDIA_REF PROP_REF MOD_NAME
+%declare NAME STRING REGEX DURATION MEDIA_REF PROP_REF MOD_NAME TRIPLE CONTENT_TEXT
 %declare _NL _BLOCK_OPEN _BLOCK_CLOSE

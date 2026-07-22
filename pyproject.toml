@@ -48,3 +48,4 @@ reliquary = [
     "codex/media/*.rlqm",
     "codex/scripts/*.rlqs",
 ]
+reliquary_tests = ["fixtures/*"]

@@ -21,6 +21,7 @@ from .platform_dos import program_name
 
 _PLATFORM_MEMORY = {
     "dos": 16,
+    "openbsd": 512,
     "win9x": 64,
     "winnt": 256,
 }

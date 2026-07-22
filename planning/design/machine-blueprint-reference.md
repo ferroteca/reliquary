@@ -54,6 +54,7 @@ for:
 | value   | meaning                    |
 |---------|----------------------------|
 | `dos`   | DOS (FreeDOS, MS-DOS, ...) |
+| `openbsd` | OpenBSD                  |
 | `win9x` | Windows 95/98/Me           |
 | `winnt` | Windows NT family          |
 
@@ -320,7 +321,7 @@ binary unit suffix — and a bare integer means MiB, so
 `"memory": "32M"` and `"memory": 32` are the same declaration.
 The size must resolve to a whole number of MiB because the state
 always carries the canonical integer-MiB form. Defaults by platform
-(dos 16 MiB, win9x 64 MiB, winnt 256 MiB).
+(dos 16 MiB, openbsd 512 MiB, win9x 64 MiB, winnt 256 MiB).
 
 ```json
 {"memory": "32M"}

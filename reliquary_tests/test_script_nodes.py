@@ -176,11 +176,12 @@ class NodeShapeTests(unittest.TestCase):
 
 
 class NoJsonInScriptsTests(unittest.TestCase):
-    """A script carries no JSON, so the node shape has no exception.
+    """A script carries no JSON island inside ordinary blocks.
 
     Authored assets — media definitions and landmarks — live in
-    their own files beside the script, so tokenization never
-    suspends and every block holds nodes.
+    their own files beside the script, so every block holds nodes.
+    The HTTP content body is a raw text body attached to one node,
+    not a block.
     """
 
     def test_every_block_holds_nodes(self):
@@ -199,6 +200,15 @@ class NoJsonInScriptsTests(unittest.TestCase):
     def test_a_comment_inside_a_block_is_still_a_comment(self):
         phase, = parse_nodes("phase p {\n    # a note\n    finish\n}\n")
         self.assertEqual([child.name for child in phase.block], ["finish"])
+
+    def test_a_content_body_is_not_parsed_as_nodes(self):
+        http, = parse_nodes(
+            'http {\n'
+            '    content answer "/answer.txt" """\n'
+            '        not a node\n'
+            '    """\n'
+            '}\n')
+        self.assertEqual([child.name for child in http.block], ["content"])
 
 
 class ReferenceScriptTests(unittest.TestCase):

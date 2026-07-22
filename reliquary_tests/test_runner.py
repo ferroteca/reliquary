@@ -119,6 +119,8 @@ class RunnerConstructionTests(unittest.TestCase):
             reliquary.MachineConfig(platform="win9x").memory, 64)
         self.assertEqual(
             reliquary.MachineConfig(platform="winnt").memory, 256)
+        self.assertEqual(
+            reliquary.MachineConfig(platform="openbsd").memory, 512)
 
     def test_memory_conflicts_with_raw_memory_argument(self):
         with self.assertRaisesRegex(ValueError, "conflicts"):

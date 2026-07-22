@@ -17,7 +17,7 @@ _FIELDS = {
     "platform", "memory", "drives", "boot", "name",
     "description", "scripts",
 }
-_PLATFORMS = {"dos", "win9x", "winnt"}
+_PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _DRIVE_FIELDS = {"size", "media"}
 _DRIVE_KEY = re.compile(r"(floppy|hdd|cdrom)(\d+)?")
 _SIZE = re.compile(r"([1-9][0-9]*)([KMGTkmgt])")
