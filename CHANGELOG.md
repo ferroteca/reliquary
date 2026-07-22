@@ -11,10 +11,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.1.0.dev1 (unreleased)
 
-### Added
+### Changed
 
-- Accept `rlq list machine` and `rlq list blueprint` as singular
-  aliases for `rlq list machines` and `rlq list blueprints`. (`#3`)
+- CLI/API twin-name identity (ROADMAP milestone 4, task 9): every
+  command is its API twin's name, dash-separated. Lifecycle verbs are
+  `create-machine` / `start-machine` / `stop-machine` /
+  `destroy-machine`; listings are `list-machines` /
+  `list-blueprints` / `list-scripts` (the nested `list …` form and
+  its singular aliases are gone); media/cache commands include
+  `fetch-media`, `clean-downloads`, `clean-media`, `insert-media`,
+  `eject-media`, and `set-boot-order`; the guest-console family
+  matches the script language (`type` raw / `enter` / `press` /
+  `exec` / `select` / `screen`). Flags may appear before or after
+  the command word without a parent-parser SUPPRESS twin.
+  `--machine` takes the full `<blueprint>-<n>` id exactly — no
+  prefix matching and no `--blueprint` + bare-number pair — and is
+  mutually exclusive with `--blueprint`. The embedding API names
+  match (`create_machine`, `start_machine`, `stop_machine`,
+  `destroy_machine`).
 
 ### Added
 

@@ -51,19 +51,19 @@ New-Item -ItemType Directory "$HOME\Documents\reliquary\drives\hdd"
 Copy-Item .\MYPROG.EXE "$HOME\Documents\reliquary\drives\hdd\"
 
 # 2. Start QEMU with your DOS boot image
-rlq start --display
+rlq start-machine --display
 
 # 3. Wait for the DOS prompt
 rlq wait "A:\\\\>"
 
 # 4. Switch to the staged drive
-rlq run "c:"
+rlq exec "c:"
 
 # 5. Run your program
-rlq run "myprog.exe > result.log"
+rlq exec "myprog.exe > result.log"
 
 # 6. Stop QEMU
-rlq stop
+rlq stop-machine
 ```
 
 After stopping, the `result.log` file is available in the `drives/hdd` directory.

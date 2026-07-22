@@ -64,19 +64,19 @@ The current implementation (milestone-1) supports a subset of the blueprint form
 
 ```powershell
 # Create a machine from a blueprint
-rlq --blueprint freedos-1.4-plain create
+rlq create-machine --blueprint freedos-1.4-plain
 
 # Start it
-rlq --blueprint freedos-1.4-plain start
+rlq start-machine --blueprint freedos-1.4-plain
 
 # Run a script
-rlq --blueprint freedos-1.4-plain script install
+rlq run-script install --blueprint freedos-1.4-plain
 
 # Stop it
-rlq --blueprint freedos-1.4-plain stop
+rlq stop-machine --blueprint freedos-1.4-plain
 
 # Destroy it
-rlq --blueprint freedos-1.4-plain --machine 1 destroy
+rlq destroy-machine --machine freedos-1.4-plain-1
 ```
 
 ## Machine lifecycle

@@ -83,13 +83,13 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
         self.assertFalse(created)
         self.assertEqual(resolved, machine_id)
 
-    def test_blueprint_and_number_resolves(self):
+    def test_machine_id_resolves(self):
         from reliquary.machines import create_machine
         with mock.patch("reliquary.machines.create_hdd_image"):
             first = create_machine("plain", home=self.home)
             second = create_machine("plain", home=self.home)
         resolved, created = _resolve_or_create_machine(
-            blueprint="plain", machine="1", home=self.home)
+            machine="plain-1", home=self.home)
         self.assertFalse(created)
         self.assertEqual(first, "plain-0")
         self.assertEqual(resolved, second)

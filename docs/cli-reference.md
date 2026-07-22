@@ -6,57 +6,64 @@ SPDX-License-Identifier: BSD-3-Clause
 # CLI reference
 
 This is the complete reference for the `rlq` command-line interface
-(alias: `reliquary`).
+(alias: `reliquary`). Every command is its API twin's name,
+dash-separated (`create-machine` ↔ `create_machine`); flags may
+appear before or after the command word.
 
 ## Global options
 
 - `--home <path>` - Override the reliquary home directory
-- `--blueprint <name>` - Select a blueprint's sole machine, or combine
-  with `--machine <n>`; names the blueprint for `create` / `list`
-- `--machine <id|n>` - Select a machine by id (`<blueprint>-<n>`),
-  unambiguous id prefix, or number with `--blueprint`
-- `--port <n>` - QMP port (legacy interaction commands; lifecycle
-  stores port per machine)
+- `--blueprint <name>` - Select a blueprint's sole machine, or
+  name the blueprint for `create-machine` / `list-*`
+- `--machine <id>` - Select a machine by full id
+  (`<blueprint>-<n>`), exactly — no prefix matching and no
+  bare-number form
+- `--port <n>` - QMP port (legacy root-home interaction and
+  bare `start-machine` / `stop-machine`)
 - `--platform <name>` - Guest platform adapter (default: `dos`)
 - `--qemu <path>` - Path to the QEMU binary
 - `--timeout <seconds>` - Default timeout for commands
 - `--version` - Show version and exit
 
-`--display` is not global: it is accepted on `start` and `script`.
+`--display` is accepted on `start-machine` and `run-script`.
+
+`--blueprint` and `--machine` are mutually exclusive.
 
 ## Machine lifecycle commands
 
-### `rlq --blueprint NAME create`
+### `rlq create-machine --blueprint NAME`
 
 Create a new machine from a blueprint.
 
-### `rlq --blueprint NAME start [--display]`
+### `rlq start-machine (--blueprint NAME | --machine ID) [--display]`
 
-Start a machine. Returns when QEMU is ready.
+Start a machine. Returns when QEMU is ready. Without a selector,
+loads the legacy root-home `machine.json` path.
 
-### `rlq --blueprint NAME stop`
+### `rlq stop-machine (--blueprint NAME | --machine ID)`
 
-Stop a running machine.
+Stop a running machine. Without a selector, stops the legacy
+root-home VM.
 
-### `rlq --blueprint NAME --machine N destroy`
+### `rlq destroy-machine (--blueprint NAME | --machine ID)`
 
 Destroy a machine. Frees the machine number for reuse.
 
-### `rlq list machines [--blueprint NAME]`
+### `rlq list-machines [--blueprint NAME]`
 
 List all machines, optionally filtered by blueprint.
 
-### `rlq list blueprints [--builtin]`
+### `rlq list-blueprints [--builtin]`
 
 List blueprints. With `--builtin`, list only built-in blueprints.
 
-### `rlq list scripts [--blueprint NAME]`
+### `rlq list-scripts [--blueprint NAME]`
 
 List scripts, optionally filtered by blueprint.
 
 ## Script commands
 
-### `rlq --blueprint NAME script <label> [--display]`
+### `rlq run-script <label> (--blueprint NAME | --machine ID) [--display]`
 
 Run a script against a blueprint's machine. Resolves the blueprint,
 creates a machine if none exists, runs the script, and records the run.
@@ -71,39 +78,52 @@ builtin). With `--blueprint` or `--machine`, `<name>` may be a
 blueprint scripts-map label. With a machine, media-slot preflight
 runs as well. Static errors exit 2.
 
-## Legacy root-home commands
+## Media and cache
 
-### `rlq start [--display] [QEMU_ARGS...]`
+### `rlq fetch-media <name>`
 
-Start QEMU using the legacy root-home path. Loads configuration from
-`<home>/machine.json` if present. Extra arguments after the known
-options are passed to QEMU.
+Fetch and verify a named media item into the cache.
 
-### `rlq stop`
+### `rlq clean-downloads` / `rlq clean-media`
 
-Stop the active VM.
+Reclaim files under `cache/downloads/` or `cache/media/`.
+
+### `rlq insert-media <slot> <media> (--blueprint NAME | --machine ID)`
+
+### `rlq eject-media <slot> (--blueprint NAME | --machine ID)`
+
+### `rlq set-boot-order <key>... (--blueprint NAME | --machine ID)`
+
+Persistent media and boot-order changes on a stopped machine.
 
 ## Keyboard and command input
 
+Guest-console verbs match the script language. Select a machine with
+`--blueprint` / `--machine`, or pass legacy `--port`.
+
 ### `rlq type TEXT`
 
-Type text followed by Enter.
+Type text with no trailing Enter.
 
-### `rlq run COMMAND`
+### `rlq enter LINE`
 
-Type a command and wait for the prompt to return.
+Type a line and press Enter.
 
-### `rlq keys KEY [KEY ...]`
+### `rlq press KEY [KEY ...]`
 
-Send raw QEMU key names (e.g., `down ret`).
+Send portable key names (and `+` chords) from the script vocabulary.
 
-### `rlq menu ITEM [--exclude TEXT]`
+### `rlq exec COMMAND [--timeout SECONDS]`
+
+Enter a command and wait for the DOS prompt to return.
+
+### `rlq select ITEM [--exclude TEXT]`
 
 Select an entry in a cursor-key driven text menu.
 
 ## Reading the guest
 
-### `rlq text`
+### `rlq screen`
 
 Print the current 80-by-25 text screen.
 
@@ -120,12 +140,6 @@ Take a screenshot saved as `<home>/screenshots/<name>.png`.
 ### `rlq hmp "COMMAND"`
 
 Send a raw QEMU human-monitor command.
-
-## Machine selection
-
-- `--blueprint NAME` - Select a blueprint's sole machine
-- `--machine NAME-N` - Select a specific machine by full id
-- Combine `--blueprint NAME --machine N` for explicit selection
 
 For more examples and usage patterns, see [README.md](../README.md).
 Agentless DOS automation is covered in

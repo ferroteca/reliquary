@@ -330,22 +330,23 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertEqual(machine_id, "freedos-0")
 
     def test_resolve_machine_by_blueprint_none_suggests_create(self):
-        """No machine for a blueprint names create in the error."""
+        """No machine for a blueprint names create-machine in the error."""
         with self.assertRaises(ValueError) as caught:
             resolve_machine(blueprint="missing", home=self.home)
         message = str(caught.exception)
         self.assertIn("no machine exists", message)
-        self.assertIn("rlq --blueprint missing create", message)
+        self.assertIn(
+            "rlq create-machine --blueprint missing", message)
 
     def test_resolve_machine_by_blueprint_ambiguous(self):
-        """Several machines of one blueprint require --machine."""
+        """Several machines of one blueprint require --machine <id>."""
         self._create_ready("freedos")
         self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
             resolve_machine(blueprint="freedos", home=self.home)
         message = str(caught.exception)
         self.assertIn("has 2 machines", message)
-        self.assertIn("--machine", message)
+        self.assertIn("--machine <id>", message)
 
     def test_resolve_machine_by_full_id(self):
         """--machine accepts the full <blueprint>-<n> id."""
@@ -354,36 +355,27 @@ class MachineMaterializationTests(unittest.TestCase):
             resolve_machine(machine=machine_id, home=self.home),
             machine_id)
 
-    def test_resolve_machine_by_blueprint_and_number(self):
-        """--blueprint with --machine <n> selects that numbered machine."""
+    def test_resolve_machine_rejects_blueprint_and_machine(self):
+        """--blueprint and --machine together are rejected."""
         self._create_ready("freedos")
-        second = self._create_ready("freedos")
-        self.assertEqual(
-            resolve_machine(blueprint="freedos", machine="1",
-                            home=self.home),
-            second)
+        with self.assertRaises(ValueError) as caught:
+            resolve_machine(blueprint="freedos", machine="freedos-0",
+                            home=self.home)
+        self.assertIn("mutually exclusive", str(caught.exception))
 
-    def test_resolve_machine_number_requires_blueprint(self):
-        """A bare machine number is rejected without --blueprint."""
+    def test_resolve_machine_rejects_bare_number(self):
+        """A bare machine number is never a machine id."""
         self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
             resolve_machine(machine="0", home=self.home)
-        self.assertIn("--blueprint", str(caught.exception))
+        self.assertIn("<blueprint>-<n>", str(caught.exception))
 
-    def test_resolve_machine_prefix(self):
-        """--machine accepts an unambiguous id prefix."""
-        machine_id = self._create_ready("freedos")
-        self.assertEqual(
-            resolve_machine(machine="freedos-", home=self.home),
-            machine_id)
-
-    def test_resolve_machine_prefix_ambiguous(self):
-        """An ambiguous prefix lists candidate machines."""
-        self._create_ready("plain")
-        self._create_ready("plain")
+    def test_resolve_machine_rejects_prefix(self):
+        """--machine requires the full id — no prefix matching."""
+        self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(machine="plain-", home=self.home)
-        self.assertIn("matches 2 machines", str(caught.exception))
+            resolve_machine(machine="freedos-", home=self.home)
+        self.assertIn("no machine", str(caught.exception))
 
     def test_start_launches_qemu_and_sets_running(self):
         """start re-verifies media, launches QEMU, and sets phase."""

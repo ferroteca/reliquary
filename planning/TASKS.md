@@ -180,6 +180,15 @@ the parser stack validates scripts; 10–12 close out:
    dies with the root-home model); id-only --machine
    selectors; uniform flag position (the cli.py SUPPRESS
    workaround retires).
+   LANDED (2026-07-22): CLI commands and API twins share one
+   name under the dash↔underscore transform; the guest-console
+   family matches the script language; `--machine` is id-only
+   and mutually exclusive with `--blueprint`; leading flags are
+   rewritten onto the subparser so SUPPRESS is gone. Nested
+   `list …` and the singular aliases are deleted. `clean-*`
+   and the state ops (`insert-media` / `eject-media` /
+   `set-boot-order`) land with their twins. search-* twins that
+   have no implementation yet stay with later milestones.
 10. Documentation sweep: every doc that quotes script syntax
     (README, planning/examples/README); docs/ and
     docs/cli-reference.md follow the CLI renames.

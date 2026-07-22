@@ -36,7 +36,7 @@ workflow:
   `check_script` / `rlq check-script` report it without running).
   `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
-  the clocks the plan resolved — and wires `script <label>` (resolve via blueprint map,
+  the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys, run
   records under `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and
   `__main__.py` preserves `python -m reliquary` execution.
@@ -135,7 +135,7 @@ Current home layout (still the active machine model):
 
 - `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting")
 - `machine.json` — optional legacy CLI machine configuration for bare
-  `rlq start` without `--blueprint` / `--machine` (not loaded by Python
+  `rlq start-machine` without `--blueprint` / `--machine` (not loaded by Python
   workflows)
 - `screenshots/` — screenshots
 - `qemu-stderr.log` — startup diagnostics
@@ -264,10 +264,10 @@ must be `1`; not a constructor field). Relative drive sources resolve from the f
 from `base_dir` / the current directory via `from_mapping`. Explicit overrides win: scalars replace (including
 `None`), `qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field /
 option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. The CLI loads
-`<effective-home>/machine.json` for bare `rlq start` (no `--blueprint` / `--machine`
+`<effective-home>/machine.json` for bare `rlq start-machine` (no `--blueprint` / `--machine`
 selector); this is a transitional convenience and does not apply to Python workflows or to
-the cached-machine lifecycle (`rlq --blueprint NAME create|start|stop|destroy`,
-`rlq list machines`). Explicit `--platform`, `--qemu`, and raw QEMU arguments
+the cached-machine lifecycle (`rlq create-machine|start-machine|stop-machine|destroy-machine
+--blueprint NAME`, `rlq list-machines`). Explicit `--platform`, `--qemu`, and raw QEMU arguments
 override the loaded file on that legacy path; an omitted `--platform` must not clobber a
 file platform (so argparse must not default `--platform` to `"dos"`). `run()` privately ensures that
 the resolved inventory declares something bootable — keep present declared media;

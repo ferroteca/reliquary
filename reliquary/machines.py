@@ -264,84 +264,36 @@ def list_machines(home=None, blueprint=None):
 def resolve_machine(*, machine=None, blueprint=None, home=None):
     """Resolve a ``--machine`` / ``--blueprint`` selector to one id.
 
-    Selectors:
+    Selectors are mutually exclusive:
 
-    - ``--blueprint NAME`` alone: the sole machine of that blueprint
-    - ``--machine NAME-N``: the full machine id (or unambiguous prefix)
-    - ``--blueprint NAME --machine N``: machine number ``N`` of that
-      blueprint
+    - ``--blueprint NAME``: the sole machine of that blueprint
+    - ``--machine NAME-N``: the full machine id, exactly
     """
     if machine is None and blueprint is None:
         raise ValueError(
             "select a machine with --blueprint or --machine")
     if machine is not None and blueprint is not None:
-        return _resolve_by_blueprint_number(blueprint, machine, home)
+        raise ValueError(
+            "--blueprint and --machine are mutually exclusive; "
+            "pass --machine <id> or --blueprint <name>")
     if machine is not None:
         return _resolve_by_id(machine, home)
     return _resolve_by_blueprint(blueprint, home)
 
 
-def _parse_machine_number(value):
-    """Parse a machine number from a ``--machine`` value."""
-    if isinstance(value, int):
-        number = value
-    elif isinstance(value, str) and value.isdigit():
-        if len(value) > 1 and value.startswith("0"):
-            raise ValueError(
-                f"machine number must not have leading zeros, "
-                f"got: {value!r}")
-        number = int(value)
-    else:
-        raise ValueError(
-            f"with --blueprint, --machine must be a machine number, "
-            f"got: {value!r}")
-    if number < 0:
-        raise ValueError(
-            f"machine number must be non-negative, got: {number}")
-    return number
-
-
-def _resolve_by_blueprint_number(blueprint, machine, home):
-    number = _parse_machine_number(machine)
-    machine_id = machine_id_for(blueprint, number)
-    path = _state_path(machine_id, home)
-    if not os.path.isfile(path):
-        raise ValueError(
-            f"no machine {machine_id!r}\n"
-            f"create one: rlq --blueprint {blueprint} create-machine")
-    state = load_machine_state(machine_id, home)
-    if state.get("blueprint") != blueprint:
-        raise ValueError(
-            f"machine {machine_id!r} belongs to blueprint "
-            f"{state.get('blueprint')!r}, not {blueprint!r}")
-    return machine_id
-
-
 def _resolve_by_id(selector, home):
-    """Resolve a full machine id or unambiguous id prefix."""
+    """Resolve a full machine id — exact match only."""
     if not isinstance(selector, str) or not selector:
         raise ValueError(
             f"machine id must be a non-empty string, got: {selector!r}")
     if selector.isdigit():
         raise ValueError(
-            f"machine number {selector!r} requires --blueprint")
-    matches = [state for state in list_machines(home)
-               if state["id"] == selector
-               or state["id"].startswith(selector)]
-    # Prefer exact match when present.
-    exact = [state for state in matches if state["id"] == selector]
-    if exact:
-        return exact[0]["id"]
-    if not matches:
-        raise ValueError(f"no machine matches id {selector!r}")
-    if len(matches) > 1:
-        lines = [f"{selector!r} matches {len(matches)} machines:"]
-        for state in matches:
-            lines.append(
-                f"  {state['id']}  {state.get('blueprint') or '-'} "
-                f"({state.get('phase', '?')})")
-        raise ValueError("\n".join(lines))
-    return matches[0]["id"]
+            f"machine id must be the full <blueprint>-<n> form, "
+            f"got: {selector!r}")
+    for state in list_machines(home):
+        if state["id"] == selector:
+            return selector
+    raise ValueError(f"no machine {selector!r}")
 
 
 def _resolve_by_blueprint(name, home):
@@ -349,12 +301,11 @@ def _resolve_by_blueprint(name, home):
     if not matches:
         raise ValueError(
             f"no machine exists for blueprint {name!r}\n"
-            f"create one: rlq --blueprint {name} create-machine")
+            f"create one: rlq create-machine --blueprint {name}")
     if len(matches) > 1:
         lines = [
             f"blueprint {name!r} has {len(matches)} machines; "
-            "pick one with --machine <n> or "
-            "--machine <blueprint>-<n>:",
+            "pick one with --machine <id>:",
         ]
         for state in matches:
             lines.append(f"  {state['id']}  ({state.get('phase', '?')})")

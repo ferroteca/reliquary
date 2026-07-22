@@ -27,8 +27,9 @@ starting with "The model at a glance" and its diagrams — and
 [Machine blueprints and machines](planning/design/instance-model.md).
 
 > **Status:** milestone-1 blueprint materialization, lifecycle CLI
-> (`create` / `start` / `stop` / `destroy` / `list machines`), and
-> `rlq --blueprint NAME script <label>` (resolve, create-if-none, run
+> (`create-machine` / `start-machine` / `stop-machine` /
+> `destroy-machine` / `list-machines`), and
+> `rlq run-script <label> --blueprint NAME` (resolve, create-if-none, run
 > records, persistent `insert`/`eject`) are implemented for the
 > QEMU/DOS subset.
 
@@ -54,7 +55,7 @@ Installing registers two equivalent commands: `rlq` (the short form used through
 
 ```powershell
 rlq --help
-rlq --blueprint freedos-1.4-plain script install
+rlq run-script install --blueprint freedos-1.4-plain
 ```
 
 From a clean home, that one command materializes a machine from the codex's `freedos-1.4-plain` blueprint (seeding the
@@ -65,9 +66,9 @@ script ejects the CD. The machine is left with FreeDOS installed on its hard dis
 it freely:
 
 ```powershell
-rlq --blueprint freedos-1.4-plain script verify
-rlq --blueprint freedos-1.4-plain start
-rlq --blueprint freedos-1.4-plain stop
+rlq run-script verify --blueprint freedos-1.4-plain
+rlq start-machine --blueprint freedos-1.4-plain
+rlq stop-machine --blueprint freedos-1.4-plain
 ```
 
 To inspect a script without running it, `rlq check-script` prints
@@ -199,7 +200,7 @@ Documents/reliquary/
 │   ├── floppy.img        a boot floppy image (slot 0 = A:)
 │   ├── hdd/              a folder exposed as a virtual FAT hard disk
 │   └── ...               hdd_1.qcow2, cdrom.iso, floppy_1/, ...
-├── machine.json          optional legacy CLI config for bare `rlq start`
+├── machine.json          optional legacy CLI config for bare `rlq start-machine`
 ├── screenshots/          captured PNG files
 ├── qemu-stderr.log       diagnostics from the last QEMU start
 ├── vm.json               identity and port of the active VM
@@ -228,7 +229,7 @@ To use a particular DOS — MS-DOS, DR-DOS, or another distribution — copy its
 `drives/floppy.img` or `drives/hdd.qcow2`.
 
 The boot order defaults to a best guess — the slot-0 floppy image, else the slot-0 hard-disk image, else the cdrom — and
-memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `rlq start` to override either.
+memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `rlq start-machine` to override either.
 
 Guest drive letters follow disk order, so a hard-disk boot image at slot 0 claims `C:` and pushes a staged virtual FAT
 drive to `D:`; reliquary defaults the staged drive letter accordingly, and `staged_drive` overrides it (for example when
@@ -251,7 +252,7 @@ already claims slot 0 / drive `A:`).
 ### 3. Start QEMU
 
 ```powershell
-rlq start
+rlq start-machine
 ```
 
 Everything declared under `drives/` is mounted. reliquary chooses an available local QMP port, starts QEMU, assigns the
@@ -261,7 +262,7 @@ port normally does not need to be copied manually.
 For a visible, manually interactive DOS session, start QEMU with its display enabled:
 
 ```powershell
-rlq start --display
+rlq start-machine --display
 ```
 
 The command returns once QEMU is ready, while the VM and its display remain open. Give the QEMU window focus and use it
@@ -269,7 +270,7 @@ like a DOS computer for as long as needed. When the manual session is finished, 
 terminal (or another terminal using the same reliquary home):
 
 ```powershell
-rlq stop
+rlq stop-machine
 ```
 
 This shutdown verifies the VM's recorded identity before closing it and flushes guest writes to the virtual FAT drive.
@@ -279,7 +280,7 @@ identity does not match its state file.
 
 ### 4. Reach the DOS prompt
 
-`start` returns when QEMU is ready, not when DOS is. Wait for a prompt before running commands:
+`start-machine` returns when QEMU is ready, not when DOS is. Wait for a prompt before running commands:
 
 ```powershell
 rlq wait "A:\\\\>"
@@ -289,7 +290,7 @@ A user-provided boot image must reach its prompt on its own, without interactive
 an ordinary DOS command:
 
 ```powershell
-rlq run "c:"
+rlq exec "c:"
 ```
 
 Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which waits for a prompt.
@@ -297,12 +298,12 @@ Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which waits for a 
 ### 5. Run DOS commands
 
 ```powershell
-rlq run "dir"
-rlq run "myprog.exe"
-rlq run "myprog.exe > result.log"
+rlq exec "dir"
+rlq exec "myprog.exe"
+rlq exec "myprog.exe > result.log"
 ```
 
-`run` types the command and waits for a DOS prompt to return. Redirecting output to drive C: is the most reliable way to
+`exec` types the command and waits for a DOS prompt to return. Redirecting output to drive C: is the most reliable way to
 retrieve detailed output. Guest writes become visible in the host staging directory after QEMU stops.
 
 ### 6. Inspect the guest
@@ -310,7 +311,7 @@ retrieve detailed output. Guest writes become visible in the host staging direct
 Print the current 80-by-25 text screen:
 
 ```powershell
-rlq text
+rlq screen
 ```
 
 Wait until the screen contains a regular expression:
@@ -331,7 +332,7 @@ separators are rejected so captures remain under the reliquary home.
 ### 7. Stop QEMU
 
 ```powershell
-rlq stop
+rlq stop-machine
 ```
 
 Stopping QEMU flushes writes from the virtual FAT drive and removes the active `vm.json` record.
@@ -344,34 +345,33 @@ and restart QEMU before using them in the guest.
 ### Managing machines (blueprint lifecycle)
 
 ```text
-rlq --blueprint NAME create
-rlq --blueprint NAME start [--display]
-rlq --blueprint NAME stop
-rlq --blueprint NAME --machine N destroy
-rlq --machine NAME-N destroy
-rlq list machines [--blueprint NAME]
+rlq create-machine --blueprint NAME
+rlq start-machine (--blueprint NAME | --machine ID) [--display]
+rlq stop-machine (--blueprint NAME | --machine ID)
+rlq destroy-machine (--blueprint NAME | --machine ID)
+rlq list-machines [--blueprint NAME]
 ```
 
-`--blueprint` selects that blueprint's sole machine (or names the blueprint for `create`). With more than one machine,
-combine
-`--blueprint NAME --machine N`, or pass the full id as
-`--machine NAME-N`. Machines live under `cache/machines/<blueprint>-<n>/`.
+`--blueprint` selects that blueprint's sole machine (or names the blueprint for `create-machine`).
+`--machine` takes the full id (`<blueprint>-<n>`) exactly — no prefix matching and no bare-number form.
+The two selectors are mutually exclusive. Machines live under
+`cache/machines/<blueprint>-<n>/`.
 
 ```powershell
-rlq --home $scratch --blueprint plain create
-rlq --home $scratch --blueprint plain start --display
-rlq --home $scratch --blueprint plain stop
-rlq --home $scratch list machines
+rlq create-machine --home $scratch --blueprint plain
+rlq start-machine --home $scratch --blueprint plain --display
+rlq stop-machine --home $scratch --blueprint plain
+rlq list-machines --home $scratch
 ```
 
 ### Managing the VM (legacy root-home path)
 
 ```text
-rlq start [--display] [-- QEMU_ARGS...]
-rlq stop
+rlq start-machine [--display] [-- QEMU_ARGS...]
+rlq stop-machine
 ```
 
-Without `--blueprint` / `--machine`, bare `rlq start` still loads an optional versioned JSON machine document from
+Without `--blueprint` / `--machine`, bare `rlq start-machine` still loads an optional versioned JSON machine document from
 `<home>/machine.json`. A missing home file means the ordinary defaults.
 
 `version` is required and must be `1`. The document uses the same field names as `MachineConfig`: `platform`, `timeout`,
@@ -406,31 +406,32 @@ file value.
 Additional QEMU arguments can follow `--`:
 
 ```powershell
-rlq start -- -cpu 486 -device virtio-rng-pci
+rlq start-machine -- -cpu 486 -device virtio-rng-pci
 ```
 
 ### Keyboard and command input
 
 ```text
 rlq type TEXT
-rlq run COMMAND
-rlq keys KEY [KEY ...]
-rlq menu ITEM [--exclude TEXT]
+rlq enter LINE
+rlq press KEY [KEY ...]
+rlq exec COMMAND
+rlq select ITEM [--exclude TEXT]
 ```
 
-`type` types text followed by Enter. `run` additionally waits for the prompt to return. `keys` accepts raw QEMU key
-names, such as:
+`type` sends raw text with no trailing Enter; `enter` types a line and presses Enter. `exec` additionally waits for the
+prompt to return. `press` accepts the script language's portable key names (and `+` chords), such as:
 
 ```powershell
-rlq keys down ret
+rlq press down enter
 ```
 
-`menu` selects an entry in a cursor-key driven text menu, such as a boot menu. It presses the up/down cursor keys and
+`select` selects an entry in a cursor-key driven text menu, such as a boot menu. It presses the up/down cursor keys and
 follows the selection highlight through the VGA attribute bytes, so the entry is confirmed by what the guest actually
 displays before Enter is pressed:
 
 ```powershell
-rlq menu "Use FreeDOS 1.4 in Live Environment mode"
+rlq select "Use FreeDOS 1.4 in Live Environment mode"
 ```
 
 The item text is matched case-insensitively against the visible screen rows. A row exactly equal to the item wins over
@@ -440,7 +441,7 @@ repeatable) rules rows out instead: rows containing an excluded text are never s
 disambiguate:
 
 ```powershell
-rlq menu "Full installation" --exclude "with sources"
+rlq select "Full installation" --exclude "with sources"
 ```
 
 Use the global `--timeout SECONDS` option to change the 30-second navigation timeout.
@@ -448,13 +449,13 @@ Use the global `--timeout SECONDS` option to change the 30-second navigation tim
 ### Reading the guest
 
 ```text
-rlq text
+rlq screen
 rlq wait REGEX
 rlq screenshot [NAME]
 ```
 
 Use the global `--timeout SECONDS` option to change the timeout for
-`run` or `wait`.
+`exec` or `wait`.
 
 ### QEMU monitor access
 
@@ -637,7 +638,7 @@ Install QEMU and put `qemu-system-i386` on `PATH`, set
 ### A command cannot find an active VM
 
 CLI commands use `<home>/vm.json`. Ensure every command uses the same
-`--home` or `RELIQUARY_HOME` value and that `rlq start` completed successfully.
+`--home` or `RELIQUARY_HOME` value and that `rlq start-machine` completed successfully.
 
 ### The VM identity does not match
 

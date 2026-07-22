@@ -868,9 +868,6 @@ def _resolve_or_create_machine(*, machine=None, blueprint=None,
     if machine is None and blueprint is None:
         raise ValueError(
             "select a machine with --blueprint or --machine")
-    if machine is not None and blueprint is None:
-        return _machines.resolve_machine(
-            machine=machine, home=home), False
     if machine is not None:
         return _machines.resolve_machine(
             machine=machine, blueprint=blueprint, home=home), False

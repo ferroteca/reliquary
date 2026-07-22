@@ -33,22 +33,28 @@ individual call overrides the process-global home for that call.
 
 ## Cached machines (the blueprint lifecycle)
 
-- `create_from_blueprint(name, *, home=None)` - Materialize a new
-  machine from a blueprint name; returns the machine id
+- `create_machine(name, *, home=None)` - Materialize a new machine
+  from a blueprint name; returns the machine id
   (`<blueprint>-<n>`, lowest free number). Seeds codex content on
-  first reference.
+  first reference. CLI twin: `create-machine`.
 - `create(blueprint, *, home=None, blueprint_name="")` - The
   same, from an already-parsed `Blueprint`.
 - `list_machines(home=None, blueprint=None)` - List machines.
+  CLI twin: `list-machines`.
 - `resolve_machine(*, machine=None, blueprint=None, home=None)` -
-  Resolve CLI-style selectors to exactly one machine id.
-- `start_cached_machine(machine_id, *, display=False, home=None)`
-  - Start a machine; the QMP port and VM identity are recorded in
-  the machine's `vm.json`.
-- `stop_cached_machine(machine_id, home=None)` - Stop a running
-  machine; identity mismatches fail closed.
-- `destroy(machine_id, home=None)` - Delete the machine entirely;
-  frees its number for reuse.
+  Resolve CLI-style selectors to exactly one machine id. The
+  selectors are mutually exclusive: `machine=` is the full id
+  (`<blueprint>-<n>`) exactly, or `blueprint=` selects that
+  blueprint's sole machine. No prefix matching and no
+  bare-number form.
+- `start_machine(machine_id, *, display=False, home=None)` -
+  Start a machine; the QMP port and VM identity are recorded in
+  the machine's `vm.json`. CLI twin: `start-machine`.
+- `stop_machine(machine_id, home=None)` - Stop a running machine;
+  identity mismatches fail closed. CLI twin: `stop-machine`.
+- `destroy_machine(machine_id, home=None)` - Delete the machine
+  entirely; frees its number for reuse. CLI twin:
+  `destroy-machine`.
 - `mark_stopped(machine_id, home=None)` - Reconcile the phase of
   a machine whose QEMU process has gone.
 - `load_machine_state(machine_id, home=None)` - Read the
@@ -58,18 +64,15 @@ individual call overrides the process-global home for that call.
 - `machine_drive_args(machine_id, home=None)` - Render QEMU
   `-drive` arguments from the machine's state.
 
-These names realign to the settled twins (`create_machine`,
-`start_machine`, `stop_machine`, `destroy_machine`) at the
-implementation realignment — see the
-[design doc](../planning/design/api.md).
-
 Persistent machine-state changes — stopped machines only;
 insert/eject are floppy and cdrom slots; all three survive
 stop/start:
 
 - `insert_media(machine_id, slot, media_name, *, home=None)`
-- `eject_media(machine_id, slot, *, home=None)`
+  (`insert-media`)
+- `eject_media(machine_id, slot, *, home=None)` (`eject-media`)
 - `set_boot_order(machine_id, boot_keys, *, home=None)`
+  (`set-boot-order`)
 
 ## Blueprints
 
