@@ -61,6 +61,16 @@ List scripts, optionally filtered by blueprint.
 Run a script against a blueprint's machine. Resolves the blueprint,
 creates a machine if none exists, runs the script, and records the run.
 
+### `rlq check-script <name> [--blueprint NAME | --machine ID]`
+
+Parse and statically check a script; print its resolved timing plan
+(each observation's effective timeout and source scope). Read-only:
+does not seed the home, create a machine, or run guest steps. Without
+a selector, `<name>` is a bare script stem (home `scripts/` or a
+builtin). With `--blueprint` or `--machine`, `<name>` may be a
+blueprint scripts-map label. With a machine, media-slot preflight
+runs as well. Static errors exit 2.
+
 ## Legacy root-home commands
 
 ### `rlq start [--display] [QEMU_ARGS...]`

@@ -32,7 +32,9 @@ workflow:
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
   `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
-  effective timeout and the scope that supplied it). `script_runner.py` executes that tree against
+  effective timeout and the scope that supplied it; `format_plan` /
+  `check_script` / `rlq check-script` report it without running).
+  `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys, run

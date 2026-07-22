@@ -25,7 +25,7 @@ from .machines import (create_from_blueprint, destroy, list_machines,
                        resolve_machine, split_machine_id,
                        start as start_machine,
                        stop as stop_machine)
-from .script_runner import ScriptRuntimeError, run_script
+from .script_runner import (ScriptRuntimeError, check_script, run_script)
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
 from .workflows import _cli_machine_config, start as start_legacy
@@ -152,6 +152,14 @@ def main(argv=None):
         "--display", action="store_true",
         help="show the QEMU window during guest steps")
 
+    command = subcommands.add_parser(
+        "check-script",
+        help="parse and statically check a script; print its "
+             "resolved timing plan (read-only)")
+    command.add_argument(
+        "name",
+        help="blueprint scripts-map label, or bare script stem")
+
     list_command = subcommands.add_parser(
         "list", help="list blueprints or machines")
     list_sub = list_command.add_subparsers(dest="list_what", required=True)
@@ -201,6 +209,9 @@ def main(argv=None):
         set_home(arguments.home)
     try:
         return _dispatch(arguments)
+    except ScriptParseError as error:
+        print(f"reliquary: error: {error}", file=sys.stderr)
+        return 2
     except (ConnectError, ConnectionError) as error:
         target = (f"127.0.0.1:{arguments.port}"
                   if arguments.port else "the active VM")
@@ -249,6 +260,17 @@ def _script(arguments):
     print(f"final script phase: {result.final_phase}")
     print(f"machine phase: {result.machine_phase}")
     print(f"run: {result.run_dir}")
+    return 0
+
+
+def _check_script(arguments):
+    result = check_script(
+        arguments.name,
+        blueprint=arguments.blueprint,
+        machine=arguments.machine,
+        home=arguments.home,
+    )
+    print(result.report, end="")
     return 0
 
 
@@ -383,6 +405,8 @@ def _dispatch(arguments):
         return _create(arguments)
     if arguments.command == "script":
         return _script(arguments)
+    if arguments.command == "check-script":
+        return _check_script(arguments)
     if arguments.command == "list":
         if arguments.list_what in ("blueprints", "blueprint"):
             return _list_blueprints(arguments)

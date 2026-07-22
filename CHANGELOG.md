@@ -73,6 +73,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   opens its own QMP session through `Machine.qmp()`, so the runtime can
   no longer drive a VM it has not confirmed is the one this home
   started, and no session is held while a handler body runs.
+- `check_script()` / `rlq check-script` report a script's resolved
+  timing plan without running it: each observation's effective
+  timeout and source scope, phase budgets, and the run deadline.
+  The check is read-only (no seeding, no machine create). With a
+  machine selector it also preflights media slots. Static errors
+  exit 2.
 
 ### Removed
 

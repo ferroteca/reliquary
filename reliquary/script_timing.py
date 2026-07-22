@@ -131,6 +131,33 @@ def resolve(script):
     return TimingPlan(default, run, dict(deadlines), tuple(observations))
 
 
+def format_plan(plan, name=None):
+    """Render a timing plan the way ``check-script`` prints it."""
+    lines = []
+    if name:
+        lines.append(f"timing plan for {name}")
+        lines.append("")
+    lines.append(f"default timeout: {plan.default}")
+    if plan.run_deadline is not None:
+        lines.append(f"run deadline: {plan.run_deadline}")
+    if plan.phase_deadlines:
+        lines.append("phase deadlines:")
+        for phase_name, budget in plan.phase_deadlines.items():
+            lines.append(f"  phase {phase_name}: {budget}")
+    if plan.observations:
+        lines.append("observations:")
+        for observation in plan.observations:
+            where = f"line {observation.line}"
+            if observation.phase is not None:
+                where = f"{where} phase {observation.phase}"
+            entry = (f"  {where} {observation.kind}: "
+                     f"{observation.timeout}")
+            if observation.stable is not None:
+                entry += f"; stable {observation.stable}"
+            lines.append(entry)
+    return "\n".join(lines) + "\n"
+
+
 def _header_default(script):
     """The script-wide observation default, or the built-in one."""
     return _bound(script.timeout, "header", None,

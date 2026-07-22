@@ -165,3 +165,34 @@ def seed_script(stem, home=None):
     for media_name in _referenced_insert_media(text):
         seed_media(media_name, home=home)
     return True
+
+
+def locate_script(stem, home=None):
+    """Return an existing ``.rlqs`` path without seeding.
+
+    Prefers ``scripts/<stem>.rlqs`` under the home; otherwise the
+    matching builtin. Raises ``FileNotFoundError`` when neither
+    exists — ``check-script`` uses this so a check never writes.
+    """
+    destination = os.path.join(scripts_dir(home), f"{stem}.rlqs")
+    if os.path.isfile(destination):
+        return destination
+    source = _builtins_root() / "scripts" / f"{stem}.rlqs"
+    if source.is_file():
+        return os.fspath(source)
+    raise FileNotFoundError(
+        f"script not found: {stem}.rlqs\n"
+        f"expected under {scripts_dir(home)}")
+
+
+def locate_blueprint(name, home=None):
+    """Return an existing blueprint path without seeding."""
+    destination = os.path.join(blueprints_dir(home), f"{name}.json")
+    if os.path.isfile(destination):
+        return destination
+    source = _builtins_root() / "blueprints" / f"{name}.json"
+    if source.is_file():
+        return os.fspath(source)
+    raise FileNotFoundError(
+        f"blueprint not found: {name}.json\n"
+        f"expected under {blueprints_dir(home)}")

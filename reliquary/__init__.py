@@ -26,8 +26,8 @@ from .media import (MediaDefinition, MediaItem, ResolvedMedia,
 from .script_nodes import ScriptParseError
 from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
-from .script_runner import (ScriptRun, ScriptRuntimeError,
-                            execute_script, run_script)
+from .script_runner import (ScriptCheck, ScriptRun, ScriptRuntimeError,
+                            check_script, execute_script, run_script)
 from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
                         start)
 
@@ -40,6 +40,7 @@ __all__ = [
     "Qmp",
     "Runner",
     "Script",
+    "ScriptCheck",
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
@@ -96,5 +97,6 @@ __all__ = [
     "stop_cached_machine",
     "wait_text",
     "execute_script",
+    "check_script",
     "run_script",
 ]

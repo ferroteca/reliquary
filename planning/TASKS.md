@@ -127,6 +127,12 @@ the parser stack validates scripts; 10–12 close out:
    the expired clock and its source scope; check-script
    grows to report the resolved timing plan (each
    observation's effective timeout and source scope).
+   LANDED (owner, 2026-07-22): the runner already named clocks
+   (task 5); `check_script()` / `rlq check-script` now resolve a
+   script read-only (home or builtin, no seeding), print
+   `format_plan()` (defaults, phase budgets, every observation's
+   timeout and source scope), and with a machine selector also
+   run media-slot preflight. Static errors exit 2.
 7. Convert the shipped scripts: the builtins
    (freedos-1.4-plain-install, freedos-1.4-verify) and
    planning/examples/scripts/ move to the new surface;

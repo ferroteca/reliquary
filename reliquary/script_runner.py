@@ -27,11 +27,13 @@ from datetime import datetime, timezone
 from qemu.qmp import ConnectError
 
 from .home import scripts_dir
-from .library import seed_script
+from .library import locate_blueprint, locate_script, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
+from .blueprint import load_blueprint
 from .script_parser import load_script
-from .script_timing import parse_duration, resolve as resolve_timing
+from .script_timing import (format_plan, parse_duration,
+                            resolve as resolve_timing)
 from . import machines as _machines
 
 
@@ -219,6 +221,16 @@ class ScriptRun:
     created_machine: bool = False
     final_phase: str = "-"
     machine_phase: str = "-"
+
+
+@dataclasses.dataclass(frozen=True)
+class ScriptCheck:
+    """Result of ``check_script``: path, plan, and printable report."""
+
+    script_path: str
+    plan: object
+    report: str
+    machine_id: str = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -939,3 +951,38 @@ def run_script(label, *, blueprint=None, machine=None, home=None,
         final_phase=final_phase,
         machine_phase=machine_phase,
     )
+
+
+def check_script(name, *, blueprint=None, machine=None, home=None):
+    """Parse and statically check a script; return its timing plan.
+
+    Read-only: does not seed the home, create a machine, write a run
+    record, or execute guest steps. Without a selector, ``name`` is a
+    bare script stem. With ``--blueprint`` or ``--machine``, ``name``
+    resolves through that blueprint's ``scripts`` map first. When a
+    machine is selected, media-slot preflight runs as well.
+    """
+    machine_id = None
+    scripts_map = {}
+    if machine is not None:
+        machine_id = _machines.resolve_machine(
+            machine=machine, blueprint=blueprint, home=home)
+        state = _machines.load_machine_state(machine_id, home)
+        scripts_map = state.get("scripts") or {}
+    elif blueprint is not None:
+        scripts_map = dict(
+            load_blueprint(
+                locate_blueprint(blueprint, home=home),
+                home=home).scripts)
+    stem = _resolve_script_stem(name, scripts_map)
+    script_path = locate_script(stem, home=home)
+    script = load_script(script_path)
+    if machine_id is not None:
+        _preflight_media_slots(
+            script, _machines.load_machine_state(machine_id, home),
+            script_path)
+    plan = resolve_timing(script)
+    report = format_plan(plan, name=os.path.basename(script_path))
+    return ScriptCheck(
+        script_path=script_path, plan=plan, report=report,
+        machine_id=machine_id)

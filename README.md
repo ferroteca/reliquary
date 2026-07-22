@@ -70,6 +70,15 @@ rlq --blueprint freedos-1.4-plain start
 rlq --blueprint freedos-1.4-plain stop
 ```
 
+To inspect a script without running it, `rlq check-script` prints
+the resolved timing plan (each observation's timeout and where it
+came from):
+
+```powershell
+rlq check-script freedos-1.4-plain-install
+rlq check-script install --blueprint freedos-1.4-plain
+```
+
 Vendor media is cached and verified against pinned SHA-256 hashes on every use: source archives under`cache/downloads/`,
 extracted payloads under `cache/media/` (`Documents\reliquary` by default; override with `--home` or the
 `RELIQUARY_HOME` environment variable). Each script run writes a transcript and screenshots under the machine's
