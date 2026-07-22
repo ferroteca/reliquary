@@ -6,12 +6,12 @@ SPDX-License-Identifier: BSD-3-Clause
 # Machine blueprints and machines
 
 > **Status:** milestone 1 spikes 5–6 implement materialization and the
-> lifecycle CLI (`create` / `start` / `stop` / `destroy` /
-> `list machines`, `--blueprint` / `--machine` selection) for the
-> QEMU-only subset. Spike 10 adds append-only run directories under
-> `cache/machines/<id>/runs/` for `script <label>`. Locking, recovery,
-> `apply`, `recreate`, clone / export, and absorbing the legacy
-> root-home model remain later milestones.
+> lifecycle CLI (`create-machine` / `start-machine` / `stop-machine` /
+> `destroy-machine` / `list-machines`, `--blueprint` / `--machine`
+> selection) for the QEMU-only subset. Spike 10 adds append-only run
+> directories under `cache/machines/<id>/runs/` for `run-script <label>`.
+> Locking, recovery, `apply`, `recreate`, clone / export, and absorbing
+> the legacy root-home model remain later milestones.
 
 A **blueprint** is a reusable, user-owned JSON description of a kind of
 machine. A **machine** is one realization of that blueprint: its
@@ -138,15 +138,16 @@ rlq export-machine --to <exporter> [<destination>]
     (--machine <id> | --blueprint <name>)
 ```
 
-`list blueprints` shows each blueprint and its machine count; `list machines`
-shows each machine's id, blueprint, phase, and backend —
-both enumerated by scanning `cache/machines/`. `create`
-validates and resolves the current blueprint, materializes a new
-machine under the next free `<blueprint>-<n>` id — state, writable
-drives, backend object — and prints the id. `destroy` deletes the
-machine entirely: the whole cache directory and the backend machine.
-`recreate` is `destroy` followed by `create` as one command,
-reusing the same id. `delete` takes only `--blueprint`: it
+`list-blueprints` shows each blueprint and its machine count;
+`list-machines` shows each machine's id, blueprint, phase, and
+backend — both enumerated by scanning `cache/machines/`.
+`create-machine` validates and resolves the current blueprint,
+materializes a new machine under the next free `<blueprint>-<n>`
+id — state, writable drives, backend object — and prints the id.
+`destroy-machine` deletes the machine entirely: the whole cache
+directory and the backend machine. `recreate-machine` is
+`destroy-machine` followed by `create-machine` as one command,
+reusing the same id. `delete-blueprint` takes only `--blueprint`: it
 removes the blueprint file itself and fails closed while any
 machine of it exists, naming the machine ids — destroy them
 first.

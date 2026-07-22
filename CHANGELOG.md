@@ -13,6 +13,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Documentation follows the redesigned script surface and the
+  twin-name CLI: `planning/examples/README`, the script-spec and
+  related design pages, and `docs/` quote `run-script`, the
+  colon-free `machine` header, and `insert`/`eject`/`set-boot`
+  rather than the superseded spellings.
+
 - CLI/API twin-name identity (ROADMAP milestone 4, task 9): every
   command is its API twin's name, dash-separated. Lifecycle verbs are
   `create-machine` / `start-machine` / `stop-machine` /

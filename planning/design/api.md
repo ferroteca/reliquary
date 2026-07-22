@@ -194,11 +194,11 @@ hidden prompt. Contract: [media spec](media-spec.md#fetch-progress).
 
 ## Realignment of the implemented binding
 
-At the implementation realignment the current binding renames to
-the settled family: `create_from_blueprint` → `create_machine`;
-the package's `start_cached_machine` / `stop_cached_machine`
-(module `machines.start` / `stop` / `destroy`) →
-`start_machine` / `stop_machine` / `destroy_machine`.
+The implemented binding uses the settled family:
+`create_machine`, `start_machine`, `stop_machine`, and
+`destroy_machine` (replacing the earlier
+`create_from_blueprint` / `start_cached_machine` /
+`stop_cached_machine` / `machines.start` spellings).
 `lifecycle.py`'s legacy `start_machine(config)` name collision
 dies with the root-home model, whose `Runner` / `MachineConfig`
 surface is superseded by the blueprint machine model

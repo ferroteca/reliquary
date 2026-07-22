@@ -192,6 +192,12 @@ the parser stack validates scripts; 10–12 close out:
 10. Documentation sweep: every doc that quotes script syntax
     (README, planning/examples/README); docs/ and
     docs/cli-reference.md follow the CLI renames.
+    LANDED (2026-07-22): planning/examples/README and the
+    script-spec / media-spec / instance-model / api design pages
+    quote `run-script` and the colon-free `machine` header;
+    docs/ (cli-reference, api-reference, dos-automation,
+    blueprint-guide) and README already follow the twin-name
+    CLI. Released CHANGELOG history is left untouched.
 11. Test realignment and the old-surface purge: the test
     suite retargeted to the new parser, runner, and command
     names, then a whole-tree sweep for surviving old-surface

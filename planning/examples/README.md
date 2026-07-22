@@ -32,20 +32,20 @@ ordinary catalog.
 Then:
 
 ```powershell
-reliquary --blueprint freedos script freedos-plain-install
+rlq run-script freedos-plain-install --blueprint freedos
 ```
 
-With no machine of the blueprint yet, `script` creates one; the blueprint
-name then selects that machine on every later command. The blueprint
-declares 32 MiB of memory (the FreeDOS LiveCD warns about low RAM
-at the 16 MiB DOS default), a blank 20M hard disk, and an **empty**
-CD drive (`"cdrom0": null`), booting hard disk first then CD. The
-blueprint alone defines the machine's hardware; the install script
-supplies the installer medium itself: it declares `machine stopped`,
-inserts the LiveCD into the empty slot, starts the machine, and drives
-the installer's "Plain DOS system" path onto the disk. A blank hard
-disk fails to boot, so firmware falls through to the inserted CD —
-no boot-order change is needed.
+With no machine of the blueprint yet, `run-script` creates one; the
+blueprint name then selects that machine on every later command. The
+blueprint declares 32 MiB of memory (the FreeDOS LiveCD warns about
+low RAM at the 16 MiB DOS default), a blank 20M hard disk, and an
+**empty** CD drive (`"cdrom0": null`), booting hard disk first then
+CD. The blueprint alone defines the machine's hardware; the install
+script supplies the installer medium itself: it declares
+`machine stopped`, inserts the LiveCD into the empty slot, starts
+the machine, and drives the installer's "Plain DOS system" path onto
+the disk. A blank hard disk fails to boot, so firmware falls through
+to the inserted CD — no boot-order change is needed.
 
 The insertion is definitive machine state, persisted in the
 machine's state document across stop/start — the machine diverges
@@ -55,7 +55,7 @@ edit or `apply` is needed before verification: the same
 `["hdd0", "cdrom0"]` boot order now boots the installed hard disk.
 
 ```powershell
-reliquary --blueprint freedos script freedos-plain-verify
+rlq run-script freedos-plain-verify --blueprint freedos
 ```
 
 The verify script also declares `machine stopped`, issues a plain

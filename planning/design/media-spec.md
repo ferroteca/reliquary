@@ -512,7 +512,7 @@ Progress is honest: a download shows byte totals only when the
 source names them, hashing and extraction render as elapsed-only
 phases with no invented denominators, and each mirror attempt is
 its own event, so a follower sees the walk. The renderer modes
-are noninteractive exactly as on `script`: under `plain` and
+are noninteractive exactly as on `run-script`: under `plain` and
 `jsonl` the [mismatched-file checkpoint](#mismatched-files)
 below never prompts — an unapproved mismatch fails fast, the
 documented programmatic behavior — while `auto`/`pretty` map it to

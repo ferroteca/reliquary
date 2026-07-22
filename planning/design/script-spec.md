@@ -34,10 +34,10 @@ One `<name>.rlqs` file per script; a run selects its machine with
 blueprint has exactly one machine, `--blueprint <name>`:
 
 ```powershell
-rlq script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos-1.4-plain
 ```
 
-After preflight, `script` resolves its machine
+After preflight, `run-script` resolves its machine
 (creating one when `--blueprint` names a
 blueprint with no machine yet), brings it to the state the script's
 [`machine` header](#header) expects — starting a stopped machine
@@ -563,7 +563,7 @@ deadline    45m
   platform-neutral script may use an explicitly defined portable
   platform value; omission never means portable.
 - `machine` declares the machine state the script expects when it
-  starts. The default is `running`: the `script` command starts a
+  starts. The default is `running`: `run-script` starts a
   stopped machine before executing. `stopped` requires a stopped
   machine — a running machine fails preflight rather than being
   implicitly powered off — and the script performs its own explicit

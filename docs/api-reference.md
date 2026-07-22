@@ -99,15 +99,18 @@ stop/start:
 ## Scripts and runs
 
 - `parse_script(source, path="<script>")` / `load_script(path)` -
-  Parse a milestone-1 `.rlqs` script into an immutable `Script`;
-  errors raise `ScriptParseError` with source locations.
+  Parse a redesigned-surface `.rlqs` script into an immutable
+  `Script`; errors raise `ScriptParseError` with source locations.
 - `run_script(label, *, blueprint=None, machine=None, home=None,
   display=False)` - Resolve the label through the blueprint's
   `scripts` map, create a machine when the blueprint has none,
-  honor the script's `machine:` header, statically preflight
-  insert/eject/boot targets, and execute with a run record under
+  honor the script's `machine` header, statically preflight
+  insert/eject/set-boot targets, and execute with a run record under
   the machine's `runs/` directory. Returns `ScriptRun`; failures
-  raise `ScriptRuntimeError`.
+  raise `ScriptRuntimeError`. CLI twin: `run-script`.
+- `check_script(name, *, blueprint=None, machine=None, home=None)` -
+  Parse and statically check a script; return a printable timing
+  plan without running it. CLI twin: `check-script`.
 - `execute_script(script, *, machine_id, home=None,
   display=False, run_dir=None, script_path=None)` - Execute an
   already-parsed script against a specific machine.

@@ -36,12 +36,12 @@ The default boot order is:
 2. Slot-0 hard disk image (if declared)
 3. First CD-ROM
 
-Override with `-boot` after the known options on `rlq start`.
+Override with `-boot` after the known options on `rlq start-machine`.
 
 ## Memory
 
 Defaults to 16 MB for DOS. Override with `-m` after the known options
-on `rlq start`.
+on `rlq start-machine`.
 
 ## Example workflow
 
