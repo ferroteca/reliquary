@@ -847,7 +847,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 **The July 2026 surface redesign is decided and
 [planning/design/script-spec.md](design/script-spec.md) is its source of
 truth** (including the complete typed EBNF), with
-`script-examples/design-install.rlqs` as the reference
+`planning/design/script-examples/design-install.rlqs` as the reference
 script. Realigning the implementation — parser, runtime, shipped
 scripts — with it is **absolute priority #1**; see the
 realignment milestone below. Pre-beta, the superseded surface is
@@ -1073,7 +1073,7 @@ checkable before it starts and legible while it runs.
 
 **The tensions this creates, which we accept.** These are real and
 should not be papered over; several are already catalogued as
-residual problems in `script-examples/`:
+residual problems in `planning/design/script-examples/`:
 
 - `phase` is a declarative construct whose body is procedural. The
   hybrid is not hidden; it is the point.
@@ -1084,12 +1084,12 @@ residual problems in `script-examples/`:
 - The paradigm boundary shows in the handler keywords: `on` is a
   case in a branching `wait`, `always` a standing rule in a
   reactive phase — one shape, two named lifetimes
-  (`script-examples/04`, resolved by the keyword split).
+  (`planning/design/script-examples/04`, resolved by the keyword split).
 - Declarative timing scopes annotate procedural statements, so an
   observation's effective bound is not locally readable
-  (`script-examples/03`).
+  (`planning/design/script-examples/03`).
 - Procedural `insert`/`eject`/`set-boot` mutate declarative
-  machine state that outlives the run (`script-examples/09`),
+  machine state that outlives the run (`planning/design/script-examples/09`),
   deliberately diverging a machine from its blueprint until
   restored.
 
@@ -1864,7 +1864,7 @@ script is valid under the answers.
 
 The July 2026 script-language redesign
 ([planning/design/script-spec.md](design/script-spec.md), with
-`script-examples/design-install.rlqs` as the reference script)
+`planning/design/script-examples/design-install.rlqs` as the reference script)
 supersedes the surface milestones 1 and 5 implemented.
 This milestone gates everything after it: no later milestone
 starts before the tree speaks the new surface. Pre-beta, the old
@@ -1899,7 +1899,7 @@ Deliverables:
    timeout and source scope).
 6. The built-in and example scripts converted, and every document
    that quotes script syntax updated (README, planning/examples/README);
-   `script-examples/design-install.rlqs` retires into the
+   `planning/design/script-examples/design-install.rlqs` retires into the
    converted builtins.
 
 Done when: the FreeDOS install and verify scripts run end to end

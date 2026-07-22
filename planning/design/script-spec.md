@@ -14,7 +14,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > planned. The implemented parser and runtime (`script.py`,
 > `script_runner.py`) and the shipped built-in and example scripts
 > still speak the earlier surface and will be retargeted wholesale.
-> `script-examples/design-install.rlqs` is the reference script, and
+> `planning/design/script-examples/design-install.rlqs` is the
+> reference script, and
 > the other files there catalog known residual rough edges in this
 > surface. Embedded media blocks, properties and their binding,
 > reactive phases, and the full transcript contract remain later

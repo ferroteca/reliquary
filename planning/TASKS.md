@@ -9,7 +9,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
 
 - ABSOLUTE PRIORITY #1: realign the implementation with the redesigned script language
   - the July 2026 redesign is decided; planning/design/script-spec.md is the source of truth
-    (full typed EBNF included) and script-examples/design-install.rlqs is the
+    (full typed EBNF included) and planning/design/script-examples/design-install.rlqs is the
     reference script
   - the redesign resolves the old "clunky/awkward" critiques: one node shape
     (name, args, name=value props, optional block), spelling-reveals-role tokens
@@ -61,7 +61,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     - convert builtin scripts and planning/examples/ scripts to the new surface
     - update every doc that quotes script syntax (README, planning/examples/README)
     - no backward compatibility: delete the old surface entirely
-  - residual language problems catalogued in script-examples/*.rlqs (see its
+  - residual language problems catalogued in planning/design/script-examples/*.rlqs (see its
     README) — best-guess priority, fix-cost order, NOT validated against real
     authoring pain, reorder freely once we've actually written/debugged
     scripts under this surface:
@@ -1310,7 +1310,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   INTERFACES.md (recorded outputs), instance-model.md (new
   section), machine-blueprint.md (runs/ contents twice),
   machine-blueprint-reference.md (hostdir prose + division of
-  labor), codex.md (naming prose), script-examples/05 rewritten
+  labor), codex.md (naming prose), planning/design/script-examples/05 rewritten
   as a regression note + README row. Gap-closure items 2 and 3
   annotated SUPERSEDED IN PART above
 - THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
@@ -1559,7 +1559,7 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      milestone-zero JSONC note marked dissolved, decisions-still-
      needed), blueprint guide + reference (parameters re-keyed,
      redirect) + cookbook + schema descriptions, the realignment
-     JSONC work item, script-examples/06 (input → property)
+     JSONC work item, planning/design/script-examples/06 (input → property)
   FOURTH FOLLOW-UP ROUND (owner, 2026-07-21, the naming round):
   19. THE MECHANISM IS NAMED SCRIPT PROPERTIES; "user properties"
      names one source — the person's durable file,

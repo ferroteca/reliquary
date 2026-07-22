@@ -94,7 +94,8 @@ inspectable before the machine starts, and governed by numbered
 language goals (G1–G7; planning/ROADMAP.md, "Primary language goals").
 Source of truth:
 [planning/design/script-spec.md](design/script-spec.md), with
-[script-examples/](../script-examples/) as reference material.
+[planning/design/script-examples/](design/script-examples/) as
+reference material.
 
 ### The machine blueprint
 
