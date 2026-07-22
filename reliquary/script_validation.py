@@ -23,12 +23,14 @@ name the offending construct and cite its rule:
 - **S12** — a phased script whose transition graph can cycle
   declares a header ``deadline``, the backstop that bounds the
   run.
+- **S14** — every ``press`` key belongs to the language's closed
+  portable vocabulary.
 
 The remaining rules belong to the layers around this one: S1, S2,
 and S4 are the lexer's and the parser's — the timing placement
-matrix is a node signature — and S6, S13, and S14 arrive with the
-closed vocabularies. The timing *model* itself, which resolves
-the durations this module checks, is
+matrix is a node signature — and S6, S13, and the remaining S14
+vocabularies arrive with their owning features. The timing *model*
+itself, which resolves the durations this module checks, is
 :mod:`reliquary.script_timing`.
 
 This module works structurally over the tree, so it imports no
@@ -43,6 +45,13 @@ from .script_timing import parse_duration
 # is deliberately absent: it has no named spelling.
 _CHANNELS = {"machine": ("state", ("stopped",))}
 _TRANSFERS = ("goto", "finish")
+PORTABLE_KEY_NAMES = frozenset({
+    "enter", "esc", "tab", "space", "backspace",
+    "up", "down", "left", "right",
+    "insert", "delete", "home", "end", "pageup", "pagedown",
+    "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10",
+    "f11", "f12", "ctrl", "alt", "shift",
+})
 
 
 def validate(script):
@@ -53,6 +62,7 @@ def validate(script):
     knows the document's path.
     """
     _durations(script)
+    _keys(script)
     if script.phases:
         _phased(script)
     else:
@@ -99,6 +109,34 @@ def _timed(statements, handlers=()):
     for statement in statements:
         yield statement
         yield from _timed((), statement.handlers)
+
+
+# -- portable keys (S14) -----------------------------------------
+
+def _keys(script):
+    """Every ``press`` argument belongs to the portable key set.
+
+    A chord may also contain one-character printable members, as
+    in ``ctrl+c``. A bare character remains text and must be sent
+    with ``type`` or ``enter``.
+    """
+    statements = list(_walk(script.statements))
+    for phase in script.phases:
+        statements.extend(_walk(phase.statements, phase.handlers))
+    for statement in statements:
+        if statement.verb != "press":
+            continue
+        for spelling in statement.arguments:
+            parts = spelling.split("+")
+            unknown = next((part for part in parts
+                            if part not in PORTABLE_KEY_NAMES
+                            and not (len(parts) > 1 and len(part) == 1)),
+                           None)
+            if unknown is not None:
+                raise ScriptParseError(
+                    statement.line,
+                    f"{unknown!r} is not a portable key name (S14)",
+                    statement.column)
 
 
 # -- the two shapes (S3, S10) ------------------------------------

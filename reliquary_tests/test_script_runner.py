@@ -16,6 +16,7 @@ from reliquary.script_parser import parse_script
 from reliquary.script_runner import (ScriptRuntimeError, _normalize_row,
                                      _resolve_key, _ScriptEngine,
                                      execute_script)
+from reliquary.script_validation import PORTABLE_KEY_NAMES
 
 _HEAD = "platform dos\n"
 
@@ -101,6 +102,9 @@ class HelperTests(unittest.TestCase):
                          "Hello World")
 
     def test_the_portable_key_names_resolve(self):
+        for name in PORTABLE_KEY_NAMES:
+            with self.subTest(name=name):
+                self.assertTrue(_resolve_key(name))
         self.assertEqual(_resolve_key("enter"), ["ret"])
         self.assertEqual(_resolve_key("pagedown"), ["pgdn"])
         self.assertEqual(_resolve_key("ctrl+alt+delete"),
@@ -418,12 +422,6 @@ class InputVerbTests(_RuntimeCase):
         self.run_linear(engine)
         self.assertEqual(self.console.keys,
                          [["down"], ["down"], ["ret"]])
-
-    def test_an_unknown_key_name_is_a_named_error(self):
-        engine = self.engine("press wingding\n")
-        with self.assertRaises(ScriptRuntimeError) as caught:
-            self.run_linear(engine)
-        self.assertIn("not a portable key name", str(caught.exception))
 
     def test_select_runs_under_its_effective_timeout(self):
         engine = self.engine(

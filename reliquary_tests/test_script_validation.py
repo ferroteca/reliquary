@@ -236,6 +236,37 @@ class ObservationChannelTests(_ValidationCase):
             [("screen", "text"), ("screen", "regex"), ("machine", "state")])
 
 
+class PortableKeyTests(_ValidationCase):
+    """S14: ``press`` uses the language's closed portable key set."""
+
+    def test_every_portable_key_name_is_valid(self):
+        names = (
+            "enter esc tab space backspace up down left right insert delete "
+            "home end pageup pagedown f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 "
+            "f12 ctrl alt shift"
+        )
+        script = parse_script(_HEAD + "press " + names + "\n")
+        self.assertEqual(script.statements[0].arguments,
+                         tuple(names.split()))
+
+    def test_a_chord_may_contain_a_printable_character(self):
+        script = parse_script(_HEAD + "press ctrl+c ctrl+alt+delete\n")
+        self.assertEqual(script.statements[0].arguments,
+                         ("ctrl+c", "ctrl+alt+delete"))
+
+    def test_an_unknown_key_name_is_a_static_error(self):
+        self.rejects(_HEAD + "press wingding\n",
+                     "'wingding' is not a portable key name", "S14")
+
+    def test_a_bare_character_is_text_not_a_key_name(self):
+        self.rejects(_HEAD + "press c\n",
+                     "'c' is not a portable key name", "S14")
+
+    def test_an_empty_chord_member_is_invalid(self):
+        self.rejects(_HEAD + "press ctrl++c\n",
+                     "'' is not a portable key name", "S14")
+
+
 class DiagnosticContextTests(_ValidationCase):
     """A static error carries the same context as a parse error."""
 

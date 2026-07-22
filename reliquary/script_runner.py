@@ -34,6 +34,7 @@ from .blueprint import load_blueprint
 from .script_parser import load_script
 from .script_timing import (format_plan, parse_duration,
                             resolve as resolve_timing)
+from .script_validation import PORTABLE_KEY_NAMES
 from . import machines as _machines
 
 
@@ -46,10 +47,10 @@ _FINISH = object()
 # business, never the script's (G5).
 _POLL_INTERVAL = 2.0
 
-# The portable key vocabulary (script-spec.md, `press`), mapped to
-# QEMU key names. The set is closed and owned by the language:
-# anything else is an error, never a pass-through guess.
-_KEY_NAMES = {
+# QEMU translations for every portable language key. Membership in
+# the closed vocabulary is owned by static validation; keeping the
+# backend map explicit makes an unsupported key fail closed.
+_QEMU_KEY_NAMES = {
     "enter": "ret",
     "esc": "esc",
     "tab": "tab",
@@ -88,8 +89,8 @@ def _resolve_key(spelling):
     parts = spelling.split("+")
     resolved = []
     for part in parts:
-        if part in _KEY_NAMES:
-            resolved.append(_KEY_NAMES[part])
+        if part in PORTABLE_KEY_NAMES:
+            resolved.append(_QEMU_KEY_NAMES[part])
             continue
         if len(parts) > 1 and len(part) == 1:
             resolved.extend(char_keys(part))

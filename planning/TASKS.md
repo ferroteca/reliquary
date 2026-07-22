@@ -159,6 +159,16 @@ the parser stack validates scripts; 10–12 close out:
    confirmation — ROADMAP milestone 4): check the spec's
    closed press key-name set against what the converted
    scripts actually need; adjudicate any gap.
+   LANDED (owner, 2026-07-22): the converted scripts need only
+   `enter`, already in the published set, so no vocabulary
+   change was needed. The confirmation exposed an enforcement
+   gap instead: S14 said the set was checked statically, while
+   the runner rejected unknown names only after execution began.
+   `script_validation.py` now owns the portable set and rejects
+   unknown names, bare printable characters, and malformed chords
+   during parsing; chords retain their one-character member
+   (`ctrl+c`). The QEMU runner now only translates the validated
+   language names to backend spellings.
 9. CLI/API renames under the twin-name identity rule
    (DECISIONS.md, CLI queue item 14): run-script,
    fetch-media, the seed- family, new-blueprint, import-vm

@@ -79,6 +79,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The check is read-only (no seeding, no machine create). With a
   machine selector it also preflights media slots. Static errors
   exit 2.
+- `press` key names are statically checked against the script
+  language's closed portable vocabulary (S14). Unknown names, bare
+  printable characters, and malformed chords now fail before a
+  machine starts; chords such as `ctrl+c` remain valid.
 
 ### Removed
 
