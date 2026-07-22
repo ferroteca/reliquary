@@ -282,7 +282,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     feedback split, 2026-07-21);
     also the interaction command family (type/keys/run/text/wait/
     screenshot/menu/hmp) is absent from the settled CLI list though a
-    CLI-driving U3 agent lives on it
+    CLI-driving U3 agent lives on it — the interaction-family and
+    query-output halves are now itemized in the CLI DESIGN GAP QUEUE
+    below (items 1-4)
   - U2 import: RESOLVED (owner, 2026-07-21, design round — see the
     blueprint-spec queue item 2): import never copies; captured disks
     stay in place as local-path definitions, and the presented choice
@@ -553,6 +555,114 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   untracked when the tracked-files-only sed ran) — now zero remain;
   and the design docs' relative planning-path citations normalized
   to the prose convention (planning/ROADMAP.md, ...)
+- CLI DESIGN GAP QUEUE (owner-requested review, 2026-07-21: the complete
+  CLI design — cli.md + ROADMAP "The CLI" + api.md's parity table —
+  walked against planning/INTERFACES.md / planning/USE-CASES.md and
+  modern CLI practice; verdict: the two-layer lifecycle vocabulary, the
+  parity doctrine, the selection failure modes, run-record custody,
+  import's consent points, and the no-prompt/--detach discipline are
+  sound — the gaps cluster in vocabulary collisions, cross-surface
+  naming drift, and the machine-readable query contract):
+  1. the `run` name collision — the interaction verb `run <command>`
+     (DOS execution) and the run-record family
+     `run (status|tail|wait|cancel|delete)` are two unrelated
+     machine-scoped commands sharing one name and grammar position
+     (`run wait` parses as run-management yet `wait` is a plausible
+     guest command; interaction `wait <pattern>` vs `run wait [<n>]`
+     is the same collision again). Recommendation: resolve via item 2
+     — align the interaction family with the script language, which
+     deliberately has no `run` verb, freeing `run` to mean run
+     records exclusively
+  2. the interaction vocabulary contradicts the scripting language:
+     the redesigned language splits `type` (raw text) from `enter`
+     (derived: type + press enter) and its key verb is `press`, while
+     the CLI's `type` is documented as text-plus-Enter (the
+     language's `enter` semantics under the language's other verb
+     name), the CLI's key verb is `keys`, and the CLI carries the
+     `run` verb the language rejected ("`enter` delivers a console
+     line, and completion is a separate explicit observation"). One
+     capability, two vocabularies — INTERFACES says a capability
+     appearing on multiple surfaces appears coherently.
+     Recommendation: the CLI interaction family adopts the script
+     verbs (`type` raw, `enter`, `press`; `wait` / `menu` /
+     `screenshot` already agree), and whether a type-and-await-prompt
+     convenience survives (today's `run`) is decided in the same
+     round under a non-colliding name
+  3. `insert` / `eject` / `set-boot` are missing from the CLI spec:
+     api.md's parity table lists them as CLI commands, their API
+     twins (insert_media / eject_media / set_boot_order) are settled
+     and implemented, and scripts perform all three — but neither
+     cli.md nor ROADMAP's synopsis block defines them. A parity gap
+     inside our own documents; add the family to the CLI design
+  4. queries have no machine-readable form: --progress rawjson covers
+     the stream-bearing commands, but the `list` / `search` tables,
+     `property get`, and the ids printed by create/clone are
+     pretty-rendering only — exactly what the feedback split forbids
+     a program to scrape, on the surface that is the fallback binding
+     for every unbound language. Recommendation: one global `--json`
+     (or `--format json`) covering every informational output,
+     designed once. This is the query-output half of the
+     guiding-principles queue's "CLI programmatic contract" entry
+  5. `pull` vs `fetch` inverts git intuition: git users arrive
+     knowing pull ≈ fetch + merge; here the two are unrelated (codex
+     extraction vs payload download). The doctrine already supplies
+     the better word — the codex is a seed, and the provenance
+     column prints `seeded`. Recommendation: rename `pull` → `seed`
+  6. the create/blueprint confusion pair: `rlq create blueprint
+     <name>` scaffolds a file while `rlq --blueprint <name> create`
+     materializes a machine — the same two words at opposite layers;
+     and `import <source> --blueprint <name>` is --blueprint's only
+     use as a destination name rather than a selector.
+     Recommendation: consider renaming the scaffolder (e.g.
+     `new blueprint`) and `import --as <name>`; at minimum the two
+     create errors cross-reference each other
+  7. `check-script` is a triple outlier: the only hyphenated command,
+     the only verb-verb compound, and it takes a bare script name
+     where `script` takes a label — the label path cannot be checked
+     (`script install` has no `check-script install`). Whatever the
+     spelling becomes, it must accept `script`'s label resolution
+     when a machine/blueprint selector is present
+  8. `property set <key> --secret` is interactive-only, which
+     ROADMAP "The CLI" forbids ("never interactive-only"): a program
+     driving the CLI as its binding cannot set a secret at all, and
+     argv is rightly prohibited. Recommendation: read the value from
+     stdin when stdin is not a tty
+  9. machine-id prefix matching is ambiguous against the id scheme:
+     blueprint names may contain `-<digit>` segments, so
+     `--machine freedos-1` is simultaneously a full id (freedos,
+     machine 1) and a prefix of freedos-1.4-plain-0; no precedence
+     rule is stated. Minimum: an exact id always wins; open question
+     whether prefix matching pays its way at all over structured,
+     meaningful, colliding-by-construction ids (`-b NAME -m N`
+     already covers terseness)
+  10. selector position is half-decided: the design says global
+      selectors come before the verb, cli.py already duplicates
+      --blueprint/--machine/--home onto some subparsers (the
+      SUPPRESS workaround), and the north-star entry below wants
+      both orders identical. Decide once, in the spec: both
+      positions uniformly accepted, or global-only strictly enforced
+  11. progress-mode names (revisits a settled spelling — flagged,
+      not decided): `rawjson` emits JSON lines, and `jsonl` is the
+      precise term; `tty` as the forced-pretty mode is odd since
+      forcing is wanted precisely when off-tty — `pretty` says what
+      it does (auto|pretty|plain|jsonl)
+  12. cli.md staleness the blueprint-queue item-6 sweep missed: hex
+      ids `a1b2` (start/stop, apply error, recreate, keys, and hmp
+      examples) and `f3e4d5c6` (clone); the naming-conventions table
+      still shows blueprints and media as `.json` (settled: .rlqb /
+      .rlqm); synopsis lines alternate `rlq` and `reliquary` — pick
+      `rlq` throughout
+  13. small underspecifications, one sweep: `--timeout` takes bare
+      seconds while the language's durations carry units (30s, 20m)
+      — accept the same literals; `fetch`'s synopsis makes
+      <media_name> required but the `fetch --script ...` example
+      omits it — spell the grammar; `export --drive` doesn't say
+      whether <destination> is required or what it defaults to;
+      `hmp` is a QEMU-specific top-level verb in a four-backend
+      design (the interaction family is already marked open — home
+      it as an explicitly backend-scoped escape hatch when that
+      settles); `clean media` (payloads) vs `list media`
+      (definitions) overloads the noun — note or rename
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
   - shared JSONC reader for authored documents (blueprints, standalone
