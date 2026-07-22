@@ -95,6 +95,17 @@ extraction.
   object; `destroy` then deletes the directory. (Extraction:
   `lifecycle.create_hdd_image` and `find_qemu_img` become
   QEMU-adapter internals.)
+- **Raw interchange.** The adapter reads a drive's content out
+  as a raw image and materializes a native drive from one — the
+  one obligation powering `export-drive`'s raw form and
+  cross-target `export-machine` (owner, 2026-07-22): drive
+  content travels between formats as raw. Exporters themselves
+  are *not* adapter operations: they are their own module family
+  beside the adapters (the `--to` vocabulary — virtualbox,
+  vmware, hyperv, libvirt, ... — probed on the host
+  independently of the backend list, sharing discovery helpers
+  where the tools coincide), consuming the machine's resolved
+  blueprint shape plus this interchange.
 - **Start, stop, liveness.** Start consumes the machine's resolved
   state document — reliquary drive vocabulary in, backend
   configuration out; raw backend arguments never cross the seam
@@ -175,6 +186,13 @@ materialization.
   local ephemeral-machine tool.
 - **Not a general hypervisor library.** The seam covers exactly
   what reliquary's machine model and control planes need.
+- **Accelerators are not backends.** KVM/WHPX/HVF/TCG are the
+  QEMU adapter's internal capability choice — host-probed, at
+  most a `backend-settings` override — never backend identity
+  and never blueprint vocabulary. libvirt likewise is an
+  exporter today and would be a distinct adapter if it ever
+  became a backend; the two roles are independent (owner,
+  2026-07-22).
 
 ## Extraction map
 

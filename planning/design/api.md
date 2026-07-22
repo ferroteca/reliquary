@@ -145,7 +145,7 @@ carries the exceptions and each family's contract home.
 | CLI | API twin | contract home |
 |---|---|---|
 | `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores | [blueprint guide](machine-blueprint.md) |
-| `export` | *open — name and twin land together with export's shape* | blueprint guide |
+| `export-drive` / `export-machine` | `export_drive(key, destination)` / `export_machine(to=, destination=None)` — stream-bearing; `to=` names an exporter (a vocabulary decoupled from backends) and is required | blueprint guide |
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |
 | `seed-blueprint` / `seed-media` / `seed-script` | `seed_blueprint(name, only=)` / `seed_media()` / `seed_script()` | [codex](codex.md) |
@@ -164,8 +164,10 @@ carries the exceptions and each family's contract home.
 
 `import-vm`'s twin is `import_vm` — a bare `import` is a Python
 keyword, and under the identity rule the CLI simply adopts the
-twin's name. `export`'s name and twin are deliberately unsettled
-until export's own shape lands — a named omission, not drift.
+twin's name. Export's former named omission is closed (owner,
+2026-07-22): `export_drive` / `export_machine` above, the `--to`
+exporter vocabulary deliberately decoupled from the backend
+list.
 
 ## Handles
 

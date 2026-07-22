@@ -101,7 +101,10 @@ rlq destroy-machine (--machine <id> | --blueprint <name>)
 rlq recreate-machine (--machine <id> | --blueprint <name>)
 rlq delete-blueprint <name>
 rlq clone-machine (--machine <id> | --blueprint <name>)
-rlq export (--machine <id> | --blueprint <name>) [<destination>]
+rlq export-drive <key> <destination>
+    (--machine <id> | --blueprint <name>)
+rlq export-machine --to <exporter> [<destination>]
+    (--machine <id> | --blueprint <name>)
 ```
 
 `list blueprints` shows each blueprint and its machine count; `list machines`

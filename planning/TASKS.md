@@ -343,11 +343,12 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     seam vocabulary, no channel by which a blueprint-held value
     reaches a script; inputs cannot parameterize watch conditions, so
     a value seam never covers a different-language installer UI
-  - U1 export journey: the easy path lands on QEMU, export targets the
-    machine's own backend, cross-backend conversion is open, and QEMU's
-    export artifact ("bare image + launch config") is a reliquary-invented
-    format with no spec — the default-install-to-VirtualBox journey is
-    unresolved
+  - U1 export journey: CLOSED (2026-07-22, gap-closure queue item
+    4): export-drive/export-machine with exporters decoupled from
+    backends — install on QEMU, export-machine --to virtualbox; the
+    invented QEMU artifact is deleted (libvirt is that ecosystem's
+    answer), and cross-backend rides the blueprint shape plus the
+    adapters' raw interchange
   - ARTIFACT RESIDENCY (use-case amendment 2026-07-21, the split in
     USE-CASES.md; resolution model DECIDED owner 2026-07-21, recorded
     in ./ROADMAP.md "Authored-asset resolution"): every invocation
@@ -1159,14 +1160,55 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      (File exchange section, machine-scoped list), api.md (table
      row, realignment note); guiding-principles U3 stage/collect
      entry CLOSED
-  4. EXPORT MECHANICS (parent: the U1 export entry + the ROADMAP open
-     decision): the two targets (single-drive media image vs
-     whole-machine native registration), the exact CLI shape and
-     command name, format conversion or not, whether a
-     media-referenced drive blocks whole-machine export or
-     materializes into it, the cross-backend story for U1's
-     install-once-export-to-VirtualBox journey, and the API twin
-     (api.md's named omission — name and twin land together)
+  4. RESOLVED (owner, 2026-07-22, design round — all four forks on
+     the recommendations, the targets fork revised mid-round by the
+     owner's decoupling insight): EXPORT IS TWO COMMANDS —
+     export-drive <key> <destination> / export-machine --to
+     <exporter> [<destination>] (twins export_drive /
+     export_machine; the --drive mode flag dies; api.md's named
+     omission closes), both stopped-only and STREAM-BEARING
+     (transfer events, --progress, --json rejected naming
+     --progress jsonl, terminal event = the result), the artifact
+     independent and outside purview, the machine untouched.
+     EXPORTERS ARE THEIR OWN VOCABULARY, decoupled from backends
+     (owner: export may target kvm/virt-manager or others — never
+     limit import/export to the backend list): --to names an
+     exporter — virtualbox, vmware, hyperv, libvirt, ... — probed
+     on the host independently; presented, never defaulted (tty
+     prompt listing available exporters, required noninteractively;
+     to= required under parity — the --hdd-images pattern); the
+     exporter builds the native VM from the machine's resolved
+     blueprint shape (capability-checked like create) with drives
+     through the adapters' RAW INTERCHANGE (each adapter reads a
+     drive out as raw and materializes one from raw — the one new
+     adapter obligation; exporters are their own seam family
+     beside the adapters); libvirt recorded as the QEMU-ecosystem
+     answer, so the reliquary-invented bare-image-plus-launch-
+     config artifact is DELETED, never specced — U1's journey
+     lands as install on QEMU, export-machine --to virtualbox.
+     MEDIA DRIVES MATERIALIZE AS COPIES in whole-machine export
+     (state-inserted media too): the export stands alone, never
+     referencing the disposable cache; blocking declined.
+     EXPORT-DRIVE lands the drive's native format or raw by
+     destination extension (.img/.raw); other conversions declined
+     as growth (cross-backend wants are export-machine's job); an
+     exported installed disk + a local-path definition = an
+     installed base for other blueprints. Import mirrors the
+     decoupling in vocabulary only (importers read native VM
+     sources, no same-named backend required; the settled import
+     mechanics untouched). Taxonomy recorded: accelerators
+     (KVM/WHPX/HVF/TCG) are adapter-internal capability of the
+     qemu backend — never backend identity, never blueprint
+     vocabulary; libvirt is an exporter now, a possible distinct
+     future backend later, the roles independent. Folded: cli.md
+     (Exporting rewrite, twins paragraph, machine-scoped list,
+     import-vm importer wording), ROADMAP ("The CLI" export
+     bullet + twins sentence + synopsis + import bullet, milestone
+     8 intro + deliverable 2, the Decisions-still-needed export
+     entry REMOVED), api.md (table row, omission closed),
+     backend-adapter.md (raw-interchange seam entry,
+     exporter-family placement, accelerators-are-not-backends
+     non-goal); guiding-principles U1 export entry CLOSED
   5. U5 STATUS CLOSEOUT (parent: the U5 blueprint-parameterization
      entry, "owner adjudication pending"): the recorded design
      predates the property-construct rounds (parameters re-keyed by

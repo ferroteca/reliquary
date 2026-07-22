@@ -72,7 +72,7 @@ planning/ROADMAP.md "The CLI"):
 | `recreate` | reads                    | regenerates, same id                   | `recreate-machine` / `recreate_machine` |
 | `clone`    | —                        | new machine, new id, drives copied     | `clone-machine` / `clone_machine` |
 | `delete`   | deletes (refuses while machines exist) | —                        | `delete-blueprint` / `delete_blueprint` |
-| `export`   | —                        | copies out                             | *(with export's shape)* |
+| `export`   | —                        | copies out                             | `export-drive` / `export_drive`; `export-machine` / `export_machine` |
 
 Every verb lands on the CLI and the embedding API together
 (planning/INTERFACES.md): the twins are flat functions — the
@@ -84,9 +84,10 @@ shared resolution seam) plus the mirrored global keywords
 CLI prints — `create_machine` and `clone_machine` return the new
 machine id — and errors raise by class where the CLI exits by
 code. `import`'s twin is `import_vm`, because a bare `import` is
-a Python keyword in the first binding; `export`'s twin is
-deliberately unnamed until export's own shape settles — a named
-omission, not drift.
+a Python keyword in the first binding; export is two commands
+with twins settled 2026-07-22 — `export_drive` (a drive out as a
+standalone image) and `export_machine` (a native VM registered
+with an exporter).
 
 Two rules carry the whole model:
 
@@ -453,12 +454,20 @@ clone's cache — a snapshot of a machine, not another blueprint. The
 clone gets its own backend object and `backend-id`; state and
 backend registration are never copied.
 
-**`export`** takes something durable out of an ephemeral machine.
-It has two targets: a **media image** — a single drive taken out
-of the machine as a standalone image file — or the **entire
-machine**, copied to its backend's native management, registered
-where that backend normally keeps VMs with disks in its native
-format. This is the first-class form of the intended endgame:
+**`export`** takes something durable out of an ephemeral machine,
+as two commands (owner, 2026-07-22). `export-drive <key>
+<destination>` takes a single drive out as a standalone image
+file — the drive's native format, or raw by destination
+extension. `export-machine --to <exporter>` creates and
+registers a native VM with a management platform built for
+keeping machines: the target names an **exporter** (virtualbox,
+vmware, hyperv, libvirt — a vocabulary probed on the host and
+deliberately decoupled from the backend list), presented on a
+tty, required noninteractively, never defaulted; the native VM
+is built from the machine's resolved blueprint shape, drives
+converted through the adapters' raw interchange, and media
+payloads copied in so the export stands alone.
+This is the first-class form of the intended endgame:
 reliquary machines are ephemeral, and when something should live
 on, you export it (U1). An exported machine is independent and
 permanently outside reliquary's purview — reliquary will never

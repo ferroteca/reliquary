@@ -318,8 +318,11 @@ rlq import-vm <source> --name <name> --platform <platform>
     [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
 ```
 
-Synthesizes a blueprint from a native backend VM's configuration —
-memory, drives, controllers — capturing the VM's disks as media
+Synthesizes a blueprint from a native VM source's configuration —
+memory, drives, controllers, read by an **importer** (a
+vocabulary decoupled from the backend list, like export's
+exporters; no same-named backend is required) — capturing the
+VM's disks as media
 items in place: each gets a generated definition whose
 `local-path` points at the disk where the native hypervisor
 keeps it (computed hash, no URL); nothing is copied or moved.
@@ -375,8 +378,9 @@ Every machine verb *is* its embedding-API twin's name under the
 identity rule: `create-machine` ↔ `create_machine`,
 `start-machine`, `stop-machine`, `apply-blueprint`,
 `destroy-machine`, `recreate-machine`, `clone-machine`,
-`delete-blueprint`, and `import-vm` ↔ `import_vm`; `export`'s
-name and twin land together with export's still-open shape.
+`delete-blueprint`, and `import-vm` ↔ `import_vm`;
+`export-drive` ↔ `export_drive` and `export-machine` ↔
+`export_machine` (settled 2026-07-22).
 
 ### Creating a machine
 
@@ -524,26 +528,56 @@ rlq clone-machine --blueprint freedos
 ### Exporting
 
 ```
-rlq export (--blueprint <name> | --machine <id>)
-    [--drive <key>] [<destination>]
+rlq export-drive <key> <destination> (--blueprint <name> | --machine <id>)
+rlq export-machine --to <exporter> [<destination>]
+    (--blueprint <name> | --machine <id>)
 ```
 
-Takes a durable artifact out of an ephemeral machine. (Export's
-shape is still open; under the identity rule its final command
-name and API twin land together when it settles.) With `--drive`,
-`<destination>` is required — nothing is guessed about filename
-or format; whole-machine export defaults to the backend's native
-machine location. Two targets:
+Takes a durable artifact out of an ephemeral machine — two
+capabilities, two commands, twins `export_drive` /
+`export_machine`. Both require a stopped machine and are
+stream-bearing (disk copies are long): transfer events render
+under `--progress`, the terminal event is the result, and
+`--json` is rejected naming `--progress jsonl`. The exported
+artifact is independent and permanently outside reliquary's
+purview; the machine itself is untouched.
 
-- **A media image** — a single drive taken out as a standalone image:
-  `rlq export --drive hdd0 D:\exports\dos-disk.qcow2 --blueprint freedos`
-- **The entire machine** — copied to its backend's native management,
-  registered where that backend normally keeps VMs, with disks in
-  its native format:
-  `rlq export --blueprint freedos`
+**`export-drive`** takes one drive out as a standalone image
+file. `<destination>` is required — nothing is guessed about
+filename or format. The image lands in the drive's native
+format, or raw when the destination extension says so
+(`.img` / `.raw`); any other conversion is declined — a
+cross-backend want is `export-machine`'s job. An exported
+installed disk plus a hand-written `local-path` media definition
+is an installed base other blueprints can `base` against.
 
-The exported artifact is independent and permanently outside
-reliquary's purview.
+```powershell
+rlq export-drive hdd0 D:\exports\dos-disk.qcow2 -b freedos
+rlq export-drive hdd0 D:\exports\dos-disk.img -b freedos
+```
+
+**`export-machine`** creates and registers a native VM with a
+management platform built for keeping machines. `--to` names an
+**exporter** — `virtualbox`, `vmware`, `hyperv`, `libvirt` — a
+vocabulary of its own, probed on the host and deliberately
+decoupled from the backend list (libvirt is the QEMU-ecosystem
+answer; no same-named backend needs to exist). The target is
+presented, never defaulted: on a tty an absent `--to` prompts
+listing the exporters available on this host; noninteractively
+it is an error; `export_machine`'s `to=` is required under
+parity. The exporter builds the native VM from the machine's
+resolved blueprint shape — capability-checked against the target
+like `create-machine` — with drive content converted through the
+adapters' raw interchange; `media`-referenced drives and
+state-inserted media materialize as payload copies inside the
+export's native location, so the exported VM stands alone
+(reliquary's cache is disposable and never referenced).
+`<destination>` defaults to the target's native machine
+location.
+
+```powershell
+rlq export-machine --to virtualbox -b freedos-1.4-plain
+```
 
 ### Listing machines
 
@@ -1155,7 +1189,8 @@ root), and `--json` (below).
 selectors, mutually exclusive. On machine-scoped commands
 (`create-machine`, `start-machine`, `stop-machine`,
 `apply-blueprint`, `destroy-machine`, `recreate-machine`,
-`clone-machine`, `export`, `run-script`, the `run` operations,
+`clone-machine`, `export-drive`, `export-machine`, `run-script`,
+the `run` operations,
 `begin-run`, `end-run`,
 `insert-media`, `eject-media`, `set-boot-order`, `stage-files`,
 `collect-files`, and the

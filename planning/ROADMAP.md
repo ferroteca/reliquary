@@ -471,8 +471,9 @@ mirrored globals (`home=` / `assets=` / `assets_only=`),
 returning what the CLI prints (`create_machine` and
 `clone_machine` return the new id), raising by class where the
 CLI exits by code (the classes are named —
-planning/design/api.md); `export`'s name and twin land together with
-export's open shape, a named omission. Implementation realigns
+planning/design/api.md); export's twins are settled (owner,
+2026-07-22): `export-drive` ↔ `export_drive` and
+`export-machine` ↔ `export_machine`. Implementation realigns
 the current names (`create_from_blueprint`, `machines.start` /
 `stop` / `destroy`) to these.
 
@@ -609,8 +610,10 @@ rlq destroy-machine (--blueprint <name> | --machine <id>)
 rlq recreate-machine (--blueprint <name> | --machine <id>)
 rlq delete-blueprint <name>
 rlq clone-machine (--blueprint <name> | --machine <id>)
-rlq export (--blueprint <name> | --machine <id>)
-    [--drive <key>] [<destination>]
+rlq export-drive <key> <destination>
+    (--blueprint <name> | --machine <id>)
+rlq export-machine --to <exporter> [<destination>]
+    (--blueprint <name> | --machine <id>)
 rlq import-vm <source> --name <name> --platform <platform>
     [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
 rlq run-script <label> (--blueprint <name> | --machine <id>)
@@ -736,17 +739,35 @@ Lifecycle semantics:
   blueprint. The clone gets its own backend object and `backend-id`;
   state and backend registration are never copied.
 
-- `export` copies a stopped machine out to the backend's native
-  management — registered in the backend's own machine location
-  (or an explicit destination) with disks in its native format.
-  The exported VM is independent and permanently outside
-  reliquary's purview: this is the first-class form of "copy the
-  result to a platform built for long-lived machines," and
-  ownership verification guarantees reliquary can never touch it
-  afterward.
-- `import-vm` synthesizes a blueprint from a native backend VM's
+- Export is two commands (owner, 2026-07-22), stopped-only and
+  stream-bearing, the artifact independent and permanently
+  outside reliquary's purview.
+  `export-drive <key> <destination>` takes one drive out as a
+  standalone image — the drive's native format, or raw by
+  destination extension (the adapters' raw interchange; other
+  conversions declined as growth). `export-machine --to
+  <exporter>` creates and registers a native VM with a
+  management platform built for keeping machines: `--to` names
+  an **exporter** — virtualbox, vmware, hyperv, libvirt, ... — a
+  vocabulary of its own, probed on the host and deliberately
+  decoupled from the backend list (libvirt is the QEMU
+  ecosystem's answer; the reliquary-invented
+  bare-image-plus-launch-config artifact is dead). The target is
+  presented, never defaulted: a tty prompts listing the
+  exporters available on this host, noninteractively it is an
+  error, `to=` required under parity. The exporter builds the
+  native VM from the machine's resolved blueprint shape
+  (capability-checked like `create-machine`) with drive content
+  through the adapters' raw interchange, and media payloads
+  materialize as copies so the export stands alone. Ownership
+  verification guarantees reliquary can never touch the exported
+  VM afterward. Import mirrors the decoupling in vocabulary:
+  `import-vm` reads a native VM source through an **importer**,
+  no same-named backend required.
+- `import-vm` synthesizes a blueprint from a native VM source's
   configuration (memory, drives, controllers — translation of
-  backend config, not guest inference), capturing the VM's disks
+  native config read by an importer, not guest inference),
+  capturing the VM's disks
   as media items in place (owner, 2026-07-21): each disk gets a
   generated definition — an absolute `local-path` at the file
   where the native hypervisor keeps it, a computed hash, no URL —
@@ -1948,9 +1969,9 @@ backends from the same blueprint (minus a pinned backend field).
 ### Milestone 8 — Machine mobility: clone, export, import
 
 The durable-artifact exits, once two backends make them
-meaningful. The open questions under "Decisions still needed"
-(`export` mechanics, `import-vm` scope) must be settled at the
-start of this milestone.
+meaningful. The open question under "Decisions still needed"
+(`import-vm` scope) must be settled at the start of this
+milestone; export's design is settled (owner, 2026-07-22).
 
 Deliverables:
 
@@ -1959,11 +1980,14 @@ Deliverables:
    resolved blueprint snapshot, with the source's writable drive
    images copied — a snapshot of a machine, never a shared
    state or backend registration.
-2. `export`: a stopped machine out to the backend's native
-   management (or a media image out of one drive), independent
-   and permanently outside reliquary's purview (its final
-   command name and API twin land with its shape, under the
-   identity rule).
+2. `export-drive` and `export-machine` per the settled design
+   (owner, 2026-07-22): native-or-raw drive images;
+   exporter-registered native VMs — `--to` presented, never
+   defaulted, the exporter vocabulary decoupled from backends;
+   the initial exporter set is scoped at this milestone
+   (virtualbox first; libvirt the recorded QEMU-ecosystem
+   answer); media payloads materialized in; both commands
+   stream-bearing.
 3. `import-vm`: synthesize a blueprint from a native VM's
    configuration,
    disks preserved as generated media definitions taken as
@@ -2597,15 +2621,6 @@ agentless and guest-agent control planes with equivalent results.
   (they regenerate like everything else under `cache/`), or
   whether `recreate-machine`/`destroy-machine` per machine is
   enough.
-- **`export` mechanics**: export has two targets — a media image
-  (a single drive taken out of the machine as a standalone image
-  file) and an entire machine (registered with the backend's
-  native management: VirtualBox machine folder + registration,
-  Hyper-V import/export format, `.vmx` directory for VMware,
-  bare image + launch config for QEMU). Open: the exact CLI
-  shape for the two, whether export offers format conversion,
-  and whether a `media`-referenced drive blocks whole-machine
-  export or is materialized into it.
 - **`import-vm` scope**: which backend config translates into the
   synthesized blueprint (memory, drives, controllers are clear;
   what of NICs and other devices the blueprint doesn't model yet),

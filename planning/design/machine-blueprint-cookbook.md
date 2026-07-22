@@ -175,7 +175,7 @@ format when needed:
 
 A duplicated drive has no runtime dependency on its base image —
 worth the disk space when the machine's image should stand alone
-(say, ahead of an `export`).
+(say, ahead of an `export-drive`).
 
 ---
 
