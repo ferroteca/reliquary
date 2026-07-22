@@ -390,7 +390,11 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     elevating reliquary-machine.json into a public contract (the
     blueprint and media-definition schemas are AUTHORED 2026-07-21 —
     see the JSON-SCHEMA entry below; the state schema and its
-    public-contract elevation stay with milestone 3)
+    public-contract elevation stay with milestone 3); the adapter
+    API becoming world-facing (planning/design/backend-adapter.md
+    is INTERNAL by decision, owner 2026-07-21 — a real third-party
+    adapter story elevates it into the INTERFACES inventory
+    through the interface-change rule, never by drift)
   - RESOLVED (July 2026): hand-placed proprietary payloads vs the "cache is
     not an interface" doctrine — local-path (item- or archive-level) is now
     the only hand-supply path; the cache is never hand-fed; a sourceless
@@ -870,19 +874,31 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      Folded: api.md (selectors + pull-only conventions),
      media-spec fetch handle, ROADMAP ("Asynchronous runs" handle
      paragraph + "The CLI" selection sentence), cli.md Selection
-  8. OPEN (owner-requested, 2026-07-21): a new design output for
-     BACKEND ADAPTERS — the adapter API as its own
-     planning/design document: the provider seam behind the
-     embedding API (ROADMAP milestone 6: lifecycle, media
-     attachment, input, screen access, control-plane endpoints,
-     per-backend capability reporting, backend-id ownership
-     verification), distinct from the consumer surface api.md
-     documents. Open with it: whether the adapter API joins
-     INTERFACES' world-facing contract inventory (third-party
-     adapters would make it one) or stays internal; authored per
-     the milestone-6 doctrine — the seam is extracted from the
-     working QEMU adapter, the document landing with that
-     extraction, never as speculation ahead of it
+  8. RESOLVED (owner, 2026-07-21, design session — all four forks
+     on the recommendations): the backend-adapter design output is
+     AUTHORED — planning/design/backend-adapter.md, the provider
+     seam's doctrine: the three-layer split (machine model above
+     the seam unmoved, adapter, control planes composing
+     carriers), the seam inventory with extraction sources
+     (discover / capability report / materialize-dispose /
+     start-stop-liveness / carriers / ownership), capability
+     honesty (reported, never emulated), the generalized vm.json
+     identity record, endpoint two-phase, non-goals, extraction
+     map. Forks: doctrine now, SIGNATURES AT THE MILESTONE-6
+     EXTRACTION (defined-by-working-code holds — the doc records
+     them when they land); INTERNAL, not world-facing (watch
+     below — third-party adapters would elevate it through the
+     interface-change rule); text readback = adapter CARRIERS +
+     one shared fixed-font recognizer composed by the
+     agentless-display control plane (snapshot contract: character
+     rows + opaque equality-comparable per-cell attribute tokens —
+     the menu algorithm compares, never interprets); drive
+     materialization belongs to the ADAPTER (native formats +
+     native differencing; qemu-img becomes QEMU-adapter
+     internals). Folded: backend-adapter.md (new), ROADMAP
+     ("Backend adapters" doctrine paragraph, agentless-display
+     recognizer sentence, milestone 6 intro), the
+     guiding-principles watch list
 - JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
   design round; all three forks settled on the recommendations):
   - planning/design/machine-blueprint.schema.json +

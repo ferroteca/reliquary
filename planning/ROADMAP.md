@@ -123,6 +123,17 @@ Design rules:
   agent described below is the one guest-side investment that pays
   off on all four backends.
 
+The adapter seam's design doctrine is consolidated in
+[planning/design/backend-adapter.md](design/backend-adapter.md)
+(owner, 2026-07-21): an internal engineering contract, deliberately
+not a world-facing interface (the third-party-adapter watch is in
+planning/TASKS.md); adapters own drive-image materialization in
+their native formats; adapters provide carriers and control planes
+compose them (one shared fixed-font recognizer serves text
+readback where no native text carrier exists). The doctrine is
+settled ahead; signatures land with the milestone-6 extraction,
+defined by the working code.
+
 ## The machine model
 
 A **blueprint** is a reusable, user-owned JSON description of a kind
@@ -1755,7 +1766,12 @@ no old-surface syntax parses anywhere.
 
 Extract the adapter API from the now-complete QEMU implementation
 — the only adapter with a full control plane set — so the seam is
-defined by working code, not speculation.
+defined by working code, not speculation. The seam's doctrine is
+pre-settled in
+[planning/design/backend-adapter.md](design/backend-adapter.md)
+(layering, seam inventory, ownership and capability doctrines,
+extraction map); this milestone defines the signatures and records
+them there.
 
 Deliverables:
 
@@ -2030,11 +2046,14 @@ It has no guest prerequisite and remains the DOS default and
 fallback. It is not accurately modeled as a stream: output is a
 sequence of screen snapshots, and keyboard input is independent of
 that output. VGA text-memory inspection is QEMU-specific; other
-backends implement the agentless display control plane with their native
-input injection and screenshot capture, which for text readback
-means pixel-level recognition — acceptable for fixed-font text
-modes, and a per-backend implementation detail behind the same
-control plane.
+backends supply their native input injection and framebuffer
+capture as adapter carriers, and text readback there runs **one
+shared fixed-font recognizer** over the captured framebuffer
+(owner, 2026-07-21) — a control-plane composition over adapter
+carriers, never a per-backend reimplementation. The portable
+snapshot contract — character rows plus opaque,
+equality-comparable per-cell attribute tokens — is in
+[planning/design/backend-adapter.md](design/backend-adapter.md).
 
 #### VNC
 
