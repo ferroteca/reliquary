@@ -6,6 +6,7 @@ import contextlib
 import io
 import json
 import os
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -116,6 +117,37 @@ class CliReorderArgvTests(unittest.TestCase):
         self.assertEqual(
             cli._reorder_argv(["--home=/tmp", "list-machines"]),
             ["list-machines", "--home=/tmp"])
+
+
+class CliProgNameTests(unittest.TestCase):
+    """Usage/help text names whichever entry point was invoked."""
+
+    def test_reliquary_entry_point(self):
+        with mock.patch.object(
+                sys, "argv", ["/usr/bin/reliquary", "-h"]):
+            self.assertEqual(cli._prog_name(), "reliquary")
+
+    def test_rlq_entry_point(self):
+        with mock.patch.object(sys, "argv", ["/usr/bin/rlq", "-h"]):
+            self.assertEqual(cli._prog_name(), "rlq")
+
+    def test_windows_exe_suffix(self):
+        with mock.patch.object(
+                sys, "argv", [r"C:\bin\reliquary.exe", "-h"]):
+            self.assertEqual(cli._prog_name(), "reliquary")
+
+    def test_unrecognized_invocation_falls_back_to_rlq(self):
+        with mock.patch.object(
+                sys, "argv", ["/usr/bin/python3", "-m", "reliquary"]):
+            self.assertEqual(cli._prog_name(), "rlq")
+
+    def test_help_text_names_invoking_command(self):
+        for prog in ("reliquary", "rlq"):
+            with mock.patch.object(sys, "argv", [prog]), \
+                    contextlib.redirect_stdout(io.StringIO()) as stdout, \
+                    self.assertRaises(SystemExit):
+                cli.main(["-h"])
+            self.assertIn(f"usage: {prog}", stdout.getvalue())
 
 
 class CliMachineLifecycleTests(unittest.TestCase):

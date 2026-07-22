@@ -176,13 +176,27 @@ def _add_selectors(parser):
     return parser
 
 
+_PROG_NAMES = ("rlq", "reliquary")
+
+
+def _prog_name():
+    """The invoked console-script name, falling back to ``rlq``.
+
+    Both ``rlq`` and ``reliquary`` are registered entry points for
+    the same command; help/usage text should reflect whichever the
+    user actually typed rather than always naming one of them.
+    """
+    stem = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+    return stem if stem in _PROG_NAMES else "rlq"
+
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     argv = _reorder_argv(list(argv))
 
     parser = argparse.ArgumentParser(
-        prog="rlq",
+        prog=_prog_name(),
         description="OS installation scripting over QEMU guest "
                     "automation (DOS by default)")
     parser.add_argument(

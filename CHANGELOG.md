@@ -34,6 +34,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `cache/`, and reports each blueprint's name alongside its full
   path.
 
+### Fixed
+
+- Usage/help text now names whichever entry point was actually
+  invoked (`reliquary -h` says `usage: reliquary ...`, `rlq -h`
+  says `usage: rlq ...`) instead of always hardcoding `rlq`.
+
 ## 0.1.0.dev1 - 2026-07-22
 
 ### Added

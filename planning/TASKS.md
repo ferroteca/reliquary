@@ -377,8 +377,6 @@ dependency order:
 - CLI, from cli help: --version should be `version` with an
   undocumented --version/-v alias; -h should be `help` with
   undocumented -h/--help aliases
-- 'reliquary -h' should reflect the command as "reliquary",
-  'rlq -h' otherwise
 - --qemu → --qemu-home
 - CLI help: run-script's text says little more than "runs a
   script on a machine"
