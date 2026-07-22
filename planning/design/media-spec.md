@@ -144,6 +144,25 @@ brace would break, and installation writes the library copy in
 canonical strict JSON, so block comments would silently vanish
 from the installed file.
 
+`sha256` values, at every level, are hexadecimal and accepted in
+either case; reliquary's canonical writes use lowercase.
+
+The format has a machine-checkable companion: the published JSON
+Schema
+([media-definition.schema.json](media-definition.schema.json),
+beside this spec) captures the per-document structural subset of
+the format's rules, for editor completion and validation while
+authoring (U4). This prose remains normative, and schema validity
+never implies definition validity: library-wide name uniqueness,
+cross-definition archive agreement, defaults derived from URL
+file names, and every resolution rule live beyond the schema. One
+schema covers both homes of a definition — the library file and
+the embedded block use the same forms, and the schema validates
+the parsed document, so the JSONC dialect is invisible to it.
+Editors bind it to `.rlqm` by file association; a definition
+carries no `$schema` field pre-beta
+([format stability](machine-blueprint.md#format-stability-none-yet)).
+
 ### Item form — one definition, one item
 
 `msdos622-boot.rlqm`:

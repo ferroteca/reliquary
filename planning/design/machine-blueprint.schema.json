@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reliquary machine blueprint",
+  "description": "Synchronized companion to the machine blueprint specification (machine-blueprint.md and machine-blueprint-reference.md), which remains normative. This schema covers the per-document structural subset of the format checks: schema validity never implies blueprint validity — media-name resolution, cross-document rules, and every backend capability check live in the specification only. It validates the parsed document: blueprints accept the JSONC dialect (comments and trailing commas), which is invisible at this level. Blueprints carry no $schema field pre-beta; editors bind this schema to *.rlqb by file association. The machine state (reliquary-machine.json) is a separate document type whose schema lands with the instance-model implementation; its state-only fields are rejected here as unknown keys.",
+  "type": "object",
+  "properties": {
+    "platform": {
+      "description": "The guest platform — the operating-system family the machine is for. Required; never inferred.",
+      "enum": ["dos", "win9x", "winnt"]
+    },
+    "backend": {
+      "description": "The virtualization backend hosting the machine. Omitted, the backend is assigned at materialization; declared, it pins the choice and fails rather than falling back.",
+      "enum": ["qemu", "virtualbox", "vmware", "hyperv"]
+    },
+    "name": {
+      "description": "Human-readable one-line display name. No effect on machine behavior; feeds search.",
+      "type": "string"
+    },
+    "description": {
+      "description": "Longer human-readable description. No effect on machine behavior; feeds search.",
+      "type": "string"
+    },
+    "scripts": {
+      "description": "Short labels naming scripts (the stem of a .rlqs file). Labels are the verbs used with the script command.",
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "parameters": {
+      "description": "Blueprint-supplied script-input bindings: keys are input names; each value is a direct string value or a {\"property\": \"<key>\"} reference into the user property registry. Secret inputs never take direct values (a rule beyond this schema).",
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string"},
+          {
+            "type": "object",
+            "properties": {
+              "property": {
+                "description": "The user-property key the parameter refers to; defined externally in the property registry.",
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["property"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "memory": {
+      "description": "Guest memory: a positive integer (MiB) or a size string (\"32M\"). A size string must resolve to a whole number of MiB — a rule beyond this schema. Defaults by platform.",
+      "oneOf": [
+        {"type": "integer", "minimum": 1},
+        {"$ref": "#/$defs/sizeString"}
+      ]
+    },
+    "cpus": {
+      "description": "Virtual CPU count. Default 1.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "drives": {
+      "description": "The drive inventory. Keys declare medium and slot (a bare medium name is the slot-0 alias); values declare where the drive's content comes from. Exactly one of media, size, or base per drive object; removable slots (floppy, cdrom) may be null — present hardware with no medium inserted.",
+      "type": "object",
+      "patternProperties": {
+        "^floppy[01]?$": {"$ref": "#/$defs/floppyDrive"},
+        "^hdd[0-3]?$": {"$ref": "#/$defs/hddDrive"},
+        "^cdrom[0-3]?$": {"$ref": "#/$defs/cdromDrive"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"not": {"required": ["floppy", "floppy0"]}},
+        {"not": {"required": ["hdd", "hdd0"]}},
+        {"not": {"required": ["cdrom", "cdrom0"]}}
+      ]
+    },
+    "boot": {
+      "description": "Boot order: declared, enabled drive keys (canonical or alias form) tried in order. Entries are unique by slot; the mixed alias/indexed spelling of one slot is a rule beyond this schema.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/driveKey"},
+      "uniqueItems": true
+    },
+    "control-planes": {
+      "description": "The ordered control-plane policy: which control planes reliquary may use for this machine, in preference order. Entries are unique. Defaults by platform.",
+      "type": "array",
+      "items": {"enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]},
+      "uniqueItems": true
+    },
+    "backend-settings": {
+      "description": "The explicitly scoped, non-portable escape hatch: one object per backend name; only the section matching the machine's backend applies. Each backend adapter defines and validates its own section's keys, and rejects overlap with reliquary-owned fields.",
+      "type": "object",
+      "properties": {
+        "qemu": {"type": "object"},
+        "virtualbox": {"type": "object"},
+        "vmware": {"type": "object"},
+        "hyperv": {"type": "object"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["platform"],
+  "additionalProperties": false,
+  "$defs": {
+    "sizeString": {
+      "description": "A positive integer immediately followed by a binary unit suffix K, M, G, or T (powers of 1024), case-insensitive.",
+      "type": "string",
+      "pattern": "^[1-9][0-9]*[KkMmGgTt]$"
+    },
+    "mediaName": {
+      "description": "The name of a defined media item, resolved from the media catalog. The name grammar is deliberately open pre-asset-spec.",
+      "type": "string",
+      "minLength": 1
+    },
+    "driveKey": {
+      "type": "string",
+      "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
+    },
+    "controller": {
+      "description": "The kind of storage controller the drive attaches to — guest-visible hardware, not a backend detail. Default ide.",
+      "enum": ["ide", "sata", "scsi", "nvme", "virtio"]
+    },
+    "base": {
+      "description": "A starting-point image the drive's own image is materialized from: a media name (shorthand), or an object with media (required) and type — difference (default: a differencing disk backed by the base) or duplicate (the base copied in full).",
+      "oneOf": [
+        {"$ref": "#/$defs/mediaName"},
+        {
+          "type": "object",
+          "properties": {
+            "media": {"$ref": "#/$defs/mediaName"},
+            "type": {"enum": ["difference", "duplicate"]}
+          },
+          "required": ["media"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "floppyDrive": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/mediaName",
+          "description": "Shorthand: a media-name string, equivalent to an object with only media set."
+        },
+        {
+          "type": "null",
+          "description": "An empty removable slot: present hardware with no medium inserted."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "media": {
+              "$ref": "#/$defs/mediaName",
+              "description": "Attach the named media payload itself — machine-independent media the machine carries at rest."
+            },
+            "size": {
+              "$ref": "#/$defs/sizeString",
+              "description": "Start the drive as a blank image of this size."
+            },
+            "base": {"$ref": "#/$defs/base"},
+            "enabled": {
+              "description": "false removes the drive from the machine entirely — no slot, no hardware — while keeping the entry in the document.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "oneOf": [
+            {"required": ["media"]},
+            {"required": ["size"]},
+            {"required": ["base"]}
+          ]
+        }
+      ]
+    },
+    "hddDrive": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/mediaName",
+          "description": "Shorthand: a media-name string, equivalent to an object with only media set."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "media": {
+              "$ref": "#/$defs/mediaName",
+              "description": "Attach the named media payload itself — machine-independent media the machine carries at rest."
+            },
+            "size": {
+              "$ref": "#/$defs/sizeString",
+              "description": "Start the drive as a blank image of this size."
+            },
+            "base": {"$ref": "#/$defs/base"},
+            "controller": {"$ref": "#/$defs/controller"},
+            "enabled": {
+              "description": "false removes the drive from the machine entirely — no slot, no hardware — while keeping the entry in the document.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "oneOf": [
+            {"required": ["media"]},
+            {"required": ["size"]},
+            {"required": ["base"]}
+          ]
+        }
+      ]
+    },
+    "cdromDrive": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/mediaName",
+          "description": "Shorthand: a media-name string, equivalent to an object with only media set."
+        },
+        {
+          "type": "null",
+          "description": "An empty removable slot: present hardware with no medium inserted."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "media": {
+              "$ref": "#/$defs/mediaName",
+              "description": "Attach the named media payload itself — machine-independent media the machine carries at rest."
+            },
+            "size": {
+              "$ref": "#/$defs/sizeString",
+              "description": "Start the drive as a blank image of this size."
+            },
+            "base": {"$ref": "#/$defs/base"},
+            "controller": {"$ref": "#/$defs/controller"},
+            "enabled": {
+              "description": "false removes the drive from the machine entirely — no slot, no hardware — while keeping the entry in the document.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "oneOf": [
+            {"required": ["media"]},
+            {"required": ["size"]},
+            {"required": ["base"]}
+          ]
+        }
+      ]
+    }
+  }
+}

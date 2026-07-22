@@ -593,6 +593,18 @@ backend and the missing capability, at `create`, `apply`, or
 `start` — never
 by silently dropping or emulating the feature.
 
+The format checks have a machine-checkable companion: the
+published JSON Schema
+([machine-blueprint.schema.json](machine-blueprint.schema.json),
+beside this spec) captures their per-document structural subset,
+for editor completion and validation while authoring (U4, U5).
+The prose reference remains normative, and schema validity never
+implies blueprint validity: media-name resolution, cross-document
+rules, and every capability check live beyond the schema. The
+schema validates the parsed document, so JSONC comments and
+trailing commas are invisible to it; editors bind it to `.rlqb`
+by file association.
+
 ## Platform defaults
 
 Omitted blueprint fields resolve from the guest platform, and
@@ -622,6 +634,17 @@ applies to the blueprint format in full:
 There is deliberately no version field. Versioning is
 compatibility machinery, and the blueprint carries none until a real
 second format version exists — no earlier than beta.
+
+For the same reason a blueprint carries no `$schema` field: a
+document pinning the schema it was written against is a version
+field in disguise, and pre-beta a document has no format vintage —
+the only schema that matters is the installed reliquary's, which
+editors bind by file association (tracking the installation, where
+an embedded pin would go stale and let the editor pass what
+reliquary rejects). When versioning arrives, no earlier than beta,
+`$schema` as a versioned URL is the leading candidate spelling of
+the version field (planning/ROADMAP.md, "Decisions still
+needed").
 
 The blueprint's value grammar is JSON, and JSON only — there is
 no YAML form, and none is planned. Because a blueprint is a

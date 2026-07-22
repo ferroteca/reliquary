@@ -383,7 +383,10 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     assets forming a new authored artifact class (hardened 2026-07-21:
     .rlql is the fourth authored extension — the INTERFACES listing is
     due at the asset-spec/realignment pass); published JSON Schemas
-    elevating reliquary-machine.json into a public contract
+    elevating reliquary-machine.json into a public contract (the
+    blueprint and media-definition schemas are AUTHORED 2026-07-21 —
+    see the JSON-SCHEMA entry below; the state schema and its
+    public-contract elevation stay with milestone 3)
   - RESOLVED (July 2026): hand-placed proprietary payloads vs the "cache is
     not an interface" doctrine — local-path (item- or archive-level) is now
     the only hand-supply path; the cache is never hand-fed; a sourceless
@@ -663,6 +666,37 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       it as an explicitly backend-scoped escape hatch when that
       settles); `clean media` (payloads) vs `list media`
       (definitions) overloads the noun — note or rename
+- JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
+  design round; all three forks settled on the recommendations):
+  - planning/design/machine-blueprint.schema.json +
+    media-definition.schema.json AUTHORED (draft 2020-12,
+    self-contained, strict JSON, REUSE.toml-covered; spec examples
+    verified against both — 32/32): synchronized companions — the
+    prose specs stay normative, schema-valid never implies valid
+    (per-document structural subset only; cross-document rules and
+    the capability tier stay prose); one media schema covers both
+    homes (library file + embedded block, the same forms)
+  - $schema field: the formats stay CLOSED pre-beta — a pinned
+    schema reference is a version field in disguise; editors bind
+    by file association, which tracks the installed reliquary;
+    $schema-as-versioned-URL recorded as the leading candidate
+    spelling of the version field at beta (ROADMAP "Decisions
+    still needed")
+  - validator: the parser stays reliquary's validator (fail-closed
+    diagnostics); a shared valid/invalid fixture corpus runs
+    against both parser and schema — at realignment, with the
+    static-conformance corpus already queued there
+  - spec pins landed with the fold: boot entries unique by slot;
+    control-planes entries unique; sha256 hex accepted in either
+    case, canonical writes lowercase
+  - deferred: machine-state schema + publication mechanics
+    (milestone 3 item 6); media/item name, script-label, and
+    input-name grammars stay open with the asset-spec work (the
+    schemas say non-empty string)
+  - open find, not decided: whether size/base are valid on cdrom
+    drives — the reference says size is "meaningful for hdd and
+    floppy" without prohibiting it elsewhere; the schemas encode
+    only the stated rules (size/base allowed on every drive object)
 - SPEC REALIGNMENT LANDED (July 2026), docs ahead of implementation — the
   media/blueprint specs now describe these; implementation work items:
   - shared JSONC reader for authored documents (blueprints, standalone

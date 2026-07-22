@@ -228,6 +228,23 @@ involvement (see planning/design/machine-blueprint-reference.md).
 Validation and capability mismatches fail closed, naming the
 backend and missing capability.
 
+The blueprint and media-definition formats have authored JSON
+Schema companions beside their specs
+(planning/design/machine-blueprint.schema.json,
+planning/design/media-definition.schema.json; decided owner,
+2026-07-21): the prose specs stay normative and schema validity
+never implies document validity — the schemas capture the
+per-document structural subset of the format checks, for editor
+completion and validation while authoring (U4, U5). The parser
+remains reliquary's own validator (fail-closed, name-the-problem
+diagnostics); a shared valid/invalid fixture corpus, run against
+both parser and schema at realignment, keeps the two aligned.
+Documents carry no `$schema` field pre-beta — editors bind the
+schemas by file association — with `$schema` as the leading
+candidate spelling of the version field at beta ("Decisions
+still needed"). The machine-state schema lands at milestone 3,
+once the state format settles.
+
 ### Home layout
 
 ```text
@@ -1448,8 +1465,13 @@ Deliverables:
    `menu`, `wait`, `text`, `screenshot`, `hmp`) take the same
    `--machine`/`--blueprint` selection and resolve ownership through
    the machine state.
-6. Published JSON Schemas for the blueprint, machine state, and
-   media definition document types.
+6. Published JSON Schemas for the document types: publication
+   mechanics and the shared valid/invalid fixture corpus (run
+   against both parser and schema) for the authored blueprint and
+   media-definition schemas
+   (`planning/design/*.schema.json` — prose specs normative, the
+   parser the validator), plus the machine-state schema, authored
+   here once the state format settles.
 7. `planning/examples/` updated to the implemented shapes
    (`planning/examples/blueprints/`, an explicit `create --blueprint` step in its
    README) — or the docs corrected where implementation proves
@@ -2249,6 +2271,18 @@ agentless and guest-agent control planes with equivalent results.
 - **Backend priority order** for default assignment when a blueprint
   names no backend (proposed: QEMU, VirtualBox, VMware Workstation,
   Hyper-V — best scriptability first).
+- **Format versioning at beta**: pre-beta, user documents carry no
+  version field and no `$schema` field (settled, owner 2026-07-21:
+  a pinned schema reference is a version field in disguise, and a
+  pre-beta document has no format vintage — the only schema that
+  matters is the installed reliquary's, which editors bind by file
+  association; an embedded pin would go stale in seeded files
+  under never-overwrite and let the editor pass what reliquary
+  rejects). When compatibility guarantees arrive — no earlier than
+  beta — the leading candidate spelling for the version field is
+  `$schema` as a versioned URL: one field declaring the document's
+  format version and binding editors to the matching published
+  schema.
 - **Script spec details** (the control-flow and response-file shape
   are decided — see "The scripting language" and
   planning/design/script-spec.md): the portable key-name vocabulary for

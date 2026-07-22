@@ -205,4 +205,12 @@ from editor completion, stable formatting, and precise diagnostics.
 The script language remains the separate line-oriented behavioral
 format. Reliquary publishes a JSON Schema for each JSON document type;
 the schema version tracks the reliquary release, not a version field in
-user documents before beta.
+user documents before beta. The blueprint and media-definition schemas
+are authored beside their specs
+([machine-blueprint.schema.json](machine-blueprint.schema.json),
+[media-definition.schema.json](media-definition.schema.json)) as
+synchronized companions: the prose specs stay normative, reliquary's
+own validation stays the parser's, and a shared valid/invalid fixture
+corpus — run against both parser and schema at realignment — keeps the
+two honest against each other. The machine-state schema lands with the
+instance-model implementation, once the state format settles.

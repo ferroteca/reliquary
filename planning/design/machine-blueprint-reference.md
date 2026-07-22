@@ -37,6 +37,11 @@ Blueprints accept comments and trailing commas — the JSONC
 dialect — per the same section; the state is strict canonical
 JSON, always.
 
+The machine-checkable companion is
+[machine-blueprint.schema.json](machine-blueprint.schema.json) —
+the structural subset of the format checks only; this reference
+is normative.
+
 ---
 
 ## `platform`
@@ -609,7 +614,9 @@ order.
 {"boot": ["hdd0", "cdrom0"]}
 ```
 
-Every entry must reference a declared, enabled drive. An empty
+Every entry must reference a declared, enabled drive, and entries
+are unique by slot: naming the same slot twice — in either
+spelling — fails validation. An empty
 or non-bootable drive is a valid entry: firmware falls through it
 to the next entry. This is the standard install pattern —
 `["hdd0", "cdrom0"]` with a blank `hdd0` and an empty `cdrom0`
@@ -634,7 +641,8 @@ capability error rather than silently booting from something else.
 The ordered control-plane policy: which control planes reliquary
 may use for guest-facing operations on this machine, in preference
 order. reliquary probes readiness in this order and never uses a
-control plane the policy doesn't list.
+control plane the policy doesn't list. Entries are unique — a
+control plane listed twice fails validation.
 
 Working name set:
 
@@ -701,7 +709,9 @@ Format checks (reject the document):
   out-of-range slots;
 - state-only fields (`backend-id`, `blueprint-digest`,
   `blueprint-source`) in a blueprint;
-- `boot` entries naming undeclared or disabled drives;
+- `boot` entries naming undeclared or disabled drives, or naming
+  one slot twice (in either spelling), and duplicate
+  `control-planes` entries;
 - drive objects declaring none, or more than one, of `media`,
   `size`, and `base`;
 - `null` (empty) values on non-removable (`hdd`) drives;

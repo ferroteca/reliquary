@@ -53,7 +53,10 @@ workflow:
   (CLI reference, Python API reference, blueprint guide, DOS
   automation). Design documents
   and planned interfaces live in `planning/design/` — the directory
-  is the classification; file names carry no suffix. Placement rules
+  is the classification; file names carry no suffix. The blueprint
+  and media-definition JSON Schemas (`*.schema.json`) sit beside
+  their specs there and must stay synchronized with them (the prose
+  specs are normative). Placement rules
   are in `.agents/skills/documentation-rules.md`.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
