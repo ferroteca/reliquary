@@ -25,6 +25,7 @@ The `docs/` directory contains user-facing documentation for **implemented featu
 The `planning/` directory contains maintainer-facing design and planning documents:
 - `planning/ROADMAP.md` — architectural context, open design questions, and implementation milestones
 - `planning/TASKS.md` — small to-do tasks (large tasks belong in the roadmap)
+- `planning/DECISIONS.md` — the adjudicated design-decision record: settled decisions, declined alternatives, and where each folded (the guard against re-litigating)
 - `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule
 - `planning/USE-CASES.md` — primary use cases that guide interface decisions (may include unimplemented aspirations)
 - `planning/design/` — design documents for specific interfaces and features (end-goal designs, not current truth)

@@ -73,18 +73,15 @@ adapters sharing a common API:
 - **VirtualBox** — driven through `VBoxManage`. Control planes: agentless
   display (`controlvm keyboardputscancode` + `controlvm screenshotpng`),
   serial (host pipe/file), guest agent (Guest Additions guest
-  control, or reliquary's own agent over serial), VNC where the
-  extension pack provides it.
+  control), VNC where the extension pack provides it.
 - **VMware Workstation** — driven through `vmrun`/`vmcli` and the
   `.vmx` file. Control planes: agentless display (limited; screenshot via
   `vmrun captureScreen`), serial (named pipe/file), guest agent
-  (VMware Tools guest operations, or reliquary's own agent over
-  serial), VNC (`RemoteDisplay.vnc.enabled`).
+  (VMware Tools guest operations), VNC (`RemoteDisplay.vnc.enabled`).
 - **Hyper-V** — driven through the PowerShell `Hyper-V` module / WMI
   (`Msvm_*` classes). Control planes: agentless display (WMI keyboard
   injection + thumbnail/screen capture), serial (named pipe), guest
-  agent (PowerShell Direct / integration services, or reliquary's
-  own agent over serial). No VNC.
+  agent (PowerShell Direct / integration services). No VNC.
 
 Design rules:
 
@@ -118,10 +115,12 @@ Design rules:
   `.vbox`, `.vmx`, Hyper-V VM/VHD paths) inside
   `cache/machines/<id>/`, so a machine's cache directory is the
   whole materialization.
-- **The serial-carried reliquary guest agent is backend-portable.**
-  Every backend can expose an emulated UART, so the QGA-profile
-  agent described below is the one guest-side investment that pays
-  off on all four backends.
+- **Guest agents are consumed, never built.** reliquary consumes
+  native guest agents — QGA, Guest Additions, VMware Tools,
+  Hyper-V integration services — through their backend adapters
+  and never builds or ships a guest-side agent of its own
+  (planning/USE-CASES.md, the control-plane arc). A guest without
+  a native agent stays agentless permanently.
 
 The adapter seam's design doctrine is consolidated in
 [planning/design/backend-adapter.md](design/backend-adapter.md)
@@ -131,7 +130,7 @@ planning/TASKS.md); adapters own drive-image materialization in
 their native formats; adapters provide carriers and control planes
 compose them (one shared fixed-font recognizer serves text
 readback where no native text carrier exists). The doctrine is
-settled ahead; signatures land with the milestone-6 extraction,
+settled ahead; signatures land with the milestone-8 extraction,
 defined by the working code.
 
 ## The machine model
@@ -254,7 +253,7 @@ both parser and schema at realignment, keeps the two aligned.
 Documents carry no `$schema` field pre-beta — editors bind the
 schemas by file association — with `$schema` as the leading
 candidate spelling of the version field at beta ("Decisions
-still needed"). The machine-state schema lands at milestone 3,
+still needed"). The machine-state schema lands at milestone 5,
 once the state format settles.
 
 ### Home layout
@@ -265,7 +264,7 @@ once the state format settles.
 ├── scripts/             reliquary automation scripts
 ├── landmarks/           landmark declarations and their variant
 │                        renderings, <name>.rlql + <name>.<n>.png
-│                        (see "Landmarks")
+│                        (see planning/design/landmarks.md)
 ├── user.properties      personal user properties (line-based
 │                        key = value; ordinary values and @secret
 │                        markers for host-stored secrets)
@@ -333,7 +332,8 @@ mechanism behind the artifact-residency split (planning/USE-CASES.md).
   extension, not location: `.rlqb` is a machine blueprint,
   `.rlqm` a media definition, `.rlqs` a script, `.rlql` a
   landmark declaration (its `<name>.<n>.png` variant renderings
-  attach by stem adjacency, not discovery — see "Landmarks").
+  attach by stem adjacency, not discovery —
+  [planning/design/landmarks.md](design/landmarks.md)).
   Discovery walks the root for the four extensions, so a project
   lays out its files however it likes — `blueprints/`, `media/`,
   `scripts/`, and `landmarks/` subdirectories are optional
@@ -849,8 +849,8 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 truth** (including the complete typed EBNF), with
 `planning/design/script-examples/design-install.rlqs` as the reference
 script. Realigning the implementation — parser, runtime, shipped
-scripts — with it is **absolute priority #1**; see the
-realignment milestone below. Pre-beta, the superseded surface is
+scripts — with it is **milestone 4, the next work in the arc**;
+see the milestones below. Pre-beta, the superseded surface is
 deleted, not bridged.
 
 **Decided shape: a line-oriented, constrained DSL with one
@@ -859,9 +859,9 @@ grammatical form.** A script is a UTF-8 text file
 positional arguments, `name=value` properties, and optionally a
 brace block — with `#` comments and no commas or colons anywhere.
 Spelling reveals role: `"..."` is guest-boundary text, `/.../` a
-regex, `@name` a library reference, `$name` a run-supplied input,
+regex, `@name` a library reference, `$key` a property reference,
 bare words are keywords and script-internal names. Declarative
-nodes (headers, `media`, `input`, `phase`) begin with a noun and
+nodes (headers, `media`, `property`, `phase`) begin with a noun and
 precede imperative verb-first statements. It is a domain-specific
 programming language with sequencing, branching, named phases,
 and explicit transitions, but no expressions, mutable variables,
@@ -956,7 +956,7 @@ in [planning/design/script-properties.md](design/script-properties.md).
 Scripts may also embed ordinary media-definition JSON objects in
 top-level, labeled `media <label> { ... }` blocks. After full
 preflight but before machine resolution, running the script installs
-each missing definition as `<label>.rlqm`; `fetch --script`
+each missing definition as `<label>.rlqm`; `fetch-media --script`
 does the same without executing guest steps. Existing definitions are
 never overwritten: wholly identical blocks are already installed,
 while differing targets, item collisions, and partially overlapping
@@ -979,7 +979,7 @@ whole-script capability preflight, and static control-flow checks
 all finish before the first guest input. User documentation and
 source of truth: [planning/design/script-spec.md](design/script-spec.md)
 (the July 2026 redesign; the implementation still speaks the
-superseded surface until the realignment milestone lands).
+superseded surface until milestone 4 lands).
 
 The primitive vocabulary already exists in today's CLI and Python
 surface — it is the proven instruction set the language must cover:
@@ -1117,164 +1117,26 @@ the script.
 
 ## Landmarks
 
-Landmarks are the image-match assets for GUI guests — the
-`@landmark` matcher the growth rule already names, and the assets
-U6's recorder captures. The 2026-07-21 owner round settled their
-shape; the full asset spec (JSON schema, similarity metric) is
-queued work, and "Decisions still needed" below carries what
-remains open.
-
-**One declaration, N renderings.** A landmark is a single
-declaration owning its geometry — the region list and the named
-spot set (click points), with pinned screen dimensions and mode —
-plus one or more *variants*: alternative renderings of the same
-screen (palette, font, or shading differences). Variants share
-the declaration's dimensions, mode, regions, and spots by
-construction, which makes the decided variant invariants
-(identical spot sets, declared order) structural rather than
-checked. A screen whose *layout* changed is a different landmark,
-not a variant — keeping variants aligned with U6's "changed
-screen for an unchanged step".
-
-**Whole-screen match; regions are modifiers.** A bare landmark
-matches the entire screen exactly (pixel-equal after decode
-normalization). Declared regions soften or void areas: a `fuzzy`
-region carries an explicit `similarity` percent literal (its unit
-spelled, as durations spell theirs; no implicit default — G6),
-and an `ignore` region is excluded outright. This chooses the
-safe failure asymmetry: over-matching misses and times out
-visibly (G4), where under-matching would fire on the wrong
-screen. os-autoinst-style *selecting* regions that confine
-matching to declared rectangles are deferred as additive growth
-(G7). Failure reporting stays per-variant: the nearest miss names
-the closest variant.
-
-**Catalog form.** The declaration is `<name>.rlql`, a JSONC
-authored document — the fourth authored extension beside
-`.rlqb` / `.rlqm` / `.rlqs`, resolved under exactly the same
-rules ("Authored-asset resolution" above: root discovery by
-extension, root shadows home, `--assets-only`; a `landmarks/`
-subdirectory is optional dressing). Variant renderings are plain
-PNGs attached by stem-and-number adjacency — `<name>.<n>.png`
-beside the declaration, ordered numerically — so a U6 asset
-refresh is strictly file-creation, never file-rewrite, and
-capture provenance lives in PNG text chunks, not sidecar files.
-Landmark names share the collision-checked `@` pool with media
-names.
-
-**Embedded form — resolve in place.** A script may carry its
-landmarks as `landmark <name> { ... }` blocks: the same JSON
-schema as `.rlql` (no second schema, as with embedded media) plus
-inline base64 variant data, so a workflow travels as one
-self-contained source file (U1, U4). Embedded landmarks resolve
-in place: nothing installs and no files sprout. Embedded *media*
-installs so later machine and media commands can use the
-definitions without the script in scope; a landmark has no
-consumer outside its script, so the install step would only
-defeat the single-file shape. Embedded landmarks are
-script-scoped — sharing between scripts uses the catalog form —
-and asset refresh writes `<name>.<n>.png` beside the script, file
-variants ordering after embedded ones, so reliquary never
-rewrites a script. Any duplicate landmark name visible to one
-script — embedded against `.rlql`, or against a media name — is
-an error naming both locations; landmarks never coalesce because
-they never install. Where the blocks sit in a script (the
-declarative header zone, or a trailing assets zone that keeps
-bulk payloads out of the procedure's way — G4) is left to the
-asset spec work.
-
-**Cursor normalization.** Captures and matching always strip the
-mouse cursor — a normalization, never an option:
-
-- Every pointer verb ends by parking the cursor at a fixed
-  per-platform park position; parking is never script surface.
-  For guests that composite the cursor into the framebuffer
-  (software cursors — nothing host-side can erase what the guest
-  drew), parking *is* the stripping mechanism: the guest
-  repaints, and every later capture is clean by construction.
-- The park zone is permanently masked from matching — a built-in
-  ignore region; a declared region overlapping it draws a
-  preflight warning.
-- Where the control plane can capture a cursor-free framebuffer
-  (RFB cursor pseudo-encodings), that is used automatically.
-- While recording, the human drives and cannot be parked — but
-  reliquary is the console, so the cursor position at capture
-  time is always known; proposed assets mask that neighborhood,
-  flagged as a generated comment (U6).
-- Diagnostics capture reality: explicit `screenshot` and failure
-  screenshots never inject a park move — it could dismiss the
-  hover state or menu that explains a failure. In script runs
-  they are cursor-clean anyway, because every pointer action
-  already ended parked.
+Landmarks — the image-match assets for GUI guests, the
+`@landmark` matcher the growth rule names, and the assets U6's
+recorder captures — are designed in
+[planning/design/landmarks.md](design/landmarks.md): one
+declaration owning geometry, with variant renderings sharing it
+by construction; whole-screen exact match with `fuzzy`/`ignore`
+modifier regions; the `.rlql` catalog form and embedded
+resolve-in-place blocks under authored-asset resolution; and the
+always-on cursor normalization contract. What remains open is
+milestone 12's "Decide first" round.
 
 ## Script authoring by recording
 
-The authoring recorder serves U6: a person performs the task once
-in a console session reliquary supervises, and reliquary drafts
-the script and captures the landmark assets that reproduce it.
-Settled design:
-
-**Recording requires reliquary to be the console.** Input typed
-into a backend's own display window never passes through
-reliquary and cannot be followed; recording happens in a
-reliquary-owned viewer over the `vnc` control plane, where every
-keystroke, click, and media swap is observable. The viewer is a
-real component, and the recording prerequisite on every backend —
-QEMU included.
-
-**First capture drafts, the author tailors.** Input events
-segment the session's timeline; the stable screen before each
-input proposes the wait condition (a VGA text match in text mode,
-a landmark in GUI mode), the input proposes the action, and
-observed timing proposes generous timeouts. What the recorder
-cannot know — which screen features are load-bearing, how long a
-step may honestly take — it flags as generated comments in the
-draft. Text-mode capture comes first and needs no new language
-surface; GUI capture rides the landmark/click work, and a click's
-position seeds its landmark's spot. The draft is ordinary script
-text, self-contained by default — landmarks travel as embedded
-resolve-in-place blocks ("Landmarks" above) — with factored
-catalog files on request; written once and user-owned from then
-on, like `import-vm` output.
-
-**Round-trip composes with tailoring — playback is the
-positioning mechanism.** Authored customization must survive
-re-capture, so later sessions never regenerate or text-merge the
-script. Instead, playback of the user's tailored script carries
-the machine to the point of change — a breakpoint, or the exact
-statement where the script fails against a changed guest — and
-the person takes over the console, demonstrates, and hands back.
-The recorder emits a *fragment* — new waits, actions, and assets
-— anchored at the phase and statement of the user's own script.
-Because the anchor comes from executing that script, not from
-diffing it against a stored base, round-trip is robust to
-arbitrary tailoring: no pristine draft is retained, no merge
-happens. (openQA's interactive mode is the concept precedent —
-concepts only, per AGENTS.md.)
-
-**Two tracks, two write boundaries.** A changed screen for an
-unchanged step is an *asset refresh*: a new landmark variant,
-never touching the script — the numbered-adjacency variant shape
-(`<name>.<n>.png` beside the declaration, or beside the script
-for an embedded landmark; "Landmarks" above) makes refresh
-file-creation, never file-rewrite. New or changed steps
-are *step capture*: the fragment is emitted beside the script for
-the author to splice in their editor; an explicit opt-in apply
-may perform the surgical insertion at the anchor, touching no
-other byte — a named exception in the family of installing an
-embedded definition. Round-trip is append-shaped everywhere;
-nothing reliquary wrote once is rewritten.
-
-**Shared machinery.** Run-to-point, breakpoints, and human
-takeover are runner features that also serve ordinary debugging —
-"take over from here" is a natural suggested next command in a
-failure report. Handover events (control passing between script
-and human) join the run-events stream as event kinds, so a
-capture session is one run record with mixed drivers. The
-`record` command family lands on the CLI and the embedding API
-together, under parity. Blueprints and media definitions are
-untouched: a session runs on an ordinary machine, and media swaps
-are already `insert`/`eject`.
+U6's authoring recorder — reliquary supervises a person doing
+the task once in a reliquary-owned console over the `vnc`
+control plane, drafts the script and landmark assets, and on
+later sessions anchors new fragments by playback position, never
+regenerating or text-merging what the author wrote — is designed
+in [planning/design/recorder.md](design/recorder.md). Delivery
+sits in "Horizon" below; work items in planning/TASKS.md.
 
 ## Asynchronous runs
 
@@ -1429,9 +1291,9 @@ under `auto`/`pretty`); `plain`/`jsonl` runs are noninteractive,
 so a missing input value is a PREFLIGHT ERROR before the machine
 starts and a program can never hang on a hidden prompt. This
 settles renderer selection and jsonl stdout purity for the
-stream-bearing commands now; the general stdout/stderr
-discipline and output-stability contract across every command
-remains queued (TASKS).
+stream-bearing commands; the general stdout/stderr discipline
+and the stability contract across every command are settled in
+"The CLI" above (owner, 2026-07-22).
 
 **Fetch progress — the same model (owner, 2026-07-21).** Media
 movement emits the same transfer and verification event kinds
@@ -1447,8 +1309,8 @@ nothing reattaches; run records remain the only recorded
 outputs. Machine operations that fetch implicitly outside a run
 (`create-machine` / `start-machine` / `apply-blueprint` /
 `recreate-machine` reconciliation) render the
-same events under the same defaults, their full output contract
-remaining with the general CLI discipline (TASKS). Honesty
+same events under the same defaults, under the output discipline
+in "The CLI" above. Honesty
 rules carry over: byte totals only where the source names them,
 hashing and extraction elapsed-only, each mirror attempt its own
 event. On the API, `fetch_media()` stays the blocking form
@@ -1467,34 +1329,36 @@ hidden prompt. Contract home: media-spec "Fetch progress".
 
 ## Milestones
 
-**Absolute priority #1 is the script-surface realignment** (its
-own milestone below): retargeting the implementation to the
-redesigned script spec before any other milestone work proceeds.
-**Within the larger arc, DOS under QEMU is the top priority, and
-blueprints are the extremely high priority within it.**
-Milestone 1 is a vertical slice: the north-star command working
-end to end from a clean home. Milestones 2–5 then complete the
-documented design — the media library, the instance model and
-machine blueprint, the script properties, and the scripting
-language, i.e. everything in `planning/` — for the DOS platform on
-the QEMU backend alone. The script-surface realignment then
-retargets the language implementation to the July 2026 redesign.
-Only then does the design generalize: the adapter seam is
-extracted from working code (6), proven by a second backend (7),
-and extended with machine mobility (8), guest agents (9), and the
-VNC control plane (10).
+Milestones run in order — the numbering is the priority. The
+whole arc runs from text-mode DOS on QEMU to the GUI era ending
+on Hyper-V. Milestones 1–3 are history: the north-star vertical
+slice, the media library, and the scripting language on its
+first, now-superseded surface. Milestone 4 — the next work —
+realigns the tree with the July 2026 redesign; no later
+milestone starts before the tree speaks the new surface.
+Milestones 5–7 complete the
+documented design — the instance model and machine blueprints
+with authored-asset residency, the script properties, and run
+records with asynchronous runs — still for the DOS platform on
+the QEMU backend alone. Only then does the design generalize:
+the adapter seam is extracted from working code (8), proven by a
+second backend (9), and extended with machine mobility (10) and
+native guest agents (11); the arc ends at the GUI era (12) —
+the VNC control plane, GUI installer scripting, and the last
+backends, Hyper-V deliberately last.
 
-Each milestone is independently shippable: the tree builds, the
-test suite passes, and the FreeDOS install keeps working end to
-end on whichever surface that milestone provides. Within 2–5 the
-order is dependency-driven — the media library before blueprints
-fully exploit it, the machine model before scripts fully drive
-it, the property sources before script declarations bind through
-them.
+A milestone that needs decisions opens with them: its "Decide
+first" block is the design round to run before its deliverables
+start. Each milestone is independently shippable: the tree
+builds, the test suite passes, and the FreeDOS install keeps
+working end to end on whichever surface that milestone provides.
 Within a milestone the listed deliverables are ordered but may
-land in separate commits.
+land in separate commits. Horizon holds what the arc
+deliberately does not deliver — the U6 authoring recorder above
+all — each item earning a numbered milestone when its turn
+comes.
 
-### Milestone 1 — The north-star command
+### Milestone 1 — The north-star command (complete, on the superseded surface)
 
 ```powershell
 rlq run-script install --blueprint freedos-1.4-plain
@@ -1504,7 +1368,7 @@ From a clean home, that one command must end with a fully
 installed FreeDOS machine that can then be started and stopped
 from the reliquary command line. Everything in this milestone is
 the minimum vertical slice of the documented design needed to get
-there — each piece grows to its full spec in milestones 2–5. The
+there — each piece grows to its full spec in later milestones. The
 built-in blueprint bundle is the public vertical slice for this
 milestone.
 
@@ -1608,7 +1472,7 @@ semantics reach into `start` reconciliation).
     installed HDD through spike 13's model (blueprint boots
     `hdd0` then `cdrom0`; install script's final `eject` leaves
     a plain `start` booting the hard disk). Exit: north-star done
-    criteria green. Out: full milestone-3 `apply` semantics.
+    criteria green. Out: full milestone-5 `apply` semantics.
 13. **Media-in-script model (complete)** — the machine-state design for
     install media: blueprints declare empty removable drives
     (`"cdrom0": null`) and no installer media — the blueprint
@@ -1627,7 +1491,7 @@ semantics reach into `start` reconciliation).
     inserts the LiveCD into an empty blueprint slot, installs,
     ejects, and a subsequent plain `start` boots the hard
     disk. Out: `apply` (recovery for diverged machines is
-    milestone 3), embedded media blocks, hot-swap polish beyond
+    milestone 5), embedded media blocks, hot-swap polish beyond
     what the install needs. Runs before spike 12, which
     consumes it.
 
@@ -1653,7 +1517,7 @@ Deliverables:
 2. Eager whole-library scanning before any media operation, with
    library-wide duplicate-name detection and the
    normalized-descriptor collision rules (the shared groundwork
-   for embedded script blocks in milestone 5).
+   for embedded script blocks in milestone 3).
 3. The two-cache split: source archives under `cache/downloads/`,
    payloads under `cache/media/`; fetch/extract/verify on demand,
    cheapest source first (verified payload, then cached archive,
@@ -1667,7 +1531,7 @@ Deliverables:
 4. `rlq fetch <media_name>` and `reliquary clean
    downloads` / `clean media` (nothing irreplaceable —
    definitions, `local-path` files, sourceless payloads — is
-   cleanable). `fetch --script` follows in milestone 5 with
+   cleanable). `fetch --script` follows in milestone 3 with
    script parsing.
 5. `list media` and `search media` over the built-in index and
    user definitions, with the `yes`/`seeded` provenance column;
@@ -1679,118 +1543,13 @@ once its deletion is approved and is kept intact when it is not;
 `clean` reclaims only restorable files; the install script passes
 on the completed layer.
 
-### Milestone 3 — The instance model and machine blueprints
-
-The whole machine model beyond milestone 1's core —
-[planning/design/instance-model.md](design/instance-model.md)
-plus the [machine blueprint](design/machine-blueprint.md) with its
-[field reference](design/machine-blueprint-reference.md) and
-[cookbook](design/machine-blueprint-cookbook.md) — still scoped to
-one backend. The `backend` field is parsed and validated in full,
-but with QEMU the only implementation, assignment is trivial; the
-adapter seam that makes it real is milestone 6. Capability checks
-are real from the start, derived from what the QEMU
-implementation can actually do.
-
-Deliverables:
-
-1. Blueprint validation per the full field reference: `platform`,
-   `backend`, `memory`, `cpus`, `drives` (slot convention and
-   aliases, per-drive `controller`, `media` references, `size`
-   blanks, `base` with `difference`/`duplicate`, `enabled`),
-   `boot`, `control-planes`, `backend-settings` — format checks
-   and capability checks both failing closed and naming the
-   problem.
-2. Machines wholly under `cache/machines/<blueprint>-<n>/` — the
-   numbered id naming the directory is the machine's identity —
-   with `reliquary-machine.json` (id repeated as a safety check,
-   blueprint reference and resolved digest, creation time, phase,
-   fully resolved configuration), canonical drive-image naming,
-   and qcow2 materialization of the `size`/`base` triad. The QEMU
-   layer re-anchors on it; `MachineConfig`, root-home
-   `machine.json`, and `vm.json` are absorbed and deleted.
-3. Lifecycle integrity per the instance model: operation
-   generations, exclusive per-machine locks, atomic JSON
-   replacement, and startup detection of interrupted phases with
-   safe rollback or explicit recovery instructions.
-4. The lifecycle CLI completed on top of milestone 1's verbs:
-   `start-machine` grown to full reconciliation — baseline,
-   state, backend identity, and re-verification of every
-   referenced media hash — plus `apply-blueprint` (adopt
-   blueprint edits into the baseline; drive-regenerating changes
-   fail closed), `recreate-machine` (same id),
-   `delete-blueprint` (machineless blueprint files only),
-   `list-blueprints`, `search-blueprints` (built-in index
-   plus user files, with provenance), `seed-blueprint` (closure
-   by default, `--only` for the single file), and the
-   `new-blueprint` scaffolder. Runtime changes update the
-   state only; machines stay running until explicitly stopped.
-5. The guest-console family (`type`, `enter`, `press`, `exec`,
-   `select`, `wait`, `screen`, `screenshot`, `hmp`) and the state
-   ops (`insert-media`, `eject-media`, `set-boot-order`) take the
-   same `--machine`/`--blueprint` selection and resolve ownership
-   through the machine state.
-6. Published JSON Schemas for the document types: publication
-   mechanics and the shared valid/invalid fixture corpus (run
-   against both parser and schema) for the authored blueprint and
-   media-definition schemas
-   (`planning/design/*.schema.json` — prose specs normative, the
-   parser the validator), plus the machine-state schema, authored
-   here once the state format settles.
-7. `planning/examples/` updated to the implemented shapes
-   (`planning/examples/blueprints/`, an explicit `create --blueprint` step in its
-   README) — or the docs corrected where implementation proves
-   the planned format wrong.
-
-Done when: the FreeDOS install script runs against a machine
-created from the example blueprint in a clean home;
-`destroy-machine` + `create-machine` regenerates the
-materialization from blueprint and media
-alone; a process killed mid-operation is detected and recovered
-per the instance model; blueprint edits round-trip through
-`apply-blueprint` with drive-regenerating changes failing closed.
-
-### Milestone 4 — Script properties
-
-All of [planning/design/script-properties.md](design/script-properties.md),
-landed ahead of the scripting language because script-declared
-properties bind
-through its sources. Small and independently useful.
-
-Deliverables:
-
-1. `user.properties` as a flat user-owned line-based
-   `key = value` file (dotted names; `@secret` markers), with
-   name validation, comment-preserving surgical edits, and
-   atomic writes.
-2. `rlq get-property` / `set-property` / `unset-property` /
-   `list-properties`: secret values held
-   only in the host's protected credential store (scoped by
-   properties-file path
-   and property name), set via no-echo prompt on a tty and from
-   stdin otherwise, never revealed by
-   list/get; kind changes require `unset-property` first.
-3. The fail-safe update order (store credential before marker,
-   remove marker before credential), with orphaned-credential
-   reporting and cleanup guidance — never a plaintext fallback.
-4. The layered property sources: repeatable `--property`
-   (refusing secret-bound keys), `RELIQUARY_PROPERTY_*` with the
-   mangling rule and fail-closed collision preflight,
-   and `--properties <path>` selecting the maintained/consulted
-   file in place of the home's (credentials scoped by file path).
-
-Done when: ordinary and secret properties round-trip through the
-CLI with no secret material ever in the file, and interrupting an
-update cannot produce a plaintext value or a marker whose
-credential was reported bound but is absent.
-
-### Milestone 5 — The scripting language (complete, on the superseded surface)
+### Milestone 3 — The scripting language (complete, on the superseded surface)
 
 The remainder of the script spec beyond milestone 1's core,
 completing the then-documented design for DOS on QEMU. The
 deliverables below record what was built; the July 2026 spec
-redesign supersedes their syntax, and the realignment milestone
-that follows retargets them.
+redesign supersedes their syntax, and milestone 4 retargets
+them.
 
 Deliverables:
 
@@ -1838,44 +1597,35 @@ blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `planning/`
 documents is implemented for DOS on QEMU.
 
-### Milestone zero — settle the surface (decided July 2026)
-
-The adjudicated language decisions recorded in ./TASKS.md are
-resolved and folded into the spec: `<key>` tokens deleted (keys
-live only after `press`; `enter` kept as a derived form —
-`type` + `press enter`); the reactive-handler keyword split
-(`always` in reactive phases, `on` only in branching waits, a
-container mismatch a validation error); a mandatory header
-`deadline` for cyclic phase graphs; `finish` banned from linear
-scripts (end of file is the one ending) and two handlers minimum
-per branching `wait`; the pre-approved validation batch applied;
-`boot` renamed `set-boot`; `machine=running` and an undiverged
-header option deferred with reasons recorded in the spec;
-response files accepted JSONC (the response concept later
-dissolved into property values — the property rounds). The
-execution-model-before-runner
-sequencing rule is satisfied: the spec's execution model (sample /
-episode / clock table), with the minimum run-events vocabulary,
-is written — its "Execution model" section — and the runner
-retarget may begin. The reference
-script is valid under the answers.
-
-### Script-surface realignment — absolute priority #1
+### Milestone 4 — Script-surface realignment
 
 The July 2026 script-language redesign
 ([planning/design/script-spec.md](design/script-spec.md), with
 `planning/design/script-examples/design-install.rlqs` as the reference script)
-supersedes the surface milestones 1 and 5 implemented.
+supersedes the surface milestones 1 and 3 implemented.
 This milestone gates everything after it: no later milestone
 starts before the tree speaks the new surface. Pre-beta, the old
 surface is deleted, not bridged.
+
+Decide first: nothing — the gating decisions were settled in
+July 2026 and folded into the spec (the adjudication trail is
+planning/DECISIONS.md: the milestone-zero round — `<key>`-token
+deletion, the `on`/`always` split, the cyclic-deadline rule,
+linear endings and the two-handler minimum, `set-boot`, the
+validation batch — plus the spec-craft and observation-channel
+rounds), and the execution-model-before-runner sequencing rule
+is satisfied: the spec's "Execution model" section is written,
+so the runner retarget may begin. One confirmation remains
+in-milestone: the portable key-name vocabulary for `press` is
+published in the spec as a closed set — confirm it against the
+converted scripts.
 
 Deliverables:
 
 1. Retarget `script.py` to the node grammar and typed EBNF: the
    three-production skeleton plus per-node signatures; no colons
    or commas, `name=value` properties, `/regex/` literals, `@`
-   media references, `$`/`${}` input references, and the
+   media references, `$`/`${}` property references, and the
    colon-free noun-first headers with `entry` and the run-level
    `deadline`.
 2. The renamed vocabulary: `phase` (was `state`), `goto` (was
@@ -1901,12 +1651,207 @@ Deliverables:
    that quotes script syntax updated (README, planning/examples/README);
    `planning/design/script-examples/design-install.rlqs` retires into the
    converted builtins.
+7. The CLI/API surface renames the July 2026 queues decided
+   (planning/DECISIONS.md): the twin-name identity sweep —
+   `run-script`, `fetch-media`, the `seed-` family,
+   `new-blueprint`, `import-vm --name`, `check-script`, the
+   dashed `list-`/`search-` forms, the property family noun-last
+   — with `create_machine` / `start_machine` / `stop_machine` /
+   `destroy_machine` replacing `create_from_blueprint` and
+   `machines.start`/`stop`/`destroy`; id-only `--machine`
+   selectors; and uniform flag position (the `cli.py` SUPPRESS
+   workaround retires). docs/ and README follow the renames.
 
 Done when: the FreeDOS install and verify scripts run end to end
 in the new surface, `check-script` reports the timing plan, and
-no old-surface syntax parses anywhere.
+no old-surface syntax or superseded command spelling survives
+anywhere.
 
-### Milestone 6 — The backend adapter seam
+### Milestone 5 — The instance model and machine blueprints
+
+The whole machine model beyond milestone 1's core —
+[planning/design/instance-model.md](design/instance-model.md)
+plus the [machine blueprint](design/machine-blueprint.md) with its
+[field reference](design/machine-blueprint-reference.md) and
+[cookbook](design/machine-blueprint-cookbook.md) — still scoped to
+one backend. The `backend` field is parsed and validated in full,
+but with QEMU the only implementation, assignment is trivial; the
+adapter seam that makes it real is milestone 8. Capability checks
+are real from the start, derived from what the QEMU
+implementation can actually do.
+
+Decide first:
+
+- Running-machine reconfiguration: how hot media changes vs.
+  stopped-only changes (like memory) are surfaced in the CLI
+  and script language.
+- Concurrent machines: whether any home-wide limit applies to
+  machines running at once (the per-machine lock and identity
+  model suggests none).
+- Whether `size`/`base` are valid on `cdrom` drives — the field
+  reference says `size` is "meaningful for hdd and floppy"
+  without prohibiting it elsewhere, and the schemas encode only
+  the stated rules (the JSON-schema round's open find).
+
+Deliverables:
+
+1. Blueprint validation per the full field reference: `platform`,
+   `backend`, `memory`, `cpus`, `drives` (slot convention and
+   aliases, per-drive `controller`, `media` references, `size`
+   blanks, `base` with `difference`/`duplicate`, `hostdir` host
+   directories (served by vvfat on QEMU), `enabled`),
+   `boot`, `control-planes`, `backend-settings` — format checks
+   and capability checks both failing closed and naming the
+   problem.
+2. Machines wholly under `cache/machines/<blueprint>-<n>/` — the
+   numbered id naming the directory is the machine's identity —
+   with `reliquary-machine.json` (id repeated as a safety check,
+   blueprint reference and resolved digest, creation time, phase,
+   fully resolved configuration), canonical drive-image naming,
+   and qcow2 materialization of the `size`/`base` triad. The QEMU
+   layer re-anchors on it; `MachineConfig`, root-home
+   `machine.json`, and `vm.json` are absorbed and deleted.
+3. Lifecycle integrity per the instance model: operation
+   generations, exclusive per-machine locks, atomic JSON
+   replacement, and startup detection of interrupted phases with
+   safe rollback or explicit recovery instructions.
+4. The lifecycle CLI completed on top of milestone 1's verbs:
+   `start-machine` grown to full reconciliation — baseline,
+   state, backend identity, and re-verification of every
+   referenced media hash — plus `apply-blueprint` (adopt
+   blueprint edits into the baseline; drive-regenerating changes
+   fail closed), `recreate-machine` (same id),
+   `delete-blueprint` (machineless blueprint files only),
+   `list-blueprints`, `search-blueprints` (built-in index
+   plus user files, with provenance), `seed-blueprint` (closure
+   by default, `--only` for the single file), and the
+   `new-blueprint` scaffolder. Runtime changes update the
+   state only; machines stay running until explicitly stopped.
+   The global `--json` flag lands here, defined by the
+   twin's-return rule ("The CLI" above).
+5. The guest-console family (`type`, `enter`, `press`, `exec`,
+   `select`, `wait`, `screen`, `screenshot`, `hmp`) and the state
+   ops (`insert-media`, `eject-media`, `set-boot-order`) take the
+   same `--machine`/`--blueprint` selection and resolve ownership
+   through the machine state; `get-machine-dir` reports the
+   machine directory (the out-of-band door —
+   planning/design/instance-model.md).
+6. Published JSON Schemas for the document types: publication
+   mechanics and the shared valid/invalid fixture corpus (run
+   against both parser and schema) for the authored blueprint and
+   media-definition schemas
+   (`planning/design/*.schema.json` — prose specs normative, the
+   parser the validator), plus the machine-state schema, authored
+   here once the state format settles.
+7. `planning/examples/` updated to the implemented shapes
+   (`planning/examples/blueprints/`, an explicit `create-machine
+   --blueprint` step in its README) — or the docs corrected where
+   implementation proves the planned format wrong.
+8. Authored-asset residency ("Authored-asset resolution" above):
+   the resolution module (`--assets` / `--assets-only`), the
+   `.rlqb` / `.rlqm` extension renames, the `builtins/` →
+   `codex/` package rename and the codex index, the
+   blueprint-source state field, selection scoping, and
+   embedded-install targeting.
+9. The shared JSONC reader for authored documents (RFC 8259 plus
+   `//` and `/* */` comments and trailing commas, nothing more;
+   string-aware, comments replaced by spaces so error positions
+   survive; JSON islands in scripts and every machine-written
+   file stay strict JSON), the remaining media-definition
+   surface (definition-level `description` / `notes` /
+   `redistributable-under`, archive-level `local-path`,
+   sourceless definitions failing resolution naming the
+   definition to edit), API parity for the media commands
+   (`fetch_media(script=)`, `clean_downloads()`,
+   `clean_media()`), and the codex teaching comments at
+   blueprint seams.
+
+Done when: the FreeDOS install script runs against a machine
+created from the example blueprint in a clean home;
+`destroy-machine` + `create-machine` regenerates the
+materialization from blueprint and media
+alone; a process killed mid-operation is detected and recovered
+per the instance model; blueprint edits round-trip through
+`apply-blueprint` with drive-regenerating changes failing closed.
+
+### Milestone 6 — Script properties
+
+All of [planning/design/script-properties.md](design/script-properties.md)
+— the sources script-declared properties bind through. Small and
+independently useful.
+
+Deliverables:
+
+1. `user.properties` as a flat user-owned line-based
+   `key = value` file (dotted names; `@secret` markers), with
+   name validation, comment-preserving surgical edits, and
+   atomic writes.
+2. `rlq get-property` / `set-property` / `unset-property` /
+   `list-properties`: secret values held
+   only in the host's protected credential store (scoped by
+   properties-file path
+   and property name), set via no-echo prompt on a tty and from
+   stdin otherwise, never revealed by
+   list/get; kind changes require `unset-property` first.
+3. The fail-safe update order (store credential before marker,
+   remove marker before credential), with orphaned-credential
+   reporting and cleanup guidance — never a plaintext fallback.
+4. The layered property sources: repeatable `--property`
+   (refusing secret-bound keys), `RELIQUARY_PROPERTY_*` with the
+   mangling rule and fail-closed collision preflight,
+   `--properties <path>` selecting the maintained/consulted
+   file in place of the home's (credentials scoped by file path),
+   the blueprint `parameters` source (direct value or redirect,
+   read at invocation), and the once-per-key interactive ask —
+   the full flattened order: flag > parameter > env > file > ask.
+
+Done when: ordinary and secret properties round-trip through the
+CLI with no secret material ever in the file, and interrupting an
+update cannot produce a plaintext value or a marker whose
+credential was reported bound but is absent.
+
+### Milestone 7 — Run records and asynchronous runs
+
+The implementation of "Asynchronous runs" above — the run-events
+stream and everything that renders it — completing the feedback
+split (planning/USE-CASES.md) for the DOS-on-QEMU vertical.
+
+Deliverables:
+
+1. The normative `run-events.jsonl` stream, written live (append
+   and flush per event, first preflight event to terminal event),
+   and the `runs/<n>/` record layout with machine-scoped
+   monotonic run numbers (the superseded `<timestamp>-<run_id>/`
+   layout dies); `transcript.txt` as a pure renderer of the
+   stream; the crashed-run rule.
+2. The `--progress (auto | pretty | plain | jsonl)` renderers on
+   the stream-bearing commands (`run-script`, `run tail`,
+   `fetch-media`), the output discipline and stability contract
+   ("The CLI" above) implemented across every command, and the
+   beautiful, timely, informative human rendering the feedback
+   split demands.
+3. `run-script --detach` (foreground preflight, owned-child
+   runner, writer identity), and the `run` family — `run status`
+   / `run tail` / `run wait` / `run cancel [--stop-machine]` /
+   `run delete` — with `list-runs`.
+4. Interaction runs: `begin-run` / `end-run`, every
+   machine-targeting command appending while a run is open, one
+   open run per machine.
+5. API twins under parity: `start_script()` and the pull-only
+   run handle, `attach_run()`, `delete_run()`, `begin_run` /
+   `end_run`, `start_fetch()` and the fetch handle; the error
+   taxonomy (`ReliquaryError`; `StaticError` 2 / `PreflightError`
+   3 / `RunFailure` 4 / `RunCancelled` 5).
+
+Done when: a detached FreeDOS install is followed from a second
+terminal in pretty and jsonl renderings of the same stream; a
+cancel ends the run at an event boundary and leaves the machine
+as-is; an interaction-run bracket records a primitive-driven
+session; and a failure report names the route and revisits, the
+expired clock and its source scope, the nearest miss, the
+screenshot, and the suggested next command.
+
+### Milestone 8 — The backend adapter seam
 
 Extract the adapter API from the now-complete QEMU implementation
 — the only adapter with a full control plane set — so the seam is
@@ -1916,6 +1861,12 @@ pre-settled in
 (layering, seam inventory, ownership and capability doctrines,
 extraction map); this milestone defines the signatures and records
 them there.
+
+Decide first:
+
+- The backend priority order for default assignment when a
+  blueprint names no backend (proposed: QEMU, VirtualBox, VMware
+  Workstation, Hyper-V — best scriptability first).
 
 Deliverables:
 
@@ -1938,7 +1889,7 @@ Deliverables:
 Done when: all QEMU interaction flows through the adapter API and
 the FreeDOS install script passes unchanged.
 
-### Milestone 7 — Second backend: VirtualBox
+### Milestone 9 — Second backend: VirtualBox
 
 The first non-QEMU adapter end to end, proving the adapter API
 against a genuinely different hypervisor. VirtualBox is the
@@ -1963,12 +1914,21 @@ Deliverables:
 Done when: the FreeDOS install script runs unmodified on both
 backends from the same blueprint (minus a pinned backend field).
 
-### Milestone 8 — Machine mobility: clone, export, import
+### Milestone 10 — Machine mobility: clone, export, import
 
 The durable-artifact exits, once two backends make them
-meaningful. The open question under "Decisions still needed"
-(`import-vm` scope) must be settled at the start of this
-milestone; export's design is settled (owner, 2026-07-22).
+meaningful. Export's design is settled (owner, 2026-07-22).
+
+Decide first:
+
+- `import-vm` scope: which backend config translates into the
+  synthesized blueprint (memory, drives, controllers are clear;
+  what of NICs and other devices the blueprint doesn't model
+  yet), whether untranslatable configuration fails the import or
+  lands in `backend-settings`, and whether import can target a
+  named native snapshot in a VM's disk chain rather than the
+  current head (the generated definition would point at that
+  snapshot's file).
 
 Deliverables:
 
@@ -1986,81 +1946,155 @@ Deliverables:
    answer); media payloads materialized in; both commands
    stream-bearing.
 3. `import-vm`: synthesize a blueprint from a native VM's
-   configuration,
+   configuration through an importer,
    disks preserved as generated media definitions taken as
-   `base`; `--platform` required; never materializes a machine.
+   `base`; source at rest only, with the `--snapshot` /
+   `--no-snapshot` and `--hdd-images` consent points presented
+   per the settled design ("The CLI" above); `--platform`
+   required; never materializes a machine.
 
 Done when: an exported FreeDOS machine boots under the backend's
 own tooling, and a machine created from an imported blueprint
 recreates from its bases like any authored machine.
 
-### Milestone 9 — Guest agent communication
+### Milestone 11 — Guest agent communication
 
-The QGA-profile client and guest agents per the design below —
-backend-portable over serial. This milestone must not weaken the
-permanent agentless DOS path; the same suites validate agentless
-and guest-agent control planes with equivalent results.
+Native guest agents as control planes, per
+[planning/design/guest-communication.md](design/guest-communication.md):
+reliquary consumes the agents guests already have
+— QGA first — and never builds its own (planning/USE-CASES.md,
+the control-plane arc). This milestone must not weaken the
+permanent agentless DOS path; guests without a native agent
+(DOS-era systems included) remain agentless, and where a guest
+holds both planes the same suites validate agentless and
+guest-agent control planes with equivalent results.
+
+Decide first:
+
+- The exact initial `guest-exec` subset, including argument and
+  environment support, capture modes, output limits, and
+  timeouts.
+- Which bounded `guest-file-*` operations follow execution,
+  including file consistency and atomic replacement semantics.
+- Whether a separate plain serial-console control plane earns
+  its keep alongside the native guest agents and the agentless
+  planes.
 
 Deliverables:
 
 1. The host QGA client module: framing, `guest-sync-delimited`,
-   `guest-ping`/`guest-info`, `guest-exec`/`guest-exec-status`,
-   shared across carriers.
+   `guest-ping`/`guest-info`, `guest-exec`/`guest-exec-status` —
+   depending on QEMU's published guest-agent protocol, never on
+   one particular guest implementation.
 2. The extended `GuestExec` interface: request and result types
    covering deadlines, completion, output, and exit status,
    without exposing transport objects.
-3. The DOS guest agent speaking the QGA execution profile over an
-   emulated UART, provisioned through the agentless workflow (the
-   serial-to-virtio bootstrap, steps 1–2).
-4. The configured readiness waterfall with conservative fallback:
+3. The configured readiness waterfall with conservative fallback:
    selection before first dispatch only, ambiguous failures never
    retried on another control plane.
 
-Done when: a guest command runs through the serial-carried agent
-on QEMU with truthful capability reporting, and the agentless
-suite still passes byte-for-byte.
+Done when: a guest command runs through QGA on QEMU with
+truthful capability reporting, and the agentless suite still
+passes byte-for-byte.
 
-### Milestone 10 — VNC control plane
+### Milestone 12 — The GUI era: VNC, GUI scripting, and the last backends
 
-The second agentless control plane, per "Control plane families"
-below: framebuffer output plus keyboard and pointer input over
-the RFB protocol, where backends provide it — QEMU natively,
-VirtualBox with the extension pack, VMware Workstation; never
-Hyper-V (a capability failure, not an emulation). Beyond a
-backend-independent wire for display automation, this is the
-groundwork for GUI installer scripting: RFB's
-PointerEvent/KeyEvent are exactly the three portable input
-primitives the GUI plan adopts (see "Decisions still needed").
+The arc's endpoint: GUI installer automation, carried by the
+VNC/RFB control plane where backends provide it — QEMU natively,
+VirtualBox with the extension pack, VMware Workstation — and the
+two remaining adapters: VMware Workstation, then Hyper-V,
+deliberately last. Hyper-V has no VNC (a capability failure,
+never an emulation), so it is the proof that GUI automation
+rides capabilities, not one wire.
+
+Decide first:
+
+- The GUI asset spec: the `.rlql` JSON schema, the similarity
+  metric, and landmark-block placement within a script (the
+  asset shape itself is settled —
+  [planning/design/landmarks.md](design/landmarks.md)).
+- Pointer input end to end: the machine-blueprint
+  pointing-device field, the control-plane input capability, and
+  the script verbs — match-and-click with the click point in the
+  asset; click owns its search as an observation-bearing action
+  and needs its timing-matrix row. The input seam follows the
+  two-layer event model: three portable primitives — pointer
+  move (x, y), button press/release, key press/release — with
+  clicks, drags, chords, and paced typing composed above them,
+  and event pacing owned by the control plane. The primitives
+  are exactly RFB's PointerEvent/KeyEvent, so the VNC control
+  plane implements them with no translation, and
+  QMP/VBoxManage/WMI input paths reduce to the same three.
+  Synchronization concepts to adopt with them: act-then-confirm
+  (an input step optionally asserting the screen changed) and
+  screen-stillness waits. Also open: a host-side
+  landmark-cropping convenience (a CLI subcommand, never a
+  service). Era note: DOS/9x-era setup GUIs are fixed-mode,
+  fixed-font, animation-free — asset churn should be far below
+  openQA's — and NT-era setup is largely keyboard-drivable, so
+  keyboard-first remains the preferred path where it works.
+  Throughout, os-autoinst is a **concept reference only** — its
+  designs are studied and reimplemented, never its code (see
+  AGENTS.md prior art for the licensing boundary).
+- Blueprint device growth: firmware/boot semantics (BIOS vs
+  UEFI) for post-DOS platforms, and when network, display
+  adapter, audio, and USB become first-class blueprint fields
+  (each following the drives pattern: agnostic vocabulary,
+  capability-checked per backend); per-platform controller
+  defaults beyond `ide`; whether slot ranges widen for
+  multi-device controllers (additive change); and how Hyper-V
+  generations surface (a backend setting vs. inferred from
+  declared capabilities).
+- The Hyper-V agentless screen strategy: whether WMI
+  thumbnail/keyboard automation is good enough for installer
+  scripting, or Hyper-V machines require the serial/agent
+  control planes from day one.
 
 Deliverables:
 
-1. Per-backend VNC endpoint configuration contributed to launch
-   config, endpoint artifacts under the machine cache, and a
-   readiness probe.
-2. An RFB client — framebuffer capture, key events, pointer
-   events — as a control plane behind the same input and screen
-   capabilities as agentless display, reusing the pixel-level
-   text recognition built for the VirtualBox display plane in
-   milestone 7.
-3. `control-planes: ["vnc"]` policy honored end to end, with a
+1. The VNC control plane: per-backend endpoint configuration
+   contributed to launch config, endpoint artifacts under the
+   machine cache, a readiness probe, and an RFB client —
+   framebuffer capture, key events, pointer events — behind the
+   same input and screen capabilities as agentless display,
+   reusing the pixel-level text recognition built for the
+   VirtualBox display plane in milestone 9.
+   `control-planes: ["vnc"]` honored end to end, with a
    capability error naming Hyper-V where it cannot exist.
-4. The three portable input primitives (pointer move, button
-   press/release, key press/release) exposed at the control-plane
-   seam, with pacing control-plane-owned. Script-level pointer
-   verbs and image matching remain horizon work.
+2. The three portable input primitives exposed at the
+   control-plane seam, with pacing control-plane-owned.
+3. Landmarks implemented per
+   [planning/design/landmarks.md](design/landmarks.md): the `.rlql`
+   catalog and embedded resolve-in-place forms, `@landmark`
+   matching with fuzzy/ignore modifier regions, the cursor
+   normalization contract, and the match-and-click verbs
+   composed on the primitives.
+4. Win9x/WinNT platform workflows: GUI installer scripting for
+   the setup GUIs text scraping cannot reach, keyboard-first
+   where NT-era setup allows it.
+5. The VMware Workstation adapter.
+6. The Hyper-V adapter, last, on its decided screen strategy.
 
 Done when: the FreeDOS install script runs unmodified on QEMU
 with the VNC control plane selected in place of agentless
-display, and text observation through pixel recognition matches
-the VGA-scraping results on the same screens.
+display, pixel-recognition text observation matching the
+VGA-scraping results on the same screens; and a GUI-era install
+script drives a setup end to end through landmarks on QEMU over
+VNC and on Hyper-V through its decided screen strategy.
 
 ### Horizon (sequenced later, not yet scheduled)
 
+- The U6 authoring recorder
+  ([planning/design/recorder.md](design/recorder.md)): the
+  reliquary-owned console viewer, text-mode
+  recording, run-to-point / breakpoint / human takeover,
+  round-trip fragments, and the `record` command family (work
+  items in planning/TASKS.md).
 - `fork-blueprint` (a fire-and-forget authoring convenience;
-  `new-blueprint` scaffolding lands in milestone 3).
-- The virtio-serial carrier for the DOS agent and bounded
-  `guest-file-*` operations (serial-to-virtio bootstrap,
-  steps 3–5).
+  `new-blueprint` scaffolding lands in milestone 5).
+- Bounded `guest-file-*` operations through a native guest
+  agent — distinct verbs, never bundled into a console
+  abstraction.
 - In-band file operations against a stopped machine's drives —
   the deferred half of the dropped run-collection model (owner,
   2026-07-22). Rough shape, its own design round before it
@@ -2075,13 +2109,10 @@ the VGA-scraping results on the same screens.
   `get-files`' destination default are that round's to settle).
   Value concentrates where out-of-band access thins — non-QEMU
   backends (no `hostdir`) and non-FAT guest filesystems — so
-  sequence at or soon after the second backend.
-- Win9x/WinNT platform workflows, and with them GUI installer
-  scripting: needle-like assets, script-level pointer verbs (on
-  the milestone-10 input primitives), and image-match `wait`
-  (see "Decisions still needed").
-- VMware Workstation and Hyper-V adapters.
-- Media commands beyond `fetch-media` (verify, remove).
+  sequence at or soon after milestone 9's second backend.
+- Media commands beyond `fetch-media` (verify, remove), and
+  whether each can select embedded definitions through
+  `--script`.
 - A `pytest-reliquary` plugin (per AGENTS.md prior art).
 
 ## Design principles
@@ -2111,450 +2142,18 @@ the VGA-scraping results on the same screens.
 
 ## Guest communication design
 
-Status: bootstrap direction established on QEMU. The `GuestExec`
-protocol, isolated agentless adapter, and its use by the DOS
-workflow are implemented; later adapters and their implementation
-details remain open. This section is QEMU-first but its seams are
-backend-neutral: `GuestExec` and the control plane vocabulary apply to
-every backend adapter, and the serial-carried QGA-profile agent is
-the portable piece. This document does not by itself authorize
-further implementation.
-
-### Purpose
-
-reliquary needs to support modern guests without weakening its
-permanent agentless DOS path. The current DOS interaction combines
-QMP keyboard events with VGA text-memory inspection. Future guests
-may instead expose a serial console, a service over virtio-serial,
-or QEMU Guest Agent (QGA).
-
-These mechanisms should be isolated, but they should not be forced
-behind one false "control plane" interface. They differ in both shape and
-capability:
-
-- keyboard input and VGA inspection are independent, host-mediated
-  capabilities rather than a duplex byte stream;
-- a serial port and a virtio-serial port carry bytes but define no
-  command, completion, or file-transfer semantics;
-- QGA is a structured request/reply protocol, normally carried over
-  a virtio-serial port, with command and file operations defined by
-  the guest agent.
-
-QMP remains the QEMU adapter's management interface. Some control
-planes use QMP operations, but QMP itself is not a guest
-communication strategy. Other backends have their own management
-interfaces (`VBoxManage`, `vmrun`, WMI) with the same rule: the
-management interface and the control planes are distinct.
-
-#### Limits of management-interface-only automation
-
-Management-interface-only interaction (QMP on QEMU, and its analogues
-elsewhere) is not a useful general automation path for Win9x,
-Windows NT, Linux, or BSD guests. It can provide lifecycle control,
-keyboard and pointing-device input, screenshots, and other
-machine-level observations, which can automate bounded firmware,
-installer, recovery, or GUI scenarios when reliquary knows the
-exact screen sequence.
-
-It does not provide the primitives needed for reliable general
-guest automation: a stable textual output stream, command
-completion and exit status, structured errors, or live file access.
-Modern graphical and framebuffer consoles also cannot be read
-through the DOS VGA text-memory technique. Screenshot recognition
-or OCR could observe them, but would be a brittle UI-automation
-control plane rather than a substitute for an OS communication protocol.
-
-Linux and BSD can be useful through a configured serial console,
-and modern guests through a guest agent, but those cease to be
-management-interface-only communication. reliquary keeps agentless
-interaction for the DOS workflow and bounded machine-level
-automation; it is not the general fallback for modern platforms.
-
-### Vocabulary
-
-Keep three layers distinct:
-
-1. **Carrier** — how bytes or device events cross the VM seam: QMP
-   keyboard events, VGA memory, a VNC connection, an emulated UART,
-   or a virtio-serial port.
-2. **Protocol** — the meaning and framing carried over that
-   mechanism: an interactive console or QGA JSON messages. A raw
-   serial carrier has no protocol by itself.
-3. **Guest integration** — what must exist in the guest: nothing
-   for the keyboard/VGA/VNC paths, an OS-configured serial console
-   or listener for serial, a virtio driver plus a QGA-compatible
-   listener, or the upstream QGA implementation where the guest
-   supports it.
-
-A **control plane** composes the required carriers and protocol and
-presents useful capabilities to a platform workflow. Configuration
-selects a control plane, not merely a device type such as
-`virtio-serial`.
-
-### Control plane families
-
-#### Agentless display console
-
-The existing DOS path is the first real control plane. On QEMU it
-combines:
-
-- QMP `send-key` for input;
-- VGA text-memory inspection for textual output and completion
-  detection;
-- QMP `screendump` as an independent diagnostic capability; and
-- vvfat as the QEMU adapter's `hostdir` mechanism — a host
-  directory as a writable guest FAT drive, proven for DOS-era
-  write patterns.
-
-It has no guest prerequisite and remains the DOS default and
-fallback. It is not accurately modeled as a stream: output is a
-sequence of screen snapshots, and keyboard input is independent of
-that output. VGA text-memory inspection is QEMU-specific; other
-backends supply their native input injection and framebuffer
-capture as adapter carriers, and text readback there runs **one
-shared fixed-font recognizer** over the captured framebuffer
-(owner, 2026-07-21) — a control-plane composition over adapter
-carriers, never a per-backend reimplementation. The portable
-snapshot contract — character rows plus opaque,
-equality-comparable per-cell attribute tokens — is in
-[planning/design/backend-adapter.md](design/backend-adapter.md).
-
-#### VNC
-
-A separate agentless control plane: framebuffer output plus keyboard (and
-pointer) input over the VNC protocol. QEMU, VirtualBox (extension
-pack), and VMware Workstation can expose VNC servers; Hyper-V
-cannot. VNC gives a backend-independent wire for display automation
-where available, at the cost of pixel-level text recognition. It is
-diagnostic and installer-automation machinery, not a general guest
-communication path.
-
-#### Serial console
-
-An emulated UART connected to a host endpoint supplies a duplex
-byte stream on every backend. Many operating systems already
-contain UART drivers, so a custom driver is not inherently
-required. The guest must nevertheless attach a console, shell, or
-listener to the selected port before reliquary can do useful work.
-
-A serial-console protocol may provide text input, streamed text
-output, and prompt-based completion. It does not inherently provide
-structured command results or file transfer. A custom listener
-could add those operations, but that would be a separate protocol
-carried over serial.
-
-#### Guest agents
-
-Structured guest protocols with command execution and file
-operations:
-
-- **QGA** on QEMU, usually over a named virtio-serial port. Support
-  must depend only on QEMU's published guest-agent protocol, never
-  on a particular downstream agent project.
-- **Backend-native agents** — VirtualBox Guest Additions guest
-  control, VMware Tools guest operations, Hyper-V PowerShell
-  Direct / integration services — wrapped by their backend adapter
-  where they earn their keep.
-- **The reliquary guest agent** — a portable QGA-compatible profile
-  (below) carried over serial, and therefore available on all four
-  backends and on guests the native agents do not support.
-
-### A portable automation agent
-
-A host controller paired with guest-resident agents provides
-substantial automation value, particularly for Win9x, old Windows
-NT, DOS, and other systems on which vendor agents are unavailable.
-This is a well-established architecture rather than a new category
-of system:
-
-- [QGA](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html)
-  provides synchronized request/reply messaging, capability
-  reporting, command execution, exit status, and file operations;
-- [VirtualBox Guest Control](https://docs.oracle.com/en/virtualization/virtualbox/7.0/user/vboxmanage.html)
-  uses Guest Additions for host-initiated process and file
-  operations;
-- [Hyper-V integration services](https://learn.microsoft.com/en-us/windows/win32/hyperv_v2/integration-services-classes)
-  expose guest services such as host-to-guest file copying;
-- [SPICE vdagent](https://www.spice-space.org/agent-protocol.html)
-  defines a framed protocol over a named virtio-serial port; and
-- [libguestfs](https://libguestfs.org/guestfsd.8.html) uses RPC
-  between a host library and `guestfsd` over virtio-serial.
-
-The host side should normally be a client module inside reliquary,
-not another long-running host agent. The backend owns the carrier
-endpoint and reliquary owns the VM lifecycle. The guest side is the
-resident agent or listener that turns protocol requests into native
-OS operations.
-
-#### Chosen target: a QGA-compatible execution profile
-
-The gold-standard execution interface is QGA `guest-exec`. The
-first guest implementations should provide a small, portable
-profile of the published QGA protocol rather than a
-reliquary-specific wire protocol. A guest implementation for an
-unsupported OS may implement only the profile while reporting its
-actual command set through `guest-info`. reliquary then depends on
-the QGA wire contract, not on one particular guest implementation.
-
-The initial profile consists of:
-
-- `guest-sync-delimited` for reconnect and stale-stream recovery;
-- `guest-ping` and `guest-info` for readiness and capability
-  discovery;
-- `guest-exec` and `guest-exec-status` for process completion,
-  output, and exit status.
-
-Bounded `guest-file-*` operations are the next capability, not a
-prerequisite for proving execution. The existing staged-media path
-can bootstrap the guest agent until live file operations exist.
-
-The preferred compatibility level is the actual QGA request and
-response shapes over the serial byte stream. A minimal subset is
-still QGA-compatible: unsupported commands are omitted or disabled
-in `guest-info`. A serial-specific protocol that merely maps to a
-similar host result is a last resort, because it would require
-another host adapter and would not be a drop-in replacement for
-QGA.
-
-The same profile can be carried over an emulated UART on systems
-without virtio support and over virtio-serial where it exists. QGA
-itself already supports both virtio-serial and ISA serial carriers,
-so this does not require transport-specific protocol semantics.
-Because every supported backend can expose an emulated UART, the
-serial-carried profile is the backend-portable execution path.
-
-#### Serial-to-virtio bootstrap
-
-The development sequence deliberately bootstraps richer guest
-integration from the permanent agentless base:
-
-1. The keyboard/VGA and staged-media workflow boots the legacy
-   guest, installs the serial listener, and starts it.
-2. A minimal guest agent speaks the QGA execution profile over an
-   emulated UART. The guest initially needs only its native or
-   purpose-built UART support, a QGA message parser, and an OS
-   execution adapter.
-3. That control plane is used to develop and test the guest's
-   virtio-serial driver.
-4. The unchanged QGA message and execution layers are moved onto
-   the virtio-serial carrier.
-5. Additional QGA commands are added by capability, without
-   changing the execution interface or carrier seam.
-
-The guest implementation should therefore have three internal
-seams:
-
-- a carrier adapter that only reads and writes bytes;
-- a QGA profile module that owns framing, synchronization,
-  messages, and capability reporting; and
-- an OS execution adapter that launches a native command and
-  reports its state and result.
-
-The host mirrors this separation: reliquary's QGA client owns
-protocol behavior, while backend lifecycle configuration owns the
-host endpoint and selected UART or virtio-serial device. Platform
-workflows consume execution results and do not need to know which
-carrier delivered them.
-
-##### Provider topology
-
-At reliquary's guest-execution seam, the waterfall consists of
-control planes satisfying the same `GuestExec` interface; on QEMU:
-
-1. standard QGA guest-exec;
-2. the legacy agent over a named virtio-serial port;
-3. the legacy agent over an emulated UART; and
-4. agentless DOS execution through keyboard input, screen
-   observation, and staged media.
-
-The names above identify control plane roles, not committed Python class
-or public configuration names. Each control plane owns its provisioning
-requirements, readiness probe, endpoint selection, execution
-lifecycle, and failure diagnostics. The waterfall selects the first
-ready control plane that supplies the capabilities required by the
-workflow. Other backends assemble their own waterfalls from the
-control planes they support; the serial-carried profile and the agentless
-display control plane are the common members.
-
-Multiple control planes do not imply multiple copies of the protocol
-implementation. The QGA-speaking control planes share one deep QGA client
-module for framing, synchronization, capability discovery,
-`guest-exec`, status polling, and result decoding; they configure
-different carriers and endpoints around that shared implementation.
-The agentless control plane has a genuinely different implementation
-behind the same execution interface.
-
-`GuestExec` is currently a runtime-checkable `typing.Protocol` with
-`wait_ready(timeout)` and `execute(command, timeout)`. The first
-implementation models the readiness and command-completion
-semantics already available from the agentless DOS workflow. Before
-a QGA control plane is added, extend this narrow interface with
-deliberate request and result types covering deadlines, completion,
-output, and exit status without exposing QGA transport objects.
-Control-plane-specific limitations, such as unavailable exit status or
-separate standard-error capture, must be explicit capabilities or
-result states rather than invented values.
-
-By default, the DOS agent selects its carrier once at startup. It
-first probes for the named virtio-serial port and verifies that the
-port can actually be opened and used. If that probe fails, it opens
-the configured UART instead. Checking only that a virtio driver is
-resident is insufficient because the device or named port may be
-absent or unusable.
-
-During the transition, reliquary configures both guest devices and
-their host endpoints. The host QGA client probes the corresponding
-endpoints in the same order, synchronizes with the one on which the
-agent responds, and locks that carrier for the VM's lifetime.
-Explicit UART-only and virtio-serial-only modes remain useful for
-testing and diagnosis.
-
-Carrier fallback occurs only during startup, before command
-dispatch. Neither side switches carriers after a command has begun
-or retries that command on the other carrier; doing so would make
-execution-at-most-once ambiguous. A VM restart permits a fresh
-carrier probe.
-
-The DOS guest still has one QGA profile and execution
-implementation. Its UART driver is replaced by a virtio-serial
-driver without replacing the agent above it.
-
-A minimal DOS listener that conforms to the QGA wire contract is
-already a real, limited QGA-compatible guest agent even when it
-runs over UART. The long-term goal is the same DOS agent, with a
-progressively broader QGA command set, running over native DOS
-virtio-serial support. Virtio is the preferred final carrier, not
-what makes the agent QGA-compatible.
-
-If the serial stepping stone cannot speak the QGA profile and
-requires a genuinely different wire protocol, only its reliquary
-control plane adapter changes; the `GuestExec` interface and waterfall
-remain stable. That is the fallback design, not the target.
-
-Legacy execution semantics must be truthful where the OS cannot
-implement the full concurrency model. A single-tasking DOS agent
-may:
-
-- allow only one command in flight;
-- return a synthetic process handle before invoking the child;
-- defer status replies while the child owns the machine; and
-- capture output through temporary files and return it after
-  completion.
-
-Those limitations should be documented and tested as profile
-behavior, not hidden behind optimistic capability claims. Win9x,
-Windows NT, and multitasking Unix-like guests can implement the
-asynchronous process model more closely.
-
-A new protocol becomes justified only if an implementation
-experiment proves that QGA semantics cannot meet essential
-constraints, such as memory limits on a 16-bit guest, streaming
-output, cancellation, or safe recovery after a mid-command
-disconnect. In that case, retain the proven elements: framed
-requests, correlation identifiers, version and capability
-negotiation, bounded payloads, explicit error categories,
-duplicate-request handling, and an unambiguous distinction between
-transport failure and command completion.
-
-Never retry an execution request automatically unless the protocol
-can prove that the guest did not begin it. At-most-once execution
-and reconnect behavior are part of the protocol interface, not
-incidental host-client details.
-
-### Capability-oriented platform workflows
-
-Platform workflows own OS meaning: provisioning, readiness, command
-syntax, completion, and result collection. Control planes own
-communication mechanics and protocol details. The seam between them
-should be expressed in terms of the smallest capabilities workflows
-actually need, not one broad interface every control plane must pretend
-to implement.
-
-Candidate capabilities are:
-
-- text or key input;
-- screen snapshots;
-- a duplex byte stream;
-- structured command execution;
-- guest file read/write; and
-- screenshots for diagnostics.
-
-The list is a design inventory, not a commitment to six public
-classes. Add a seam only when two real control planes need to satisfy the
-same workflow capability. Until then, keep control plane details private
-to their platform workflow.
-
-In particular, screenshots remain a management-interface
-diagnostic regardless of the selected control plane. They are
-explicitly outside the `GuestExec` protocol: using QGA for
-execution does not affect screenshot availability, and a control plane
-does not implement or advertise screenshots. Orchestration may
-capture them internally when useful, while the existing direct-use
-screenshot surface remains independent. File exchange should not be
-bundled into a console abstraction: vvfat and QGA file operations
-have different lifecycle and consistency rules.
-
-The QEMU `Machine` exposes its identity-verified QMP session
-through `Machine.qmp()`. Raw QMP `cmd()` and HMP `hmp()` operations
-remain available to embedding callers. Control planes receive a `Machine`
-and use this public seam; they do not connect to QMP directly or
-duplicate monitor methods on their own interfaces.
-
-### Configuration and lifecycle
-
-Platform selection and the allowed control plane policy must be explicit
-through the machine blueprint or per-invocation configuration. reliquary
-must never infer the platform from the guest image, screen, or
-device behavior; capability probes only choose among control planes
-already permitted by that policy. The current DOS default remains
-the agentless display-console control plane. Once guest-agent support
-exists, the intended DOS automatic policy is an explicitly
-configured ordered readiness waterfall:
-
-1. probe the standard QGA endpoint;
-2. probe the legacy agent's named virtio-serial endpoint;
-3. probe the legacy agent's UART endpoint; and
-4. fall back to the agentless keyboard/VGA workflow.
-
-The first three candidates may all use the same host QGA-profile
-client. If a QGA-compatible DOS agent uses the standard QGA
-endpoint, the first two steps collapse: reliquary neither needs nor
-tries to distinguish the upstream QGA binary from another
-conforming implementation.
-
-An endpoint is ready only after `guest-sync-delimited` succeeds and
-`guest-info` advertises the commands required by the workflow. A
-connected host socket, an attached device, or resident guest driver
-is not proof that a compatible listener is servicing the endpoint.
-Each unsuccessful probe uses a bounded part of the overall startup
-deadline.
-
-The selected candidate is reported in diagnostics and remains fixed
-after the first command is dispatched. A timeout or transport
-failure after dispatch must surface as an ambiguous execution
-failure; reliquary must not resend the command through the next
-candidate. The agentless final fallback applies only to platform
-workflows, currently DOS, that explicitly support keyboard and
-screen automation. It is not a general fallback for modern guests.
-
-A control plane may need two lifecycle phases:
-
-1. contribute validated backend launch configuration for its
-   carrier and host endpoint before the machine starts; and
-2. connect to that endpoint and establish protocol readiness after
-   startup.
-
-Endpoint paths and other persistent artifacts must remain under the
-machine's cached materialization. Ownership verification remains
-mandatory for every
-management-interface operation, including operations used by the agentless
-control plane.
-
-Automatic fallback must be conservative. It may select another
-configured control plane only before a guest command has been dispatched.
-Retrying through a fallback after an ambiguous transport failure
-could execute a command twice. The selected control plane and fallback
-decision should be visible in diagnostics.
+The control-plane design — the carrier / protocol /
+guest-integration vocabulary, the control plane families
+(agentless display, VNC, serial console, native guest agents),
+the consume-native-agents-only doctrine, the `GuestExec`
+capability seam, and the readiness-waterfall configuration and
+lifecycle rules — is consolidated in
+[planning/design/guest-communication.md](design/guest-communication.md).
+The `GuestExec` protocol, the isolated agentless adapter, and
+its use by the DOS workflow are implemented; native-agent
+control planes land at milestone 11 and the VNC plane at
+milestone 12. Agentless DOS operation remains the permanent base
+no milestone may weaken.
 
 ## Roadmap constraints
 
@@ -2573,39 +2172,20 @@ media kinds, controllers, and USB devices must extend the same
 convention — a new medium name — not appear as opaque raw backend
 arguments.
 
-The bootstrap direction is important: agentless reliquary is the
-rig used to test the DOS drivers and guest agent before those
-components exist. Once available, the same suites should validate
-agentless and guest-agent control planes with equivalent results.
+The bootstrap direction is important: agentless operation is how
+a machine reaches the point where a guest agent exists inside it
+— the OS, and with it the OS's own agent package, is installed
+through the agentless workflow (planning/USE-CASES.md, the
+control-plane arc). Where a guest holds both planes, the same
+suites should validate agentless and guest-agent control planes
+with equivalent results.
 
 ## Decisions still needed
 
-- **Backend priority order** for default assignment when a blueprint
-  names no backend (proposed: QEMU, VirtualBox, VMware Workstation,
-  Hyper-V — best scriptability first).
-- **Format versioning at beta**: pre-beta, user documents carry no
-  version field and no `$schema` field (settled, owner 2026-07-21:
-  a pinned schema reference is a version field in disguise, and a
-  pre-beta document has no format vintage — the only schema that
-  matters is the installed reliquary's, which editors bind by file
-  association; an embedded pin would go stale in seeded files
-  under never-overwrite and let the editor pass what reliquary
-  rejects). When compatibility guarantees arrive — no earlier than
-  beta — the leading candidate spelling for the version field is
-  `$schema` as a versioned URL: one field declaring the document's
-  format version and binding editors to the matching published
-  schema.
-- **Script spec details** (the control-flow and property-binding
-  shape
-  are decided — see "The scripting language" and
-  planning/design/script-spec.md): the portable key-name vocabulary for
-  `press`/`<key>` tokens is published in the spec as a closed set;
-  confirm it at realignment. Literal value defaults are resolved:
-  they live in the blueprint `parameters` field (U5's
-  blueprint-held seam), never in property declarations — a default
-  in
-  the script would undercut the blueprint as the customization
-  surface.
+Milestone-gating decisions sit at the head of the milestone that
+needs them — the "Decide first" blocks above. What remains here
+is not gating:
+
 - **Cross-script reuse**: whether repeated behavior eventually
   justifies a constrained include mechanism. There is deliberately
   no handler-splicing macro in the initial language; real scripts
@@ -2619,11 +2199,8 @@ agentless and guest-agent control planes with equivalent results.
   resolution; what stays open is behavior reuse, and any future
   include must preserve the static graph (G3), the
   non-computational surface (G2), and transcript provenance.
-- **Blueprint details**: whether per-drive backend settings are ever
-  needed beyond the top-level `backend-settings` scope, and how
-  running-machine reconfiguration (hot media changes vs.
-  stopped-only changes like memory) is surfaced in the CLI and
-  script language.
+- **Per-drive backend settings**: whether they are ever needed
+  beyond the top-level `backend-settings` scope.
 - **Promoting runtime changes**: whether a convenience command
   copies a state-side runtime change (e.g. attached media) back
   into the blueprint, or users always edit the blueprint by hand.
@@ -2632,85 +2209,23 @@ agentless and guest-agent control planes with equivalent results.
   (they regenerate like everything else under `cache/`), or
   whether `recreate-machine`/`destroy-machine` per machine is
   enough.
-- **`import-vm` scope**: which backend config translates into the
-  synthesized blueprint (memory, drives, controllers are clear;
-  what of NICs and other devices the blueprint doesn't model yet),
-  whether untranslatable configuration fails the import or lands
-  in `backend-settings`, and whether import can target a named
-  native snapshot in a VM's disk chain rather than the current
-  head (the generated definition would point at that snapshot's
-  file).
-- **Blueprint device growth**: firmware/boot semantics (BIOS vs UEFI)
-  for post-DOS platforms, and when network, display adapter,
-  audio, and USB become first-class blueprint fields (each following
-  the drives pattern: agnostic vocabulary, capability-checked per
-  backend). Storage controller *types* are already blueprint vocabulary
-  (per-drive `controller`); still open are per-platform controller
-  defaults beyond `ide`, whether slot ranges widen for
-  multi-device controllers (additive change), and how Hyper-V
-  generations surface (a backend setting vs. inferred from
-  declared capabilities).
-- **GUI installer scripting** (an explicit goal: win9x/winnt setup
-  GUIs and beyond). Text scraping ends at text mode; GUI guests
-  need screenshot-based matching. The asset shape is settled —
-  see "Landmarks": one declaration plus variant renderings,
-  whole-screen matching with fuzzy/ignore modifier regions,
-  catalog and embedded resolve-in-place forms under
-  authored-asset resolution, and the always-on cursor
-  normalization contract — with os-autoinst's needle design the
-  concept reference behind it (AGENTS.md prior art). Still open:
-  the full asset spec (the `.rlql` JSON schema, the similarity
-  metric, landmark-block placement within a script), and pointer
-  input, which reliquary currently lacks end to end (machine
-  blueprint pointing-device field, a control-plane input
-  capability, and the script verbs — match-and-click with the
-  click point in the asset; click owns its search as an
-  observation-bearing action and needs its timing-matrix row).
-  The input seam should follow os-autoinst's two-layer event
-  model: three portable primitives — pointer move (x, y), button
-  press/release, key press/release — with clicks, drags, chords,
-  and paced typing composed above them, and event pacing owned by
-  the control plane. The primitives are exactly VNC's RFB input
-  vocabulary (PointerEvent, KeyEvent), so a VNC control plane
-  implements them with no translation, and QMP/VBoxManage/WMI
-  input paths reduce to the same three. Synchronization concepts
-  to adopt with them: act-then-confirm (an input step optionally
-  asserting the screen changed) and screen-stillness waits;
-  pointer hygiene has hardened into the landmark normalization
-  contract (pointer actions always end parked). Also open: a
-  host-side landmark-cropping convenience (a CLI subcommand,
-  never a service). Era note: DOS/9x-era setup GUIs are
-  fixed-mode, fixed-font, animation-free — asset churn should be
-  far below openQA's — and NT-era setup is largely
-  keyboard-drivable, so keyboard-first remains the preferred path
-  where it works. Throughout, os-autoinst is a **concept
-  reference only** — its designs are studied and reimplemented,
-  never its code (see AGENTS.md prior art for the licensing
-  boundary).
-- **Distribution-assertion field shape**: the exact field(s) in a
-  media definition that assert redistribution licensing for
-  built-in URLs (an SPDX identifier? free text naming the
-  license? both?), and whether user-owned definitions may carry
-  the same field inertly.
-- **Media commands beyond `fetch-media`**: whether the CLI grows
-  verbs such as verify and remove, and whether each can select
-  embedded definitions through `--script` when needed.
-- **Hyper-V agentless screen strategy**: whether WMI thumbnail/
-  keyboard automation is good enough for installer scripting or
-  Hyper-V machines require the serial/agent control planes from day one.
-- **Concurrent machines**: per-machine exclusive locking is
-  decided (planning/design/instance-model.md); still open is whether any
-  home-wide limit applies to machines running at once (the
-  per-machine lock and identity model suggests none).
 - **Friendly machine aliases**: machine identity is already
   human-readable (`<blueprint>-<n>`); still open is whether
   listings and selectors additionally offer docker-style generated
   word aliases, or whether numbered ids plus blueprint selection
   make them unnecessary.
-- The exact initial `guest-exec` subset, including argument and
-  environment support, capture modes, output limits, timeouts, and
-  legacy-OS deviations.
-- Which bounded `guest-file-*` operations follow execution,
-  including file consistency and atomic replacement semantics.
-- Whether a separate plain serial-console control plane remains useful
-  once the QGA-compatible serial listener exists.
+
+Deferred to beta:
+
+- **Format versioning**: pre-beta, user documents carry no
+  version field and no `$schema` field (settled, owner 2026-07-21:
+  a pinned schema reference is a version field in disguise, and a
+  pre-beta document has no format vintage — the only schema that
+  matters is the installed reliquary's, which editors bind by file
+  association; an embedded pin would go stale in seeded files
+  under never-overwrite and let the editor pass what reliquary
+  rejects). When compatibility guarantees arrive — no earlier than
+  beta — the leading candidate spelling for the version field is
+  `$schema` as a versioned URL: one field declaring the document's
+  format version and binding editors to the matching published
+  schema.
