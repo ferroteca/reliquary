@@ -292,8 +292,8 @@ single type per machine when drive lettering matters.
 
 A blueprint written to be seeded and customized (its
 [customization seams](machine-blueprint.md#customization-seams)):
-the install script declares `owner-name` and `install-key`
-inputs, and the blueprint binds them.
+the install script declares the `identity.full-name` and
+`os.install-key` properties, and the blueprint binds them.
 
 ```json
 {

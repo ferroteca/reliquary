@@ -326,8 +326,13 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     adapter's at-rest access with record custody; the CLI gains
     stage-files/collect-files; and hostdir joins the drive
     vocabulary as the writable vvfat-served fourth content source
-  - U5 blueprint parameterization — DESIGN RECORDED 2026-07-21, owner
-    adjudication pending: blueprint `parameters` field (direct value |
+  - U5 blueprint parameterization — CLOSED (2026-07-22, gap-closure
+    queue item 5): the design below was recorded 2026-07-21 with
+    owner adjudication pending, then overtaken and fully adjudicated
+    by the property-construct rounds — every element survived into
+    the settled shape or was superseded by an owner decision (the
+    closure trace is in the queue item). Recorded design was:
+    blueprint `parameters` field (direct value |
     {"property": ...} reference; binding order response > blueprint >
     input property= > prompt; a reference REPLACES the input's own
     property= binding, never chains; secret inputs never take direct
@@ -1209,12 +1214,40 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      backend-adapter.md (raw-interchange seam entry,
      exporter-family placement, accelerators-are-not-backends
      non-goal); guiding-principles U1 export entry CLOSED
-  5. U5 STATUS CLOSEOUT (parent: the U5 blueprint-parameterization
-     entry, "owner adjudication pending"): the recorded design
-     predates the property-construct rounds (parameters re-keyed by
-     property key, references renamed redirects, the response concept
-     deleted); verify the landed shape covers the original gap text
-     and close the entry — expected bookkeeping, not new design
+  5. RESOLVED (2026-07-22, verification closeout — bookkeeping as
+     expected, plus one residue fix): the U5 recorded design's
+     pending adjudication was OVERTAKEN AND COMPLETED by the
+     owner-adjudicated property-construct rounds — every element
+     traced: the `parameters` field with its two bindings SURVIVED
+     (direct value | redirect); the reference form became the
+     REDIRECT, replaces-entirely and never-chains surviving
+     verbatim; the recorded binding order "response > blueprint >
+     input property= > prompt" was SUPERSEDED by the flattened
+     property sources (--property > parameter > env > file > ask:
+     responses deleted, input property= dissolved into the
+     one-namespace property declaration, the prompt became the
+     once-per-key ask); the secret-parameter rules and the seam
+     doctrine (value seams = parameters, locale-class =
+     composition; the watch-condition ban, G2/G3) survived
+     untouched; invocation-read, no state/apply/digest involvement
+     survived. Landed docs verified in the settled shape:
+     machine-blueprint-reference #parameters (re-keyed, redirect,
+     the flattened source order), cookbook #9, guide
+     #customization-seams, ROADMAP's literal-defaults note.
+     Residue fixed in passing: cookbook #9's intro declared
+     "owner-name and install-key inputs" — the dead concept name
+     AND pre-one-namespace keys that didn't match its own
+     example — now "the identity.full-name and os.install-key
+     properties". The guiding-principles U5 entry is CLOSED
+  QUEUE COMPLETE (2026-07-22): all five items resolved — 1 (the
+  output discipline + the stability contracts), 2 (interaction
+  runs + the renderer contract + per-test results), 3 (the results
+  directory, stage/collect, hostdir), 4 (export mechanics + the
+  exporter vocabulary), 5 (the U5 closeout). Every gap entry in
+  the guiding-principles queue is now closed (its watch list
+  stands, as watches); everything still open anywhere is parked in
+  ROADMAP "Decisions still needed" by design, with implementation
+  work owned by the realignment and later milestones
 - THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
   the docker-comparison round; all three forks on the
   recommendations). The docker model largely CONFIRMS the design
