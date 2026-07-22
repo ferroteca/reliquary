@@ -991,7 +991,7 @@ versa — require `unset` first.
 
 ```
 rlq [--home <path>] [--blueprint <name>] [--machine <id>]
-          [--timeout <seconds>] <command> [args...]
+          [--timeout <seconds>] [--json] <command> [args...]
 ```
 
 `--home` overrides the reliquary home directory (default:
@@ -1010,6 +1010,44 @@ blueprint`, `import`, `check-script`) ignore them.
 
 `--timeout` sets a per-command timeout in seconds where applicable
 (runtime defaults vary by command).
+
+### Machine-readable output
+
+`--json` is the global machine-readable switch for result-bearing
+commands — the query half of the feedback split, and the parity
+rule made visible: under `--json` a command prints **exactly what
+its API twin returns**, serialized as one JSON document (object,
+array, or scalar) on stdout — nothing else on stdout, diagnostics
+on stderr, the exit code unchanged. The two presentations cannot
+drift: a twin's return contract *is* the command's `--json`
+contract, defined once where the twin is specified
+([api.md](api.md)).
+
+```powershell
+$ rlq --json list machines
+[{"id": "freedos-0", "blueprint": "freedos", "phase": "ready", "backend": "qemu"}]
+
+$ rlq --json --blueprint freedos create
+"freedos-1"
+```
+
+Rules:
+
+- A command whose twin returns nothing prints `{}` on success, so
+  a program may pass `--json` unconditionally on any
+  result-bearing command.
+- Stream-bearing commands (`script`, `run tail`, `fetch`) reject
+  `--json`, naming `--progress rawjson`: a live run is an event
+  stream, not a document — one flag, one meaning each.
+- Secret property values never serialize; the marker
+  (`{"secret": true}`) stands in, exactly as in `properties.json`.
+- `--verbose` is a pretty-rendering concern: `--json` always
+  carries the full record and never combines with it.
+
+Field names are part of the CLI contract and land with each
+twin's return contract; pre-beta the shapes are closed, and the
+output-stability promise arrives with the general
+programmatic-contract work.
 
 There is no bare-script shorthand: an unrecognized command word is
 an error, never a script lookup. `script <label>` is the tightest

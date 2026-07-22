@@ -275,9 +275,12 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     the stream-bearing commands (2026-07-21, ROADMAP "Asynchronous
     runs") — now script, run tail, AND fetch, with the implicit-fetch
     phases of bare machine ops rendering the same events (2026-07-21,
-    blueprint-spec queue item 3); still unhomed: the general stdout/stderr discipline and
-    output stability across every command, the rawjson event-schema
-    stability contract
+    blueprint-spec queue item 3); query output is homed (2026-07-21,
+    CLI queue item 4: global --json prints the API twin's return as
+    one JSON document — the twin's-return rule); still unhomed: the
+    general stdout/stderr discipline for pretty output across every
+    command, and the stability contracts for the rawjson event
+    schema and the --json shapes
     (the machine-readable mode is now demanded directly by the USE-CASES
     feedback split, 2026-07-21);
     the interaction command family is now IN the settled CLI list
@@ -607,15 +610,30 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      argument is a bare name — `@` marks references only inside
      script text. stage/collect stay out: their exchange-drive
      model remains the guiding-principles U3 gap
-  4. queries have no machine-readable form: --progress rawjson covers
-     the stream-bearing commands, but the `list` / `search` tables,
-     `property get`, and the ids printed by create/clone are
-     pretty-rendering only — exactly what the feedback split forbids
-     a program to scrape, on the surface that is the fallback binding
-     for every unbound language. Recommendation: one global `--json`
-     (or `--format json`) covering every informational output,
-     designed once. This is the query-output half of the
-     guiding-principles queue's "CLI programmatic contract" entry
+  4. RESOLVED (owner, 2026-07-21, design round — all three forks
+     on the recommendations): machine-readable query output is
+     `--json`, a global flag, defined by parity rather than
+     enumeration — under `--json` a command prints exactly what
+     its API twin returns, serialized as one JSON document
+     (object, array, or scalar) on stdout, nothing else there,
+     diagnostics on stderr, exit codes unchanged: the twin's
+     return contract IS the command's --json contract, so the
+     two presentations cannot drift and future commands are
+     covered by definition. Void twins print {} on success (a
+     program passes --json unconditionally); stream-bearing
+     commands (script, run tail, fetch) reject it naming
+     --progress rawjson (document flag vs stream flag, one
+     meaning each); secrets serialize as their marker, never
+     their value; --verbose stays pretty-only. --format weighed
+     and declined (YAGNI — a pre-beta conversion stays free if a
+     second format ever earns its way in). Field names land with
+     each twin's return contract; the output-stability promise
+     stays with the general programmatic-contract work. Folded:
+     cli.md (global synopsis + the Machine-readable output
+     section), ROADMAP "The CLI" (globals sentence + settled
+     paragraph), api.md (returns-mirror convention closed into
+     the rule; sync-divergence bullet), guiding-principles
+     CLI-contract entry
   5. `pull` vs `fetch` inverts git intuition: git users arrive
      knowing pull ≈ fetch + merge; here the two are unrelated (codex
      extraction vs payload download). The doctrine already supplies

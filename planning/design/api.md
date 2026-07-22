@@ -34,10 +34,10 @@ SPDX-License-Identifier: BSD-3-Clause
   runtime) drive the same public surface available to external
   callers.
 - **The blessed sync divergence.** Blocking API forms return
-  typed results and raise by error class; the CLI speaks streams
-  and exit codes. Twins in capability, divergent in presentation
-  — a named decision, not drift (planning/ROADMAP.md
-  "Asynchronous runs").
+  typed results and raise by error class; the CLI speaks streams,
+  documents (`--json`), and exit codes. Twins in capability,
+  divergent in presentation — a named decision, not drift
+  (planning/ROADMAP.md "Asynchronous runs").
 - **No backward compatibility before beta.** The implemented
   binding realigns to the settled names below when the
   realignment lands; there are no aliases or shims.
@@ -54,7 +54,11 @@ SPDX-License-Identifier: BSD-3-Clause
   keywords mirror `--home`, `--assets`, and `--assets-only`.
 - **Returns mirror what the CLI prints**: `create_machine` and
   `clone_machine` return the new machine id; `import_vm` returns
-  the blueprint it wrote.
+  the blueprint it wrote. Under the CLI's global `--json` the
+  mirror is exact (settled 2026-07-21): the command prints the
+  twin's return serialized as one JSON document, so a return
+  contract is also the command's machine-readable output
+  contract (planning/ROADMAP.md "The CLI").
 - **Handles are pull-only**: `status()`, `events(follow=)` as a
   blocking iterator, `wait(timeout=)`, `cancel()` — never
   callbacks.

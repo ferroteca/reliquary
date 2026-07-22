@@ -469,9 +469,27 @@ functions.
 `--blueprint` and `--machine` are global selectors, given before
 the verb — as are `--assets <dir>` and `--assets-only`, which
 name and scope the asset root ("Authored-asset resolution"
-above); there is no bare-script shorthand — an unrecognized
-command word is an error, never a script lookup (`script <label>`
-is the tightest form).
+above), and `--json` (below); there is no bare-script shorthand —
+an unrecognized command word is an error, never a script lookup
+(`script <label>` is the tightest form).
+
+Machine-readable query output is `--json`, a global flag (owner,
+2026-07-21) — the query half of the feedback split, defined by
+parity rather than enumeration: under `--json` a command prints
+exactly what its API twin returns, serialized as one JSON
+document (object, array, or scalar) on stdout — nothing else on
+stdout, diagnostics on stderr, exit codes unchanged — so the
+twin's return contract is the command's `--json` contract and
+the two presentations cannot drift. A twin that returns nothing
+prints `{}` on success, letting a program pass `--json`
+unconditionally; stream-bearing commands (`script`, `run tail`,
+`fetch`) reject `--json` naming `--progress rawjson` — a run is
+an event stream, not a document; one flag, one meaning each.
+Secret property values serialize as their marker, never their
+value, and `--verbose` remains pretty-rendering only. Field
+names land with each twin's return contract
+(planning/design/api.md); the output-stability promise stays
+with the general programmatic-contract work.
 
 ```text
 rlq list (blueprints | machines [--blueprint <name>] | scripts | media
