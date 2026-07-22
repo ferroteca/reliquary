@@ -187,8 +187,12 @@ class Qmp:
     def __init__(self, port):
         self._loop = asyncio.new_event_loop()
         self._client = QMPClient("reliquary")
-        self._loop.run_until_complete(
-            self._client.connect(("127.0.0.1", port)))
+        try:
+            self._loop.run_until_complete(
+                self._client.connect(("127.0.0.1", port)))
+        except BaseException:
+            self._loop.close()
+            raise
 
     def cmd(self, name, **arguments):
         return self._loop.run_until_complete(

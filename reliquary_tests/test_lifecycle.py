@@ -379,6 +379,38 @@ class LifecycleTests(unittest.TestCase):
         self.assertIsNone(lifecycle_module.read_vm_state())
 
 
+class QmpTests(unittest.TestCase):
+    """``Qmp`` owns the event loop it creates for the QMP connection."""
+
+    def test_connect_failure_closes_the_loop(self):
+        """A failed connect must not leak the event loop it created."""
+        class _FailingClient:
+            def __init__(self, name):
+                pass
+
+            async def connect(self, address):
+                raise ConnectionRefusedError("refused")
+
+        created_loops = []
+        real_new_event_loop = lifecycle_module.asyncio.new_event_loop
+
+        def _tracking_new_event_loop():
+            loop = real_new_event_loop()
+            created_loops.append(loop)
+            return loop
+
+        with mock.patch.object(lifecycle_module, "QMPClient",
+                               _FailingClient), \
+                mock.patch.object(lifecycle_module.asyncio,
+                                  "new_event_loop",
+                                  _tracking_new_event_loop):
+            with self.assertRaises(ConnectionRefusedError):
+                lifecycle_module.Qmp(1234)
+
+        self.assertEqual(len(created_loops), 1)
+        self.assertTrue(created_loops[0].is_closed())
+
+
 class CreateHddImageTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
