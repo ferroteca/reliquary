@@ -306,7 +306,9 @@ languages — never make it difficult to drive from a program.
 
 ## Licensing
 
-The project is BSD-3-Clause and follows REUSE conventions.
+The project is BSD-3-Clause and follows REUSE conventions. The name
+**reliquary** is reserved to Paul Galbraith under [TRADEMARKS.md](TRADEMARKS.md);
+do not weaken or contradict that policy in docs or packaging metadata.
 
 Every new file authored for the project by Paul needs:
 

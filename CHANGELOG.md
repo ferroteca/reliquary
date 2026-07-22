@@ -13,6 +13,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- [TRADEMARKS.md](TRADEMARKS.md): the name **reliquary** is owned by
+  Paul Galbraith and is not licensed for forks or redistributions;
+  the BSD-3-Clause grant covers the software only. Linked from
+  README and CONTRIBUTING.
 - `list-media` / `list_media()` lists media item names from the
   home library (or `--builtin` / `builtin=True` for the codex).
 - `delete-media` / `delete_media(name)` removes a home media

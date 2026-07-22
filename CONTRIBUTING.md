@@ -56,6 +56,10 @@ reliquary is licensed under the [BSD 3-Clause License](LICENSE). By submitting
 a contribution, you agree to license that contribution under the same
 BSD-3-Clause terms. You retain copyright in your contribution.
 
+The project name **reliquary** is owned by Paul Galbraith and is not
+part of the BSD grant. Forks and redistributions must use a different
+name; see [TRADEMARKS.md](TRADEMARKS.md).
+
 Only submit work that you have the right to contribute on those terms. This
 means, as applicable, obtaining permission from an employer or other rights
 holder and identifying third-party material and its license. Contributions

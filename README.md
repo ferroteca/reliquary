@@ -675,3 +675,6 @@ Stop QEMU before reading files written to the virtual FAT drive. Writes are flus
 ## License
 
 BSD-3-Clause. See [LICENSE](LICENSE).
+
+The name **reliquary** is owned by Paul Galbraith and is not licensed
+for use by forks or redistributions. See [TRADEMARKS.md](TRADEMARKS.md).
