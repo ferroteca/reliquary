@@ -11,7 +11,11 @@ isolates one **remaining** soft spot — mushiness, inconsistency,
 or ambiguity that survived the redesign — and shows it through
 contrasting examples with commentary. These are not runnable
 scripts: some lines are deliberately illegal (always commented and
-marked), and the themes matter more than end-to-end coherence.
+marked), and the themes matter more than end-to-end coherence. The
+surface's *reference* script is a shipped builtin,
+`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` — the
+`design-install.rlqs` that used to sit here retired into it when
+the implementation caught up (ROADMAP milestone 4).
 
 | file | residual problem |
 |---|---|

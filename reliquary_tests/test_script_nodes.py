@@ -5,12 +5,15 @@
 import os
 import unittest
 
+import reliquary
 from reliquary.script_nodes import (Interpolation, ScriptParseError,
                                     parse_nodes, tokenize)
 
+# The reference script is a shipped builtin, resolved as package
+# data so these tests run against an installed artifact too.
 _REFERENCE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "planning", "design", "script-examples", "design-install.rlqs")
+    os.path.dirname(os.path.abspath(reliquary.__file__)),
+    "builtins", "scripts", "freedos-1.4-plain-install.rlqs")
 
 
 def _kinds(text):

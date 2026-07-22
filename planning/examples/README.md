@@ -6,11 +6,10 @@ SPDX-License-Identifier: BSD-3-Clause
 # Examples
 
 > **Status:** the blueprint and the machine model these scripts use
-> (empty removable slots, the `machine:` header, persistent
-> `insert`/`eject`) are implemented. The scripts still speak the
-> superseded milestone-one surface
-> ([planning/design/script-spec.md](../design/script-spec.md) is the
-> redesigned one); ROADMAP milestone 4 converts them.
+> (empty removable slots, the `machine` header, persistent
+> `insert`/`eject`) are implemented, and the scripts speak the
+> redesigned script surface
+> ([planning/design/script-spec.md](../design/script-spec.md)).
 
 A complete, shareable FreeDOS 1.4 plain-install blueprint bundle in
 reliquary's document formats. Assets are identified by extension,
@@ -42,7 +41,7 @@ declares 32 MiB of memory (the FreeDOS LiveCD warns about low RAM
 at the 16 MiB DOS default), a blank 20M hard disk, and an **empty**
 CD drive (`"cdrom0": null`), booting hard disk first then CD. The
 blueprint alone defines the machine's hardware; the install script
-supplies the installer medium itself: it declares `machine: stopped`,
+supplies the installer medium itself: it declares `machine stopped`,
 inserts the LiveCD into the empty slot, starts the machine, and drives
 the installer's "Plain DOS system" path onto the disk. A blank hard
 disk fails to boot, so firmware falls through to the inserted CD —
@@ -59,7 +58,7 @@ edit or `apply` is needed before verification: the same
 reliquary --blueprint freedos script freedos-plain-verify
 ```
 
-The verify script also declares `machine: stopped`, issues a plain
+The verify script also declares `machine stopped`, issues a plain
 `start`, and confirms that the installed system reaches a DOS prompt.
 If an interrupted install run left the CD attached, a future
 `apply` is the one-command recovery back to the blueprint shape;

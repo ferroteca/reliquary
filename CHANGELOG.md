@@ -62,6 +62,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   expired and the scope that supplied it, and observation timeouts,
   reactive intervals, per-activation phase budgets, and the run deadline
   are all enforced at sample and statement boundaries.
+- The shipped scripts speak the redesigned surface: the built-in
+  `freedos-1.4-plain-install` and `freedos-1.4-verify`, and the
+  `planning/examples/` pair. The install script is the language's
+  reference script. Seeding a script still brings the media
+  definitions its `insert` statements name — the scan follows the
+  `@name` spelling now, and a `$key` property reference names no
+  static item to seed.
 - Script sessions are identity-verified. Every sample and input verb
   opens its own QMP session through `Machine.qmp()`, so the runtime can
   no longer drive a VM it has not confirmed is the one this home

@@ -27,7 +27,7 @@ press enter
 
 # enter remains a derived form — `enter "cls"` is `type "cls"`
 # then `press enter` — kept because console lines dominate real
-# install scripts (see design-install.rlqs).
+# install scripts (see the shipped freedos-1.4-plain-install).
 #
 # RESIDUE (minor, accepted): "enter" is still a verb in one
 # position and a key name after press. The two are distinguished

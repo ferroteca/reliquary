@@ -1,19 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 
-description: "FreeDOS 1.4 plain install from LiveCD"
-platform: dos
-machine: stopped
-initial: insert-cd
-timeout: 30s
+description "FreeDOS 1.4 plain install from LiveCD"
+platform dos
+machine  stopped
+entry    insert-cd
+timeout  30s
+deadline 45m        # required: the cd-boot <-> partitioning cycle
 
-state insert-cd {
-    insert cdrom0 freedos-1.4-livecd
+phase insert-cd {
+    insert cdrom0 @freedos-1.4-livecd
     start
-    -> cd-boot
+    goto cd-boot
 }
 
-state cd-boot {
+phase cd-boot {
     wait "Welcome to FreeDOS 1.4 (LiveCD)"
     select "Install to harddisk"
     wait "What is your preferred language"
@@ -21,31 +22,31 @@ state cd-boot {
     wait "Welcome to the FreeDOS 1.4 installation program"
     press enter
 
-    expect {
-        "Drive C: does not appear to be partitioned.": {
+    wait {
+        on "Drive C: does not appear to be partitioned." {
             select "Yes"
-            -> partitioning
+            goto partitioning
         }
-        "Drive C: does not appear to be formatted.": {
+        on "Drive C: does not appear to be formatted." {
             select "Yes"
-            -> formatting
+            goto formatting
         }
     }
 }
 
-state partitioning {
+phase partitioning {
     wait "You must reboot your computer"
     select "Yes"
-    -> cd-boot
+    goto cd-boot
 }
 
-state formatting, timeout: 5m, deadline: 20m {
+phase formatting timeout=5m deadline=20m {
     wait "Press a key..."
     press enter
     wait "Please select your keyboard layout"
     select "US English (Default)"
     wait "What FreeDOS packages do you want to install?"
-    select "Plain DOS system", exclude: "with sources"
+    select "Plain DOS system" exclude="with sources"
     wait "We are now ready to install FreeDOS 1.4."
     select "Yes"
     wait "Installation of FreeDOS 1.4 is now complete."
@@ -55,7 +56,7 @@ state formatting, timeout: 5m, deadline: 20m {
     wait "C:\>"
     screenshot installed
     enter "fdapm poweroff"
-    wait stopped, timeout: 2m
+    wait machine=stopped timeout=2m
     eject cdrom0
-    done
+    finish
 }

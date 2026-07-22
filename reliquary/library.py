@@ -132,7 +132,11 @@ def seed_media(name, home=None):
     return False
 
 
-_INSERT_MEDIA = re.compile(r"^\s*insert\s+\S+\s+(\S+)\s*$", re.MULTILINE)
+# A deliberate text scan, not a parse: seeding must work on a file
+# the parser may reject. Only the `@name` form names an item a
+# definition can be seeded for -- `$key` is a property reference,
+# resolved per run once binding exists.
+_INSERT_MEDIA = re.compile(r"^\s*insert\s+\S+\s+@(\S+)", re.MULTILINE)
 
 
 def _referenced_insert_media(script_text):

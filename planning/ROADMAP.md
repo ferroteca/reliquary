@@ -844,8 +844,8 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 **The July 2026 surface redesign is decided and
 [planning/design/script-spec.md](design/script-spec.md) is its source of
 truth** (including the complete typed EBNF), with
-`planning/design/script-examples/design-install.rlqs` as the reference
-script. Realigning the implementation — parser, runtime, shipped
+`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` as the
+reference script. Realigning the implementation — parser, runtime, shipped
 scripts — with it is **milestone 4, the next work in the arc**;
 see the milestones below. Pre-beta, the superseded surface is
 deleted, not bridged.
@@ -1604,7 +1604,8 @@ documents is implemented for DOS on QEMU.
 
 The July 2026 script-language redesign
 ([planning/design/script-spec.md](design/script-spec.md), with
-`planning/design/script-examples/design-install.rlqs` as the reference script)
+`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` as the
+reference script)
 supersedes the surface milestones 1 and 3 implemented.
 This milestone gates everything after it: no later milestone
 starts before the tree speaks the new surface. Pre-beta, the old
@@ -1652,8 +1653,8 @@ Deliverables:
    timeout and source scope).
 6. The built-in and example scripts converted, and every document
    that quotes script syntax updated (README, planning/examples/README);
-   `planning/design/script-examples/design-install.rlqs` retires into the
-   converted builtins.
+   the reference script now IS the converted builtin
+   (`reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs`).
 7. The CLI/API surface renames the July 2026 queues decided
    (planning/DECISIONS.md): the twin-name identity sweep —
    `run-script`, `fetch-media`, the `seed-` family,

@@ -92,6 +92,12 @@ class SeedingTest(unittest.TestCase):
         self.assertTrue(seed_script(SCRIPTS[0], home=self.home))
         self.assertFalse(seed_script(SCRIPTS[0], home=self.home))
 
+    def test_seed_script_brings_its_referenced_media(self):
+        """`insert cdrom0 @name` seeds the definition it names."""
+        self.assertTrue(seed_script(SCRIPTS[0], home=self.home))
+        self.assertTrue(os.path.isfile(
+            self._path("media", f"{MEDIA}.json")))
+
 
 class FirstReferenceTest(unittest.TestCase):
     """Implicit seeding through the resolution seams."""

@@ -11,15 +11,15 @@ SPDX-License-Identifier: BSD-3-Clause
 > strings, colon headers, comma-separated modifiers, bare media
 > names, and the bare `stopped` condition) completely; pre-beta,
 > there is no compatibility between the two surfaces and none is
-> planned. The implemented parser and runtime (`script.py`,
-> `script_runner.py`) and the shipped built-in and example scripts
-> still speak the earlier surface and will be retargeted wholesale.
-> `planning/design/script-examples/design-install.rlqs` is the
-> reference script, and
-> the other files there catalog known residual rough edges in this
-> surface. Properties and their binding,
-> reactive phases, and the full transcript contract remain later
-> milestones; details may still change before first release.
+> planned. The parser, the static rules, the timing plan, and the
+> runtime speak this surface, and so do the shipped built-in and
+> example scripts:
+> `reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs` is
+> the reference script, and the files under
+> `planning/design/script-examples/` catalog known residual rough
+> edges in this surface. Properties and their binding and the full
+> transcript contract remain later milestones; details may still
+> change before first release.
 
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files

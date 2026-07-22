@@ -15,7 +15,7 @@ Realign the implementation with the redesigned script language
 and the July 2026 decisions (DECISIONS.md).
 planning/design/script-spec.md is the source of truth (full
 typed EBNF) with
-planning/design/script-examples/design-install.rlqs the
+reliquary/builtins/scripts/freedos-1.4-plain-install.rlqs the
 reference script; ROADMAP milestone 4 owns this work, and no
 later milestone starts before it lands. No backward
 compatibility: the old surface is deleted entirely, not
@@ -132,6 +132,23 @@ the parser stack validates scripts; 10–12 close out:
    planning/examples/scripts/ move to the new surface;
    planning/design/script-examples/design-install.rlqs
    retires into the converted builtins.
+   LANDED (owner, 2026-07-22): all four scripts converted and
+   parsing; design-install.rlqs deleted, and
+   freedos-1.4-plain-install.rlqs IS the reference script now
+   (spec status note, ROADMAP, the script-examples README).
+   Two things the conversion caught:
+   - library.py's insert-media text scan still expected the
+     bare media name and captured `@name` with its sigil, so a
+     seeded script no longer brought its definition. Fixed to
+     match the `@` form only ($key names no static item), with
+     a test.
+   - the reference-script tests read design-install.rlqs from
+     planning/, which is not packaged; they now resolve the
+     builtin through reliquary.__file__, so they pass against an
+     installed artifact too.
+   The examples' install script needed a header deadline it
+   never had: its cd-boot <-> partitioning cycle is exactly what
+   S12 requires one for.
 8. Confirm the portable key vocabulary (the one in-milestone
    confirmation — ROADMAP milestone 4): check the spec's
    closed press key-name set against what the converted
