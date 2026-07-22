@@ -104,6 +104,19 @@ Changing between ordinary and secret requires `unset-property` first, preventing
 accidental secret downgrade. Unsetting a secret removes both its marker and
 its credential.
 
+The embedding-API twins are `list_properties(prefix=None)`,
+`get_property(key)`, `set_property(key, value, secret=False)`, and
+`unset_property(key)` (planning/design/api.md). One named divergence
+(owner, 2026-07-21): `set_property` takes a secret's value as its
+ordinary in-memory `value` parameter — the CLI's entry channels exist
+because argv leaks into process listings and shell history, which an
+in-process value never touches, and a library function never prompts
+or reads stdin. Reading stays the CLI's rule: `get_property` returns
+an ordinary value but only the secret marker for a secret, never the
+value (exactly the `--json` serialization), and the kind-change rule
+applies unchanged — `set_property` over a property of the other kind
+fails; `unset_property` first.
+
 The JSON file and a host credential service cannot provide one atomic
 transaction. Reliquary therefore orders updates fail-safely: it stores a new
 credential before publishing its marker, and removes a marker before deleting

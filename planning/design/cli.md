@@ -37,7 +37,8 @@ Nothing is CLI-only.
   prefix matching and no bare-number form: the id *is* the
   (blueprint, number) pair composed, so each selector carries one
   honest type — `resolve_machine(machine=, blueprint=)` under the
-  mirror.
+  mirror (the shared implementation seam, not a public twin: no
+  command; the query form is `list-machines --blueprint`).
 
 Blueprints are selected by name alone (`--blueprint <name>`, the
 stem of the `<name>.rlqb` file the asset root supplies). Machine
@@ -873,7 +874,9 @@ rlq list-runs [--blueprint <name> | --machine <id>]
 The `run` family is the identity rule's second named exception:
 its operations map to the API run handle's methods (`status()`,
 `events()`, `wait()`, `cancel()`, plus `delete_run`), not to flat
-functions. A foreground `run-script` run is start-plus-attach: it
+functions; the exception covers flag spellings too
+(`run cancel --stop` ↔ `cancel(stop_machine=)`), and a fresh
+process reopens the handle with `attach_run()`. A foreground `run-script` run is start-plus-attach: it
 streams its own progress until the run ends, and Ctrl-C cancels
 the run.
 `--detach` completes parsing, binding, and preflight in the
@@ -946,7 +949,8 @@ win98se                 Windows 98 SE OEM installation ISO       yes
 ### Fetching and cleaning
 
 ```
-rlq fetch-media <media_name> [--script <script_name>] [--progress <mode>]
+rlq fetch-media <media_name> [--script <script_name>]
+    [--progress <mode>] [--on-mismatch (fail | refetch)]
 rlq clean-downloads
 rlq clean-media
 ```
@@ -960,8 +964,12 @@ fetching, without executing guest steps. `--progress` selects
 rendering as on `run-script` — pretty live progress on a tty under
 `auto`; `jsonl` emits pure event JSON on stdout, the last line
 the terminal event stating the outcome. `plain` and `jsonl`
-never prompt: a hash mismatch without `--refetch-mismatched`
-fails fast.
+never prompt: a hash mismatch without `--on-mismatch refetch`
+fails fast. `--on-mismatch` mirrors the twin's `on_mismatch=`
+parameter under the identity rule (media spec, "Mismatched
+files"): `refetch` pre-approves delete-and-refetch, `fail`
+forces the noninteractive failure even on a tty; an interactive
+run without the flag gets the checkpoint prompt.
 
 The media name is always required — exactly the twin
 `fetch_media(name, script=)`; `--script` supplies definitions,

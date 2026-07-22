@@ -408,7 +408,9 @@ position: `--blueprint <name>` (short `-b`) names a blueprint,
 2026-07-21): prefix matching and the bare-number pair form are
 deleted — the id *is* the (blueprint, number) pair composed, so
 each selector carries one honest type, mirroring
-`resolve_machine(machine=, blueprint=)`, and nothing is left to
+`resolve_machine(machine=, blueprint=)` (an implementation seam
+both presentations route through, not a public twin — owner,
+2026-07-21), and nothing is left to
 disambiguate. As the common convenience, `--blueprint` also selects a
 *machine* on machine-level verbs: when exactly one machine of that
 blueprint exists — the normal one-machine-per-blueprint case — the
@@ -455,7 +457,8 @@ the CLI's selectors (`resolve_machine()` the shared seam) and the
 mirrored globals (`home=` / `assets=` / `assets_only=`),
 returning what the CLI prints (`create_machine` and
 `clone_machine` return the new id), raising by class where the
-CLI exits by code; `export`'s name and twin land together with
+CLI exits by code (the classes are named —
+planning/design/api.md); `export`'s name and twin land together with
 export's open shape, a named omission. Implementation realigns
 the current names (`create_from_blueprint`, `machines.start` /
 `stop` / `destroy`) to these.
@@ -1249,11 +1252,19 @@ get results by waiting), `run cancel [--stop]`, and
 `list runs`. The embedding API's twins: `run_script()` stays the
 blocking form; `start_script()` returns a run handle —
 `status()`, `events(follow=)` as a blocking iterator,
-`wait(timeout=)`, `cancel(stop_machine=)` — plus `delete_run()`
-and an attach-by-id
-call reopens a handle from a fresh process. The handle is
+`wait(timeout=)`, `cancel(stop_machine=)` — plus `delete_run()`;
+`attach_run(machine=, blueprint=, run=None)` reopens a handle
+from a fresh process, the run number defaulting to the machine's
+latest exactly as the CLI `run` operations do. The handle is
 pull-only: no callbacks, nothing a common binding language
-cannot express directly. A caller wanting concurrency without
+cannot express directly. `wait(timeout=)` completes exactly as
+the blocking form — same result, same raises — and expiry
+raises outside the error taxonomy (Python: the builtin
+`TimeoutError`): nothing failed, the handle stays valid, the
+call repeats (owner, 2026-07-21). A handle is a follower, never
+the owner: dropping one never affects its operation — GC timing
+carries no semantics in any binding, and `cancel()` is the only
+cancellation. A caller wanting concurrency without
 any of this still runs the blocking form on its own thread —
 computation stays on the caller's side of the seam.
 
@@ -1302,8 +1313,11 @@ event. On the API, `fetch_media()` stays the blocking form
 parameters) returns a pull-only fetch handle — `status()`,
 `events(follow=)`, `wait(timeout=)`, `cancel()` (aborts at an
 event boundary; the partial download is deleted, no pre-existing
-file touched). There is no attach-by-id: an ephemeral stream is
-process-local, and reattachment is what run records provide. The
+file touched). There is no attach-by-id and no CLI command —
+`start_fetch` is the one async starter without one (owner,
+2026-07-21): an ephemeral stream is process-local, reattachment
+is what run records provide, and a CLI driver backgrounds
+`fetch-media` itself, the process being the handle. The
 handle form is noninteractive by construction and rejects
 `on_mismatch="prompt"` — a background fetch can never hang on a
 hidden prompt. Contract home: media-spec "Fetch progress".

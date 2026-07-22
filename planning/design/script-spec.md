@@ -1619,9 +1619,10 @@ Registry-aware checking reports property presence and kind; it
 never reveals a property value. Its two modes are the two
 checkable tiers of the [processing model](#processing-model);
 the embedding API's twins are `run_script` and `check_script` —
-`start_script` joins them as `script --detach`'s twin, returning
-the run handle whose operations the CLI `run` family mirrors —
-taking the same identifiers under CLI–API parity.
+`start_script` joins them as `run-script --detach`'s twin,
+returning the run handle whose operations the CLI `run` family
+mirrors, and `attach_run` reopens that handle from a fresh
+process — taking the same identifiers under CLI–API parity.
 
 ### Error classes and exit codes
 
@@ -1639,7 +1640,11 @@ faults; `5` is a cancelled run — a deliberate `run cancel` (API
 `cancel()`) that ended the run at an event boundary with a
 `cancelled` terminal event, neither success nor RUN FAILURE. The
 classes are the CLI's exit codes and the API's
-exception taxonomy — one mapping, under parity. Every diagnostic
+exception taxonomy — one mapping, under parity: Python spells it
+`StaticError` / `PreflightError` / `RunFailure` / `RunCancelled`
+under the `ReliquaryError` root every deliberate reliquary error
+subclasses (planning/design/api.md), and exit `1` is precisely
+an error outside the taxonomy. Every diagnostic
 carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
 across the classes, and the full id index is deferred to beta.

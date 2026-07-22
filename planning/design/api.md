@@ -53,12 +53,17 @@ SPDX-License-Identifier: BSD-3-Clause
   exceptions, each an identity with a different home surface:
   the guest-console family spells as the script language's verbs
   (its twins deferred to the control-plane design), and the
-  `run` family maps to the run handle's methods.
+  `run` family maps to the run handle's methods, flag spellings
+  included (`run cancel --stop` ↔ `cancel(stop_machine=)`).
 - **Selectors** (owner, 2026-07-21): machine-scoped functions
   take `machine=` — the full machine id (`"<blueprint>-<n>"`),
   exactly — or `blueprint=` — a blueprint name, selecting its
   sole machine; `resolve_machine()` is the shared resolution
-  seam. Each parameter carries one honest type: there is no
+  seam — an implementation seam both presentations route
+  through, not a public twin (owner, 2026-07-21): it gets no
+  command, selection is a property of every machine-scoped call,
+  and the query form is `list_machines(blueprint=)`. Each
+  parameter carries one honest type: there is no
   prefix matching and no bare-number form (the id *is* the
   (blueprint, number) pair composed), so the selectors bind
   cleanly in any language.
@@ -71,9 +76,37 @@ SPDX-License-Identifier: BSD-3-Clause
   twin's return serialized as one JSON document, so a return
   contract is also the command's machine-readable output
   contract (planning/ROADMAP.md "The CLI").
+- **Errors — the taxonomy is named** (owner, 2026-07-21):
+  blocking forms raise by error class, and the classes are the
+  script spec's failure classes under one root. Python spells
+  them `ReliquaryError` — the root every deliberate reliquary
+  error subclasses — with `StaticError` (exit 2),
+  `PreflightError` (exit 3), `RunFailure` (exit 4), and
+  `RunCancelled` (exit 5): the CLI's exit codes and the API's
+  exceptions are one mapping under parity (script spec "Error
+  classes and exit codes"); exit `1` — reliquary's own
+  unexpected fault — is precisely an error outside the taxonomy.
+  Other bindings spell the same classes natively.
+- **Async starters present as `--detach`, never as commands**
+  (owner, 2026-07-21): a long operation is one capability with
+  two API forms — the blocking twin and a starter returning its
+  handle (`run_script()` / `start_script()`, `fetch_media()` /
+  `start_fetch()`). A starter is not a third name on the CLI:
+  the pair presents as one command, with `--detach` the handoff
+  (`run-script --detach` ↔ `start_script()`). `start_fetch` has
+  no CLI form at all — a fetch handle is process-local, so for a
+  CLI driver the `fetch-media` process itself is the handle:
+  background it and read `--progress jsonl`; reattachment is
+  what run records provide.
 - **Handles are pull-only**: `status()`, `events(follow=)` as a
   blocking iterator, `wait(timeout=)`, `cancel()` — never
-  callbacks.
+  callbacks. `wait()` completes exactly as the blocking twin —
+  same result, same raises — and expiry raises outside the
+  taxonomy (Python: the builtin `TimeoutError`), because nothing
+  failed: the operation is still live, the handle stays valid,
+  and the call may be repeated (owner, 2026-07-21). A handle is
+  a follower, never the owner: dropping one never affects its
+  operation — `cancel()` is the only cancellation.
 
 ## The surface
 
@@ -93,14 +126,14 @@ carries the exceptions and each family's contract home.
 | `seed-blueprint` / `seed-media` / `seed-script` | `seed_blueprint(name, only=)` / `seed_media()` / `seed_script()` | [codex](codex.md) |
 | `run-script <label>` | `run_script()` blocking; `start_script()` → run handle (`--detach`) | [script spec](script-spec.md) |
 | `check-script` | `check_script()` | script spec |
-| `run status` / `tail` / `wait` / `cancel` | run-handle `status()` / `events()` / `wait()` / `cancel()`, plus attach-by-id — the handle-method exception | script spec |
+| `run status` / `tail` / `wait` / `cancel` | run-handle `status()` / `events()` / `wait()` / `cancel()`, the handle reopened by `attach_run()` — the handle-method exception | script spec |
 | `run delete` | `delete_run()` | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
 | `clean-downloads` / `clean-media` | `clean_downloads()` / `clean_media()` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
-| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | [cli design](cli.md) |
+| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | [ROADMAP "The CLI"](../ROADMAP.md) |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [property registry](property-registry.md) |
-| guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | cli design |
+| guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
 
 `import-vm`'s twin is `import_vm` — a bare `import` is a Python
 keyword, and under the identity rule the CLI simply adopts the
@@ -109,16 +142,21 @@ until export's own shape lands — a named omission, not drift.
 
 ## Handles
 
-**The run handle** (`start_script()`, reopenable by id): a
-pull-only follower of the run's live `run-events.jsonl`. Because
-a run record persists, a handle can be reopened from a fresh
-process (attach-by-id). Contract:
+**The run handle** (`start_script()`; reopened by
+`attach_run()`): a pull-only follower of the run's live
+`run-events.jsonl`. Because a run record persists, a handle can
+be reopened from a fresh process:
+`attach_run(machine=, blueprint=, run=None)` takes the ordinary
+selectors plus the machine-scoped run number, defaulting to the
+machine's latest run exactly as the CLI `run` operations do.
+Contract:
 [script spec](script-spec.md) "Failure, runs, and transcripts"
 and planning/ROADMAP.md "Asynchronous runs".
 
 **The fetch handle** (`start_fetch()`): the same pull vocabulary
 over an ephemeral stream — process-local, no attach-by-id
-(reattachment is what run records provide), and it rejects
+(reattachment is what run records provide), no CLI command (the
+async-starter convention above), and it rejects
 `on_mismatch="prompt"`: a background fetch can never hang on a
 hidden prompt. Contract: [media spec](media-spec.md#fetch-progress).
 

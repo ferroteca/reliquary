@@ -473,13 +473,24 @@ form: a typed result, errors raised by class. Its asynchronous
 twin `start_fetch(...)` (same parameters) returns a pull-only
 fetch handle — `status()`, `events(follow=)` as a blocking
 iterator over the same event kinds
-([fetch progress](#fetch-progress)), `wait(timeout=)` returning
-the blocking form's result, and `cancel()`, which aborts at the
+([fetch progress](#fetch-progress)), `wait(timeout=)` completing
+exactly as the blocking form — same result, same raises, expiry
+raising outside the error taxonomy (Python: the builtin
+`TimeoutError`) with the fetch still live and the call
+repeatable — and `cancel()`, which aborts at the
 next event boundary and deletes the partial download (no
 pre-existing file is touched) — no callbacks, nothing a common
 binding language cannot express. A fetch stream is ephemeral, so
 a handle lives only in the process that started it — there is no
 attach-by-id; reattachment is what run records exist to provide.
+Nor is there a CLI command: `start_fetch` is the one async
+starter without one, because for a CLI driver the `fetch-media`
+process itself is the handle — background it and read
+`--progress jsonl` (planning/design/api.md, the async-starter
+convention).
+A handle is a follower, never the owner: dropping it never
+cancels — the fetch runs to completion unless `cancel()` is
+called.
 The handle form is noninteractive by construction:
 `on_mismatch="prompt"` is rejected, so a background fetch can
 never hang on a hidden prompt.
@@ -546,11 +557,13 @@ how reliquary is running:
 - **Programmatically** (and whenever input is not a terminal),
   the mismatch fails fast with an error naming the file and both
   hashes.
-- The deletion can be **pre-approved**: the CLI flag
-  `--refetch-mismatched` on commands that fetch media, or the
-  embedding API's `on_mismatch="refetch"` option
+- The deletion can be **pre-approved**: `--on-mismatch refetch`
+  on commands that fetch media — the flag mirrors the twin's
+  parameter under the twin-name identity rule — or the embedding
+  API's `on_mismatch="refetch"` option
   (`fetch_media(name, home=None, script=None,
-  on_mismatch="fail")`; the CLI maps interactive runs to
+  on_mismatch="fail")`; the CLI accepts `fail | refetch`
+  explicitly and maps interactive runs without the flag to
   `"prompt"`).
 
 A mismatched file whose definition names no source is always kept

@@ -803,6 +803,86 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       (verb table gains the CLI/twin column), -reference,
       -cookbook, instance-model, media-spec, property-registry.
       docs/ and README follow at implementation realignment
+- API DESIGN GAP QUEUE (owner-requested review, 2026-07-21:
+  planning/design/api.md walked against planning/INTERFACES.md /
+  planning/USE-CASES.md, the CLI design, and Python practice; verdict:
+  the twin-name identity rule, the --json twin's-return rule, pull-only
+  handles, and the named-omission discipline are sound — the gaps were
+  unnamed conventions and unnamed twins):
+  1. RESOLVED (owner, 2026-07-21): the async starters are a NAMED
+     convention — start_script / start_fetch are the blocking twins'
+     starters, presenting on the CLI as --detach on the blocking
+     command, never a third command; start_fetch deliberately has NO
+     CLI form (a fetch handle is process-local — a CLI driver
+     backgrounds fetch-media itself, the process being the handle;
+     run records provide reattachment). Folded: api.md (conventions +
+     handles), media-spec fetching, ROADMAP "Asynchronous runs"
+  2. RESOLVED (owner, 2026-07-21): attach-by-id is NAMED —
+     attach_run(machine=, blueprint=, run=None), the run number
+     defaulting to the machine's latest exactly as the CLI run
+     operations; the last unnamed twin. Folded: api.md (table +
+     handles), cli.md run family, script-spec twins sentence (its
+     stale `script --detach` spelling fixed to run-script in
+     passing), ROADMAP "Asynchronous runs"
+  3. RESOLVED (owner, 2026-07-21): the exception taxonomy is NAMED —
+     ReliquaryError the root every deliberate error subclasses;
+     StaticError(2) / PreflightError(3) / RunFailure(4) /
+     RunCancelled(5) the one exit-code mapping under parity; exit 1
+     is precisely an error outside the taxonomy; other bindings
+     spell the same classes natively. Folded: api.md conventions,
+     script-spec "Error classes and exit codes", ROADMAP "The CLI"
+  4. RESOLVED (owner, 2026-07-21): flag↔parameter mirror drift
+     closed — --refetch-mismatched respelled --on-mismatch
+     (fail | refetch), the mechanical mirror of on_mismatch=
+     (interactive runs without the flag still map to "prompt";
+     milestone 2 and released CHANGELOG keep historical
+     spellings); and the run-family exception explicitly covers
+     flag spellings (run cancel --stop ↔ cancel(stop_machine=)).
+     Folded: media-spec mismatched-files, cli.md (fetch synopsis +
+     prose, run family), api.md naming convention
+  5. RESOLVED (2026-07-21): api.md contract homes no longer point
+     at the short-lived cli.md — list/search → ROADMAP "The CLI";
+     guest-console → script-spec (verbs) + the control-plane
+     design (twins)
+  6. RESOLVED (owner, 2026-07-21): the property twins' signatures
+     are settled — list_properties(prefix=None), get_property(key),
+     set_property(key, value, secret=False), unset_property(key);
+     named divergence: the API takes a secret's value as an
+     ordinary in-memory parameter (argv/process-listing concerns
+     are CLI-side; a library never prompts or reads stdin);
+     get_property returns the marker for a secret, never the
+     value; the kind-change rule applies unchanged. Folded:
+     property-registry.md "Maintaining properties"
+  7. RESOLVED (owner, 2026-07-21, follow-up — the deferred
+     semantics settled on the recommendations): wait(timeout=)
+     completes exactly as the blocking twin (same result, same
+     raises) and expiry raises OUTSIDE the taxonomy (Python: the
+     builtin TimeoutError) — nothing failed, the handle stays
+     valid, the call repeats; a handle is a follower, never the
+     owner — dropping one never affects its operation (GC timing
+     carries no semantics in any binding; cancel() is the only
+     cancellation, a dropped fetch runs to completion);
+     resolve_machine is an IMPLEMENTATION SEAM, not a public twin
+     (no command — selection is a property of every machine-scoped
+     call, the query form is list_machines(blueprint=)); per-twin
+     return-shape contracts stay with the queued output-stability
+     work, the wait-mirrors-the-blocking-twin rule settled now.
+     Folded: api.md (selectors + pull-only conventions),
+     media-spec fetch handle, ROADMAP ("Asynchronous runs" handle
+     paragraph + "The CLI" selection sentence), cli.md Selection
+  8. OPEN (owner-requested, 2026-07-21): a new design output for
+     BACKEND ADAPTERS — the adapter API as its own
+     planning/design document: the provider seam behind the
+     embedding API (ROADMAP milestone 6: lifecycle, media
+     attachment, input, screen access, control-plane endpoints,
+     per-backend capability reporting, backend-id ownership
+     verification), distinct from the consumer surface api.md
+     documents. Open with it: whether the adapter API joins
+     INTERFACES' world-facing contract inventory (third-party
+     adapters would make it one) or stays internal; authored per
+     the milestone-6 doctrine — the seam is extracted from the
+     working QEMU adapter, the document landing with that
+     extraction, never as speculation ahead of it
 - JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
   design round; all three forks settled on the recommendations):
   - planning/design/machine-blueprint.schema.json +
