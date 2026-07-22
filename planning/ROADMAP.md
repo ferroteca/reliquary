@@ -441,6 +441,31 @@ shape, a named omission. Implementation realigns the current
 names (`create_from_blueprint`, `machines.start` / `stop` /
 `destroy`) to these.
 
+The interaction vocabulary is the script language's own (owner,
+2026-07-21): `type` (raw text, no implicit ending), `enter`
+(type + press enter), `press` (the language's closed portable
+key vocabulary, `+` chords), `select` (cursor-menu selection by
+normalized visible label), `wait` (the language's condition
+spellings — `"..."` a normalized literal, `/.../` a regex,
+`machine=stopped` the machine channel), and `screenshot` spell
+on the CLI exactly as in a script, each defined once in
+planning/design/script-spec.md and referenced, never redefined,
+by the CLI. The state operations `insert <slot> <media>`,
+`eject <slot>`, and `set-boot <key>...` take the script verbs'
+spellings and rules (state-not-blueprint persistence; the CLI's
+media argument is a bare name — `@` marks references only inside
+script text). The CLI adds exactly two commands the language
+deliberately lacks: `screen` prints the current text screen
+(scripts observe; humans and programs read), and `exec <command>`
+is the composite convenience — `enter` plus the platform
+workflow's completion detection — that scripts spell as explicit
+observation. `run` therefore names run records exclusively.
+`hmp` remains the QEMU-only escape hatch until the control-plane
+design homes it; the interaction family's API twins land with
+that same design as a named omission (planning/design/api.md),
+the capability meanwhile reachable through today's `Machine`
+functions.
+
 `--blueprint` and `--machine` are global selectors, given before
 the verb — as are `--assets <dir>` and `--assets-only`, which
 name and scope the asset root ("Authored-asset resolution"
@@ -473,6 +498,22 @@ reliquary (--blueprint <name> | --machine <id>) run tail [<n>]
     [--progress <mode>]
 reliquary (--blueprint <name> | --machine <id>) run wait [<n>]
 reliquary (--blueprint <name> | --machine <id>) run cancel [<n>] [--stop]
+reliquary (--blueprint <name> | --machine <id>) run delete <n> [<n> ...]
+reliquary (--blueprint <name> | --machine <id>) type <text>
+reliquary (--blueprint <name> | --machine <id>) enter <line>
+reliquary (--blueprint <name> | --machine <id>) press <key>...
+reliquary (--blueprint <name> | --machine <id>) exec <command>
+    [--timeout <seconds>]
+reliquary (--blueprint <name> | --machine <id>) select <item>
+    [--exclude <text>]... [--timeout <seconds>]
+reliquary (--blueprint <name> | --machine <id>) wait <condition>
+    [--timeout <seconds>]
+reliquary (--blueprint <name> | --machine <id>) screen
+reliquary (--blueprint <name> | --machine <id>) screenshot [<name>]
+reliquary (--blueprint <name> | --machine <id>) insert <slot> <media>
+reliquary (--blueprint <name> | --machine <id>) eject <slot>
+reliquary (--blueprint <name> | --machine <id>) set-boot <key>...
+reliquary (--blueprint <name> | --machine <id>) hmp <line>
 rlq check-script <script_name> [--blueprint <name> | --machine <id>]
     [--responses <path>]
 rlq fetch <media_name> [--script <script_name>]

@@ -85,7 +85,7 @@ this table is the index.
 | `insert` / `eject` / `set-boot` (state ops) | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
 | `list` / `search` families | `list_<noun>` (`list_machines` today; the rest follow the pattern as they land) | [cli design](cli.md) |
 | `property` family | pending naming, with the property-registry design | [property registry](property-registry.md) |
-| interaction family (`type` / `keys` / `wait` / `screenshot` / `menu` / `hmp`) | today's `Machine` and module functions; the settled family lands with the control-plane design | cli design (open) |
+| interaction family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — a named omission (CLI spellings settled 2026-07-21: the script language's vocabulary, plus CLI-only `screen` and `exec`) | cli design |
 
 `import`'s twin is `import_vm` because a bare `import` is a
 Python keyword in the first binding. `export`'s twin is

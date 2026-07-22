@@ -280,11 +280,12 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     stability contract
     (the machine-readable mode is now demanded directly by the USE-CASES
     feedback split, 2026-07-21);
-    also the interaction command family (type/keys/run/text/wait/
-    screenshot/menu/hmp) is absent from the settled CLI list though a
-    CLI-driving U3 agent lives on it — the interaction-family and
-    query-output halves are now itemized in the CLI DESIGN GAP QUEUE
-    below (items 1-4)
+    the interaction command family is now IN the settled CLI list
+    (2026-07-21, CLI DESIGN GAP QUEUE items 1-3: the script
+    language's vocabulary — type/enter/press/select/wait/screenshot
+    — plus CLI-only screen and exec, and the insert/eject/set-boot
+    state ops); the query-output half remains open as CLI queue
+    item 4
   - U2 import: RESOLVED (owner, 2026-07-21, design round — see the
     blueprint-spec queue item 2): import never copies; captured disks
     stay in place as local-path definitions, and the presented choice
@@ -566,37 +567,46 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   import's consent points, and the no-prompt/--detach discipline are
   sound — the gaps cluster in vocabulary collisions, cross-surface
   naming drift, and the machine-readable query contract):
-  1. the `run` name collision — the interaction verb `run <command>`
-     (DOS execution) and the run-record family
-     `run (status|tail|wait|cancel|delete)` are two unrelated
-     machine-scoped commands sharing one name and grammar position
-     (`run wait` parses as run-management yet `wait` is a plausible
-     guest command; interaction `wait <pattern>` vs `run wait [<n>]`
-     is the same collision again). Recommendation: resolve via item 2
-     — align the interaction family with the script language, which
-     deliberately has no `run` verb, freeing `run` to mean run
-     records exclusively
-  2. the interaction vocabulary contradicts the scripting language:
-     the redesigned language splits `type` (raw text) from `enter`
-     (derived: type + press enter) and its key verb is `press`, while
-     the CLI's `type` is documented as text-plus-Enter (the
-     language's `enter` semantics under the language's other verb
-     name), the CLI's key verb is `keys`, and the CLI carries the
-     `run` verb the language rejected ("`enter` delivers a console
-     line, and completion is a separate explicit observation"). One
-     capability, two vocabularies — INTERFACES says a capability
-     appearing on multiple surfaces appears coherently.
-     Recommendation: the CLI interaction family adopts the script
-     verbs (`type` raw, `enter`, `press`; `wait` / `menu` /
-     `screenshot` already agree), and whether a type-and-await-prompt
-     convenience survives (today's `run`) is decided in the same
-     round under a non-colliding name
-  3. `insert` / `eject` / `set-boot` are missing from the CLI spec:
-     api.md's parity table lists them as CLI commands, their API
-     twins (insert_media / eject_media / set_boot_order) are settled
-     and implemented, and scripts perform all three — but neither
-     cli.md nor ROADMAP's synopsis block defines them. A parity gap
-     inside our own documents; add the family to the CLI design
+  1. RESOLVED (owner, 2026-07-21, design round — all six forks on
+     the recommendations): the `run` collision dissolves through
+     item 2's alignment — guest execution renames to
+     `exec <command> [--timeout]`, the composite convenience
+     (`enter` + the platform workflow's completion detection,
+     which scripts spell as explicit observation; a CLI/API
+     capability above the language, not a language concept) — and
+     `run` names run records exclusively. The settled run family
+     stays as decided (rename-to-`runs` weighed and declined: no
+     remaining problem argues for reopening the async round)
+  2. RESOLVED (owner, 2026-07-21, same round): the CLI interaction
+     family adopts the script language's vocabulary verbatim, each
+     verb defined once in script-spec.md and referenced, never
+     redefined, by the CLI — `type` raw (implicit Enter dropped),
+     `enter` added, `keys` → `press` (the closed portable key set,
+     `+` chords), `menu` → `select`, `wait` adopts the condition
+     grammar ("..." normalized literal / /.../ regex /
+     machine=stopped) and normalized matching, and `text` →
+     `screen`, the CLI-only read of the language's default
+     observation channel. API twins DEFERRED with precedent
+     (export/property) to the control-plane design — a named
+     omission in api.md; the capability stays reachable through
+     today's Machine functions until then. Folded: cli.md
+     (Interaction section rewritten + Global options verb list),
+     ROADMAP "The CLI" (synopsis gains the interaction family —
+     and the settled `run delete` line it was missing — plus the
+     settled-vocabulary paragraph), api.md interaction row;
+     docs/cli-reference.md follows at implementation realignment
+  3. RESOLVED (owner, 2026-07-21, same round, the rider):
+     `insert <slot> <media>`, `eject <slot>`, and
+     `set-boot <key>...` join the CLI design with the script
+     verbs' spellings and rules by reference — removable slots
+     only and running-or-stopped for insert/eject (occupancy is a
+     run error, a missing/non-removable slot fails preflight),
+     stopped-only ordered drive keys for set-boot,
+     state-not-blueprint persistence with `apply` the
+     reconciliation. One named divergence: the CLI's media
+     argument is a bare name — `@` marks references only inside
+     script text. stage/collect stay out: their exchange-drive
+     model remains the guiding-principles U3 gap
   4. queries have no machine-readable form: --progress rawjson covers
      the stream-bearing commands, but the `list` / `search` tables,
      `property get`, and the ids printed by create/clone are

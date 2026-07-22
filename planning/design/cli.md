@@ -587,95 +587,157 @@ rlq: 'freedos' matches 2 machines:
 
 ## Interaction
 
-Commands for typing, running commands, and inspecting the guest.
-Every interaction command requires `--blueprint <name>` or
-`--machine <id>` to identify the running machine. There is no
-"active machine" shortcut.
+Commands for sending input, executing guest commands, and
+inspecting the guest. The vocabulary is the script language's own
+([script-spec.md](script-spec.md), "Input verbs" and "Supporting
+operations"): a capability spells the same on both surfaces, each
+verb defined once — in the spec — and referenced, never redefined,
+by the CLI. The CLI adds exactly two commands scripts deliberately
+lack: `screen` (scripts observe; humans and programs read) and
+`exec` (a composite convenience; in a script, completion is an
+explicit observation). Every interaction command requires
+`--blueprint <name>` or `--machine <id>` to identify the machine.
+There is no "active machine" shortcut. The family's API twins land
+with the control-plane design — a named omission
+([api.md](api.md)); the capability is meanwhile reachable through
+today's `Machine` functions.
 
-### Typing and sending keys
+### Typing and pressing keys
 
 ```
-reliquary (--blueprint <name> | --machine <id>) type <text>
-reliquary (--blueprint <name> | --machine <id>) keys <key>...
+rlq (--blueprint <name> | --machine <id>) type <text>
+rlq (--blueprint <name> | --machine <id>) enter <line>
+rlq (--blueprint <name> | --machine <id>) press <key>...
 ```
+
+`type` sends raw text with no implicit ending; `enter` types the
+line and presses Enter (the language's derived form); `press`
+sends keys from the language's closed portable key vocabulary,
+with `+` forming chords. Key names and delivery semantics are the
+script spec's — the CLI adds no keys and no per-platform variants.
 
 ```powershell
-rlq --blueprint freedos type "dir C:\"
-rlq --blueprint freedos keys enter
-rlq --machine a1b2 keys ctrl-alt-del
+rlq -b freedos type "A:"
+rlq -b freedos press enter
+rlq -b freedos enter "dir C:\"
+rlq -m freedos-0 press ctrl+alt+delete
 ```
 
-Available key names include `enter`, `esc`, `tab`, `backspace`,
-`f1`–`f12`, `up`, `down`, `left`, `right`, `ctrl-alt-del`, and
-single characters.
-
-### Running DOS commands
+### Executing guest commands
 
 ```
-reliquary (--blueprint <name> | --machine <id>) run <command> [--timeout <seconds>]
+rlq (--blueprint <name> | --machine <id>) exec <command> [--timeout <seconds>]
 ```
 
-Executes a DOS command with prompt-based completion detection.
-Requires the DOS platform:
+`exec` is the composite convenience: `enter` plus the platform
+workflow's completion detection (prompt-based on DOS). The script
+language deliberately has no such verb — in a script, completion
+is an explicit observation — but interactively one command is
+worth the composite, and the platform owns the completion
+knowledge the caller would otherwise re-spell. A CLI/API
+capability above the language, not a language concept.
 
 ```powershell
-rlq --blueprint freedos run "ver"
+rlq -b freedos exec "ver"
 # → FreeDOS kernel 2043 (Build 2043) [compiled Feb 26 2021]
-rlq --blueprint freedos run --timeout 120 "dir C:\*.exe"
+rlq -b freedos exec --timeout 120 "dir C:\*.exe"
 ```
 
-### Inspecting the screen
+### Observing the screen
 
 ```
-reliquary (--blueprint <name> | --machine <id>) text
-reliquary (--blueprint <name> | --machine <id>) wait <pattern> [--timeout <seconds>]
-reliquary (--blueprint <name> | --machine <id>) screenshot [<name>]
+rlq (--blueprint <name> | --machine <id>) screen
+rlq (--blueprint <name> | --machine <id>) wait <condition> [--timeout <seconds>]
+rlq (--blueprint <name> | --machine <id>) screenshot [<name>]
 ```
 
-`text` prints the current VGA text screen (80x25 rows). `wait`
-blocks until the screen matches a regex — literal text or a Python
-regular expression. `screenshot` captures the framebuffer.
+`screen` prints the current text screen (80x25 rows on VGA
+guests) — the read twin of the language's default observation
+channel. `wait` blocks until a condition matches, in the
+language's condition spellings: `"..."` is a normalized literal
+match (decoded, trimmed, whitespace-collapsed — no regex
+escaping), `/.../` an opt-in regex, and `machine=stopped` the
+machine channel — how a shell waits out a guest-initiated
+power-off. `screenshot` captures the framebuffer.
 
 ```powershell
-rlq --blueprint freedos text
+rlq -b freedos screen
 # 25 lines of screen content printed to stdout
 
-rlq --blueprint freedos wait "C:\\\\>" --timeout 30
+rlq -b freedos wait "C:\>" --timeout 30
 # blocks until the DOS prompt appears
-# → matched.
 
-rlq --blueprint freedos screenshot boot-menu
+rlq -b freedos wait machine=stopped
+# returns when the guest powers itself off
+
+rlq -b freedos screenshot boot-menu
 # writes screenshots/boot-menu.png under the machine's cache
 ```
 
-### Menu navigation
+### Menu selection
 
 ```
-reliquary (--blueprint <name> | --machine <id>) menu <item>
+rlq (--blueprint <name> | --machine <id>) select <item>
     [--exclude <text>]... [--timeout <seconds>]
 ```
 
-Navigates a cursor-key text menu by visible text. Presses up/down
-keys following the selection highlight until the highlight sits on
-the matching row, then presses Enter. Rows containing any
-`--exclude` text are skipped.
+`select` picks an entry in a cursor-key menu by its normalized
+visible label, exactly as the language's `select`: candidate rows
+matching `<item>` are found, rows containing any `--exclude` text
+are rejected, the highlight moves by observable feedback, and
+Enter is pressed. Zero candidates, several remaining candidates,
+an undetectable highlight, or traversal without progress are named
+failures — it never guesses.
 
 ```powershell
-rlq --blueprint freedos menu "Install to harddisk"
-rlq --blueprint freedos menu --exclude "with sources" "Plain DOS system"
+rlq -b freedos select "Install to harddisk"
+rlq -b freedos select --exclude "with sources" "Plain DOS system"
+```
+
+### Removable media and boot order
+
+```
+rlq (--blueprint <name> | --machine <id>) insert <slot> <media>
+rlq (--blueprint <name> | --machine <id>) eject <slot>
+rlq (--blueprint <name> | --machine <id>) set-boot <key>...
+```
+
+The CLI spellings of the script verbs, with the script spec's
+rules by reference: `insert` and `eject` address declared
+removable slots only (floppy and CD-ROM; slot names per the
+blueprint reference) and work on a running or stopped machine;
+inserting into an occupied slot or ejecting an empty one fails; a
+missing or non-removable slot fails before anything is touched.
+`set-boot` replaces the boot order with the listed drive keys
+(canonical or alias form, duplicates rejected, every key a
+declared drive) and requires a stopped machine. The CLI's
+`<media>` argument is a bare media name — `@` marks references
+only inside script text. Each change lands in the machine's state
+document, not its blueprint, and persists across stop/start: the
+machine legitimately diverges until a later change restores it or
+`apply` reconciles it to its blueprint.
+
+```powershell
+rlq -b freedos insert cdrom0 freedos-1.4-livecd
+rlq -b freedos stop
+rlq -b freedos set-boot cdrom0 hdd0
+rlq -b freedos start
 ```
 
 ### Raw HMP
 
 ```
-reliquary (--blueprint <name> | --machine <id>) hmp <line>
+rlq (--blueprint <name> | --machine <id>) hmp <line>
 ```
 
-Sends a raw QEMU human monitor protocol (HMP) command:
+Sends a raw QEMU human monitor protocol (HMP) command — the
+QEMU-only escape hatch. It has no meaning on other backends and
+will be homed as an explicitly backend-scoped command when the
+control-plane design settles.
 
 ```powershell
-rlq --blueprint freedos hmp "info status"
-rlq --machine a1b2 hmp "info block"
+rlq -b freedos hmp "info status"
+rlq -m freedos-0 hmp "info block"
 ```
 
 ---
@@ -938,8 +1000,9 @@ rlq [--home <path>] [--blueprint <name>] [--machine <id>]
 `--blueprint <name>` and `--machine <id>` are global selectors
 available before any subcommand. They are mutually exclusive. On
 machine-level verbs (`start`, `stop`, `apply`, `destroy`,
-`recreate`, `clone`, `export`, `type`, `run`, `keys`, `menu`,
-`text`, `wait`, `screenshot`, `hmp`, `script`) at least one is
+`recreate`, `clone`, `export`, `type`, `enter`, `press`, `exec`,
+`select`, `screen`, `wait`, `screenshot`, `insert`, `eject`,
+`set-boot`, `hmp`, `script`, the `run` operations) at least one is
 required; `script` auto-creates a machine when `--blueprint` names a
 blueprint with none yet. Commands that don't operate on a machine
 (`list`, `fetch`, `property`, `clean`, `create blueprint`, `delete
