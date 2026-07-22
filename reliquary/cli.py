@@ -18,16 +18,17 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import read_vm_state, stop as stop_legacy
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .home import blueprints_dir, scripts_dir, set_home
-from .library import (list_builtin_blueprints, seed_blueprint,
-                      seed_media, seed_script)
+from .home import blueprints_dir, media_dir, scripts_dir, set_home
+from .library import (list_builtin_blueprints, list_builtin_media,
+                      seed_blueprint, seed_media, seed_script)
 from . import blueprint as blueprint_mod
 from .machines import (create_machine, destroy_machine, eject_media,
                        insert_media, list_machines, load_machine_state,
                        machine_dir_path, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
-from .media import (fetch_media, clean_downloads, clean_media)
+from .media import (fetch_media, clean_downloads, clean_media,
+                    delete_media, list_media)
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
 from .script_runner import (ScriptRuntimeError, check_script,
@@ -44,9 +45,11 @@ _COMMANDS = frozenset({
     "create-machine", "start-machine", "stop-machine",
     "destroy-machine", "run-script", "check-script", "fetch-media",
     "seed-blueprint", "seed-media", "seed-script", "new-blueprint",
+    "delete-blueprint",
     "get-property", "set-property", "unset-property",
     "list-properties", "import-vm", "list-blueprints",
-    "list-machines", "list-scripts", "clean-downloads",
+    "list-machines", "list-scripts", "list-media",
+    "delete-media", "clean-downloads",
     "clean-media", "insert-media", "eject-media", "set-boot-order",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
@@ -255,6 +258,12 @@ def main(argv=None):
     command.add_argument("--platform", default=None,
                          help="guest platform")
 
+    # delete-blueprint
+    command = subcommands.add_parser(
+        "delete-blueprint", help="delete a home blueprint file")
+    _add_home(command)
+    command.add_argument("name", help="blueprint name")
+
     # property family
     command = subcommands.add_parser(
         "get-property", help="get a property")
@@ -300,6 +309,16 @@ def main(argv=None):
     command = subcommands.add_parser(
         "list-scripts", help="list script stems or labels")
     _add_selectors(command)
+
+    command = subcommands.add_parser(
+        "list-media", help="list media item names")
+    _add_home(command)
+    command.add_argument("--builtin", action="store_true")
+
+    command = subcommands.add_parser(
+        "delete-media", help="delete a home media definition")
+    _add_home(command)
+    command.add_argument("name", help="media item name")
 
     # clean-*
     command = subcommands.add_parser(
@@ -482,6 +501,31 @@ def _list_blueprints(arguments):
     return 0
 
 
+def _list_media(arguments):
+    if getattr(arguments, "builtin", False):
+        names = list(list_builtin_media())
+        if not names:
+            print("(no built-in media)")
+            return 0
+        for name in names:
+            print(name)
+        return 0
+    names = list_media(home=arguments.home)
+    library = media_dir(arguments.home)
+    if not names:
+        print(f"(no media in {library})")
+        return 0
+    for name in names:
+        print(name)
+    return 0
+
+
+def _delete_media(arguments):
+    path = delete_media(arguments.name, home=arguments.home)
+    print(f"deleted media {arguments.name} ({path})")
+    return 0
+
+
 def _list_machines(arguments):
     filter_blueprint = getattr(arguments, "blueprint", None)
     machines = list_machines(
@@ -619,6 +663,13 @@ def _new_blueprint(arguments):
     return 0
 
 
+def _delete_blueprint(arguments):
+    path = blueprint_mod.delete_blueprint(
+        arguments.name, home=arguments.home)
+    print(f"deleted blueprint {arguments.name} ({path})")
+    return 0
+
+
 def _get_property(arguments):
     value = get_property(arguments.key, home=arguments.home)
     if value is not None:
@@ -711,6 +762,8 @@ def _dispatch(arguments):
         return _seed_script(arguments)
     if arguments.command == "new-blueprint":
         return _new_blueprint(arguments)
+    if arguments.command == "delete-blueprint":
+        return _delete_blueprint(arguments)
     if arguments.command == "get-property":
         return _get_property(arguments)
     if arguments.command == "set-property":
@@ -727,6 +780,10 @@ def _dispatch(arguments):
         return _list_machines(arguments)
     if arguments.command == "list-scripts":
         return _list_scripts(arguments)
+    if arguments.command == "list-media":
+        return _list_media(arguments)
+    if arguments.command == "delete-media":
+        return _delete_media(arguments)
     if arguments.command == "clean-downloads":
         return _clean_downloads(arguments)
     if arguments.command == "clean-media":

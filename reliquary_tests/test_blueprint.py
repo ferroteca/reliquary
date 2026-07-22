@@ -9,7 +9,8 @@ import unittest
 
 import reliquary
 from reliquary.blueprint import (Blueprint, BlueprintDrive,
-                                 load_blueprint, parse_blueprint)
+                                 delete_blueprint, load_blueprint,
+                                 new_blueprint, parse_blueprint)
 
 
 SHA256 = "1" * 64
@@ -44,6 +45,8 @@ class ParseBlueprintTests(BlueprintTestCase):
         self.assertIs(reliquary.BlueprintDrive, BlueprintDrive)
         self.assertIs(reliquary.parse_blueprint, parse_blueprint)
         self.assertIs(reliquary.load_blueprint, load_blueprint)
+        self.assertIs(reliquary.delete_blueprint, delete_blueprint)
+        self.assertIs(reliquary.new_blueprint, new_blueprint)
 
     def test_parses_freedos_install_shape(self):
         """The complete built-in-library shape parses and resolves."""
@@ -312,6 +315,54 @@ class NewBlueprintTests(BlueprintTestCase):
         with self.assertRaises(FileExistsError) as caught:
             new_blueprint("test-bp", home=self.home)
         self.assertIn("legacy blueprint already exists", str(caught.exception))
+
+
+class DeleteBlueprintTests(BlueprintTestCase):
+    def test_deletes_rlqb(self):
+        path = new_blueprint("test-bp", home=self.home)
+        removed = delete_blueprint("test-bp", home=self.home)
+        self.assertEqual(removed, path)
+        self.assertFalse(os.path.exists(path))
+
+    def test_deletes_legacy_json(self):
+        path = os.path.join(self.home, "blueprints", "legacy.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("{}\n")
+        removed = delete_blueprint("legacy", home=self.home)
+        self.assertEqual(removed, path)
+        self.assertFalse(os.path.exists(path))
+
+    def test_missing_raises(self):
+        with self.assertRaises(FileNotFoundError) as caught:
+            delete_blueprint("missing", home=self.home)
+        self.assertIn("blueprint not found", str(caught.exception))
+
+    def test_refuses_while_machines_exist(self):
+        new_blueprint("plain", home=self.home)
+        machine_dir = os.path.join(
+            self.home, "cache", "machines", "plain-0")
+        os.makedirs(machine_dir)
+        with open(os.path.join(machine_dir, "reliquary-machine.json"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({
+                "id": "plain-0",
+                "blueprint": "plain",
+                "phase": "ready",
+            }, handle)
+        with self.assertRaises(RuntimeError) as caught:
+            delete_blueprint("plain", home=self.home)
+        message = str(caught.exception)
+        self.assertIn("still has 1 machine(s)", message)
+        self.assertIn("plain-0", message)
+        self.assertTrue(os.path.exists(
+            os.path.join(self.home, "blueprints", "plain.rlqb")))
+
+    def test_does_not_delete_builtin(self):
+        # No home file; builtin-only name must not be removed from
+        # the package.
+        with self.assertRaises(FileNotFoundError):
+            delete_blueprint("freedos-1.4-plain", home=self.home)
 
 
 if __name__ == "__main__":

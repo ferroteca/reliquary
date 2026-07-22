@@ -86,6 +86,27 @@ def list_builtin_blueprints():
             yield entry.name[:-5]
 
 
+def list_builtin_media():
+    """Yield item names defined by the built-in media library."""
+    root = _builtins_root() / "media"
+    if not root.is_dir():
+        return
+    names = set()
+    for entry in sorted(root.iterdir(), key=lambda item: item.name):
+        if not (entry.name.endswith(".rlqm")
+                or entry.name.endswith(".json")):
+            continue
+        try:
+            definition = parse_definition(
+                jsonc.loads(entry.read_text(encoding="utf-8")))
+        except (ValueError, UnicodeDecodeError, KeyError):
+            continue
+        for item in definition.items:
+            names.add(item.name)
+    for name in sorted(names):
+        yield name
+
+
 def seed_blueprint(name, home=None):
     """Seed ``blueprints/<name>.rlqb`` from the built-in library.
 

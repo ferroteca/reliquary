@@ -202,6 +202,44 @@ class ObservationTests(_RuntimeCase):
                 "plain-0", home="/tmp/home")
         self.assertIsNone(engine._port)
 
+    def test_an_unreachable_vm_runtime_error_is_stopped(self):
+        # Production path: qmp_session wraps ConnectError as
+        # RuntimeError after removing vm.json. That must still
+        # count as the stopped sample (not escape the wait).
+        engine = self.engine("wait machine=stopped\n")
+
+        @contextlib.contextmanager
+        def unreachable():
+            raise RuntimeError(
+                "the recorded reliquary VM is no longer reachable\n"
+                "  expected: reliquary-plain-0 on 127.0.0.1:5555\n"
+                "  stale VM state was removed")
+            yield  # pragma: no cover
+
+        engine._console = unreachable
+        with mock.patch(
+                "reliquary.script_runner._machines") as machines:
+            self.run_linear(engine)
+            machines.mark_stopped.assert_called_once_with(
+                "plain-0", home="/tmp/home")
+        self.assertIsNone(engine._port)
+
+    def test_identity_mismatch_is_not_treated_as_stopped(self):
+        engine = self.engine("wait machine=stopped\n")
+
+        @contextlib.contextmanager
+        def mismatch():
+            raise RuntimeError(
+                "QMP identity mismatch; the unrelated VM was "
+                "not modified")
+            yield  # pragma: no cover
+
+        engine._console = mismatch
+        with self.assertRaises(RuntimeError) as caught:
+            self.run_linear(engine)
+        self.assertIn("identity mismatch", str(caught.exception))
+        self.assertEqual(engine._port, 5555)
+
     def test_a_stopped_machine_satisfies_without_a_console(self):
         engine = self.engine("wait machine=stopped\n", port=None)
         self.run_linear(engine)

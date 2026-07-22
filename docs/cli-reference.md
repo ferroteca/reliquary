@@ -57,6 +57,12 @@ List all machines, optionally filtered by blueprint.
 
 List blueprints. With `--builtin`, list only built-in blueprints.
 
+### `rlq delete-blueprint <name>`
+
+Remove the home blueprint file (``.rlqb`` or legacy ``.json``).
+Refuses while any machine of that blueprint exists, naming their
+ids — destroy them first. Never deletes package builtins.
+
 ### `rlq list-scripts [--blueprint NAME]`
 
 List scripts, optionally filtered by blueprint.
@@ -79,6 +85,18 @@ blueprint scripts-map label. With a machine, media-slot preflight
 runs as well. Static errors exit 2.
 
 ## Media and cache
+
+### `rlq list-media [--builtin]`
+
+List media item names from the home ``media/`` library. With
+``--builtin``, list package codex items instead.
+
+### `rlq delete-media <name>`
+
+Remove the home definition file that defines media item ``name``.
+Refuses while any machine drive still references an item from that
+definition. Never deletes package builtins. Does not reclaim
+``cache/media/`` payloads — use ``clean-media`` for that.
 
 ### `rlq fetch-media <name>`
 

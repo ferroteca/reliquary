@@ -206,6 +206,71 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("plain", output,
                       "default must include local blueprint 'plain'")
 
+    def test_delete_blueprint(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home,
+                "delete-blueprint", "plain",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("deleted blueprint plain", stdout.getvalue())
+        self.assertFalse(os.path.exists(
+            os.path.join(self.home, "blueprints", "plain.json")))
+
+    def test_delete_blueprint_refuses_while_machines_exist(self):
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main([
+                "--home", self.home,
+                "create-machine",
+                "--blueprint", "plain",
+            ])
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = cli.main([
+                "--home", self.home,
+                "delete-blueprint", "plain",
+            ])
+        self.assertEqual(result, 1)
+        self.assertIn("still has 1 machine(s)", stderr.getvalue())
+        self.assertIn("plain-0", stderr.getvalue())
+
+    def test_list_media_and_delete_media(self):
+        media_path = os.path.join(self.home, "media")
+        os.makedirs(media_path)
+        definition = os.path.join(media_path, "livecd.rlqm")
+        with open(definition, "w", encoding="utf-8") as handle:
+            json.dump({
+                "name": "livecd",
+                "file": "live.iso",
+                "sha256": "1" * 64,
+            }, handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list-media",
+            ])
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout.getvalue().strip(), "livecd")
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "list-media", "--builtin",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("freedos-1.4-livecd", stdout.getvalue())
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "delete-media", "livecd",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("deleted media livecd", stdout.getvalue())
+        self.assertFalse(os.path.exists(definition))
+
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.
 

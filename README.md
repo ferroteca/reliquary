@@ -350,12 +350,15 @@ rlq start-machine (--blueprint NAME | --machine ID) [--display]
 rlq stop-machine (--blueprint NAME | --machine ID)
 rlq destroy-machine (--blueprint NAME | --machine ID)
 rlq list-machines [--blueprint NAME]
+rlq delete-blueprint NAME
 ```
 
 `--blueprint` selects that blueprint's sole machine (or names the blueprint for `create-machine`).
 `--machine` takes the full id (`<blueprint>-<n>`) exactly — no prefix matching and no bare-number form.
 The two selectors are mutually exclusive. Machines live under
 `cache/machines/<blueprint>-<n>/`.
+`delete-blueprint` removes the home blueprint file and refuses while
+any machine of it still exists.
 
 ```powershell
 rlq create-machine --home $scratch --blueprint plain
@@ -363,6 +366,20 @@ rlq start-machine --home $scratch --blueprint plain --display
 rlq stop-machine --home $scratch --blueprint plain
 rlq list-machines --home $scratch
 ```
+
+### Media catalog
+
+```text
+rlq list-media [--builtin]
+rlq delete-media NAME
+rlq fetch-media NAME
+rlq clean-downloads
+rlq clean-media
+```
+
+`list-media` names items in home ``media/`` (or the package codex with
+`--builtin`). `delete-media` removes the home definition for an item
+and refuses while a machine drive still holds it.
 
 ### Managing the VM (legacy root-home path)
 

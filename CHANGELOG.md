@@ -11,8 +11,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.1.0.dev1 (unreleased)
 
+### Added
+
+- `list-media` / `list_media()` lists media item names from the
+  home library (or `--builtin` / `builtin=True` for the codex).
+- `delete-media` / `delete_media(name)` removes a home media
+  definition and refuses while any machine drive still references
+  an item from that definition.
+- `delete-blueprint` / `delete_blueprint(name)` removes a home
+  blueprint file and refuses while any machine of it exists,
+  naming the machine ids.
+- Opt-in FreeDOS install+verify QEMU integration test
+  (`reliquary_tests.test_freedos_install_integration`): set
+  `RELIQUARY_INTEGRATION=1` (optional
+  `RELIQUARY_INTEGRATION_HOME` to keep the media cache). Skipped
+  under the default guarded unit suite.
+
+### Fixed
+
+- Script samples treat a guest power-off as `machine=stopped`
+  when `lifecycle.qmp_session` raises its "no longer reachable"
+  `RuntimeError` after clearing stale `vm.json`. Identity
+  mismatches still fail closed. Unblocks FreeDOS install/verify
+  shutdown after `fdapm poweroff`.
+
 ### Changed
 
+- Milestone 4 (script-surface realignment) is complete: FreeDOS
+  `run-script install` / `run-script verify` on
+  `--blueprint freedos-1.4-plain` finish end to end, and
+  `check-script` reports the timing plan.
 - Documentation follows the redesigned script surface and the
   twin-name CLI: `planning/examples/README`, the script-spec and
   related design pages, and `docs/` quote `run-script`, the

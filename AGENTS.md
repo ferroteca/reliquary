@@ -12,8 +12,10 @@ workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
   resolution, layout, and containment, `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
-  its media references, `drives.py` parses declared drives, `media.py` owns media definitions
-  (parsing, name resolution) and hash-verified acquisition of OS installation media into the
+  its media references, scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
+  fails closed while any machine of that blueprint exists), `drives.py` parses declared drives, `media.py` owns media definitions
+  (parsing, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
+  machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
@@ -220,6 +222,9 @@ model". Preserve these when touching `script_runner.py`:
   from the parse-time plan, never re-derived here, so a failure can name the scope that supplied it.
 - No QMP session is ever held while a statement list runs: QEMU's QMP server admits one client at a time,
   so every sample and every input verb opens its own identity-verified session.
+- A sample whose QMP session is gone is the stopped observation: `_read` treats connect failures and
+  lifecycle's wrapped "no longer reachable" `RuntimeError` (after clearing `vm.json`) as
+  `machine=stopped` and calls `mark_stopped`. Identity-mismatch `RuntimeError`s still fail closed.
 
 ## Guest program runs
 
@@ -355,6 +360,16 @@ Run `git diff --check` before handing work back.
 
 Hands-on tests require QEMU. Use `--home` with a scratch or deliberately reused test home rather than polluting the
 default per-user home.
+
+The FreeDOS install+verify QEMU integration test is opt-in (skipped in the
+default suite; needs network for the LiveCD on a cold home):
+
+```powershell
+$env:RELIQUARY_INTEGRATION = "1"
+# optional: reuse a home so cache/media survives reruns
+# $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
+.venv\Scripts\python.exe -m unittest -v reliquary_tests.test_freedos_install_integration
+```
 
 ## Test expectations
 

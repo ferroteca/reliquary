@@ -80,11 +80,23 @@ stop/start:
   `load_blueprint(path, home=None)` - Parse and validate the
   milestone-1 blueprint subset, resolving media names through the
   library; return `Blueprint` (drives as `BlueprintDrive`).
+- `new_blueprint(name, *, platform="dos", home=None)` - Scaffold a
+  home ``blueprints/<name>.rlqb``. CLI twin: `new-blueprint`.
+- `delete_blueprint(name, *, home=None)` - Remove the home blueprint
+  file; fails closed while any machine of it exists. Never touches
+  package builtins. CLI twin: `delete-blueprint`.
 
 ## Media
 
 - `resolve_media(name, home=None)` - Resolve a defined item by
   name across the media library; returns `ResolvedMedia`.
+- `list_media(home=None, *, builtin=False)` - Sorted item names from
+  home ``media/``, or the package codex when ``builtin=True``.
+  CLI twin: `list-media`.
+- `delete_media(name, *, home=None)` - Remove the home definition
+  file that defines ``name``; fails closed while any machine drive
+  still references an item from that definition. CLI twin:
+  `delete-media`.
 - `fetch_media(name, home=None, on_mismatch="fail")` - Return the
   named item's verified payload path, fetching on demand —
   cheapest source first: a verifying payload as-is, a verifying

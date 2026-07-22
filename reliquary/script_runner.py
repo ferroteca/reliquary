@@ -647,6 +647,14 @@ class _ScriptEngine:
             # later insert/eject and `start`.
             self._mark_stopped()
             return _Sample((), True)
+        except RuntimeError as error:
+            # lifecycle.qmp_session wraps connect failures as
+            # RuntimeError after clearing vm.json; that sample is
+            # the stopped observation (task 5 / AGENTS).
+            if "no longer reachable" not in str(error):
+                raise
+            self._mark_stopped()
+            return _Sample((), True)
         return _Sample(tuple(_normalize_row(row) for row in rows), False)
 
     @contextlib.contextmanager

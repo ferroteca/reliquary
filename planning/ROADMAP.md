@@ -846,7 +846,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 truth** (including the complete typed EBNF), with
 `reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
 reference script. Realigning the implementation — parser, runtime, shipped
-scripts — with it is **milestone 4, the next work in the arc**;
+scripts — with it was **milestone 4** (complete);
 see the milestones below. Pre-beta, the superseded surface is
 deleted, not bridged.
 
@@ -976,8 +976,8 @@ and a guest reboot remains guest input. Parsing, property binding,
 whole-script capability preflight, and static control-flow checks
 all finish before the first guest input. User documentation and
 source of truth: [planning/design/script-spec.md](design/script-spec.md)
-(the July 2026 redesign; the implementation still speaks the
-superseded surface until milestone 4 lands).
+(the July 2026 redesign; the tree speaks this surface as of
+milestone 4).
 
 The primitive vocabulary already exists in today's CLI and Python
 surface — it is the proven instruction set the language must cover:
@@ -1330,10 +1330,8 @@ Milestones run in order — the numbering is the priority. The
 whole arc runs from text-mode DOS on QEMU to the GUI era ending
 on Hyper-V. Milestones 1–3 are history: the north-star vertical
 slice, the media library, and the scripting language on its
-first, now-superseded surface. Milestone 4 — the next work —
-realigns the tree with the July 2026 redesign; no later
-milestone starts before the tree speaks the new surface.
-Milestones 5–7 complete the
+first, now-superseded surface. Milestone 4 is complete: the
+tree speaks the July 2026 redesign. Milestones 5–7 complete the
 documented design — the instance model and machine blueprints
 with authored-asset residency, the script properties, and run
 records with asynchronous runs — still for the DOS platform on
@@ -1600,16 +1598,16 @@ blocks, run records), and transcripts honor the provenance and
 secret-redaction contracts. At this point everything `planning/`
 documents is implemented for DOS on QEMU.
 
-### Milestone 4 — Script-surface realignment
+### Milestone 4 — Script-surface realignment (complete)
 
 The July 2026 script-language redesign
 ([planning/design/script-spec.md](design/script-spec.md), with
 `reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
 reference script)
 supersedes the surface milestones 1 and 3 implemented.
-This milestone gates everything after it: no later milestone
-starts before the tree speaks the new surface. Pre-beta, the old
-surface is deleted, not bridged.
+This milestone gated everything after it: later milestones
+start only once the tree speaks the new surface. Pre-beta, the
+old surface is deleted, not bridged.
 
 Decide first: nothing — the gating decisions were settled in
 July 2026 and folded into the spec (the adjudication trail is

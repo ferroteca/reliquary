@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """OS installation scripting over agentless QEMU guest automation."""
 
-from .blueprint import (Blueprint, BlueprintDrive, load_blueprint,
-                        parse_blueprint, new_blueprint)
+from .blueprint import (Blueprint, BlueprintDrive, delete_blueprint,
+                        load_blueprint, parse_blueprint, new_blueprint)
 from .cli import main
 from .home import (blueprints_dir, cache_dir, documents_dir,
                    downloads_cache_dir, drives_dir, home, machines_cache_dir,
@@ -23,7 +23,7 @@ from .machines import (create, create_machine, destroy_machine,
                        stop_machine)
 from .media import (MediaDefinition, MediaItem, ResolvedMedia,
                     fetch_media, resolve_media, clean_downloads,
-                    clean_media)
+                    clean_media, delete_media, list_media)
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
 from .script_nodes import ScriptParseError
@@ -57,6 +57,8 @@ __all__ = [
     "create_hdd_image",
     "create_machine",
     "cursor_menu_select",
+    "delete_blueprint",
+    "delete_media",
     "destroy_machine",
     "eject_media",
     "insert_media",
@@ -75,6 +77,7 @@ __all__ = [
     "get_property",
     "home",
     "list_machines",
+    "list_media",
     "list_properties",
     "load_blueprint",
     "load_script",

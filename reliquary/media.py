@@ -269,6 +269,76 @@ def resolve_media(name, home=None):
     return ResolvedMedia(definition=definition, item=item)
 
 
+def list_media(home=None, *, builtin=False):
+    """Return sorted media item names from the catalog.
+
+    Home ``media/`` by default. With ``builtin=True``, the package
+    codex instead — never writes or seeds.
+    """
+    if builtin:
+        from .library import list_builtin_media
+        return list(list_builtin_media())
+    library = media_dir(home)
+    if not os.path.isdir(library):
+        return []
+    names = set()
+    for filename in sorted(os.listdir(library)):
+        if not (filename.endswith(".rlqm")
+                or filename.endswith(".json")):
+            continue
+        filepath = os.path.join(library, filename)
+        try:
+            definition = load_definition(filepath)
+        except (ValueError, KeyError, FileNotFoundError):
+            continue
+        for item in definition.items:
+            names.add(item.name)
+    return sorted(names)
+
+
+def delete_media(name, *, home=None):
+    """Remove the home definition file that defines item ``name``.
+
+    Fails closed while any machine drive references any item in
+    that definition, naming the machine ids. Never deletes package
+    builtins. Returns the removed path.
+    """
+    from .machines import list_machines
+
+    library = media_dir(home)
+    matches = scan_media_definitions(library, name)
+    if not matches:
+        raise FileNotFoundError(
+            f"No media definition found with name: {name}\n"
+            f"expected under {library}")
+    if len(matches) > 1:
+        paths = ", ".join(match[0] for match in matches)
+        raise ValueError(
+            f"Multiple media definitions have the same name "
+            f"'{name}': {paths}")
+    path, definition, _item = matches[0]
+    item_names = {item.name for item in definition.items}
+
+    holders = []
+    for state in list_machines(home):
+        drives = state.get("drives") or {}
+        for drive in drives.values():
+            media_name = drive.get("media")
+            if media_name in item_names:
+                holders.append(state["id"])
+                break
+    if holders:
+        ids = ", ".join(holders)
+        raise RuntimeError(
+            f"media {name!r} is still used by "
+            f"{len(holders)} machine(s):\n"
+            f"  {ids}\n"
+            "eject or destroy them first, then delete the media")
+
+    os.remove(path)
+    return path
+
+
 _MISMATCH_POLICIES = ("fail", "prompt", "refetch")
 
 

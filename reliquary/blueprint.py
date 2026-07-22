@@ -298,3 +298,37 @@ def new_blueprint(name, *, platform="dos", home=None):
         handle.write("\n")
 
     return path
+
+
+def delete_blueprint(name, *, home=None):
+    """Remove the home blueprint file for ``name``.
+
+    Fails closed while any machine of the blueprint exists,
+    naming their ids. Never deletes package builtins — only a
+    file under ``blueprints/``. Returns the removed path.
+    """
+    from .home import blueprints_dir
+    from .machines import list_machines
+
+    machines = list_machines(home, blueprint=name)
+    if machines:
+        ids = ", ".join(machine["id"] for machine in machines)
+        raise RuntimeError(
+            f"blueprint {name!r} still has "
+            f"{len(machines)} machine(s):\n"
+            f"  {ids}\n"
+            "destroy them first, then delete the blueprint")
+
+    path = None
+    for extension in (".rlqb", ".json"):
+        candidate = os.path.join(
+            blueprints_dir(home), f"{name}{extension}")
+        if os.path.isfile(candidate):
+            path = candidate
+            break
+    if path is None:
+        raise FileNotFoundError(
+            f"blueprint not found: {name}.rlqb\n"
+            f"expected under {blueprints_dir(home)}")
+    os.remove(path)
+    return path

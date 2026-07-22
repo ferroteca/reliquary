@@ -9,15 +9,15 @@ Small to-do tasks. Large tasks belong in the roadmap; the
 adjudicated design-decision records live in
 [DECISIONS.md](DECISIONS.md).
 
-## Implementation realignment (ROADMAP milestone 4 — the next work)
+## Implementation realignment (ROADMAP milestone 4 — complete)
 
 Realign the implementation with the redesigned script language
 and the July 2026 decisions (DECISIONS.md).
 planning/design/script-spec.md is the source of truth (full
 typed EBNF) with
 reliquary/codex/scripts/freedos-1.4-plain-install.rlqs the
-reference script; ROADMAP milestone 4 owns this work, and no
-later milestone starts before it lands. No backward
+reference script; ROADMAP milestone 4 owned this work, and no
+later milestone started before it landed. No backward
 compatibility: the old surface is deleted entirely, not
 bridged.
 
@@ -218,6 +218,14 @@ the parser stack validates scripts; 10–12 close out:
     run end to end on the new surface and check-script
     reports the timing plan (ROADMAP milestone 4's "Done
     when").
+    LANDED (2026-07-22): `check-script` prints the timing plan
+    for the FreeDOS install/verify scripts; `run-script install
+    --blueprint freedos-1.4-plain` and `run-script verify` both
+    finished `result: ok` with machine phase `ready` on a
+    scratch home. Guest `fdapm poweroff` samples treat
+    lifecycle's "no longer reachable" RuntimeError as
+    `machine=stopped` (script_runner `_read`), so shutdown
+    completes after QEMU exits.
 
 Realignment items riding later milestones (kept here so the
 umbrella list stays complete; not milestone 4):
@@ -343,6 +351,23 @@ dependency order:
   owner 2026-07-21 — a real third-party adapter story elevates
   it into the INTERFACES inventory through the interface-change
   rule, never by drift)
+
+## Design
+
+- Media lifecycle commands (`list-media`, `delete-media`, and any
+  further definition-level verbs) need careful planning before
+  the surface hardens: one media definition (`.rlqm`) can define
+  several items (archive form). Open questions to adjudicate and
+  record in DECISIONS.md / media-spec / cli.md — what does the
+  command noun name (item vs definition stem)? does
+  `delete-media` remove the whole file, edit items out, or refuse
+  when siblings remain? how should `list-media` present file vs
+  item identity (and multi-item provenance)? `seed-media` already
+  seeds by item name and copies the whole definition — keep or
+  revisit that invariant together with delete/list. The current
+  provisional twins (item-name delete of the owning file; list of
+  item names) are placeholders pending this round, not settled
+  design.
 
 ## Wishlist
 

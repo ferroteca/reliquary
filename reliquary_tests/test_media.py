@@ -828,6 +828,84 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
             self.assertEqual(handle.read(), ISO_BYTES)
 
 
+class ListMediaTests(MediaHomeTestCase):
+    def test_lists_item_names(self):
+        self.write_definition("a.json", {
+            "name": "alpha",
+            "file": "a.iso",
+            "sha256": ISO_SHA256,
+        })
+        self.write_definition("b.rlqm", {
+            "name": "beta",
+            "file": "b.iso",
+            "sha256": ISO_SHA256,
+        })
+        self.assertEqual(
+            media.list_media(home=self.home), ["alpha", "beta"])
+
+    def test_empty_home(self):
+        self.assertEqual(media.list_media(home=self.home), [])
+
+    def test_builtin_includes_freedos(self):
+        names = media.list_media(builtin=True)
+        self.assertIn("freedos-1.4-livecd", names)
+
+
+class DeleteMediaTests(MediaHomeTestCase):
+    def test_deletes_definition_file(self):
+        path = self.write_definition("livecd.rlqm", {
+            "name": "freedos-1.4-livecd",
+            "file": "FD14LIVE.iso",
+            "sha256": ISO_SHA256,
+        })
+        removed = media.delete_media(
+            "freedos-1.4-livecd", home=self.home)
+        self.assertEqual(removed, path)
+        self.assertFalse(os.path.exists(path))
+        self.assertEqual(media.list_media(home=self.home), [])
+
+    def test_missing_raises(self):
+        with self.assertRaises(FileNotFoundError) as caught:
+            media.delete_media("missing", home=self.home)
+        self.assertIn("No media definition found", str(caught.exception))
+
+    def test_refuses_while_machine_holds_media(self):
+        self.write_definition("livecd.rlqm", {
+            "name": "livecd",
+            "file": "live.iso",
+            "sha256": ISO_SHA256,
+        })
+        machine_dir = os.path.join(
+            self.home, "cache", "machines", "plain-0")
+        os.makedirs(machine_dir)
+        with open(os.path.join(machine_dir, "reliquary-machine.json"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({
+                "id": "plain-0",
+                "blueprint": "plain",
+                "phase": "ready",
+                "drives": {
+                    "cdrom0": {
+                        "medium": "cdrom",
+                        "slot": 0,
+                        "media": "livecd",
+                        "path": None,
+                    },
+                },
+            }, handle)
+        with self.assertRaises(RuntimeError) as caught:
+            media.delete_media("livecd", home=self.home)
+        self.assertIn("still used by 1 machine(s)", str(caught.exception))
+        self.assertIn("plain-0", str(caught.exception))
+        self.assertTrue(os.path.exists(
+            os.path.join(self.media_dir, "livecd.rlqm")))
+
+    def test_does_not_delete_builtin(self):
+        with self.assertRaises(FileNotFoundError):
+            media.delete_media(
+                "freedos-1.4-livecd", home=self.home)
+
+
 class CleanupTests(MediaHomeTestCase):
     def test_clean_downloads(self):
         cache = os.path.join(self.home, "cache", "downloads")
