@@ -319,10 +319,13 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     test selection is property data (inputs-as-data holds), and the
     iterate loop needs per-iteration run records plus collected
     results the automator can parse
-  - U3 stage/collect: the "declared exchange drive" cannot be declared in
-    the decided blueprint drive vocabulary (no directory/vvfat kind), the
-    CLI has no file-exchange commands, and only the superseded legacy
-    Runner/root-home surface serves injection today
+  - U3 stage/collect: the "declared exchange drive" cannot be declared —
+    CLOSED (2026-07-22, gap-closure queue item 3): the results
+    directory is a script-declared drive-key+path (coupled to the
+    instruction stream, never a blueprint item) reached by the
+    adapter's at-rest access with record custody; the CLI gains
+    stage-files/collect-files; and hostdir joins the drive
+    vocabulary as the writable vvfat-served fourth content source
   - U5 blueprint parameterization — DESIGN RECORDED 2026-07-21, owner
     adjudication pending: blueprint `parameters` field (direct value |
     {"property": ...} reference; binding order response > blueprint >
@@ -1078,15 +1081,84 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      list), api.md (table row, attach_run driver-indifference);
      guiding-principles U3 run-records entry CLOSED (its stale
      response-data phrasing fixed to properties)
-  3. THE STAGE/COLLECT EXCHANGE MODEL (parent: the U3 stage/collect
-     entry): the declared exchange drive cannot be declared — the
-     blueprint drive vocabulary has no directory-backed kind, the CLI
-     has no file-exchange commands, and only the superseded legacy
-     Runner/root-home surface serves injection; design the model end
-     to end: blueprint vocabulary, the script verbs' backing, CLI
-     commands and API twins under the identity rule — and collect's
-     delivery into the run record's output/ (item 2's recorded
-     demand)
+  3. RESOLVED (owner, 2026-07-22, design round — an extended
+     owner-driven walk-through that reshaped the design four
+     times; each intermediate shape was killed by an owner
+     challenge): THE RESULTS DIRECTORY IS A SCRIPT DECLARATION —
+     `results <drive-key> ["<path>"]` (header node, S15; path
+     defaults to the drive root; renamed from `exchange`
+     in-round, owner: name it by what earns it — U3's results
+     out; stage-into-results the named cost; resultsdir and
+     workdir weighed and declined, workdir a docker false
+     friend): the def is coupled to the
+     instruction stream — the script that tells the guest to
+     write to D:\RESULTS is the file that declares results hdd1
+     "/results" — so it is NOT a blueprint item (blueprint stays
+     pure topology; the letter↔key agreement is the author's
+     ordinary guest-boundary duty, reliquary never maps guest
+     letters). stage/collect are IN-BAND COPIES resolving within
+     the point (bounded host reach; no absolutes, no ..), machine
+     stopped on every control plane, via the adapter's at-rest
+     filesystem access (native formats + chains, capability
+     honesty, FAT first; no-filesystem fails by name — a blank
+     size drive has none until the installer makes one);
+     preflight verifies the drive (size/base/hostdir content —
+     never media, never an empty slot); directory arguments
+     recursive, collect "/" sweeps the point (also the
+     crash-forensics read — the drive at rest is authoritative);
+     stage creates the dir; capacity errors name file and free
+     space; collect lands in runs/<n>/output/ (item 2's demand,
+     served). CLI: stage-files <path>... --to <drive:path> /
+     collect-files <drive:path>... [--to <dir>] (twins
+     stage_files / collect_files; durable-state side per the
+     insert-media precedent), --to defaulting to the open
+     interaction run's output/, required with none open. HOSTDIR
+     REINSTATED (owner: "vvfat is too useful to ignore") as the
+     FOURTH drive content source beside media/size/base: a host
+     directory presented to the guest as a READABLE, WRITABLE FAT
+     drive — no modes, no flags; the directory reflects the
+     guest's writes at the latest by machine stop (QEMU vvfat may
+     show them live; the floor is the contract); while stopped
+     the directory IS the drive's content (out-of-band
+     preparation with any host tool is legitimate;
+     stage-files/collect-files are the in-band form);
+     latest-state-only (history is what run records are for) and
+     no sharing across concurrently running machines, both
+     documented; hdd/floppy only (never cdrom — no ISO9660);
+     relative paths asset-root-resolved (U4-portable), absolute
+     allowed (the local-path class); unverified by design (media
+     stays the pinned path); apply-absorbable; adapter-served
+     under capability honesty (QEMU = vvfat, proven for DOS-era
+     write patterns; others serve the contract their own way or
+     report unsupported — owner: backend nonuniformity accepted
+     here, vvfat too useful to ignore). Division of labor:
+     hostdir = the standing working surface (the design's half),
+     stage = per-run injection (the instruction stream's half),
+     the results directory + collect = bounded reach and
+     evidence custody.
+     DECLINED along the walk-through: a dedicated size-valued
+     exchange drive (topology/drive-letter churn); folder-as-
+     custody and the boundary folder MIRROR (last-stop-wins vs
+     one-iteration-one-record; parked — the CLI pair covers the
+     folder workflow explicitly); the blueprint drive:path
+     exchange def (the instruction-stream coupling killed it);
+     READ-ONLY HOSTDIR and any writable/readonly flag (an agent
+     invention the owner never asked for, declined explicitly
+     after discussion-to-understanding — hostdir is writable,
+     period; QEMU's live vvfat-rw caveats concern modern guests,
+     not this domain, and imposed no constraint). Growth notes:
+     agent-era live transfer stays DISTINCT VERBS (guest-file-*
+     needs no results directory); multiple results directories =
+     an optional drive argument, additive. Folded: script-spec (header
+     table/grammar/prose, S15 + S1-S15 citation, stage/collect
+     rewrite, preflight list), blueprint reference (four-field
+     exactly-one-of, #hostdir, no-image-paths scoping, validation
+     summary), machine-blueprint.schema.json (hostdir def +
+     floppy/hdd oneOf), ROADMAP (offline-exchange paragraph, CLI
+     synopsis + state-ops paragraph, horizon vvfat note), cli.md
+     (File exchange section, machine-scoped list), api.md (table
+     row, realignment note); guiding-principles U3 stage/collect
+     entry CLOSED
   4. EXPORT MECHANICS (parent: the U1 export entry + the ROADMAP open
      decision): the two targets (single-drive media image vs
      whole-machine native registration), the exact CLI shape and

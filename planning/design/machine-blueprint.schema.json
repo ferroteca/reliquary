@@ -57,7 +57,7 @@
       "minimum": 1
     },
     "drives": {
-      "description": "The drive inventory. Keys declare medium and slot (a bare medium name is the slot-0 alias); values declare where the drive's content comes from. Exactly one of media, size, or base per drive object; removable slots (floppy, cdrom) may be null — present hardware with no medium inserted.",
+      "description": "The drive inventory. Keys declare medium and slot (a bare medium name is the slot-0 alias); values declare where the drive's content comes from. Exactly one of media, size, base, or hostdir per drive object; removable slots (floppy, cdrom) may be null — present hardware with no medium inserted.",
       "type": "object",
       "patternProperties": {
         "^floppy[01]?$": {"$ref": "#/$defs/floppyDrive"},
@@ -131,6 +131,11 @@
         }
       ]
     },
+    "hostdir": {
+      "description": "A host directory presented to the guest as a readable, writable FAT drive: while the machine is stopped the directory is the drive's content, and it reflects the guest's writes at the latest by machine stop. Relative paths resolve against the asset root. Unverified by design — media is the hash-pinned path.",
+      "type": "string",
+      "minLength": 1
+    },
     "floppyDrive": {
       "oneOf": [
         {
@@ -153,6 +158,7 @@
               "description": "Start the drive as a blank image of this size."
             },
             "base": {"$ref": "#/$defs/base"},
+            "hostdir": {"$ref": "#/$defs/hostdir"},
             "enabled": {
               "description": "false removes the drive from the machine entirely — no slot, no hardware — while keeping the entry in the document.",
               "type": "boolean"
@@ -162,7 +168,8 @@
           "oneOf": [
             {"required": ["media"]},
             {"required": ["size"]},
-            {"required": ["base"]}
+            {"required": ["base"]},
+            {"required": ["hostdir"]}
           ]
         }
       ]
@@ -185,6 +192,7 @@
               "description": "Start the drive as a blank image of this size."
             },
             "base": {"$ref": "#/$defs/base"},
+            "hostdir": {"$ref": "#/$defs/hostdir"},
             "controller": {"$ref": "#/$defs/controller"},
             "enabled": {
               "description": "false removes the drive from the machine entirely — no slot, no hardware — while keeping the entry in the document.",
@@ -195,7 +203,8 @@
           "oneOf": [
             {"required": ["media"]},
             {"required": ["size"]},
-            {"required": ["base"]}
+            {"required": ["base"]},
+            {"required": ["hostdir"]}
           ]
         }
       ]

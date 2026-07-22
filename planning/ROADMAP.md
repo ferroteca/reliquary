@@ -492,7 +492,18 @@ state, not the live console; the script verbs `insert` / `eject` /
 `set-boot` are the in-script spellings of the same operations,
 whose rules apply by reference (state-not-blueprint persistence;
 the CLI's media argument is a bare name — `@` marks references
-only inside script text). The CLI adds exactly two commands the language
+only inside script text). The file-exchange pair joins them on
+the durable-state side (owner, 2026-07-22):
+`stage-files <path>... --to <drive:path>` and
+`collect-files <drive:path>... [--to <dir>]` (twins
+`stage_files` / `collect_files`) are the in-band copies into and
+out of a stopped machine's drives at rest —
+`size`/`base`/`hostdir` content only, paths contained within the
+named point, directories recursive; `collect-files --to`
+defaults to the open interaction run's `output/` and is required
+with none open. In a script the same capability is the
+`results` header with `stage`/`collect`
+(planning/design/script-spec.md). The CLI adds exactly two commands the language
 deliberately lacks: `screen` prints the current text screen
 (scripts observe; humans and programs read), and `exec <command>`
 is the composite convenience — `enter` plus the platform
@@ -627,6 +638,10 @@ rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
 rlq insert-media <slot> <media> (--blueprint <name> | --machine <id>)
 rlq eject-media <slot> (--blueprint <name> | --machine <id>)
 rlq set-boot-order <key>... (--blueprint <name> | --machine <id>)
+rlq stage-files <path>... --to <drive:path>
+    (--blueprint <name> | --machine <id>)
+rlq collect-files <drive:path>... [--to <dir>]
+    (--blueprint <name> | --machine <id>)
 rlq hmp <line> (--blueprint <name> | --machine <id>)
 rlq check-script <label-or-name> [--blueprint <name> | --machine <id>]
     [--property <key>=<value>]... [--properties <path>]
@@ -931,7 +946,12 @@ and become ordinary user-owned library documents. Fetched and
 extracted artifacts use the common caches.
 
 Offline `stage`/`collect` require a stopped machine on every
-control plane; future live transfers get distinct verbs rather
+control plane, reaching the script-declared results directory — a
+drive key plus path (`results hdd0 "/results"`), the bounded
+host reach into the guest's disks — through the adapter's
+at-rest filesystem access, with collected files landing in the
+run record's `output/` (owner, 2026-07-22); future live
+transfers get distinct verbs rather
 than backend-dependent semantics. `start` reconciles the authored
 machine blueprint and `stop` is visibly a host hard power-off.
 There is no `restart`: a hard power cycle is the explicit pair,
@@ -2146,8 +2166,10 @@ combines:
 - VGA text-memory inspection for textual output and completion
   detection;
 - QMP `screendump` as an independent diagnostic capability; and
-- vvfat staging and write-back as an independent file-exchange
-  mechanism.
+- vvfat as the QEMU adapter's `hostdir` mechanism — a host
+  directory as a writable guest FAT drive, proven for DOS-era
+  write patterns (`stage`/`collect` ride at-rest image access
+  instead).
 
 It has no guest prerequisite and remains the DOS default and
 fallback. It is not accurately modeled as a stream: output is a

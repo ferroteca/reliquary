@@ -381,8 +381,9 @@ A value is either a media-name string (shorthand):
 {"drives": {"cdrom": "freedos-1.4-livecd"}}
 ```
 
-or an object. **Exactly one** of three fields — `media`, `size`,
-or `base` — declares where the drive's content comes from; a
+or an object. **Exactly one** of four fields — `media`, `size`,
+`base`, or `hostdir` — declares where the drive's content comes
+from; a
 drive object with none of them, or more than one, fails
 validation.
 
@@ -405,7 +406,10 @@ preflight (and a script's `insert` targets) can be checked before
 anything runs. Fixed drives
 (`hdd`) cannot be empty.
 
-There are no image paths anywhere in the blueprint. A drive that has
+There are no paths to reliquary-managed images anywhere in the
+blueprint ([`hostdir`](#hostdir--optional--string) deliberately
+names user-owned content — the media `local-path` class). A
+drive that has
 its own image file (declared with `size` or `base`) gets it
 materialized by reliquary inside the cached materialization, named
 canonically after the drive key —
@@ -518,6 +522,56 @@ cheapest possible `recreate`.
 `duplicate` works everywhere (converted to the backend's
 preferred format when needed) and makes the drive fully
 independent of backing-file support.
+
+#### `hostdir` — optional · string
+
+A host directory presented to the guest as a FAT drive —
+readable and writable:
+
+```json
+{"drives": {"hdd1": {"hostdir": "work/"}}}
+```
+
+The guest reads and writes the drive like any disk; the
+directory reflects the guest's writes at the latest by machine
+stop — on QEMU (vvfat) they may appear live. While the machine
+is stopped, the directory is the drive's content and is an
+ordinary host directory: prepare or harvest it with any tool
+(out-of-band), or with the in-band copies
+`stage-files`/`collect-files`; host-side edits while the machine
+runs are outside the contract. The directory always shows the
+drive's *latest* state, never history — per-run results belong
+to `collect` and the run record — and one directory should not
+be shared by concurrently running machines.
+
+Valid on `hdd` and `floppy` drives, never `cdrom` (no ISO9660
+synthesis). A relative path resolves against the invocation's
+asset root, so a checked-in blueprint can present the project's
+own tree and stay portable (U4); an absolute path is allowed —
+the content is the user's own, exactly the media `local-path`
+class — with the caveat that it is machine-specific and belongs
+in personal, not shared, blueprints. A missing directory fails
+closed naming the path; contents exceeding the medium's capacity
+(a floppy's fixed size, the platform-default hard-disk capacity)
+fail at `start` naming the files that do not fit.
+
+`hostdir` deliberately trades verification for liveness: the
+directory is user-owned and mutable between runs, and nothing is
+hash-checked — `media` remains the pinned, reproducible path for
+content a workflow must trust (U4). The mechanism is the
+adapter's under capability honesty: QEMU serves `hostdir` with
+vvfat (proven in exactly this domain — simple FAT, DOS-era write
+patterns); a backend without an equivalent serves the same
+contract its own way (a FAT image materialized from the
+directory and reconciled at rest) or reports the capability
+unsupported, naming itself. `apply` absorbs `hostdir` changes
+(content re-presents at the next start; nothing regenerates).
+
+Division of labor: `hostdir` is the standing working surface
+declared by the design; per-run injection and results custody
+belong to the script's [`results` directory and
+`stage`/`collect`](script-spec.md#stage-and-collect), which may
+target a `hostdir` drive.
 
 #### `controller` — optional · string
 
@@ -728,7 +782,9 @@ Format checks (reject the document):
   one slot twice (in either spelling), and duplicate
   `control-planes` entries;
 - drive objects declaring none, or more than one, of `media`,
-  `size`, and `base`;
+  `size`, `base`, and `hostdir`;
+- `hostdir` on `cdrom` drives, or a `hostdir` directory that
+  does not exist;
 - `null` (empty) values on non-removable (`hdd`) drives;
 - `media` or `base.media` names no media definition provides;
 - `backend-settings` sections overlapping reliquary-owned fields;
@@ -744,6 +800,7 @@ naming backend and capability):
 - controller types the backend cannot provide (e.g. anything but
   `scsi` on Hyper-V Generation 2);
 - `difference` bases the backend/format pair cannot express;
+- `hostdir` drives the backend cannot serve;
 - image formats the backend cannot attach;
 - control planes the backend cannot offer;
 - boot orders the backend cannot honor.

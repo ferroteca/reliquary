@@ -743,6 +743,40 @@ rlq set-boot-order cdrom0 hdd0 -b freedos
 rlq start-machine -b freedos
 ```
 
+### File exchange
+
+```
+rlq stage-files <path>... --to <drive:path>
+    (--blueprint <name> | --machine <id>)
+rlq collect-files <drive:path>... [--to <dir>]
+    (--blueprint <name> | --machine <id>)
+```
+
+The in-band file copies — twins `stage_files` / `collect_files`,
+on the durable-state side like the media operations above.
+`<drive:path>` names a drive key and a path on its filesystem
+(`hdd0:/results`): `size`/`base` drives are reached through the
+adapter's at-rest image access, `hostdir` drives are plain
+directory copies (where out-of-band preparation with any host
+tool is equally legitimate — the directory is the drive). The
+machine must be stopped on every control plane; directories
+transfer recursively; paths are contained (no `..`, no
+absolutes); a drive with no readable filesystem fails by name;
+`media` drives are never written. `collect-files --to` defaults
+to the open interaction run's `output/` directory — the U3
+loop's custody for free — and is required when no run is open:
+nothing guessed. In a script the same capability is the
+`results` header with `stage` / `collect`
+([script spec](script-spec.md#stage-and-collect)).
+
+```powershell
+rlq stage-files payloads\AUTOTEST.EXE --to hdd0:/results -b freedos
+rlq begin-run -b freedos
+# ... drive the tests ...
+rlq collect-files hdd0:/results -b freedos   # → the run's output/
+rlq end-run -b freedos
+```
+
 ### Raw HMP
 
 ```
@@ -1123,7 +1157,8 @@ selectors, mutually exclusive. On machine-scoped commands
 `apply-blueprint`, `destroy-machine`, `recreate-machine`,
 `clone-machine`, `export`, `run-script`, the `run` operations,
 `begin-run`, `end-run`,
-`insert-media`, `eject-media`, `set-boot-order`, and the
+`insert-media`, `eject-media`, `set-boot-order`, `stage-files`,
+`collect-files`, and the
 guest-console family `type`, `enter`, `press`, `exec`, `select`,
 `screen`, `wait`, `screenshot`, `hmp`) at least one is required;
 `run-script` auto-creates a machine when `--blueprint` names a

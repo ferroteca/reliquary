@@ -315,6 +315,7 @@ Header nodes:
 | `entry` | phase name | required in a phased script, forbidden in a linear one |
 | `timeout` | duration | script-wide observation default |
 | `deadline` | duration | wall-clock budget for the whole run |
+| `results` | drive key, optional path string | the results directory for `stage`/`collect` |
 
 Declarations:
 
@@ -368,7 +369,8 @@ header          = "description" , string , eol
                 | "machine" , ( "running" | "stopped" ) , eol
                 | "entry" , name , eol
                 | "timeout" , duration , eol
-                | "deadline" , duration , eol ;
+                | "deadline" , duration , eol
+                | "results" , slot , [ string ] , eol ;
 
 media-def       = "media" , name , json-island ;
 json-island     = "{" , eol , { json-line } , "}" , eol ;
@@ -533,6 +535,8 @@ the CFG. Each has a stable id; diagnostics cite them:
   the portable set, `insert`/`eject` name removable
   (floppy/cdrom) slots, `set-boot` names drive slots, and
   interpolation appears only where the argument accepts it.
+- **S15** — `stage` and `collect` appear only in a script whose
+  header declares `results`.
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
@@ -607,6 +611,24 @@ deadline    45m
   without it, and validation rejects the script rather than let
   the backstop be forgotten. Acyclic and linear scripts may omit
   it.
+- `results` declares the results directory — the host's
+  file-exchange point on a guest disk: a drive key
+  and an optional path string on that drive's filesystem,
+  defaulting to the drive root — `results hdd0 "/results"`. It
+  is required by [`stage` and `collect`](#stage-and-collect)
+  (S15), and it bounds the host's reach into the guest's disks:
+  both verbs resolve within this directory and cannot escape it.
+  Preflight verifies the drive against the target machine: it
+  must be declared with `size`, `base`, or `hostdir` content —
+  never `media` (hash-verified, read-only by doctrine), never an
+  empty slot. The declaration lives in the script rather than
+  the blueprint because it is coupled to the instruction stream:
+  the script that tells a guest program to write to `D:\RESULTS`
+  is the document that declares `results hdd1 "/results"`, so
+  both halves of that coupling live in one file. Keeping the
+  typed guest letter and the declared drive key in agreement is
+  the author's ordinary guest-boundary duty — reliquary never
+  maps guest drive letters.
 
 Each header may appear at most once. The file name supplies the
 script name. There is no format-version field before beta because
@@ -1586,18 +1608,52 @@ start
 collect "RESULTS.LOG" to="results/"
 ```
 
-`stage` places a host file on the declared exchange drive;
-`collect` copies a guest-produced file from it. Both require the
-machine to be stopped on every control plane. This uniform contract
-preserves agentless virtual-FAT snapshot and write-back semantics.
-Future live guest-agent transfer, if added, will use different
-verbs with an explicitly stronger capability rather than silently
-changing these verbs' lifecycle behavior.
+A script using either verb declares its [results
+directory](#header) first:
+
+```rlqs
+results hdd0 "/results"
+```
+
+`stage` copies host files into the results directory — above,
+landing at `hdd0:/results/AUTOTEST.EXE`; `collect` copies
+guest-produced files out of it, into the run record's `output/`
+directory. Both are **in-band copies**: reliquary performs them,
+emits their transfer events, and requires the machine to be
+stopped on every control plane — the adapter reaches the drive's
+filesystem *at rest*, through its native image formats and
+differencing chains, under capability honesty (FAT filesystems
+first; a drive carrying no filesystem the adapter can read fails
+the verb by name — a blank `size` drive honestly has none until
+the guest's installer creates one). On a
+[`hostdir`](machine-blueprint-reference.md#hostdir--optional--string)
+drive the same verbs are plain directory copies — and
+*out-of-band* preparation, any host tool touching the directory
+while the machine is stopped, is equally legitimate: the
+directory is the drive. Future live guest-agent transfer, if
+added, will use different verbs with an explicitly stronger
+capability rather than silently changing these verbs' lifecycle
+behavior.
+
+Arguments may name files or directories; a directory transfers
+recursively, and `collect "/"` sweeps the entire results
+directory — the ordinary post-run "give me everything", and the
+forensic read after a crashed run (the drive at rest is
+authoritative; nothing depends on a clean shutdown). `stage`
+creates the results directory when absent; `collect` of a
+missing path fails naming it; staging past the drive's free
+space fails naming the file and the space remaining. Guest-side
+paths resolve within the results directory and cannot escape it (no
+absolute paths, no `..`); neither verb touches any other drive,
+and media items are never written.
 
 Stage sources resolve relative to the script directory. Collection
 destinations resolve beneath the run's output directory, never the
 process working directory. The CLI may select another output root;
-script paths cannot escape it.
+script paths cannot escape it. Out of a script, the state
+commands `stage-files` / `collect-files` are the same in-band
+capability, addressing the point explicitly as
+`<drive-key>:<path>` (planning/ROADMAP.md "The CLI").
 
 ### `start` and `stop`
 
@@ -1624,7 +1680,7 @@ reconciliation behavior visible.
 
 Parsing and static validation enforce the legality rules — the
 [lexical rules](#lexical-rules), the grammar, and the
-[syntactic restrictions](#syntactic-restrictions) S1–S14 — from
+[syntactic restrictions](#syntactic-restrictions) S1–S15 — from
 the script text alone, before the machine starts. With more in
 scope, preflight further rejects, naming what it needed:
 
@@ -1634,7 +1690,8 @@ scope, preflight further rejects, naming what it needed:
 - `stage` sources that do not exist relative to the script's
   directory (the filesystem);
 - `insert`/`eject` slots and `set-boot` drives the target
-  machine does not declare (a machine);
+  machine does not declare, and a `results` drive it does not
+  declare with `size`, `base`, or `hostdir` content (a machine);
 - explicit `--property` keys the running script does not declare,
   keys given twice, and still-unbound noninteractive properties
   (the explicit values);
