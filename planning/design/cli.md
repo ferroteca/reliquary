@@ -247,7 +247,7 @@ blueprint and script:
 | shared media | `<name>.rlqm` | `freedos-1.4-livecd.rlqm` |
 
 A media definition that is specific to one script's step — the
-installer CD that script inserts, a driver disk it stages — uses the
+installer CD that script inserts, a driver disk it swaps in — uses the
 script-aligned pattern. A media definition shared across scripts or
 blueprints (or used independently by `create-machine`) uses a
 standalone name. Both resolve through the same media library;
@@ -777,38 +777,32 @@ rlq set-boot-order cdrom0 hdd0 -b freedos
 rlq start-machine -b freedos
 ```
 
-### File exchange
+### The machine directory
 
 ```
-rlq stage-files <path>... --to <drive:path>
-    (--blueprint <name> | --machine <id>)
-rlq collect-files <drive:path>... [--to <dir>]
-    (--blueprint <name> | --machine <id>)
+rlq get-machine-dir (--blueprint <name> | --machine <id>)
 ```
 
-The in-band file copies — twins `stage_files` / `collect_files`,
-on the durable-state side like the media operations above.
-`<drive:path>` names a drive key and a path on its filesystem
-(`hdd0:/results`): `size`/`base` drives are reached through the
-adapter's at-rest image access, `hostdir` drives are plain
-directory copies (where out-of-band preparation with any host
-tool is equally legitimate — the directory is the drive). The
-machine must be stopped on every control plane; directories
-transfer recursively; paths are contained (no `..`, no
-absolutes); a drive with no readable filesystem fails by name;
-`media` drives are never written. `collect-files --to` defaults
-to the open interaction run's `output/` directory — the U3
-loop's custody for free — and is required when no run is open:
-nothing guessed. In a script the same capability is the
-`results` header with `stage` / `collect`
-([script spec](script-spec.md#stage-and-collect)).
+Prints the machine's cache directory —
+`cache/machines/<id>/` as an absolute path — twin
+`get_machine_dir()`, whose return is the path string (`--json`
+serializes it like any other return). A query: it works in any
+machine phase and touches nothing.
+
+The path is the door to out-of-band file exchange, the
+sanctioned way files cross the host/guest boundary until the
+deferred in-band file operations land (planning/ROADMAP.md
+"Horizon"): while the machine is stopped on every control
+plane, its drives are plain host state — a `hostdir` drive *is*
+its directory, and image drives are readable and writable with
+the user's own tools. reliquary neither mediates nor records
+out-of-band access. The contract, including what stays
+untouchable (`cache/media/` payloads, `runs/` records), lives
+in the [instance model](instance-model.md).
 
 ```powershell
-rlq stage-files payloads\AUTOTEST.EXE --to hdd0:/results -b freedos
-rlq begin-run -b freedos
-# ... drive the tests ...
-rlq collect-files hdd0:/results -b freedos   # → the run's output/
-rlq end-run -b freedos
+rlq get-machine-dir -b freedos
+# → D:\OneDrive\Documents\reliquary\cache\machines\freedos-0
 ```
 
 ### Raw HMP
@@ -1192,8 +1186,8 @@ selectors, mutually exclusive. On machine-scoped commands
 `clone-machine`, `export-drive`, `export-machine`, `run-script`,
 the `run` operations,
 `begin-run`, `end-run`,
-`insert-media`, `eject-media`, `set-boot-order`, `stage-files`,
-`collect-files`, and the
+`insert-media`, `eject-media`, `set-boot-order`,
+`get-machine-dir`, and the
 guest-console family `type`, `enter`, `press`, `exec`, `select`,
 `screen`, `wait`, `screenshot`, `hmp`) at least one is required;
 `run-script` auto-creates a machine when `--blueprint` names a

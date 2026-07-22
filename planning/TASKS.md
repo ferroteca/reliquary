@@ -309,7 +309,10 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     interaction runs — the begin-run/end-run opt-in bracket — give
     primitive loops the same records; transcript.txt respecified a
     pure renderer of the stream; per-test results = properties in,
-    collected caller artifacts out, no test vocabulary — G2); the
+    collected caller artifacts out, no test vocabulary — G2; the
+    collected-artifacts half later superseded by the run-collection
+    drop, 2026-07-22 below — artifacts are read out-of-band, records
+    carry no output/); the
     unit-test loop is now IN U3 itself (amended 2026-07-21: the
     canonical journey uses reliquary twice — define and build the test
     VM, then automate testing inside it; detailed per-test results,
@@ -326,6 +329,10 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     adapter's at-rest access with record custody; the CLI gains
     stage-files/collect-files; and hostdir joins the drive
     vocabulary as the writable vvfat-served fourth content source
+    — then SUPERSEDED IN PART (owner, 2026-07-22, the run-collection
+    drop below): the file-exchange half (results directory,
+    stage/collect, stage-files/collect-files, record custody) is
+    dropped; the hostdir half stands
   - U5 blueprint parameterization — CLOSED (2026-07-22, gap-closure
     queue item 5): the design below was recorded 2026-07-21 with
     owner adjudication pending, then overtaken and fully adjudicated
@@ -1077,7 +1084,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      vocabulary in reliquary (G2) — granularity comes from run
      structure: one iteration = one run record. The
      collect-into-runs/<n>/output/ demand is recorded as input to
-     queue item 3. Folded: script-spec "Failure, runs, and
+     queue item 3. (The custody half — collect and output/ — was
+     later dropped: see the run-collection drop, 2026-07-22.) Folded: script-spec "Failure, runs, and
      transcripts" (transcript respec, crashed-rule scoping, the
      Interaction runs section) + "The run event stream" (preflight
      and interaction kinds, collected paths, statement provenance),
@@ -1164,7 +1172,11 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      synopsis + state-ops paragraph, horizon vvfat note), cli.md
      (File exchange section, machine-scoped list), api.md (table
      row, realignment note); guiding-principles U3 stage/collect
-     entry CLOSED
+     entry CLOSED. SUPERSEDED IN PART (owner, 2026-07-22, the
+     run-collection drop below): the file-exchange half — results
+     directory, stage/collect, stage-files/collect-files, record
+     output/ custody — is dropped; hostdir, the at-rest access
+     doctrine, and distinct-verbs-for-live-transfer stand
   4. RESOLVED (owner, 2026-07-22, design round — all four forks on
      the recommendations, the targets fork revised mid-round by the
      owner's decoupling insight): EXPORT IS TWO COMMANDS —
@@ -1248,6 +1260,59 @@ Small to-do tasks.  Large tasks belong in the roadmap.
   stands, as watches); everything still open anywhere is parked in
   ROADMAP "Decisions still needed" by design, with implementation
   work owned by the realignment and later milestones
+- THE RUN-COLLECTION DROP — DECIDED (owner, 2026-07-22, the
+  out-of-band round; an owner revisit of gap-closure items 2 and 3
+  settled through "what use case cannot be met without it?" —
+  answer: none; the mechanism was custody and ergonomics, never
+  capability; U6 verified untouched — console capture in, authored
+  files out). DROPPED wholesale: the `results` header,
+  `stage`/`collect` (S15 and the language's only host paths die
+  with them — example 05's two-worlds question dissolves: strings
+  are guest text only), the CLI pair stage-files/collect-files,
+  and record custody — runs/<n>/output/ leaves the record; a
+  record is the event stream + transcript + screenshots
+  (INTERFACES "Recorded outputs" updated). FILE EXCHANGE IS
+  OUT-OF-BAND: while a machine is stopped on every control plane
+  its drives are plain host state (a hostdir drive is its
+  directory; images are the user's own tools' business);
+  reliquary neither mediates nor records it; the contract with
+  its edges (running drives untouchable, media cache read-only
+  by doctrine, runs/ append-only, machine state files
+  reliquary's own) is in instance-model.md "The machine
+  directory and out-of-band access". NEW QUERY:
+  get-machine-dir / get_machine_dir(machine=|blueprint=) — the
+  machine's cache directory as an absolute path; any phase,
+  standard selectors, --json serializes the string. DEFERRED
+  with a roughed shape (ROADMAP "Horizon"): in-band
+  list-files/get-files/put-files (twins list_files / get_files /
+  put_files), <drive-key>:<path> addressing, at-rest
+  capability-honest per call, media excluded, recursive, no
+  custody; details (e.g. get-files' destination default) belong
+  to that milestone's own round; value concentrates where
+  out-of-band thins (non-QEMU backends — no hostdir — and
+  non-FAT filesystems), so sequence at or soon after the second
+  backend. Named cost accepted: per-iteration artifact history
+  is the caller's to keep (U3 already makes the caller the
+  interpreter). Use-case triage: no amendment — strong U3
+  alignment (interpretation on the agent's side; the record is
+  evidence, not a warehouse). Folded: script-spec (action list,
+  strings table, header table + prose, grammar, S15 removed —
+  S1–S14, severability, event-stream transfer bullet, preflight
+  list, "File exchange — a named omission" replacing the
+  stage-and-collect section, run-directory tree, per-test
+  paragraph, bundle note), cli.md ("The machine directory"
+  replacing "File exchange", machine-scoped command list,
+  media-naming prose), api.md (surface table row, realignment
+  note), ROADMAP ("The CLI" state-ops paragraph + synopsis,
+  script-section offline paragraph, primitive-vocabulary list,
+  interaction-runs custody phrase, spike-8 out-list, realignment
+  deliverable 3, control-plane vvfat note, the Horizon bullet),
+  INTERFACES.md (recorded outputs), instance-model.md (new
+  section), machine-blueprint.md (runs/ contents twice),
+  machine-blueprint-reference.md (hostdir prose + division of
+  labor), codex.md (naming prose), script-examples/05 rewritten
+  as a regression note + README row. Gap-closure items 2 and 3
+  annotated SUPERSEDED IN PART above
 - THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
   the docker-comparison round; all three forks on the
   recommendations). The docker model largely CONFIRMS the design

@@ -536,12 +536,12 @@ The guest reads and writes the drive like any disk; the
 directory reflects the guest's writes at the latest by machine
 stop — on QEMU (vvfat) they may appear live. While the machine
 is stopped, the directory is the drive's content and is an
-ordinary host directory: prepare or harvest it with any tool
-(out-of-band), or with the in-band copies
-`stage-files`/`collect-files`; host-side edits while the machine
+ordinary host directory: prepare or harvest it with any tool —
+out-of-band exchange is the sanctioned file path
+([instance model](instance-model.md)); host-side edits while the machine
 runs are outside the contract. The directory always shows the
-drive's *latest* state, never history — per-run results belong
-to `collect` and the run record — and one directory should not
+drive's *latest* state, never history — history is what run
+records are for — and one directory should not
 be shared by concurrently running machines.
 
 Valid on `hdd` and `floppy` drives, never `cdrom` (no ISO9660
@@ -568,10 +568,10 @@ unsupported, naming itself. `apply` absorbs `hostdir` changes
 (content re-presents at the next start; nothing regenerates).
 
 Division of labor: `hostdir` is the standing working surface
-declared by the design; per-run injection and results custody
-belong to the script's [`results` directory and
-`stage`/`collect`](script-spec.md#stage-and-collect), which may
-target a `hostdir` drive.
+declared by the design; per-run injection and harvest are
+out-of-band host work against the stopped machine
+([instance model](instance-model.md)), for which a `hostdir`
+drive is the natural surface.
 
 #### `controller` — optional · string
 

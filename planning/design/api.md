@@ -157,7 +157,7 @@ carries the exceptions and each family's contract home.
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
 | `clean-downloads` / `clean-media` | `clean_downloads()` / `clean_media()` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
-| `stage-files` / `collect-files` | `stage_files(paths, to=)` / `collect_files(paths, to=None)` — in-band file exchange with a stopped machine's drives | script spec |
+| `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the door to out-of-band file exchange (in-band file operations are deferred: planning/ROADMAP.md "Horizon") | [instance model](instance-model.md) |
 | `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [ROADMAP "The CLI"](../ROADMAP.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
 | guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
@@ -202,8 +202,10 @@ the package's `start_cached_machine` / `stop_cached_machine`
 `lifecycle.py`'s legacy `start_machine(config)` name collision
 dies with the root-home model, whose `Runner` / `MachineConfig`
 surface is superseded by the blueprint machine model
-(file exchange is settled 2026-07-22: the script `results`
-header with `stage`/`collect`, the CLI pair
-`stage-files`/`collect-files`, and `hostdir` drives — script
-spec and blueprint reference; vvfat survives as the QEMU
-adapter's `hostdir` mechanism).
+(file exchange is settled 2026-07-22: out-of-band host access
+to a stopped machine's drives — `hostdir` drives and the user's
+own image tooling, the machine directory reported by
+`get-machine-dir` — with in-band file operations deferred to a
+late milestone (planning/ROADMAP.md "Horizon") and no script
+verbs; vvfat survives as the QEMU adapter's `hostdir`
+mechanism).

@@ -144,7 +144,7 @@ blueprint and script:
 | shared media | `<name>.rlqm` | `freedos-1.4-livecd.rlqm` |
 
 A media definition specific to one script's step — the installer
-CD that script inserts, a driver disk it stages — uses the
+CD that script inserts, a driver disk it swaps in — uses the
 script-aligned pattern. A media definition shared across scripts
 or blueprints uses a standalone name. Both resolve through the
 same media catalog; the naming convention identifies ownership,

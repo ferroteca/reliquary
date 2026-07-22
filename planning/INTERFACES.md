@@ -134,8 +134,8 @@ covers them equally:
   for shipped media URLs:
   [planning/design/codex.md](design/codex.md).
 - **Recorded outputs** — run records under a machine's `runs/`
-  directory: transcripts (with the secret-redaction contract),
-  screenshots, and collected outputs. The world reads these;
+  directory: the event stream, transcripts (with the
+  secret-redaction contract), and screenshots. The world reads these;
   their shape and retention are a contract: append-only, never
   rewritten, never implicitly pruned — a record lives until its
   machine is destroyed or the user explicitly deletes it. A

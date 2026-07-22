@@ -75,8 +75,7 @@ select "English (United States)"
   forms, and reactive `always` handlers.
 - **Actions** deliver intent-level input or perform supporting host
   operations: `enter`, `type`, `press`, `select`, `insert`,
-  `eject`, `set-boot`, `stage`, `collect`, `screenshot`, `start`,
-  and `stop`.
+  `eject`, `set-boot`, `screenshot`, `start`, and `stop`.
 
 Intent-level verbs remain above portable input events. `select`
 means choosing a visible menu entry, not sending a guessed number
@@ -204,7 +203,7 @@ Every token class has one spelling:
 | spelling | meaning | examples |
 |---|---|---|
 | bare word | keyword or script-internal name | `phase`, `goto formatting`, `cdrom0`, `press enter`, the `stopped` in `machine=stopped` |
-| `"..."` | literal text crossing the guest boundary, or a host path | `wait "C:\>"`, `enter "fdapm poweroff"`, `stage "payloads/AUTOTEST.EXE"` |
+| `"..."` | literal text crossing the guest boundary | `wait "C:\>"`, `enter "fdapm poweroff"` |
 | `/.../` | regex match | `wait /[0-9]+ files copied/` |
 | `@name` | external reference, resolved from the library | `insert cdrom0 @freedos-1.4-livecd` |
 | `$key` | a declared property's bound value | `insert floppy1 $supplemental-disk` |
@@ -315,7 +314,6 @@ Header nodes:
 | `entry` | phase name | required in a phased script, forbidden in a linear one |
 | `timeout` | duration | script-wide observation default |
 | `deadline` | duration | wall-clock budget for the whole run |
-| `results` | drive key, optional path string | the results directory for `stage`/`collect` |
 
 Declarations:
 
@@ -344,8 +342,6 @@ Statements:
 | `set-boot` | drive keys | — | — |
 | `start` | — | — | — |
 | `stop` | — | — | — |
-| `stage` | path string | — | — |
-| `collect` | path string | `to` | — |
 
 And the phase declaration:
 
@@ -369,8 +365,7 @@ header          = "description" , string , eol
                 | "machine" , ( "running" | "stopped" ) , eol
                 | "entry" , name , eol
                 | "timeout" , duration , eol
-                | "deadline" , duration , eol
-                | "results" , slot , [ string ] , eol ;
+                | "deadline" , duration , eol ;
 
 media-def       = "media" , name , json-island ;
 json-island     = "{" , eol , { json-line } , "}" , eol ;
@@ -418,10 +413,7 @@ action          = "enter" , string , eol
                 | "eject" , slot , eol
                 | "set-boot" , slot , { slot } , eol
                 | "start" , eol
-                | "stop" , eol
-                | "stage" , string , eol
-                | "collect" , string ,
-                  [ "to" , "=" , string ] , eol ;
+                | "stop" , eol ;
 
 block-open      = "{" , eol ;
 block-close     = "}" , eol ;
@@ -535,8 +527,6 @@ the CFG. Each has a stable id; diagnostics cite them:
   the portable set, `insert`/`eject` name removable
   (floppy/cdrom) slots, `set-boot` names drive slots, and
   interpolation appears only where the argument accepts it.
-- **S15** — `stage` and `collect` appear only in a script whose
-  header declares `results`.
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
@@ -611,24 +601,6 @@ deadline    45m
   without it, and validation rejects the script rather than let
   the backstop be forgotten. Acyclic and linear scripts may omit
   it.
-- `results` declares the results directory — the host's
-  file-exchange point on a guest disk: a drive key
-  and an optional path string on that drive's filesystem,
-  defaulting to the drive root — `results hdd0 "/results"`. It
-  is required by [`stage` and `collect`](#stage-and-collect)
-  (S15), and it bounds the host's reach into the guest's disks:
-  both verbs resolve within this directory and cannot escape it.
-  Preflight verifies the drive against the target machine: it
-  must be declared with `size`, `base`, or `hostdir` content —
-  never `media` (hash-verified, read-only by doctrine), never an
-  empty slot. The declaration lives in the script rather than
-  the blueprint because it is coupled to the instruction stream:
-  the script that tells a guest program to write to `D:\RESULTS`
-  is the document that declares `results hdd1 "/results"`, so
-  both halves of that coupling live in one file. Keeping the
-  typed guest letter and the declared drive key in agreement is
-  the author's ordinary guest-boundary duty — reliquary never
-  maps guest drive letters.
 
 Each header may appear at most once. The file name supplies the
 script name. There is no format-version field before beta because
@@ -1064,9 +1036,9 @@ atomic: once a verb begins composing events — a `type` string, a
 completes even if a deadline passes meanwhile; the expiry is
 declared at the next boundary. A torn half-typed command would
 leave the guest in a state no observation could account for.
-Host-side operations are the opposite: a media fetch or a
-`stage`/`collect` transfer crosses no guest seam and aborts
-cleanly at deadline, however long it had run.
+Host-side operations are the opposite: a media fetch crosses no
+guest seam and aborts cleanly at deadline, however long it had
+run.
 
 ### The run event stream
 
@@ -1093,8 +1065,7 @@ activation (the phase deadline's scope), a span per observation
   deliveries, `insert` / `eject` / `set-boot`, `start` / `stop`,
   `screenshot`;
 - transfer progress only where an honest total exists — media
-  fetch bytes, `stage` / `collect` bytes (each collected file's
-  landed path under `output/`), `select` traversal
+  fetch bytes, `select` traversal
   steps — never invented denominators: renderers show phases and
   observations as "elapsed / limit" pairs, not progress bars;
 - embedded-definition installation, with source line and
@@ -1597,63 +1568,27 @@ attached installer CD, then boots the installed disk once it is
 populated. The verb exists for scripts that genuinely need a
 different order than the blueprint's default.
 
-### `stage` and `collect`
+### File exchange — a named omission
 
-```rlqs
-stop
-stage "payloads/AUTOTEST.EXE"
-start
-
-# guest runs and shuts down
-collect "RESULTS.LOG" to="results/"
-```
-
-A script using either verb declares its [results
-directory](#header) first:
-
-```rlqs
-results hdd0 "/results"
-```
-
-`stage` copies host files into the results directory — above,
-landing at `hdd0:/results/AUTOTEST.EXE`; `collect` copies
-guest-produced files out of it, into the run record's `output/`
-directory. Both are **in-band copies**: reliquary performs them,
-emits their transfer events, and requires the machine to be
-stopped on every control plane — the adapter reaches the drive's
-filesystem *at rest*, through its native image formats and
-differencing chains, under capability honesty (FAT filesystems
-first; a drive carrying no filesystem the adapter can read fails
-the verb by name — a blank `size` drive honestly has none until
-the guest's installer creates one). On a
+The language deliberately has no file-exchange verbs (owner,
+2026-07-22). Moving files across the host/guest boundary is the
+caller's side of the seam, like every interpretation of what a
+run produced (G2): while a machine is stopped on every control
+plane, its drives are plain host state — a
 [`hostdir`](machine-blueprint-reference.md#hostdir--optional--string)
-drive the same verbs are plain directory copies — and
-*out-of-band* preparation, any host tool touching the directory
-while the machine is stopped, is equally legitimate: the
-directory is the drive. Future live guest-agent transfer, if
-added, will use different verbs with an explicitly stronger
-capability rather than silently changing these verbs' lifecycle
-behavior.
-
-Arguments may name files or directories; a directory transfers
-recursively, and `collect "/"` sweeps the entire results
-directory — the ordinary post-run "give me everything", and the
-forensic read after a crashed run (the drive at rest is
-authoritative; nothing depends on a clean shutdown). `stage`
-creates the results directory when absent; `collect` of a
-missing path fails naming it; staging past the drive's free
-space fails naming the file and the space remaining. Guest-side
-paths resolve within the results directory and cannot escape it (no
-absolute paths, no `..`); neither verb touches any other drive,
-and media items are never written.
-
-Stage sources resolve relative to the script directory. Collection
-destinations resolve beneath the run's output directory, never the
-process working directory. The CLI may select another output root;
-script paths cannot escape it. Out of a script, the state
-commands `stage-files` / `collect-files` are the same in-band
-capability, addressing the point explicitly as
-`<drive-key>:<path>` (planning/ROADMAP.md "The CLI").
+drive *is* its directory, and drive images are readable and
+writable with the user's own tools — so exchange is ordinary
+out-of-band host work against the machine directory
+(`get-machine-dir` reports it; contract in
+[the instance model](instance-model.md)). The omission also
+keeps every quoted string in a script on one side of one
+boundary: string content is guest-facing text, never a host
+path. In-band file operations addressed as `<drive-key>:<path>`
+are a deferred CLI/API capability (planning/ROADMAP.md
+"Horizon"), and future live guest-agent transfer gets its own
+distinct verbs with an explicitly stronger capability; neither
+lands in the language through this omission — reopening it is a
+language decision under the growth goals.
 
 ### `start` and `stop`
 
@@ -1680,18 +1615,15 @@ reconciliation behavior visible.
 
 Parsing and static validation enforce the legality rules — the
 [lexical rules](#lexical-rules), the grammar, and the
-[syntactic restrictions](#syntactic-restrictions) S1–S15 — from
+[syntactic restrictions](#syntactic-restrictions) S1–S14 — from
 the script text alone, before the machine starts. With more in
 scope, preflight further rejects, naming what it needed:
 
 - conflicting embedded or shared media definitions, and
   definition labels whose target files already contain different
   content (the visible catalog);
-- `stage` sources that do not exist relative to the script's
-  directory (the filesystem);
 - `insert`/`eject` slots and `set-boot` drives the target
-  machine does not declare, and a `results` drive it does not
-  declare with `size`, `base`, or `hostdir` content (a machine);
+  machine does not declare (a machine);
 - explicit `--property` keys the running script does not declare,
   keys given twice, and still-unbound noninteractive properties
   (the explicit values);
@@ -1778,8 +1710,7 @@ Every invocation creates a unique run directory under:
 cache/machines/<machine_id>/runs/<n>/
 ├── run-events.jsonl
 ├── transcript.txt
-├── screenshots/
-└── output/
+└── screenshots/
 ```
 
 Runs number monotonically per machine and a number is never
@@ -1841,8 +1772,6 @@ standalone record is the custody story. What a transcript shows
 is therefore exactly what the stream carries; the stream's
 content requirements are listed with [its
 vocabulary](#the-run-event-stream).
-The CLI may redirect the output root, but transcript paths are
-always reported explicitly.
 
 On failure the record carries the pending condition or action,
 the clock that
@@ -1896,9 +1825,11 @@ U3's unit-test loop is served by these mechanics, never by
 semantics: per-run test selection travels as ordinary script
 properties (`--property` / the `properties=` mapping,
 interpolated by property references); granular results are a
-caller-authored artifact (JUnit XML, TAP) that leaves the guest
-via `collect` or exec capture and lands in the record's
-`output/`, its path reported in events; and reliquary has
+caller-authored artifact (JUnit XML, TAP) that the caller takes
+directly — read out-of-band from the stopped machine's drives
+at rest (a `hostdir` results drive makes this a plain directory
+read), or captured as text through `exec` — and keeps on its
+own side of the seam; and reliquary has
 deliberately no test-result vocabulary — no pass/fail schema,
 no result parsing (G2). Granularity comes from run structure:
 one iteration is one run record.
@@ -2046,7 +1977,7 @@ run — into the recipient's home `media/`, or beside the script in
 a project. Definitions already reused
 by several scripts may be distributed directly under `media/`
 instead. The user's own properties file, secret values, and
-staged payloads stay out of the bundle and version
-control. A script's declarations name its property keys, but every
+host payload files exchanged with machines stay out of the
+bundle and version control. A script's declarations name its property keys, but every
 recipient supplies their own values. Media remains hash-pinned and
 independently fetched.

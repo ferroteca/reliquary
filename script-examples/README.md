@@ -19,7 +19,7 @@ marked), and the themes matter more than end-to-end coherence.
 | [02-stop-stopped-family.rlqs](02-stop-stopped-family.rlqs) | **RESOLVED** by named observation channels (`machine=stopped`; a bare string/regex is the screen's only spelling) — kept as a regression note |
 | [03-timing-spellings-and-scope.rlqs](03-timing-spellings-and-scope.rlqs) | `timeout 30s` vs `timeout=5m`; non-local defaults; the stable split; reset asymmetry |
 | [04-on-two-lifecycles.rlqs](04-on-two-lifecycles.rlqs) | **RESOLVED** by the `on`/`always` keyword split — lifetime in the first word; fall-through and hidden terminals stay documented — regression note |
-| [05-strings-two-worlds.rlqs](05-strings-two-worlds.rlqs) | quoted strings are guest text in one verb, host paths in the next |
+| [05-strings-two-worlds.rlqs](05-strings-two-worlds.rlqs) | **RESOLVED** by dropping the file-exchange verbs with the run-collection model — no verb takes a host path; strings are guest text only — regression note |
 | [06-media-label-vs-item.rlqs](06-media-label-vs-item.rlqs) | the media label names a file, `@` references an item; `@` vs `$` definiteness |
 | [07-regex-escaping-regimes.rlqs](07-regex-escaping-regimes.rlqs) | the same screen text escapes differently in `"..."` and `/.../` |
 | [08-bare-word-namespaces.rlqs](08-bare-word-namespaces.rlqs) | bare words span six namespaces; asymmetric reservations |

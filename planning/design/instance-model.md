@@ -63,6 +63,37 @@ several machines exist (listing the candidate ids) or when none
 exist (suggesting `create-machine`; `run-script` creates one
 instead).
 
+## The machine directory and out-of-band access
+
+`get-machine-dir` (twin `get_machine_dir()`) returns the
+machine's cache directory as an absolute path — a query under
+the standard selectors, valid in any phase, touching nothing.
+
+The path is the door to **out-of-band file exchange**, the
+sanctioned way files cross the host/guest boundary (owner,
+2026-07-22 — the run-collection model was dropped; in-band file
+operations are a deferred capability, planning/ROADMAP.md
+"Horizon"). While the machine is stopped on every control
+plane, the content under `drives/` is plain host state: a
+`hostdir` drive *is* its directory, and image drives are
+readable and writable with the user's own tools. reliquary
+neither mediates nor records out-of-band access — what the
+next `start` finds on the drives is simply the machine's state,
+exactly as if the guest had written it.
+
+The blessing has edges:
+
+- a running machine's drives are never touched from the host —
+  the stopped requirement is the contract, not advice;
+- `cache/media/` payloads stay outside it: hash-verified and
+  read-only by doctrine, and rewriting one breaks verification
+  and any `difference` machine backed by it;
+- `runs/` records stay append-only evidence — reading and
+  copying them out is the sanctioned custody move, writing into
+  them is not;
+- `reliquary-machine.json`, `vm.json`, and lock files are
+  reliquary's own state, not an editing surface.
+
 ## Lifecycle
 
 A machine rests in one of two phases — `ready` or `running` — and

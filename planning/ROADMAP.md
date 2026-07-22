@@ -493,17 +493,18 @@ state, not the live console; the script verbs `insert` / `eject` /
 `set-boot` are the in-script spellings of the same operations,
 whose rules apply by reference (state-not-blueprint persistence;
 the CLI's media argument is a bare name — `@` marks references
-only inside script text). The file-exchange pair joins them on
-the durable-state side (owner, 2026-07-22):
-`stage-files <path>... --to <drive:path>` and
-`collect-files <drive:path>... [--to <dir>]` (twins
-`stage_files` / `collect_files`) are the in-band copies into and
-out of a stopped machine's drives at rest —
-`size`/`base`/`hostdir` content only, paths contained within the
-named point, directories recursive; `collect-files --to`
-defaults to the open interaction run's `output/` and is required
-with none open. In a script the same capability is the
-`results` header with `stage`/`collect`
+only inside script text). File exchange is out-of-band (owner,
+2026-07-22 — the run-collection model was dropped):
+`get-machine-dir` (twin `get_machine_dir`, returning the
+machine's cache directory as an absolute path; a query, any
+machine phase) is the door, and while a machine is stopped on
+every control plane its drives are plain host state — a
+`hostdir` drive *is* its directory, and image drives are the
+user's own tools' business; reliquary neither mediates nor
+records out-of-band access (contract:
+planning/design/instance-model.md). In-band file operations are
+deferred to a late milestone ("Horizon" below), and the script
+language has no file verbs — a named omission
 (planning/design/script-spec.md). The CLI adds exactly two commands the language
 deliberately lacks: `screen` prints the current text screen
 (scripts observe; humans and programs read), and `exec <command>`
@@ -641,10 +642,7 @@ rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
 rlq insert-media <slot> <media> (--blueprint <name> | --machine <id>)
 rlq eject-media <slot> (--blueprint <name> | --machine <id>)
 rlq set-boot-order <key>... (--blueprint <name> | --machine <id>)
-rlq stage-files <path>... --to <drive:path>
-    (--blueprint <name> | --machine <id>)
-rlq collect-files <drive:path>... [--to <dir>]
-    (--blueprint <name> | --machine <id>)
+rlq get-machine-dir (--blueprint <name> | --machine <id>)
 rlq hmp <line> (--blueprint <name> | --machine <id>)
 rlq check-script <label-or-name> [--blueprint <name> | --machine <id>]
     [--property <key>=<value>]... [--properties <path>]
@@ -966,14 +964,14 @@ blocks fail with both locations named. New files use canonical JSON
 and become ordinary user-owned library documents. Fetched and
 extracted artifacts use the common caches.
 
-Offline `stage`/`collect` require a stopped machine on every
-control plane, reaching the script-declared results directory — a
-drive key plus path (`results hdd0 "/results"`), the bounded
-host reach into the guest's disks — through the adapter's
-at-rest filesystem access, with collected files landing in the
-run record's `output/` (owner, 2026-07-22); future live
-transfers get distinct verbs rather
-than backend-dependent semantics. `start` reconciles the authored
+The language has no file-exchange verbs (owner, 2026-07-22 —
+the run-collection model was dropped): files cross the boundary
+out-of-band, against a machine stopped on every control plane,
+whose drives are then plain host state — a `hostdir` drive is
+its directory, and the machine directory is reported by
+`get-machine-dir`; in-band file operations are a deferred
+CLI/API capability ("Horizon"), and future live transfers get
+distinct verbs rather than backend-dependent semantics. `start` reconciles the authored
 machine blueprint and `stop` is visibly a host hard power-off.
 There is no `restart`: a hard power cycle is the explicit pair,
 and a guest reboot remains guest input. Parsing, property binding,
@@ -992,8 +990,7 @@ surface — it is the proven instruction set the language must cover:
 - select an entry in a cursor-key menu by visible feedback;
 - take a screenshot;
 - define embedded media, insert/eject it, and start/stop the
-  machine;
-- stage files to and collect files from the guest.
+  machine.
 
 ### Primary language goals
 
@@ -1382,7 +1379,8 @@ it while open. Followers are indifferent to the driver:
 runs as ordinary records that self-identify their driver.
 U3's per-test loop rides these mechanics: selection in as
 script properties, results out as caller-authored artifacts
-collected into the record's `output/`, and deliberately no
+the caller reads out-of-band from the stopped machine's drives
+at rest, and deliberately no
 test-result vocabulary in reliquary (G2) — one iteration is
 one run record. Contract home: script-spec.md "Failure, runs,
 and transcripts".
@@ -1590,7 +1588,7 @@ semantics reach into `start` reconciliation).
 8. **`.rlqs` parse (FreeDOS shape; complete)** — header + state-machine +
    the verbs that example uses. Exit: parse the documented
    install script; useful parse errors. Out: linear-only path,
-   `on`/reactive, `insert`/`stage`/`collect`, inputs/properties.
+   `on`/reactive, `insert`, inputs/properties.
 9. **Script runtime on QEMU/DOS (complete)** — `wait`/`expect` on
    normalized VGA text; `enter`/`type`/`press`/`select`;
    `screenshot`; `start`/`stop`. Exit: drive a tiny hand
@@ -1809,8 +1807,7 @@ Deliverables:
    `select` (feedback-driven, never guessing), `screenshot`,
    `insert`/`eject` (persistent state-document changes — never
    the blueprint — surviving stop/start per spike 13's model),
-   stopped-only `stage`/`collect` with contained paths, and
-   `start`/`stop`.
+   and `start`/`stop`.
 4. Property declarations: `property [type] <key>` with
    `${key}` binding by the flattened source order — explicit
    `--property` value → blueprint parameter (direct or
@@ -2064,6 +2061,21 @@ the VGA-scraping results on the same screens.
 - The virtio-serial carrier for the DOS agent and bounded
   `guest-file-*` operations (serial-to-virtio bootstrap,
   steps 3–5).
+- In-band file operations against a stopped machine's drives —
+  the deferred half of the dropped run-collection model (owner,
+  2026-07-22). Rough shape, its own design round before it
+  lands: the CLI/API triple `list-files` / `get-files` /
+  `put-files` (twins `list_files` / `get_files` / `put_files`),
+  addressing `<drive-key>:<path>`; `size`/`base` images reached
+  through the adapter's at-rest filesystem access, `hostdir`
+  directories directly; capability-honest per call — a drive
+  whose filesystem the adapter cannot read fails by name;
+  `media` drives excluded; directories recursive; no record
+  custody — files land where the caller says (details such as
+  `get-files`' destination default are that round's to settle).
+  Value concentrates where out-of-band access thins — non-QEMU
+  backends (no `hostdir`) and non-FAT guest filesystems — so
+  sequence at or soon after the second backend.
 - Win9x/WinNT platform workflows, and with them GUI installer
   scripting: needle-like assets, script-level pointer verbs (on
   the milestone-10 input primitives), and image-match `wait`
@@ -2192,8 +2204,7 @@ combines:
 - QMP `screendump` as an independent diagnostic capability; and
 - vvfat as the QEMU adapter's `hostdir` mechanism — a host
   directory as a writable guest FAT drive, proven for DOS-era
-  write patterns (`stage`/`collect` ride at-rest image access
-  instead).
+  write patterns.
 
 It has no guest prerequisite and remains the DOS default and
 fallback. It is not accurately modeled as a stream: output is a

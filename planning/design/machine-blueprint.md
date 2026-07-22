@@ -112,8 +112,8 @@ Two rules carry the whole model:
 <reliquary_home>/cache/machines/<id>/
 ├── reliquary-machine.json   the machine's state — reliquary's
 ├── drives/                  the machine's disk and floppy images
-├── runs/                    append-only run records (transcripts,
-│                            screenshots, collected outputs)
+├── runs/                    append-only run records (the event
+│                            stream, transcripts, screenshots)
 └── ...                      backend files and logs
 ```
 
@@ -131,7 +131,7 @@ Two rules carry the whole model:
   machine lives outside `cache/`, because a machine lives and
   dies as one thing. reliquary writes all of it; the one part
   written *for you* is `runs/` — the machine's run records
-  (transcripts, screenshots, collected outputs), which the world
+  (the event stream, transcripts, screenshots), which the world
   reads in place and copies out to keep (see below). Everything
   else you never need to touch.
 
