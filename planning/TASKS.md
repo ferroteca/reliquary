@@ -19,30 +19,93 @@ planning/design/script-examples/design-install.rlqs the
 reference script; ROADMAP milestone 4 owns this work, and no
 later milestone starts before it lands. No backward
 compatibility: the old surface is deleted entirely, not
-bridged. Work items:
+bridged.
 
-- retarget script.py to the node grammar (the parser should
-  shrink: colon, comma, expect, ->, and regex-keyword handling
-  all disappear)
-- retarget script_runner.py: failure diagnostics name the
-  expired clock and its source scope; check-script reports the
-  resolved timing plan; run records move to the runs/<n>/
-  layout (script_runner.py writes the superseded
-  <timestamp>-<run_id>/ layout until milestone 7, run records)
-- convert the builtin scripts and planning/examples/ scripts to
-  the new surface
-- update every doc that quotes script syntax (README,
-  planning/examples/README); docs/ and docs/cli-reference.md
-  follow the CLI renames
-- the static-conformance fixture corpus (valid and invalid
-  documents), run against both the parsers and the authored
-  JSON Schemas (DECISIONS.md, the schema round)
-- CLI/API renames under the twin-name identity rule
-  (DECISIONS.md, CLI queue item 14): create_from_blueprint →
-  create_machine; machines.start/stop/destroy → start_machine /
-  stop_machine / destroy_machine (lifecycle.py's legacy
-  start_machine(config) collision dies with the root-home
-  model); the cli.py SUPPRESS flag-position workaround retires
+Numbered tasks, in dependency order — the spine is 1 → 2 →
+3/4 → 5 → 6; task 9 runs parallel to the spine; 7/8 start once
+the parser stack validates scripts; 10–12 close out:
+
+1. Parser retarget, node grammar: rebuild script.py on the
+   typed EBNF's three-production skeleton — every line a node
+   of name, positional arguments, name=value properties, and
+   an optional brace block; the lexer's five spellings
+   ("..." guest text, /.../ regex, @name media references,
+   $key / ${key} property references, bare words) plus #
+   comments. Colon, comma, expect, ->, and regex-keyword
+   handling all deleted — the parser should shrink.
+2. Parser retarget, vocabulary and node signatures: phase
+   (was state), goto (was ->), finish (was done), expect
+   folded into the branching wait { on ... }, always for
+   reactive handlers (on only in branching waits), set-boot
+   (was boot), no <key> tokens (key names only after press);
+   the colon-free noun-first headers with entry and the
+   run-level deadline; per-node signature validation.
+3. Static validation, shapes and observation channels: the
+   two non-mixing script shapes; phases sequential or
+   reactive, never hybrid; every sequential phase ends in
+   goto/finish; the two-handler minimum in branching waits;
+   the screen-default conditions (a bare string or regex the
+   only screen spelling — screen= does not exist;
+   machine=stopped the only machine spelling — no bare
+   stopped); one condition per observation; unknown or
+   wrong-kind channels are validation errors.
+4. Static validation, timing model: lexically scoped
+   timeout/stable defaults (innermost wins), per-activation
+   deadline budgets (fresh per phase entry; the header
+   deadline backstops the run), and the placement matrix
+   enforced as parse errors.
+5. Runner retarget: rebuild script_runner.py on the new
+   graph — phase transitions, branching-wait dispatch,
+   reactive run-to-completion dispatch with the
+   once-per-episode rearm rule, the timing runtime honoring
+   task 4's scoping. Run records keep the superseded
+   <timestamp>-<run_id>/ layout (the runs/<n>/ move is
+   milestone 7's, run records).
+6. Diagnostics and check-script: failure diagnostics name
+   the expired clock and its source scope; check-script
+   grows to report the resolved timing plan (each
+   observation's effective timeout and source scope).
+7. Convert the shipped scripts: the builtins
+   (freedos-1.4-plain-install, freedos-1.4-verify) and
+   planning/examples/scripts/ move to the new surface;
+   planning/design/script-examples/design-install.rlqs
+   retires into the converted builtins.
+8. Confirm the portable key vocabulary (the one in-milestone
+   confirmation — ROADMAP milestone 4): check the spec's
+   closed press key-name set against what the converted
+   scripts actually need; adjudicate any gap.
+9. CLI/API renames under the twin-name identity rule
+   (DECISIONS.md, CLI queue item 14): run-script,
+   fetch-media, the seed- family, new-blueprint, import-vm
+   --name, check-script, the dashed list-/search- forms, the
+   property family noun-last; create_from_blueprint →
+   create_machine; machines.start/stop/destroy →
+   start_machine / stop_machine / destroy_machine
+   (lifecycle.py's legacy start_machine(config) collision
+   dies with the root-home model); id-only --machine
+   selectors; uniform flag position (the cli.py SUPPRESS
+   workaround retires).
+10. Documentation sweep: every doc that quotes script syntax
+    (README, planning/examples/README); docs/ and
+    docs/cli-reference.md follow the CLI renames.
+11. Test realignment and the old-surface purge: the test
+    suite retargeted to the new parser, runner, and command
+    names, then a whole-tree sweep for surviving old-surface
+    spellings (state, ->, done, expect, bare stopped, <key>
+    tokens, boot, superseded command names) — none survive
+    anywhere.
+12. Milestone gate: the FreeDOS install and verify scripts
+    run end to end on the new surface and check-script
+    reports the timing plan (ROADMAP milestone 4's "Done
+    when").
+
+Realignment items riding later milestones (kept here so the
+umbrella list stays complete; not milestone 4):
+
+- the static-conformance fixture corpus (ROADMAP milestone 5,
+  deliverable 6): valid and invalid documents, run against
+  both the parsers and the authored JSON Schemas
+  (DECISIONS.md, the schema round)
 - the error taxonomy under parity (ROADMAP milestone 7):
   ReliquaryError the root; StaticError(2) / PreflightError(3) /
   RunFailure(4) / RunCancelled(5)
@@ -51,23 +114,26 @@ bridged. Work items:
   (.rlqb / .rlqm), the builtins/ → codex/ package-dir rename and
   the codex index, the state blueprint-source field, selection
   scoping, and embedded-install targeting
-- shared JSONC reader for authored documents (blueprints,
-  standalone media definitions): RFC 8259 + // and /* */
+- shared JSONC reader for authored documents (ROADMAP
+  milestone 5) — blueprints, standalone media definitions:
+  RFC 8259 + // and /* */
   comments + trailing commas, nothing more (no JSON5 features);
   string-aware tokenizer, comments replaced by spaces so error
   line/col survive; JSON islands in scripts and every
   machine-written file stay strict JSON (user properties speak
   their own line format)
-- new media definition surface: definition-level description /
+- new media definition surface (ROADMAP milestone 5):
+  definition-level description /
   notes / redistributable-under (the built-in URL
   licensing-assertion field), archive-level local-path;
   sourceless definitions fail resolution with the
   edit-the-definition error
-- CLI fetch/clean commands + API parity: fetch_media(script=),
-  clean_downloads(), clean_media()
+- CLI fetch/clean commands + API parity (ROADMAP milestone 5):
+  fetch_media(script=), clean_downloads(), clean_media()
 - codex: teaching comments at blueprint seams once the JSONC
-  reader lands
-- the hostdir drive content source (vvfat on the QEMU adapter)
+  reader lands (ROADMAP milestone 5)
+- the hostdir drive content source (vvfat on the QEMU
+  adapter — ROADMAP milestone 5)
 - user.properties and the property command family (ROADMAP
   milestone 6)
 
