@@ -634,8 +634,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      paragraph), api.md (returns-mirror convention closed into
      the rule; sync-divergence bullet), guiding-principles
      CLI-contract entry
-  5. DECIDED, fold deferred behind item 14 (owner, 2026-07-21,
-     batch round): codex extraction renames `pull` → `seed` — the
+  5. RESOLVED (owner, 2026-07-21, batch round; folded with item
+     14): codex extraction renames `pull` → `seed` — the
      doctrine's own word (seed-not-a-resolution-tier, the `seeded`
      provenance column, the implemented library.seed_blueprint),
      killing the git false-friend (git/docker pull = network
@@ -643,10 +643,10 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      downloads). API twins named under parity: seed_blueprint(name,
      only=) / seed_media / seed_script — the family was absent from
      api.md's table entirely. Item 14's dash rule spells the
-     commands seed-blueprint / seed-media / seed-script; the fold
-     lands with 14's
-  6. DECIDED, fold deferred behind item 14 (owner, 2026-07-21,
-     batch round): the scaffolder renames `create blueprint` →
+     commands seed-blueprint / seed-media / seed-script; landed
+     in 14's fold
+  6. RESOLVED (owner, 2026-07-21, batch round; folded with item
+     14): the scaffolder renames `create blueprint` →
      `new blueprint` (cargo/dotnet/rails-new precedent; `create`
      becomes machine-lifecycle vocabulary only; twin
      new_blueprint()), and import's destination flag renames
@@ -655,8 +655,8 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      import→import_vm precedent designs keyword collisions away),
      making --blueprint selector-only everywhere. Under item 14
      these spell new-blueprint and import-vm --name
-  7. DECIDED, fold deferred behind item 14 (owner, 2026-07-21,
-     batch round): `check-script <name>` becomes the check family
+  7. RESOLVED (owner, 2026-07-21, batch round; folded with item
+     14): `check-script <name>` becomes the check family
      with `script`'s label resolution — with a --blueprint/
      --machine selector the argument resolves label-first then
      bare name, exactly as `script`; without one, bare script name
@@ -673,20 +673,31 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      read stdin to EOF otherwise — the house --progress-auto /
      import-prompt pattern), an explicit docker-style --stdin
      flag, or both
-  9. machine-id prefix matching is ambiguous against the id scheme:
-     blueprint names may contain `-<digit>` segments, so
-     `--machine freedos-1` is simultaneously a full id (freedos,
-     machine 1) and a prefix of freedos-1.4-plain-0; no precedence
-     rule is stated. Minimum: an exact id always wins; open question
-     whether prefix matching pays its way at all over structured,
-     meaningful, colliding-by-construction ids (`-b NAME -m N`
-     already covers terseness)
-  10. selector position is half-decided: the design says global
-      selectors come before the verb, cli.py already duplicates
-      --blueprint/--machine/--home onto some subparsers (the
-      SUPPRESS workaround), and the north-star entry below wants
-      both orders identical. Decide once, in the spec: both
-      positions uniformly accepted, or global-only strictly enforced
+  9. RESOLVED (owner, 2026-07-21, follow-up round — id-only on
+     the recommendation): `--machine` takes the full machine id,
+     exactly; prefix matching AND the bare-number pair form
+     (`-b NAME -m N`) are deleted, closing the freedos-1
+     ambiguity structurally — nothing is left to disambiguate.
+     The id is the (blueprint, number) pair composed, so each
+     selector carries one honest type and the mirror is clean:
+     resolve_machine(machine=, blueprint=), no stringly union
+     reaching any binding (the suffix trio
+     --blueprint-name/--machine-number/--machine-id was weighed
+     and declined: deletion beat addition — the decomposed form
+     was redundant with the id, and blueprint/machine need no
+     disambiguating suffixes once each has a single referent).
+     Folded: cli.md (Selection bullets, create-machine prose,
+     Selection rules — pair examples and the ambiguous-prefix
+     block deleted, error text names --machine <id>),
+     ROADMAP (machine-model selection sentence + "The CLI"
+     selection paragraph), api.md Selectors convention,
+     instance-model, machine-blueprint guide
+  10. RESOLVED (owner, 2026-07-21, by item 14's flag-position
+      fork): flags may appear before or after the command word,
+      uniformly — position carries no meaning, the north star's
+      two spellings are identical, synopses canonically show
+      flags after the command; the cli.py SUPPRESS workaround
+      retires at implementation realignment
   11. progress-mode names (revisits a settled spelling — flagged,
       not decided): `rawjson` emits JSON lines, and `jsonl` is the
       precise term; `tty` as the forced-pretty mode is odd since
@@ -709,8 +720,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       it as an explicitly backend-scoped escape hatch when that
       settles); `clean media` (payloads) vs `list media`
       (definitions) overloads the noun — note or rename
-  14. TWIN-NAME IDENTITY — AGREED IN PRINCIPLE (owner, 2026-07-21;
-      design round pending to work the forks and fold): a CLI
+  14. TWIN-NAME IDENTITY — RESOLVED (owner, 2026-07-21; agreed in
+      principle, then the design round settled both remaining
+      forks on the recommendations and the fold landed): a CLI
       command IS its API twin's name, dash-separated where the
       twin has underscores, and its --flags mirror the function's
       parameters — what the surface pays in succinctness it reaps
@@ -742,14 +754,32 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       freedos), resolving item 10 toward flags-after-verb and
       retiring the SUPPRESS hack. North star becomes `rlq
       run-script install -b freedos-1.4-plain` (+4 chars, paid
-      knowingly). Design round to settle: the full respell
-      inventory (incl. export's open shape landing CLI+twin as
-      one act), selector/global-flag placement details, `--only`
-      and other parameter mirrors, disposition of items 5-7's
-      spellings under the rule (recorded in place above), and the
-      cross-document fold (cli.md, ROADMAP "The CLI" + synopsis,
-      api.md table collapse to the mechanical transform,
-      examples, README north star)
+      knowingly). ROUND OUTCOMES: the state ops sit on the
+      management side — `insert-media` / `eject-media` /
+      `set-boot-order` (twin identity; the crisp boundary is
+      live-console vs durable-state, and the script verbs
+      insert/eject/set-boot remain the in-script spellings of the
+      same operations); flag position is UNIFORM — a flag may
+      appear before or after the command word, position carries
+      no meaning (the north star's two spellings are identical),
+      synopses canonically show flags after — resolving item 10
+      and retiring the SUPPRESS hack. Items 5-7's spellings
+      landed dash-formed (seed-blueprint/-media/-script,
+      new-blueprint, import-vm --name, check-script with label
+      resolution). FOLDED: cli.md (intro doctrine, every synopsis
+      and example, Flags-and-options rewrite), ROADMAP "The CLI"
+      (identity paragraph, two-layer + interaction + globals +
+      --json paragraphs, full synopsis block, lifecycle bullets,
+      import/export bullets, scaffolder, future milestones 3/4/
+      7/8 — completed milestones keep their historical spellings;
+      the realignment milestone owns the implementation rename),
+      api.md (identity convention; table collapsed to the
+      mechanical transform, seed family and property twins added,
+      property "pending naming" row closed), INTERFACES.md (CLI
+      section), USE-CASES U1, codex.md, machine-blueprint.md
+      (verb table gains the CLI/twin column), -reference,
+      -cookbook, instance-model, media-spec, property-registry.
+      docs/ and README follow at implementation realignment
 - JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
   design round; all three forks settled on the recommendations):
   - planning/design/machine-blueprint.schema.json +
@@ -819,8 +849,9 @@ Small to-do tasks.  Large tasks belong in the roadmap.
 - install script output currently is UGLY, it needs to be BEAUTFIUL, TIMELY, and INFORMATIVE
   - this is the human half of the USE-CASES feedback split (2026-07-21);
     render it from the run-events stream per the decided shape above
-- "rlq script install --blueprint freedos-1.4-plain" should be our north star
-  - "rlq --blueprint freedos-1.4-plain script install" is identical 
+- "rlq run-script install --blueprint freedos-1.4-plain" is our north star
+  - "rlq --blueprint freedos-1.4-plain run-script install" is identical
+    (settled: uniform flag position, CLI queue items 10/14)
 - allow specifying cache location outside of home dir
 - tension between 'media/download' that we need to resolve
   - see 'inventory'

@@ -29,7 +29,7 @@ and amendments are made deliberately and recorded here.
   requirement: the command-line syntax stays terse and succinct,
   and the blueprint and install recipe are easy to find, point
   to, and use. From a clean home this is one short command
-  (`rlq --blueprint freedos-1.4-plain script install`): the
+  (`rlq run-script install --blueprint freedos-1.4-plain`): the
   codex seeds the blueprint, media definition, and
   scripts; media is fetched and hash-verified; the script drives
   the installer end to end — menus, partitioning, reboots, media

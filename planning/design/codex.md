@@ -7,7 +7,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the seeding core — the packaged tree, copy-out on
 > first reference, and the never-overwrite rule — is implemented.
-> The index, provenance columns, `search`, and `pull` are still
+> The index, provenance columns, `search-`, and `seed-` are still
 > planned; details may change before first release.
 
 The codex is reliquary's built-in seed content: a shipped
@@ -16,7 +16,7 @@ popular open source operating systems, so the common case is one
 command from a clean home:
 
 ```powershell
-rlq --blueprint freedos-1.4-plain script install
+rlq run-script install --blueprint freedos-1.4-plain
 ```
 
 That single command extracts the blueprint, its media definitions,
@@ -44,7 +44,7 @@ Two rules carry the model:
   update changed my machine" surprise: what your home contains is
   what runs, always.
 - **Deleting your copy is how you refresh it.** Once you delete a
-  file yourself, the next reference (or an explicit `pull`)
+  file yourself, the next reference (or an explicit `seed-`)
   extracts the current codex copy again. Orphaned references — a
   blueprint naming a media definition or script you removed —
   re-seed the same way.
@@ -74,12 +74,14 @@ Extraction happens two ways:
   first, then the codex; a codex hit is copied out (a
   blueprint brings its referenced media definitions and scripts
   with it) and resolution proceeds against the new user file.
-- **Explicitly, with `pull`.** `pull blueprint <name>` extracts
+- **Explicitly, with the `seed-` family.** `seed-blueprint
+  <name>` extracts
   the blueprint and everything it references — the one-stop bridge
   from "just use the codex's" to "I want to tweak it"
   (`--only` restricts it to the blueprint file itself);
-  `pull media <name>` and `pull script <name>` extract single
-  artifacts.
+  `seed-media <name>` and `seed-script <name>` extract single
+  artifacts (API twins `seed_blueprint(name, only=)` /
+  `seed_media` / `seed_script`).
 
 Both paths obey the never-overwrite rule.
 
@@ -119,7 +121,7 @@ Materializing such a machine before the media is supplied **fast
 fails by design**: resolution finds a definition with no download
 source and no payload on disk, and stops before anything is
 created, naming the missing media. That failure is the prompt —
-the user pulls (or lets reliquary seed) the definition, then
+the user seeds (explicitly, or by reference) the definition, then
 adds their own `url` or `local-path` to it, pointing at the
 media wherever they keep it — the cache is never hand-fed;
 definitions are the interface, and a payload the user supplies
@@ -154,7 +156,7 @@ A blueprint may declare a `scripts` map — short labels naming
 `.rlqs` script files — plus optional `name` and `description`
 fields for discovery (see the
 [field reference](machine-blueprint-reference.md)). The labels are
-the verbs you use with `script`:
-`rlq --blueprint freedos-1.4-plain script install` looks up
+the verbs you use with `run-script`:
+`rlq run-script install --blueprint freedos-1.4-plain` looks up
 `scripts.install` and runs the script it names, creating a machine
 first when the blueprint has none.

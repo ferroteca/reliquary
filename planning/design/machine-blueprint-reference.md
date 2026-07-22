@@ -24,7 +24,7 @@ Each field is marked with where it may appear:
 
 - **blueprint** — valid in a blueprint (the `.rlqb` document you
   author and realize as a machine with
-  `rlq create --blueprint <name>`). Every blueprint field is also
+  `rlq create-machine --blueprint <name>`). Every blueprint field is also
   valid in the state, where it always appears fully resolved.
 - **state-only** — written by reliquary into the state; rejected
   in a blueprint.
@@ -139,8 +139,9 @@ reading the fields from the file (see
 **blueprint (optional) · object**
 
 A map of short labels to script file names (the stem of
-`scripts/<name>.rlqs`). Labels are the verbs used with the `script`
-command: `rlq --blueprint freedos-1.4-plain script install`
+`scripts/<name>.rlqs`). Labels are the verbs used with the
+`run-script` command:
+`rlq run-script install --blueprint freedos-1.4-plain`
 looks up `scripts.install` and runs the script it names. Labels
 take priority over bare script filenames.
 

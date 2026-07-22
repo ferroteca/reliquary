@@ -182,8 +182,8 @@ atomically in the same operation as every machine change.
 Machines have no separate human name — the id
 `<blueprint>-<n>` naming the machine's directory is its identity
 (lowest free number at create; reused after destroy), and
-commands accept the full id, an unambiguous prefix, or
-`--blueprint` with a machine number. Every mutating operation
+commands accept the full id exactly, or `--blueprint` selection
+of a sole machine. Every mutating operation
 takes an exclusive per-machine lock; an interrupted operation is
 detected by phase and generation and either rolled back safely or
 failed with explicit recovery instructions. The resolved snapshot
@@ -217,8 +217,8 @@ hatch applied only when its named backend is selected; it never
 selects that backend by itself).
 Discovery and scripting fields: optional `name` and `description`
 (indexed by `search`), the `scripts` map — short labels naming
-`.rlqs` files, the verbs used with `script`
-(`rlq --blueprint freedos-1.4-plain script install`) — and the
+`.rlqs` files, the verbs used with `run-script`
+(`rlq run-script install --blueprint freedos-1.4-plain`) — and the
 `parameters` map: blueprint-supplied script-input bindings, each
 a direct value or a `{"property": ...}` reference, the blueprint
 half of U5's customization seams. Like the `scripts` map it is
@@ -290,7 +290,7 @@ overwritten, and deleting a copy is how it is refreshed. An index
 maps every codex artifact to its name, description, and
 relationships; `search` queries the index and user files together,
 and listings report provenance (`yes` / `seeded` / user-authored).
-`pull` is the explicit extraction command; implicit extraction on
+The `seed-` family is the explicit extraction command; implicit extraction on
 first reference makes the common case one command from a clean
 home. A top-priority licensing rule
 governs its media
@@ -306,7 +306,7 @@ hash verifying it is the exact build the scripts target. For
 open source systems the lazy path is:
 
 ```powershell
-rlq --blueprint freedos-1.4-plain script install
+rlq run-script install --blueprint freedos-1.4-plain
 ```
 
 ## Authored-asset resolution
@@ -403,43 +403,61 @@ from a program, never interactive-only.
 Blueprints and machines are selected by explicit flags, never by
 position: `--blueprint <name>` (short `-b`) names a blueprint,
 `--machine <id>` (short `-m`) a machine. A machine's identity is
-`<blueprint>-<n>`; `--machine` accepts the full id or any
-unambiguous prefix, and `--blueprint NAME --machine N` selects by
-number. As the common convenience, `--blueprint` also selects a
+`<blueprint>-<n>`; `--machine` takes the full id, exactly (owner,
+2026-07-21): prefix matching and the bare-number pair form are
+deleted — the id *is* the (blueprint, number) pair composed, so
+each selector carries one honest type, mirroring
+`resolve_machine(machine=, blueprint=)`, and nothing is left to
+disambiguate. As the common convenience, `--blueprint` also selects a
 *machine* on machine-level verbs: when exactly one machine of that
 blueprint exists — the normal one-machine-per-blueprint case — the
 blueprint name is enough; with several machines the command fails
-and lists their ids, and with none it fails and suggests `create`
-(`script` instead creates one).
+and lists their ids, and with none it fails and suggests
+`create-machine` (`run-script` instead creates one).
 Nothing is ever selected positionally or by guessing.
-Property-registry commands put an operation (`list`, `get`,
-`set`, or `unset`) after `property`.
+
+Command names follow the **twin-name identity rule** (owner,
+2026-07-21): a CLI command *is* its API twin's name,
+dash-separated where the twin has underscores, and its flags
+mirror the twin's parameters (`--hdd-images` ↔ `hdd_images=`).
+Naming the twin names the command, so the two presentations
+cannot drift and the parity invariant is self-enforcing. Two
+named exceptions, each an identity with a different home surface:
+the guest-console family spells as the script language's verbs
+(below), and the `run` family maps to the API run handle's
+methods. The identity paid four characters on the north-star
+command (`rlq run-script install --blueprint freedos-1.4-plain`)
+— a knowing trade of succinctness for cohesion.
 
 The lifecycle vocabulary is two-layered. Blueprints are plain files
 under `blueprints/`: authored, renamed, and removed directly in an
-editor, with `create blueprint` and `import` as authoring
-conveniences, `pull` as extraction from the codex, and
-`delete blueprint` as the managed removal. Machine-level verbs act
-on machines: `create` materializes a blueprint as a new machine
-under a new id, `start`/`stop` run it, `destroy` deletes it
-entirely (a machine is nothing but its cache directory), and
-`recreate` is `destroy` + `create` as one command under the same
-id. `import` synthesizes a blueprint from a native VM — blueprint
-authoring only; realizing it afterward is an ordinary `create`.
+editor, with `new-blueprint` and `import-vm` as authoring
+conveniences, the `seed-` family as extraction from the codex, and
+`delete-blueprint` as the managed removal. Machine-level verbs act
+on machines: `create-machine` materializes a blueprint as a new
+machine under a new id, `start-machine`/`stop-machine` run it,
+`destroy-machine` deletes it entirely (a machine is nothing but
+its cache directory), and `recreate-machine` is destroy + create
+as one command under the same id. `import-vm` synthesizes a
+blueprint from a native VM — blueprint authoring only; realizing
+it afterward is an ordinary `create-machine`; `--name` names the
+blueprint to write, so `--blueprint` is selector-only everywhere.
 Each verb's embedding-API twin is settled (owner, 2026-07-21):
 flat verb-noun functions completing the `fetch_media` /
 `run_script` family — `create_machine`, `start_machine`,
 `stop_machine`, `apply_blueprint`, `destroy_machine`,
-`recreate_machine`, `clone_machine`, `delete_blueprint`, and
-`import_vm` (a bare `import` is a Python keyword) — taking the
-CLI's selectors (`resolve_machine()` the shared seam) and the
+`recreate_machine`, `clone_machine`, `delete_blueprint`,
+`import_vm`, `seed_blueprint` / `seed_media` / `seed_script`,
+`new_blueprint`, and the property family `get_property` /
+`set_property` / `unset_property` / `list_properties` — taking
+the CLI's selectors (`resolve_machine()` the shared seam) and the
 mirrored globals (`home=` / `assets=` / `assets_only=`),
 returning what the CLI prints (`create_machine` and
 `clone_machine` return the new id), raising by class where the
-CLI exits by code; `export`'s twin lands with export's open
-shape, a named omission. Implementation realigns the current
-names (`create_from_blueprint`, `machines.start` / `stop` /
-`destroy`) to these.
+CLI exits by code; `export`'s name and twin land together with
+export's open shape, a named omission. Implementation realigns
+the current names (`create_from_blueprint`, `machines.start` /
+`stop` / `destroy`) to these.
 
 The interaction vocabulary is the script language's own (owner,
 2026-07-21): `type` (raw text, no implicit ending), `enter`
@@ -450,11 +468,14 @@ spellings — `"..."` a normalized literal, `/.../` a regex,
 `machine=stopped` the machine channel), and `screenshot` spell
 on the CLI exactly as in a script, each defined once in
 planning/design/script-spec.md and referenced, never redefined,
-by the CLI. The state operations `insert <slot> <media>`,
-`eject <slot>`, and `set-boot <key>...` take the script verbs'
-spellings and rules (state-not-blueprint persistence; the CLI's
-media argument is a bare name — `@` marks references only inside
-script text). The CLI adds exactly two commands the language
+by the CLI. The state operations spell as their twins —
+`insert-media <slot> <media>`, `eject-media <slot>`,
+`set-boot-order <key>...` — because they mutate durable machine
+state, not the live console; the script verbs `insert` / `eject` /
+`set-boot` are the in-script spellings of the same operations,
+whose rules apply by reference (state-not-blueprint persistence;
+the CLI's media argument is a bare name — `@` marks references
+only inside script text). The CLI adds exactly two commands the language
 deliberately lacks: `screen` prints the current text screen
 (scripts observe; humans and programs read), and `exec <command>`
 is the composite convenience — `enter` plus the platform
@@ -466,12 +487,16 @@ that same design as a named omission (planning/design/api.md),
 the capability meanwhile reachable through today's `Machine`
 functions.
 
-`--blueprint` and `--machine` are global selectors, given before
-the verb — as are `--assets <dir>` and `--assets-only`, which
-name and scope the asset root ("Authored-asset resolution"
-above), and `--json` (below); there is no bare-script shorthand —
-an unrecognized command word is an error, never a script lookup
-(`script <label>` is the tightest form).
+Flags are the command's parameters and **position carries no
+meaning** (owner, 2026-07-21): a flag may appear before or after
+the command word — the north star's two spellings are identical —
+with synopses canonically showing flags after the command.
+`--home`, `--assets <dir>` / `--assets-only` ("Authored-asset
+resolution" above), and `--json` (below) are accepted by every
+command, mirroring the API's shared keywords. There is no
+bare-script shorthand — an unrecognized command word is an error,
+never a script lookup (`run-script <label>` is the tightest
+form).
 
 Machine-readable query output is `--json`, a global flag (owner,
 2026-07-21) — the query half of the feedback split, defined by
@@ -482,8 +507,9 @@ stdout, diagnostics on stderr, exit codes unchanged — so the
 twin's return contract is the command's `--json` contract and
 the two presentations cannot drift. A twin that returns nothing
 prints `{}` on success, letting a program pass `--json`
-unconditionally; stream-bearing commands (`script`, `run tail`,
-`fetch`) reject `--json` naming `--progress rawjson` — a run is
+unconditionally; stream-bearing commands (`run-script`,
+`run tail`, `fetch-media`) reject `--json` naming
+`--progress rawjson` — a run is
 an event stream, not a document; one flag, one meaning each.
 Secret property values serialize as their marker, never their
 value, and `--verbose` remains pretty-rendering only. Field
@@ -492,122 +518,133 @@ names land with each twin's return contract
 with the general programmatic-contract work.
 
 ```text
-rlq list (blueprints | machines [--blueprint <name>] | scripts | media
-    | runs [--blueprint <name> | --machine <id>])
-rlq search (blueprints | scripts | media) <term>... [--verbose]
-rlq create blueprint <name> [flags]
-rlq pull (blueprint | media | script) <name> [--only]
-rlq --blueprint <name> create
-reliquary (--blueprint <name> | --machine <id>) start [--display]
-reliquary (--blueprint <name> | --machine <id>) stop
-reliquary (--blueprint <name> | --machine <id>) apply
-reliquary (--blueprint <name> | --machine <id>) destroy
-reliquary (--blueprint <name> | --machine <id>) recreate
-rlq delete blueprint <name>
-reliquary (--blueprint <name> | --machine <id>) clone
-reliquary (--blueprint <name> | --machine <id>) export
+rlq list-blueprints
+rlq list-machines [--blueprint <name>]
+rlq list-scripts
+rlq list-media
+rlq list-runs [--blueprint <name> | --machine <id>]
+rlq (search-blueprints | search-scripts | search-media) <term>...
+    [--verbose]
+rlq new-blueprint <name> [flags]
+rlq (seed-blueprint | seed-media | seed-script) <name> [--only]
+rlq create-machine --blueprint <name>
+rlq start-machine (--blueprint <name> | --machine <id>) [--display]
+rlq stop-machine (--blueprint <name> | --machine <id>)
+rlq apply-blueprint (--blueprint <name> | --machine <id>)
+rlq destroy-machine (--blueprint <name> | --machine <id>)
+rlq recreate-machine (--blueprint <name> | --machine <id>)
+rlq delete-blueprint <name>
+rlq clone-machine (--blueprint <name> | --machine <id>)
+rlq export (--blueprint <name> | --machine <id>)
     [--drive <key>] [<destination>]
-rlq import <source> --blueprint <name> --platform <platform>
+rlq import-vm <source> --name <name> --platform <platform>
     [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
-reliquary (--blueprint <name> | --machine <id>) script <label>
+rlq run-script <label> (--blueprint <name> | --machine <id>)
     [--responses <path>] [--display] [--detach] [--progress <mode>]
-reliquary (--blueprint <name> | --machine <id>) run status [<n>]
-reliquary (--blueprint <name> | --machine <id>) run tail [<n>]
+rlq run status [<n>] (--blueprint <name> | --machine <id>)
+rlq run tail [<n>] (--blueprint <name> | --machine <id>)
     [--progress <mode>]
-reliquary (--blueprint <name> | --machine <id>) run wait [<n>]
-reliquary (--blueprint <name> | --machine <id>) run cancel [<n>] [--stop]
-reliquary (--blueprint <name> | --machine <id>) run delete <n> [<n> ...]
-reliquary (--blueprint <name> | --machine <id>) type <text>
-reliquary (--blueprint <name> | --machine <id>) enter <line>
-reliquary (--blueprint <name> | --machine <id>) press <key>...
-reliquary (--blueprint <name> | --machine <id>) exec <command>
+rlq run wait [<n>] (--blueprint <name> | --machine <id>)
+rlq run cancel [<n>] [--stop] (--blueprint <name> | --machine <id>)
+rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
+rlq type <text> (--blueprint <name> | --machine <id>)
+rlq enter <line> (--blueprint <name> | --machine <id>)
+rlq press <key>... (--blueprint <name> | --machine <id>)
+rlq exec <command> (--blueprint <name> | --machine <id>)
     [--timeout <seconds>]
-reliquary (--blueprint <name> | --machine <id>) select <item>
+rlq select <item> (--blueprint <name> | --machine <id>)
     [--exclude <text>]... [--timeout <seconds>]
-reliquary (--blueprint <name> | --machine <id>) wait <condition>
+rlq wait <condition> (--blueprint <name> | --machine <id>)
     [--timeout <seconds>]
-reliquary (--blueprint <name> | --machine <id>) screen
-reliquary (--blueprint <name> | --machine <id>) screenshot [<name>]
-reliquary (--blueprint <name> | --machine <id>) insert <slot> <media>
-reliquary (--blueprint <name> | --machine <id>) eject <slot>
-reliquary (--blueprint <name> | --machine <id>) set-boot <key>...
-reliquary (--blueprint <name> | --machine <id>) hmp <line>
-rlq check-script <script_name> [--blueprint <name> | --machine <id>]
+rlq screen (--blueprint <name> | --machine <id>)
+rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
+rlq insert-media <slot> <media> (--blueprint <name> | --machine <id>)
+rlq eject-media <slot> (--blueprint <name> | --machine <id>)
+rlq set-boot-order <key>... (--blueprint <name> | --machine <id>)
+rlq hmp <line> (--blueprint <name> | --machine <id>)
+rlq check-script <label-or-name> [--blueprint <name> | --machine <id>]
     [--responses <path>]
-rlq fetch <media_name> [--script <script_name>]
-rlq property list [<prefix>]
-rlq property get <key>
-rlq property set <key> <value>
-rlq property set <key> --secret
-rlq property unset <key>
-rlq clean downloads
-rlq clean media
+rlq fetch-media <media_name> [--script <script_name>]
+rlq list-properties [<prefix>]
+rlq get-property <key>
+rlq set-property <key> <value>
+rlq set-property <key> --secret
+rlq unset-property <key>
+rlq clean-downloads
+rlq clean-media
 ```
 
 Lifecycle semantics:
 
-- `list blueprints` shows each blueprint with its machine count; `list
-  machines` shows each machine's id, blueprint, phase, and
+- `list-blueprints` shows each blueprint with its machine count;
+  `list-machines` shows each machine's id, blueprint, phase, and
   backend (`--blueprint` filters to one blueprint's machines).
-- `create` validates and resolves the named blueprint
-  (a `.rlqb` file — written by hand, by `init`, or by
-  `import`), materializes a new machine under a new id — state,
+- `create-machine` validates and resolves the named blueprint
+  (a `.rlqb` file — written by hand, by `new-blueprint`, or by
+  `import-vm`), materializes a new machine under a new id — state,
   drives, backend object — and prints that id.
   Blueprints are authored documents. Media definitions are likewise
   user-owned, though a script can seed missing library
   definitions from its embedded blocks before its first run.
-- `apply` adopts the current blueprint into a stopped machine: it
+- `apply-blueprint` adopts the current blueprint into a stopped
+  machine: it
   re-resolves the blueprint, reconciles the machine to the new
   resolution (memory, boot order, drives enabled/disabled, media
   changes), and records the new baseline digest. Changes the
   machine cannot absorb without regenerating drives (`size` or
   `base` changes on materialized images) fail closed naming both
-  sides; `recreate` is the honest alternative.
-- `destroy` deletes the machine entirely — its directory (state,
+  sides; `recreate-machine` is the honest alternative.
+- `destroy-machine` deletes the machine entirely — its directory
+  (state,
   drive images, run records) and the backend's machine. The
-  blueprint is never touched; `create` makes a fresh machine
-  whenever one is wanted again.
-- `delete blueprint <name>` removes the blueprint file itself and
+  blueprint is never touched; `create-machine` makes a fresh
+  machine whenever one is wanted again.
+- `delete-blueprint <name>` removes the blueprint file itself and
   fails closed while any machine of it exists, naming the machine
-  ids — `destroy` them first. (Removing a machine is `destroy`'s
-  job.)
+  ids — destroy them first. (Removing a machine is
+  `destroy-machine`'s job.)
 - runs are machine-scoped — monotonic numbers, never reused; the
   `run` operations take the number positionally and default to
-  the machine's latest run. A foreground `script` is
+  the machine's latest run. A foreground `run-script` is
   start-plus-attach; `--detach` returns the run id after
   foreground preflight ("Asynchronous runs" below).
 
-- `script` completes preflight, installs missing embedded media
+- `run-script` completes preflight, installs missing embedded media
   definitions, resolves its machine (creating one when `--blueprint`
   names a blueprint with no machine yet), and starts it if it is not
   already running before executing guest steps.
-- `fetch` downloads, extracts, and hash-verifies a defined media
+- `fetch-media` downloads, extracts, and hash-verifies a defined
+  media
   item (see planning/design/media-spec.md). It is a convenience: machine
   operations resolving a `media` reference to a fetchable
   definition fetch implicitly. Source archives are cached under
   `cache/downloads/`, separate from the payloads in
   `cache/media/`. `--script` installs that script's embedded
   definitions before fetching, without executing guest steps.
-- `property` maintains the home-wide personal registry described in
+- the property family (`get-property`, `set-property`,
+  `unset-property`, `list-properties`) maintains the home-wide
+  personal registry described in
   planning/design/property-registry.md. Ordinary strings live in
   `properties.json`; secret values live only in a protected host
   credential store, with a marker in the file. Listing and getting
   secrets never reveal them, and secret setting uses a no-echo prompt
   rather than an argument that would enter process listings or shell
   history.
-- `clean downloads` / `clean media` reclaim the two caches:
+- `clean-downloads` / `clean-media` reclaim the two caches:
   cached source archives, and payload files reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
   payloads without a download source) is cleanable.
-- `recreate` is exactly `destroy` + `create` under the same
+- `recreate-machine` is exactly destroy + create under the same
   machine id: drives regenerate as declared (`size`
   blank, `base` differenced or copied afresh). Since resolution
   and backend assignment re-run, a recreated machine may land on
-  a different backend — `recreate` is the sanctioned way to move
+  a different backend — `recreate-machine` is the sanctioned way
+  to move
   a machine between backends, and regenerated drives arrive in
   the new backend's formats.
-- `clone` duplicates a stopped machine as a new machine under a
-  new id (printed like `create`'s): it retains the
+- `clone-machine` duplicates a stopped machine as a new machine
+  under a
+  new id (printed like `create-machine`'s): it retains the
   source's resolved blueprint snapshot and copies the source's
   writable drive images — a snapshot of a machine, not another
   blueprint. The clone gets its own backend object and `backend-id`;
@@ -621,7 +658,7 @@ Lifecycle semantics:
   result to a platform built for long-lived machines," and
   ownership verification guarantees reliquary can never touch it
   afterward.
-- `import` synthesizes a blueprint from a native backend VM's
+- `import-vm` synthesizes a blueprint from a native backend VM's
   configuration (memory, drives, controllers — translation of
   backend config, not guest inference), capturing the VM's disks
   as media items in place (owner, 2026-07-21): each disk gets a
@@ -664,17 +701,19 @@ Lifecycle semantics:
   parity. A machine created
   from an imported blueprint recreates like any other: from its
   bases. `platform` is not
-  knowable from any backend configuration, so `import` requires
-  `--platform` explicitly; the never-infer rule holds. `import`
+  knowable from any backend configuration, so `import-vm` requires
+  `--platform` explicitly; the never-infer rule holds (`--name`
+  names the blueprint to write). `import-vm`
   stops at the blueprint: it never materializes a machine — running one
-  afterward is an ordinary `create`. Drive preservation is
+  afterward is an ordinary `create-machine`. Drive preservation is
   entirely the blueprint's job, through the drive materialization
   triad: `size` (always a fresh blank disk at `create`), `base`
   with type `difference` (the default — a differencing disk
   backed by the base image), and `base` with type `duplicate`
   (materialized as a full copy).
 - Machines **stay running** until explicitly stopped — by a script
-  step or by `stop`. No command implicitly tears the machine down.
+  step or by `stop-machine`. No command implicitly tears the
+  machine down.
 - `--display` shows the backend's console window instead of running
   headless.
 - Ownership verification generalizes: no adapter sends a control
@@ -682,7 +721,7 @@ Lifecycle semantics:
   object is the one recorded in the machine's state (the QMP
   identity check is the QEMU instance of this rule).
 
-`create blueprint <name>` is the blueprint-scaffolding
+`new-blueprint <name>` is the blueprint-scaffolding
 convenience (supersedes the earlier `init` idea): it writes a
 minimal starter blueprint from CLI flags (platform, memory, a
 blank hard disk by size, CD/floppy media, boot order), so new
@@ -697,7 +736,7 @@ from a built-in blueprint.
 
 reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
-`rlq script <script_name>` against a machine selected with
+`rlq run-script <label>` against a machine selected with
 `--machine <id>` or `--blueprint <name>`.
 
 **The July 2026 surface redesign is decided and
@@ -1081,7 +1120,7 @@ position seeds its landmark's spot. The draft is ordinary script
 text, self-contained by default — landmarks travel as embedded
 resolve-in-place blocks ("Landmarks" above) — with factored
 catalog files on request; written once and user-owned from then
-on, like `import` output.
+on, like `import-vm` output.
 
 **Round-trip composes with tailoring — playback is the
 positioning mechanism.** Authored customization must survive
@@ -1140,13 +1179,14 @@ follow a run — the C/Java constraint) and keeps daemons and
 services permanently out of the picture. A record whose writer
 died without a terminal event is detectably a *crashed* run.
 
-**Sync is async plus attach.** A foreground `script` run is
+**Sync is async plus attach.** A foreground `run-script` run is
 defined as: start the run, immediately attach the live renderer.
 One semantic, one code path — and a run started in one terminal
 can be observed from another. Ctrl-C on a foreground run cancels
 the run; Ctrl-C on a later reattach merely stops tailing.
 
-**Detach hands off at the machine boundary.** `script --detach`
+**Detach hands off at the machine boundary.** `run-script
+--detach`
 completes parsing, binding, and static and capability preflight
 in the foreground (G3 — those failures belong to the invoker's
 exit code, never buried in a record), then spawns the runner and
@@ -1196,7 +1236,7 @@ in USE-CASES (the artifact-residency split) and INTERFACES
 (recorded outputs).
 
 **Two presentations, under parity.** The CLI carries
-`script --detach`, the `run` noun family — `run status`,
+`run-script --detach`, the `run` noun family — `run status`,
 `run tail` (rendering per the decided progress vocabulary:
 pretty on a tty, plain and rawjson for programs), `run wait`
 (its exit code mirrors the run's outcome, so unbound languages
@@ -1216,12 +1256,13 @@ computation stays on the caller's side of the seam.
 **Synchronous programmatic runs — the blessed divergence.** The
 sync forms are twins in capability but divergent in presentation
 — a named decision, not drift: `run_script()` returns a typed
-result and raises by error class, while the foreground `script`
-command speaks the stream and its exit code. Rendering is
+result and raises by error class, while the foreground
+`run-script` command speaks the stream and its exit code.
+Rendering is
 selected explicitly with `--progress (auto | tty | plain |
 rawjson)` (default `auto`, tty detection — the decided BuildKit
-vocabulary) on the stream-bearing commands — `script`,
-`run tail`, and `fetch`. Under `rawjson`, stdout carries the event stream as
+vocabulary) on the stream-bearing commands — `run-script`,
+`run tail`, and `fetch-media`. Under `rawjson`, stdout carries the event stream as
 JSON lines and nothing else, ever — diagnostics go to stderr —
 and because the stream ends with the terminal event, the last
 line is the machine-readable result: no separate result mode
@@ -1238,7 +1279,7 @@ remains queued (TASKS).
 movement emits the same transfer and verification event kinds
 wherever it happens; only where they land differs. Inside a
 script run they ride the run's stream (the transfer events
-above). Standalone `fetch` renders them itself under the same
+above). Standalone `fetch-media` renders them itself under the same
 `--progress` vocabulary — rawjson stdout purity and the
 no-prompt rule included, so the mismatched-file checkpoint
 prompts only under `auto`/`tty` and fails fast under
@@ -1246,7 +1287,8 @@ prompts only under `auto`/`tty` and fails fast under
 document and there is no fetch record — nothing persists,
 nothing reattaches; run records remain the only recorded
 outputs. Machine operations that fetch implicitly outside a run
-(`create`/`start`/`apply`/`recreate` reconciliation) render the
+(`create-machine` / `start-machine` / `apply-blueprint` /
+`recreate-machine` reconciliation) render the
 same events under the same defaults, their full output contract
 remaining with the general CLI discipline (TASKS). Honesty
 rules carry over: byte totals only where the source names them,
@@ -1293,7 +1335,7 @@ land in separate commits.
 ### Milestone 1 — The north-star command
 
 ```powershell
-rlq --blueprint freedos-1.4-plain script install
+rlq run-script install --blueprint freedos-1.4-plain
 ```
 
 From a clean home, that one command must end with a fully
@@ -1510,20 +1552,22 @@ Deliverables:
    replacement, and startup detection of interrupted phases with
    safe rollback or explicit recovery instructions.
 4. The lifecycle CLI completed on top of milestone 1's verbs:
-   `start` grown to full reconciliation — baseline, state,
-   backend identity, and re-verification of every referenced
-   media hash — plus `apply` (adopt blueprint edits into the
-   baseline; drive-regenerating changes fail closed), `recreate`
-   (same id), `delete blueprint` (machineless blueprint files
-   only), `list blueprints`, `search blueprints` (built-in index
-   plus user files, with provenance), `pull blueprint` (closure
+   `start-machine` grown to full reconciliation — baseline,
+   state, backend identity, and re-verification of every
+   referenced media hash — plus `apply-blueprint` (adopt
+   blueprint edits into the baseline; drive-regenerating changes
+   fail closed), `recreate-machine` (same id),
+   `delete-blueprint` (machineless blueprint files only),
+   `list-blueprints`, `search-blueprints` (built-in index
+   plus user files, with provenance), `seed-blueprint` (closure
    by default, `--only` for the single file), and the
-   `create blueprint` scaffolder. Runtime changes update the
+   `new-blueprint` scaffolder. Runtime changes update the
    state only; machines stay running until explicitly stopped.
-5. Existing single-machine commands (`type`, `run`, `keys`,
-   `menu`, `wait`, `text`, `screenshot`, `hmp`) take the same
-   `--machine`/`--blueprint` selection and resolve ownership through
-   the machine state.
+5. The guest-console family (`type`, `enter`, `press`, `exec`,
+   `select`, `wait`, `screen`, `screenshot`, `hmp`) and the state
+   ops (`insert-media`, `eject-media`, `set-boot-order`) take the
+   same `--machine`/`--blueprint` selection and resolve ownership
+   through the machine state.
 6. Published JSON Schemas for the document types: publication
    mechanics and the shared valid/invalid fixture corpus (run
    against both parser and schema) for the authored blueprint and
@@ -1537,11 +1581,12 @@ Deliverables:
    the planned format wrong.
 
 Done when: the FreeDOS install script runs against a machine
-created from the example blueprint in a clean home; `destroy` +
-`create` regenerates the materialization from blueprint and media
+created from the example blueprint in a clean home;
+`destroy-machine` + `create-machine` regenerates the
+materialization from blueprint and media
 alone; a process killed mid-operation is detected and recovered
 per the instance model; blueprint edits round-trip through
-`apply` with drive-regenerating changes failing closed.
+`apply-blueprint` with drive-regenerating changes failing closed.
 
 ### Milestone 4 — The property registry
 
@@ -1554,10 +1599,11 @@ Deliverables:
 1. `properties.json` as a flat user-owned map of dotted names to
    strings or `{"secret": true}` markers, with name validation
    and canonical atomic writes.
-2. `rlq property list/get/set/unset`: secret values held
+2. `rlq get-property` / `set-property` / `unset-property` /
+   `list-properties`: secret values held
    only in the host's protected credential store (scoped by home
    and property name), set via no-echo prompt, never revealed by
-   `list`/`get`; kind changes require `unset` first.
+   list/get; kind changes require `unset-property` first.
 3. The fail-safe update order (store credential before marker,
    remove marker before credential), with orphaned-credential
    reporting and cleanup guidance — never a plaintext fallback.
@@ -1730,7 +1776,8 @@ Deliverables:
    keyboardputscancode` input and `screenshotpng` capture, with
    pixel-level text recognition for fixed-font text modes behind
    the same control plane interface.
-3. VirtualBox in autodiscovery and the priority list; `recreate`
+3. VirtualBox in autodiscovery and the priority list;
+   `recreate-machine`
    as the sanctioned backend move, drives regenerating in native
    formats.
 
@@ -1741,19 +1788,23 @@ backends from the same blueprint (minus a pinned backend field).
 
 The durable-artifact exits, once two backends make them
 meaningful. The open questions under "Decisions still needed"
-(`export` mechanics, `import` scope) must be settled at the start
-of this milestone.
+(`export` mechanics, `import-vm` scope) must be settled at the
+start of this milestone.
 
 Deliverables:
 
-1. `clone`: a new machine under a new UUID retaining the source's
+1. `clone-machine`: a new machine under a new UUID retaining the
+   source's
    resolved blueprint snapshot, with the source's writable drive
    images copied — a snapshot of a machine, never a shared
    state or backend registration.
 2. `export`: a stopped machine out to the backend's native
    management (or a media image out of one drive), independent
-   and permanently outside reliquary's purview.
-3. `import`: synthesize a blueprint from a native VM's configuration,
+   and permanently outside reliquary's purview (its final
+   command name and API twin land with its shape, under the
+   identity rule).
+3. `import-vm`: synthesize a blueprint from a native VM's
+   configuration,
    disks preserved as generated media definitions taken as
    `base`; `--platform` required; never materializes a machine.
 
@@ -1824,7 +1875,7 @@ the VGA-scraping results on the same screens.
 ### Horizon (sequenced later, not yet scheduled)
 
 - `fork-blueprint` (a fire-and-forget authoring convenience;
-  `create blueprint` scaffolding lands in milestone 3).
+  `new-blueprint` scaffolding lands in milestone 3).
 - The virtio-serial carrier for the DOS agent and bounded
   `guest-file-*` operations (serial-to-virtio bootstrap,
   steps 3–5).
@@ -1833,7 +1884,7 @@ the VGA-scraping results on the same screens.
   the milestone-10 input primitives), and image-match `wait`
   (see "Decisions still needed").
 - VMware Workstation and Hyper-V adapters.
-- Media commands beyond `fetch` (list, verify, remove).
+- Media commands beyond `fetch-media` (verify, remove).
 - A `pytest-reliquary` plugin (per AGENTS.md prior art).
 
 ## Design principles
@@ -2375,7 +2426,8 @@ agentless and guest-agent control planes with equivalent results.
 - **Machine cache cleaning**: whether a `clean machines` command
   reclaims cached materializations of stopped machines wholesale
   (they regenerate like everything else under `cache/`), or
-  whether `recreate`/`delete` per machine is enough.
+  whether `recreate-machine`/`destroy-machine` per machine is
+  enough.
 - **`export` mechanics**: export has two targets — a media image
   (a single drive taken out of the machine as a standalone image
   file) and an entire machine (registered with the backend's
@@ -2385,7 +2437,7 @@ agentless and guest-agent control planes with equivalent results.
   shape for the two, whether export offers format conversion,
   and whether a `media`-referenced drive blocks whole-machine
   export or is materialized into it.
-- **`import` scope**: which backend config translates into the
+- **`import-vm` scope**: which backend config translates into the
   synthesized blueprint (memory, drives, controllers are clear;
   what of NICs and other devices the blueprint doesn't model yet),
   whether untranslatable configuration fails the import or lands
@@ -2445,8 +2497,8 @@ agentless and guest-agent control planes with equivalent results.
   built-in URLs (an SPDX identifier? free text naming the
   license? both?), and whether user-owned definitions may carry
   the same field inertly.
-- **Media commands beyond `fetch`**: whether the CLI grows verbs
-  such as list, verify, and remove, and whether each can select
+- **Media commands beyond `fetch-media`**: whether the CLI grows
+  verbs such as verify and remove, and whether each can select
   embedded definitions through `--script` when needed.
 - **Hyper-V agentless screen strategy**: whether WMI thumbnail/
   keyboard automation is good enough for installer scripting or

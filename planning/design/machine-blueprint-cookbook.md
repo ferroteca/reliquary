@@ -23,7 +23,7 @@ root and create a
 machine from it:
 
 ```powershell
-rlq create --blueprint <name>
+rlq create-machine --blueprint <name>
 ```
 
 ---
@@ -317,11 +317,11 @@ inputs, and the blueprint binds them.
 `owner-name` is specified directly — every machine installs as
 `testuser` until you edit the value. `install-key` is only
 referred to: each user stores their own key once
-(`rlq property set products.windows-98.install-key --secret`) and
+(`rlq set-property products.windows-98.install-key --secret`) and
 the script retrieves it at use; the key never enters the
 blueprint or version control. A response file still overrides
 either binding for one invocation
-(`rlq --blueprint win98 script install --responses answers.json`).
+(`rlq run-script install --blueprint win98 --responses answers.json`).
 
 Both are value seams. Installing the *German* edition instead is
 a [composition seam](machine-blueprint.md#customization-seams):

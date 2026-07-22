@@ -55,14 +55,13 @@ positionally:
 
 - `--blueprint <name>` — that blueprint's machine when exactly one
   exists
-- `--machine <blueprint>-<n>` — the full machine id (or any
-  unambiguous prefix)
-- `--blueprint <name> --machine <n>` — machine number `<n>` of that
-  blueprint
+- `--machine <id>` — the full machine id, exactly (no prefix
+  matching, no bare-number form)
 
 On machine-level verbs, `--blueprint <name>` alone fails when
 several machines exist (listing the candidate ids) or when none
-exist (suggesting `create`; `script` creates one instead).
+exist (suggesting `create-machine`; `run-script` creates one
+instead).
 
 ## Lifecycle
 
@@ -92,16 +91,16 @@ transitional phase and completes a safe rollback or fails with
 recovery instructions (see below).
 
 ```text
-rlq list blueprints
-rlq list machines [--blueprint <name>]
-rlq create --blueprint <name>
-rlq start (--machine <id> | --blueprint <name>) [--display]
-rlq stop (--machine <id> | --blueprint <name>)
-rlq apply (--machine <id> | --blueprint <name>)
-rlq destroy (--machine <id> | --blueprint <name>)
-rlq recreate (--machine <id> | --blueprint <name>)
-rlq delete --blueprint <name>
-rlq clone (--machine <id> | --blueprint <name>)
+rlq list-blueprints
+rlq list-machines [--blueprint <name>]
+rlq create-machine --blueprint <name>
+rlq start-machine (--machine <id> | --blueprint <name>) [--display]
+rlq stop-machine (--machine <id> | --blueprint <name>)
+rlq apply-blueprint (--machine <id> | --blueprint <name>)
+rlq destroy-machine (--machine <id> | --blueprint <name>)
+rlq recreate-machine (--machine <id> | --blueprint <name>)
+rlq delete-blueprint <name>
+rlq clone-machine (--machine <id> | --blueprint <name>)
 rlq export (--machine <id> | --blueprint <name>) [<destination>]
 ```
 

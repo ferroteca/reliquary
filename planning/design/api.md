@@ -44,12 +44,24 @@ SPDX-License-Identifier: BSD-3-Clause
 
 ## Conventions
 
-- **Naming**: flat verb-noun functions — `create_machine`,
-  `fetch_media`, `run_script`.
-- **Selectors**: machine-scoped functions take a machine id
-  (`"<blueprint>-<n>"`) or the CLI's `blueprint=` / `machine=`
-  selector pair; `resolve_machine()` is the shared resolution
-  seam.
+- **Naming — the twin-name identity rule** (owner, 2026-07-21):
+  flat verb-noun functions — `create_machine`, `fetch_media`,
+  `run_script` — and the CLI command *is* the twin's name,
+  dash-separated (`create-machine` ↔ `create_machine`), its
+  flags mirroring the function's parameters. Naming a twin names
+  its command; drift is impossible by construction. Two named
+  exceptions, each an identity with a different home surface:
+  the guest-console family spells as the script language's verbs
+  (its twins deferred to the control-plane design), and the
+  `run` family maps to the run handle's methods.
+- **Selectors** (owner, 2026-07-21): machine-scoped functions
+  take `machine=` — the full machine id (`"<blueprint>-<n>"`),
+  exactly — or `blueprint=` — a blueprint name, selecting its
+  sole machine; `resolve_machine()` is the shared resolution
+  seam. Each parameter carries one honest type: there is no
+  prefix matching and no bare-number form (the id *is* the
+  (blueprint, number) pair composed), so the selectors bind
+  cleanly in any language.
 - **Mirrored globals**: `home=`, `assets=`, and `assets_only=`
   keywords mirror `--home`, `--assets`, and `--assets-only`.
 - **Returns mirror what the CLI prints**: `create_machine` and
@@ -68,33 +80,32 @@ SPDX-License-Identifier: BSD-3-Clause
 Each family's normative contract lives with its interface spec;
 this table is the index.
 
+Under the identity rule the CLI column is the mechanical
+transform of the twin column (dash ↔ underscore); the table
+carries the exceptions and each family's contract home.
+
 | CLI | API twin | contract home |
 |---|---|---|
-| `create` | `create_machine` | [blueprint guide](machine-blueprint.md) |
-| `start` | `start_machine` | blueprint guide |
-| `stop` | `stop_machine` | blueprint guide |
-| `apply` | `apply_blueprint` | blueprint guide |
-| `destroy` | `destroy_machine` | blueprint guide |
-| `recreate` | `recreate_machine` | blueprint guide |
-| `clone` | `clone_machine` | blueprint guide |
-| `delete` | `delete_blueprint` | blueprint guide |
-| `export` | *open — lands with export's shape* | blueprint guide |
-| `import` | `import_vm(source, blueprint, platform, hdd_images, snapshot)` | blueprint guide |
-| `script <label>` | `run_script()` blocking; `start_script()` → run handle | [script spec](script-spec.md) |
+| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores | [blueprint guide](machine-blueprint.md) |
+| `export` | *open — name and twin land together with export's shape* | blueprint guide |
+| `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
+| `new-blueprint` | `new_blueprint()` | blueprint guide |
+| `seed-blueprint` / `seed-media` / `seed-script` | `seed_blueprint(name, only=)` / `seed_media()` / `seed_script()` | [codex](codex.md) |
+| `run-script <label>` | `run_script()` blocking; `start_script()` → run handle (`--detach`) | [script spec](script-spec.md) |
 | `check-script` | `check_script()` | script spec |
-| `run status` / `tail` / `wait` / `cancel` | run-handle `status()` / `events()` / `wait()` / `cancel()`, plus attach-by-id | script spec |
+| `run status` / `tail` / `wait` / `cancel` | run-handle `status()` / `events()` / `wait()` / `cancel()`, plus attach-by-id — the handle-method exception | script spec |
 | `run delete` | `delete_run()` | script spec |
-| `fetch` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
-| `clean downloads` / `clean media` | `clean_downloads()` / `clean_media()` | media spec |
-| `insert` / `eject` / `set-boot` (state ops) | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
-| `list` / `search` families | `list_<noun>` (`list_machines` today; the rest follow the pattern as they land) | [cli design](cli.md) |
-| `property` family | pending naming, with the property-registry design | [property registry](property-registry.md) |
-| interaction family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — a named omission (CLI spellings settled 2026-07-21: the script language's vocabulary, plus CLI-only `screen` and `exec`) | cli design |
+| `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
+| `clean-downloads` / `clean-media` | `clean_downloads()` / `clean_media()` | media spec |
+| `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
+| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | [cli design](cli.md) |
+| `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [property registry](property-registry.md) |
+| guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | cli design |
 
-`import`'s twin is `import_vm` because a bare `import` is a
-Python keyword in the first binding. `export`'s twin is
-deliberately unnamed until export's own CLI shape settles — a
-named omission, not drift.
+`import-vm`'s twin is `import_vm` — a bare `import` is a Python
+keyword, and under the identity rule the CLI simply adopts the
+twin's name. `export`'s name and twin are deliberately unsettled
+until export's own shape lands — a named omission, not drift.
 
 ## Handles
 

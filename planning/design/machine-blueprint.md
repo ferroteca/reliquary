@@ -58,18 +58,20 @@ stateDiagram-v2
 
 `recreate` is exactly `destroy` + `create` as one command, under
 the same id; `clone` and `export` act on a Ready (stopped)
-machine. What each verb touches:
+machine. What each verb touches — the CLI command is the API
+twin's name, dash-separated (the identity rule,
+planning/ROADMAP.md "The CLI"):
 
-| verb       | blueprint file           | the machine (`cache/machines/<id>/`)   | API twin           |
+| verb       | blueprint file           | the machine (`cache/machines/<id>/`)   | CLI / API twin     |
 |------------|--------------------------|----------------------------------------|--------------------|
-| `create`   | reads                    | materializes, under a new id           | `create_machine`   |
-| `start`    | —                        | runs (as its state describes)          | `start_machine`    |
-| `stop`     | —                        | powers off                             | `stop_machine`     |
-| `apply`    | reads                    | reconciles to edits, new baseline      | `apply_blueprint`  |
-| `destroy`  | —                        | deletes entirely                       | `destroy_machine`  |
-| `recreate` | reads                    | regenerates, same id                   | `recreate_machine` |
-| `clone`    | —                        | new machine, new id, drives copied     | `clone_machine`    |
-| `delete`   | deletes (refuses while machines exist) | —                        | `delete_blueprint` |
+| `create`   | reads                    | materializes, under a new id           | `create-machine` / `create_machine` |
+| `start`    | —                        | runs (as its state describes)          | `start-machine` / `start_machine` |
+| `stop`     | —                        | powers off                             | `stop-machine` / `stop_machine` |
+| `apply`    | reads                    | reconciles to edits, new baseline      | `apply-blueprint` / `apply_blueprint` |
+| `destroy`  | —                        | deletes entirely                       | `destroy-machine` / `destroy_machine` |
+| `recreate` | reads                    | regenerates, same id                   | `recreate-machine` / `recreate_machine` |
+| `clone`    | —                        | new machine, new id, drives copied     | `clone-machine` / `clone_machine` |
+| `delete`   | deletes (refuses while machines exist) | —                        | `delete-blueprint` / `delete_blueprint` |
 | `export`   | —                        | copies out                             | *(with export's shape)* |
 
 Every verb lands on the CLI and the embedding API together
@@ -200,7 +202,7 @@ backend facts. See [the instance model](instance-model.md).
 
 **Blueprints have names; machines have ids.** A blueprint's name is its file
 stem (`<name>.rlqb`). A machine's identity is `<blueprint>-<n>` — commands take
-`--machine <blueprint>-<n>`, or `--blueprint <name> --machine <n>`,
+`--machine <blueprint>-<n>` — the full id, exactly —
 and `--blueprint <name>` alone selects a blueprint's machine when
 exactly one exists. Destroy frees the number for reuse on the next
 `create`. Selection by name is scoped to the invocation's
@@ -230,18 +232,18 @@ optional organizational dressing (planning/ROADMAP.md, "Authored-asset
 resolution"). Blueprints arrive written by hand, seeded
 out of the
 [codex](codex.md) (implicitly on first
-reference, or explicitly with `pull`), synthesized from a native
+reference, or explicitly with `seed-blueprint`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command.
-Seeding — implicit or `pull` — is the human-convenience half of
+Seeding — implicit or explicit — is the human-convenience half of
 the artifact-residency split (planning/USE-CASES.md): automation
 runs project-scoped with the home fallback off (`--assets-only`),
-where the codex is never a resolution tier — a project `pull`s a
+where the codex is never a resolution tier — a project seeds a
 copy once and commits it. Create a machine and run it:
 
 ```powershell
-rlq create --blueprint msdos
-rlq start --blueprint msdos --display
-rlq stop --blueprint msdos
+rlq create-machine --blueprint msdos
+rlq start-machine --blueprint msdos --display
+rlq stop-machine --blueprint msdos
 ```
 
 `create` resolves the blueprint against an assigned backend,
@@ -368,7 +370,7 @@ runs as; the baseline enters only through `create` and `apply`:
 ### Applying blueprint edits
 
 ```powershell
-rlq apply --blueprint msdos
+rlq apply-blueprint --blueprint msdos
 ```
 
 `apply` adopts the current blueprint into an existing, stopped
@@ -411,8 +413,8 @@ Because the blueprint lives outside the cache, a machine is
 always disposable:
 
 ```powershell
-rlq destroy --blueprint msdos
-rlq recreate --blueprint msdos
+rlq destroy-machine --blueprint msdos
+rlq recreate-machine --blueprint msdos
 ```
 
 `destroy` deletes the machine entirely — its directory (state,

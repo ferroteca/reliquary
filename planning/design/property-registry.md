@@ -74,17 +74,17 @@ rewritten.
 Ordinary values may be edited directly or maintained through the CLI:
 
 ```text
-rlq property list [<prefix>]
-rlq property get <key>
-rlq property set <key> <value>
-rlq property set <key> --secret
-rlq property unset <key>
+rlq list-properties [<prefix>]
+rlq get-property <key>
+rlq set-property <key> <value>
+rlq set-property <key> --secret
+rlq unset-property <key>
 ```
 
-`list` sorts keys and shows whether each is ordinary, a present secret, or a
+`list-properties` sorts keys and shows whether each is ordinary, a present secret, or a
 secret whose credential is missing. A prefix such as `products.windows-98`
 limits the listing to that key and its dotted descendants; it is not a raw
-string-prefix search. `get` prints an ordinary value; for a secret it reports
+string-prefix search. `get-property` prints an ordinary value; for a secret it reports
 only whether the credential exists and never reveals it.
 
 `set <key> <value>` creates or replaces an ordinary property. `set <key>
@@ -96,7 +96,7 @@ interactive terminal fails with guidance to use the embedding API or the
 host's credential-management facility.
 
 Replacing a property with another value of the same kind is allowed.
-Changing between ordinary and secret requires `unset` first, preventing an
+Changing between ordinary and secret requires `unset-property` first, preventing an
 accidental secret downgrade. Unsetting a secret removes both its marker and
 its credential.
 

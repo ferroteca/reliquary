@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > scanning with duplicate detection, and hash-verified fetching
 > and extraction with the mismatched-file contract. Embedded
 > `media` blocks parse in scripts; their installation into the
-> library, mirror URL lists, the `fetch` and `clean` commands,
+> library, mirror URL lists, the `fetch-media` and `clean-` commands,
 > JSONC acceptance, and the definition-level annotation fields
 > are not implemented yet; details may still change before first
 > release.
@@ -333,7 +333,7 @@ each `items` entry of the archive form:
   as they would in the cache, just at this path. `file` defaults
   to the location's file-name component, so it can usually be
   omitted alongside `local-path`. A custom local path is outside
-  `cache/`, so `clean media` never touches it — the file is the
+  `cache/`, so `clean-media` never touches it — the file is the
   user's, wherever it is.
   A relative path in a library definition resolves from that
   definition file's directory. An embedded definition resolves it
@@ -447,15 +447,15 @@ either exists and verifies, or it doesn't.
 ## Fetching
 
 ```text
-rlq fetch <media_name> [--script <script_name>]
+rlq fetch-media <media_name> [--script <script_name>]
 ```
 
 fetches a defined item explicitly: downloads (if missing or failing
 verification), extracts, verifies, reports. Machine operations that
 resolve a media reference to a fetchable definition do the same
-implicitly, so `fetch` is a convenience for warming the library —
+implicitly, so `fetch-media` is a convenience for warming the library —
 an install script's media is fetched before the machine boots
-either way. Without `--script`, `fetch` sees the shared library.
+either way. Without `--script`, `fetch-media` sees the shared library.
 With it, fetch validates and installs that script's embedded
 definitions using the same rules as script execution, then fetches
 the named item; it does not execute guest steps or start a machine.
@@ -506,7 +506,7 @@ and verification event kinds the run-event stream defines
 
 - **Inside a script run**, the events ride the run's own stream;
   followers of the run see the fetch as part of it.
-- **Standalone `fetch`** renders them itself. `--progress
+- **Standalone `fetch-media`** renders them itself. `--progress
   (auto | tty | plain | rawjson)` selects the rendering exactly
   as on `script`: pretty, live progress on a tty under `auto`;
   under `rawjson`, stdout carries the event stream as JSON lines
@@ -568,13 +568,13 @@ definition can be rebuilt from its mirrors — and each has its own
 clean command:
 
 ```text
-rlq clean downloads
-rlq clean media
+rlq clean-downloads
+rlq clean-media
 ```
 
-- `clean downloads` deletes cached source archives. Always safe:
+- `clean-downloads` deletes cached source archives. Always safe:
   archives exist only to spare a re-download.
-- `clean media` deletes payload files that reliquary can fetch
+- `clean-media` deletes payload files that reliquary can fetch
   again — items whose definition has a `url` (or a cached — or
   local — verifying archive). It never touches definitions,
   `local-path` files, or payloads without a download source:

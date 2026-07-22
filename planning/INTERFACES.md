@@ -50,9 +50,13 @@ where it does not, the omission is a named decision, not drift.
 
 `rlq` (and its alias `reliquary`) is the human operator's surface:
 explicit `--blueprint` / `--machine` selection, the two-layer
-lifecycle vocabulary, `script`, media, and property commands. It is
-a thin veneer over the embedding API — it may resolve selectors and
-print ids, but it owns no semantics of its own. It is also the
+lifecycle vocabulary, `run-script`, media, and property commands.
+It is a thin veneer over the embedding API — it may resolve
+selectors and print ids, but it owns no semantics of its own, and
+under the twin-name identity rule a command *is* its API twin's
+name, dash-separated (the guest-console family instead spells as
+the script language's verbs, and the `run` family maps to the run
+handle — planning/ROADMAP.md "The CLI"). It is also the
 universal automation path: any language that wants reliquary
 automation but has no native API binding automates via the CLI, so
 the CLI serves programs as well as people — and, like the API, it
@@ -96,7 +100,7 @@ Source of truth:
 
 A blueprint is a reusable, user-owned JSON description of a kind
 of machine: authored directly in an editor, seeded out of the
-codex, or synthesized from a native VM by `import` —
+codex, or synthesized from a native VM by `import-vm` —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
 customization (U5). Specification:
