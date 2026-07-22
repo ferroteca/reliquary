@@ -78,6 +78,20 @@ the parser stack validates scripts; 10–12 close out:
    deadline backstops the run, and S12 requires one of a
    cyclable phase graph), and the placement matrix enforced as
    parse errors.
+   LANDED as script_timing.py (owner, 2026-07-22): resolve()
+   computes the plan up front — each observation's effective
+   timeout with the scope that supplied it (innermost-wins:
+   statement > branching wait > phase > header > built-in 60s),
+   each phase's budget, the run's — so the runner is handed its
+   bounds and check-script can report them without running
+   anything. A branching wait is a real scope level: the
+   observations inside its handler bodies inherit its timeout.
+   Budgets resolve trivially because they are never inherited.
+   The placement matrix stays in the node signatures (a parse
+   error, per the task), but each timing rejection now gives its
+   reason and cites S2; S5's positive durations and S12's cycle
+   check (reachable phases only, naming the route) are in
+   script_validation.py with the other S-rules.
 5. Runner retarget: rebuild script_runner.py on the new
    graph — phase transitions, branching-wait dispatch,
    reactive run-to-completion dispatch with the

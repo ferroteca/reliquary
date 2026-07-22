@@ -65,6 +65,33 @@ _DISPLAY = {
 # closed timing set that separates an observation's own modifiers
 # from the channels it observes.
 _DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable"})
+
+# The placement matrix (script-spec.md, "Timing"): every timing
+# word the signatures above reject is rejected for a reason, and
+# S2 diagnostics give it rather than listing what fits instead.
+_PLACEMENT = {
+    ("wait_one", "deadline"):
+        "a budget bounds the wall clock of the construct it annotates, "
+        "which on a single observation is exactly what timeout bounds",
+    ("wait_branching", "deadline"):
+        "a budget belongs to a phase or the run; a wait is bounded by "
+        "timeout",
+    ("wait_branching", "stable"):
+        "only a match can be required to hold: write stable on the on "
+        "handler whose condition must hold",
+    ("on_handler", "timeout"):
+        "the container owns the waiting: write timeout on the wait",
+    ("always_handler", "timeout"):
+        "the container owns the waiting: write timeout on the phase, "
+        "where it bounds each interval with no handler firing",
+    ("on_handler", "deadline"):
+        "a budget belongs to a phase or the run",
+    ("always_handler", "deadline"):
+        "a budget belongs to a phase or the run",
+    ("phase", "stable"):
+        "only a match can be required to hold, and a phase has no "
+        "condition of its own",
+}
 # A modifier value's terminal, as the condition kind it spells.
 _CONDITION_KINDS = {
     "STRING": "text", "REGEX": "regex", "NAME": "state",
@@ -241,9 +268,15 @@ def _modifiers(node, items):
             raise ScriptParseError(
                 line, f"duplicate modifier: {name}", column)
         if name not in allowed:
+            display = _DISPLAY.get(node, node)
+            reason = _PLACEMENT.get((node, name))
+            if reason is not None:
+                raise ScriptParseError(
+                    line, f"{display} does not accept {name}=: {reason} "
+                    "(S2)", column)
             listing = ", ".join(allowed) if allowed else "none"
             raise ScriptParseError(
-                line, f"{_DISPLAY.get(node, node)} does not accept the "
+                line, f"{display} does not accept the "
                 f"modifier {name!r} (accepts: {listing})", column)
         if name in _DURATION_MODIFIERS and value.type != "DURATION":
             raise ScriptParseError(

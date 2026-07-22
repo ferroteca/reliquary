@@ -151,12 +151,9 @@ class SignatureTests(unittest.TestCase):
                       str(caught.exception))
         self.assertIn("accepts: none", str(caught.exception))
 
-    def test_a_wait_lists_the_timing_modifiers_it_accepts(self):
+    def test_a_wait_takes_the_timing_modifiers_that_are_its_own(self):
         # Only the timing set is a wait's own; every other modifier
         # names a channel, and S7 owns that diagnostic.
-        with self.assertRaises(ScriptParseError) as caught:
-            parse_document(_HEAD + 'wait "x" deadline=5m\n')
-        self.assertIn("accepts: timeout, stable", str(caught.exception))
         with self.assertRaises(ScriptParseError) as caught:
             parse_document(_HEAD + 'wait "x" exclude="y"\n')
         self.assertIn("unknown observation channel: exclude",

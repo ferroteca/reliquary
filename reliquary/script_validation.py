@@ -8,7 +8,7 @@ restrictions"), checked over the typed tree so each diagnostic can
 name the offending construct and cite its rule:
 
 - **S3** — ``entry`` appears exactly in phased scripts;
-- **S5** — phase names are unique;
+- **S5** — phase names are unique and durations are positive;
 - **S7** — an observation carries exactly one condition, on a
   known channel, of the right kind;
 - **S8** — a branching ``wait`` carries no condition of its own,
@@ -19,17 +19,24 @@ name the offending construct and cite its rule:
 - **S10** — the two script shapes never mix, and every phase name
   a script transfers to is declared;
 - **S11** — nothing follows a terminating statement, and a
-  sequential phase's statement list terminates.
+  sequential phase's statement list terminates;
+- **S12** — a phased script whose transition graph can cycle
+  declares a header ``deadline``, the backstop that bounds the
+  run.
 
 The remaining rules belong to the layers around this one: S1, S2,
-and S4 are the lexer's and the parser's, and S6, S12, S13, and S14
-arrive with the timing model and the closed vocabularies.
+and S4 are the lexer's and the parser's — the timing placement
+matrix is a node signature — and S6, S13, and S14 arrive with the
+closed vocabularies. The timing *model* itself, which resolves
+the durations this module checks, is
+:mod:`reliquary.script_timing`.
 
 This module works structurally over the tree, so it imports no
 node type; that keeps the parser free to import it.
 """
 
 from .script_nodes import ScriptParseError
+from .script_timing import parse_duration
 
 # The observable channels, each with the condition kind it takes
 # and its closed value set. The screen is the default channel and
@@ -45,10 +52,53 @@ def validate(script):
     first violation. Source context is attached by the caller that
     knows the document's path.
     """
+    _durations(script)
     if script.phases:
         _phased(script)
     else:
         _linear(script)
+
+
+# -- durations (S5) ----------------------------------------------
+
+def _durations(script):
+    """Every written duration is positive.
+
+    Where each may be written is the placement matrix, which the
+    node signatures enforce (S2); this is the value rule.
+    """
+    for name in ("timeout", "deadline"):
+        _positive(getattr(script, name), name,
+                  script.headers.get(name, 1), 1)
+    for phase in script.phases:
+        for name in ("timeout", "deadline"):
+            _positive(getattr(phase, name), name, phase.line, phase.column)
+        _observed(_timed(phase.statements, phase.handlers))
+    _observed(_timed(script.statements))
+
+
+def _observed(nodes):
+    for node in nodes:
+        for name in ("timeout", "stable"):
+            _positive(getattr(node, name, None), name, node.line,
+                      node.column)
+
+
+def _positive(spelling, name, line, column):
+    if spelling is not None and parse_duration(spelling) <= 0:
+        raise ScriptParseError(
+            line, f"{name} must be a positive duration: {spelling} (S5)",
+            column)
+
+
+def _timed(statements, handlers=()):
+    """Yield every node that may carry a timing modifier."""
+    for handler in handlers:
+        yield handler
+        yield from _timed(handler.statements)
+    for statement in statements:
+        yield statement
+        yield from _timed((), statement.handlers)
 
 
 # -- the two shapes (S3, S10) ------------------------------------
@@ -96,6 +146,42 @@ def _phased(script):
                     statement.line,
                     "goto names an undeclared phase: "
                     f"{statement.arguments[0]} (S10)", statement.column)
+    _cycles(script)
+
+
+def _cycles(script):
+    """A phase graph that can cycle declares a run deadline (S12).
+
+    Only phases reachable from ``entry`` are walked: a cycle among
+    phases the run can never enter is unreachable code, which
+    static analysis warns about rather than budgets.
+    """
+    if script.deadline is not None:
+        return
+    edges = {phase.name: tuple(
+        (statement.arguments[0], statement)
+        for statement in _walk(phase.statements, phase.handlers)
+        if statement.verb == "goto") for phase in script.phases}
+    visiting, done, path = set(), set(), []
+
+    def visit(name):
+        visiting.add(name)
+        path.append(name)
+        for target, statement in edges[name]:
+            if target in visiting:
+                route = " -> ".join(path[path.index(target):] + [target])
+                raise ScriptParseError(
+                    statement.line,
+                    f"the phase graph can cycle ({route}): a script that "
+                    "can revisit a phase declares a header deadline, the "
+                    "backstop that bounds the run (S12)", statement.column)
+            if target not in done:
+                visit(target)
+        path.pop()
+        visiting.discard(name)
+        done.add(name)
+
+    visit(script.entry)
 
 
 def _phase(phase):

@@ -94,7 +94,7 @@ class PhaseShapeTests(_ValidationCase):
 
     def test_a_branching_wait_terminates_when_every_handler_does(self):
         script = parse_document(
-            _HEAD + "entry a\nphase a {\n    wait {\n"
+            _HEAD + "entry a\ndeadline 10m\nphase a {\n    wait {\n"
             '        on "x" {\n            finish\n        }\n'
             '        on "y" {\n            goto a\n        }\n    }\n}\n')
         self.assertEqual(script.phases[0].statements[0].verb, "wait")
@@ -211,7 +211,7 @@ class ObservationChannelTests(_ValidationCase):
 
     def test_a_handler_names_a_non_default_channel(self):
         script = parse_document(
-            _HEAD + "entry a\nphase a {\n    wait timeout=5m {\n"
+            _HEAD + "entry a\ndeadline 10m\nphase a {\n    wait timeout=5m {\n"
             '        on "Press a key..." {\n            press enter\n'
             "        }\n"
             "        on machine=stopped {\n            goto a\n        }\n"

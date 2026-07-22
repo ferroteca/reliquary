@@ -34,8 +34,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   per observation on a known channel of the right kind (S7), the
   branching `wait`'s shape and depth limit (S8), sequential-or-
   reactive phases (S9), and the terminating-statement rules (S11).
-  Parsing a document now applies them. The timing model's rules
-  (S2's placement matrix, S12) follow with the timing retarget.
+  Parsing a document now applies them.
+- The script timing model: `reliquary.script_timing` resolves a
+  script's whole timing plan at parse time — every observation's
+  effective timeout and the scope that supplied it (innermost-wins
+  over statement, branching `wait`, phase, header, and the built-in
+  60s), each phase's per-activation budget, and the run's. A
+  timing failure can therefore name the clock that expired and
+  where it came from, and `check-script` can report the plan
+  without running anything. Alongside it, the placement matrix's
+  rejections now give their reason and cite S2 — `deadline` on a
+  single observation would be a synonym for `timeout`, `timeout`
+  on a handler belongs on its container, `stable` needs a match to
+  hold — durations must be positive (S5), and a phased script
+  whose reachable phase graph can cycle must declare a header
+  `deadline` (S12), the diagnostic naming the route that closes
+  the cycle.
 
 ### Removed
 
