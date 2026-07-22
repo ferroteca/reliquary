@@ -628,9 +628,12 @@ Lifecycle semantics:
   planning/design/property-registry.md. Ordinary strings live in
   `properties.json`; secret values live only in a protected host
   credential store, with a marker in the file. Listing and getting
-  secrets never reveal them, and secret setting uses a no-echo prompt
-  rather than an argument that would enter process listings or shell
-  history.
+  secrets never reveal them, and secret setting takes no value
+  argument (process listings and shell history are not credential
+  stores): on a tty it prompts with no echo; otherwise it reads
+  the value from stdin (to EOF, one trailing newline stripped,
+  empty is an error — owner, 2026-07-21), keeping the CLI a
+  complete binding for programs.
 - `clean-downloads` / `clean-media` reclaim the two caches:
   cached source archives, and payload files reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
@@ -1603,7 +1606,8 @@ Deliverables:
 2. `rlq get-property` / `set-property` / `unset-property` /
    `list-properties`: secret values held
    only in the host's protected credential store (scoped by home
-   and property name), set via no-echo prompt, never revealed by
+   and property name), set via no-echo prompt on a tty and from
+   stdin otherwise, never revealed by
    list/get; kind changes require `unset-property` first.
 3. The fail-safe update order (store credential before marker,
    remove marker before credential), with orphaned-credential

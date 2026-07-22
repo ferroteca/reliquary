@@ -87,13 +87,17 @@ limits the listing to that key and its dotted descendants; it is not a raw
 string-prefix search. `get-property` prints an ordinary value; for a secret it reports
 only whether the credential exists and never reveals it.
 
-`set <key> <value>` creates or replaces an ordinary property. `set <key>
---secret` reads a value using a no-echo terminal prompt, writes it to the host
-credential store, and records only the secret marker in `properties.json`.
-There is no secret-value command-line argument because process listings and
-shell history are not credential stores. Secret setting without an
-interactive terminal fails with guidance to use the embedding API or the
-host's credential-management facility.
+`set-property <key> <value>` creates or replaces an ordinary property.
+`set-property <key> --secret` reads the value from the entry channel the
+context provides (owner, 2026-07-21 — the house tty-detection pattern): on
+an interactive terminal, a no-echo prompt; otherwise it reads stdin to EOF,
+strips one trailing newline, and rejects an empty value — so
+`echo $key | rlq set-property product-key --secret` is the programmatic
+path and the CLI stays a complete binding for unbound languages. Either
+way the value is written to the host credential store and only the secret
+marker is recorded in `properties.json`. There is no secret-value
+command-line argument because process listings and shell history are not
+credential stores.
 
 Replacing a property with another value of the same kind is allowed.
 Changing between ordinary and secret requires `unset-property` first, preventing an

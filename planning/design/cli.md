@@ -995,7 +995,8 @@ protected credential store, with a marker in the file.
 ```powershell
 rlq set-property username "paul"
 rlq set-property product-key --secret
-# prompts for the value with no echo
+# tty: prompts for the value with no echo
+# not a tty: reads the value from stdin
 rlq get-property username
 # → paul
 rlq get-property product-key
@@ -1008,7 +1009,10 @@ rlq unset-property username
 
 Keys are dotted names (`timezone`, `keys.product`, `network.host`).
 Listing and getting secrets never reveals them; `set-property
---secret` uses a no-echo prompt. Kind changes — making a secret
+--secret` uses a no-echo prompt on a tty and otherwise reads the
+value from stdin (to EOF, one trailing newline stripped, empty is
+an error) — never an argument, which would enter process listings
+and shell history. Kind changes — making a secret
 ordinary or vice versa — require `unset-property` first.
 
 ---

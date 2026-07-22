@@ -665,14 +665,20 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      chose the spelling `check script`; item 14's dash rule
      respells it check-script — the original hyphen, now derived
      from the twin's name rather than an outlier)
-  8. OPEN — fork not yet decided (question dismissed, re-ask):
-     `property set <key> --secret` is interactive-only, which
-     ROADMAP "The CLI" forbids: a program driving the CLI as its
-     binding cannot set a secret at all, and argv is rightly
-     prohibited. Candidate shapes: tty-detect (prompt on a tty,
-     read stdin to EOF otherwise — the house --progress-auto /
-     import-prompt pattern), an explicit docker-style --stdin
-     flag, or both
+  8. RESOLVED (owner, 2026-07-21 — auto-detect on the
+     recommendation): `set-property <key> --secret` uses the
+     house tty-detection pattern — a no-echo prompt on a tty,
+     otherwise the value is read from stdin (to EOF, one trailing
+     newline stripped, empty is an error), so
+     `echo $key | rlq set-property k --secret` is the
+     programmatic path and the CLI stays a complete binding;
+     never an argv value (process listings, shell history). The
+     explicit --stdin flag and the hybrid were weighed and
+     declined (one spelling, zero new surface; the forgot-to-pipe
+     block is standard Unix stdin behavior). Folded:
+     property-registry.md "Maintaining properties" (the
+     fails-with-guidance clause replaced), cli.md Properties,
+     ROADMAP (property bullet + milestone 4 deliverable 2)
   9. RESOLVED (owner, 2026-07-21, follow-up round — id-only on
      the recommendation): `--machine` takes the full machine id,
      exactly; prefix matching AND the bare-number pair form
