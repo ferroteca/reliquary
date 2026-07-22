@@ -566,6 +566,13 @@ how reliquary is running:
   explicitly and maps interactive runs without the flag to
   `"prompt"`).
 
+The `"prompt"` value is selected, never inferred (owner,
+2026-07-21): a library never prompts by default — passing
+`on_mismatch="prompt"` is the caller explicitly delegating the
+checkpoint to the tty. The blocking form's default stays
+`"fail"`, `start_fetch` rejects `"prompt"`, and the `plain` /
+`jsonl` renderings never pass it.
+
 A mismatched file whose definition names no source is always kept
 and reported — with nothing to refetch from, deleting it could
 destroy the only copy.

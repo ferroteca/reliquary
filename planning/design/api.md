@@ -53,8 +53,10 @@ SPDX-License-Identifier: BSD-3-Clause
   exceptions, each an identity with a different home surface:
   the guest-console family spells as the script language's verbs
   (its twins deferred to the control-plane design), and the
-  `run` family maps to the run handle's methods, flag spellings
-  included (`run cancel --stop` ↔ `cancel(stop_machine=)`).
+  `run` family maps to the run handle's methods. The exceptions
+  cover command names only — flags mirror their function's or
+  method's parameters everywhere, exception families included
+  (`run cancel --stop-machine` ↔ `cancel(stop_machine=)`).
 - **Selectors** (owner, 2026-07-21): machine-scoped functions
   take `machine=` — the full machine id (`"<blueprint>-<n>"`),
   exactly — or `blueprint=` — a blueprint name, selecting its
@@ -75,36 +77,54 @@ SPDX-License-Identifier: BSD-3-Clause
   mirror is exact (settled 2026-07-21): the command prints the
   twin's return serialized as one JSON document, so a return
   contract is also the command's machine-readable output
-  contract (planning/ROADMAP.md "The CLI").
+  contract (planning/ROADMAP.md "The CLI"). Returns are plain
+  JSON-shaped values (owner, 2026-07-21): a union of document
+  shapes is ordinary JSON — `get_property` returns an ordinary
+  value's string but a secret's marker, exactly as `--json`
+  serializes — while a value-or-handle union is never allowed: a
+  handle is not a value, which is why a `detach=` mode flag on
+  the blocking twins was declined.
 - **Errors — the taxonomy is named** (owner, 2026-07-21):
-  blocking forms raise by error class, and the classes are the
-  script spec's failure classes under one root. Python spells
-  them `ReliquaryError` — the root every deliberate reliquary
-  error subclasses — with `StaticError` (exit 2),
-  `PreflightError` (exit 3), `RunFailure` (exit 4), and
-  `RunCancelled` (exit 5): the CLI's exit codes and the API's
-  exceptions are one mapping under parity (script spec "Error
-  classes and exit codes"); exit `1` — reliquary's own
+  blocking forms raise by error class under one root. Python
+  spells the root `ReliquaryError` — every deliberate reliquary
+  error subclasses it, on every surface, so
+  `except ReliquaryError` is always the catch-all — and the run
+  surface's classes `StaticError` (exit 2), `PreflightError`
+  (exit 3), `RunFailure` (exit 4), and `RunCancelled` (exit 5;
+  it subclasses the root, never `RunFailure` — cancellation is
+  an outcome, neither success nor failure): the run surface's
+  exit codes and exceptions are one mapping under parity (script
+  spec "Error classes and exit codes"). Deliberate errors
+  outside the run surface subclass the root directly until the
+  general programmatic-contract work names finer classes —
+  growth is additive, never a break. Exit `1` — reliquary's own
   unexpected fault — is precisely an error outside the taxonomy.
   Other bindings spell the same classes natively.
-- **Async starters present as `--detach`, never as commands**
-  (owner, 2026-07-21): a long operation is one capability with
-  two API forms — the blocking twin and a starter returning its
-  handle (`run_script()` / `start_script()`, `fetch_media()` /
-  `start_fetch()`). A starter is not a third name on the CLI:
-  the pair presents as one command, with `--detach` the handoff
-  (`run-script --detach` ↔ `start_script()`). `start_fetch` has
-  no CLI form at all — a fetch handle is process-local, so for a
-  CLI driver the `fetch-media` process itself is the handle:
-  background it and read `--progress jsonl`; reattachment is
-  what run records provide.
+- **Async starters — sync is async plus attach** (owner,
+  2026-07-21): a long operation is one start+attach model with
+  two projections (planning/ROADMAP.md "Asynchronous runs"). The
+  CLI composes them: every foreground command is
+  start-plus-attach, and `--detach` is start without attach. The
+  API separates them: the blocking twin (`run_script()`,
+  `fetch_media()`) is the composition, and the starter
+  (`start_script()`, `start_fetch()`) returns the handle that
+  attach follows. A starter therefore never has its own command —
+  it *is* the composed command's `--detach` mode
+  (`run-script --detach` ↔ `start_script()`), and the identity
+  rule binds the capability pair, not each function alone.
+  `start_fetch` has no CLI form at all — a fetch handle is
+  process-local, so for a CLI driver the `fetch-media` process
+  itself is the handle: background it and read
+  `--progress jsonl`; reattachment is what run records provide.
 - **Handles are pull-only**: `status()`, `events(follow=)` as a
   blocking iterator, `wait(timeout=)`, `cancel()` — never
   callbacks. `wait()` completes exactly as the blocking twin —
   same result, same raises — and expiry raises outside the
   taxonomy (Python: the builtin `TimeoutError`), because nothing
   failed: the operation is still live, the handle stays valid,
-  and the call may be repeated (owner, 2026-07-21). A handle is
+  and the call may be repeated (owner, 2026-07-21) —
+  deliberately outside `except ReliquaryError`'s reach, because
+  an expiry is not a reliquary error. A handle is
   a follower, never the owner: dropping one never affects its
   operation — `cancel()` is the only cancellation.
 
@@ -131,7 +151,7 @@ carries the exceptions and each family's contract home.
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
 | `clean-downloads` / `clean-media` | `clean_downloads()` / `clean_media()` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
-| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | [ROADMAP "The CLI"](../ROADMAP.md) |
+| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [ROADMAP "The CLI"](../ROADMAP.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [property registry](property-registry.md) |
 | guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
 

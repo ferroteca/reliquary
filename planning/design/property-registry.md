@@ -113,7 +113,9 @@ because argv leaks into process listings and shell history, which an
 in-process value never touches, and a library function never prompts
 or reads stdin. Reading stays the CLI's rule: `get_property` returns
 an ordinary value but only the secret marker for a secret, never the
-value (exactly the `--json` serialization), and the kind-change rule
+value (exactly the `--json` serialization); `list_properties` returns
+the registry projection — key to value-or-marker — of which the
+pretty listing is a rendering; and the kind-change rule
 applies unchanged — `set_property` over a property of the other kind
 fails; `unset_property` first.
 

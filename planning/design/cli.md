@@ -866,7 +866,7 @@ rlq run-script <label> --detach (--blueprint <name> | --machine <id>)
 rlq run status [<n>] (--blueprint <name> | --machine <id>)
 rlq run tail [<n>] (--blueprint <name> | --machine <id>)
 rlq run wait [<n>] (--blueprint <name> | --machine <id>)
-rlq run cancel [<n>] [--stop] (--blueprint <name> | --machine <id>)
+rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
 rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
 rlq list-runs [--blueprint <name> | --machine <id>]
 ```
@@ -874,9 +874,10 @@ rlq list-runs [--blueprint <name> | --machine <id>]
 The `run` family is the identity rule's second named exception:
 its operations map to the API run handle's methods (`status()`,
 `events()`, `wait()`, `cancel()`, plus `delete_run`), not to flat
-functions; the exception covers flag spellings too
-(`run cancel --stop` ↔ `cancel(stop_machine=)`), and a fresh
-process reopens the handle with `attach_run()`. A foreground `run-script` run is start-plus-attach: it
+functions; the exception covers the command names only — flags
+mirror the method parameters as everywhere
+(`run cancel --stop-machine` ↔ `cancel(stop_machine=)`) — and a
+fresh process reopens the handle with `attach_run()`. A foreground `run-script` run is start-plus-attach: it
 streams its own progress until the run ends, and Ctrl-C cancels
 the run.
 `--detach` completes parsing, binding, and preflight in the
@@ -893,7 +894,7 @@ tailing without touching the run; `run wait` blocks until the
 terminal event and exits with the run's own outcome code, so a
 shell script or unbound language gets the result by waiting;
 `run cancel` ends the run at the next event boundary and leaves
-the machine as-is — `--stop` also hard powers it off.
+the machine as-is — `--stop-machine` also hard powers it off.
 `run delete` removes a run's record — the one `run` operation
 that never defaults to the latest run, because deleting evidence
 warrants naming it: the numbers are explicit, several may be
@@ -907,7 +908,7 @@ rlq run-script install --blueprint freedos-1.4-plain --detach
 # → freedos-1.4-plain-1/4
 rlq run tail --blueprint freedos-1.4-plain
 rlq run wait --blueprint freedos-1.4-plain; echo $LASTEXITCODE
-rlq run cancel 4 --stop --machine freedos-1.4-plain-1
+rlq run cancel 4 --stop-machine --machine freedos-1.4-plain-1
 ```
 
 ---

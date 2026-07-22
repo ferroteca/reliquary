@@ -560,7 +560,7 @@ rlq run status [<n>] (--blueprint <name> | --machine <id>)
 rlq run tail [<n>] (--blueprint <name> | --machine <id>)
     [--progress <mode>]
 rlq run wait [<n>] (--blueprint <name> | --machine <id>)
-rlq run cancel [<n>] [--stop] (--blueprint <name> | --machine <id>)
+rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
 rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
 rlq type <text> (--blueprint <name> | --machine <id>)
 rlq enter <line> (--blueprint <name> | --machine <id>)
@@ -1219,7 +1219,10 @@ a stop; the runner ends at the next event boundary (input
 deliveries are atomic, host transfers abort — the execution
 model's severability), writes a `cancelled` terminal event, and
 leaves the machine as-is per the no-implicit-teardown rule;
-`--stop` opts into the visible hard power-off. Cancelled exits
+`--stop-machine` opts into the visible hard power-off
+(the flag mirrors `cancel(stop_machine=)` — flags mirror
+parameters even in the run family; owner, 2026-07-21). Cancelled
+exits
 with its own code (`5`): deliberately neither success nor RUN
 FAILURE.
 
@@ -1258,7 +1261,7 @@ in USE-CASES (the artifact-residency split) and INTERFACES
 `run tail` (rendering per the decided progress vocabulary:
 pretty on a tty, plain and jsonl for programs), `run wait`
 (its exit code mirrors the run's outcome, so unbound languages
-get results by waiting), `run cancel [--stop]`, and
+get results by waiting), `run cancel [--stop-machine]`, and
 `run delete <n> [<n> ...]` — and
 `list runs`. The embedding API's twins: `run_script()` stays the
 blocking form; `start_script()` returns a run handle —

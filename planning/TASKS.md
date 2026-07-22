@@ -820,34 +820,91 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      CLI form (a fetch handle is process-local — a CLI driver
      backgrounds fetch-media itself, the process being the handle;
      run records provide reattachment). Folded: api.md (conventions +
-     handles), media-spec fetching, ROADMAP "Asynchronous runs"
+     handles), media-spec fetching, ROADMAP "Asynchronous runs".
+     DESIGN ROUND (owner, 2026-07-21, both forks on the
+     recommendations): the convention now DERIVES from the async
+     round's sync-is-async-plus-attach doctrine — the CLI composes
+     start+attach (--detach = start without attach), the API
+     separates them, and the identity rule binds the capability
+     pair, not each function alone (api.md bullet rewritten; a
+     mechanical mirror was weighed and declined: detach= is a
+     union return type, a start-script command duplicates the
+     capability); start_fetch's no-CLI-form CONFIRMED
+     (process-is-the-handle; fetch records weighed and declined —
+     reopening ephemerality for a cache-warming convenience)
   2. RESOLVED (owner, 2026-07-21): attach-by-id is NAMED —
      attach_run(machine=, blueprint=, run=None), the run number
      defaulting to the machine's latest exactly as the CLI run
      operations; the last unnamed twin. Folded: api.md (table +
      handles), cli.md run family, script-spec twins sentence (its
      stale `script --detach` spelling fixed to run-script in
-     passing), ROADMAP "Asynchronous runs"
+     passing), ROADMAP "Asynchronous runs".
+     DESIGN ROUND (owner, 2026-07-21, both forks on the
+     recommendations): attach_run CONFIRMED (the doctrine's own
+     verb — sync is async plus attach; open_run/get_run weighed
+     and declined) and the latest-run default CONFIRMED (mirrors
+     the settled CLI default; delete's required-number rule stays
+     deletion's alone — attach is read-only observation). One
+     handle type: attach_run returns what start_script returns;
+     a crashed run attaches and reports crashed. No doc change —
+     the committed shape stands
   3. RESOLVED (owner, 2026-07-21): the exception taxonomy is NAMED —
      ReliquaryError the root every deliberate error subclasses;
      StaticError(2) / PreflightError(3) / RunFailure(4) /
      RunCancelled(5) the one exit-code mapping under parity; exit 1
      is precisely an error outside the taxonomy; other bindings
      spell the same classes natively. Folded: api.md conventions,
-     script-spec "Error classes and exit codes", ROADMAP "The CLI"
+     script-spec "Error classes and exit codes", ROADMAP "The CLI".
+     DESIGN ROUND (owner, 2026-07-21, both forks on the
+     recommendations): SCOPE settled — the root is universal, the
+     four named classes are the RUN SURFACE's exit-code mapping;
+     deliberate errors outside the run surface subclass the root
+     directly until the general programmatic-contract work names
+     finer classes (growth additive, never a break; a full domain
+     tree now was weighed and declined as speculation ahead of
+     the queued contract); NAMING confirmed as spec-term identity
+     (RunFailure / RunCancelled unsuffixed — RunCancelled an
+     outcome, subclassing the root, never RunFailure; strict
+     Error-suffixing declined). api.md Errors bullet rewritten
   4. RESOLVED (owner, 2026-07-21): flag↔parameter mirror drift
      closed — --refetch-mismatched respelled --on-mismatch
      (fail | refetch), the mechanical mirror of on_mismatch=
      (interactive runs without the flag still map to "prompt";
      milestone 2 and released CHANGELOG keep historical
-     spellings); and the run-family exception explicitly covers
-     flag spellings (run cancel --stop ↔ cancel(stop_machine=)).
-     Folded: media-spec mismatched-files, cli.md (fetch synopsis +
-     prose, run family), api.md naming convention
+     spellings). Folded: media-spec mismatched-files, cli.md
+     (fetch synopsis + prose, run family), api.md naming
+     convention.
+     DESIGN ROUND (owner, 2026-07-21): --on-mismatch CONFIRMED
+     (enum-flag house style per --hdd-images; explicit fail also
+     forces noninteractive failure on a tty); the PROMPT RULE
+     named — "prompt" is selected, never inferred: a library
+     never prompts by default, on_mismatch="prompt" is the
+     caller explicitly delegating the checkpoint to the tty
+     (folded into media-spec; CLI-owned checkpoint weighed and
+     declined — the mismatch error names one file while refetch
+     pre-approves all, so the loop changes semantics or the
+     veneer starts owning them); and AGAINST the recommendation,
+     --stop respelled --stop-machine — the exceptions cover
+     command names only, flags mirror their function's or
+     method's parameters everywhere, exception families included
+     (api.md naming bullet flipped; cli.md run family + synopsis
+     + example; ROADMAP cancel paragraph + synopsis; TASKS async
+     record keeps its historical spelling)
   5. RESOLVED (2026-07-21): api.md contract homes no longer point
      at the short-lived cli.md — list/search → ROADMAP "The CLI";
      guest-console → script-spec (verbs) + the control-plane
-     design (twins)
+     design (twins).
+     DESIGN ROUND (owner, 2026-07-21): list/search refined to the
+     HYBRID — family semantics (ANDed terms, CODEX column,
+     --verbose pretty-only) stay in ROADMAP "The CLI"; each
+     noun's return shape lands with that noun's own spec as it
+     lands (machines → instance model, blueprints → blueprint
+     guide, media → media spec, scripts/runs → script spec) —
+     the table's each-family-with-its-spec principle applied
+     (api.md row updated); guest-console home CONFIRMED (verbs
+     in script-spec, twins with the deferred control-plane
+     design — the named-omission pattern; screen/exec durably
+     defined in ROADMAP "The CLI")
   6. RESOLVED (owner, 2026-07-21): the property twins' signatures
      are settled — list_properties(prefix=None), get_property(key),
      set_property(key, value, secret=False), unset_property(key);
@@ -856,7 +913,18 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      are CLI-side; a library never prompts or reads stdin);
      get_property returns the marker for a secret, never the
      value; the kind-change rule applies unchanged. Folded:
-     property-registry.md "Maintaining properties"
+     property-registry.md "Maintaining properties".
+     DESIGN ROUND (owner, 2026-07-21, both forks on the
+     recommendations): set_property's single-twin shape CONFIRMED
+     (one command, one twin — set_secret would name a command the
+     CLI doesn't have); the VALUE-UNION PRINCIPLE recorded in
+     api.md's returns convention — returns are plain JSON-shaped
+     values, a union of document shapes is ordinary JSON (forced
+     by the --json marker rule), a value-or-handle union is never
+     allowed (a handle is not a value — why detach= died);
+     list_properties returns the registry projection (key →
+     value-or-marker), the pretty listing a rendering of it
+     (property-registry updated)
   7. RESOLVED (owner, 2026-07-21, follow-up — the deferred
      semantics settled on the recommendations): wait(timeout=)
      completes exactly as the blocking twin (same result, same
@@ -873,7 +941,22 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      work, the wait-mirrors-the-blocking-twin rule settled now.
      Folded: api.md (selectors + pull-only conventions),
      media-spec fetch handle, ROADMAP ("Asynchronous runs" handle
-     paragraph + "The CLI" selection sentence), cli.md Selection
+     paragraph + "The CLI" selection sentence), cli.md Selection.
+     DESIGN ROUND (owner, 2026-07-21, all three forks on the
+     recommendations): wait expiry CONFIRMED outside the taxonomy
+     (builtin TimeoutError; interlocks with item 3's scope — the
+     catch-all deliberately does not catch expiry, "still
+     running" is not an error; a ReliquaryError subclass and a
+     sentinel return weighed and declined; api.md pull-only
+     bullet gains the catch-all sentence); drop semantics
+     CONFIRMED (follower-never-owner, cancel() the only
+     cancellation; cancel-on-drop declined — GC timing carries
+     no semantics in any binding; Python with-sugar cancel
+     declined as the same trap opted into; named cost: an
+     abandoned fetch runs to completion); resolve_machine
+     CONFIRMED internal (a resolve-machine command would
+     duplicate the list family's query). Return shapes stay
+     queued, landing per item 5's hybrid homes
   8. RESOLVED (owner, 2026-07-21, design session — all four forks
      on the recommendations): the backend-adapter design output is
      AUTHORED — planning/design/backend-adapter.md, the provider
