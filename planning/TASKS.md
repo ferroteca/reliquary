@@ -634,30 +634,45 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      paragraph), api.md (returns-mirror convention closed into
      the rule; sync-divergence bullet), guiding-principles
      CLI-contract entry
-  5. `pull` vs `fetch` inverts git intuition: git users arrive
-     knowing pull ≈ fetch + merge; here the two are unrelated (codex
-     extraction vs payload download). The doctrine already supplies
-     the better word — the codex is a seed, and the provenance
-     column prints `seeded`. Recommendation: rename `pull` → `seed`
-  6. the create/blueprint confusion pair: `rlq create blueprint
-     <name>` scaffolds a file while `rlq --blueprint <name> create`
-     materializes a machine — the same two words at opposite layers;
-     and `import <source> --blueprint <name>` is --blueprint's only
-     use as a destination name rather than a selector.
-     Recommendation: consider renaming the scaffolder (e.g.
-     `new blueprint`) and `import --as <name>`; at minimum the two
-     create errors cross-reference each other
-  7. `check-script` is a triple outlier: the only hyphenated command,
-     the only verb-verb compound, and it takes a bare script name
-     where `script` takes a label — the label path cannot be checked
-     (`script install` has no `check-script install`). Whatever the
-     spelling becomes, it must accept `script`'s label resolution
-     when a machine/blueprint selector is present
-  8. `property set <key> --secret` is interactive-only, which
-     ROADMAP "The CLI" forbids ("never interactive-only"): a program
-     driving the CLI as its binding cannot set a secret at all, and
-     argv is rightly prohibited. Recommendation: read the value from
-     stdin when stdin is not a tty
+  5. DECIDED, fold deferred behind item 14 (owner, 2026-07-21,
+     batch round): codex extraction renames `pull` → `seed` — the
+     doctrine's own word (seed-not-a-resolution-tier, the `seeded`
+     provenance column, the implemented library.seed_blueprint),
+     killing the git false-friend (git/docker pull = network
+     acquisition; ours was local extraction while `fetch`
+     downloads). API twins named under parity: seed_blueprint(name,
+     only=) / seed_media / seed_script — the family was absent from
+     api.md's table entirely. Item 14's dash rule spells the
+     commands seed-blueprint / seed-media / seed-script; the fold
+     lands with 14's
+  6. DECIDED, fold deferred behind item 14 (owner, 2026-07-21,
+     batch round): the scaffolder renames `create blueprint` →
+     `new blueprint` (cargo/dotnet/rails-new precedent; `create`
+     becomes machine-lifecycle vocabulary only; twin
+     new_blueprint()), and import's destination flag renames
+     `--blueprint` → `--name` (mirrors as name= in every binding
+     language — `--as` declined, as= is a Python keyword; the
+     import→import_vm precedent designs keyword collisions away),
+     making --blueprint selector-only everywhere. Under item 14
+     these spell new-blueprint and import-vm --name
+  7. DECIDED, fold deferred behind item 14 (owner, 2026-07-21,
+     batch round): `check-script <name>` becomes the check family
+     with `script`'s label resolution — with a --blueprint/
+     --machine selector the argument resolves label-first then
+     bare name, exactly as `script`; without one, bare script name
+     only. Twin check_script() unchanged; a future check
+     blueprint/media validation family stays open. (The batch
+     chose the spelling `check script`; item 14's dash rule
+     respells it check-script — the original hyphen, now derived
+     from the twin's name rather than an outlier)
+  8. OPEN — fork not yet decided (question dismissed, re-ask):
+     `property set <key> --secret` is interactive-only, which
+     ROADMAP "The CLI" forbids: a program driving the CLI as its
+     binding cannot set a secret at all, and argv is rightly
+     prohibited. Candidate shapes: tty-detect (prompt on a tty,
+     read stdin to EOF otherwise — the house --progress-auto /
+     import-prompt pattern), an explicit docker-style --stdin
+     flag, or both
   9. machine-id prefix matching is ambiguous against the id scheme:
      blueprint names may contain `-<digit>` segments, so
      `--machine freedos-1` is simultaneously a full id (freedos,
@@ -694,6 +709,47 @@ Small to-do tasks.  Large tasks belong in the roadmap.
       it as an explicitly backend-scoped escape hatch when that
       settles); `clean media` (payloads) vs `list media`
       (definitions) overloads the noun — note or rename
+  14. TWIN-NAME IDENTITY — AGREED IN PRINCIPLE (owner, 2026-07-21;
+      design round pending to work the forks and fold): a CLI
+      command IS its API twin's name, dash-separated where the
+      twin has underscores, and its --flags mirror the function's
+      parameters — what the surface pays in succinctness it reaps
+      in cohesiveness, and the parity invariant becomes
+      self-enforcing (naming the twin names the command; drift
+      becomes impossible; several queue items above — 1, 6a — were
+      hand-fixed instances of what this rule prevents by
+      construction). The identity is already ~80% latent
+      (delete blueprint ↔ delete_blueprint, check_script,
+      list_machines, clean_downloads, seed_blueprint,
+      new_blueprint); the rule completes it: create-machine,
+      start-machine, stop-machine, apply-blueprint,
+      destroy-machine, recreate-machine, clone-machine,
+      delete-blueprint, import-vm, run-script, check-script,
+      fetch-media, clean-downloads, clean-media, list-machines,
+      list-blueprints, search-media, seed-blueprint... — and the
+      property noun-first outlier dies (get-property,
+      set-property, unset-property, list-properties, twins named
+      in the same act, closing api.md's pending row). TWO NAMED
+      EXCEPTIONS, each an identity with a different home surface:
+      the interaction family (type/enter/press/select/wait/screen/
+      screenshot/exec) keeps identity with the SCRIPT LANGUAGE —
+      its home surface, settled at items 1-3 — and its deferred
+      API twins adopt the script names when the control-plane
+      round lands; the run family (run status|tail|wait|cancel|
+      delete) maps to HANDLE METHODS per the blessed divergence
+      (dash keeps run-script a distinct single token beside it).
+      Selectors become per-command flags (rlq start-machine -b
+      freedos), resolving item 10 toward flags-after-verb and
+      retiring the SUPPRESS hack. North star becomes `rlq
+      run-script install -b freedos-1.4-plain` (+4 chars, paid
+      knowingly). Design round to settle: the full respell
+      inventory (incl. export's open shape landing CLI+twin as
+      one act), selector/global-flag placement details, `--only`
+      and other parameter mirrors, disposition of items 5-7's
+      spellings under the rule (recorded in place above), and the
+      cross-document fold (cli.md, ROADMAP "The CLI" + synopsis,
+      api.md table collapse to the mechanical transform,
+      examples, README north star)
 - JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
   design round; all three forks settled on the recommendations):
   - planning/design/machine-blueprint.schema.json +
