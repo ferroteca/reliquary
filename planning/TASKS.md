@@ -305,16 +305,18 @@ Small to-do tasks.  Large tasks belong in the roadmap.
     start_script/attach handles); record durability/custody settled
     (2026-07-21, blueprint-spec queue item 1: machine-bounded
     retention, run delete, copy-out survival);
-    remaining: records for API/CLI-primitive runs,
-    the full renderer contract (transcript rewrite), per-test result
-    collection; the
+    remaining halves CLOSED (2026-07-22, gap-closure queue item 2:
+    interaction runs — the begin-run/end-run opt-in bracket — give
+    primitive loops the same records; transcript.txt respecified a
+    pure renderer of the stream; per-test results = properties in,
+    collected caller artifacts out, no test vocabulary — G2); the
     unit-test loop is now IN U3 itself (amended 2026-07-21: the
     canonical journey uses reliquary twice — define and build the test
     VM, then automate testing inside it; detailed per-test results,
     update a test object, re-run one test or the whole suite; granular
     results and selective re-run are first-class demands) — so the
     run-records design serves a primary use case directly: per-run
-    test selection is response data (inputs-as-data holds), and the
+    test selection is property data (inputs-as-data holds), and the
     iterate loop needs per-iteration run records plus collected
     results the automator can parse
   - U3 stage/collect: the "declared exchange drive" cannot be declared in
@@ -1028,21 +1030,63 @@ Small to-do tasks.  Large tasks belong in the roadmap.
      each noun's spec (api-queue item 5 hybrid). The
      guiding-principles CLI-contract entry is CLOSED — all four
      halves homed
-  2. RUN RECORDS FOR PRIMITIVE RUNS, THE RENDERER CONTRACT, AND
-     PER-TEST RESULTS (parent: the U3 run-records entry): whether and
-     how an API/CLI-primitives interaction loop leaves a run record
-     (today only run-script writes one, yet U3 names the record the
-     product); the full renderer contract — transcript.txt respecified
-     as a rendering of run-events.jsonl; and per-test result
-     collection for U3's unit-test loop (granular results the
-     automator parses, selective re-run)
+  2. RESOLVED (owner, 2026-07-22, design round — all four forks on
+     the recommendations): INTERACTION RUNS, the opt-in bracket —
+     begin-run / end-run (flat twins begin_run/end_run; begin
+     returns the run number) open and close an ordinary run record
+     whose driver is the caller; while open, EVERY machine-targeting
+     command on that machine appends the event kinds the execution
+     model defines (interaction family with screen's CLI-only read
+     kind, state ops, lifecycle — interaction-only scope declined
+     as lying by omission); with none open, primitives record
+     nothing (always-record and never-record both declined). One
+     open run per machine — a second begin-run or a run-script
+     fails closed naming it (mixed-driver records stay U6's growth
+     path via the reserved handover kinds); end-run writes the
+     neutral `ended` terminal (no outcome — G2); no resident
+     writer: appends ride the machine lock, the crashed-run rule is
+     script-run-scoped, openness is visible never inferred (run
+     status shows last-event time; run cancel refuses naming
+     end-run; run delete refuses while open); followers indifferent
+     (run tail / attach_run / list-runs; records self-identify
+     their driver). THE RENDERER CONTRACT — transcript.txt stays in
+     every record, written live (on-demand rendering declined: the
+     copied-out record must stand alone), respecified as a PURE
+     renderer: every line derives from an event, adds nothing,
+     one-way stream→transcript, format uncontracted per item 1; the
+     old transcript bullet list promoted to stream content
+     requirements, adding the missing kinds — backend/control-plane
+     selection at preflight, statement provenance on events
+     generally (was embedded-installs only), collected-file landed
+     paths. PER-TEST RESULTS — two channels and a named refusal:
+     selection IN as script properties (--property / properties=,
+     interpolated by ordinary references — supersedes the stale
+     "response data" phrasing; responses died in the
+     property-construct round); results OUT as caller-authored
+     artifacts (JUnit XML, TAP) via collect/exec-capture into the
+     record's output/, path reported live in events; NO test-result
+     vocabulary in reliquary (G2) — granularity comes from run
+     structure: one iteration = one run record. The
+     collect-into-runs/<n>/output/ demand is recorded as input to
+     queue item 3. Folded: script-spec "Failure, runs, and
+     transcripts" (transcript respec, crashed-rule scoping, the
+     Interaction runs section) + "The run event stream" (preflight
+     and interaction kinds, collected paths, statement provenance),
+     ROADMAP "Asynchronous runs" (interaction-runs paragraph) +
+     "The CLI" (synopsis + interaction paragraph), cli.md (Recorded
+     interaction runs section, intro sentence, machine-scoped
+     list), api.md (table row, attach_run driver-indifference);
+     guiding-principles U3 run-records entry CLOSED (its stale
+     response-data phrasing fixed to properties)
   3. THE STAGE/COLLECT EXCHANGE MODEL (parent: the U3 stage/collect
      entry): the declared exchange drive cannot be declared — the
      blueprint drive vocabulary has no directory-backed kind, the CLI
      has no file-exchange commands, and only the superseded legacy
      Runner/root-home surface serves injection; design the model end
      to end: blueprint vocabulary, the script verbs' backing, CLI
-     commands and API twins under the identity rule
+     commands and API twins under the identity rule — and collect's
+     delivery into the run record's output/ (item 2's recorded
+     demand)
   4. EXPORT MECHANICS (parent: the U1 export entry + the ROADMAP open
      decision): the two targets (single-drive media image vs
      whole-machine native registration), the exact CLI shape and

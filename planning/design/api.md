@@ -153,6 +153,7 @@ carries the exceptions and each family's contract home.
 | `check-script` | `check_script()` | script spec |
 | `run status` / `tail` / `wait` / `cancel` | run-handle `status()` / `events()` / `wait()` / `cancel()`, the handle reopened by `attach_run()` — the handle-method exception | script spec |
 | `run delete` | `delete_run()` | script spec |
+| `begin-run` / `end-run` | `begin_run()` (returns the run number) / `end_run()` — the interaction-run bracket: an ordinary run record whose driver is the caller | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
 | `clean-downloads` / `clean-media` | `clean_downloads()` / `clean_media()` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
@@ -174,6 +175,9 @@ be reopened from a fresh process:
 `attach_run(machine=, blueprint=, run=None)` takes the ordinary
 selectors plus the machine-scoped run number, defaulting to the
 machine's latest run exactly as the CLI `run` operations do.
+Followers are indifferent to the driver: `attach_run` follows an
+interaction run (`begin_run` / `end_run`) exactly as a script
+run.
 Contract:
 [script spec](script-spec.md) "Failure, runs, and transcripts"
 and planning/ROADMAP.md "Asynchronous runs".

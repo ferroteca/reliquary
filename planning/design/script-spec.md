@@ -1061,6 +1061,8 @@ define — a run span (the run deadline's scope), a span per phase
 activation (the phase deadline's scope), a span per observation
 (its timeout's scope). The minimum vocabulary the runtime emits:
 
+- preflight identification: the selected backend, and the
+  control plane serving each operation;
 - run and phase-activation span starts and ends, and `goto` /
   `finish` transitions;
 - observation arm, match (with the matched row and elapsed
@@ -1069,7 +1071,8 @@ activation (the phase deadline's scope), a span per observation
   deliveries, `insert` / `eject` / `set-boot`, `start` / `stop`,
   `screenshot`;
 - transfer progress only where an honest total exists — media
-  fetch bytes, `stage` / `collect` bytes, `select` traversal
+  fetch bytes, `stage` / `collect` bytes (each collected file's
+  landed path under `output/`), `select` traversal
   steps — never invented denominators: renderers show phases and
   observations as "elapsed / limit" pairs, not progress bars;
 - embedded-definition installation, with source line and
@@ -1078,10 +1081,17 @@ activation (the phase deadline's scope), a span per observation
   and its source scope, the route taken with phase revisit
   counts, the nearest-miss screen row, the automatic screenshot
   reference, and the suggested next command;
+- for [interaction runs](#interaction-runs): `screen`'s CLI-only
+  read kind, and the neutral `ended` terminal event;
 - reserved for the authoring recorder (U6): handover kinds —
   control passing from script to human and back — so a capture
   session is one run record with mixed drivers.
 
+Events carry their originating statement's source line and
+number wherever one exists (owner, 2026-07-22) — action,
+observation, and transition events name the line they execute,
+as embedded-install events already did — so a transcript line
+can always cite its source.
 Events carry property keys and supplying sources, never
 bound values; the secret contract applies to the stream
 exactly as it applies to transcripts.
@@ -1732,8 +1742,10 @@ deletions.
 
 The record directory is self-contained and self-identifying:
 plain files, no links into machine internals, carrying the
-machine id, run number, timestamps, and the script's source and
-digest — so a record copied out of the cache stands alone, and
+machine id, run number, timestamps, and the run's driver — a
+script run records the script's source and digest, an
+[interaction run](#interaction-runs) that its driver was the
+caller — so a record copied out of the cache stands alone, and
 records from different machine generations (machine ids are
 reused after `destroy`) remain distinguishable. Copying
 `runs/<n>/` out with ordinary tools is the sanctioned way to
@@ -1748,30 +1760,35 @@ the consumer's claim.
 
 `run-events.jsonl` is the run's normative record — the
 [event stream](#the-run-event-stream) the execution model
-defines; `transcript.txt` is a human-readable rendering of it.
+defines.
 The stream is written live: appended event by event, flushed at
 each event boundary, from the first preflight event to a
-terminal event stating the outcome (success, a failure class, or
-cancelled). Every follower — the live display, `run tail`, the
-embedding API's event iterator — reads the same growing file; a
-record whose writer terminated without a terminal event is a
-crashed run.
+terminal event stating the outcome (success, a failure class,
+cancelled — or `ended`, an interaction run's neutral close).
+Every follower — the live display, `run tail`, the
+embedding API's event iterator — reads the same growing file. A
+script run's record is owned by its runner (writer pid and start
+time); one whose writer terminated without a terminal event is
+detectably a *crashed* run. An interaction run has no resident
+writer and closes only by `end-run` (below).
+
+`transcript.txt` is a pure rendering of the stream (owner,
+2026-07-22), written live beside it so a copied-out record
+stands alone for a human with no reliquary installed: every
+line derives from an event, it adds no information the stream
+does not carry, and deriving is one-way — stream to transcript,
+never scraped back. Its format is a human surface, deliberately
+uncontracted (planning/ROADMAP.md "The CLI"); the stream is
+what programs read. On-demand rendering was declined — the
+standalone record is the custody story. What a transcript shows
+is therefore exactly what the stream carries; the stream's
+content requirements are listed with [its
+vocabulary](#the-run-event-stream).
 The CLI may redirect the output root, but transcript paths are
-always reported explicitly. A transcript records:
+always reported explicitly.
 
-- each executed source line and line number;
-- phase entries, handler firings, branches, and transitions;
-- observations with their channel, normalized matches, and elapsed
-  time;
-- declared property keys, each one's supplying source (flag,
-  blueprint parameter, environment, file, or ask) and any
-  redirect target, but never bound values;
-- each media definition installed or found identical, its source
-  script line and shared-library path, and verified hashes;
-- the selected backend and control plane for each operation; and
-- every produced screenshot or collected-file path.
-
-On failure it adds the pending condition or action, the clock that
+On failure the record carries the pending condition or action,
+the clock that
 expired and the scope that supplied it (statement timeout, phase
 deadline, or run deadline), final observed screen text, machine
 state, and an automatic screenshot when available.
@@ -1781,6 +1798,53 @@ partially modified disk is not generally safe and is not described
 as a retry. The caller deliberately resumes, recreates the machine,
 or runs again according to that workflow's documented recovery
 semantics.
+
+### Interaction runs
+
+A run record is not only a script's product: a primitive-driven
+loop — a program driving the guest-console and state commands,
+or their API twins — earns the same evidence by opting in
+(owner, 2026-07-22). `begin-run` (twin
+`begin_run(machine=|blueprint=)`, returning the new run number)
+opens an **interaction run**: an ordinary run record — same
+directory shape, same monotonic numbering, same retention and
+custody — whose driver is the caller, not a script. While it is
+open, every machine-targeting command on that machine appends
+the event kinds the execution model defines for the same
+actions — the interaction family (`screen` emitting its
+CLI-only read kind), the state operations, and lifecycle
+commands alike: a mid-session `apply-blueprint` or
+`stop-machine` is exactly the evidence a record exists to keep.
+With no open run, primitives record nothing — interactive
+fiddling never spams records; the automator opts in when the
+record is the product (U3).
+
+One run may be open per machine: a second `begin-run`, or a
+`run-script`, fails closed naming the open run (the
+mixed-driver composition — script playback and human takeover
+in one record — is U6's recorder machinery, which grows out of
+this shape through the reserved handover kinds). `end-run`
+closes the record with the neutral `ended` terminal event:
+reliquary attaches no outcome to an interaction run —
+interpreting what the loop did is the caller's computation
+(G2). An open interaction run is visible, never inferred:
+`run status` shows it open with its last-event time,
+`run cancel` refuses it naming `end-run`, and `run delete`
+refuses it while open, exactly as it refuses a live script run.
+Followers never cared who writes: `run tail` and `attach_run()`
+observe an interaction run exactly as a script run, and
+`list runs` shows each record's driver.
+
+U3's unit-test loop is served by these mechanics, never by
+semantics: per-run test selection travels as ordinary script
+properties (`--property` / the `properties=` mapping,
+interpolated by property references); granular results are a
+caller-authored artifact (JUnit XML, TAP) that leaves the guest
+via `collect` or exec capture and lands in the record's
+`output/`, its path reported in events; and reliquary has
+deliberately no test-result vocabulary — no pass/fail schema,
+no result parsing (G2). Granularity comes from run structure:
+one iteration is one run record.
 
 ## How the vocabulary grows
 

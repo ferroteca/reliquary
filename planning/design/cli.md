@@ -613,7 +613,9 @@ Every interaction command requires `--blueprint <name>` or
 machine" shortcut. The family's API twins land with the
 control-plane design — a named omission ([api.md](api.md)); the
 capability is meanwhile reachable through today's `Machine`
-functions.
+functions. By default these commands leave no record; with a
+[recorded interaction run](#recorded-interaction-runs) open
+they append to it.
 
 ### Typing and pressing keys
 
@@ -755,6 +757,38 @@ control-plane design settles.
 ```powershell
 rlq hmp "info status" -b freedos
 rlq hmp "info block" -m freedos-0
+```
+
+### Recorded interaction runs
+
+```
+rlq begin-run (--blueprint <name> | --machine <id>)
+rlq end-run (--blueprint <name> | --machine <id>)
+```
+
+By default the interaction commands leave no record. `begin-run`
+(twin `begin_run`, printing the new run number) opens an
+**interaction run** — an ordinary run record whose driver is the
+caller — and while it is open, every machine-targeting command
+on that machine (this family, the state operations, lifecycle)
+appends the same event kinds a script action emits; `end-run`
+(twin `end_run`) closes it with the neutral `ended` terminal
+event. reliquary attaches no outcome to an interaction run —
+interpreting the loop is the caller's computation. One run may
+be open per machine: a second `begin-run` or a `run-script`
+fails closed naming it. `run status` shows an open run with its
+last-event time; `run cancel` refuses it naming `end-run`;
+`run tail`, `attach_run()`, and `list-runs` treat it as any
+other record (records self-identify their driver). The record
+contract is the script spec's ("Failure, runs, and
+transcripts").
+
+```powershell
+rlq begin-run -b freedos
+# → freedos-0/5
+rlq enter "run-tests.bat" -b freedos
+rlq wait "Tests complete" -b freedos --timeout 300
+rlq end-run -b freedos
 ```
 
 ---
@@ -1088,6 +1122,7 @@ selectors, mutually exclusive. On machine-scoped commands
 (`create-machine`, `start-machine`, `stop-machine`,
 `apply-blueprint`, `destroy-machine`, `recreate-machine`,
 `clone-machine`, `export`, `run-script`, the `run` operations,
+`begin-run`, `end-run`,
 `insert-media`, `eject-media`, `set-boot-order`, and the
 guest-console family `type`, `enter`, `press`, `exec`, `select`,
 `screen`, `wait`, `screenshot`, `hmp`) at least one is required;

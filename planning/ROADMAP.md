@@ -502,7 +502,10 @@ observation. `run` therefore names run records exclusively.
 design homes it; the interaction family's API twins land with
 that same design as a named omission (planning/design/api.md),
 the capability meanwhile reachable through today's `Machine`
-functions.
+functions. By default these commands leave no record; with an
+interaction run open (`begin-run` / `end-run` — "Asynchronous
+runs" below) every machine-targeting command appends to its
+record.
 
 Flags are the command's parameters and **position carries no
 meaning** (owner, 2026-07-21): a flag may appear before or after
@@ -608,6 +611,8 @@ rlq run tail [<n>] (--blueprint <name> | --machine <id>)
 rlq run wait [<n>] (--blueprint <name> | --machine <id>)
 rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
 rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
+rlq begin-run (--blueprint <name> | --machine <id>)
+rlq end-run (--blueprint <name> | --machine <id>)
 rlq type <text> (--blueprint <name> | --machine <id>)
 rlq enter <line> (--blueprint <name> | --machine <id>)
 rlq press <key>... (--blueprint <name> | --machine <id>)
@@ -1309,6 +1314,37 @@ host-side plain files at a reported path. Contract home:
 script-spec.md "Failure, runs, and transcripts"; custody model
 in USE-CASES (the artifact-residency split) and INTERFACES
 (recorded outputs).
+
+**Interaction runs — the opt-in bracket (owner, 2026-07-22).**
+A primitive-driven loop earns the same evidence a script gets:
+`begin-run` (twin `begin_run`, returning the new run number)
+opens an ordinary run record whose driver is the caller; while
+it is open, every machine-targeting command on that machine —
+the guest-console family, the state operations, lifecycle —
+appends the event kinds the execution model defines for the
+same actions, and `end-run` closes the record with the neutral
+`ended` terminal event (reliquary attaches no outcome to an
+interaction run — G2). With no open run, primitives record
+nothing: recording is opt-in, so the automator opts in exactly
+when the record is the product (U3) and interactive fiddling
+never spams records. One run may be open per machine —
+`begin-run` and `run-script` both fail closed naming an open
+run (mixed-driver records are U6's recorder machinery, grown
+from this shape through the reserved handover kinds). An
+interaction run has no resident writer: each command appends
+under the machine's exclusive lock, the crashed-run rule stays
+script-run-scoped, and openness is visible, never inferred —
+`run status` shows the open run and its last-event time,
+`run cancel` refuses it naming `end-run`, `run delete` refuses
+it while open. Followers are indifferent to the driver:
+`run tail`, `attach_run()`, and `list runs` treat interaction
+runs as ordinary records that self-identify their driver.
+U3's per-test loop rides these mechanics: selection in as
+script properties, results out as caller-authored artifacts
+collected into the record's `output/`, and deliberately no
+test-result vocabulary in reliquary (G2) — one iteration is
+one run record. Contract home: script-spec.md "Failure, runs,
+and transcripts".
 
 **Two presentations, under parity.** The CLI carries
 `run-script --detach`, the `run` noun family — `run status`,
