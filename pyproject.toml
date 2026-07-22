@@ -28,7 +28,7 @@ classifiers = [
 dependencies = ["qemu.qmp"]
 
 [dependency-groups]
-dev = ["build"]
+dev = ["build", "twine"]
 
 [project.scripts]
 rlq = "reliquary:main"
