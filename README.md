@@ -1,13 +1,62 @@
 # reliquary
 
 reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
-produce bootable disk images without manual interaction. It can help execute one-off comamnds and capture the restuls.
+produce bootable disk images without manual interaction. It can help execute one-off commands and capture the results.
 It is built on its own agentless QEMU guest automation layer, which owns QEMU lifecycle, media, QMP identity checks,
 keyboard input, screen access, screenshots, and per-run state.
 
 reliquary machines are ephemeral: disposable rigs for scripted installs and automated guest tasks, cheap to destroy and
 recreate. The machine is never the product — often nothing durable comes out at all (the point was to run some tests).
 reliquary is not a VM manager for machines you keep.
+
+## When to use Vagrant, Packer, openQA, or reliquary
+
+For modern, standard operating-system testing in VMs, start with
+Vagrant and Packer. Packer is the established tool for defining
+source-controlled image builds from install media, provisioners, and
+checksummed inputs, then producing reusable VM or cloud artifacts.
+Vagrant is the established tool for source-controlled development and
+test environments: bring a VM up from a box, sync project files, run
+provisioners, execute guest commands over SSH or WinRM, collect normal
+test output, and destroy or recreate the environment when needed.
+
+reliquary is for the cases where that cooperative guest channel is not
+available, not trustworthy, or is itself the thing being created or
+tested. It drives a guest through the VM's observable console: keyboard
+events in, screen text and screenshots out, with media changes and run
+records captured by the host. That makes it useful for text-mode
+installers, legacy systems such as DOS, broken or partially configured
+guests, boot menus, setup flows before SSH/WinRM/guest tools exist, and
+tests where the screen or installer behavior is the assertion surface.
+
+If your guest can already accept SSH, WinRM, cloud-init, a guest agent,
+or a normal configuration-management/provisioning path, Vagrant and
+Packer are usually the better default. Use reliquary when the important
+part of the workflow lives before that point, below it, or outside it.
+
+openQA covers much of that console-driven ground at production scale.
+It is built for operating-system and system-level workflow testing:
+scheduling many test jobs, booting systems under test, driving
+installers and applications, matching screens with needles, checking
+serial and screen output, and publishing results through a service with
+workers and a web UI. If you need a full openQA-style testing service,
+use openQA. openQA also has mature authoring support around its model,
+especially live debugging and creating or updating needles from captured
+screenshots; its tests are still primarily authored as test modules plus
+needles.
+
+reliquary lives in the smaller local-tool and embedding-library space.
+It is meant to be run directly from a source tree or a user's machine,
+as a QEMU automation harness a script, test runner, CI job, or coding
+agent can call without adopting a scheduler, worker farm, web service,
+test distribution, or image-needle workflow. Its current strongest case
+is agentless text-mode automation — especially DOS and other guests
+where VGA text, keyboard input, virtual FAT media, and compact run
+records are enough and a larger OS-testing service would be more
+machinery than the job needs. Its planned authoring niche is local
+demonstration-driven drafting: do the task once, then turn the observed
+keystrokes, media changes, and screen states into ordinary script and
+asset files that can be reviewed and edited.
 
 ## Blueprints and machines
 
