@@ -78,7 +78,7 @@ failure report. Handover events (control passing between script
 and human) join the run-events stream as event kinds, so a
 capture session is one run record with mixed drivers. The
 `record` command family lands on the CLI and the embedding API
-together, under parity. Blueprints and media definitions are
-untouched: a session runs on an ordinary machine, and media swaps
-are already `insert`/`eject`.
+together, under parity. Blueprints are untouched: a session runs
+on an ordinary machine, and media swaps are already
+`insert`/`eject`.
 

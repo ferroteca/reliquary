@@ -15,11 +15,11 @@ appear before or after the command word.
 - `--home <path>` - Override the reliquary home directory
 - `--cache <path>` - Override the cache directory (default:
   `<home>/cache`)
-- `--assets <dir>` - Resolve authored assets (blueprints, media
-  definitions, scripts) solely from this project root, walked
-  recursively by extension — no home, no codex, no seeding. Its
-  absence is home mode: the home's canonical `blueprints/` /
-  `media/` / `scripts/` folders, seeding missing names from the
+- `--assets <dir>` - Resolve authored assets (blueprints, with
+  their media/source/archive components, and scripts) solely from
+  this project root, walked recursively by extension — no home, no
+  codex, no seeding. Its absence is home mode: the home's canonical
+  `blueprints/` / `scripts/` folders, seeding missing names from the
   built-in codex. Use `--assets` for reproducible, project-scoped
   automation
 - `--blueprint <name>` - Select a blueprint's sole machine, or
@@ -74,10 +74,11 @@ re-resolved, so drives regenerate as declared.
 
 Adopt the current blueprint into a **stopped** machine, and return
 a script-diverged machine to its blueprint shape. Absorbable
-changes — memory, cpus, boot order, control planes, metadata, and
-added/removed/`media`/`hostdir`/empty drives — are applied and the
-baseline digest re-recorded; a changed `size` or `base` on an
-already-materialized image fails closed (use `recreate-machine`).
+changes — memory, cpus, boot order, control planes, metadata,
+added/removed/re-pointed and empty drives, and re-fetched `use`
+media — are applied and the baseline digest re-recorded; a changed
+`size` or `materialize` on an already-materialized media image
+fails closed (use `recreate-machine`).
 
 ### `rlq get-machine-dir (--blueprint NAME | --machine ID)`
 
@@ -101,11 +102,14 @@ the home, `user` = home-authored), platform, and description. The
 term is matched case-insensitively against name, description, and
 platform; omitted, everything is listed.
 
-### `rlq (seed-blueprint | seed-media | seed-script) <name> [--only]`
+### `rlq (seed-blueprint | seed-script) <name> [--only]`
 
 Copy a built-in artifact into the home. By default a blueprint or
-script also brings its closure (referenced media and scripts);
-`--only` copies just the named file.
+script also brings its closure (referenced scripts; media travel
+inside the blueprint itself); `--only` copies just the named file.
+`seed-media` is retained as a deprecated no-op — media are
+components inside a `.rlqb` now, so there is no separate media file
+to seed.
 
 ### `rlq delete-blueprint <name>`
 
@@ -138,23 +142,26 @@ runs as well. Static errors exit 2.
 
 ### `rlq list-media [--builtin]`
 
-List media item names from the home ``media/`` library. With
-``--builtin``, list package codex items instead.
+List media names resolvable from the active source (the `media`
+components across its `.rlqb` files). With ``--builtin``, list
+package codex media instead.
 
 ### `rlq delete-media <name>`
 
-Remove the home definition file that defines media item ``name``.
-Refuses while any machine drive still references an item from that
-definition. Never deletes package builtins. Does not reclaim
-``cache/media/`` payloads — use ``clean-media`` for that.
+Media are components inside a `.rlqb` now, not standalone files, so
+there is nothing to delete: this errors, pointing at editing the
+blueprint that defines the media. (To reclaim a cached payload, use
+``clean-media``.)
 
 ### `rlq fetch-media <name>`
 
-Fetch and verify a named media item into the cache.
+Resolve a media by name and fetch and verify its payload into the
+cache.
 
 ### `rlq clean-downloads` / `rlq clean-media`
 
-Reclaim files under `cache/downloads/` or `cache/media/`.
+Reclaim the cached source archives (`cache/archives/`) or the
+cached media payloads (`cache/media/`).
 
 ### `rlq insert-media <slot> <media> (--blueprint NAME | --machine ID)`
 

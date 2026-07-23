@@ -129,6 +129,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Composed blueprint model.** reliquary's two authored JSON formats
+  fold into one composable blueprint `.rlqb` of named components —
+  `machine` / `media` / `source` / `archive` — mixed and matched
+  across files, or a lone machine as a bare root. A machine's drive
+  now names a **media** by name (or `null`, or `{media, controller,
+  enabled}`); the old four-way drive content selector (`size` /
+  `base` / `media` / `hostdir`) is gone. The named media owns
+  materialization: `materialize` ∈ `new` / `difference` / `copy` /
+  `use` (default `use`), with `size`, a `source` locator
+  (`url`+mirrors / `local` / from-archive / by-name), conditional
+  `sha256` (required on `url`), `read-only`, and `extension`.
+  Archives are recursive trees (a node with `members` is an archive,
+  a leaf a media); a `hostdir` drive is now a media whose `source` is
+  a directory with `materialize: use`. Resolution reads the whole
+  source into one `(name, type)` namespace.
+- **Machine directory reorganized.** `cache/machines/<id>/` now holds
+  `machine.json` (was `reliquary-machine.json`) with the live-VM
+  identity folded in as a `vm` section written atomically with
+  `phase`; per-machine images move to `media/<media-name>.<ext>` (was
+  `drives/<key>.<ext>`, now keyed by media so removable-slot swaps
+  never clobber); and backend artifacts (QEMU's captured stderr) move
+  into a `<backend>/` subdir. `lifecycle.py` no longer owns a state
+  file — `launch_owned_qemu` returns the identity and `machines.py`
+  persists it. Cached source archives move from `cache/downloads/` to
+  `cache/archives/`.
+- **One published schema.** The blueprint and media-definition JSON
+  Schemas collapse into a single `reliquary/schemas/blueprint-schema-v1.json`
+  (packaged, versioned v1 so editors can bind it); `.rlqm` retires.
 - `list-blueprints` (local listing) resolves through the active
   asset source: home mode lists the home's canonical `blueprints/`
   folder (recursively within it), and `--assets <dir>` lists the

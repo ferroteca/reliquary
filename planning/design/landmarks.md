@@ -44,8 +44,8 @@ matching to declared rectangles are deferred as additive growth
 the closest variant.
 
 **Catalog form.** The declaration is `<name>.rlql`, a JSONC
-authored document — the fourth authored extension beside
-`.rlqb` / `.rlqm` / `.rlqs`, resolved under exactly the same
+authored document — the third authored extension beside
+`.rlqb` / `.rlqs`, resolved under exactly the same
 rules (planning/ROADMAP.md "Authored-asset resolution": home mode
 vs a hermetic `--assets` project root, discovery by extension;
 a `landmarks/` subdirectory is optional dressing). Variant renderings are plain
@@ -69,7 +69,7 @@ permanent freeze on the asset format, since anything embedded
 in a text script can never become non-text. Keeping the
 declaration in its own file leaves `.rlql` free to grow a
 non-text form later, keeps scripts legible (G4), and makes
-one rule serve all four authored extensions.
+one rule serve all three authored extensions.
 
 **Cursor normalization.** Captures and matching always strip the
 mouse cursor — a normalization, never an option:

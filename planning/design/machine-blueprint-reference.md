@@ -6,12 +6,12 @@ SPDX-License-Identifier: BSD-3-Clause
 # Machine blueprint — field reference
 
 > **Status:** the full field reference is validated at parse time —
-> `platform`, `backend`, `memory`, `cpus`, `drives` (all four content
-> sources plus `controller` and `enabled`), `boot`, `name`,
-> `description`, `scripts`, `control-planes`, `backend-settings`, and
-> `parameters` — with JSONC acceptance and `media`/`base.media`
-> resolution. Machine materialization realizes `size`, `media`,
-> `base` (a differencing or duplicated qcow2), and `hostdir` drives,
+> `platform`, `backend`, `memory`, `cpus`, `drives` (a media name,
+> `null`, or an object with `controller`/`enabled`/`media`), `boot`,
+> `name`, `description`, `scripts`, `control-planes`,
+> `backend-settings`, and `parameters` — with JSONC acceptance and
+> media-name resolution. Machine materialization realizes each drive's
+> media per its `materialize` mode (`new`/`difference`/`copy`/`use`),
 > resolves defaults into the state, and records the provenance fields
 > (`blueprint-digest`, `blueprint-source`, `backend-id`). Non-`ide`
 > controllers and backend capability checks ride the adapter seam.
@@ -19,8 +19,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`<name>.rlqb`, yours) and each
-machine's **state** (`cache/machines/<id>/reliquary-machine.json`,
-reliquary's). For the blueprint/state model, read
+machine's **state** (`cache/machines/<id>/machine.json`,
+reliquary's). A drive names a **media** component; the media's own
+fields (`materialize`, `size`, `source`, `read-only`, …) live in
+[the media spec](media-spec.md). For the blueprint/state model, read
 [the guide](machine-blueprint.md) first; for complete examples, see
 the [cookbook](machine-blueprint-cookbook.md).
 
@@ -41,8 +43,9 @@ Blueprints accept comments and trailing commas — the JSONC
 dialect — per the same section; the state is strict canonical
 JSON, always.
 
-The machine-checkable companion is
-[machine-blueprint.schema.json](machine-blueprint.schema.json) —
+The machine-checkable companion is the one published
+[blueprint-schema-v1.json](../../reliquary/schemas/blueprint-schema-v1.json)
+(machine, media, source, and archive components in one schema) —
 the structural subset of the format checks only; this reference
 is normative.
 
@@ -122,11 +125,14 @@ backend machine and resolves the blueprint afresh (see
 
 **blueprint (optional) · string · present in the state**
 
-The blueprint's **identity** — its selection key. Declared, it
-overrides the filename stem: `--blueprint <name>` selects it and a
-machine's identity is `<name>-<n>`. Omitted, identity falls back
-to the file stem (the common case — a `freedos-1.4-plain.rlqb`
-needs no `name`). Because it becomes a machine-id segment and a
+The machine component's **identity** — its selection key. Declared,
+it overrides the filename stem: `--blueprint <name>` selects it and a
+machine's identity is `<name>-<n>`. A lone bare-root machine may omit
+it — identity falls back to the file stem (the common case, a
+`freedos-1.4-plain.rlqb` needs no `name`); a machine written inside a
+`machines` section must name itself, since a section can hold several
+and the file stem cannot pick one. Because it becomes a machine-id
+segment and a
 cache directory name it must be **id-safe**: a leading
 alphanumeric then alphanumerics, `.`, `_`, or `-`, and never all
 digits. Two blueprints resolving to one effective name within a
@@ -339,9 +345,10 @@ until `apply` records a new digest.
 
 **blueprint (optional) · positive integer or size string**
 
-Guest memory. A size string uses the same grammar as drive
-[`size`](#size--optional--string) — a positive integer with a
-binary unit suffix — and a bare integer means MiB, so
+Guest memory. A size string uses the same grammar as a media
+[`size`](media-spec.md#size) — a positive integer with a
+binary unit suffix (`K`/`M`/`G`/`T`, powers of 1024) — and a bare
+integer means MiB, so
 `"memory": "32M"` and `"memory": 32` are the same declaration.
 The size must resolve to a whole number of MiB because the state
 always carries the canonical integer-MiB form. Defaults by platform
@@ -365,8 +372,11 @@ Virtual CPU count. Default `1`.
 
 **blueprint (optional) · object**
 
-The machine's drive inventory. Keys declare a medium and slot; each
-value declares where the drive's content comes from, and options.
+The machine's drive inventory — topology only. Keys declare a medium
+and slot; each value names the **media** the slot carries (or leaves
+it empty), plus optional hardware attributes. What the content *is*
+and how it materializes belongs to the named
+[media component](media-spec.md), never to the drive.
 
 ### Keys: medium and slot
 
@@ -378,11 +388,11 @@ value declares where the drive's content comes from, and options.
 
 In a blueprint, the bare medium name is accepted as an alias for
 slot 0 (`"hdd"` ≡ `"hdd0"`); the state always uses the canonical
-indexed form. The canonical key is also the name of the drive's
-image file in the cached materialization, when it has one (see
-[image naming](#image-naming-and-formats) below). Declaring both an alias and its indexed form in one
-document is a slot clash and fails validation, as do slots outside
-the table's ranges.
+indexed form. A per-machine image, when a drive's media materializes
+one, is named for the **media**, not the slot (see
+[image naming](#image-naming-and-formats) below). Declaring both an
+alias and its indexed form in one document is a slot clash and fails
+validation, as do slots outside the table's ranges.
 
 **Slots are logical positions, not controller addresses.** Slot
 numbers declare guest drive ordering — DOS assigns `C:`, `D:`, ...
@@ -400,22 +410,29 @@ dropped.
 
 ### Values
 
-A value is either a media-name string (shorthand):
+A value is a **media-name string** (shorthand):
 
 ```json
 {"drives": {"cdrom": "freedos-1.4-livecd"}}
 ```
 
-or an object. **Exactly one** of four fields — `media`, `size`,
-`base`, or `hostdir` — declares where the drive's content comes
-from; a
-drive object with none of them, or more than one, fails
-validation.
+or an **object** carrying the media name plus hardware attributes:
 
-The three writable/materialized sources — `size`, `base`, and
-`hostdir` — require a writable medium: on a `cdrom` drive only
-`media` (or the empty `null`) is valid, because the read-only
-optical medium has nothing to size, difference, or synthesize.
+```json
+{"drives": {"hdd0": {"media": "dos622-installed", "controller": "scsi"}}}
+```
+
+The drive names one [`media`](#media--optional--string) component and
+says nothing else about content: the media owns
+[materialization](media-spec.md#materialize) — a fresh blank, a
+writable overlay over a payload, a copy of one, or an attached
+payload (a file, or a host directory served as a virtual FAT drive).
+**The old four-way drive content selector (`size` / `base` / `media`
+/ `hostdir`) is gone**; a blank disk is a media with
+`materialize: new`, a differencing drive is a media with
+`materialize: difference`, a `hostdir` drive is a media whose
+`source` is a directory with `materialize: use`. To change how a
+drive materializes, change (or point at a different) media.
 
 A removable drive (`cdrom`, `floppy`) may instead be declared
 **empty** with the value `null`:
@@ -437,176 +454,44 @@ anything runs. Fixed drives
 (`hdd`) cannot be empty.
 
 There are no paths to reliquary-managed images anywhere in the
-blueprint ([`hostdir`](#hostdir--optional--string) deliberately
-names user-owned content — the media `local-path` class). A
-drive that has
-its own image file (declared with `size` or `base`) gets it
-materialized by reliquary inside the cached materialization, named
-canonically after the drive key —
-`cache/machines/<id>/drives/hdd0.qcow2` for `hdd0` on QEMU —
-with the extension of the format reliquary chose (see
-[image naming](#image-naming-and-formats)). You never name,
-place, or reference these files; the drive key is the only handle.
+blueprint. A drive whose media materializes a per-machine image
+(`new` / `difference` / `copy`) gets it created by reliquary inside
+the cached materialization, named for the **media** —
+`cache/machines/<id>/media/blank-20m.qcow2` for a media `blank-20m`
+on QEMU — with the extension of the format reliquary chose (see
+[image naming](#image-naming-and-formats)). You never name, place,
+or reference these files; the media name is the handle.
 
 #### `media` — optional · string
 
-The name of a defined media item:
+The name of a [media component](media-spec.md):
 
 ```json
 {"media": "freedos-1.4-livecd"}
 ```
 
-The name resolves to a [defined media item](media-spec.md), fetched
-and hash-verified on demand. Definitions live in the shared
-`<reliquary_home>/media` library; scripts may install embedded
-definitions there before resolving their target machine. A name no
-definition provides is an error. The drive attaches the media payload
-itself — use this for
-machine-independent, read-only-use media the machine should carry
-*at rest*: a driver disk, a reference CD. Media a workflow needs
-only temporarily — above all installer ISOs — conventionally stay
-out of the blueprint: declare the slot empty and let the install
-script insert and eject the medium, so the machine's default
-shape is the installed system, not the installer. (To boot or
-modify a copy of a media image,
-make it a drive [`base`](#base--optional--string-or-object) instead.)
+The name resolves against the blueprint namespace — the `media`
+components across every `.rlqb` in the active source — and its
+payload is fetched and hash-verified on demand. A name no component
+provides is an error (resolution fails closed naming the media). The
+media owns [materialization](media-spec.md#materialize): a `use`
+media attaches the payload itself (use it for machine-independent
+media the machine carries *at rest* — a driver disk, a reference
+CD), while `new`/`difference`/`copy` materialize a per-machine image.
+Media a workflow needs only temporarily — above all installer ISOs —
+conventionally stay off the machine's drives: declare the slot empty
+and let the install script insert and eject the medium, so the
+machine's default shape is the installed system, not the installer.
 A media name is the *only* cross-boundary reference the machine
-shape may make: the drive inventory reaches the media catalog and
+shape may make: the drive inventory reaches the media components and
 nothing else (U4). (The [`scripts`](#scripts) map and
 [`parameters`](#parameters) property references are invocation
 wiring — they configure script binding, never machine shape.)
 
-#### `size` — optional · string
-
-Start the drive as a blank image of this size. Valid on `hdd` and
-`floppy` drives; **rejected on `cdrom`** — a blank optical disc has
-nothing to size, so a `cdrom` takes only [`media`](#media--optional--string)
-or the empty `null`:
-
-```json
-{"size": "20M"}
-```
-
-rlq creates the image — at `create`, or at the first
-`start` — dynamically allocated, in the backend's preferred
-format, at the drive's canonical path. Once the image exists,
-`size` is validated against it and a mismatch is an error;
-`size` never resizes or overwrites an existing image
-(`recreate` is how a drive starts over).
-
-Grammar: a positive integer immediately followed by a binary unit
-suffix — `K`, `M`, `G`, or `T` (powers of 1024) — case-insensitive.
-`"20M"`, `"2G"`, `"720k"`.
-
-#### `base` — optional · string or object
-
-A **starting-point image** for the drive: a media item the
-drive's own image is materialized from — at `create`, or at the
-first `start`. Valid on `hdd` and `floppy` drives; **rejected on
-`cdrom`** — optical media is read-only, so there is nothing to
-difference or duplicate into (attach an ISO with
-[`media`](#media--optional--string) instead). As an object it has two fields — `media` (required)
-and `type` (how to materialize, optional). `base.media` names an
-defined item in the media catalog, exactly like the
-[`media` field](#media--optional--string): the name must resolve to a
-[media definition](media-spec.md) in the library, possibly installed
-from the current script before machine resolution, and the item is
-fetched and hash-verified on demand. The difference is what happens
-next —
-`media` attaches the payload itself, `base` materializes the
-drive's own image from it:
-
-```json
-{"drives": {"hdd0": {"base": {"media": "dos622-installed", "type": "duplicate"}}}}
-```
-
-A bare string is shorthand for the object with only `media` set:
-
-```json
-{"drives": {"hdd0": {"base": "dos622-installed"}}}
-```
-
-The state always carries the resolved object form, `type`
-explicit.
-
-The base itself is never written to; it is the fixed external
-image the drive starts from. This is how pre-existing content
-enters a machine: there is no dropping of files into the cache —
-a drive that should start with content declares where that
-content comes from, and `recreate` can regenerate it at any time.
-
-`type` selects one of two materializations, defaulting to
-`difference`:
-
-| type         | meaning                                         |
-|--------------|-------------------------------------------------|
-| `difference` | the drive is a differencing disk backed by the base; writes land in the difference, the base stays pristine (default) |
-| `duplicate`  | the base image is copied in full                |
-
-`difference` maps to the backend's native mechanism — qcow2
-backing files, VHDX differencing disks, VMDK linked clones, VDI
-differencing — and is a backend/format capability: a backend that
-cannot difference against the base fails the capability check
-rather than silently copying (declare `"type": "duplicate"` to
-copy instead). It is the default because it matches what based drives
-are for: differencing keeps large bases cheap to fan out — many
-machines can difference against one installed base image, each
-paying only for its own writes — and a fresh difference is the
-cheapest possible `recreate`.
-
-`duplicate` works everywhere (converted to the backend's
-preferred format when needed) and makes the drive fully
-independent of backing-file support.
-
-#### `hostdir` — optional · string
-
-A host directory presented to the guest as a FAT drive —
-readable and writable:
-
-```json
-{"drives": {"hdd1": {"hostdir": "work/"}}}
-```
-
-The guest reads and writes the drive like any disk; the
-directory reflects the guest's writes at the latest by machine
-stop — on QEMU (vvfat) they may appear live. While the machine
-is stopped, the directory is the drive's content and is an
-ordinary host directory: prepare or harvest it with any tool —
-out-of-band exchange is the sanctioned file path
-([instance model](instance-model.md)); host-side edits while the machine
-runs are outside the contract. The directory always shows the
-drive's *latest* state, never history — history is what run
-records are for — and one directory should not
-be shared by concurrently running machines.
-
-Valid on `hdd` and `floppy` drives, never `cdrom` (no ISO9660
-synthesis). A relative path resolves against the invocation's
-asset root, so a checked-in blueprint can present the project's
-own tree and stay portable (U4); an absolute path is allowed —
-the content is the user's own, exactly the media `local-path`
-class — with the caveat that it is machine-specific and belongs
-in personal, not shared, blueprints. A missing directory fails
-closed naming the path; contents exceeding the medium's capacity
-(a floppy's fixed size, the platform-default hard-disk capacity)
-fail at `start` naming the files that do not fit.
-
-`hostdir` deliberately trades verification for liveness: the
-directory is user-owned and mutable between runs, and nothing is
-hash-checked — `media` remains the pinned, reproducible path for
-content a workflow must trust (U4). The mechanism is the
-adapter's under capability honesty: QEMU serves `hostdir` with
-vvfat (proven in exactly this domain — simple FAT, DOS-era write
-patterns); a backend without an equivalent serves the same
-contract its own way (a FAT image materialized from the
-directory and reconciled at rest) or reports the capability
-unsupported, naming itself. `apply` absorbs `hostdir` changes
-(content re-presents at the next start; nothing regenerates).
-
-Division of labor: `hostdir` is the standing working surface
-declared by the design; per-run injection and harvest are
-out-of-band host work against the stopped machine
-([instance model](instance-model.md)), for which a `hostdir`
-drive is the natural surface.
+A `cdrom` drive's media must be read-only (`materialize: use`): the
+optical medium has nothing to size, difference, or synthesize, so a
+`new`/`difference`/`copy` media on a `cdrom` fails validation naming
+the drive.
 
 #### `controller` — optional · string
 
@@ -628,7 +513,7 @@ for all current platforms is `ide`, resolved into the state at
 creation.
 
 ```json
-{"drives": {"hdd0": {"size": "4G", "controller": "scsi"}}}
+{"drives": {"hdd0": {"media": "system-disk", "controller": "scsi"}}}
 ```
 
 What the blueprint deliberately does **not** say:
@@ -663,7 +548,7 @@ from the machine entirely — no slot, no hardware — useful for
 switching between configurations without deleting entries:
 
 ```json
-{"drives": {"hdd1": {"size": "100M", "enabled": false}}}
+{"drives": {"hdd1": {"media": "scratch-100m", "enabled": false}}}
 ```
 
 This differs from an empty removable drive (`null`): an empty
@@ -674,17 +559,18 @@ convention above.)
 
 ### Image naming and formats
 
-A drive's own image file (from `size` or `base`) lives at the
-canonical path `cache/machines/<id>/drives/<key>.<ext>` — the
-drive key names the file, and the extension follows the image
-format. There are no other image names, ever: the blueprint has no
-image-path field, and nothing is hand-placed in the cache.
+A drive's per-machine image (a media that `materialize`s
+`new` / `difference` / `copy`) lives at the canonical path
+`cache/machines/<id>/media/<media-name>.<ext>` — named for the
+media, not the slot, so a media moving through one removable slot
+keeps its own image and a re-insert reuses it. There are no other
+image names, ever: the blueprint has no image-path field, and
+nothing is hand-placed in the cache.
 
-The format is reliquary's choice, made per backend. An image
-created blank from `size`, or duplicated from a `base`
-(`"type": "duplicate"`, converting when needed), uses the
+The format is reliquary's choice, made per backend. A `new` blank,
+or a `copy` of a payload (converting when needed), uses the
 backend's preferred dynamically-allocated format; a `difference`
-drive uses the backend-native differencing format:
+media uses the backend-native differencing format:
 
 | backend      | image format |
 |--------------|--------------|
@@ -699,11 +585,12 @@ arrives on whatever backend is assigned, and `recreate` onto a
 different backend regenerates the images in the new backend's
 format.
 
-`media` drives attach the media payload file itself, whose format
+A `use` media attaches the payload file itself — or its `source`
+directory, served as vvfat — with no per-machine image. Its format
 is declared by its
-[cached file name's extension](media-spec.md) in the media
-library. A media payload in a format the machine's backend cannot
-attach is a capability error naming both.
+[cached file name's extension](media-spec.md). A media payload in a
+format the machine's backend cannot attach is a capability error
+naming both.
 
 ---
 
@@ -816,12 +703,12 @@ Format checks (reject the document):
 - `boot` entries naming undeclared or disabled drives, or naming
   one slot twice (in either spelling), and duplicate
   `control-planes` entries;
-- drive objects declaring none, or more than one, of `media`,
-  `size`, `base`, and `hostdir`;
-- `hostdir` on `cdrom` drives, or a `hostdir` directory that
-  does not exist;
+- a drive object missing `media`, or carrying keys other than
+  `media` / `controller` / `enabled`;
 - `null` (empty) values on non-removable (`hdd`) drives;
-- `media` or `base.media` names no media definition provides;
+- a `media` name no media component provides (plus every media /
+  source / archive rule in [the media spec](media-spec.md));
+- a `cdrom` drive naming a media that is not read-only `use`;
 - `backend-settings` sections overlapping reliquary-owned fields;
 - `parameters` values that are neither a string nor a
   `{"property": "<key>"}` object, or with invalid input or
@@ -834,8 +721,8 @@ naming backend and capability):
   slots);
 - controller types the backend cannot provide (e.g. anything but
   `scsi` on Hyper-V Generation 2);
-- `difference` bases the backend/format pair cannot express;
-- `hostdir` drives the backend cannot serve;
+- `difference` media the backend/format pair cannot express;
+- directory-source (`hostdir`) media the backend cannot serve;
 - image formats the backend cannot attach;
 - control planes the backend cannot offer;
 - boot orders the backend cannot honor.

@@ -5,18 +5,22 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The machine blueprint
 
-> **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
-> `size`/`media` and empty removable slots (`null`), `boot`,
-> `description`, and `scripts`) is implemented: parsing, validation,
-> media-name resolution, machine materialization, and persistent
-> script-driven `insert`/`eject`. The remaining fields, and JSONC
-> acceptance, are not implemented yet; details may still change
-> before first release.
+> **Status:** implemented on the composed blueprint model — a machine's
+> `drives` name **media** components ([media spec](media-spec.md)),
+> resolved from the `.rlqb` namespace, with empty removable slots
+> (`null`), alongside `platform`, `memory`, `boot`, `description`, and
+> `scripts`: parsing, validation, media-name resolution, machine
+> materialization, and persistent script-driven `insert`/`eject`. The
+> remaining fields may still change before first release; the composed
+> model itself is worked out in
+> [the composed blueprint model](blueprint-model.md).
 
 Every reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create
-many machines. The detailed ownership, state, locking, and recovery
-model is in [Machine blueprints and machines](instance-model.md).
+many machines. The blueprint is one file holding named **components** —
+a `machine` and the `media`, `source`, and `archive` components it
+draws on; the detailed ownership, state, locking, and recovery model is
+in [Machine blueprints and machines](instance-model.md).
 
 ## The model at a glance
 
@@ -28,17 +32,15 @@ When a result should outlive its machine, `export` carries it out.
 ```mermaid
 flowchart LR
     subgraph yours["yours — durable, worth versioning"]
-        BP["blueprint<br/>freedos.rlqb"]
-        MED["media definitions<br/>*.rlqm"]
+        BP["blueprint freedos.rlqb<br/>machine + media + archives"]
         SCR["scripts<br/>*.rlqs"]
     end
     subgraph reliquarys["reliquary's — disposable, regenerates"]
-        M1["machine freedos-0<br/>state · drives · runs"]
-        M2["machine freedos-1<br/>state · drives · runs"]
+        M1["machine freedos-0<br/>state · media · runs"]
+        M2["machine freedos-1<br/>state · media · runs"]
     end
     BP -- "create" --> M1
     BP -- "create" --> M2
-    MED -. "media / base<br/>references" .-> M1
     SCR -. "script" .-> M1
     M1 -- "export" --> OUT["native VM or media image<br/>(outside reliquary, for keeps)"]
 ```
@@ -100,9 +102,9 @@ Two rules carry the whole model:
   baseline, and `start` runs the machine as its state describes,
   never silently reverting it.
 - **Everything reliquary materialized is disposable.** `destroy` +
-  `recreate` rebuilds a machine wholesale from the blueprint,
-  media definitions, and scripts; nothing under `cache/` is ever
-  precious.
+  `recreate` rebuilds a machine wholesale from the blueprint — its
+  machine, media, and archive components — and its scripts; nothing
+  under `cache/` is ever precious.
 
 ## The documents
 
@@ -110,27 +112,31 @@ Two rules carry the whole model:
 <reliquary_home>/blueprints/
 └── msdos.rlqb               reusable blueprint — yours
 <reliquary_home>/cache/machines/<id>/
-├── reliquary-machine.json   the machine's state — reliquary's
-├── drives/                  the machine's disk and floppy images
+├── machine.json             the machine's state — reliquary's; while
+│                            running, the live VM identity folds in
+│                            as a `vm` section
+├── media/                   per-machine materialized images, by
+│                            media name
 ├── runs/                    append-only run records (the event
 │                            stream, transcripts, screenshots)
-└── ...                      backend files and logs
+└── <backend>/               the backend's own files (e.g. qemu/)
 ```
 
 - The **blueprint** (`<name>.rlqb`) is the reusable machine shape
-  you defined. You own it: reliquary reads it and never writes it —
-  `import` and the future `init` author one once, at your request,
-  and never touch it again; `delete`, equally at your request,
-  removes it.
-- The **state** (`cache/machines/<id>/reliquary-machine.json`)
+  you defined — the machine plus the media, source, and archive
+  components it draws on, all in one file. You own it: reliquary
+  reads it and never writes it — `import` and the future `init`
+  author one once, at your request, and never touch it again;
+  `delete`, equally at your request, removes it.
+- The **state** (`cache/machines/<id>/machine.json`)
   describes one machine: its identity, blueprint, lifecycle
   phase, and resolved configuration, at the root of the
   machine's directory — which holds everything reliquary
-  materialized for it: state, disk images, run records, backend
-  files. The machine **is** this directory; nothing about a
-  machine lives outside `cache/`, because a machine lives and
-  dies as one thing. reliquary writes all of it; the one part
-  written *for you* is `runs/` — the machine's run records
+  materialized for it: state, per-machine media images, run
+  records, backend files. The machine **is** this directory;
+  nothing about a machine lives outside `cache/`, because a machine
+  lives and dies as one thing. reliquary writes all of it; the one
+  part written *for you* is `runs/` — the machine's run records
   (the event stream, transcripts, screenshots), which the world
   reads in place and copies out to keep (see below). Everything
   else you never need to touch.
@@ -140,10 +146,10 @@ work**. A reliquary machine is a disposable rig — created to run a
 scripted OS install or an automated task, recreated freely, and
 deleted when done. The blueprint makes rebuilding cheap; the
 entire cached materialization is safe to throw away, because
-everything in it — run records excepted — regenerates from
-blueprints, media definitions, and scripts. The records are
-evidence of runs, delivered live to whoever drove them and
-retained until the machine goes; they are the one thing in the
+everything in it — run records excepted — regenerates from the
+blueprint (its media and archive components) and its scripts. The
+records are evidence of runs, delivered live to whoever drove them
+and retained until the machine goes; they are the one thing in the
 cache no re-run reproduces. The machine is never the product —
 often the run record is (U3): the point was to run some tests,
 and the record is copied out as plain files when it should
@@ -155,23 +161,20 @@ machine, handed to a hypervisor built for long-lived machines.
 reliquary is not the place to keep a machine you care about.
 
 The same ownership line runs through the whole reliquary home:
-everything outside `cache/` is durable data you own. Machine
-blueprints, media definitions, and scripts are small, shareable,
-and worth versioning. The [user properties
+everything outside `cache/` is durable data you own. Blueprints —
+each carrying its own media and archive components — and scripts
+are small, shareable, and worth versioning. The [user properties
 file](script-properties.md)
-is also durable but personal and normally not shared or committed. A
-media definition may initially be installed from an embedded script
-block, after which its library copy is likewise user-owned. Everything
-under `cache/` is reliquary's and disposable — and, run records
-excepted, reconstructible: the records are evidence, kept for the
-machine's life and never regenerable, so copy out any record that
-should outlive its machine. There is no dropping
-of pre-created files into cache directories; inputs enter machines
-through the blueprint —
-[`media` references](machine-blueprint-reference.md#media--optional--string)
-and [starting-point
-images](machine-blueprint-reference.md#base--optional--string-or-object)
-that machine drives are differenced from, or copies of.
+is also durable but personal and normally not shared or committed.
+Everything under `cache/` is reliquary's and disposable — and, run
+records excepted, reconstructible: the records are evidence, kept
+for the machine's life and never regenerable, so copy out any
+record that should outlive its machine. There is no dropping of
+pre-created files into cache directories; inputs enter machines
+through the blueprint — a drive names a
+[`media`](machine-blueprint-reference.md#drives) component, and the
+media owns how it materializes (a fresh blank, a writable overlay
+over a payload, a copy of one, or an attached payload).
 
 This page explains the format and how these documents behave
 through a machine's life. Companion pages:
@@ -180,8 +183,11 @@ through a machine's life. Companion pages:
   every rule.
 - **[Cookbook](machine-blueprint-cookbook.md)** — complete worked
   examples.
-- **[The media spec](media-spec.md)** — the media library, including
-  definitions that scripts can install before machine resolution.
+- **[The media spec](media-spec.md)** — the `media`, `source`, and
+  `archive` components: how payloads are located, fetched, verified,
+  and materialized.
+- **[The composed blueprint model](blueprint-model.md)** — the
+  component model the whole `.rlqb` format is built on.
 - **[Script properties](script-properties.md)** — how scripts
   consume values: the source order, and the user file holding
   reusable personal values and protected secrets.
@@ -203,10 +209,12 @@ portable JSON document you author. The reliquary-owned machine
 state wraps its resolved form with identity, lifecycle, and
 backend facts. See [the instance model](instance-model.md).
 
-**Blueprints have names; machines have ids.** A blueprint's name is its file
-stem (`<name>.rlqb`). A machine's identity is `<blueprint>-<n>` — commands take
-`--machine <blueprint>-<n>` — the full id, exactly —
-and `--blueprint <name>` alone selects a blueprint's machine when
+**Machine components have names; machines have ids.** A machine
+component's name is its declared `name`, or — for a lone bare-root
+machine — its file stem (`<name>.rlqb`). `--blueprint <name>` selects
+the machine component of that name; its machine's identity is
+`<name>-<n>`, and commands take `--machine <name>-<n>` — the full id,
+exactly — with `--blueprint <name>` alone selecting the machine when
 exactly one exists. Destroy frees the number for reuse on the next
 `create`. Selection by name is scoped to the invocation's
 resolution: a machine matches only when the name resolves —
@@ -227,6 +235,15 @@ A minimal blueprint that boots a DOS floppy image:
   }
 }
 ```
+
+This is a **bare root** — a lone machine, its fields at top level,
+no component sections. The `floppy` drive names a `media` component,
+`msdos622-boot`, that reliquary resolves from the namespace: a
+`media` entry in a sibling `.rlqb`, or a codex media seeded on first
+reference. To ship the machine and its media as one self-contained
+file, add the sections — `{ "machines": [ … ], "media": [ … ] }` (see
+[the media spec](media-spec.md) and
+[cookbook](machine-blueprint-cookbook.md)).
 
 Save it as `msdos.rlqb` anywhere under your asset root — the
 current directory by default, or the reliquary home for the
@@ -289,13 +306,15 @@ implicitly at `start`.
 
 ### The state — reliquary's
 
-`cache/machines/<id>/reliquary-machine.json` describes the machine as
+`cache/machines/<id>/machine.json` describes the machine as
 it actually is, and reliquary maintains it: whenever reliquary
 changes the machine — inserts media, changes memory, reorders
 boot devices — it updates the state in the same operation. A
 state document that disagrees with the hypervisor's actual
 configuration is a bug in reliquary, not an ambiguity you have to
-resolve.
+resolve. While the machine is running the state also carries a
+`vm` section — the live VM's identity and port — written
+atomically with the lifecycle `phase` and cleared when it stops.
 
 The state is fully resolved:
 
@@ -326,12 +345,23 @@ produces, on a host where QEMU was selected:
   "memory": 16,
   "cpus": 1,
   "drives": {
-    "floppy0": {"media": "msdos622-boot"}
+    "floppy0": {
+      "medium": "floppy",
+      "slot": 0,
+      "media": "msdos622-boot",
+      "materialize": "use",
+      "path": "<cache>/media/msdos622-boot.img"
+    }
   },
   "boot": ["floppy0"],
   "control-planes": ["agentless-display"]
 }
 ```
+
+Each resolved drive records its `medium`/`slot`, the `media` it
+names, how that media `materialize`s, and the realized cache
+`path`. A running machine additionally carries a top-level `vm`
+section.
 
 Don't edit the state — or anything else under
 `cache/machines/<id>/`. reliquary rewrites the state as it
@@ -356,12 +386,11 @@ runs as; the baseline enters only through `create` and `apply`:
    baseline's *shape* — its drive slots, hardware, and capabilities —
    without reverting divergent content. The blueprint file itself
    is not re-read; adopting blueprint edits is `apply`'s job.
-2. Every media item the state references — including media a script
-   attached — is resolved from the visible media catalog and
+2. Every media the state references — including media a script
+   attached — is resolved from the blueprint namespace and
    hash-verified (and fetched if missing or stale — see
    [the media spec](media-spec.md)); the machine never boots
-   against silently changed media. A script installs its embedded
-   definitions into the library before this reconciliation.
+   against silently changed media.
 3. The state is compared with the actual backend machine (verified
    by identity — see [backend assignment](#backend-assignment)),
    and differences reliquary can apply to the backend — its
@@ -387,10 +416,10 @@ is returned to its blueprint shape. Differences the machine can
 absorb without regenerating anything — memory, boot order, drives
 enabled or disabled, changed `media` references, added drives —
 are applied.
-Differences it cannot — a changed `size` on an existing image, a
-`base` change on a materialized drive — fail closed naming both
-sides; `recreate` is the honest alternative when the drives
-should regenerate.
+Differences it cannot — a changed `size` on an already-materialized
+`new` image, or a change to how an already-built media
+`materialize`s — fail closed naming both sides; `recreate` is the
+honest alternative when the drives should regenerate.
 
 ### Runtime changes live in the state
 
@@ -427,11 +456,11 @@ first) and the backend's machine — and never
 touches the blueprint; `create` makes a fresh machine from the
 blueprint whenever one is wanted again. `recreate` is exactly
 `destroy` + `create` as one command, reusing the same id. Drives
-regenerate the way they were declared: `size` drives come back
-blank, [`base` drives](machine-blueprint-reference.md#base--optional--string-or-object)
-come back as fresh differencing disks (or fresh copies) of their
-base images. An installed system that only lives in the
-cached drive image is gone after `recreate` — which is the point;
+regenerate the way their media declare: a `new` media comes back
+blank, a [`difference` or `copy`
+media](media-spec.md#materialize) comes back as a fresh overlay on
+(or copy of) its payload. An installed system that only lives in
+the cached drive image is gone after `recreate` — which is the point;
 if it should survive, `export` it first or produce it with an
 install script that can simply run again.
 
@@ -475,20 +504,20 @@ permanently outside reliquary's purview — reliquary will never
 touch it again.
 
 **`import <source> --platform <platform>`** goes the other way:
-it produces a *blueprint* from a native backend VM — a blueprint
-synthesized from the backend's machine configuration, with the
-VM's disks captured as media items *in place*: each gets a
-generated definition — an absolute
-[`local-path`](media-spec.md#item-fields) at the disk where the
-native hypervisor keeps it, a computed hash, no URL — and the
-blueprint's drives take the items as
-[`base`](machine-blueprint-reference.md#base--optional--string-or-object).
+it produces a *blueprint* from a native backend VM — a composed
+`.rlqb` synthesized from the backend's machine configuration, with
+the VM's disks captured as `media` components *in place*: each gets
+a `media` entry whose [`source`](media-spec.md#locators) is a
+`local` locator at the disk where the native hypervisor keeps it,
+plus a computed `sha256` and no URL — and the machine's drives name
+those media.
 Import reads only a source at rest: a source VM that is running —
 or suspended, its disks stable but full of mid-flight guest
 state — fails closed naming the VM and its state; power it off
 first. The captured images are never copied, moved, or modified;
-the definition is yours, so an image that should live somewhere
-more durable is moved by you and its `local-path` repointed.
+the media component is yours, so an image that should live
+somewhere more durable is moved by you and its `local` source
+repointed.
 Import presents two choices, never defaulted (U2) — on a
 terminal an absent flag becomes a prompt naming its tradeoff,
 noninteractively it is an error:
@@ -498,15 +527,16 @@ noninteractively it is an error:
   source VM, and only with this consent. Snapshotting pins the
   definitions to the frozen extent while the source VM stays
   free to keep running natively; the snapshot is
-  reliquary-named, recorded in the generated definitions'
+  reliquary-named, recorded in the generated media components'
   `notes`, and thereafter yours in native tooling (verification
   reports a lost extent). `--no-snapshot` touches nothing — but
   running the source VM again rewrites its disks, and
   verification then refuses resolution until re-import.
 - `--hdd-images (duplicate | difference)` — how machines materialize
-  from the captured disks, spelled explicitly into the generated
-  drives' `base.type`: `duplicate` copies the image into each
-  created machine, whose drive stands alone afterward;
+  from the captured disks, spelled explicitly into each generated
+  media's [`materialize`](media-spec.md#materialize) (`duplicate` →
+  `copy`, `difference` → `difference`): `copy` duplicates the image
+  into each created machine, whose drive stands alone afterward;
   `difference` is the cheapest create but keeps depending on the
   source staying byte-identical — media verification at `start`
   refuses a machine whose source has since been rewritten.
@@ -514,7 +544,7 @@ noninteractively it is an error:
 Import stops
 at the blueprint — it never creates a machine; run `create` when you
 want one. A machine created from an imported blueprint recreates like
-any other: from its bases. Translating backend config — memory, drives, controllers —
+any other: from its media. Translating backend config — memory, drives, controllers —
 is fine; guessing what OS is inside is not, and no backend
 records it, so `--platform` is required. Use import to run
 scripted, disposable experiments against a copy of a real machine
@@ -609,15 +639,18 @@ by silently dropping or emulating the feature.
 
 The format checks have a machine-checkable companion: the
 published JSON Schema
-([machine-blueprint.schema.json](machine-blueprint.schema.json),
-beside this spec) captures their per-document structural subset,
-for editor completion and validation while authoring (U4, U5).
-The prose reference remains normative, and schema validity never
-implies blueprint validity: media-name resolution, cross-document
-rules, and every capability check live beyond the schema. The
-schema validates the parsed document, so JSONC comments and
-trailing commas are invisible to it; editors bind it to `.rlqb`
-by file association.
+([blueprint-schema-v1.json](../../reliquary/schemas/blueprint-schema-v1.json))
+— one schema for the whole composed document, covering the machine,
+media, source, and archive components — captures their per-document
+structural subset, for editor completion and validation while
+authoring (U4, U5). It is published under `reliquary/schemas/` and
+versioned as v1 so editors can bind it today; it will keep evolving
+as v1, additively where it can. The prose reference remains
+normative, and schema validity never implies blueprint validity:
+media-name resolution, cross-document rules, and every capability
+check live beyond the schema. The schema validates the parsed
+document, so JSONC comments and trailing commas are invisible to
+it; editors bind it to `.rlqb` by file association.
 
 ## Platform defaults
 
@@ -682,7 +715,7 @@ is strict canonical JSON, always.
 ## Where to next
 
 - [Field reference](machine-blueprint-reference.md) — `platform`,
-  `backend`, `drives` (including starting-point `base` images),
+  `backend`, `drives` (naming media components),
   `boot`, `control-planes`, `parameters`, `backend-settings`, and
   the state-only fields, with every rule and per-field examples.
 - [Cookbook](machine-blueprint-cookbook.md) — complete blueprints for

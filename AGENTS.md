@@ -17,23 +17,30 @@ workflow:
   a `--assets <dir>` project root walked recursively by extension as the sole hermetic source), `source_for`, and the
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API names its
   source or fails closed (no home/CWD default), and an `ObjectSource` of JSON-imported objects is the planned third
-  source, `blueprint.py` validates the full machine blueprint field reference (`platform`, `backend`, `memory`, `cpus`,
-  `drives` with the four content sources plus `controller`/`enabled`, `boot`, `name` (the id-safe identity, not a
-  display label), `description`, `scripts`,
-  `control-planes`, `backend-settings`, `parameters`) and resolves
-  its `media`/`base.media` references (backend capability checks and `base`/`hostdir` materialization ride later
-  milestone-6 work), scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
-  fails closed while any machine of that blueprint exists), `media.py` owns media definitions
-  (parsing including the definition-level `description`/`notes` annotations and unknown-key rejection, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
-  machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
-  `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
+  source, `document.py` is the composed `.rlqb` parser — `parse_document` / `load_document` build a `Document` of named
+  `machines` / `media` / `sources` / `archives` (component dataclasses `Machine`, `Media`, `Source`, `Archive`,
+  `Locator`), a bare root reads as one machine, an archive tree expands recursively (a node with `members` is an
+  archive, a leaf a media), names default to source/path stems, and identity is the `(name, type)` pair with
+  medium-compatibility checks; it validates the full field reference (`platform`, `backend`, `memory`, `cpus`,
+  `drives` — a media name, `null`, or `{media, controller, enabled}` — `boot`, `name` (the id-safe identity, not a
+  display label), `description`, `scripts`, `control-planes`, `backend-settings`, `parameters`),
+  `blueprint.py` is authoring-only — scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
+  fails closed while any machine of that blueprint exists), `resolve.py` builds the merged `(name, type)` resolution
+  namespace from every `.rlqb` in the active source (`load_namespace` / `build_namespace`, cross-file collision
+  detection), resolves a media by name (`resolve_media`), and lowers it to a nested fetch plan
+  (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,
+  on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the `cache/archives/` and
+  `cache/media/` caches, attaching a `local` source in place, `media.py` is acquisition-only — `fetch_media(name,
+  context, on_mismatch)` and `list_media` over the namespace, `clean_downloads` / `clean_media`, and `delete_media`
+  (a `NotImplementedError` pointing at editing the blueprint, since media are components inside a `.rlqb` now),
+  `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
   matches codex + home blueprints and reports provenance `yes`/`seeded`/`user`), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` /
   `recreate_machine` (destroy+create under the same id) / `apply_blueprint` (adopt blueprint edits into a
-  stopped machine, reconciling absorbable diffs and failing closed on a changed size/base of an existing
-  image) / `get_machine_dir` (the out-of-band door) /
+  stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
+  already-materialized media image) / `get_machine_dir` (the out-of-band door) /
   `list_machines` /
   `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
@@ -76,22 +83,26 @@ workflow:
 - `CHANGELOG.md` records release-facing changes.
 - `planning/ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
 - `planning/INTERFACES.md` is the governing document for reliquary's world-facing interfaces: it names the interface
-  inventory (CLI, embedding API, scripting language, machine blueprints, and media definitions, plus the
+  inventory (CLI, embedding API, scripting language, and machine blueprints — media, source, and archive are
+  components inside the blueprint — plus the
   script properties, recorded outputs, and the home layout) and the
   vetting rule every interface-changing decision must follow. The numbered primary use cases — the decision
   surface that rule weighs against — live in `planning/USE-CASES.md`.
-- `planning/examples/` contains a complete FreeDOS example in the planned formats: a machine blueprint and scripts, with the
-  install script embedding the media definition that its first run installs in the media library. Its README carries
-  the status note. Keep the examples synchronized with `planning/design/` when the formats change.
+- `planning/examples/` contains a complete FreeDOS example: a composed `.rlqb` blueprint (the machine plus its media and
+  archive components) and scripts, the install script inserting the LiveCD media the blueprint carries. Its README
+  carries the status note. Keep the examples synchronized with `planning/design/` when the formats change.
 - `docs/` holds user-facing documentation for implemented features
   (CLI reference, Python API reference, blueprint guide, DOS
   automation). Design documents
   and planned interfaces live in `planning/design/` — the directory
-  is the classification; file names carry no suffix. The blueprint,
-  media-definition, and machine-state JSON Schemas (`*.schema.json`)
-  sit beside their specs there and must stay synchronized with them
-  (the prose specs are normative); the shared valid/invalid
-  conformance corpus (`reliquary_tests/fixtures/conformance/`,
+  is the classification; file names carry no suffix. The one composed
+  blueprint JSON Schema is published and packaged at
+  `reliquary/schemas/blueprint-schema-v1.json` (versioned v1 so
+  editors can bind it today); the machine-state schema
+  (`machine-state.schema.json`) sits beside its spec in
+  `planning/design/`. Both must stay synchronized with the prose specs
+  (which are normative); the shared valid/invalid conformance corpus
+  (`reliquary_tests/fixtures/conformance/`,
   `test_conformance_corpus.py`) runs every fixture against both the
   parser and the schema so the two cannot drift. Placement rules
   are in `.agents/skills/documentation-rules.md`.
@@ -113,7 +124,8 @@ and users recreate them. Compatibility guarantees, if any, will be defined no ea
 
 ### Interface changes are vetted
 
-The CLI, the embedding API, the scripting language, the machine blueprint, and the media definition are
+The CLI, the embedding API, the scripting language, and the machine blueprint (media, source, and archive
+components included) are
 reliquary's primary interfaces to the world; the script properties, recorded outputs (run records,
 transcripts), and the home layout are world-facing contracts alongside them. Any decision that
 changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
@@ -161,7 +173,7 @@ All persistent state belongs under the reliquary home (`Documents/reliquary` by 
 when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--home`, or `set_home()`). The
 regenerable cache root defaults to `<home>/cache` but resolves independently — overridden by `RELIQUARY_CACHE_DIR`,
 `--cache`, or `set_cache()` — so it can live outside the home entirely (e.g. off OneDrive-synced storage). Seeding
-(`seed-blueprint` / `seed-media` / `seed-script`) always targets `<home>/blueprints` / `<home>/media` /
+(`seed-blueprint` / `seed-script`; `seed-media` is a deprecated no-op) always targets `<home>/blueprints` /
 `<home>/scripts`, never the cache root. Every function that resolves a path under the home or cache accepts a
 `context=` parameter (`home.py`'s `Context`, exported from the package root): omit it (the common case) to use the
 process-global default; pass a bare string as shorthand for `Context(home=that_string)`; pass a `Context(home=...,
@@ -171,10 +183,11 @@ process-global default via `--home`/`--cache` — scoped `Context` objects are a
 plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
 deliberately left alone. Never write beside the module or into the source repository during normal use.
 
-Authored-asset residency is a separate axis from the home (ROADMAP "Authored-asset resolution"; `assets.py`). Blueprints,
-media definitions, and scripts resolve in one of two modes, carried on `Context.assets` / the `set_assets` global:
+Authored-asset residency is a separate axis from the home (ROADMAP "Authored-asset resolution"; `assets.py`). Blueprints
+(their media, source, and archive components included) and scripts resolve in one of two modes, carried on
+`Context.assets` / the `set_assets` global:
 **home mode** (`HOME_ASSETS` — the CLI default when `--assets` is absent) reads the home's canonical `blueprints/` /
-`media/` / `scripts/` folders and seeds from the codex on a miss; **dir mode** (`--assets <dir>`, API `assets=<dir>`)
+`scripts/` folders and seeds from the codex on a miss; **dir mode** (`--assets <dir>`, API `assets=<dir>`)
 walks that project root recursively by extension as the sole hermetic source — no home, no codex, no seeding. The
 root **replaces** the home (there is no shadow and no fallback; `--assets-only` never existed here). The embedding API
 has **no default source**: a bare `Context`/`None` that resolves a name with nothing configured fails closed, so
@@ -182,31 +195,35 @@ automation never picks up home assets or a stray CWD (CWD is not an asset defaul
 home-mode shorthand. An asset's identity is its declared `name` (id-safe) else its filename stem; within-source
 effective-name collisions are errors. Selection scoping: `--blueprint <name>` matches only machines whose recorded
 `blueprint-source` equals this invocation's resolution (a sourceless machine matches by name alone). Seeding
-(`seed-blueprint` / `seed-media` / `seed-script`) is a home operation and still targets `<home>/blueprints` etc.,
+(`seed-blueprint` / `seed-script`) is a home operation and still targets `<home>/blueprints` etc.,
 never a project root or the cache.
 
 Home layout. A machine is wholly its cache materialization — there is
-no root-home machine model (the legacy root-home `drives/` /
-`machine.json` / `vm.json` were absorbed and deleted):
+no root-home machine model (the legacy root-home machine surface — a
+root-level `drives/`, a root `machine.json`, a root `vm.json` — was
+absorbed and deleted; the per-machine `machine.json` below is the new,
+unrelated cache state file):
 
-- `blueprints/` — machine blueprints (`blueprints_dir`)
-- `media/` — shared media definitions (`media_dir`)
+- `blueprints/` — composed blueprints, media components included (`blueprints_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
-- `cache/downloads/` — cached source archives (`downloads_cache_dir`), under the cache root
+- `cache/archives/` — cached source archives (`archives_cache_dir`), under the cache root
 - `cache/media/` — cached media payloads (`media_cache_dir`), under the cache root
-- `cache/machines/<blueprint>-<n>/` — machine materializations (`machines_cache_dir`;
-  parent via `cache_dir`), under the cache root, each with `reliquary-machine.json`,
-  `drives/` (the machine's declared drive images and vvfat directories, named
-  canonically after the drive key), and when running `vm.json` (VM identity, port,
-  PID) / `qemu-stderr.log`
+- `cache/machines/<name>-<n>/` — machine materializations (`machines_cache_dir`;
+  parent via `cache_dir`), under the cache root, each with `machine.json` (the
+  resolved state; while running its `vm` section carries the live VM identity,
+  port, PID), `media/` (the machine's per-machine images and vvfat directories,
+  named by media), `runs/` (run records), and a `<backend>/` subdir
+  (e.g. `qemu/qemu-stderr.log`)
 
 ### VM ownership
 
 Never send a control command to a QMP server until its identity is verified.
 
 `launch_owned_qemu()` assigns a readable QEMU name plus a fresh per-start `-uuid`,
-records both with the selected port in `vm.json`, and returns the port.
-Every later connection checks `query-name` **and** `query-uuid` against
+and returns the verified identity `{port, name, uuid, pid}`; `machines.py`
+persists it into the `vm` section of `machine.json`, atomically with `phase`
+(lifecycle no longer owns a state file). Every later connection checks
+`query-name` **and** `query-uuid` against
 that record. The name alone must never authorize a command: same-numbered
 machines of one blueprint in different homes share their readable name, so
 only the uuid identifies the exact QEMU instance this home started.
@@ -221,14 +238,15 @@ this seam rather than opening QMP connections directly.
 When `port=None`, `launch_owned_qemu()` selects an available local port. An explicit port must be free. Startup failure and timeout
 paths must terminate the child so they cannot leave an untracked QEMU process.
 
-The CLI resolves the active port from the machine's `vm.json`; `start_machine()` returns the port for callers to
-propagate explicitly.
+The CLI resolves the active port from the `vm` section of the machine's `machine.json` (via `read_vm_state`, which
+reads that section); `start_machine()` returns the port for callers to propagate explicitly.
 
 ### DOS boot and scripting
 
 A machine's drives are declared in its blueprint (the field reference,
-`planning/design/machine-blueprint-reference.md`) and materialized into
-`cache/machines/<id>/drives/`, named canonically after the drive key.
+`planning/design/machine-blueprint-reference.md`), each naming a media
+component; per-machine images are materialized into
+`cache/machines/<id>/media/`, named for the media.
 `machine_drive_args()` (`machines.py`) renders them from the machine
 state: floppies first (slots 0–1, A: and B:), hard disks next (slots
 0–3, the IDE bus), then cdroms placed on the IDE slots after the hard
@@ -236,9 +254,10 @@ disks; each removable drive carries a stable QMP `id=<key>` so a running
 `insert`/`eject` can target it. An image path's extension declares the
 format (`format_options()`): `*.img` / `*.iso` are pinned to
 `format=raw` (avoiding QEMU's format-probing warning), any other
-extension is handed to QEMU to identify; a `hostdir` drive's directory
-path renders as a vvfat drive (vvfat emulates no ISO9660, so cdrom
-hostdirs are rejected at blueprint validation). Memory and boot order
+extension is handed to QEMU to identify; a directory-source media (its
+`source` a directory, `materialize: use`) renders as a vvfat drive
+(vvfat emulates no ISO9660, so a directory source on a cdrom is rejected
+at resolution). Memory and boot order
 resolve into the state at `create` (boot best-guess: the slot-0 floppy,
 else the slot-0 hard disk, else the first cdrom).
 
@@ -250,8 +269,8 @@ environment variables, and program invocations belong in `AgentlessGuestExec.exe
 
 QEMU snapshots a vvfat staging directory when the drive is attached. Host changes require a stop/start cycle. Guest
 writes should be read after QEMU stops so write-back has completed. A
-`hostdir` drive attaches its directory as vvfat (`hdd` as a vvfat hard
-disk, `floppy` as a vvfat 1.44M FAT12 floppy).
+directory-source media attaches its directory as vvfat (`hdd` as a vvfat
+hard disk, `floppy` as a vvfat 1.44M FAT12 floppy).
 
 ### Script dispatch
 
@@ -270,8 +289,9 @@ model". Preserve these when touching `script_runner.py`:
 - No QMP session is ever held while a statement list runs: QEMU's QMP server admits one client at a time,
   so every sample and every input verb opens its own identity-verified session.
 - A sample whose QMP session is gone is the stopped observation: `_read` treats connect failures and
-  lifecycle's wrapped "no longer reachable" `RuntimeError` (after clearing `vm.json`) as
-  `machine=stopped` and calls `mark_stopped`. Identity-mismatch `RuntimeError`s still fail closed.
+  lifecycle's wrapped "no longer reachable" `RuntimeError` as `machine=stopped` and calls `mark_stopped`
+  (which clears the `vm` section and returns the machine to `ready`). Identity-mismatch `RuntimeError`s still
+  fail closed.
 
 ## The embedding surface
 
@@ -282,9 +302,10 @@ flat verb-noun functions (`create_machine` / `start_machine` /
 script runtime (`script_runner.py`'s `run_script` / `check_script`). The
 milestone-1 root-home runner surface — `workflows.py`'s
 `Runner` / `MachineConfig` / `run_guest_program` / `run_task` / `start`,
-the root-home `machine.json` / `drives/` / `vm.json`, and the legacy
-`drives.py` auto-discovery — was absorbed into this model and deleted
-(no backward compatibility before beta). The user-facing reference is
+the old root-home state files (a root `machine.json`, `drives/`,
+`vm.json` — distinct from the per-machine cache `machine.json` this
+model writes), and the legacy `drives.py` auto-discovery — was absorbed
+into this model and deleted (no backward compatibility before beta). The user-facing reference is
 `docs/api-reference.md`; the end-goal API design (settled twin names,
 conventions, handles) is `planning/design/api.md`.
 

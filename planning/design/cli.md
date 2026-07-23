@@ -49,16 +49,18 @@ ids are
 
 ## Blueprints
 
-Blueprint files describe a kind of machine. They live under
-`blueprints/` alongside companion media definitions (`media/`) and
-scripts (`scripts/`). Author them by hand, scaffold them with
-`new-blueprint`, or let reliquary extract them from its codex.
+Blueprint files describe a kind of machine, composed of named
+`machine` / `media` / `source` / `archive` components. They live
+under `blueprints/` alongside scripts (`scripts/`); a blueprint
+carries its media, source, and archive components inside itself.
+Author them by hand, scaffold them with `new-blueprint`, or let
+reliquary extract them from its codex.
 
-**The codex.** reliquary ships a set of blueprints, media
-definitions, and scripts for popular open source operating systems.
-In a source checkout these live as ordinary files under
-`codex/blueprints/`, `codex/media/`, and
-`codex/scripts/`; when packaged for distribution they are bundled
+**The codex.** reliquary ships a set of blueprints (media
+components included) and scripts for popular open source operating
+systems. In a source checkout these live as ordinary files under
+`codex/blueprints/` and `codex/scripts/`; when packaged for
+distribution they are bundled
 in a zip archive within the reliquary package. Either way, when you
 reference a codex artifact that doesn't yet exist in your home,
 reliquary copies it out. From that point on it is an ordinary
@@ -69,15 +71,15 @@ not a live resolution tier.
 Deleting your copy is also how you refresh it: a file in your home
 is never touched, but once you delete it yourself, the next
 reference (or an explicit `seed-`) extracts the current codex
-copy again. Orphaned
-references — a blueprint naming a media definition or script you
-removed — re-seed the same way.
+copy again. An orphaned
+reference — a blueprint naming a script you removed — re-seeds the
+same way.
 
 This means the lazy path is often one command with zero files in
 your home beforehand: `rlq run-script install --blueprint
-freedos-1.4` extracts the blueprint, its media, and its scripts,
-creates a machine, and runs the install — everything materialized on
-first use.
+freedos-1.4` extracts the blueprint (its media inside it) and its
+scripts, creates a machine, and runs the install — everything
+materialized on first use.
 
 ### Named scripts
 
@@ -95,12 +97,15 @@ blueprint's one name):
     "verify": "freedos-1.4-plain-verify"
   },
   "drives": {
-    "hdd": {"size": "20M"},
+    "hdd": "blank-20m",
     "cdrom": null
   },
   "boot": ["hdd", "cdrom"]
 }
 ```
+
+(`blank-20m` names a `media` component — `materialize: new`,
+`size: "20M"` — carried in a `media` section of the same `.rlqb`.)
 
 The labels are the verbs you use with `run-script`:
 `rlq run-script install --blueprint freedos-1.4-plain` looks up
@@ -136,10 +141,12 @@ Writes `blueprints/test-rig.rlqb`:
 
 ```json
 {
-  "platform": "dos",
-  "drives": {
-    "hdd": {"size": "20M"}
-  }
+  "machines": [
+    {"name": "test-rig", "platform": "dos", "drives": {"hdd": "blank-20m"}}
+  ],
+  "media": [
+    {"name": "blank-20m", "materialize": "new", "size": "20M"}
+  ]
 }
 ```
 
@@ -155,13 +162,18 @@ script will fill (`"cdrom": null`). Resulting shape:
 
 ```json
 {
-  "platform": "dos",
-  "memory": "32M",
-  "drives": {
-    "hdd": {"size": "20M"},
-    "cdrom": null
-  },
-  "boot": ["hdd", "cdrom"]
+  "machines": [
+    {
+      "name": "freedos",
+      "platform": "dos",
+      "memory": "32M",
+      "drives": {"hdd": "blank-20m", "cdrom": null},
+      "boot": ["hdd", "cdrom"]
+    }
+  ],
+  "media": [
+    {"name": "blank-20m", "materialize": "new", "size": "20M"}
+  ]
 }
 ```
 
@@ -175,13 +187,13 @@ rlq new-blueprint retro-pc --platform dos --backend qemu `
     --hdd 100M --memory 16M
 ```
 
-`--hdd <size>` produces a blank disk (`{"size": "20M"}`). For a
-hard disk built on a base image or backed by a media item, edit the
-JSON — or start from a codex blueprint that already has the
-shape you want.
+`--hdd <size>` produces a `new` media of that size plus a drive
+naming it. For a hard disk that differences or copies a payload, or
+attaches an existing media, edit the JSON — or start from a codex
+blueprint that already has the shape you want.
 
-`--cdrom <media>` and `--floppy <media>` produce `media`
-references.
+`--cdrom <media>` and `--floppy <media>` name an existing media on
+the slot.
 
 `--boot <order>` takes a comma-separated list of drive keys in alias
 form (`cdrom,hdd`, `floppy,hdd`).
@@ -191,9 +203,9 @@ form (`cdrom,hdd`, `floppy,hdd`).
 --memory <size>                   e.g. 32M, 128M, 2G
 --cpus <n>                        default 1
 --backend <qemu|virtualbox|vmware|hyperv>
---hdd <size>                      blank hard disk, e.g. 20M, 500M
---cdrom <media>                   CD-ROM from the media library
---floppy <media>                  floppy from the media library
+--hdd <size>                      blank hard disk (a new media), e.g. 20M, 500M
+--cdrom <media>                   CD-ROM naming an existing media
+--floppy <media>                  floppy naming an existing media
 --boot <order>                    comma-separated drive keys, e.g. cdrom,hdd
 --control-planes <list>           comma-separated, e.g. guest-agent,agentless-display
 ```
@@ -204,19 +216,20 @@ else the scaffolder doesn't cover, edit the JSON file directly.
 ### Seeding from the codex
 
 ```
-rlq (seed-blueprint | seed-media | seed-script) <name> [--only]
+rlq (seed-blueprint | seed-script) <name> [--only]
 ```
 
 Extracts artifacts from the codex into your home — API twins
-`seed_blueprint(name, only=)`, `seed_media`, `seed_script`.
-Existing files are never overwritten.
+`seed_blueprint(name, only=)`, `seed_script`. Existing files are
+never overwritten. (`seed-media` is retained as a deprecated no-op —
+media are components inside a `.rlqb` now, with no separate file to
+seed.)
 
-- `rlq seed-blueprint <name>` — seeds a blueprint and
-  everything it references: its media definitions and all scripts
-  named in its `scripts` map. This is the one-stop command to
-  materialize a codex artifact into your home. `--only` restricts it to
-  the blueprint file itself.
-- `rlq seed-media <name>` — seeds a single media definition.
+- `rlq seed-blueprint <name>` — seeds a blueprint (its media, source,
+  and archive components ride inside it) and all scripts named in its
+  `scripts` map. This is the one-stop command to materialize a codex
+  artifact into your home. `--only` restricts it to the blueprint
+  file itself.
 - `rlq seed-script <name>` — seeds a single script.
 
 ```powershell
@@ -225,7 +238,6 @@ rlq seed-blueprint freedos-1.4
 
 # Seed individual artifacts
 rlq seed-blueprint freedos-1.4-plain --only
-rlq seed-media freedos-1.4-livecd
 rlq seed-script freedos-1.4-plain-install
 ```
 
@@ -243,15 +255,14 @@ blueprint and script:
 |---|---|---|
 | blueprint | `<name>.rlqb` | `freedos-1.4-plain.rlqb` |
 | script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
-| script-aligned media | `<blueprint>-<script-id>-<drive>.rlqm` | `freedos-1.4-plain-install-cdrom.rlqm` |
-| shared media | `<name>.rlqm` | `freedos-1.4-livecd.rlqm` |
 
-A media definition that is specific to one script's step — the
-installer CD that script inserts, a driver disk it swaps in — uses the
-script-aligned pattern. A media definition shared across scripts or
-blueprints (or used independently by `create-machine`) uses a
-standalone name. Both resolve through the same media library;
-the naming convention identifies ownership, not a namespace.
+Media are components inside the blueprint, not files of their own, so
+they carry component *names* rather than filenames: conventionally
+`<blueprint>-<script-id>-<drive>` for a media specific to one script's
+step (the installer CD it inserts, a driver disk it swaps in), or a
+standalone `<name>` for one shared across scripts or blueprints. Both
+resolve through the same namespace; the naming convention identifies
+ownership, not a namespace.
 
 ### Listing and searching blueprints
 
@@ -322,9 +333,9 @@ Synthesizes a blueprint from a native VM source's configuration —
 memory, drives, controllers, read by an **importer** (a
 vocabulary decoupled from the backend list, like export's
 exporters; no same-named backend is required) — capturing the
-VM's disks as media
-items in place: each gets a generated definition whose
-`local-path` points at the disk where the native hypervisor
+VM's disks as `media`
+components in place: each gets a generated media whose `source` is
+a `local` locator at the disk where the native hypervisor
 keeps it (computed hash, no URL); nothing is copied or moved.
 The source must be at rest: a running or suspended VM fails
 closed naming its state — power it off first.
@@ -343,10 +354,11 @@ an error:
   nothing — but running the source VM again breaks verification
   until re-import.
 - `--hdd-images` sets how machines materialize from the captured
-  disks: `duplicate` copies the image into each created machine,
-  whose drive stands alone afterward; `difference` differences
-  against it (cheapest create, but per-start verification
-  refuses a source rewritten since).
+  disks, spelled into each generated media's `materialize`:
+  `duplicate` → `copy` (the image is copied into each created
+  machine, whose drive stands alone afterward); `difference`
+  differences against it (cheapest create, but per-start
+  verification refuses a source rewritten since).
 
 `--name` names the blueprint to write (`--blueprint` always
 selects an existing one) and `--platform` is required
@@ -359,9 +371,9 @@ rlq import-vm "C:\VMs\my-dos-box" --name my-dos-box `
 ```
 
 Machines created from an imported blueprint recreate from their
-bases like any other. To move a captured image to more durable
-ground, move the file and repoint the definition's `local-path` —
-the definition is yours.
+media like any other. To move a captured image to more durable
+ground, move the file and repoint the media's `local` source —
+the media component is yours.
 
 ---
 
@@ -371,7 +383,7 @@ Machines are disposable realizations of a blueprint, each identified
 by `<blueprint>-<n>` and stored entirely under
 `cache/machines/<blueprint>-<n>/`. Everything under `cache/` is
 reliquary's and disposable — and, run records excepted, regenerates
-from blueprints, media definitions, and scripts (records are
+from blueprints (media components and all) and scripts (records are
 evidence: copy out any worth keeping).
 
 Every machine verb *is* its embedding-API twin's name under the
@@ -390,8 +402,8 @@ rlq create-machine --blueprint <name>
 
 Resolves `<name>` to a blueprint in `blueprints/`. If the file
 doesn't exist but is available in the codex, it is
-extracted — along with any referenced media definitions and scripts
-not already present. Existing files are never overwritten.
+extracted — along with any referenced scripts not already present
+(its media ride inside it). Existing files are never overwritten.
 
 Validates the blueprint, assigns a backend (if not declared),
 allocates the lowest free machine number for that blueprint,
@@ -458,8 +470,8 @@ rlq apply-blueprint (--blueprint <name> | --machine <id>)
 
 Adopts the current blueprint into a stopped machine. Differences the
 machine can absorb without regenerating drives — memory, boot order,
-drives enabled or disabled, changed `media` references, added drives
-— are applied and the baseline digest updated:
+drives enabled or disabled, re-pointed media names, re-fetched `use`
+media, added drives — are applied and the baseline digest updated:
 
 ```powershell
 # Edit freedos.rlqb: disable the CD, boot from hard disk
@@ -468,13 +480,12 @@ rlq apply-blueprint --blueprint freedos
 rlq start-machine --blueprint freedos
 ```
 
-Changes the machine cannot absorb — a different `size` on an
-existing image, a `base` change on a materialized drive — fail
-closed:
+Changes the machine cannot absorb — a changed `size` or
+`materialize` on an already-materialized media image — fail closed:
 
 ```
 $ rlq apply-blueprint --blueprint freedos
-rlq: cannot apply: hdd0 size changed from "20M" to "40M"
+rlq: cannot apply: media blank-20m size changed from "20M" to "40M"
 drive-regenerating changes require 'recreate-machine' (machine freedos-0)
 ```
 
@@ -491,8 +502,9 @@ touched.
 
 `recreate-machine` is destroy + create as one command under the
 same id.
-Drives regenerate fresh: `size` drives come back blank, `base`
-drives come back as fresh differencing disks (or copies). A
+Drives regenerate fresh the way their media declare: a `new` media
+comes back blank, a `difference`/`copy` media comes back as a fresh
+overlay on (or copy of) its payload. A
 blueprint without a pinned `backend` may land on a different
 backend — this is the supported way to move a machine between
 backends.
@@ -548,8 +560,8 @@ filename or format. The image lands in the drive's native
 format, or raw when the destination extension says so
 (`.img` / `.raw`); any other conversion is declined — a
 cross-backend want is `export-machine`'s job. An exported
-installed disk plus a hand-written `local-path` media definition
-is an installed base other blueprints can `base` against.
+installed disk, plus a hand-written `media` with a `local` source,
+is a payload other blueprints can `difference` or `copy` against.
 
 ```powershell
 rlq export-drive hdd0 D:\exports\dos-disk.qcow2 -b freedos
@@ -1029,11 +1041,11 @@ rlq run cancel 4 --stop-machine --machine freedos-1.4-plain-1
 
 ## Media
 
-Media definitions describe installation media — download URLs,
-archive structure, and SHA-256 hashes. Definitions live under
-`media/` and are ordinary user-owned JSON files (the codex
-library provides seeds that are extracted on first reference;
-existing files are never overwritten).
+`media` components describe installation media — where a payload
+is located (a `url`+mirrors, a `local` path, or a member of an
+`archive`), how it materializes, and the SHA-256 hashes that verify
+it. They are components inside a blueprint `.rlqb`, not files of
+their own; the codex seeds them inside the blueprints that use them.
 
 ### Listing and searching media
 
@@ -1042,10 +1054,11 @@ rlq list-media
 rlq search-media <term>...
 ```
 
-`list-media` shows everything in `media/`. `search-media` queries
-the codex index and user media definitions, matching terms
-against filename, item `name`s (the identifiers machine drives
-reference — semantic, not display metadata), and `description`.
+`list-media` shows the media names resolvable from the active
+source (the `media` components across its `.rlqb` files).
+`search-media` queries the codex index and user media, matching
+terms against the media `name`s (the identifiers machine drives
+reference — semantic, not display metadata) and `description`.
 Multiple terms are ANDed:
 
 ```powershell
@@ -1070,12 +1083,12 @@ rlq clean-downloads
 rlq clean-media
 ```
 
-`fetch-media` downloads, extracts, and hash-verifies a defined
-media item. Machine operations resolving a `media` reference to a
-fetchable definition fetch implicitly; `fetch-media` is the
-standalone convenience. Every definition is an authored `.rlqm`
-file, so there is nothing a script would supply that the catalog
-does not already have. `--progress` selects
+`fetch-media` resolves a media by name and downloads, extracts,
+and hash-verifies its payload. Machine operations resolving a
+`media` reference fetch implicitly; `fetch-media` is the
+standalone convenience. Media resolve against the same namespace
+every command sees, so there is nothing a script would supply that
+it does not already have. `--progress` selects
 rendering as on `run-script` — pretty live progress on a tty under
 `auto`; `jsonl` emits pure event JSON on stdout, the last line
 the terminal event stating the outcome. `plain` and `jsonl`
@@ -1095,13 +1108,11 @@ rlq fetch-media freedos-1.4-livecd
 ```
 
 `clean-downloads` reclaims cached source archives under
-`cache/downloads/`. `clean-media` reclaims fetched payload files
-under `cache/media/` that reliquary can re-fetch. The `clean-`
-noun names the cache directory it reclaims, never an artifact
-class — `list-media` lists definitions in `media/`, `clean-media`
-reclaims `cache/media/`. Nothing
-irreplaceable — definitions, `local-path` files, sourceless
-payloads — is cleanable.
+`cache/archives/`. `clean-media` reclaims fetched payload files
+under `cache/media/` that reliquary can re-fetch. Nothing
+irreplaceable — `local` source files, sourceless payloads — is
+cleanable. (There is no `delete-media`: media are components inside
+a `.rlqb`, so removing one means editing the blueprint.)
 
 ```powershell
 rlq clean-downloads

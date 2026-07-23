@@ -38,8 +38,9 @@ results belongs to the caller.
   call within one process. The CLI only ever drives the
   process-global default via `--home`/`--cache`/`--assets` — scoped
   `Context` objects are an embedding-API-only capability.
-- `assets=` selects where authored assets (blueprints, media
-  definitions, scripts) resolve from: a directory path is a
+- `assets=` selects where authored assets (blueprints and their
+  media/source/archive components, plus scripts) resolve from: a
+  directory path is a
   hermetic project root walked recursively by extension (the sole
   source — no home, no codex, no seeding), and `HOME_ASSETS` is
   home mode (the home's canonical folders plus codex seeding). The
@@ -62,8 +63,9 @@ which lives under the (independently resolvable) cache root.
   from a blueprint name; returns the machine id
   (`<blueprint>-<n>`, lowest free number). Seeds codex content on
   first reference. CLI twin: `create-machine`.
-- `create(blueprint, *, context=None, blueprint_name="")` - The
-  same, from an already-parsed `Blueprint`.
+- `create(machine, namespace, *, context=None, blueprint_name="")` -
+  The same, from an already-parsed machine component and the
+  resolution namespace (`load_namespace`).
 - `list_machines(context=None, blueprint=None)` - List machines.
   CLI twin: `list-machines`.
 - `resolve_machine(*, machine=None, blueprint=None, context=None)` -
@@ -74,7 +76,8 @@ which lives under the (independently resolvable) cache root.
   bare-number form.
 - `start_machine(machine_id, *, display=False, context=None)` -
   Start a machine; the QMP port and VM identity are recorded in
-  the machine's `vm.json`. CLI twin: `start-machine`.
+  the machine's `machine.json` as a `vm` section, written
+  atomically with `phase`. CLI twin: `start-machine`.
 - `stop_machine(machine_id, context=None)` - Stop a running machine;
   identity mismatches fail closed. CLI twin: `stop-machine`.
 - `destroy_machine(machine_id, context=None)` - Delete the machine
@@ -87,15 +90,15 @@ which lives under the (independently resolvable) cache root.
 - `apply_blueprint(*, machine=None, blueprint=None, context=None)` -
   Adopt the current blueprint into a stopped machine: absorbable
   changes are applied and the baseline digest re-recorded; a changed
-  `size`/`base` on an existing image fails closed. Returns the id.
-  CLI twin: `apply-blueprint`.
+  `size` or `materialize` on an already-materialized media image
+  fails closed. Returns the id. CLI twin: `apply-blueprint`.
 - `get_machine_dir(*, machine=None, blueprint=None, context=None)` -
   The selected machine's cache directory as an absolute path (any
   phase). CLI twin: `get-machine-dir`.
 - `mark_stopped(machine_id, context=None)` - Reconcile the phase of
   a machine whose QEMU process has gone.
 - `load_machine_state(machine_id, context=None)` - Read the
-  machine's `reliquary-machine.json`.
+  machine's `machine.json`.
 - `machine_dir_path(machine_id, context=None)` - The machine's cache
   directory.
 - `machine_drive_args(machine_id, context=None)` - Render QEMU
@@ -112,39 +115,49 @@ survive stop/start:
 - `set_boot_order(machine_id, boot_keys, *, context=None)`
   (`set-boot-order`)
 
-## Blueprints
+## Blueprints (composed documents)
 
-- `parse_blueprint(value, context=None)` /
-  `load_blueprint(path, context=None)` - Parse and validate the
-  milestone-1 blueprint subset, resolving media names through the
-  library; return `Blueprint` (drives as `BlueprintDrive`).
+- `parse_document(value, *, stem=None)` /
+  `load_document(path)` - Parse and validate a composed `.rlqb`
+  document (a bare-root machine, or the `machines` / `media` /
+  `sources` / `archives` sections); return `Document`, whose
+  `machines` / `media` / `sources` / `archives` are dicts by name.
+- `load_namespace(context=None)` - Build the merged `(name, type)`
+  resolution namespace from every `.rlqb` in the active source;
+  `resolve_machine`/`create` and media resolution read it. (The
+  namespace-level `resolve_media(name, namespace)` lives in
+  `reliquary.resolve`.)
 - `new_blueprint(name, *, platform="dos", context=None)` - Scaffold a
-  home ``blueprints/<name>.rlqb``. CLI twin: `new-blueprint`.
+  home ``blueprints/<name>.rlqb`` (a bare-root machine). CLI twin:
+  `new-blueprint`.
 - `delete_blueprint(name, *, context=None)` - Remove the home blueprint
   file; fails closed while any machine of it exists. Never touches
   package builtins. CLI twin: `delete-blueprint`.
+- Component types live in `reliquary.document`: `Media`, `Source`,
+  `Archive`, `Locator`, `Machine`.
 
 ## Media
 
-- `resolve_media(name, context=None)` - Resolve a defined item by
-  name across the media library; returns `ResolvedMedia`.
-- `list_media(context=None, *, builtin=False)` - Sorted item names from
-  home ``media/``, or the package codex when ``builtin=True``.
+- `fetch_media(name, context=None, on_mismatch="fail")` - Resolve a
+  media by name against the namespace and return its verified
+  payload path, fetching on demand — cheapest source first: a
+  verifying payload as-is, a verifying cached archive re-extracted,
+  then the mirror URLs. Every file is SHA-256-verified before use.
+  `on_mismatch` is `"fail"` (default), `"prompt"` (interactive
+  delete-and-refetch checkpoint), or `"refetch"` (pre-approved
+  deletion); a mismatched file whose media names no source is
+  always kept. CLI twin: `fetch-media`.
+- `list_media(context=None, *, builtin=False)` - Sorted media names
+  from the namespace, or the package codex when ``builtin=True``.
   CLI twin: `list-media`.
-- `delete_media(name, *, context=None)` - Remove the home definition
-  file that defines ``name``; fails closed while any machine drive
-  still references an item from that definition. CLI twin:
-  `delete-media`.
-- `fetch_media(name, context=None, on_mismatch="fail")` - Return the
-  named item's verified payload path, fetching on demand —
-  cheapest source first: a verifying payload as-is, a verifying
-  cached archive re-extracted, then the definition's URL. Every
-  file is SHA-256-verified before use. `on_mismatch` is `"fail"`
-  (default), `"prompt"` (interactive delete-and-refetch
-  checkpoint), or `"refetch"` (pre-approved deletion); a
-  mismatched file whose definition names no source is always
-  kept.
-- Types: `MediaDefinition`, `MediaItem`, `ResolvedMedia`.
+- `delete_media(name, *, context=None)` - Media now lives inside a
+  `.rlqb`; deleting a shared component is not a file operation, so
+  this raises `NotImplementedError` pointing at editing the
+  blueprint. CLI twin: `delete-media`.
+- `clean_downloads(context=None)` / `clean_media(context=None)` -
+  Reclaim the cached source archives (`cache/archives/`) and cached
+  payloads (`cache/media/`). CLI twins: `clean-downloads`,
+  `clean-media`.
 
 ## Scripts and runs
 

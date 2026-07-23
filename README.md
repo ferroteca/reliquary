@@ -13,10 +13,11 @@ reliquary is not a VM manager for machines you keep.
 
 The first thing to learn is reliquary's central model. A **blueprint** is a reusable JSON design you author and keep —
 a `<name>.rlqb` file, conventionally under `<reliquary_home>/blueprints/`. A **machine** is a disposable realization reliquary builds from it,
-identified by a generated id — one blueprint, many machines. Machines are created, run, destroyed, and recreated freely:
-the blueprint (with media definitions and scripts) is always enough to rebuild one, so nothing reliquary materializes is
-ever precious. Editing a blueprint never changes an existing machine by itself; a machine keeps the snapshot it was
-created from. To adopt blueprint edits, destroy the machine and create it again.
+identified by a generated id — one blueprint, many machines. The blueprint is one file holding named components — a
+`machine` plus the `media`, `source`, and `archive` components it draws on. Machines are created, run, destroyed, and
+recreated freely: the blueprint (media components and all) and its scripts are always enough to rebuild one, so nothing
+reliquary materializes is ever precious. Editing a blueprint never changes an existing machine by itself; a machine
+keeps the snapshot it was created from. To adopt blueprint edits, destroy the machine and create it again.
 
 Read the [Blueprint guide](docs/blueprint-guide.md) for the implemented
 milestone-1 surface, the [CLI reference](docs/cli-reference.md) for
@@ -59,7 +60,7 @@ rlq run-script install --blueprint freedos-1.4-plain
 ```
 
 From a clean home, that one command materializes a machine from the codex's `freedos-1.4-plain` blueprint (seeding the
-blueprint, its scripts, and the LiveCD media definition into your home as ordinary user-owned files), inserts the
+blueprint — its LiveCD media rides inside it — and its scripts into your home as ordinary user-owned files), inserts the
 fetched, hash-verified LiveCD to the blueprint's empty CD drive, boots it, and drives the FreeDOS installer end to end —
 language, partitioning, the reboot, the "Plain DOS system" package set — until the guest powers itself off and the
 script ejects the CD. The machine is left with FreeDOS installed on its hard disk; confirm it boots, then start and stop
@@ -80,7 +81,7 @@ rlq check-script freedos-1.4-plain-install
 rlq check-script install --blueprint freedos-1.4-plain
 ```
 
-Vendor media is cached and verified against pinned SHA-256 hashes on every use: source archives under`cache/downloads/`,
+Vendor media is cached and verified against pinned SHA-256 hashes on every use: source archives under `cache/archives/`,
 extracted payloads under `cache/media/` (`Documents\reliquary` by default; override with `--home` or the
 `RELIQUARY_HOME` environment variable). Each script run writes a transcript and screenshots under the machine's
 `cache/machines/<id>/runs/` directory. Pass `--display` to show the QEMU window instead of running headless — helpful
@@ -125,27 +126,29 @@ reliquary therefore works **agentlessly**:
 The guest needs no reliquary software, network driver, serial driver, or background service. This makes the harness
 useful even while the guest is partially configured or broken.
 
-Any DOS with a bootable image works. A machine's drives are declared in
-its blueprint — a blank `size` disk, an attached `media` payload, a
-differencing or duplicated `base` image, or a `hostdir` host directory
-served as a virtual FAT drive — and reliquary materializes them under
-`cache/machines/<id>/drives/`. Any QEMU-supported image format works;
-`*.img` and `*.iso` are taken as raw. reliquary hands back a guest
-program's raw output, and interpreting it is left to the caller.
+Any DOS with a bootable image works. A machine's drives each name a
+**media** component, and the media owns its content — a blank
+`materialize: new` disk of `size`, a `difference`/`copy` over a
+payload, or a `use` attach (an ISO, or a host directory served as a
+virtual FAT drive) — and reliquary materializes any per-machine image
+under `cache/machines/<id>/media/`. Any QEMU-supported image format
+works; `*.img` and `*.iso` are taken as raw. reliquary hands back a
+guest program's raw output, and interpreting it is left to the caller.
 
 ## The workflow
 
 1. **Describe the machine.** Author a `<name>.rlqb` blueprint (by hand,
    with `rlq new-blueprint`, or by seeding one from the codex) declaring
-   the platform, memory, and drives — a blank `size` disk, an attached
-   `media` payload, a `base` image to difference or duplicate, or a
-   `hostdir` directory for out-of-band file exchange. To hand the guest
-   its own files, a `hostdir` drive is the natural surface: its host
-   directory *is* the drive.
+   the platform, memory, and drives; each drive names a **media**
+   component, and the media owns how it materializes — a blank `new`
+   disk, a `difference`/`copy` over a payload, or a `use` attach. To
+   hand the guest its own files, a media whose `source` is a host
+   directory (`materialize: use`) is the natural surface: that directory
+   *is* the drive.
 2. **Create a machine.** `rlq create-machine --blueprint <name>`
    materializes one under a generated id (or `run-script` creates one on
-   demand). The blueprint, media, and scripts are always enough to
-   rebuild it, so a machine is never precious.
+   demand). The blueprint (media components and all) and its scripts are
+   always enough to rebuild it, so a machine is never precious.
 3. **Drive it.** Run an attached `.rlqs` script with
    `rlq run-script <label> --blueprint <name>`, or operate the machine
    interactively — `rlq start-machine`, then `exec` / `wait` / `screen` /
@@ -153,8 +156,8 @@ program's raw output, and interpreting it is left to the caller.
 4. **Collect the results.** Script runs leave a transcript, screenshots,
    and outputs under the machine's `cache/machines/<id>/runs/` records.
    For files, `rlq get-machine-dir` prints the machine directory: while
-   the machine is stopped, its `hostdir` and image drives are ordinary
-   host state to read or prepare.
+   the machine is stopped, its directory-source and image drives are
+   ordinary host state to read or prepare.
 5. **Recreate freely.** `destroy-machine` deletes a machine entirely and
    `recreate-machine` rebuilds it under the same id; `apply-blueprint`
    adopts blueprint edits into a stopped machine.
@@ -198,28 +201,31 @@ The layout is:
 
 ```text
 Documents/reliquary/
-├── blueprints/           machine blueprints you author (<name>.rlqb)
-├── media/                shared media definitions (<name>.rlqm)
+├── blueprints/           composed blueprints you author (<name>.rlqb) —
+│                         a machine plus its media/source/archive components
 ├── scripts/              automation scripts (<name>.rlqs)
 └── cache/                regenerable; resolves independently (--cache /
     │                     RELIQUARY_CACHE_DIR) and can live elsewhere
-    ├── downloads/        cached source archives (redownloadable)
+    ├── archives/         cached source archives (redownloadable)
     ├── media/            cached, hash-verified media payloads
     └── machines/<id>/    each materialized machine — its own directory
-                          with reliquary-machine.json (the state), drives/,
-                          runs/ (transcripts + screenshots), and, while
-                          running, vm.json / qemu-stderr.log
+                          with machine.json (the state; while running its
+                          `vm` section holds the live VM identity), media/
+                          (per-machine images), runs/ (transcripts +
+                          screenshots), and a <backend>/ subdir (e.g.
+                          qemu/qemu-stderr.log)
 ```
 
 A machine is wholly its `cache/machines/<id>/` directory — there is no
 root-home machine model. Everything under `cache/` is regenerable. The
 selected home is printed to standard error the first time it is used.
 
-Authored assets (blueprints, media definitions, scripts) resolve in one
-of two modes. By default — **home mode** — reliquary reads the home's
-`blueprints/` / `media/` / `scripts/` folders and seeds any name it does
-not find from the built-in codex; this is the convenient path for
-interactive use. Point `--assets <dir>` at a project directory instead
+Authored assets (blueprints — with their media/source/archive
+components — and scripts) resolve in one of two modes. By default —
+**home mode** — reliquary reads the home's `blueprints/` / `scripts/`
+folders and seeds any name it does not find from the built-in codex;
+this is the convenient path for interactive use. Point `--assets <dir>`
+at a project directory instead
 and reliquary resolves **solely** from that tree (walked recursively by
 file extension): no home, no codex, no seeding. That is the mode for
 automation — assets are your project's source-controlled files, so a run
@@ -247,8 +253,8 @@ rlq seed-blueprint freedos-1.4-plain
 rlq create-machine --blueprint freedos-1.4-plain
 ```
 
-`create-machine` materializes the machine's drives under
-`cache/machines/<id>/drives/` and prints the generated id. (If a
+`create-machine` materializes the machine's per-machine images under
+`cache/machines/<id>/media/` and prints the generated id. (If a
 machine of this blueprint already exists — e.g. one installed by
 `run-script install` — you can start it directly.)
 
@@ -260,8 +266,9 @@ rlq start-machine --blueprint freedos-1.4-plain
 
 reliquary chooses an available local QMP port, starts QEMU headless,
 assigns the VM a unique identity, and records it in the machine's
-`vm.json`. Later commands find the running VM through the machine
-selector, so the port never needs to be copied by hand. The machine
+`machine.json` (as a `vm` section, written while running). Later
+commands find the running VM through the machine selector, so the port
+never needs to be copied by hand. The machine
 stays running until you stop it. Add `--display` for a visible,
 manually interactive QEMU window; `--port PORT` requests a particular
 QMP port (an occupied port is refused).
@@ -283,10 +290,10 @@ rlq exec "myprog.exe > result.log" --blueprint freedos-1.4-plain
 ```
 
 `exec` types the command and waits for the DOS prompt to return. To
-retrieve detailed output, give the machine a `hostdir` drive in its
-blueprint and have the program write to it; while the machine is
-stopped, that directory is ordinary host state (`rlq get-machine-dir`
-prints the path).
+retrieve detailed output, name a directory-source media (`source` a
+host directory, `materialize: use`) on a machine drive and have the
+program write to it; while the machine is stopped, that directory is
+ordinary host state (`rlq get-machine-dir` prints the path).
 
 ### 5. Inspect the guest
 
@@ -307,9 +314,9 @@ rlq stop-machine --blueprint freedos-1.4-plain
 
 Stopping verifies the VM's recorded identity before closing it and
 flushes guest writes to any virtual FAT drive. QEMU snapshots a
-`hostdir` directory when the drive is attached, so after changing its
-host files, stop and restart the machine before using them in the
-guest.
+directory-source media's directory when the drive is attached, so after
+changing its host files, stop and restart the machine before using them
+in the guest.
 
 ## Command guide
 
@@ -327,7 +334,7 @@ rlq delete-blueprint NAME
 `--blueprint` selects that blueprint's sole machine (or names the blueprint for `create-machine`).
 `--machine` takes the full id (`<blueprint>-<n>`) exactly — no prefix matching and no bare-number form.
 The two selectors are mutually exclusive. Machines live under
-`cache/machines/<blueprint>-<n>/`.
+`cache/machines/<name>-<n>/`.
 `delete-blueprint` removes the home blueprint file and refuses while
 any machine of it still exists.
 
@@ -342,15 +349,18 @@ rlq list-machines --home $scratch
 
 ```text
 rlq list-media [--builtin]
-rlq delete-media NAME
 rlq fetch-media NAME
 rlq clean-downloads
 rlq clean-media
 ```
 
-`list-media` names items in home ``media/`` (or the package codex with
-`--builtin`). `delete-media` removes the home definition for an item
-and refuses while a machine drive still holds it.
+`list-media` names the `media` components resolvable from the active
+source (or the package codex with `--builtin`). `fetch-media` resolves
+a media by name and warms its cached payload. `clean-downloads` and
+`clean-media` reclaim the cached source archives (`cache/archives/`)
+and payloads (`cache/media/`); both are safe — anything with a source
+refetches. (Media are components inside a `.rlqb` now, so there is no
+`delete-media` file operation — edit the blueprint instead.)
 
 ### Keyboard and command input
 
@@ -503,26 +513,26 @@ Install QEMU and put `qemu-system-i386` on `PATH`, set
 
 ### A command cannot find an active VM
 
-Guest-console commands find the running VM through the machine's
-`cache/machines/<id>/vm.json`. Ensure every command uses the same
-`--home` / `RELIQUARY_HOME` and the same machine selector, and that
-`rlq start-machine` completed successfully.
+Guest-console commands find the running VM through the `vm` section of
+the machine's `cache/machines/<id>/machine.json`. Ensure every command
+uses the same `--home` / `RELIQUARY_HOME` and the same machine
+selector, and that `rlq start-machine` completed successfully.
 
 ### The VM identity does not match
 
 reliquary verifies the unique QEMU name and per-start uuid before
 sending any command. An identity error means the recorded port now
 belongs to another process or the state file is stale. The unrelated VM
-is not modified. Review the machine's `vm.json` and `qemu-stderr.log`
-(under `cache/machines/<id>/`; `rlq get-machine-dir` prints the path),
-then start the machine again.
+is not modified. Review the machine's `machine.json` (its `vm` section)
+and its backend `qemu/qemu-stderr.log` (under `cache/machines/<id>/`;
+`rlq get-machine-dir` prints the path), then start the machine again.
 
 ### QEMU exits during startup
 
 The error includes the selected port, QEMU exit status, command line,
-and path to the machine's `qemu-stderr.log`. That log normally contains
-QEMU's reason, such as an invalid device option or an unavailable disk
-image.
+and path to the machine's `qemu/qemu-stderr.log`. That log normally
+contains QEMU's reason, such as an invalid device option or an
+unavailable disk image.
 
 ### Guest-written files are missing
 

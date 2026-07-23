@@ -132,6 +132,33 @@ def _iter_sweep_files():
                     yield os.path.join(dirpath, name)
 
 
+class RetiredMediaDefinitionTests(unittest.TestCase):
+    """The `.rlqm` media-definition file kind is retired tree-wide.
+
+    Media folded into the composed `.rlqb` blueprint (the 2026-07-23
+    media/composition round); no `.rlqm` file survives anywhere in the
+    package, the shipped codex, the examples, or the fixtures. The
+    string may still appear in historical records (CHANGELOG,
+    DECISIONS, completed ROADMAP notes) and design prose that names the
+    retired format — this guards the *files*, not the spelling.
+    """
+
+    def test_no_rlqm_files_survive(self):
+        survivors = []
+        skip_dirs = {".venv", ".git", "__pycache__", "build", "dist"}
+        for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
+            dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+            for name in filenames:
+                if name.endswith(".rlqm"):
+                    survivors.append(
+                        os.path.relpath(os.path.join(dirpath, name),
+                                        _REPO_ROOT))
+        self.assertEqual(
+            survivors, [],
+            "the .rlqm media-definition file kind is retired; "
+            "these files must be removed:\n" + "\n".join(survivors))
+
+
 class OldApiNamesAbsentTests(unittest.TestCase):
     """Superseded package exports are gone, not aliased."""
 

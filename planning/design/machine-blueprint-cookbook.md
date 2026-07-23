@@ -5,17 +5,18 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Machine blueprint — cookbook
 
-> **Status:** examples using only the milestone-1 subset (`platform`,
-> `memory`, `drives` with `size`/`media`, `boot`, `description`,
-> and `scripts`) can now be parsed, validated, and resolved. Machine
-> materialization and the remaining fields are not implemented yet; details
-> may still change before first release.
+> **Status:** examples using the implemented subset (`platform`,
+> `memory`, `drives` naming media, `boot`, `description`, `scripts`,
+> and the `media` components they name) are parsed, validated,
+> resolved, and materialized. The remaining fields may still change
+> before first release.
 
 Complete, working blueprints for common machine shapes. Each
 entry shows the blueprint (what you write) and, where instructive,
-the state document reliquary resolves it into.
-Concepts — including the blueprint/state split — are in
-[the guide](machine-blueprint.md); every rule is in the
+the state document reliquary resolves it into. A drive names a
+**media** component; the media owns its content (see the
+[media spec](media-spec.md)). Concepts — including the blueprint/state
+split — are in [the guide](machine-blueprint.md); every rule is in the
 [field reference](machine-blueprint-reference.md).
 
 Throughout, save the blueprint as `<name>.rlqb` under your asset
@@ -30,8 +31,10 @@ rlq create-machine --blueprint <name>
 
 ## 1. The simplest machine: boot a floppy image
 
-A DOS machine that boots a floppy image from the shared media
-library. One required field plus one drive:
+A DOS machine that boots a floppy image. The `floppy` drive names a
+media component, `msdos622-boot`, resolved from the namespace (a
+sibling `.rlqb`, or a codex media). One required field plus one
+drive:
 
 ```json
 {
@@ -60,7 +63,13 @@ The state after `create` on a host where QEMU was selected:
   "memory": 16,
   "cpus": 1,
   "drives": {
-    "floppy0": {"media": "msdos622-boot"}
+    "floppy0": {
+      "medium": "floppy",
+      "slot": 0,
+      "media": "msdos622-boot",
+      "materialize": "use",
+      "path": "<cache>/media/msdos622-boot.img"
+    }
   },
   "boot": ["floppy0"],
   "control-planes": ["agentless-display"]
@@ -68,8 +77,9 @@ The state after `create` on a host where QEMU was selected:
 ```
 
 Note what resolution did: `floppy` became `floppy0`, the bare
-media name became a `media` object, defaults became explicit
-values, and the state-only fields appeared.
+media name became a full drive entry (medium, slot, the resolved
+`media` and its `materialize` mode, and the realized cache `path`),
+defaults became explicit values, and the state-only fields appeared.
 
 ---
 
@@ -84,19 +94,28 @@ warning:
 
 ```json
 {
-  "platform": "dos",
-  "memory": "32M",
-  "drives": {
-    "hdd": {"size": "20M"},
-    "cdrom": null
-  },
-  "boot": ["hdd", "cdrom"]
+  "machines": [
+    {
+      "name": "freedos-install",
+      "platform": "dos",
+      "memory": "32M",
+      "drives": {
+        "hdd": "blank-20m",
+        "cdrom": null
+      },
+      "boot": ["hdd", "cdrom"]
+    }
+  ],
+  "media": [
+    {"name": "blank-20m", "materialize": "new", "size": "20M"}
+  ]
 }
 ```
 
-rlq creates the hard disk as a 20 MiB dynamically-allocated
-image at the drive's canonical path (`drives/hdd0.qcow2` on QEMU —
-the [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
+The `hdd` drive names the `blank-20m` media — `materialize: new`,
+so rlq creates a 20 MiB dynamically-allocated image at the
+media-keyed path (`media/blank-20m.qcow2` on QEMU — the
+[naming and format](machine-blueprint-reference.md#image-naming-and-formats)
 are reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
@@ -106,74 +125,76 @@ a different order can use the
 [`set-boot`](script-spec.md#set-boot) verb while the machine is
 stopped.
 
-> **Media note:** the installer medium never appears in this
-> blueprint — the empty `cdrom` slot is the convention. The
-> install script inserts it (`insert cdrom0 @freedos-1.4-livecd`)
-> and ejects it as its last act. `freedos-1.4-livecd` names a
-> [media definition](media-spec.md) (`freedos-1.4-livecd.rlqm`
-> with the LiveCD's download URL, archive details, and hashes):
-> every media reference — a blueprint's or a script's — resolves
-> through a definition, fetched and verified on demand. The
-> script may carry that definition in a labeled `media` block,
-> installed into the library before the machine resolves and
-> available to later independent operations.
+> **Media note:** the installer medium never appears on a drive
+> here — the empty `cdrom` slot is the convention. The install
+> script inserts it (`insert cdrom0 @freedos-1.4-livecd`) and
+> ejects it as its last act. `freedos-1.4-livecd` names a
+> [media component](media-spec.md) — a `read-only` `use` media,
+> extracted from an `archive` (the LiveCD's download URL and
+> hashes), carried inside this same `.rlqb` or a sibling in the
+> source. Every media reference — a blueprint's or a script's —
+> resolves against the namespace, fetched and verified on demand.
 
 ---
 
 ## 3. A machine from a starting-point image
 
-Pre-existing content enters a machine as a drive `base` — a
-fixed starting-point image the drive's own image is materialized
-from. A test rig booting a writable instance of an installed DOS
-image:
+Pre-existing content enters a machine as a **`difference` media** —
+a fixed payload the drive's own image is materialized over. A test
+rig booting a writable instance of an installed DOS image:
 
 ```json
 {
-  "platform": "dos",
-  "drives": {
-    "hdd": {"base": "dos622-installed"}
-  }
+  "machines": [
+    {"name": "dos-rig", "platform": "dos",
+     "drives": {"hdd": "dos622-installed"}}
+  ],
+  "media": [
+    {"name": "dos622-installed", "materialize": "difference",
+     "source": {"local": "D:/images/dos622.qcow2"}}
+  ]
 }
 ```
 
-At `create` (or first `start`), the drive is materialized as a
-**differencing disk** backed by the `dos622-installed` media item
-— the default base `type` — so writes land in the difference
-and the base is never written to. `recreate` throws the
-difference away and starts a fresh one, which is as cheap as disk
-creation gets: every run of the rig starts from the same known
-content. There is no way to drop pre-created files into a
-machine's cache directory; a drive that should start with content
-declares where the content comes from.
+At `create` (or first `start`), the `dos622-installed` media
+materializes as a **differencing disk** over its source payload —
+so writes land in the difference and the payload is never written
+to. `recreate` throws the difference away and starts a fresh one,
+which is as cheap as disk creation gets: every run of the rig
+starts from the same known content. There is no way to drop
+pre-created files into a machine's cache directory; a media
+declares where its content comes from.
 
 Because every machine's difference is private, many machines can
-share one large installed base, each paying only for its own
+share one large installed payload, each paying only for its own
 writes — the fan-out pattern differencing exists for.
 
 ---
 
-## 4. Duplicating a base instead
+## 4. Copying a payload instead
 
 Differencing is a backend/format capability (qcow2 backing files,
 VHDX differencing disks, VMDK linked clones, VDI differencing); a
-backend that cannot difference against the base fails the
-capability check rather than silently copying. The `base` object
-form's `type` field selects a full independent duplicate instead
+backend that cannot difference against the payload fails the
+capability check rather than silently copying. A media's
+`materialize: copy` selects a full independent duplicate instead
 — it works everywhere, converting to the backend's preferred
 format when needed:
 
 ```json
 {
-  "platform": "winnt",
-  "drives": {
-    "hdd": {
-      "base": {"media": "nt4-installed", "type": "duplicate"}
-    }
-  }
+  "machines": [
+    {"name": "nt4-rig", "platform": "winnt",
+     "drives": {"hdd": "nt4-installed"}}
+  ],
+  "media": [
+    {"name": "nt4-installed", "materialize": "copy",
+     "source": {"local": "D:/images/nt4.vhdx"}}
+  ]
 }
 ```
 
-A duplicated drive has no runtime dependency on its base image —
+A copied drive has no runtime dependency on its source payload —
 worth the disk space when the machine's image should stand alone
 (say, ahead of an `export-drive`).
 
@@ -187,17 +208,20 @@ type — settings no other backend understands, so they live under
 
 ```json
 {
-  "platform": "dos",
-  "backend": "qemu",
-  "drives": {
-    "hdd": {"size": "100M"}
-  },
-  "backend-settings": {
-    "qemu": {
-      "machine": "pc",
-      "args": ["-cpu", "486"]
+  "machines": [
+    {
+      "name": "dos-486",
+      "platform": "dos",
+      "backend": "qemu",
+      "drives": {"hdd": "blank-100m"},
+      "backend-settings": {
+        "qemu": {"machine": "pc", "args": ["-cpu", "486"]}
+      }
     }
-  }
+  ],
+  "media": [
+    {"name": "blank-100m", "materialize": "new", "size": "100M"}
+  ]
 }
 ```
 
@@ -217,15 +241,24 @@ defaults do the right thing (64 MiB memory), and the explicit
 
 ```json
 {
-  "platform": "win9x",
-  "memory": "128M",
-  "drives": {
-    "hdd": {"size": "2G"},
-    "cdrom": "win98se"
-  },
-  "boot": ["cdrom", "hdd"]
+  "machines": [
+    {
+      "name": "win98",
+      "platform": "win9x",
+      "memory": "128M",
+      "drives": {"hdd": "blank-2g", "cdrom": "win98se"},
+      "boot": ["cdrom", "hdd"]
+    }
+  ],
+  "media": [
+    {"name": "blank-2g", "materialize": "new", "size": "2G"}
+  ]
 }
 ```
+
+`win98se` names a `use` media the machine carries at rest (a
+non-redistributable ISO — a component with a pinned hash and a
+`source` the user supplies).
 
 > The win9x platform workflow is not implemented yet; the machine
 > can be created and operated at the machine level, but platform
@@ -266,16 +299,26 @@ with its system disk on SCSI and the installer CD on IDE:
 
 ```json
 {
-  "platform": "winnt",
-  "drives": {
-    "hdd": {"size": "4G", "controller": "scsi"},
-    "cdrom": "nt4-install"
-  },
-  "boot": ["cdrom", "hdd"]
+  "machines": [
+    {
+      "name": "nt4",
+      "platform": "winnt",
+      "drives": {
+        "hdd": {"media": "nt4-blank-4g", "controller": "scsi"},
+        "cdrom": "nt4-install"
+      },
+      "boot": ["cdrom", "hdd"]
+    }
+  ],
+  "media": [
+    {"name": "nt4-blank-4g", "materialize": "new", "size": "4G"}
+  ]
 }
 ```
 
-The CD-ROM takes the platform default (`ide`). Omit `controller`
+The object drive form carries the media name plus the
+`controller`. The CD-ROM takes the platform default (`ide`). Omit
+`controller`
 everywhere — as every earlier example does — and you get `ide`
 across the board, which is what DOS-era guests want.
 
@@ -297,20 +340,25 @@ the install script declares the `identity.full-name` and
 
 ```json
 {
-  "platform": "win9x",
-  "drives": {
-    "hdd": {"size": "2G"},
-    "cdrom": null
-  },
-  "boot": ["hdd", "cdrom"],
-  "scripts": {
-    "install": "win98-install",
-    "verify": "win98-verify"
-  },
-  "parameters": {
-    "identity.full-name": "testuser",
-    "os.install-key": {"property": "products.windows-98.install-key"}
-  }
+  "machines": [
+    {
+      "name": "win98",
+      "platform": "win9x",
+      "drives": {"hdd": "blank-2g", "cdrom": null},
+      "boot": ["hdd", "cdrom"],
+      "scripts": {
+        "install": "win98-install",
+        "verify": "win98-verify"
+      },
+      "parameters": {
+        "identity.full-name": "testuser",
+        "os.install-key": {"property": "products.windows-98.install-key"}
+      }
+    }
+  ],
+  "media": [
+    {"name": "blank-2g", "materialize": "new", "size": "2G"}
+  ]
 }
 ```
 

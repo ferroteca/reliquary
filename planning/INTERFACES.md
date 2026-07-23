@@ -22,10 +22,9 @@ reliquary meets the world through its primary interfaces:
 2. **The embedding API** — native language bindings (Python is
    the first).
 3. **The scripting language** — `.rlqs` scripts.
-4. **The machine blueprint** — the authored machine-definition
-   document.
-5. **The media definition** — the authored media-acquisition
-   document.
+4. **The machine blueprint** — the authored `.rlqb` document: the
+   machine and the `media`, `source`, and `archive` components it
+   draws on.
 
 They are deliberately not independent designs. The CLI and
 the API are two presentations of one semantic surface: every
@@ -36,12 +35,13 @@ to the surface lands on both in the same change, never deferred —
 and this parity is a required invariant (AGENTS.md). The
 scripting language sits above both — invoked through either — and
 is deliberately non-computational, so that anything computational
-belongs to the API (language goal G2). The two document formats
-are authored directly in an editor and consumed through every
-other surface: the CLI and API resolve and materialize
-blueprints, and scripts reference media definitions and landmark
-declarations, which are authored files of their own — a script
-carries no JSON. A capability that appears
+belongs to the API (language goal G2). The authored blueprint
+format is written directly in an editor and consumed through every
+other surface: the CLI and API resolve and materialize blueprints
+(their media, source, and archive components included), scripts
+reference media by name, and landmark declarations are authored
+files of their own — a script carries no JSON. A capability that
+appears
 on one surface appears on the others wherever it is meaningful;
 where it does not, the omission is a named decision, not drift.
 
@@ -101,22 +101,20 @@ reference material.
 ### The machine blueprint
 
 A blueprint is a reusable, user-owned JSON description of a kind
-of machine: authored directly in an editor, seeded out of the
-codex, or synthesized from a native VM by `import-vm` —
+of machine, composed of named `machine`, `media`, `source`, and
+`archive` components: authored directly in an editor, seeded out of
+the codex, or synthesized from a native VM by `import-vm` —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
-customization (U5). Specification:
+customization (U5). Its `media` components name installation media
+and pin it: where a payload may be acquired, and the hashes that
+verify the exact build the scripts target — what lets a repository
+refer precisely to media it cannot distribute (U4). Specification:
 [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its
-[reference](design/machine-blueprint-reference.md) and
-[cookbook](design/machine-blueprint-cookbook.md).
-
-### The media definition
-
-A media definition names installation media and pins it: where a
-payload may be acquired, and the hashes that verify the exact
-build the scripts target. Hash-pinned definitions are what let a
-repository refer precisely to media it cannot distribute (U4).
-Specification: [planning/design/media-spec.md](design/media-spec.md).
+[reference](design/machine-blueprint-reference.md),
+[cookbook](design/machine-blueprint-cookbook.md), and the
+[media spec](design/media-spec.md) for the media, source, and
+archive components.
 
 ## Supporting world-facing contracts
 
@@ -221,7 +219,7 @@ Every approved change then lands the same way:
 | Embedding API | [planning/design/api.md](design/api.md); the implemented binding in [docs/api-reference.md](../docs/api-reference.md) |
 | Scripting language | [planning/design/script-spec.md](design/script-spec.md) |
 | Blueprints | [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its [reference](design/machine-blueprint-reference.md) and [cookbook](design/machine-blueprint-cookbook.md) |
-| Media definitions | [planning/design/media-spec.md](design/media-spec.md) |
+| Media / source / archive components | [planning/design/media-spec.md](design/media-spec.md) |
 | Script properties | [planning/design/script-properties.md](design/script-properties.md) |
 | The codex | [planning/design/codex.md](design/codex.md) |
 | Home / machines | [planning/design/instance-model.md](design/instance-model.md) |

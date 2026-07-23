@@ -39,7 +39,7 @@ Each reliquary home has one user properties file:
 
 It belongs to the user, not to a machine or script. Changing homes selects
 different properties. Reliquary never copies property values into a machine
-blueprint, script, or media definition.
+blueprint or script.
 
 An absent file means no properties. The first successful `set-property`
 creates it; reading or running an unrelated script does not.
@@ -323,7 +323,7 @@ collision among consulted keys is reported naming both keys.
 Binding failures identify the declared property key, then state
 whether it is unanswered, has the wrong kind, lacks its secret
 credential, or cannot be accessed through a secure host store. All such
-failures occur during preflight, before a media definition is installed or a
+failures occur during preflight, before a media is materialized or a
 machine is created or started.
 
 ## Sharing

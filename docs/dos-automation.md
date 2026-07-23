@@ -11,23 +11,26 @@ reliquary provides agentless automation for DOS guests through QEMU. No guest ag
 
 - **Input** is sent as keyboard events through QEMU's control protocol
 - **Output** is read directly from VGA text memory, without OCR
-- **Files** are exchanged out-of-band through a `hostdir` drive (a host
-  directory served as a virtual FAT drive)
+- **Files** are exchanged out-of-band through a directory-source
+  media (a host directory served as a virtual FAT drive)
 - **Command completion** is detected by watching for the DOS prompt
 - **Screenshots** are captured through QEMU
 
 ## Declaring the machine
 
 A machine's platform, memory, boot order, and drives are declared in its
-blueprint (`<name>.rlqb`) — see the [blueprint guide](blueprint-guide.md)
-and the [field reference](../planning/design/machine-blueprint-reference.md).
-A drive's content comes from one of four sources: a blank `size` disk, an
-attached `media` payload, a `base` image (differenced or duplicated), or
-a `hostdir` host directory. `platform` must be `dos`; memory defaults to
-16 MB; the boot order defaults to the slot-0 floppy, else the slot-0 hard
-disk, else the first cdrom.
+blueprint (`<name>.rlqb`) — see the [blueprint guide](blueprint-guide.md),
+the [field reference](../planning/design/machine-blueprint-reference.md),
+and the [media spec](../planning/design/media-spec.md). A drive names a
+**media** by name; the media owns its content — `materialize: new` for a
+blank disk of `size`, `difference`/`copy` over a payload, or `use` to
+attach a payload (an ISO, or a host directory served as vvfat).
+`platform` must be `dos`; memory defaults to 16 MB; the boot order
+defaults to the slot-0 floppy, else the slot-0 hard disk, else the first
+cdrom.
 
-To hand the guest its own programs, declare a `hostdir` drive: its host
+To hand the guest its own programs, declare a media whose `source` is a
+host directory with `materialize: use`, and name it from a drive: that
 directory *is* the drive, readable and writable while the machine is
 stopped.
 
@@ -46,9 +49,9 @@ rlq exec "myprog.exe > result.log" --blueprint my-dos
 rlq stop-machine --blueprint my-dos
 ```
 
-If `my-dos` declares a `hostdir` drive, `result.log` is in that host
-directory once the machine stops (`rlq get-machine-dir` prints the
-machine directory).
+If `my-dos` names a directory-source media on a drive, `result.log` is
+in that host directory once the machine stops (`rlq get-machine-dir`
+prints the machine directory).
 
 ## Python API
 

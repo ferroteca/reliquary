@@ -5,9 +5,10 @@ tests, and code changes are welcome when they preserve the project's BSD
 licensing and its role as a self-contained OS installation scripter
 with an agentless QEMU guest automation layer.
 
-reliquary is pre-release. Contributions that add built-in blueprints,
-media definitions, or scripts should follow the repository structure in
-AGENTS.md and keep user-facing documentation synchronized.
+reliquary is pre-release. Contributions that add built-in blueprints
+(with their media, source, and archive components) or scripts should
+follow the repository structure in AGENTS.md and keep user-facing
+documentation synchronized.
 
 ## Before you start
 
@@ -66,13 +67,13 @@ holder and identifying third-party material and its license. Contributions
 that would prevent reliquary from being used or distributed under its existing
 BSD-3-Clause license cannot be accepted.
 
-Codex media definitions follow an additional
-top-priority rule: a definition may include a download `url` only
-together with an explicit assertion that the media's own
+Codex media components follow an additional
+top-priority rule: a media (or its `source`) may include a download
+`url` only together with an explicit assertion that the media's own
 licensing permits redistribution (see planning/design/codex.md).
-Changes that add or alter URLs in built-in media definitions
-without that assertion cannot be accepted; definitions for
-non-redistributable media ship hashes only.
+Changes that add or alter URLs in built-in media without that
+assertion cannot be accepted; media for non-redistributable payloads
+ship hashes only.
 
 Use accurate SPDX copyright information in each new file:
 

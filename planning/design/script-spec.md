@@ -54,7 +54,8 @@ them — with one named exception: the authoring recorder's opt-in
 fragment apply (U6; [planning/ROADMAP.md](../ROADMAP.md), "Script authoring
 by recording") inserts a captured fragment at its playback anchor
 and touches no other byte. They belong in version control beside
-the machine blueprints and media definitions on which they depend.
+the machine blueprints (media components and all) on which they
+depend.
 
 ## The language model
 
@@ -145,7 +146,7 @@ tiers:
   [syntactic restrictions](#syntactic-restrictions) (S-ids).
   Violations are STATIC ERRORs.
 - **Machine rules** — need something beyond the text in scope:
-  the visible media catalog, the filesystem, a machine or
+  the media namespace, the filesystem, a machine or
   blueprint, explicit property values. Capability preflight, slot
   and drive existence, property binding, and media reconciliation
   live here ([validation and preflight](#validation-and-preflight)).
@@ -205,7 +206,7 @@ Every token class has one spelling:
 | bare word | keyword or script-internal name | `phase`, `goto formatting`, `cdrom0`, `press enter`, the `stopped` in `machine=stopped` |
 | `"..."` | literal text crossing the guest boundary | `wait "C:\>"`, `enter "fdapm poweroff"` |
 | `/.../` | regex match | `wait /[0-9]+ files copied/` |
-| `@name` | external reference, resolved from the library | `insert cdrom0 @freedos-1.4-livecd` |
+| `@name` | external reference, resolved from the media namespace | `insert cdrom0 @freedos-1.4-livecd` |
 | `$key` | a declared property's bound value | `insert floppy1 $supplemental-disk` |
 | `name=value` | modifier of the node it follows | `timeout=5m`, `machine=stopped`, `exclude="with sources"` |
 | `5m`, `500ms` | duration | `wait machine=stopped timeout=2m` |
@@ -256,10 +257,10 @@ never expanded inside a regex.
 
 ### References
 
-`@name` references a media item by its catalog name; it resolves
-through the shared media library — definitions are authored
-`.rlqm` files resolved beside the script or in the home, never
-carried in the script. `$key` references a declared
+`@name` references a media by name; it resolves through the
+blueprint namespace — the `media` components across the `.rlqb`
+files in the active source, never carried in the script. `$key`
+references a declared
 [property](#properties) and must stand alone
 as a whole argument; inside strings the braced form `${key}` is
 used instead, and dotted keys are valid in both forms. The
@@ -285,10 +286,11 @@ does not use a block: it attaches either a raw triple-quoted body
 or a `from=` source file whose lines are served as an installer
 answer file
 ([http-serve.md](http-serve.md)). A script carries no JSON: media
-definitions and landmark declarations are authored files of their
-own, resolved beside the script (planning/ROADMAP.md,
-"Authored-asset resolution"), and answer files are `content`
-entries with inline or file-backed bodies.
+travel as `media` components in the blueprint and landmark
+declarations are authored files of their own, resolved from the
+active source (planning/ROADMAP.md, "Authored-asset resolution"),
+and answer files are `content` entries with inline or file-backed
+bodies.
 
 A typing layer over the node shape supplies the rest of the
 language definition:
@@ -812,7 +814,7 @@ a blueprint that fixes its user name as
 "testuser" keeps it fixed on every machine of it — while an
 explicit `--property` overrides even the design for one run
 (U5). A media value is resolved after binding, and a
-media ask lists the library names valid
+media ask lists the media names valid
 for that property.
 
 Ordinary properties are strings. Secret properties keep only a
@@ -1483,8 +1485,8 @@ The language deliberately has no file-exchange verbs (owner,
 caller's side of the seam, like every interpretation of what a
 run produced (G2): while a machine is stopped on every control
 plane, its drives are plain host state — a
-[`hostdir`](machine-blueprint-reference.md#hostdir--optional--string)
-drive *is* its directory, and drive images are readable and
+[directory-source (`hostdir`) media](media-spec.md#the-media-component)
+*is* its directory, and drive images are readable and
 writable with the user's own tools — so exchange is ordinary
 out-of-band host work against the machine directory
 (`get-machine-dir` reports it; contract in
@@ -1527,8 +1529,8 @@ Parsing and static validation enforce the legality rules — the
 the script text alone, before the machine starts. With more in
 scope, preflight further rejects, naming what it needed:
 
-- media references (`@name`) naming no item the visible catalog
-  defines (the visible catalog);
+- media references (`@name`) naming no media the namespace
+  defines (the media namespace);
 - `insert`/`eject` slots and `set-boot` drives the target
   machine does not declare (a machine);
 - explicit `--property` keys the running script does not declare,
@@ -1875,14 +1877,12 @@ anyway while the CD remains attached).
 
 ## Sharing
 
-A shareable blueprint/script bundle consists of its script, machine
-blueprint, the media definitions and landmark declarations it
-references, and optionally an
-example properties file containing only non-sensitive illustrative
-values. Every authored asset is a file of its own — a script
-carries none of them — so a bundle is a small set of files beside
-each other rather than a single document. Definitions reused
-by several scripts are shared exactly the same way.
+A shareable blueprint/script bundle consists of its script, the
+machine blueprint (its media, source, and archive components ride
+inside it), and the landmark declarations it references, plus
+optionally an example properties file containing only non-sensitive
+illustrative values. A script carries no JSON, so a bundle is a
+small set of files beside each other rather than a single document.
 The user's own properties file, secret values, and
 host payload files exchanged with machines stay out of the
 bundle and version control. A script's declarations name its property keys, but every

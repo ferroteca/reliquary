@@ -85,8 +85,8 @@ extraction.
   capabilities — and capability failures name the backend and the
   requirement.
 - **Materialize and dispose.** The adapter owns drive-image
-  creation in its backend's native format — blank `size` drives
-  and `difference` drives alike (qcow2 under QEMU; VDI/VMDK/VHDX
+  creation in its backend's native format — `new` and
+  `difference` media alike (qcow2 under QEMU; VDI/VMDK/VHDX
   and native differencing elsewhere; the blueprint reference makes
   the format reliquary's per-backend choice) — plus whatever
   registration the backend requires, with every backend file kept
@@ -124,7 +124,7 @@ extraction.
   escape hatch — today `Machine.qmp()` / `hmp`, always explicitly
   backend-scoped, never generalized. (Extraction: `machine.py`'s
   `char_keys` / `send_keys`, `screenshot`, `vga_screen`.)
-- **Ownership.** The vm.json doctrine, generalized (below).
+- **Ownership.** The recorded-VM-identity doctrine, generalized (below).
 
 ## The text-screen contract
 
@@ -148,9 +148,10 @@ except "equal tokens mean identically rendered cells".
 
 ## The ownership doctrine
 
-The vm.json doctrine, generalized to every backend: the
-materialization records an identity — the backend, the backend's
-own machine identifier (`backend-id`: QEMU's per-start `-uuid`
+The recorded-VM-identity doctrine, generalized to every backend:
+the machine's `vm` state section records an identity — the
+backend, the backend's own machine identifier (`backend-id`:
+QEMU's per-start `-uuid`
 with its readable name, a VirtualBox machine UUID, a `.vmx` path,
 a Hyper-V VM Id), a per-start token where the carrier is an
 addressable endpoint that outlives its owner (a QMP port is

@@ -30,8 +30,8 @@ and amendments are made deliberately and recorded here.
   and the blueprint and install recipe are easy to find, point
   to, and use. From a clean home this is one short command
   (`rlq run-script install --blueprint freedos-1.4-plain`): the
-  codex seeds the blueprint, media definition, and
-  scripts; media is fetched and hash-verified; the script drives
+  codex seeds the blueprint (its media included) and scripts;
+  media is fetched and hash-verified; the script drives
   the installer end to end — menus, partitioning, reboots, media
   swaps — until the guest is installed.
 - **U2 — Import an existing VM as a blueprint.** A user has
@@ -41,10 +41,10 @@ and amendments are made deliberately and recorded here.
   Import reads only a source at rest — a running or suspended
   source VM fails closed naming its state — and the captured
   disk image stays where the native hypervisor keeps it: import
-  points a generated media definition at it and never copies,
-  moves, or modifies it; a user who wants the image somewhere
-  more durable moves it and repoints the definition, which is
-  theirs. Two decision points are presented, never defaulted.
+  points a generated `media` component — a `local` source
+  inside the blueprint — at it and never copies, moves, or
+  modifies it; a user who wants the image somewhere more durable
+  moves it and repoints that media, which is theirs. Two decision points are presented, never defaulted.
   First, whether to take a native snapshot — the one thing
   import may do to the source VM, and only with this consent:
   snapshotted, the blueprint pins the frozen extent and the
@@ -89,7 +89,7 @@ and amendments are made deliberately and recorded here.
   tested in the work environment — it needs a VM, perhaps running
   a proprietary OS like Windows. The test machine must be
   precisely defined, yet nothing proprietary can be distributed:
-  the repository carries only blueprints, media definitions, and
+  the repository carries only blueprints (media included) and
   reliquary scripts. Another developer picks up the work
   supplying just the two things the repository cannot provide —
   the Windows install ISO and its license — and the checked-in
@@ -172,9 +172,9 @@ reliquary home are a convenience for human CLI interaction: users
 get a convenient home for shared assets — blueprints, media
 definitions, and scripts reused across human-interaction
 scenarios — seeded by the codex (U1, U5). The other side of the
-coin: for automation, media definitions, scripts, blueprints,
-and landmark assets are source code artifacts — they belong to
-the consuming project, live in its source control, and never
+coin: for automation, scripts, blueprints, and landmark assets
+are source code artifacts — they belong to the consuming
+project, live in its source control, and never
 live in reliquary's home (U3, U4). The codex is *never* used for machine
 automation — that would be a trap: a blueprint changing outside
 the project's source control breaks the project. For automation
