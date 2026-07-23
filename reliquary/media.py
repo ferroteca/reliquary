@@ -63,7 +63,7 @@ def _clean(cache):
             os.remove(entry.path)
 
 
-def clean_downloads(context=None):
+def clean_archives(context=None):
     """Delete all cached source archives (``cache/archives/``)."""
     _clean(archives_cache_dir(context))
 

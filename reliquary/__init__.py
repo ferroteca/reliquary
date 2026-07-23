@@ -5,8 +5,8 @@
 from .blueprint import delete_blueprint, new_blueprint
 from .cli import main
 from .document import Document, load_document, parse_document
-from .home import (HOME_ASSETS, Context, blueprints_dir, cache_dir,
-                   documents_dir, downloads_cache_dir, home,
+from .home import (HOME_ASSETS, Context, archives_cache_dir,
+                   blueprints_dir, cache_dir, documents_dir, home,
                    machines_cache_dir, media_cache_dir, media_dir,
                    scripts_dir, set_assets, set_cache, set_home)
 from .interaction import GuestExec
@@ -24,7 +24,7 @@ from .machines import (apply_blueprint, create, create_machine,
                        recreate_machine, resolve_machine, set_boot_order,
                        start_machine,
                        stop_machine)
-from .media import (fetch_media, clean_downloads, clean_media,
+from .media import (fetch_media, clean_archives, clean_media,
                     delete_media, list_media)
 from .resolve import load_namespace
 from .properties import (get_property, set_property, unset_property,
@@ -64,12 +64,12 @@ __all__ = [
     "eject_media",
     "get_machine_dir",
     "insert_media",
+    "archives_cache_dir",
     "blueprints_dir",
     "cache_dir",
-    "clean_downloads",
+    "clean_archives",
     "clean_media",
     "documents_dir",
-    "downloads_cache_dir",
     "find_qemu",
     "find_qemu_img",
     "get_property",

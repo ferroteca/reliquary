@@ -430,11 +430,11 @@ Both payloads and archives are caches — anything with a source can
 be rebuilt from its mirrors — and each has its own clean command:
 
 ```text
-rlq clean-downloads
+rlq clean-archives
 rlq clean-media
 ```
 
-- `clean-downloads` deletes cached source archives (under
+- `clean-archives` deletes cached source archives (under
   `cache/archives/`). Always safe: archives exist only to spare a
   re-download.
 - `clean-media` deletes payload files reliquary can fetch again —
@@ -444,7 +444,7 @@ rlq clean-media
 
 To reclaim everything for a media reliquary can restore, run both;
 the next reference fetches it fresh. The API counterparts are
-`clean_downloads(context=None)` and `clean_media(context=None)`.
+`clean_archives(context=None)` and `clean_media(context=None)`.
 
 ## Sharing
 

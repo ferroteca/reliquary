@@ -158,7 +158,7 @@ blueprint that defines the media. (To reclaim a cached payload, use
 Resolve a media by name and fetch and verify its payload into the
 cache.
 
-### `rlq clean-downloads` / `rlq clean-media`
+### `rlq clean-archives` / `rlq clean-media`
 
 Reclaim the cached source archives (`cache/archives/`) or the
 cached media payloads (`cache/media/`).

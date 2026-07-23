@@ -154,6 +154,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file — `launch_owned_qemu` returns the identity and `machines.py`
   persists it. Cached source archives move from `cache/downloads/` to
   `cache/archives/`.
+- The cache-reclaim command `clean-downloads` and its API twin
+  `clean_downloads()` are renamed `clean-archives` / `clean_archives`,
+  matching the `cache/archives/` cache they reclaim and the composed
+  model's `archive` components. No backward-compatible alias (pre-beta).
 - **One published schema.** The blueprint and media-definition JSON
   Schemas collapse into a single `reliquary/schemas/blueprint-schema-v1.json`
   (packaged, versioned v1 so editors can bind it); `.rlqm` retires.
@@ -195,6 +199,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Whether a codex definition may carry a `url` is now a maintainer
   discipline (the codex may only link to legally redistributable
   downloads), not a per-definition field.
+- The dead `downloads_cache_dir` path helper (`Context` method and
+  module twin) — a leftover pointer at the retired `cache/downloads/`.
+  Its live counterpart `archives_cache_dir` (`cache/archives/`) is now
+  exported from the package root in its place.
 
 ## 0.1.0.dev1 - 2026-07-22
 

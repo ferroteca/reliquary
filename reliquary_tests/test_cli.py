@@ -691,10 +691,10 @@ class CliMachineLifecycleTests(unittest.TestCase):
         send.assert_called_once_with(
             [["ret"], ["ctrl", "c"]], 1234)
 
-    def test_clean_downloads(self):
-        with mock.patch("reliquary.cli.clean_downloads") as clean, \
+    def test_clean_archives(self):
+        with mock.patch("reliquary.cli.clean_archives") as clean, \
                 contextlib.redirect_stdout(io.StringIO()):
-            result = cli.main(["clean-downloads", "--home", self.home])
+            result = cli.main(["clean-archives", "--home", self.home])
         self.assertEqual(result, 0)
         clean.assert_called_once_with()
 

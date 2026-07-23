@@ -160,7 +160,7 @@ carries the exceptions and each family's contract home.
 | `run delete` | `delete_run()` | script spec |
 | `begin-run` / `end-run` | `begin_run()` (returns the run number) / `end_run()` — the interaction-run bracket: an ordinary run record whose driver is the caller | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
-| `clean-downloads` / `clean-media` | `clean_downloads()` / `clean_media()` | media spec |
+| `clean-archives` / `clean-media` | `clean_archives()` / `clean_media()` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the door to out-of-band file exchange (in-band file operations are deferred: planning/ROADMAP.md "Horizon") | [instance model](instance-model.md) |
 | `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [ROADMAP "The CLI"](../ROADMAP.md); each noun's returns: that noun's spec, as they land |

@@ -51,7 +51,7 @@ results belongs to the caller.
   `set_assets(dir)` set the process-global; the CLI sets it from
   `--assets` (home mode when absent).
 - Path helpers, each accepting `context=None`: `blueprints_dir`,
-  `media_dir`, `scripts_dir`, `cache_dir`, `downloads_cache_dir`,
+  `media_dir`, `scripts_dir`, `cache_dir`, `archives_cache_dir`,
   `media_cache_dir`, and `machines_cache_dir`.
 
 All state lives under the home, except the regenerable cache,
@@ -154,9 +154,9 @@ survive stop/start:
   `.rlqb`; deleting a shared component is not a file operation, so
   this raises `NotImplementedError` pointing at editing the
   blueprint. CLI twin: `delete-media`.
-- `clean_downloads(context=None)` / `clean_media(context=None)` -
+- `clean_archives(context=None)` / `clean_media(context=None)` -
   Reclaim the cached source archives (`cache/archives/`) and cached
-  payloads (`cache/media/`). CLI twins: `clean-downloads`,
+  payloads (`cache/media/`). CLI twins: `clean-archives`,
   `clean-media`.
 
 ## Scripts and runs

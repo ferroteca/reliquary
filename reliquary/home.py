@@ -201,9 +201,6 @@ class Context:
     def scripts_dir(self):
         return os.path.join(self.home_dir(), "scripts")
 
-    def downloads_cache_dir(self):
-        return os.path.join(self.cache_dir(), "downloads")
-
     def archives_cache_dir(self):
         return os.path.join(self.cache_dir(), "archives")
 
@@ -246,11 +243,6 @@ def scripts_dir(context=None):
 def cache_dir(context=None):
     """Return the regenerable-cache root under the effective context."""
     return _ctx(context).cache_dir()
-
-
-def downloads_cache_dir(context=None):
-    """Return the cached source-archive directory under the context."""
-    return _ctx(context).downloads_cache_dir()
 
 
 def archives_cache_dir(context=None):

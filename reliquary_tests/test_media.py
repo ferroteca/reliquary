@@ -63,7 +63,7 @@ class MediaModuleTests(unittest.TestCase):
                 with open(os.path.join(cache, "junk"), "wb") as handle:
                     handle.write(b"x")
             media.clean_media(ctx)
-            media.clean_downloads(ctx)
+            media.clean_archives(ctx)
             self.assertEqual(os.listdir(media_cache_dir(ctx)), [])
             self.assertEqual(os.listdir(archives_cache_dir(ctx)), [])
 

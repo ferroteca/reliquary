@@ -31,7 +31,7 @@ workflow:
   (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,
   on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the `cache/archives/` and
   `cache/media/` caches, attaching a `local` source in place, `media.py` is acquisition-only — `fetch_media(name,
-  context, on_mismatch)` and `list_media` over the namespace, `clean_downloads` / `clean_media`, and `delete_media`
+  context, on_mismatch)` and `list_media` over the namespace, `clean_archives` / `clean_media`, and `delete_media`
   (a `NotImplementedError` pointing at editing the blueprint, since media are components inside a `.rlqb` now),
   `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;

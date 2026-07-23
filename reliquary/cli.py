@@ -31,7 +31,7 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
                        recreate_machine, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
-from .media import (fetch_media, clean_downloads, clean_media,
+from .media import (fetch_media, clean_archives, clean_media,
                     delete_media, list_media)
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
@@ -54,7 +54,7 @@ _COMMANDS = frozenset({
     "get-property", "set-property", "unset-property",
     "list-properties", "import-vm", "list-blueprints",
     "list-machines", "list-scripts", "list-media",
-    "delete-media", "clean-downloads",
+    "delete-media", "clean-archives",
     "clean-media", "insert-media", "eject-media", "set-boot-order",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
@@ -386,7 +386,7 @@ def main(argv=None):
 
     # clean-*
     command = subcommands.add_parser(
-        "clean-downloads", help="reclaim cached source archives")
+        "clean-archives", help="reclaim cached source archives")
     _add_home(command)
 
     command = subcommands.add_parser(
@@ -807,9 +807,9 @@ def _import_vm(arguments):
     raise NotImplementedError("import-vm is not yet implemented")
 
 
-def _clean_downloads(arguments):
-    clean_downloads()
-    return _emit(arguments, {}, lambda: print("cleaned downloads cache"))
+def _clean_archives(arguments):
+    clean_archives()
+    return _emit(arguments, {}, lambda: print("cleaned archives cache"))
 
 
 def _clean_media(arguments):
@@ -886,8 +886,8 @@ def _dispatch(arguments):
         return _list_media(arguments)
     if arguments.command == "delete-media":
         return _delete_media(arguments)
-    if arguments.command == "clean-downloads":
-        return _clean_downloads(arguments)
+    if arguments.command == "clean-archives":
+        return _clean_archives(arguments)
     if arguments.command == "clean-media":
         return _clean_media(arguments)
     if arguments.command == "insert-media":

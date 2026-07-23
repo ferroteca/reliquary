@@ -189,7 +189,7 @@ dependency order:
   QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
   specific floppy image mounted; QEMU machine #4 with 16 MB of
   memory and a specific cdrom mounted
-- CLI clean, beyond the settled clean-downloads / clean-media
+- CLI clean, beyond the settled clean-archives / clean-media
   invariants: delete completely unreferenced media? all
   downloads? unreferenced only? (machine-cache cleaning is an
   open decision in ROADMAP "Decisions still needed")

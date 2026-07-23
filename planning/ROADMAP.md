@@ -663,7 +663,7 @@ rlq get-property <key>
 rlq set-property <key> <value>
 rlq set-property <key> --secret
 rlq unset-property <key>
-rlq clean-downloads
+rlq clean-archives
 rlq clean-media
 ```
 
@@ -726,7 +726,7 @@ Lifecycle semantics:
   complete binding for programs. Every property command accepts
   `--properties <path>`, maintaining a selected file in place of
   the home's `user.properties`.
-- `clean-downloads` / `clean-media` reclaim the two caches:
+- `clean-archives` / `clean-media` reclaim the two caches:
   cached source archives, and payload files reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
   payloads without a download source) is cleanable.
@@ -1880,7 +1880,7 @@ Deliverables:
    archive-level `local-path`,
    sourceless definitions failing resolution naming the
    definition to edit), API parity for the media commands
-   (`fetch_media(script=)`, `clean_downloads()`,
+   (`fetch_media(script=)`, `clean_archives()`,
    `clean_media()`), and the codex teaching comments at
    blueprint seams.
 

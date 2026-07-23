@@ -350,13 +350,13 @@ rlq list-machines --home $scratch
 ```text
 rlq list-media [--builtin]
 rlq fetch-media NAME
-rlq clean-downloads
+rlq clean-archives
 rlq clean-media
 ```
 
 `list-media` names the `media` components resolvable from the active
 source (or the package codex with `--builtin`). `fetch-media` resolves
-a media by name and warms its cached payload. `clean-downloads` and
+a media by name and warms its cached payload. `clean-archives` and
 `clean-media` reclaim the cached source archives (`cache/archives/`)
 and payloads (`cache/media/`); both are safe — anything with a source
 refetches. (Media are components inside a `.rlqb` now, so there is no

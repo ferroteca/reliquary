@@ -1079,7 +1079,7 @@ win98se                 Windows 98 SE OEM installation ISO       yes
 ```
 rlq fetch-media <media_name>
     [--progress <mode>] [--on-mismatch (fail | refetch)]
-rlq clean-downloads
+rlq clean-archives
 rlq clean-media
 ```
 
@@ -1107,7 +1107,7 @@ would be its own named growth if real use demands one).
 rlq fetch-media freedos-1.4-livecd
 ```
 
-`clean-downloads` reclaims cached source archives under
+`clean-archives` reclaims cached source archives under
 `cache/archives/`. `clean-media` reclaims fetched payload files
 under `cache/media/` that reliquary can re-fetch. Nothing
 irreplaceable — `local` source files, sourceless payloads — is
@@ -1115,7 +1115,7 @@ cleanable. (There is no `delete-media`: media are components inside
 a `.rlqb`, so removing one means editing the blueprint.)
 
 ```powershell
-rlq clean-downloads
+rlq clean-archives
 rlq clean-media
 ```
 
