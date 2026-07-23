@@ -17,7 +17,7 @@ popular open source operating systems, so the common case is one
 command from a clean home:
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 ```
 
 That single command extracts the blueprint (its media ride inside
@@ -127,13 +127,41 @@ media the scripts were built for (see
 
 ## Naming conventions
 
+**The codex is a launching point, never a version library.**
+Entries are named for the system, not the release — `openbsd`,
+`freedos` — and no codex name ever carries a version. Each entry
+tracks one current release *inside* the file (the source
+component's URL and hash); a codex version bump is a content
+update under an unchanged name, reaching new seeds only — the
+never-overwrite rule keeps every existing copy yours. Pinned
+vintages, concurrent versions, and variants are user and
+project territory: seed the generic entry, rename your copy,
+make it real. Scripts are named for the flow they drive, not a
+release — a well-authored install script spans versions by
+watching stable prompts and branching on observed divergence
+(script-spec), and its supported span is legible in its own
+handlers.
+
+The contract stops there, deliberately. Each entry keeps its
+version *control points* nominal and legible where that is
+easy — the source component's URL and hash sit adjacent, one
+component, and a codex blueprint's seam comments point at them —
+because version churn is a fact and turning those two knobs is
+the supported move. But the codex never promises a
+comprehensive, guaranteed-working matrix of systems and
+versions — that set is unboundable. An entry is tested as
+shipped, against the one release it tracks; a bumped copy is
+the user's experiment, aided by everything that fails closed —
+hash verification, script waits timing out at the exact
+divergence point — and warranted by nothing.
+
 Codex artifacts follow a convention that ties them together by
 blueprint and script:
 
 | artifact | pattern | example |
 |---|---|---|
-| blueprint | `<name>.rlqb` | `freedos-1.4-plain.rlqb` |
-| script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
+| blueprint | `<name>.rlqb` | `freedos.rlqb` |
+| script | `<blueprint>-<script-id>.rlqs` | `freedos-install.rlqs` |
 
 Media are components inside the blueprint, not files of their own,
 so they carry component *names* rather than filenames: conventionally
@@ -150,6 +178,6 @@ A blueprint may declare a `scripts` map — short labels naming
 fields for discovery (see the
 [field reference](machine-blueprint-reference.md)). The labels are
 the verbs you use with `run-script`:
-`rlq run-script install --blueprint freedos-1.4-plain` looks up
+`rlq run-script install --blueprint freedos` looks up
 `scripts.install` and runs the script it names, creating a machine
 first when the blueprint has none.

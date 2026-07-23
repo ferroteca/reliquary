@@ -20,7 +20,8 @@ run-specific answers. A script [declares its
 properties](script-spec.md#properties); every source that can
 answer speaks the same keys: the caller's explicit `--property`
 values, the blueprint's designed parameters, the environment, the
-user properties file, and finally an interactive ask (the
+user properties file, the script's declared derivation, and
+finally an interactive ask (the
 flattened order is
 normative in the [script
 spec](script-spec.md#the-property-sources)). This document owns
@@ -148,6 +149,19 @@ document owns the operator-side mechanics:
   file can reach it. Ordinary values, secret markers, and the
   kind rules live at this source — the ephemeral sources above
   hold direct values only.
+- **The declared derivation** — the script's own computed
+  answer: a declaration's `default=` candidates, tried in
+  declaration order, each resolved in the script language's
+  reference grammar over literal text, other declared keys, and
+  the `rlq.*` system facts (the catalog below). The first
+  candidate whose references all bind answers the key — a
+  literal default always answers, so declaring one is opting to
+  stop here — and a key no candidate answers falls through to
+  the ask. Derivations are recorded like any source:
+  `check-script` and transcripts name the supplying source, so
+  a host-derived value is always auditable, and no hermetic ban
+  applies — a project wanting determinism pins the key in its
+  committed properties file.
 - **Asking** — in an interactive context (a terminal under the
   `auto`/`pretty` progress renderings) the last source asks the
   user (owner, 2026-07-21): one ask per unresolved key per run,
@@ -158,12 +172,96 @@ document owns the operator-side mechanics:
   order exhausts and binding fails during preflight, before the
   machine starts.
 
+The system facts are what the reserved namespaces were held
+for: values Reliquary computes from the host, referenceable in
+derivations and unwritable by any user source. The canonical
+namespace is the short one — `rlq.*`, the name users already
+type — while `reliquary.*` stays reserved and empty, never an
+alias. The initial catalog is deliberately small — each fact's
+derivation is part of its contract:
+
+- `rlq.host.username` — the host login name, normalized
+  to a login-safe form (the per-platform derivation is
+  documented with the implementation).
+- `rlq.host.full-name` — the host account's descriptive
+  name (display name on Windows, the GECOS field on POSIX);
+  frequently empty, and an empty fact makes a derivation
+  unanswerable by design.
+- `rlq.env.<NAME>` — the named host environment variable,
+  verbatim: the raw escape hatch beside the curated facts, in
+  exactly the sense `backend-settings` is the escape hatch
+  beside the portable machine fields — a derivation that
+  reaches for it is host-specific by construction, and says so
+  on its face. Lookup follows the platform's own case rules; an
+  unset or empty variable is an unanswerable fact; a name
+  outside the property-segment grammar cannot be referenced.
+  Env facts are ordinary text only — a secret routed through
+  one would bypass protected handling, and secrets keep their
+  own channels. Distinct from the environment *tier*:
+  `RELIQUARY_PROPERTY_*` lets the session push a value at any
+  declared key, while an env fact is pulled, by name, only
+  where a declaration's derivation says so.
+
+Growth of the catalog is a design decision like any new tier
+(`rlq.host.hostname` and a raw, unnormalized username are
+the parked candidates); transforms in derivation syntax are
+permanently out — normalization lives in a fact's definition,
+arbitrary computation in the embedding API's provider seam.
+
 A blueprint [redirect](machine-blueprint-reference.md#parameters)
 resolves its target key through the non-blueprint sources here: a
 CI run may satisfy a redirect to
 `products.windows-98.install-key` from its own
 secret store via the environment, without pre-provisioning
 a Reliquary home.
+
+### Growth: the order is closed, the seams are named
+
+The flattened order is semantics, not configuration — each rank
+encodes an adjudicated argument (an ambient variable never
+overrides a designed value; argv never carries secrets; asks are
+invocation-local) — so no end-user surface reorders tiers or
+inserts one. The model still expands, on three designed routes
+(owner, 2026-07-23; planning/DECISIONS.md):
+
+- **New tiers land by design decision at fixed ranks.** A new
+  source arrives as a one-line change to the normative order,
+  and every existing bundle keeps resolving identically.
+- **Provider plurality lives inside a tier, behind a capability
+  contract.** The credential store is the precedent — Windows
+  Credential Manager, macOS Keychain, a Secret Service provider,
+  one contract; a future corporate-secrets provider joins as
+  another implementation of that capability, invisible to the
+  order.
+- **Programmatic injection belongs to the embedding API.** A
+  future `register_property_source(name, provider,
+  before=/after=<rank>)` seam may let *code* insert a source at
+  a named rank — custody stays with a developer whose artifact
+  versions the choice, never with per-machine operator
+  configuration — and provenance is mandatory: `check-script`
+  and transcripts name the injected source like any built-in
+  tier. The provider protocol will be Reliquary-defined and
+  flat (planning/INTERFACES.md — a shape every binding language
+  can express), which is also why no existing settings library
+  can own the public seam.
+
+The pattern has strong prior art, and the order matches its
+convergence: Spring's PropertySource model (a fixed documented
+precedence for file-side users, programmatic mutability for
+code, the chain enumerable with per-key provenance), Go's Viper
+(explicit > flag > env > file > remote store > default), and
+.NET's configuration providers with user-secrets. Ansible's
+twenty-two precedence levels bound the accretion this rule
+prevents; PAM and nsswitch.conf mark the other hazard —
+operator-file reordering without provenance. Implementation
+stays bespoke: the resolution loop is trivial, and the tiers
+that define this model — the designed blueprint tier, the
+interactive ask, secret kinds bound to the credential store and
+the run engine's redaction contract, this file's surgically
+editable line format — are Reliquary's own under any library.
+pydantic-settings and Dynaconf were weighed and declined with
+the revisit condition recorded (planning/DECISIONS.md,
+2026-07-23).
 
 ## Maintaining properties
 
@@ -270,8 +368,9 @@ grammar and the [source order](script-spec.md#the-property-sources);
 this document owns the sources' operator-side mechanics and the
 stored values. The short form: the blueprint's designed values
 override this file's standing defaults, an explicit `--property`
-overrides even the blueprint for one run, and when no source
-answers, an interactive run asks and a
+overrides even the blueprint for one run, and when no outer
+source answers, a declared derivation answers when it can, an
+interactive run asks, and a
 noninteractive run fails before the machine starts. Asked
 values are invocation-local; Reliquary never changes the user's properties
 unless the user runs a property command or calls the corresponding
@@ -315,8 +414,8 @@ must still use the guest's password or product-key entry fields correctly.
 `check-script` validates property-key syntax and declaration/kind
 compatibility without changing the properties file or credential store. It reports
 each declared property's supplying source — flag, blueprint
-parameter (direct or redirect), environment, file, or ask —
-but never reports values. A missing property is reported as an unresolved
+parameter (direct or redirect), environment, file, derivation,
+or ask — but never reports values. A missing property is reported as an unresolved
 key rather than being created implicitly, and an environment-name
 collision among consulted keys is reported naming both keys.
 

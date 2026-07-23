@@ -1946,7 +1946,12 @@ Deliverables:
    home-layout descriptions — blueprint-model.md's "supersedes"
    list is the checklist.
 6. The codex and `planning/examples/` re-authored to the composed
-   format; the FreeDOS install kept green end to end (including the
+   format and renamed to the launching-point doctrine
+   (DECISIONS.md, 2026-07-23): `freedos-1.4-plain.rlqb` →
+   `freedos.rlqb`, `freedos-1.4-plain-install.rlqs` →
+   `freedos-install.rlqs`, the mentions across script-spec,
+   machine-blueprint.md, cli.md, docs, and tests following; the
+   FreeDOS install kept green end to end (including the
    recursive-archive example).
 
 Done when: the FreeDOS install script runs from a clean home
@@ -1985,12 +1990,24 @@ Deliverables:
    file in place of the home's (credentials scoped by file path),
    the blueprint `parameters` source (direct value or redirect,
    read at invocation), and the once-per-key interactive ask —
-   the full flattened order: flag > parameter > env > file > ask.
+   the full flattened order: flag > parameter > env > file >
+   derivation > ask.
+5. The declared derivation rank (DECISIONS.md, 2026-07-23):
+   repeatable `default=` candidates in the reference grammar —
+   literals, `${key}` cross-references with static cycle
+   detection, the `rlq.*` system facts (`rlq.host.username`
+   login-normalized, `rlq.host.full-name`, the `rlq.env.<NAME>`
+   family) — first-answerable-wins, empty facts unanswerable,
+   dead literal candidates and any secret involvement static
+   errors, and the supplying candidate named by `check-script`
+   and transcripts.
 
 Done when: ordinary and secret properties round-trip through the
-CLI with no secret material ever in the file, and interrupting an
+CLI with no secret material ever in the file, interrupting an
 update cannot produce a plaintext value or a marker whose
-credential was reported bound but is absent.
+credential was reported bound but is absent, and a
+derivation-backed key binds without an ask, naming its winning
+candidate as the supplying source.
 
 ### Milestone 9 — Run records and asynchronous runs
 
@@ -2387,6 +2404,20 @@ is not gating:
   resolution; what stays open is behavior reuse, and any future
   include must preserve the static graph (G3), the
   non-computational surface (G2), and transcript provenance.
+- **Blueprint computational constructs**: which bounded
+  declarative constructs the blueprint format eventually grows.
+  Computational expansion is an anticipated growth area, and its
+  governing rule is decided (planning/DECISIONS.md, 2026-07-23):
+  a construct that enriches values may land as plain data
+  expanded by Reliquary — the parked extraction short-circuit
+  and a variant/matrix expansion are the candidates on record —
+  while general computation never enters the JSON tree. It would
+  arrive only as a layer producing plain blueprints: generation
+  above via the embedding API, or a JSON-superset evaluation
+  layer (Jsonnet the leading candidate — JSONC is already valid
+  Jsonnet). In-tree function objects and string templating are
+  permanently rejected. What stays open is only which constructs,
+  and when one earns its keep.
 - **Per-drive backend settings**: whether they are ever needed
   beyond the top-level `backend-settings` scope.
 - **Promoting runtime changes**: whether a convenience command

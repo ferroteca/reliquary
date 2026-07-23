@@ -710,8 +710,8 @@ property media supplemental-disk prompt="Supplemental disk"
 property secret products.windows-98.install-key
 ```
 
-A declaration is `property [type] <key>` with an optional
-`prompt=` modifier. The type is one of three:
+A declaration is `property [type] <key>` with optional
+`prompt=` and `default=` modifiers. The type is one of three:
 
 - `text` — immutable text supplied to action arguments such as
   `enter`, `type`, and `select`. It cannot parameterize watch
@@ -730,6 +730,32 @@ interactive ask presents; the key is shown when it is omitted. A
 key is declared once per script — a duplicate declaration is a
 static error — and referenced as often as needed, so one bound
 value serves every use of the key.
+
+`default=` declares the key's *derivation* — the script's own
+answer when no outer source supplies one. Its value is a quoted
+string in the reference grammar below: literal text, `${key}`
+references to other declared keys, and the `rlq.*` system
+facts ([script
+properties](script-properties.md#property-sources)). A
+derivation is not an expression — no transforms, no
+conditionals — and it binds statically: references among
+defaults form a static dependency graph, a cycle is a static
+error, and a reference to an undeclared, non-system key is a
+static error. At binding time a derivation whose references all
+bind answers the key — a literal default always answers, so
+`default="paul"` simply stops resolution at the derivation —
+while one touching an empty or unavailable fact does not
+answer, and the key falls to the ask. `default=` may repeat:
+the candidates are tried in declaration order and the first
+that answers supplies the key — alternation on availability,
+never on a value test — so a curated fact prefers itself over
+a raw fallback (`default="${rlq.host.full-name}"
+default="${rlq.env.FULLNAME}"`). A literal candidate anywhere
+but last is a static error — the candidates below it are dead.
+A `secret` declaration
+may not carry `default=`, and no derivation may reference a
+secret key. `prompt=` and `default=` compose: the prompt is
+simply never shown unless the derivation fails to answer.
 
 References use `$key` as a whole argument and `${key}` inside
 strings; dotted keys are valid in both forms:
@@ -791,7 +817,17 @@ link here:
    selected by `--properties <path>`: *the person's* durable
    values and secret markers
    ([script properties](script-properties.md)).
-5. **The interactive ask** — one ask per unresolved key,
+5. **The declared derivation** — *the script's* computed
+   answer: the declaration's `default=` candidates, tried in
+   declaration order, each resolved in the reference grammar
+   over literal text, other declared keys, and the `rlq.*`
+   system facts ([Properties](#properties)). The first
+   candidate whose references all bind answers the key — a
+   literal always answers, so declaring one is opting to stop
+   here — while a candidate touching an empty or unavailable
+   fact does not, and a key no candidate answers falls
+   through.
+6. **The interactive ask** — one ask per unresolved key,
    presented with the declaration's `prompt=` text; the answer
    serves every reference to the key and is invocation-local,
    never written back.
@@ -800,6 +836,16 @@ Nothing binds uninvited (owner, 2026-07-21, restated by this
 round): no value reaches a script unless a declaration names its
 key, and the one environment channel is the declared
 `RELIQUARY_PROPERTY_*` spelling, sitting below the design.
+
+The order itself is closed at this surface — it is semantics,
+each rank encoding an adjudicated argument, never
+configuration. How the model grows without opening it — new
+tiers at design-decided ranks, provider plurality inside a
+tier, programmatic injection through the embedding API with
+mandatory provenance — is recorded with the operator-side
+mechanics ([script
+properties](script-properties.md#growth-the-order-is-closed-the-seams-are-named);
+planning/DECISIONS.md, 2026-07-23).
 
 Asking requires an interactive context: stdin and stderr both
 ttys — prompt text writes to stderr, the answer reads from

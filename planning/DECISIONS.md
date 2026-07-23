@@ -19,6 +19,261 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- CODEX NAMING: A LAUNCHING POINT, NEVER A VERSION LIBRARY —
+  DECIDED (owner, 2026-07-23, closing the open point from the
+  generic-blueprint walkthrough): no versioned items in the
+  codex — generic `openbsd`, generic `freedos`; "the codex is a
+  launching point for real blueprints only" (owner). Entries
+  are named for the system; the version lives inside the file
+  as the source component's URL and hash (the two-field bump),
+  so a codex version bump is a content update under an
+  unchanged name, reaching new seeds only — the never-overwrite
+  rule keeps existing copies the user's. Concurrent versions,
+  pinned vintages, and variants are user/project territory:
+  seed, rename, make it real — which dissolves the coexistence
+  case that motivated version-bound names. Scripts are named
+  for the flow they drive (`freedos-install`), never a release:
+  the branching-wait design spans versions by observation, and
+  a script's supported span is legible in its own handlers. The
+  split rule (generic by default, version-bound on deliberate
+  coexistence) was the recommendation; the owner went stronger —
+  coexistence in the codex is simply out. The `-plain` variant
+  marker dissolves with it: the launching point IS the plain
+  install, and variants belong to users. SCOPE (owner): entries
+  keep nominal version control points where easy — the adjacent
+  url+sha knobs, seam comments pointing at them — acknowledging
+  version churn; but the codex NEVER promises a comprehensive
+  guaranteed-working asset set across systems and versions
+  ("impossible!"): an entry is tested as shipped against the
+  one release it tracks; a bumped copy is the user's, aided by
+  fail-closed verification and observation-driven scripts,
+  warranted by nothing. REALIGNMENT AHEAD (per
+  the no-BC rule): `freedos-1.4-plain.rlqb` → `freedos.rlqb`,
+  `freedos-1.4-plain-install.rlqs` → `freedos-install.rlqs`,
+  and the mentions across script-spec (the reference-script
+  pointer), machine-blueprint.md, and cli.md follow at
+  implementation realignment. FOLDED: codex.md (the doctrine
+  under Naming conventions; the table examples; both
+  `run-script` examples).
+
+- THE DECLARED DERIVATION RANK (HOST-DERIVED DEFAULTS LANDED) —
+  DECIDED (owner, 2026-07-23, same-day follow-up settling the
+  forks the source-model governance entry below left pending;
+  supersedes that entry's closed-@host-token sketch). The use
+  case: a guest user created at install time defaults from the
+  host — login name, descriptive full name — overridable by any
+  explicit source. THE SHAPE: the chain's tail is DERIVATION →
+  ASK. A declaration takes an optional `default=` beside
+  `prompt=` (they compose — the prompt shows only when the
+  derivation cannot answer): its value is a string in the
+  EXISTING reference grammar — literal text, `${key}`
+  references to other declared keys, and `rlq.*` SYSTEM
+  FACTS — so the reserved namespace earns its keep and no new
+  token syntax exists. NAMESPACE (owner): the canonical facts
+  live under the short `rlq.*` — the name users type, brevity
+  in interpolations — while `reliquary.*` stays reserved and
+  empty, never an alias. "A script literally declaring
+  default="paul" is just opting to stop at derivation" (owner).
+  Derivations are not expressions: no transforms, no
+  conditionals; cross-key references form a static dependency
+  graph, cycles and references to undeclared non-system keys
+  are static errors, system facts are leaves. A derivation
+  answers when its references all bind (a literal always
+  answers); an empty or unavailable fact makes it unanswerable
+  and the key falls to the ask — noninteractively, the standing
+  unanswered-key preflight failure. ALTERNATION (owner, via the
+  fallback framing): `default=` may repeat — ordered
+  candidates, the first that answers wins; the predicate is
+  always availability (did every reference bind), never a value
+  test — the mirror-list / first-source-that-answers house
+  shape; a literal candidate anywhere but last is a static
+  error (dead candidates below it); provenance names the
+  winning candidate. THE ENV FACT FAMILY: rlq.env.<NAME> reads
+  the named host environment variable, verbatim — the raw
+  escape hatch beside the curated facts (the backend-settings
+  precedent: host-specific by construction, visible on its
+  face); platform case rules apply; unset or empty is
+  unanswerable; ordinary text only — secrets keep their own
+  channels; distinct in custody from the RELIQUARY_PROPERTY_*
+  tier (the tier pushes at any declared key; the fact is
+  pulled, by name, from a declaration). The curated fact stays
+  preferred — rlq.host.username is the os-neutral value,
+  rlq.env.USERNAME the always-there fallback (owner). SECRETS:
+  no `default=` on a secret declaration, no secret key
+  referenced in a derivation.
+  PROVENANCE OVER PROHIBITION: check-script and transcripts
+  name the derivation as supplying source like any tier; no
+  hermetic ban — a project wanting determinism pins the key in
+  its committed properties file. INITIAL FACT CATALOG:
+  rlq.host.username (login name, login-safe normalization
+  documented with the implementation), rlq.host.full-name
+  (display name / GECOS; frequently empty — unanswerable by
+  design). WEIGHED AND DECLINED: the closed @host token
+  vocabulary (a second reference syntax duplicating `${}`);
+  terminal exclusivity (prompt= XOR default= — proposed by the
+  owner, reversed on second thought: derivation-then-ask
+  degrades gracefully where a hard default-terminal failure
+  served no one); transform pipelines in derivation syntax
+  (normalization belongs in a fact's definition, arbitrary
+  computation in the embedding API provider seam — the openQA
+  conditional_schedule lesson at declaration scale); a bare
+  top-level env.* fact namespace (unreserved — it would invade
+  user space; every system fact stays under the one rlq.*
+  root). PARKED:
+  rlq.host.hostname; a raw unnormalized username fact;
+  blueprint parameters redirecting to system facts (the
+  designed-binding route). FOLDED: script-spec.md (Properties —
+  the `default=` grammar; The property sources — rank 5, the
+  declared derivation, ask renumbered 6), script-properties.md
+  (order summary, the derivation bullet, the system-fact
+  catalog, the binding short form, check-script's source list).
+
+- PROPERTY SOURCE MODEL: THE ORDER IS CLOSED, THE SEAMS ARE
+  NAMED; BESPOKE IMPLEMENTATION — DECIDED (owner, 2026-07-23,
+  the source-model governance round). The owner probed the
+  chain's extensibility — injectable custom providers, end-user
+  control of the layer hierarchy — and the round adjudicated
+  with the Spring lens (the owner's ten-plus Spring years:
+  MutablePropertySources / EnvironmentPostProcessor reward
+  vastly outweighed risk). The distinction that predicts
+  outcomes is not fixed-vs-reorderable but CUSTODY AND
+  INTROSPECTION: Spring's rank control lives in code, versioned
+  with the application, its chain enumerable with per-key
+  provenance (Actuator /env); PAM / nsswitch.conf put
+  reordering in per-machine operator files with no provenance —
+  that custody without introspection, not reordering itself, is
+  the hazard class.
+
+  THE GOVERNANCE RULE (the property chain's growth rule — the
+  same shape as the blueprint computational-growth rule): the
+  flattened order is semantics, never configuration, at the
+  artifact/CLI surface. Three designed expansion routes: (1)
+  NEW TIERS land by design decision at fixed ranks (the
+  host-derived-defaults tier is the worked candidate —
+  declaration `default=` with a closed @host token vocabulary,
+  silent with recorded provenance, never on secrets — its forks
+  pending their own round; nothing folded yet); (2) PROVIDER
+  PLURALITY lives inside a tier behind a capability contract
+  (the credential store is the precedent; a corporate-secrets
+  provider joins there, invisible to the order); (3)
+  PROGRAMMATIC INJECTION belongs to the embedding API — a
+  future register_property_source(name, provider,
+  before=/after=<rank>): custody in code, provenance mandatory
+  (check-script and transcripts name the injected source like
+  any built-in tier), protocol Reliquary-defined and FLAT under
+  the INTERFACES binding rule — no third-party types in the
+  public seam.
+
+  PRIOR ART RECORDED (the order matches independent
+  convergence): Spring PropertySource (same noun; a fixed
+  documented precedence for file-side users plus programmatic
+  mutability for code), Viper (explicit > flag > env > file >
+  remote store > default — near-isomorphic, defaults tier
+  included), .NET configuration providers (user-secrets ≈
+  user.properties + credential store; the Key Vault provider ≈
+  the provider route), pydantic-settings / Dynaconf; Ansible's
+  twenty-two precedence levels as the accretion bound.
+
+  WEIGHED AND DECLINED: pydantic-settings as implementation
+  base (model-centric — fields fixed at class definition where
+  Reliquary's keys are script-declared per run; typed coercion
+  inapplicable — values are text by spec, declarations carry
+  the type; env mangling and collision rules differ; the file
+  tier is bespoke-load-bearing — surgical comment-preserving
+  edits are why the line format exists; pydantic-core
+  dependency weight and major-version churn; diagnostics need
+  translation to the named-key house style; and the public
+  provider protocol must be flat and Reliquary-shaped, so the
+  library could only ever scaffold the internal for-loop);
+  Dynaconf (global settings object, its own environment
+  semantics, format zoo, a Vault loader that serves its layout,
+  looser maintenance). REVISIT CONDITION: typed value coercion,
+  multi-format settings files, or out-of-box Vault/Redis
+  loaders as product features flip the math toward
+  pydantic-settings, whose source protocol is good design to
+  steal shapes from. EXTRACTION AS A STANDALONE LIBRARY
+  DECLINED: the extractable resolution loop is commodity —
+  several pip installs exist; the differentiators are entangled
+  with Reliquary (the designed blueprint tier, the interactive
+  ask tier, secret kinds bound to the credential store and the
+  run engine's redaction contract); and the library market
+  wants exactly the reorderable surface this rule closes. The
+  exportable form, if ever wanted, is the written pattern, not
+  code. FOLDED: script-properties.md (Property sources —
+  "Growth: the order is closed, the seams are named"),
+  script-spec.md (The property sources — closure note).
+
+- BLUEPRINT FORMAT: JSONC AFFIRMED + THE COMPUTATIONAL-GROWTH
+  RULE — DECIDED (owner, 2026-07-23, the format-review round).
+  The owner re-opened "blueprints are authored source, not data —
+  is JSON right?" and separately flagged computational/
+  programmatic expansion as a likely growth area. Both resolved
+  together: the JSONC choice STANDS, and the growth rule is
+  recorded ahead of the growth so logic is never smuggled into
+  the tree one convenient field at a time.
+
+  A — THE FORMAT STANDS. The dichotomy that governs format
+  choice is not authored-vs-machine-written but logic-bearing vs
+  declarative, and the project already applies it consistently:
+  scripts (sequencing, branching) got a purpose-built DSL; the
+  user-properties file (machine-rewritten key=value) left JSON
+  for the line format (recorded below); blueprints are logic-free
+  declarative components — the profile where JSON's weaknesses
+  are mildest and its payoff largest (the published schema's
+  editor completion/validation, load-bearing for U4/U5 seeded
+  customization; trivially emitted by import/init; parsed
+  natively by every embedding language). JSONC's comments and
+  trailing commas are the authored-source concessions, already
+  in; the authored/machine asymmetry (JSONC for yours, strict
+  canonical JSON for everything Reliquary writes) is the
+  source-vs-data distinction, already built in. WEIGHED AND
+  DECLINED: YAML (the format's values are its footgun shapes —
+  sizes, hashes, bare names silently retyped unless quoted —
+  plus whitespace-significant nesting on the recursive archive
+  tree; the standing no-YAML call holds); TOML (recursive member
+  trees are its pathological case; declined once already for
+  nesting, the properties entry below); KDL (the aesthetic
+  best fit, but it costs the entire tooling story — no
+  editor-schema ecosystem comparable to JSON Schema, immature
+  parsers in the embedding languages); HCL2 NOW (python-hcl2
+  parses but does not evaluate — adopting the expression
+  language today means writing an evaluator, paying immediately
+  for capability at a scale not yet visible); A FULL LANGUAGE
+  (Vagrant's Ruby Vagrantfile: unparseable outside its own
+  runtime, unschemable, arbitrary execution at load — a choice
+  its own vendor never repeated). Prior art read as the natural
+  experiment: Packer's strict-JSON era failed on exactly two
+  forces — no comments (JSONC already concedes) and wanted
+  logic (deliberately excluded here) — before migrating to HCL2.
+
+  B — THE COMPUTATIONAL-GROWTH RULE. Growth pressure is
+  anticipated (the owner's read) at three seams: variant/matrix
+  expansion (the localization composition seam at scale), member
+  itemization (the parked extraction short-circuit), and derived
+  values. The governing line: A CONSTRUCT THAT ENRICHES VALUES
+  MAY LAND AS DATA; COMPUTATION THAT DECIDES STRUCTURE NEVER
+  ENTERS THE TREE. Bounded, purpose-built declarative constructs
+  (a member glob; possibly a variant matrix, the
+  GitHub-Actions-matrix shape) may be added one at a time, each
+  argued on its own, expanded by Reliquary, never author-side.
+  General expressions — arithmetic, conditionals, string
+  interpolation, user logic of any kind — trigger a LAYER
+  SWITCH, never a tree extension, and both designated routes
+  keep plain JSON as the substrate: GENERATION ABOVE (the
+  embedding API is computation's designated home — the G2
+  principle extended to the blueprint surface), or a
+  JSON-SUPERSET EVALUATION LAYER producing the plain format
+  (Jsonnet the leading candidate: JSONC is already valid
+  Jsonnet, so every existing blueprint carries over
+  byte-identical, and evaluation output feeds the existing
+  schema/validation/resolution pipeline unchanged). PERMANENTLY
+  REJECTED: in-tree function objects (the CloudFormation `Fn::`
+  shape) and string templating (the Helm shape) — the two
+  documented ways JSON formats die. FOLDED:
+  machine-blueprint.md ("Format stability" — the growth rule),
+  ROADMAP "Decisions still needed" (Blueprint computational
+  constructs).
+
 - COMPOSED BLUEPRINT MODEL + MEDIA-RESIDENCY CACHE — DECIDED
   (owner, 2026-07-23, the media/composition design round). Full
   worked design: planning/design/blueprint-model.md (the source of

@@ -712,6 +712,26 @@ tooling — a deliberate trade. Machine-written documents are
 different: the state — and every other file Reliquary writes —
 is strict canonical JSON, always.
 
+The format's growth rule is likewise decided ahead of the
+growth (planning/DECISIONS.md, 2026-07-23). Computational
+expansion is an anticipated pressure — variant expansion,
+member itemization, derived values — and one line governs it:
+**a construct that enriches values may land as data;
+computation that decides structure never enters the tree.** A
+bounded, purpose-built declarative construct (a member glob, a
+variant matrix) may be added when it earns its keep, expanded
+by Reliquary, never by an author-side expression. General
+computation — arithmetic, conditionals, string interpolation,
+user logic of any kind — is a layer switch, not a tree
+extension: it would arrive only as a layer that *produces*
+plain blueprints, either generation above (the embedding API is
+computation's designated home, the same principle the script
+language records as G2) or a JSON-superset evaluation layer
+emitting the format documented here — leaving parsing,
+validation, and resolution unchanged underneath. In-tree
+function objects and string templating are permanently
+rejected.
+
 ## Where to next
 
 - [Field reference](machine-blueprint-reference.md) — `platform`,
