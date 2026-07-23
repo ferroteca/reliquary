@@ -3,6 +3,7 @@
 """Machine materialization and cached-state management."""
 
 import contextlib
+import hashlib
 import json
 import os
 import shutil
@@ -12,7 +13,8 @@ from .blueprint import load_blueprint
 from .drives import format_options
 from .home import blueprints_dir, machines_cache_dir
 from .library import seed_blueprint
-from .lifecycle import (create_hdd_image, find_qemu, launch_owned_qemu,
+from .lifecycle import (create_difference_image, create_duplicate_image,
+                        create_hdd_image, find_qemu, launch_owned_qemu,
                         read_vm_state, stop as stop_owned_qemu)
 from .media import fetch_media
 
@@ -24,6 +26,56 @@ _PLATFORM_MEMORY = {
     "win9x": 64,
     "winnt": 256,
 }
+
+
+def _default_control_planes(platform):
+    """The platform's default control-plane policy.
+
+    Every current platform defaults to agentless display — the
+    universal, cooperation-free plane (machine-blueprint-reference.md).
+    Richer per-platform defaults arrive with the adapter seam.
+    """
+    return ["agentless-display"]
+
+
+def _resolve_hostdir(declared, source):
+    """Resolve a drive ``hostdir`` to an existing absolute directory.
+
+    A relative path resolves against the blueprint file's directory
+    (the invocation asset root supersedes this in the residency work);
+    an absolute path is used as given. A missing directory fails
+    closed naming the resolved path.
+    """
+    if os.path.isabs(declared):
+        resolved = declared
+    else:
+        base = os.path.dirname(source) if source else os.getcwd()
+        resolved = os.path.join(base, declared)
+    resolved = os.path.abspath(resolved)
+    if not os.path.isdir(resolved):
+        raise FileNotFoundError(
+            f"hostdir directory does not exist: {resolved}")
+    return resolved
+
+
+def _blueprint_digest(resolved, drives):
+    """Digest the resolved blueprint snapshot (the machine baseline).
+
+    Covers the resolved logical shape only — the per-drive cache
+    ``path`` (environment-specific) is excluded — so the same blueprint
+    resolves to the same digest across homes, which is what ``apply``
+    compares against.
+    """
+    snapshot = dict(resolved)
+    snapshot["drives"] = {
+        key: {name: value for name, value in entry.items()
+              if name != "path"}
+        for key, entry in drives.items()
+    }
+    canonical = json.dumps(
+        snapshot, sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(
+        canonical.encode("utf-8")).hexdigest()
 
 
 def machine_dir_path(machine_id, context=None):
@@ -118,15 +170,65 @@ def _allocate_machine_id(blueprint_name, context=None):
         number += 1
 
 
-def create(blueprint, *, context=None, blueprint_name=""):
+def _materialize_drive(key, drive, drives_root, source, context):
+    """Materialize one enabled drive, returning its resolved state entry.
+
+    The entry carries the drive's logical shape plus the cache
+    ``path`` reliquary realized (an image file, a host directory, or
+    ``None`` for an empty removable slot). ``source`` is the blueprint
+    file path a relative ``hostdir`` resolves against.
+    """
+    entry = {"medium": drive.medium, "slot": drive.slot}
+    if drive.medium != "floppy":
+        controller = drive.controller or "ide"
+        if controller != "ide":
+            raise NotImplementedError(
+                f"drive {key!r} declares controller {controller!r}; "
+                "only ide is wired on QEMU so far (the adapter seam "
+                "owns richer controller topology)")
+        entry["controller"] = controller
+    if drive.size is not None:
+        path = os.path.join(drives_root, f"{key}.qcow2")
+        create_hdd_image(path, drive.size)
+        entry.update(size=drive.size, path=path)
+    elif drive.media is not None:
+        entry.update(
+            media=drive.media.item.name,
+            path=fetch_media(drive.media.item.name, context=context))
+    elif drive.base is not None:
+        base_payload = fetch_media(drive.base.item.name, context=context)
+        dest = os.path.join(drives_root, f"{key}.qcow2")
+        if drive.base_type == "duplicate":
+            create_duplicate_image(dest, base_payload)
+        else:
+            create_difference_image(dest, base_payload)
+        entry.update(
+            base={"media": drive.base.item.name, "type": drive.base_type},
+            path=dest)
+    elif drive.hostdir is not None:
+        entry.update(
+            hostdir=drive.hostdir,
+            path=_resolve_hostdir(drive.hostdir, source))
+    else:
+        # An empty removable drive: guest-visible hardware with no
+        # medium until a script inserts one.
+        entry.update(media=None, path=None)
+    return entry
+
+
+def create(blueprint, *, context=None, blueprint_name="", source=None):
     """Materialize one machine from a parsed Blueprint.
 
     Creates the machine cache directory under
     ``cache/machines/<blueprint>-<n>/``, writes
-    ``reliquary-machine.json``, creates qcow2 images for every drive
-    declared with ``size``, and fetches every media item to the shared
-    cache (the machine's drives record the payload path).  The machine
-    number is the lowest free non-negative integer for that blueprint.
+    ``reliquary-machine.json`` with the fully resolved configuration
+    and its provenance (``blueprint-source``, ``blueprint-digest``,
+    ``backend-id``), and materializes every enabled drive: qcow2 for
+    ``size`` and ``base`` (differencing or duplicated), the fetched
+    payload for ``media``, a resolved host directory for ``hostdir``.
+    ``source`` is the absolute path of the blueprint file this machine
+    resolved from, recorded for selection scoping. The machine number
+    is the lowest free non-negative integer for that blueprint.
     Returns the generated machine id.
     """
     if not isinstance(blueprint_name, str) or not blueprint_name:
@@ -143,37 +245,27 @@ def create(blueprint, *, context=None, blueprint_name=""):
             # `enabled: false` removes the drive from the machine
             # entirely (machine-blueprint-reference.md).
             continue
-        if drive.base is not None or drive.hostdir is not None:
-            raise NotImplementedError(
-                f"drive {key!r} uses base/hostdir; materialization of "
-                "base and hostdir drives lands later in milestone 6")
-        if drive.size is not None:
-            filename = f"{key}.qcow2"
-            path = os.path.join(drives_root, filename)
-            create_hdd_image(path, drive.size)
-            resolved_drives[key] = {
-                "medium": drive.medium,
-                "slot": drive.slot,
-                "size": drive.size,
-                "path": path,
-            }
-        elif drive.media is not None:
-            payload = fetch_media(drive.media.item.name, context=context)
-            resolved_drives[key] = {
-                "medium": drive.medium,
-                "slot": drive.slot,
-                "media": drive.media.item.name,
-                "path": payload,
-            }
-        else:
-            # An empty removable drive: guest-visible hardware with
-            # no medium until a script inserts one.
-            resolved_drives[key] = {
-                "medium": drive.medium,
-                "slot": drive.slot,
-                "media": None,
-                "path": None,
-            }
+        resolved_drives[key] = _materialize_drive(
+            key, drive, drives_root, source, context)
+
+    memory = blueprint.memory
+    if memory is None:
+        memory = _PLATFORM_MEMORY.get(blueprint.platform, 16)
+    resolved = {
+        "platform": blueprint.platform,
+        "backend": blueprint.backend or "qemu",
+        "memory": memory,
+        "cpus": blueprint.cpus if blueprint.cpus is not None else 1,
+        "boot": list(blueprint.boot),
+        "name": blueprint.name,
+        "description": blueprint.description,
+        "scripts": dict(blueprint.scripts),
+        "control-planes": (list(blueprint.control_planes)
+                           or _default_control_planes(blueprint.platform)),
+        "backend-settings": {
+            name: dict(section)
+            for name, section in blueprint.backend_settings.items()},
+    }
 
     state = {
         "id": machine_id,
@@ -181,15 +273,13 @@ def create(blueprint, *, context=None, blueprint_name=""):
         "created": datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"),
         "phase": "ready",
-        "backend": "qemu",
-        "platform": blueprint.platform,
-        "memory": blueprint.memory,
+        "backend-id": f"reliquary-{machine_id}",
+        "blueprint-digest": _blueprint_digest(resolved, resolved_drives),
+        **resolved,
         "drives": resolved_drives,
-        "boot": list(blueprint.boot),
-        "name": blueprint.name,
-        "description": blueprint.description,
-        "scripts": dict(blueprint.scripts),
     }
+    if source is not None:
+        state["blueprint-source"] = os.path.abspath(os.fspath(source))
 
     _write_state(machine_id, state, context)
     return machine_id
@@ -212,7 +302,8 @@ def create_machine(name, *, context=None):
         seed_blueprint(name, context=context)
     path = locate_blueprint(name, context=context)
     blueprint = load_blueprint(path, context=context)
-    return create(blueprint, context=context, blueprint_name=name)
+    return create(blueprint, context=context, blueprint_name=name,
+                  source=path)
 
 
 def _write_state(machine_id, state, context=None):

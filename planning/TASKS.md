@@ -336,6 +336,21 @@ T5; T6 and T7 run beside it.
    (difference/duplicate) and `hostdir` vvfat materialization in
    `create`; record the resolved `blueprint-digest`,
    `blueprint-source` path, and `backend-id` in the state.
+   LANDED (2026-07-22): `lifecycle.py` gained
+   `create_difference_image` (qcow2 backed by the base, format
+   probed for the explicit `-F`), `create_duplicate_image`
+   (`qemu-img convert`), and `probe_image_format`; `create`
+   materializes `size`/`media`/`base`/`hostdir` drives (a relative
+   `hostdir` resolves against the blueprint source dir — the asset
+   root supersedes this at T6 — and a missing directory fails
+   closed), resolves platform defaults (`memory`/`cpus`/
+   `control-planes`) into the state, and records `backend-id`
+   (`reliquary-<id>`), `blueprint-digest` (`sha256:` over the
+   resolved snapshot with cache paths excluded, so two machines of
+   one blueprint share it), and `blueprint-source`. Non-`ide`
+   controllers fail closed (the adapter seam owns richer
+   topology). Real `qemu-img` difference/duplicate materialization
+   smoke-verified. `apply` (T4) consumes the digest.
 3. Lifecycle integrity (deliverable 3): operation generations,
    exclusive per-machine operation locks (beyond today's
    allocation lock), and startup detection of interrupted

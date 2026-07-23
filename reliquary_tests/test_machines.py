@@ -88,10 +88,17 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertEqual(state["phase"], "ready")
         self.assertEqual(state["backend"], "qemu")
         self.assertEqual(state["platform"], "dos")
-        self.assertIsNone(state["memory"])
+        # Defaults are materialized into the resolved state.
+        self.assertEqual(state["memory"], 16)
+        self.assertEqual(state["cpus"], 1)
+        self.assertEqual(state["control-planes"], ["agentless-display"])
         self.assertEqual(state["name"], "Test Machine")
         self.assertEqual(state["scripts"], {"install": "install-script"})
         self.assertEqual(state["boot"], ["hdd0"])
+        # Provenance.
+        self.assertEqual(state["backend-id"], f"reliquary-{machine_id}")
+        self.assertTrue(
+            state["blueprint-digest"].startswith("sha256:"))
 
     def test_create_writes_state_file_with_optional_fields_absent(self):
         """Omitted optional fields are None/empty in the state."""
@@ -102,7 +109,7 @@ class MachineMaterializationTests(unittest.TestCase):
                                 blueprint_name="minimal")
 
         state = load_machine_state(machine_id, self.home)
-        self.assertIsNone(state["memory"])
+        self.assertEqual(state["memory"], 16)
         self.assertIsNone(state["name"])
         self.assertIsNone(state["description"])
         self.assertEqual(state["scripts"], {})
@@ -169,6 +176,116 @@ class MachineMaterializationTests(unittest.TestCase):
             os.path.normpath(cdrom["path"]),
             os.path.normpath(self.iso_path),
         )
+
+    def test_base_difference_materializes_and_records(self):
+        """A base drive (default difference) materializes a qcow2 and
+        records its media/type in the state."""
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd0": {"base": "freedos-1.4-livecd"}},
+        })
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path), \
+                mock.patch(
+                    "reliquary.machines.create_difference_image") as diff:
+            machine_id = create(blueprint, context=self.home,
+                                blueprint_name="based")
+        dest = diff.call_args.args[0]
+        self.assertEqual(os.path.basename(dest), "hdd0.qcow2")
+        self.assertEqual(diff.call_args.args[1], self.iso_path)
+        state = load_machine_state(machine_id, self.home)
+        base = state["drives"]["hdd0"]["base"]
+        self.assertEqual(base, {"media": "freedos-1.4-livecd",
+                                "type": "difference"})
+
+    def test_base_duplicate_materializes(self):
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd0": {"base": {"media": "freedos-1.4-livecd",
+                                         "type": "duplicate"}}},
+        })
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path), \
+                mock.patch(
+                    "reliquary.machines.create_duplicate_image") as dup:
+            machine_id = create(blueprint, context=self.home,
+                                blueprint_name="dup")
+        dup.assert_called_once()
+        state = load_machine_state(machine_id, self.home)
+        self.assertEqual(state["drives"]["hdd0"]["base"]["type"],
+                         "duplicate")
+
+    def test_hostdir_resolves_and_renders_vvfat(self):
+        work = os.path.join(self.home, "work")
+        os.makedirs(work)
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd0": {"hostdir": work}},
+        })
+        machine_id = create(blueprint, context=self.home,
+                            blueprint_name="hd")
+        state = load_machine_state(machine_id, self.home)
+        drive = state["drives"]["hdd0"]
+        self.assertEqual(drive["hostdir"], work)
+        self.assertEqual(os.path.normpath(drive["path"]),
+                         os.path.normpath(work))
+        args = machine_drive_args(machine_id, self.home)
+        drive_values = [args[i + 1] for i, a in enumerate(args)
+                        if a == "-drive"]
+        self.assertTrue(any("fat:rw:" in v for v in drive_values))
+
+    def test_hostdir_missing_directory_fails_closed(self):
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd0": {"hostdir": os.path.join(self.home, "nope")}},
+        })
+        with self.assertRaises(FileNotFoundError) as caught:
+            create(blueprint, context=self.home, blueprint_name="missing")
+        self.assertIn("nope", str(caught.exception))
+
+    def test_nonide_controller_fails_closed(self):
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M", "controller": "scsi"}},
+        })
+        with self.assertRaises(NotImplementedError) as caught:
+            create(blueprint, context=self.home, blueprint_name="scsi")
+        self.assertIn("scsi", str(caught.exception))
+
+    def test_disabled_drive_excluded_from_state(self):
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {
+                "hdd0": {"size": "20M"},
+                "hdd1": {"size": "50M", "enabled": False},
+            },
+        })
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create(blueprint, context=self.home,
+                                blueprint_name="disabled")
+        state = load_machine_state(machine_id, self.home)
+        self.assertIn("hdd0", state["drives"])
+        self.assertNotIn("hdd1", state["drives"])
+
+    def test_blueprint_source_recorded_and_digest_stable(self):
+        """create_machine records the resolved source path, and two
+        machines of one blueprint share a digest (path excluded)."""
+        bp_dir = os.path.join(self.home, "blueprints")
+        os.makedirs(bp_dir)
+        source = os.path.join(bp_dir, "twin.rlqb")
+        with open(source, "w", encoding="utf-8") as handle:
+            json.dump({"platform": "dos",
+                       "drives": {"hdd": {"size": "20M"}}}, handle)
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            first = create_machine("twin", context=self.home)
+            second = create_machine("twin", context=self.home)
+        s1 = load_machine_state(first, self.home)
+        s2 = load_machine_state(second, self.home)
+        self.assertEqual(
+            os.path.normpath(s1["blueprint-source"]),
+            os.path.normpath(source))
+        self.assertEqual(s1["blueprint-digest"], s2["blueprint-digest"])
+        self.assertNotEqual(first, second)
 
     def test_machine_drive_args_includes_cdrom_iso(self):
         """machine_drive_args mounts a cdrom media drive after hard

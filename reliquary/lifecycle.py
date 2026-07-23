@@ -181,6 +181,76 @@ def create_hdd_image(filename, capacity):
     return path
 
 
+def _run_qemu_img(args, action, target):
+    completed = subprocess.run(
+        [find_qemu_img(), *args], capture_output=True, text=True,
+        check=False)
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        raise RuntimeError(
+            f"qemu-img failed {action} {target}"
+            + (f": {detail}" if detail else ""))
+    return completed
+
+
+def probe_image_format(path):
+    """Return the qemu-detected format string of an existing image."""
+    completed = _run_qemu_img(
+        ["info", "--output=json", os.fspath(path)], "probing", path)
+    return json.loads(completed.stdout)["format"]
+
+
+def create_difference_image(filename, base):
+    """Create a qcow2 differencing image backed by ``base``.
+
+    Writes land in the difference; the base image stays pristine
+    (the drive ``base`` triad's default ``difference`` type). The
+    base's format is probed so the backing reference is explicit.
+    Existing files are not overwritten. Returns the created path.
+    """
+    path = os.path.abspath(os.fspath(filename))
+    if not path.lower().endswith(".qcow2"):
+        raise ValueError(
+            f"difference image filename must end with .qcow2: {filename}")
+    if os.path.exists(path):
+        raise FileExistsError(f"image already exists: {path}")
+    base = os.path.abspath(os.fspath(base))
+    base_format = probe_image_format(base)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    print(f"creating qcow2 difference: {path} (backing {base})")
+    _run_qemu_img(
+        ["create", "-f", "qcow2", "-o", "compat=1.1",
+         "-b", base, "-F", base_format, path],
+        "creating difference", path)
+    return path
+
+
+def create_duplicate_image(filename, base):
+    """Materialize a standalone qcow2 copy of ``base``.
+
+    The base is converted in full (``duplicate`` base type), leaving
+    the drive independent of any backing file. Existing files are not
+    overwritten. Returns the created path.
+    """
+    path = os.path.abspath(os.fspath(filename))
+    if not path.lower().endswith(".qcow2"):
+        raise ValueError(
+            f"duplicate image filename must end with .qcow2: {filename}")
+    if os.path.exists(path):
+        raise FileExistsError(f"image already exists: {path}")
+    base = os.path.abspath(os.fspath(base))
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    print(f"creating qcow2 duplicate: {path} (from {base})")
+    _run_qemu_img(
+        ["convert", "-O", "qcow2", base, path],
+        "duplicating", path)
+    return path
+
+
 class Qmp:
     """Synchronous facade over the official asyncio qemu.qmp library."""
 

@@ -56,6 +56,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Media definitions accept the definition-level annotation fields
   `description`, `notes`, and `redistributable-under` (both the
   item and archive forms).
+- `create-machine` materializes `base` drives (a differencing qcow2
+  backed by the base image, or a full `duplicate` copy) and
+  `hostdir` drives (a resolved host directory served over vvfat),
+  resolves platform defaults (`memory`, `cpus`, `control-planes`)
+  into the machine state, and records the machine's provenance —
+  `blueprint-source` (the resolved blueprint path), `blueprint-digest`
+  (the resolved-snapshot baseline), and `backend-id`. Non-`ide`
+  controllers fail closed pending the adapter seam.
 
 ### Changed
 

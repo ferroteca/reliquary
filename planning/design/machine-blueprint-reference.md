@@ -10,12 +10,12 @@ SPDX-License-Identifier: BSD-3-Clause
 > sources plus `controller` and `enabled`), `boot`, `name`,
 > `description`, `scripts`, `control-planes`, `backend-settings`, and
 > `parameters` — with JSONC acceptance and `media`/`base.media`
-> resolution. Machine materialization currently realizes `size` and
-> `media` drives and persistent script-driven `insert`/`eject`;
-> `base` and `hostdir` drive materialization, full state resolution
-> (digest, backend-id, defaults), and backend capability checks land
-> later in milestone 6 and with the adapter seam. Details may still
-> change before first release.
+> resolution. Machine materialization realizes `size`, `media`,
+> `base` (a differencing or duplicated qcow2), and `hostdir` drives,
+> resolves defaults into the state, and records the provenance fields
+> (`blueprint-digest`, `blueprint-source`, `backend-id`). Non-`ide`
+> controllers and backend capability checks ride the adapter seam.
+> Details may still change before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`<name>.rlqb`, yours) and each
