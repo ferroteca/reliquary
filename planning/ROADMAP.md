@@ -1929,16 +1929,17 @@ materialization reshape, no new capability. No backward
 compatibility: the pre-composition formats are replaced, not
 bridged.
 
-Decide first: one item. The `${…}` reference / media-locator
-grammar (the qualifier set — `${media:…}` today, others
-reserved — the containment path-suffix rule, escapes, and list
-positions) was settled fast at the close of the revision round;
-run it through a scenario battery like the one that hardened the
-location field, and record the outcome in DECISIONS.md, before
-deliverable 1's parser is written. Everything else is settled
-(optional root `type` defaulting to media; the plural sections
-retired, a lone spec object kept as sugar for the array of one;
-the source type and composition declined).
+Decide first: nothing — the one gating item, the `${…}` reference
+/ media-locator grammar, went through its
+scenario battery and is recorded in DECISIONS.md (D24, the
+reference grammar battery): the shape D22 settled holds, with the
+escape amended to `\${` and the reach widened to full
+interpolation anywhere a string value is accepted, under the rule
+that a reference may supply any value that does not participate
+in identity or resolution structure. Everything else was already
+settled (optional root `type` defaulting to media; the plural
+sections retired, a lone spec object kept as sugar for the array
+of one; the source type and composition declined).
 
 Deliverables:
 
@@ -1959,19 +1960,38 @@ Deliverables:
    the `{ "size": … }` blank, `size` implying `new`);
    name-or-nothing identity (explicit or content-stem names into
    the one catalog; the anonymous blank site-identified,
-   slot-named at materialization); identity-dedup (identical
+   slot-named at materialization) under the name rules of D24 —
+   the `media-name` production is the charter (the script `name`
+   production with a leading digit allowed, split from the
+   letter-initial `property-key`), an out-of-charter
+   stem is repaired with a warning naming the derived name and
+   its source, a stem that cannot be repaired or does not exist
+   fails closed demanding an explicit `name`, and names match
+   case-sensitively but collide case-insensitively;
+   identity-dedup (identical
    same-`(name, type)` specs coexist, differing collide, in-file
    duplicates error); and the location grammar — one `location`
    field: bare-path / `https:`-`http:` /
-   `${media:<name>}/<path>` / `${<key>}` strings,
+   `${media:<name>}[/<path>]` / `${<key>}` strings,
    the explicit object forms (`url` / `local` / `parent`+`path`
-   incl. an inline parent spec / `property`) as canonical form
-   and escape, mirror lists (mixed schemes; `sha256` required
-   once any remote rung is present), unrecognized-scheme-shape
-   parse errors, `${key}` whole-value references with binding
-   deferred to milestone 8 (fails closed naming it until then) —
-   all parsed by the one shared media-locator component. `.rlqm`
-   retired. All fail-closed, naming the problem.
+   incl. an inline parent spec / `property`) as canonical form,
+   mirror lists (mixed schemes; singleton is the scalar, empty
+   and nested illegal), unrecognized-scheme-shape
+   parse errors — all parsed by the one shared media-locator
+   component. With them the reference grammar as hardened by D24:
+   unqualified `${key}` interpolating anywhere a string value is
+   accepted, `\${` the literal escape, resolved text never
+   re-scanned, references refused in `name` / `type` / `children`
+   paths / object keys, qualified `${media:…}` whole-value with
+   its optional `/<path>` second component (bare form =
+   `{"parent": …}`, no path), unknown and reserved qualifiers
+   failing closed, path suffixes normalized against `..` /
+   absolute / empty segments, containment cycles named, and
+   two-phase validation — shape at parse, value at resolution,
+   which is where the `sha256`-required-once-remote check and
+   non-string coercion now land; `${key}` binding is deferred to
+   milestone 8 (failing closed naming properties until then).
+   `.rlqm` retired. All fail-closed, naming the problem.
 2. Media and materialization realigned (media.py / machines.py):
    the `materialize` modes (`new`/`difference`/`copy`/`use`),
    `read-only` (default true on cdrom), conditional `sha256`,
@@ -2008,8 +2028,9 @@ Deliverables:
    media-spec.md (the location grammar, the readings, and
    parent/children containment replacing the source/archive
    sections),
-   instance-model.md, and the AGENTS / ROADMAP home-layout
-   descriptions.
+   instance-model.md, INTERFACES.md (its blueprint entry still
+   describes the retired four-component shape), and the AGENTS /
+   ROADMAP home-layout descriptions.
 7. The codex and `planning/examples/` re-authored to the revised
    format — explicit `type` on every spec (the good-code
    doctrine: the format doesn't enforce it, the shipped corpus

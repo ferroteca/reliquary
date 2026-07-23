@@ -35,6 +35,156 @@ text intact, to the Retired decisions section at the bottom,
 its note naming what overruled it — a retired decision binds
 nothing but remains the record.
 
+- D24 — THE REFERENCE GRAMMAR BATTERY — DECIDED (owner,
+  2026-07-23, the milestone-7 decide-first item). Supports U1, U4,
+  U5; P11; G3, G6, G7. Triage under the interface-change rule: no
+  use-case impact — an unlanded format hardened before its parser
+  is written. D22 settled the `${…}` grammar fast at the close of
+  the revision round; the scenario battery run against it here
+  holds the shape and sharpens it, with one amendment (the escape)
+  and one widening (the reach).
+  THE REACH RULE, the battery's governing find: A REFERENCE MAY
+  SUPPLY ANY VALUE THAT DOES NOT PARTICIPATE IN IDENTITY OR
+  RESOLUTION STRUCTURE. The exclusions are `name`, `type`,
+  `children` paths, and object keys (drive slots) — the catalog
+  and the authored graph stay static (G3), which is D22's own
+  ground for killing the `children` glob; everything else a scalar
+  position accepts may be referenced.
+  FULL INTERPOLATION (owner — "a general `${...}` should be viable
+  almost anywhere a scalar/string/enum is provided"): an
+  unqualified `${key}` interpolates ANYWHERE A STRING VALUE IS
+  ACCEPTED, exactly as the script language already does
+  (script-spec.md "Strings"; reliquary/script_parser.py) — the
+  blueprint refusing what scripts allow was the surface divergence
+  the battery could not justify (G6). Object field values
+  interpolate too. THE ESCAPE IS `\${` — identical to the script
+  spelling, written `"\\${"` in JSON — AMENDING D22's "the object
+  form escapes out-of-band": prose fields (`description`) and
+  direct `parameters` values have no object form, and a parameter
+  carrying a literal `${HOME}` into a guest config file is an
+  ordinary case, not a corner. The object form remains what D22
+  made it — the canonical/state form and the option point — it is
+  simply no longer the escape. RESOLUTION ORDER: interpolate, then
+  scheme-dispatch the result; RESOLVED TEXT IS NEVER RE-SCANNED,
+  which is D22's no-chaining rule made precise — a property whose
+  value reads `${media:X}/p` stays literal text and fails the
+  scheme check.
+  QUALIFIED REFERENCES STAY STRUCTURAL: `${media:<name>}` is
+  whole-value only (it desugars to an object; a media reference
+  inside prose is meaningless), the `/<path>` suffix its second
+  component as D22 has it. A BARE `${media:X}` IS LEGAL as a whole
+  location, desugaring to `{"parent": "X"}` WITH NO `path` — the
+  parent's own bytes — which is how `materialize: difference` puts
+  an overlay over another media, the one case D22 left with no
+  spelling. Declined: a new `{"media": …}` object form (a second
+  object spelling for what `parent` already says).
+  THE MEDIA-NAME CHARTER, SPLIT FROM THE PROPERTY-KEY CHARTER
+  (owner challenge — "I am surprised 86Box.zip would cause any
+  issue, and what's the downside to `[()\[\]]`"): the battery had
+  inherited the script `name` production for media names without
+  testing whether it was load-bearing, AND IT IS NOT. The lexer
+  dispatches on the `@`/`$` sigil BEFORE the digit branch
+  (reliquary/script_nodes.py), so the sigil is what classifies the
+  token and a leading digit is unambiguous behind it; the
+  letter-initial rule is load-bearing ONLY FOR PROPERTY KEYS,
+  which also appear BARE at a `property` declaration, where a
+  leading digit lexes as a duration. Media names have no bare site
+  in any surface — `@name` in scripts, JSON strings in
+  blueprints. Nor do `(`/`)`/`[`/`]` cost anything grammatically:
+  a token ends at whitespace, brace, or comment
+  (`_DELIMITERS = " \t{}#"`), so brackets scan straight through.
+  THE CHARTER THEREFORE SPLITS, by one clause: `media-name =
+  (letter | digit) , { letter | digit | "." | "_" | "-" }`, while
+  `property-key` keeps its letter-initial `name`. The wider
+  grammar-forced-only charter (excluding just whitespace, `{`,
+  `}`, `#`, `/`, and control characters, admitting `FD(1)` and
+  `FD[SE]`) was WEIGHED AND DECLINED: parens and brackets are
+  equally shell metacharacters — `rlq fetch-media FD(1)` is a bash
+  syntax error exactly as `FD[1]` is — and every media name is
+  argv at `fetch-media` / `add-media` / `clean-media`, so a name
+  needing per-shell quoting is a permanent papercut against P7;
+  brackets add a glob hazard over `cache/media/` on top. What is
+  mechanically forced out of a name regardless: whitespace, `{`,
+  `}`, `#`, `/` (the containment separator — `${media:C:/x}` is
+  otherwise ambiguous), and control characters.
+  NAME DERIVATION — SANITIZE WITH A WARNING (owner), read as: THE
+  SANITIZER REPAIRS THE CHARACTER SET, NEVER INVENTS A NAME. A
+  stem outside the charter is repaired and warned, naming both the
+  derived name and the source it came from (`FD 1.4 (final).zip` →
+  `FD-1.4-final`); where repair cannot yield a legal name — the
+  stem is empty, or repairs to nothing — or where there is no stem
+  to derive from at all (a `${…}` location, a reference-bearing
+  path suffix, a mirror list whose first rung is a reference), it
+  FAILS CLOSED demanding an explicit `name`. A leading digit is
+  NOT such a case under the split charter: `86Box.zip` derives
+  `86Box` cleanly, no warning. Two sources
+  sanitizing to one name still meet the standing duplicate-name
+  collision error naming both, so the repair can hide nothing.
+  Media names have never been charter-checked at all
+  (the regex lives only in the script layer); deliverable 1 is
+  where the check starts.
+  CASE: names MATCH CASE-SENSITIVELY, COLLIDE CASE-INSENSITIVELY
+  (owner) — `cache/media/` is name-keyed on filesystems that are
+  not, so `FDBOOT` and `fdboot` in one source are a collision
+  error naming both, while references still bind exactly.
+  THE PATH SUFFIX: exactly one `/` separates reference from path,
+  member paths are `/`-separated always (the container formats'
+  own convention), and the path normalizes — `..`, absolute paths,
+  and empty segments REFUSED as containment escapes. A backslash
+  after `}` is an error naming the `/` rule (the Windows author's
+  first guess); trailing and doubled slashes are errors.
+  DISPATCH AND DEGENERATES: the qualifier is the text before the
+  FIRST colon, so a property key never contains one (the charter
+  already agrees); unqualified `${media}` is rejected with a
+  did-you-mean rather than read as a property of that name;
+  unknown qualifiers fail closed naming themselves (P11), with
+  `property:` reserved-and-rejected under a nudge to drop the
+  qualifier and `env:` / `file:` / `machine:` / `script:` /
+  `landmark:` / `secret:` reserved; qualifiers are lowercase-only;
+  `${}`, `${media:}`, `${:x}`, an unterminated `${`, and
+  whitespace inside the braces are all parse errors naming the
+  malformed reference. Scheme dispatch is unchanged, drive-letter
+  exemption included.
+  CYCLES AND ORDER: containment cycles and a self-parent fail
+  closed naming the cycle; forward references stay legal —
+  resolution reads the whole source and is order-independent.
+  LISTS: a one-element mirror list is the scalar (no special
+  case), an empty list is an error, nested lists are illegal.
+  TWO-PHASE VALIDATION, the widening's one real cost and the same
+  work `location` already demanded: shape at parse, value at
+  resolution (`create`/`apply`). THE `sha256`-REQUIRED-ONCE-REMOTE
+  RULE MOVES TO RESOLUTION TIME — a `${key}` rung may resolve to a
+  URL, so parse-time cannot know. Coercion at non-string positions
+  is the field's own parser run over the resolved string, failing
+  closed naming field, value, and source. Failures before
+  milestone 8 name properties, never a milestone number.
+  RECORDED, NOT A DEFECT: scripts reference media as `@name` and
+  blueprints as `${media:<name>}` — deliberate divergence, since
+  JSON has no token classes and a reference must live inside a
+  string; the property spelling is identical across both surfaces,
+  which is what D22's "one reference syntax" was buying.
+  WEIGHED AND DECLINED: whole-value-only reach (D22 as written —
+  it left the blueprint refusing what scripts allow, and left a
+  property-built path unexpressible); the two-rule split
+  (interpolation in free text, whole-value in typed fields — a
+  second rule bought nothing, G6); the `{"media": …}` object form;
+  silent sanitization (the derived catalog key must be visible to
+  the author who will type `@name`); fully case-insensitive names
+  (it would make the blueprint catalog case-blind while the script
+  token is not); case-sensitivity throughout (two media differing
+  only in case silently share one cache file on Windows and
+  macOS).
+  FOLDED: this entry; ROADMAP milestone 7 — the decide-first block
+  retired, deliverable 1 restated to the hardened grammar,
+  INTERFACES.md added to deliverable 6's realignment list (it
+  still describes the retired four-component shape); script-spec.md
+  — the `media-name` production and the References prose, the one
+  place this round touches a landed surface — and its shipped
+  check (reliquary/script_nodes.py), which now accepts `@86Box`.
+  media-spec.md
+  and blueprint-model.md stay superseded pending deliverable 6, as
+  D22 left them; this entry and D22 are normative meanwhile.
+
 - D23 — USE-CASE LIFECYCLE: THE CURRENT LIST + THE PROPOSALS DOC —
   DECIDED (owner, 2026-07-23). The use-case surface
   splits in two: planning/USE-CASES.md is the CURRENT STATE —

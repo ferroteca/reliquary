@@ -25,6 +25,11 @@ from typing import Mapping, Optional, Tuple
 
 _DURATION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:ms|s|m|h)$")
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
+# A media name may lead with a digit where a property key may not:
+# the `@` sigil already classifies the token, while a property key
+# also appears bare at its `property` declaration, where a leading
+# digit would lex as a duration (D24).
+_MEDIA_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*$")
 # A token ends at whitespace, a brace, a comment, or the line
 # terminator; strings and regexes end at their closing delimiter.
 _DELIMITERS = " \t{}#"
@@ -260,7 +265,7 @@ def _scan_value(text, start, number, bare_number=False):
     if char in "@$":
         name, end = _scan_word(text, start + 1, False)
         kind = "media" if char == "@" else "property"
-        if not _NAME.fullmatch(name):
+        if not (_MEDIA_NAME if char == "@" else _NAME).fullmatch(name):
             what = "media reference" if char == "@" else "property reference"
             raise ScriptParseError(
                 number, f"invalid {what}: {text[start:end]!r}", start + 1)

@@ -102,6 +102,16 @@ class TokenizerTests(unittest.TestCase):
             tokenize("insert cdrom0 @", 1)
         self.assertIn("invalid media reference", str(caught.exception))
 
+    def test_a_media_name_may_lead_with_a_digit(self):
+        # The sigil classifies the token, so @86Box is unambiguous
+        # where a bare 86Box would lex as a duration; a property
+        # key, which also appears bare, keeps letter-initial (D24).
+        self.assertEqual(tokenize("insert cdrom0 @86Box", 1)[-1].value,
+                         "86Box")
+        with self.assertRaises(ScriptParseError) as caught:
+            tokenize("wait $86key", 1)
+        self.assertIn("invalid property reference", str(caught.exception))
+
 
 class NodeShapeTests(unittest.TestCase):
     def test_a_node_carries_arguments_then_modifiers(self):

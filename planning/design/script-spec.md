@@ -258,8 +258,14 @@ never expanded inside a regex.
 ### References
 
 `@name` references a media by name; it resolves through the
-blueprint namespace — the `media` components across the `.rlqb`
-files in the active source, never carried in the script. `$key`
+blueprint namespace — the `media` specs across the `.rlqb`
+files in the active source, never carried in the script. A media
+name is a `media-name` token, not a `name`: it may lead with a
+digit (`@86Box`), because the `@` sigil has already classified the
+token where a bare word could not be. A property key may not — it
+also appears bare at its `property` declaration, where a leading
+digit lexes as a duration. That is the whole of the difference
+(D24). `$key`
 references a declared
 [property](#properties) and must stand alone
 as a whole argument; inside strings the braced form `${key}` is
@@ -435,12 +441,14 @@ action          = "enter" , string , eol
 
 block-open      = "{" , eol ;
 block-close     = "}" , eol ;
-media-ref       = "@" , name ;
+media-ref       = "@" , media-name ;
 property-ref    = "$" , name ;
 property-key    = name ;
 key             = key-name , { "+" , key-name } ;
 
 name            = letter , { letter | digit | "." | "_" | "-" } ;
+media-name      = ( letter | digit ) ,
+                  { letter | digit | "." | "_" | "-" } ;
 duration        = number , ( "ms" | "s" | "m" | "h" ) ;
 number          = digit , { digit } ,
                   [ "." , digit , { digit } ]
