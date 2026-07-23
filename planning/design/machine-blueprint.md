@@ -732,6 +732,34 @@ validation, and resolution unchanged underneath. In-tree
 function objects and string templating are permanently
 rejected.
 
+The tree rule has a twin governing the *strings*, because a
+format of this kind dies from the inside as readily as from the
+top (planning/DECISIONS.md, D26): **the `${…}` reference body is
+closed, and operations are closed while namespaces are open.**
+What may appear between the braces is the character class
+`[A-Za-z0-9._:/-]` and nothing else — every character in it
+load-bearing already, `:` separating the qualifier, `/` the
+containment path, `.` the property dot-path, `_` and `-` the
+media-name charter. No operator ever joins them: no defaults, no
+filters or pipes, no calls, no indexing, no arithmetic, no
+comparison, no nesting, no second escape. The test is
+mechanical rather than a matter of judgment, because every such
+feature needs a character outside the class — a proposal that
+does not fit the class is a layer switch, not a grammar
+extension. What stays open is new *qualifiers* (`env:`, `file:`,
+`machine:`, `script:`, `landmark:`, `secret:` are reserved): a
+qualifier names a namespace to look in, never an operation to
+perform, and costs no new character.
+
+When the layer switch does come, it arrives as a **separate file
+kind or an explicit step** — never as a widening of what `.rlqb`
+means. A document evaluated before it is read cannot be
+schema-validated or completed by an editor, and that cost would
+otherwise fall on every blueprint in the format, including the
+large majority wanting no computation at all. Plain `.rlqb`
+keeps its schema, its completion, and its strictness
+permanently.
+
 ## Where to next
 
 - [Field reference](machine-blueprint-reference.md) — `platform`,

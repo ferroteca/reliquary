@@ -35,6 +35,155 @@ text intact, to the Retired decisions section at the bottom,
 its note naming what overruled it — a retired decision binds
 nothing but remains the record.
 
+- D26 — THE REACH TRIM AND THE STRING-GRAMMAR CLOSURE — DECIDED
+  (owner, 2026-07-23, the format re-examination round). Supports
+  U4, U5; P7, P10. AMENDS D18 (its HCL2 decline and its growth
+  rule) and D24 (its reach rule). The owner re-opened the
+  blueprint format one round after D18 affirmed it — "getting
+  this decision wrong will be very expensive." THE FORMAT STANDS
+  AGAIN, but the re-examination found the premise misdirected and
+  the real exposure somewhere else, and this entry moves the
+  hardening to where it belongs.
+
+  A — THE FORMAT CHOICE IS THE CHEAP DECISION; THE STRING
+  SUBLANGUAGE IS THE EXPENSIVE ONE. Swapping the format is
+  near-free here and stays that way: three authored blueprints
+  plus a one-line fixture corpus, D25 having just removed every
+  compatibility promise before 1.0, and a logic-free tree
+  converting mechanically in BOTH directions (Packer ran exactly
+  the JSON→HCL2 migration and survived it — D18 read that as
+  evidence for JSON, and it is equally evidence that the mistake
+  is cheap to unwind). What does not unwind is a language living
+  inside JSON strings: Helm's `{{ }}` and CloudFormation's
+  `Fn::`/`!Sub` are unremovable not because the host format was
+  wrong but because, once authors depend on the sublanguage, it
+  must be carried alongside whatever replaces it. THE ROUND'S
+  GOVERNING FIND: the irreversible decision was never JSON vs
+  HCL2 — it is HOW MUCH LANGUAGE IS ALLOWED INSIDE THE STRINGS,
+  and D18's growth rule governed only tree extensions, which is
+  why D24 could widen the string surface without tripping any
+  recorded rule.
+
+  B — HCL2 DECLINED STRUCTURALLY, NOT "NOT YET". D18 declined
+  "HCL2 NOW" on evaluator cost — a timing argument, which
+  guarantees the question returns every time the cost estimate
+  moves. The permanent objection is P7 with P6: blueprints are
+  documents the embedding API emits as well as reads, and an HCL2
+  WRITER outside Go effectively does not exist (`hclwrite` is
+  Go-only; `python-hcl2` parses without round-tripping). Adopting
+  HCL2 gives every non-Go binding a lossy, read-only relationship
+  with the project's primary authoring format — a P7 violation on
+  day one, not a deferred bill. Scale seconds it: real blueprints
+  are 34–43 lines, and the one live growth pressure (member
+  itemization) is the one place D22 forbids a language from
+  helping — names must be static, the catalog can never depend on
+  a download. HCL2 moves from the deferred column to the closed
+  one. YAML, TOML, and KDL are unchanged and stay declined on
+  D18's reasoning.
+
+  C — THE REACH TRIM: CLOSED VOCABULARIES STAY STATIC. D24 widened
+  `${…}` to any value not participating in identity or resolution
+  structure, arguing from surface symmetry with the script
+  language (G6) rather than from named cases. Reach is
+  ASYMMETRIC — widening it later is backward-compatible,
+  narrowing it is not — so the burden of proof belongs on the
+  widening, and the symmetry argument does not discharge it.
+  Tested against demand, the positions separate: `location`,
+  `parameters` values, and `description` have named cases (D22's
+  supply seam; prose), and the open numerics `memory` / `cpus` /
+  `size` are plausible and cheap. THE CLOSED VOCABULARIES HAVE NO
+  NAMED CASE AND CARRY THE WHOLE COST: `platform`, `backend`,
+  `materialize`, `controller`, and `control-planes` items are
+  where a published schema's completion is most valuable and
+  where a reference destroys it. THE RULE, ONE CLAUSE ADDED TO
+  D24'S: A REFERENCE MAY NOT SUPPLY A CLOSED-VOCABULARY VALUE.
+  `platform` is the sharpest instance — P10 has it never inferred
+  and always from the blueprint, and a `${…}` platform is a
+  runtime-decided platform in all but name. This trades a measure
+  of G6 symmetry for U4/U5 editor completion knowingly: the
+  blueprint's enums are a fixed catalog the script language has
+  no counterpart to, so the surfaces are not actually divergent
+  where authors feel it.
+  `sha256` IS KEPT INTERPOLABLE (weighed and declined for
+  exclusion): a hash is not a closed vocabulary, so excluding it
+  would cost the rule its one-clause shape; and it would NOT buy
+  back parse-time validation, since what forces the
+  `sha256`-required-once-remote check to resolution time is a
+  REFERENCED LOCATION RUNG, not the hash field. D24's two-phase
+  validation stands unchanged.
+
+  D — THE STRING-GRAMMAR CLOSURE: OPERATIONS ARE CLOSED,
+  NAMESPACES ARE OPEN. The `${…}` body is CLOSED at D24's shape
+  and does not grow. Stated as the character class it already
+  is — the whole closure, and the only test needed:
+
+      ^\$\{[A-Za-z0-9._:/-]+\}$
+
+  Every character is load-bearing today: `:` separates the
+  qualifier (the text before the first colon), `/` separates the
+  containment path (exactly one), `.` carries the property
+  dot-path and is legal in a media name, `_` and `-` are
+  media-name charter characters. CLOSED PERMANENTLY: every
+  operator — defaults (`${key:-x}`), pipes and filters, calls,
+  indexing, arithmetic, comparison, ternaries, nesting
+  (`${${a}}`), and any second escape. They share one property
+  that makes the closure mechanical rather than a matter of
+  judgment: EVERY ONE OF THEM NEEDS A CHARACTER OUTSIDE THE
+  CLASS. A proposal that does not fit the regex is a LAYER-SWITCH
+  SIGNAL, never a grammar extension — which is the point of
+  deciding now, because each such feature will arrive with a
+  real user and a good case, and unanimous individual
+  justification is exactly how the Helm shape is reached.
+  OPEN: new QUALIFIERS — `env:`, `file:`, `machine:`, `script:`,
+  `landmark:`, `secret:` already reserved by D24 — because a
+  qualifier names a NAMESPACE TO LOOK IN, never an OPERATION TO
+  PERFORM, and adding one costs no new character. UNAFFECTED: the
+  script language's `${key}` is the narrower unqualified form
+  (script-spec.md, `interpolation = "${" , name , "}"`) and is
+  already inside the class; the closure is not a reason to
+  harmonize it upward.
+
+  E — THE LAYER SWITCH IS A SEPARATE KIND, NEVER A WIDENING OF
+  `.rlqb`. D18 named Jsonnet the leading evaluation layer on the
+  ground that JSONC is already valid Jsonnet — VERIFIED and it
+  holds (Jsonnet takes `//`, `/* */`, `#`, and trailing commas;
+  the JSON escape set is identical; `${…}` has no meaning in a
+  Jsonnet string and passes through literally, escape included),
+  so every existing blueprint would carry over byte-identical.
+  But the free migration belongs to the DOCUMENTS, not to the
+  DECISION: the day `.rlqb` means "evaluate as Jsonnet" the
+  format can never narrow back, and schema validation and
+  completion die for every file in the format, including the
+  large majority that never wanted computation — the exact cost
+  D18 bought JSON to avoid. THEREFORE, WHENEVER IT COMES: the
+  evaluation layer is a DISTINCT FILE KIND or an EXPLICIT STEP (a
+  `.rlqb.jsonnet` evaluated to a `.rlqb`, or an evaluate flag),
+  so plain `.rlqb` keeps its schema, completion, and strictness
+  permanently and the power user opts in per file. Recorded
+  against the day, not scheduled; the packaging cost (Python
+  Jsonnet means native bindings and Windows wheel availability)
+  is a known input to that decision, not a blocker to this one.
+
+  WEIGHED AND DECLINED: migrating to HCL2 (B); reverting D24's
+  reach wholesale to D22's whole-value-only rule (the named cases
+  are real and D24's argument for them stands — only the
+  unnamed closed-vocabulary positions are trimmed); excluding
+  `sha256` from reach (C); harmonizing the script `${…}` upward
+  to the qualified form (nothing asks for it); gating the grammar
+  closure on evidence (the inversion this entry exists to
+  prevent — evidence-gating is right for reach, where the change
+  is cheap in the safe direction, and wrong for grammar, where it
+  is not).
+  FOLDED: this entry; machine-blueprint.md ("Format stability" —
+  the growth rule gains the string-grammar closure and the
+  separate-kind rule); ROADMAP milestone 7 (the decide-first
+  block and deliverable 1's reference-grammar paragraph — the
+  reach exclusion lands with the parser, and deliverable 5's
+  schema keeps its enums unpolluted). No landed code changes:
+  the reference grammar is unimplemented, and
+  blueprint-schema-v1.json is the milestone-6 schema deliverable
+  5 replaces.
+
 - D25 — THE COMPATIBILITY HORIZON MOVES TO 1.0 — DECIDED (owner,
   2026-07-23). Supports P9 (which it amends). A principle
   amendment, argued and approved as one under the

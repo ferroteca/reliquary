@@ -1936,7 +1936,12 @@ reference grammar battery): the shape D22 settled holds, with the
 escape amended to `\${` and the reach widened to full
 interpolation anywhere a string value is accepted, under the rule
 that a reference may supply any value that does not participate
-in identity or resolution structure. Everything else was already
+in identity or resolution structure — as trimmed by D26 (the
+reach trim and the string-grammar closure), which adds one clause
+to that rule, no reference may supply a closed-vocabulary value,
+and closes the `${…}` body itself: operations closed at the
+character class `[A-Za-z0-9._:/-]`, namespaces (new qualifiers)
+open. Everything else was already
 settled (optional root `type` defaulting to media; the plural
 sections retired, a lone spec object kept as sugar for the array
 of one; the source type and composition declined).
@@ -1982,7 +1987,12 @@ Deliverables:
    unqualified `${key}` interpolating anywhere a string value is
    accepted, `\${` the literal escape, resolved text never
    re-scanned, references refused in `name` / `type` / `children`
-   paths / object keys, qualified `${media:…}` whole-value with
+   paths / object keys and — under D26's trim — in the closed
+   vocabularies (`platform`, `backend`, `materialize`,
+   `controller`, `control-planes` items), the `${…}` body itself
+   closed to the character class `[A-Za-z0-9._:/-]` so that a
+   body carrying any operator is a parse error naming the
+   malformed reference, qualified `${media:…}` whole-value with
    its optional `/<path>` second component (bare form =
    `{"parent": …}`, no path), unknown and reserved qualifiers
    failing closed, path suffixes normalized against `..` /
@@ -2021,7 +2031,10 @@ Deliverables:
 5. One published blueprint JSON Schema — the two-variant root,
    machine requiring its declared `type`, media accepting its
    absence — replacing the two milestone-6 schemas; the
-   conformance corpus reworked to the revised format.
+   conformance corpus reworked to the revised format. The closed
+   vocabularies stay plain `enum`s, never widened to admit a
+   reference pattern — which is what D26's reach trim buys, and
+   the completion it protects is the point (U4, U5).
 6. The specs realigned as normative: blueprint-model.md rewritten
    first as the revision's worked design, then
    machine-blueprint.md + field reference + cookbook,
