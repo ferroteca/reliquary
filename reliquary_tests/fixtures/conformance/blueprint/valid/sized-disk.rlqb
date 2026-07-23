@@ -1,0 +1,17 @@
+{
+  "platform": "dos",
+  "backend": "qemu",
+  "memory": "32M",
+  "cpus": 2,
+  "name": "workbench-1",
+  "description": "a sized hard disk with removable slots",
+  "drives": {
+    "hdd0": {"size": "20M"},
+    "cdrom0": null,
+    "floppy0": null
+  },
+  "boot": ["hdd0", "cdrom0"],
+  "control-planes": ["agentless-display"],
+  "scripts": {"install": "workbench-install"},
+  "backend-settings": {"qemu": {}}
+}

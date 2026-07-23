@@ -233,7 +233,9 @@ umbrella list stays complete; not milestone 4):
 - the static-conformance fixture corpus (ROADMAP milestone 6,
   deliverable 6): valid and invalid documents, run against
   both the parsers and the authored JSON Schemas
-  (DECISIONS.md, the schema round)
+  (DECISIONS.md, the schema round) — LANDED with milestone 6 T7
+  (see below): `test_conformance_corpus.py` +
+  `reliquary_tests/fixtures/conformance/`
 - the error taxonomy under parity (ROADMAP milestone 8):
   ReliquaryError the root; StaticError(2) / PreflightError(3) /
   RunFailure(4) / RunCancelled(5)
@@ -255,8 +257,7 @@ umbrella list stays complete; not milestone 4):
   the unusual requirement to check them against
 - new media definition surface (ROADMAP milestone 6):
   definition-level description /
-  notes / redistributable-under (the built-in URL
-  licensing-assertion field), archive-level local-path;
+  notes, archive-level local-path;
   sourceless definitions fail resolution with the
   edit-the-definition error
 - CLI fetch/clean commands + API parity (ROADMAP milestone 6):
@@ -310,8 +311,8 @@ T5; T6 and T7 run beside it.
    (difference/duplicate), `hostdir`, `enabled`, `control-planes`,
    `backend-settings`, and `parameters`, with format and
    QEMU-derived capability checks failing closed; add
-   definition-level `description` / `notes` /
-   `redistributable-under` to `MediaDefinition`.
+   definition-level `description` / `notes` to `MediaDefinition`
+   (`redistributable-under` was added here and later removed in T7).
    LANDED (2026-07-22): `blueprint.py` validates the full field
    reference — all four drive content sources plus
    `controller`/`enabled`, and the top-level `backend` / `cpus` /
@@ -450,6 +451,23 @@ T5; T6 and T7 run beside it.
    settles; the shared valid/invalid fixture corpus run against
    both parser and schema; `planning/examples/` audited to the
    implemented shapes.
+   LANDED (2026-07-23): `planning/design/machine-state.schema.json`
+   authored for `reliquary-machine.json` (identity core required,
+   resolved fields + drives typed, transitional partial states
+   allowed); the blueprint schema's `name`/`description` synced to
+   the T6 id-safe-identity semantics. The shared corpus lives at
+   `reliquary_tests/fixtures/conformance/{blueprint,media}/{valid,invalid}/`
+   and `test_conformance_corpus.py` runs every fixture against both
+   the parser (always) and the schema (skipped when `jsonschema` — a
+   new dev dep — or the repo schemas are absent), plus a real
+   materialized state against the state schema. The corpus forced two
+   parser/schema reconciliations: the media parser now rejects unknown
+   keys (it silently ignored them), and the codex media definitions'
+   mis-spelled `redistribution` key was caught — the whole
+   `redistributable-under` field was then removed as overkill (owner,
+   2026-07-23; the codex URL-licensing rule is now maintainer
+   discipline, not a field). `planning/examples/` audited clean:
+   blueprint + media parse and are schema-valid, both scripts parse.
 
 ## Language
 
@@ -583,6 +601,20 @@ dependency order:
 
 ## Wishlist
 
+- new command to download a file and add its definition to the user
+  asset library in one step (owner request, 2026-07-22): point it at
+  a URL (or local file), it downloads/reads the payload, computes the
+  sha256, and scaffolds a `.rlqm` media definition into the home
+  `media/` (the user asset library — home mode), so a user need not
+  hand-author a definition and then `fetch-media` it. Open shape
+  questions: the command noun (`add-media` / `import-media` /
+  `capture-media`?); item- vs archive-form scaffolding (an archive
+  needs itemization the tool can't infer — prompt or item-form only?);
+  name/file derivation (reuse the media-spec derivation chain); how it
+  relates to `fetch-media` (which downloads an already-authored
+  definition) and to the residency model (it targets the home library,
+  so it is a home-mode convenience, not a `--assets` project action);
+  and CLI+API parity (a twin returning the written definition path).
 - new command diff-blueprint <name>: diff the user blueprint
   against the codex blueprint of the same name
 - CLI, from cli help: --version should be `version` with an

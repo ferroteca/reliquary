@@ -31,7 +31,7 @@ dependencies = ["lark", "pillow", "qemu.qmp"]
 Homepage = "https://github.com/ferroteca/reliquary"
 
 [dependency-groups]
-dev = ["build", "twine"]
+dev = ["build", "twine", "jsonschema"]
 
 [project.scripts]
 rlq = "reliquary:main"
@@ -48,4 +48,4 @@ reliquary = [
     "codex/media/*.rlqm",
     "codex/scripts/*.rlqs",
 ]
-reliquary_tests = ["fixtures/*"]
+reliquary_tests = ["fixtures/*", "fixtures/**/*"]

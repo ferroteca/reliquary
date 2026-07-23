@@ -24,7 +24,7 @@ workflow:
   its `media`/`base.media` references (backend capability checks and `base`/`hostdir` materialization ride later
   milestone-6 work), scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
   fails closed while any machine of that blueprint exists), `media.py` owns media definitions
-  (parsing including the definition-level `description`/`notes`/`redistributable-under` annotations, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
+  (parsing including the definition-level `description`/`notes` annotations and unknown-key rejection, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
   machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
@@ -87,10 +87,13 @@ workflow:
   (CLI reference, Python API reference, blueprint guide, DOS
   automation). Design documents
   and planned interfaces live in `planning/design/` — the directory
-  is the classification; file names carry no suffix. The blueprint
-  and media-definition JSON Schemas (`*.schema.json`) sit beside
-  their specs there and must stay synchronized with them (the prose
-  specs are normative). Placement rules
+  is the classification; file names carry no suffix. The blueprint,
+  media-definition, and machine-state JSON Schemas (`*.schema.json`)
+  sit beside their specs there and must stay synchronized with them
+  (the prose specs are normative); the shared valid/invalid
+  conformance corpus (`reliquary_tests/fixtures/conformance/`,
+  `test_conformance_corpus.py`) runs every fixture against both the
+  parser and the schema so the two cannot drift. Placement rules
   are in `.agents/skills/documentation-rules.md`.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a

@@ -1,0 +1,6 @@
+// a JSONC media definition
+{
+  "name": "commented",
+  "file": "C.IMG",
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", /* verified on every use */
+}

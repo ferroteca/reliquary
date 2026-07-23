@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reliquary machine state",
+  "description": "Synchronized companion to the instance model (instance-model.md), which remains normative. Describes reliquary-machine.json — the per-machine state document reliquary writes under cache/machines/<id>/. reliquary authors this file (canonical strict JSON, no comments); the schema documents the recorded-output contract for consumers reading it out-of-band. Schema validity never implies a live, consistent machine: identity verification, lifecycle reconciliation, media re-verification, and the blueprint-digest/blueprint-source selection rules live in the instance model only. Only the identity core (id, blueprint, created, phase, generation) is required, because a machine caught mid-create carries just that transitional subset; a fully materialized (ready/running) machine additionally carries the resolved fields and drives below. The running VM's identity and port live in a separate vm.json, not here. No $schema field is written pre-beta.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The machine id, <blueprint>-<n>: the blueprint name (identity) and the lowest-free non-negative number at create time.",
+      "type": "string",
+      "pattern": "^.+-(0|[1-9][0-9]*)$"
+    },
+    "blueprint": {
+      "description": "The blueprint's identity name (its declared name, else its file stem) — the id's stem and the name-selection key.",
+      "type": "string",
+      "minLength": 1
+    },
+    "created": {
+      "description": "Creation timestamp, UTC ISO 8601 to the second (YYYY-MM-DDThh:mm:ssZ).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "phase": {
+      "description": "Lifecycle phase. The three transitional phases (creating/stopping/destroying) mark an operation in flight, reconciled at the next op.",
+      "enum": ["creating", "ready", "running", "stopping", "destroying"]
+    },
+    "generation": {
+      "description": "Operation generation: a monotonic counter bumped once per mutating operation, so an interrupted operation is detectable by phase and generation.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "backend-id": {
+      "description": "The stable per-machine backend identity (reliquary-<id>), regenerated into the backend at each start.",
+      "type": "string",
+      "minLength": 1
+    },
+    "blueprint-digest": {
+      "description": "sha256:<hex> over the resolved blueprint snapshot (cache paths excluded), so two machines of one blueprint share it and apply/start can detect blueprint drift.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "blueprint-source": {
+      "description": "Absolute path of the blueprint file this machine resolved from, recorded for --blueprint selection scoping. Absent when the machine was created without a source path.",
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "description": "The resolved guest platform.",
+      "enum": ["dos", "openbsd", "win9x", "winnt"]
+    },
+    "backend": {
+      "description": "The resolved virtualization backend.",
+      "type": "string",
+      "minLength": 1
+    },
+    "memory": {
+      "description": "Resolved guest memory in whole MiB.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "cpus": {
+      "description": "Resolved virtual CPU count.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "boot": {
+      "description": "Resolved boot order: declared drive keys in order.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/driveKey"}
+    },
+    "name": {
+      "description": "The blueprint's declared identity name, or null when it defaulted to the file stem.",
+      "type": ["string", "null"]
+    },
+    "description": {
+      "description": "The blueprint's human description, or null.",
+      "type": ["string", "null"]
+    },
+    "scripts": {
+      "description": "The blueprint's script label -> stem map.",
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "control-planes": {
+      "description": "The resolved ordered control-plane policy.",
+      "type": "array",
+      "items": {"enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]}
+    },
+    "backend-settings": {
+      "description": "The blueprint's per-backend settings sections, carried through verbatim.",
+      "type": "object"
+    },
+    "drives": {
+      "description": "The resolved, enabled drives keyed by drive key. Each entry carries the drive's medium and slot plus the realized cache path (an image file, a host directory, or null for an empty removable slot).",
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/driveState"}
+    }
+  },
+  "required": ["id", "blueprint", "created", "phase", "generation"],
+  "additionalProperties": false,
+  "$defs": {
+    "driveKey": {
+      "type": "string",
+      "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
+    },
+    "driveState": {
+      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; exactly one content shape (size, media, base, or hostdir) is realized, with path the cache location (or null for an empty removable slot). media is null in an empty removable slot.",
+      "type": "object",
+      "properties": {
+        "medium": {"enum": ["floppy", "hdd", "cdrom"]},
+        "slot": {"type": "integer", "minimum": 0},
+        "controller": {"enum": ["ide", "sata", "scsi", "nvme", "virtio"]},
+        "size": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[KkMmGgTt]$"
+        },
+        "media": {"type": ["string", "null"]},
+        "base": {
+          "type": "object",
+          "properties": {
+            "media": {"type": "string", "minLength": 1},
+            "type": {"enum": ["difference", "duplicate"]}
+          },
+          "required": ["media", "type"],
+          "additionalProperties": false
+        },
+        "hostdir": {"type": "string", "minLength": 1},
+        "path": {"type": ["string", "null"]}
+      },
+      "required": ["medium", "slot"],
+      "additionalProperties": false
+    }
+  }
+}

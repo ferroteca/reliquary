@@ -7,8 +7,8 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the definition core is implemented: both forms with
 > their derived defaults, `file-extension`, `local-path`, the
-> definition-level annotation fields (`description`, `notes`,
-> `redistributable-under`), library scanning with duplicate
+> definition-level annotation fields (`description`, `notes`),
+> unknown-key rejection, library scanning with duplicate
 > detection, hash-verified fetching and extraction with the
 > mismatched-file contract, JSONC acceptance, and the `fetch-media`
 > and `clean-` commands. Mirror URL lists are not implemented yet;
@@ -331,14 +331,10 @@ above:
   [the codex](codex.md)).
 - **`notes`** — optional. Free-form prose for anything longer:
   provenance, licensing context, why a particular mirror.
-  reliquary never interprets it.
-- **`redistributable-under`** — optional. The explicit assertion
-  that the payload's own licensing permits redistribution,
-  naming the license (`"GPL-2.0-or-later"`, say). Its presence
-  is the assertion; reliquary records and displays it but cannot
-  verify a license. A built-in definition may carry a `url` only
-  when it also carries this field — the
-  [codex's licensing rule](codex.md#non-redistributable-media).
+  reliquary never interprets it. (Whether a codex definition may
+  carry a `url` at all is a maintainer discipline — the
+  [codex's licensing rule](codex.md#non-redistributable-media) —
+  not a field reliquary records.)
 
 ### Derived defaults, worked through
 

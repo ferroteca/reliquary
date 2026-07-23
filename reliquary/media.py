@@ -19,6 +19,26 @@ from .home import downloads_cache_dir, media_cache_dir, media_dir
 _CHUNK = 1024 * 1024
 _SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
 
+# The canonical key sets per definition form. Unknown keys are
+# rejected so a mis-spelled field is a loud error rather than a
+# silently ignored no-op — matching media-definition.schema.json's
+# ``additionalProperties: false``.
+_ANNOTATION_KEYS = frozenset({"description", "notes"})
+_ITEM_FORM_KEYS = frozenset(
+    {"name", "file", "file-extension", "sha256", "url", "local-path"}
+) | _ANNOTATION_KEYS
+_ARCHIVE_FORM_KEYS = frozenset(
+    {"archive", "sha256", "url", "local-path", "items"}) | _ANNOTATION_KEYS
+_ARCHIVE_ITEM_KEYS = frozenset(
+    {"name", "file", "path", "file-extension", "sha256", "local-path"})
+
+
+def _reject_unknown_keys(data, allowed, what):
+    unknown = set(data) - allowed
+    if unknown:
+        raise ValueError(
+            f"unknown {what} key(s): {', '.join(sorted(unknown))}")
+
 
 def _sha256(path):
     digest = hashlib.sha256()
@@ -68,12 +88,10 @@ class MediaDefinition:
     entries its items are extracted from. Mirror URL lists and
     several definitions sharing one archive are milestone 2.
 
-    ``description``, ``notes``, and ``redistributable_under`` are the
-    optional definition-level annotations (valid in either form):
-    a one-line description read into listings and ``search``,
-    free-form provenance/licensing prose reliquary never interprets,
-    and the explicit redistribution-licensing assertion naming the
-    license (the codex's URL licensing rule — media-spec.md).
+    ``description`` and ``notes`` are the optional definition-level
+    annotations (valid in either form): a one-line description read
+    into listings and ``search``, and free-form provenance prose
+    reliquary never interprets.
     """
     items: Tuple[MediaItem, ...]
     url: Optional[str] = None
@@ -81,7 +99,6 @@ class MediaDefinition:
     archive_sha256: Optional[str] = None
     description: Optional[str] = None
     notes: Optional[str] = None
-    redistributable_under: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +156,8 @@ def _parse_item(data, url=None, archived=False):
     if not isinstance(data, dict):
         raise ValueError(
             f"items entries must be objects, got {type(data).__name__}")
+    if archived:
+        _reject_unknown_keys(data, _ARCHIVE_ITEM_KEYS, "archive item")
     if "sha256" not in data:
         raise KeyError("sha256 is required")
     _validate_sha256(data["sha256"])
@@ -174,14 +193,12 @@ def _parse_item(data, url=None, archived=False):
 def _definition_annotations(data):
     """Return the optional definition-level annotation fields.
 
-    ``description`` / ``notes`` / ``redistributable-under`` are valid
-    at the top level of either definition form (media-spec.md).
+    ``description`` / ``notes`` are valid at the top level of either
+    definition form (media-spec.md).
     """
     return {
         "description": _optional_string(data, "description"),
         "notes": _optional_string(data, "notes"),
-        "redistributable_under": _optional_string(
-            data, "redistributable-under"),
     }
 
 
@@ -201,6 +218,7 @@ def parse_definition(data):
     if "archive" in data:
         raise ValueError(
             "archive is only valid in the archive form (with items)")
+    _reject_unknown_keys(data, _ITEM_FORM_KEYS, "media definition")
     url = _parse_url(data)
     return MediaDefinition(items=(_parse_item(data, url=url),), url=url,
                            **_definition_annotations(data))
@@ -208,6 +226,7 @@ def parse_definition(data):
 
 def _parse_archive_definition(data):
     """Parse the archive form: one source archive, itemized payloads."""
+    _reject_unknown_keys(data, _ARCHIVE_FORM_KEYS, "media definition")
     if "sha256" not in data:
         raise KeyError("sha256 is required")
     _validate_sha256(data["sha256"])

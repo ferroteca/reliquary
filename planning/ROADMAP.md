@@ -306,10 +306,9 @@ The `seed-` family is the explicit extraction command; implicit extraction on
 first reference makes the common case one command from a clean
 home. A top-priority licensing rule
 governs its media
-definitions: a codex definition may carry a `url` only
-alongside an explicit assertion that the media's licensing
-permits redistribution, and no change adding a URL is accepted
-without it. The codex deliberately covers non-redistributable
+definitions: a codex definition may carry a `url` only when that
+download is legally redistributable — a maintainer discipline
+enforced at review, not a per-definition field. The codex deliberately covers non-redistributable
 operating systems too: those blueprints ship media definitions
 with hashes but no URLs, and materialization fast-fails naming
 the missing media until the user supplies it by adding their own
@@ -1862,8 +1861,8 @@ Deliverables:
    string-aware, comments replaced by spaces so error positions
    survive; every machine-written file stays strict JSON), the
    remaining media-definition
-   surface (definition-level `description` / `notes` /
-   `redistributable-under`, archive-level `local-path`,
+   surface (definition-level `description` / `notes`,
+   archive-level `local-path`,
    sourceless definitions failing resolution naming the
    definition to edit), API parity for the media commands
    (`fetch_media(script=)`, `clean_downloads()`,

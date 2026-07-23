@@ -96,19 +96,15 @@ copies files verbatim, comments included.
 
 ## Non-redistributable media
 
-**Top-priority rule: a codex media
-definition may carry a
-`url` only when it also carries the
-[`redistributable-under` field](media-spec.md#definition-level-fields)
-— the explicit assertion that the media's own licensing permits
-redistribution, naming the license** (e.g. FreeDOS's
-`"GPL-2.0-or-later"`). The assertion lives in the definition
-itself, so the claim travels with the URL it justifies. No change
-adding or altering a URL in a codex
-media definition is accepted without it; absent the assertion, a
-codex definition ships hashes only. This is what keeps the
-codex shippable: reliquary never points at — or fetches —
-media it has no right to distribute or induce the download of.
+**Top-priority rule: a codex media definition may carry a `url`
+only when that download is legally redistributable — media whose
+own licensing permits reliquary to point at and fetch it** (e.g.
+the FreeDOS LiveCD under the GNU GPL, or the official OpenBSD
+install media). This is a maintainer discipline enforced at review,
+not a per-definition field: reliquary attaches no licensing
+metadata to a definition and cannot verify a license. The rule is
+what keeps the codex shippable — reliquary never points at, or
+induces the download of, media it has no right to distribute.
 
 The codex deliberately includes blueprints for operating systems
 whose installation media cannot be distributed — Windows and other

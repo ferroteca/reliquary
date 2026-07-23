@@ -53,11 +53,6 @@
       "description": "Free-form prose: provenance, licensing context, why a particular mirror. reliquary never interprets it.",
       "type": "string"
     },
-    "redistributableUnder": {
-      "description": "The explicit assertion that the payload's own licensing permits redistribution, naming the license. Its presence is the assertion; reliquary records and displays it but cannot verify a license.",
-      "type": "string",
-      "minLength": 1
-    },
     "itemForm": {
       "description": "Item form — one definition, one item: the URL points at the media image itself and the download lands directly in the media cache. A payload that arrives inside an archive always uses the archive form.",
       "type": "object",
@@ -75,8 +70,7 @@
         "url": {"$ref": "#/$defs/url"},
         "local-path": {"$ref": "#/$defs/localPath"},
         "description": {"$ref": "#/$defs/descriptionField"},
-        "notes": {"$ref": "#/$defs/notesField"},
-        "redistributable-under": {"$ref": "#/$defs/redistributableUnder"}
+        "notes": {"$ref": "#/$defs/notesField"}
       },
       "required": ["sha256"],
       "additionalProperties": false,
@@ -110,8 +104,7 @@
           "items": {"$ref": "#/$defs/archiveItem"}
         },
         "description": {"$ref": "#/$defs/descriptionField"},
-        "notes": {"$ref": "#/$defs/notesField"},
-        "redistributable-under": {"$ref": "#/$defs/redistributableUnder"}
+        "notes": {"$ref": "#/$defs/notesField"}
       },
       "required": ["sha256", "items"],
       "additionalProperties": false

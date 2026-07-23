@@ -256,12 +256,10 @@ class BuiltinMediaDefinitionTests(unittest.TestCase):
             cls._raw = jsonc.load(handle)
         cls._parsed = parse_definition(cls._raw)
 
-    def test_url_carrying_definition_has_redistribution_assertion(self):
-        """Built-in definitions with a URL must assert redistribution rights."""
+    def test_url_carrying_definition_parses(self):
+        """The shipped LiveCD definition carries a URL and parses."""
         self.assertIn("url", self._raw)
-        self.assertIn("redistribution", self._raw)
-        self.assertIsInstance(self._raw["redistribution"], str)
-        self.assertTrue(self._raw["redistribution"].strip())
+        self.assertEqual(self._parsed.url, self._raw["url"])
 
     def test_livecd_item_identifies_correct_file(self):
         self.assertEqual(self._parsed.items[0].name, "freedos-1.4-livecd")
@@ -288,11 +286,9 @@ class BuiltinOpenBsdDefinitionTests(unittest.TestCase):
             cls._raw = jsonc.load(handle)
         cls._parsed = parse_definition(cls._raw)
 
-    def test_url_carrying_definition_has_redistribution_assertion(self):
+    def test_url_carrying_definition_parses(self):
         self.assertIn("url", self._raw)
-        self.assertIn("redistribution", self._raw)
-        self.assertIsInstance(self._raw["redistribution"], str)
-        self.assertTrue(self._raw["redistribution"].strip())
+        self.assertEqual(self._parsed.url, self._raw["url"])
 
     def test_install_iso_item_identifies_correct_file(self):
         self.assertEqual(self._parsed.items[0].name, OPENBSD_MEDIA)

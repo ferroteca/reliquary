@@ -13,6 +13,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Published the machine-state JSON Schema
+  (`planning/design/machine-state.schema.json`) for
+  `reliquary-machine.json`, alongside the blueprint and
+  media-definition schemas. A shared valid/invalid conformance corpus
+  (`reliquary_tests/fixtures/conformance/`) now runs every fixture
+  against both the parser and the schema so the two cannot drift
+  (schema checks use `jsonschema`, a dev dependency, and skip when it
+  or the repo schemas are absent).
 - Authored-asset residency: a single global `--assets <dir>` flag
   (API `assets=`) selects where blueprints, media definitions, and
   scripts resolve from. Without it, **home mode** resolves from the
@@ -131,6 +139,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   declared — not a display label; human prose belongs in
   `description`. `new-blueprint` no longer writes a `version`
   field — blueprints carry no version pre-beta.
+- Media definitions now reject unknown keys (matching the schema's
+  `additionalProperties: false` and the blueprint parser), so a
+  mis-spelled field is a loud error instead of a silently ignored
+  no-op.
 
 ### Fixed
 
@@ -150,6 +162,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are created and driven through `create-machine` / `start-machine`
   (selector required) and `run-script`. No backward compatibility is
   kept before beta.
+- The media-definition `redistributable-under` field is removed as
+  overkill: reliquary attaches no licensing metadata to a definition.
+  Whether a codex definition may carry a `url` is now a maintainer
+  discipline (the codex may only link to legally redistributable
+  downloads), not a per-definition field.
 
 ## 0.1.0.dev1 - 2026-07-22
 

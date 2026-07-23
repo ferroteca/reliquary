@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "reliquary machine blueprint",
-  "description": "Synchronized companion to the machine blueprint specification (machine-blueprint.md and machine-blueprint-reference.md), which remains normative. This schema covers the per-document structural subset of the format checks: schema validity never implies blueprint validity — media-name resolution, cross-document rules, and every backend capability check live in the specification only. It validates the parsed document: blueprints accept the JSONC dialect (comments and trailing commas), which is invisible at this level. Blueprints carry no $schema field pre-beta; editors bind this schema to *.rlqb by file association. The machine state (reliquary-machine.json) is a separate document type whose schema lands with the instance-model implementation; its state-only fields are rejected here as unknown keys.",
+  "description": "Synchronized companion to the machine blueprint specification (machine-blueprint.md and machine-blueprint-reference.md), which remains normative. This schema covers the per-document structural subset of the format checks: schema validity never implies blueprint validity — media-name resolution, cross-document rules, and every backend capability check live in the specification only. It validates the parsed document: blueprints accept the JSONC dialect (comments and trailing commas), which is invisible at this level. Blueprints carry no $schema field pre-beta; editors bind this schema to *.rlqb by file association. The machine state (reliquary-machine.json) is a separate document type with its own schema (machine-state.schema.json); its state-only fields are rejected here as unknown keys.",
   "type": "object",
   "properties": {
     "platform": {
@@ -13,12 +13,12 @@
       "enum": ["qemu", "virtualbox", "vmware", "hyperv"]
     },
     "name": {
-      "description": "Human-readable display name for the blueprint, distinct from the file-stem identity. A presentation label only — never a selection key; the stem remains the one selector. Feeds search and appears in listings. Present in the state.",
+      "description": "The blueprint's identity — the selection key. Declared, it overrides the filename stem; omitted, identity is the stem. Because it becomes a machine-id segment and a cache directory name it must be id-safe: a leading alphanumeric then alphanumerics, '.', '_', or '-'. It must not be all digits (a rule beyond this pattern). Present in the state.",
       "type": "string",
-      "minLength": 1
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
     "description": {
-      "description": "Human-readable description. No effect on machine behavior; feeds search alongside name. The file stem remains the blueprint's one selection key; name is a display label, not an identity.",
+      "description": "Human-readable description — the blueprint's free-text label, now that name is an id-safe identity. No effect on machine behavior; feeds search alongside the name and platform.",
       "type": "string"
     },
     "scripts": {

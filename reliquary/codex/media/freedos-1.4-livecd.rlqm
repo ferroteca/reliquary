@@ -1,7 +1,5 @@
 {
-  "name": "freedos-1.4-livecd",
   "description": "FreeDOS 1.4 LiveCD installation image",
-  "redistribution": "FreeDOS 1.4 is free software distributed under the GNU GPL; its LiveCD may be redistributed, so this definition may carry its download URL.",
   "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
   "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
   "items": [
