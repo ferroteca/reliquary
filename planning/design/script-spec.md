@@ -1059,7 +1059,7 @@ from 1.0 it grows additively only — new event kinds and new
 fields may appear in any release, an existing field never
 changes type or meaning, and a removal or rename is a breaking
 change — and consumers must ignore unknown event kinds and
-unknown fields. Pre-beta the shapes track this spec with no
+unknown fields. Pre-1.0 the shapes track this spec with no
 stability promise. The human renderings (`pretty`/`plain`) are
 deliberately uncontracted; the machine surfaces are this
 stream, `--json` documents, exit codes, and the run record's

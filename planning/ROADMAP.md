@@ -607,14 +607,15 @@ surfaces are exactly four — exit codes (the error classes),
 files. Pretty and plain output are explicitly uncontracted —
 free to change any release: machine consumers get machine
 surfaces, and nobody freezes the human rendering by depending
-on it. From beta the machine surfaces grow additively only —
-new event kinds and new fields may appear in any release, an
-existing field never changes type or meaning, and a removal or
-rename is a breaking change — and consumers must ignore unknown
-event kinds and unknown fields. Pre-beta there is no stability
-promise; shapes track the specs and the CHANGELOG records
-changes. The version-field spelling stays with the beta
-format-versioning decision ("Decisions still needed").
+on it. From 1.0 the machine surfaces grow additively only (the
+horizon moved from beta with D25) — new event kinds and new
+fields may appear in any release, an existing field never
+changes type or meaning, and a removal or rename is a breaking
+change — and consumers must ignore unknown event kinds and
+unknown fields. Pre-1.0 there is no stability promise; shapes
+track the specs and the CHANGELOG records changes. The
+version-field spelling stays with the 1.0 format-versioning
+decision ("Decisions still needed").
 
 ```text
 rlq list-blueprints
@@ -877,7 +878,7 @@ truth** (including the complete typed EBNF), with
 `reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
 reference script. Realigning the implementation — parser, runtime, shipped
 scripts — with it was **milestone 4** (complete);
-see the milestones below. Pre-beta, the superseded surface is
+see the milestones below. Pre-1.0, the superseded surface is
 deleted, not bridged.
 
 **Decided shape: a line-oriented, constrained DSL with one
@@ -1649,7 +1650,7 @@ The July 2026 script-language redesign
 reference script)
 supersedes the surface milestones 1 and 3 implemented.
 This milestone gated everything after it: later milestones
-start only once the tree speaks the new surface. Pre-beta, the
+start only once the tree speaks the new surface. Pre-1.0, the
 old surface is deleted, not bridged.
 
 Decide first: nothing — the gating decisions were settled in

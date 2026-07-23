@@ -667,8 +667,10 @@ the resolved values appear in the state:
 ## Format stability: none, yet
 
 Reliquary is evolving rapidly and **maintains no backward
-compatibility before at least a beta-quality release**. That
-applies to the blueprint format in full:
+compatibility until a GA 1.0 release** (see AGENTS.md, the
+normative home — beta included, where an occasional cushion may
+be granted when warranted but none is promised). That applies to
+the blueprint format in full:
 
 - The format may change shape at any time, without migration
   support.
