@@ -433,6 +433,7 @@ Use stdlib `unittest` and `unittest.mock` unless a compelling reason justifies a
 README.md is a human-facing guide to what Reliquary does, why it exists, and how to use it. Keep it explanatory and
 task-oriented. Do not move agent instructions, implementation constraints, roadmap discussion, or maintenance notes into
 it.
+When Packer and Vagrant are mentioned together in prose, name Packer first and Vagrant second.
 
 After changing commands, flags, paths, behavior, or Python interfaces, update README.md, CHANGELOG.md, and this file
 wherever affected. CHANGELOG updates land under the unreleased section only: released history is never retroactively

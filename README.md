@@ -9,10 +9,10 @@ Reliquary machines are ephemeral: disposable rigs for scripted installs and auto
 recreate. The machine is never the product — often nothing durable comes out at all (the point was to run some tests).
 Reliquary is not a VM manager for machines you keep.
 
-## When to use Vagrant, Packer, openQA, or Reliquary
+## When to use Packer, Vagrant, openQA, or Reliquary
 
 For modern, standard operating-system testing in VMs, start with
-Vagrant and Packer. Packer is the established tool for defining
+Packer and Vagrant. Packer is the established tool for defining
 source-controlled image builds from install media, provisioners, and
 checksummed inputs, then producing reusable VM or cloud artifacts.
 Vagrant is the established tool for source-controlled development and
@@ -30,8 +30,8 @@ guests, boot menus, setup flows before SSH/WinRM/guest tools exist, and
 tests where the screen or installer behavior is the assertion surface.
 
 If your guest can already accept SSH, WinRM, cloud-init, a guest agent,
-or a normal configuration-management/provisioning path, Vagrant and
-Packer are usually the better default. Use Reliquary when the important
+or a normal configuration-management/provisioning path, Packer and
+Vagrant are usually the better default. Use Reliquary when the important
 part of the workflow lives before that point, below it, or outside it.
 
 openQA covers much of that console-driven ground at production scale.
