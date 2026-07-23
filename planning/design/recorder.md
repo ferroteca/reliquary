@@ -54,7 +54,7 @@ The recorder emits a *fragment* — new waits, actions, and assets
 Because the anchor comes from executing that script, not from
 diffing it against a stored base, round-trip is robust to
 arbitrary tailoring: no pristine draft is retained, no merge
-happens. (openQA's interactive mode is the concept precedent —
+happens. (os-autoinst's interactive mode is the concept precedent —
 concepts only, per AGENTS.md.)
 
 **Two tracks, two write boundaries.** A changed screen for an

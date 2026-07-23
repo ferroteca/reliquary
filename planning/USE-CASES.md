@@ -158,7 +158,7 @@ product (planning/ROADMAP.md, "Vision"). Across them runs a control-plane
 arc: agentless operation is at its most useful preparing a
 machine — installing the OS (U1) and bringing the guest to the
 point where an agent exists inside it — and for testing
-installations themselves, openQA-style, where the install is the
+installations themselves, os-autoinst-style, where the install is the
 thing under test and the screen is the assertion surface. Once a
 guest holds an agent, that agent is the better work plane (U3);
 agentless remains the permanent fallback for guests that can

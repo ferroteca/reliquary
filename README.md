@@ -9,7 +9,7 @@ Reliquary machines are ephemeral: disposable rigs for scripted installs and auto
 recreate. The machine is never the product — often nothing durable comes out at all (the point was to run some tests).
 Reliquary is not a VM manager for machines you keep.
 
-## When to use Packer, Vagrant, openQA, or Reliquary
+## When to use Packer, Vagrant, os-autoinst, or Reliquary
 
 For modern, standard operating-system testing in VMs, start with
 Packer and Vagrant. Packer is the established tool for defining
@@ -34,22 +34,19 @@ or a normal configuration-management/provisioning path, Packer and
 Vagrant are usually the better default. Use Reliquary when the important
 part of the workflow lives before that point, below it, or outside it.
 
-openQA covers much of that console-driven ground at production scale.
-It is built for operating-system and system-level workflow testing:
-scheduling many test jobs, booting systems under test, driving
-installers and applications, matching screens with needles, checking
-serial and screen output, and publishing results through a service with
-workers and a web UI. If you need a full openQA-style testing service,
-use openQA. openQA also has mature authoring support around its model,
-especially live debugging and creating or updating needles from captured
-screenshots; its tests are still primarily authored as test modules plus
-needles.
+os-autoinst, the engine under openQA, covers much of that
+console-driven ground at production scale: booting systems under test,
+driving installers and applications, matching screens with needles,
+checking serial and screen output, and recording job artifacts. If you
+need openQA's scheduler, worker farm, web UI, asset management, and job
+history around that engine, use openQA. Reliquary's overlap is with
+os-autoinst itself, not with openQA as a service.
 
 Reliquary lives in the smaller local-tool and embedding-library space.
 It is meant to be run directly from a source tree or a user's machine,
 as a QEMU automation harness a script, test runner, CI job, or coding
 agent can call without adopting a scheduler, worker farm, web service,
-test distribution, or image-needle workflow. Its current strongest case
+or image-needle workflow. Its current strongest case
 is agentless text-mode automation — especially DOS and other guests
 where VGA text, keyboard input, virtual FAT media, and compact run
 records are enough and a larger OS-testing service would be more
