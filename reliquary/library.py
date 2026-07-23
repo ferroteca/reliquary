@@ -107,7 +107,7 @@ def list_builtin_media():
         yield name
 
 
-def seed_blueprint(name, home=None):
+def seed_blueprint(name, context=None):
     """Seed ``blueprints/<name>.rlqb`` from the built-in library.
 
     A home blueprint of that name already exists, or no builtin
@@ -122,13 +122,14 @@ def seed_blueprint(name, home=None):
             return False
 
     # Check for existing destination before creating directory
-    destination = os.path.join(blueprints_dir(home), source.name)
+    destination = os.path.join(blueprints_dir(context), source.name)
     if os.path.exists(destination):
         return False
 
     # Check for legacy home .json IF seeding a .rlqb
     if source.name.endswith(".rlqb"):
-        if os.path.exists(os.path.join(blueprints_dir(home), f"{name}.json")):
+        if os.path.exists(
+                os.path.join(blueprints_dir(context), f"{name}.json")):
             return False
 
     # Pre-read to catch referenced media/scripts
@@ -140,20 +141,20 @@ def seed_blueprint(name, home=None):
         # the real parse error against the user's file.
         data = {}
 
-    os.makedirs(blueprints_dir(home), exist_ok=True)
+    os.makedirs(blueprints_dir(context), exist_ok=True)
     if not _copy_out(source, destination):
         return False
 
     if isinstance(data, collections.abc.Mapping):
         # Resolve everything relative to the home this seed is into
         for media_name in _referenced_media(data):
-            seed_media(media_name, home=home)
+            seed_media(media_name, context=context)
         for stem in _referenced_scripts(data):
-            seed_script(stem, home=home)
+            seed_script(stem, context=context)
     return True
 
 
-def seed_media(name, home=None):
+def seed_media(name, context=None):
     """Seed the built-in media definition defining item ``name``.
 
     Returns whether a definition file was copied out. A home
@@ -161,7 +162,7 @@ def seed_media(name, home=None):
     occupying the builtin's filename, or no builtin defining the
     name: nothing happens.
     """
-    if scan_media_definitions(media_dir(home), name):
+    if scan_media_definitions(media_dir(context), name):
         return False
     root = _builtins_root() / "media"
     if not root.is_dir():
@@ -176,8 +177,8 @@ def seed_media(name, home=None):
             continue
         if any(item.name == name for item in definition.items):
             stem = entry.name.rsplit(".", 1)[0]
-            os.makedirs(media_dir(home), exist_ok=True)
-            destination = os.path.join(media_dir(home), f"{stem}.rlqm")
+            os.makedirs(media_dir(context), exist_ok=True)
+            destination = os.path.join(media_dir(context), f"{stem}.rlqm")
             return _copy_out(entry, destination)
     return False
 
@@ -194,7 +195,7 @@ def _referenced_insert_media(script_text):
     yield from _INSERT_MEDIA.findall(script_text)
 
 
-def seed_script(stem, home=None):
+def seed_script(stem, context=None):
     """Seed ``scripts/<stem>.rlqs`` from the built-in library.
 
     Returns whether the script file was copied out. The media
@@ -205,8 +206,8 @@ def seed_script(stem, home=None):
     source = _builtins_root() / "scripts" / f"{stem}.rlqs"
     if not source.is_file():
         return False
-    os.makedirs(scripts_dir(home), exist_ok=True)
-    destination = os.path.join(scripts_dir(home), f"{stem}.rlqs")
+    os.makedirs(scripts_dir(context), exist_ok=True)
+    destination = os.path.join(scripts_dir(context), f"{stem}.rlqs")
     if not _copy_out(source, destination):
         return False
     try:
@@ -214,18 +215,18 @@ def seed_script(stem, home=None):
     except UnicodeDecodeError:
         return True
     for media_name in _referenced_insert_media(text):
-        seed_media(media_name, home=home)
+        seed_media(media_name, context=context)
     return True
 
 
-def locate_script(stem, home=None):
+def locate_script(stem, context=None):
     """Return an existing ``.rlqs`` path without seeding.
 
     Prefers ``scripts/<stem>.rlqs`` under the home; otherwise the
     matching builtin. Raises ``FileNotFoundError`` when neither
     exists — ``check-script`` uses this so a check never writes.
     """
-    destination = os.path.join(scripts_dir(home), f"{stem}.rlqs")
+    destination = os.path.join(scripts_dir(context), f"{stem}.rlqs")
     if os.path.isfile(destination):
         return destination
     source = _builtins_root() / "scripts" / f"{stem}.rlqs"
@@ -233,13 +234,13 @@ def locate_script(stem, home=None):
         return os.fspath(source)
     raise FileNotFoundError(
         f"script not found: {stem}.rlqs\n"
-        f"expected under {scripts_dir(home)}")
+        f"expected under {scripts_dir(context)}")
 
 
-def locate_blueprint(name, home=None):
+def locate_blueprint(name, context=None):
     """Return an existing blueprint path without seeding."""
     for ext in [".rlqb", ".json"]:
-        path = os.path.join(blueprints_dir(home), f"{name}{ext}")
+        path = os.path.join(blueprints_dir(context), f"{name}{ext}")
         if os.path.isfile(path):
             return path
 
@@ -252,4 +253,4 @@ def locate_blueprint(name, home=None):
 
     raise FileNotFoundError(
         f"blueprint not found: {name}.rlqb\n"
-        f"expected under {blueprints_dir(home)}")
+        f"expected under {blueprints_dir(context)}")

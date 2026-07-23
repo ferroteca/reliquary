@@ -112,7 +112,7 @@ def _drive_key(value):
     return medium, slot, f"{medium}{slot}"
 
 
-def _drive(value, key, medium, slot, home):
+def _drive(value, key, medium, slot, context):
     if value is None:
         if medium == "hdd":
             raise ValueError(
@@ -144,10 +144,10 @@ def _drive(value, key, medium, slot, home):
         value["media"], f"drives.{key}.media")
     return BlueprintDrive(
         key=key, medium=medium, slot=slot,
-        media=resolve_media(media_name, home=home))
+        media=resolve_media(media_name, context=context))
 
 
-def _drives(value, home):
+def _drives(value, context):
     if not isinstance(value, collections.abc.Mapping):
         raise ValueError("drives must be an object")
     normalized = {}
@@ -160,7 +160,7 @@ def _drives(value, home):
                 f"{authored_key!r} both mean {key}")
         claimed[key] = authored_key
         normalized[key] = _drive(
-            declaration, key, medium, slot, home)
+            declaration, key, medium, slot, context)
     return types.MappingProxyType(normalized)
 
 
@@ -208,7 +208,7 @@ def _scripts(value):
     return types.MappingProxyType(normalized)
 
 
-def parse_blueprint(value, home=None):
+def parse_blueprint(value, context=None):
     """Parse, validate, and resolve one machine blueprint object.
 
     This implements the milestone-1 subset. Media references resolve
@@ -229,7 +229,7 @@ def parse_blueprint(value, home=None):
         supported = ", ".join(sorted(_PLATFORMS))
         raise ValueError(
             f"platform must be one of {supported}, got: {platform!r}")
-    drives = (_drives(value["drives"], home)
+    drives = (_drives(value["drives"], context)
               if "drives" in value
               else types.MappingProxyType({}))
     memory = (_memory(value["memory"])
@@ -253,28 +253,28 @@ def parse_blueprint(value, home=None):
     )
 
 
-def load_blueprint(path, home=None):
+def load_blueprint(path, context=None):
     """Load, parse, and resolve one machine blueprint JSON file."""
     path = os.path.abspath(os.fspath(path))
     if not os.path.exists(path):
         raise FileNotFoundError(f"Machine blueprint not found: {path}")
     with open(path, "r", encoding="utf-8") as handle:
         value = jsonc.load(handle)
-    return parse_blueprint(value, home=home)
+    return parse_blueprint(value, context=context)
 
 
-def new_blueprint(name, *, platform="dos", home=None):
+def new_blueprint(name, *, platform="dos", context=None):
     """Create a new blueprint file with reasonable defaults.
 
     Returns the path to the created file. Raises FileExistsError if
     the blueprint already exists.
     """
     from .home import blueprints_dir
-    path = os.path.join(blueprints_dir(home), f"{name}.rlqb")
+    path = os.path.join(blueprints_dir(context), f"{name}.rlqb")
     if os.path.exists(path):
         raise FileExistsError(f"blueprint already exists: {path}")
     # Check for legacy home .json
-    if os.path.exists(os.path.join(blueprints_dir(home), f"{name}.json")):
+    if os.path.exists(os.path.join(blueprints_dir(context), f"{name}.json")):
         raise FileExistsError(f"legacy blueprint already exists: {name}.json")
 
     # Scaffolding default (ROADMAP milestone 5)
@@ -300,7 +300,7 @@ def new_blueprint(name, *, platform="dos", home=None):
     return path
 
 
-def delete_blueprint(name, *, home=None):
+def delete_blueprint(name, *, context=None):
     """Remove the home blueprint file for ``name``.
 
     Fails closed while any machine of the blueprint exists,
@@ -310,7 +310,7 @@ def delete_blueprint(name, *, home=None):
     from .home import blueprints_dir
     from .machines import list_machines
 
-    machines = list_machines(home, blueprint=name)
+    machines = list_machines(context, blueprint=name)
     if machines:
         ids = ", ".join(machine["id"] for machine in machines)
         raise RuntimeError(
@@ -322,13 +322,13 @@ def delete_blueprint(name, *, home=None):
     path = None
     for extension in (".rlqb", ".json"):
         candidate = os.path.join(
-            blueprints_dir(home), f"{name}{extension}")
+            blueprints_dir(context), f"{name}{extension}")
         if os.path.isfile(candidate):
             path = candidate
             break
     if path is None:
         raise FileNotFoundError(
             f"blueprint not found: {name}.rlqb\n"
-            f"expected under {blueprints_dir(home)}")
+            f"expected under {blueprints_dir(context)}")
     os.remove(path)
     return path

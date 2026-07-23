@@ -16,88 +16,102 @@ it realigns to, is in
 reliquary attaches no meaning to guest output; interpreting
 results belongs to the caller.
 
-## Home and paths
+## Home, cache, and Context
 
-- `set_home(path)` - Set the process-global reliquary home.
+- `set_home(path)` - Set the process-global reliquary home
+  (overrides `RELIQUARY_HOME`).
+- `set_cache(path)` - Set the process-global cache root (overrides
+  `RELIQUARY_CACHE_DIR`); defaults to `<home>/cache`.
 - `home()` - Return the effective home (`RELIQUARY_HOME`,
   `set_home()`, or the platform default under Documents).
 - `documents_dir()` - Resolve the user's platform Documents
   folder, or `None` when it cannot be determined.
-- Path helpers, each accepting `home=None`: `blueprints_dir`,
+- `Context(home=None, cache=None)` - An explicit (home, cache) pair
+  scoping one call or a group of calls, independent of the
+  process-global default. Every function below that resolves a
+  path under the home accepts a `context=` parameter: omit it (the
+  common case) to use the process-global default; pass a bare
+  string as shorthand for `Context(home=that_string)` (cache still
+  follows the global default); pass a `Context` instance to pin
+  both home and cache explicitly, safe to vary per call within one
+  process. The CLI only ever drives the process-global default via
+  `--home`/`--cache` — scoped `Context` objects are an
+  embedding-API-only capability.
+- Path helpers, each accepting `context=None`: `blueprints_dir`,
   `media_dir`, `scripts_dir`, `cache_dir`, `downloads_cache_dir`,
   `media_cache_dir`, `machines_cache_dir`, and the legacy
   `drives_dir`.
 
-All state lives under the home. An explicit `home=` on an
-individual call overrides the process-global home for that call.
+All state lives under the home, except the regenerable cache,
+which lives under the (independently resolvable) cache root.
 
 ## Cached machines (the blueprint lifecycle)
 
-- `create_machine(name, *, home=None)` - Materialize a new machine
+- `create_machine(name, *, context=None)` - Materialize a new machine
   from a blueprint name; returns the machine id
   (`<blueprint>-<n>`, lowest free number). Seeds codex content on
   first reference. CLI twin: `create-machine`.
-- `create(blueprint, *, home=None, blueprint_name="")` - The
+- `create(blueprint, *, context=None, blueprint_name="")` - The
   same, from an already-parsed `Blueprint`.
-- `list_machines(home=None, blueprint=None)` - List machines.
+- `list_machines(context=None, blueprint=None)` - List machines.
   CLI twin: `list-machines`.
-- `resolve_machine(*, machine=None, blueprint=None, home=None)` -
+- `resolve_machine(*, machine=None, blueprint=None, context=None)` -
   Resolve CLI-style selectors to exactly one machine id. The
   selectors are mutually exclusive: `machine=` is the full id
   (`<blueprint>-<n>`) exactly, or `blueprint=` selects that
   blueprint's sole machine. No prefix matching and no
   bare-number form.
-- `start_machine(machine_id, *, display=False, home=None)` -
+- `start_machine(machine_id, *, display=False, context=None)` -
   Start a machine; the QMP port and VM identity are recorded in
   the machine's `vm.json`. CLI twin: `start-machine`.
-- `stop_machine(machine_id, home=None)` - Stop a running machine;
+- `stop_machine(machine_id, context=None)` - Stop a running machine;
   identity mismatches fail closed. CLI twin: `stop-machine`.
-- `destroy_machine(machine_id, home=None)` - Delete the machine
+- `destroy_machine(machine_id, context=None)` - Delete the machine
   entirely; frees its number for reuse. CLI twin:
   `destroy-machine`.
-- `mark_stopped(machine_id, home=None)` - Reconcile the phase of
+- `mark_stopped(machine_id, context=None)` - Reconcile the phase of
   a machine whose QEMU process has gone.
-- `load_machine_state(machine_id, home=None)` - Read the
+- `load_machine_state(machine_id, context=None)` - Read the
   machine's `reliquary-machine.json`.
-- `machine_dir_path(machine_id, home=None)` - The machine's cache
+- `machine_dir_path(machine_id, context=None)` - The machine's cache
   directory.
-- `machine_drive_args(machine_id, home=None)` - Render QEMU
+- `machine_drive_args(machine_id, context=None)` - Render QEMU
   `-drive` arguments from the machine's state.
 
 Persistent machine-state changes — stopped machines only;
 insert/eject are floppy and cdrom slots; all three survive
 stop/start:
 
-- `insert_media(machine_id, slot, media_name, *, home=None)`
+- `insert_media(machine_id, slot, media_name, *, context=None)`
   (`insert-media`)
-- `eject_media(machine_id, slot, *, home=None)` (`eject-media`)
-- `set_boot_order(machine_id, boot_keys, *, home=None)`
+- `eject_media(machine_id, slot, *, context=None)` (`eject-media`)
+- `set_boot_order(machine_id, boot_keys, *, context=None)`
   (`set-boot-order`)
 
 ## Blueprints
 
-- `parse_blueprint(value, home=None)` /
-  `load_blueprint(path, home=None)` - Parse and validate the
+- `parse_blueprint(value, context=None)` /
+  `load_blueprint(path, context=None)` - Parse and validate the
   milestone-1 blueprint subset, resolving media names through the
   library; return `Blueprint` (drives as `BlueprintDrive`).
-- `new_blueprint(name, *, platform="dos", home=None)` - Scaffold a
+- `new_blueprint(name, *, platform="dos", context=None)` - Scaffold a
   home ``blueprints/<name>.rlqb``. CLI twin: `new-blueprint`.
-- `delete_blueprint(name, *, home=None)` - Remove the home blueprint
+- `delete_blueprint(name, *, context=None)` - Remove the home blueprint
   file; fails closed while any machine of it exists. Never touches
   package builtins. CLI twin: `delete-blueprint`.
 
 ## Media
 
-- `resolve_media(name, home=None)` - Resolve a defined item by
+- `resolve_media(name, context=None)` - Resolve a defined item by
   name across the media library; returns `ResolvedMedia`.
-- `list_media(home=None, *, builtin=False)` - Sorted item names from
+- `list_media(context=None, *, builtin=False)` - Sorted item names from
   home ``media/``, or the package codex when ``builtin=True``.
   CLI twin: `list-media`.
-- `delete_media(name, *, home=None)` - Remove the home definition
+- `delete_media(name, *, context=None)` - Remove the home definition
   file that defines ``name``; fails closed while any machine drive
   still references an item from that definition. CLI twin:
   `delete-media`.
-- `fetch_media(name, home=None, on_mismatch="fail")` - Return the
+- `fetch_media(name, context=None, on_mismatch="fail")` - Return the
   named item's verified payload path, fetching on demand —
   cheapest source first: a verifying payload as-is, a verifying
   cached archive re-extracted, then the definition's URL. Every
@@ -113,17 +127,17 @@ stop/start:
 - `parse_script(source, path="<script>")` / `load_script(path)` -
   Parse a redesigned-surface `.rlqs` script into an immutable
   `Script`; errors raise `ScriptParseError` with source locations.
-- `run_script(label, *, blueprint=None, machine=None, home=None,
+- `run_script(label, *, blueprint=None, machine=None, context=None,
   display=False)` - Resolve the label through the blueprint's
   `scripts` map, create a machine when the blueprint has none,
   honor the script's `machine` header, statically preflight
   insert/eject/set-boot targets, and execute with a run record under
   the machine's `runs/` directory. Returns `ScriptRun`; failures
   raise `ScriptRuntimeError`. CLI twin: `run-script`.
-- `check_script(name, *, blueprint=None, machine=None, home=None)` -
+- `check_script(name, *, blueprint=None, machine=None, context=None)` -
   Parse and statically check a script; return a printable timing
   plan without running it. CLI twin: `check-script`.
-- `execute_script(script, *, machine_id, home=None,
+- `execute_script(script, *, machine_id, context=None,
   display=False, run_dir=None, script_path=None)` - Execute an
   already-parsed script against a specific machine.
 
@@ -132,7 +146,9 @@ stop/start:
 `Machine(port=None, home=None, deadline=None)` is the
 platform-neutral interaction handle for a running,
 reliquary-owned VM. Every operation verifies VM identity before
-sending anything:
+sending anything. `Machine.home` is a plain already-resolved
+directory, not a `Context` — typically a specific machine's own
+cache subdirectory, not the reliquary home itself.
 
 - `Machine.qmp()` - Context manager yielding the
   identity-verified QMP session (its `cmd()` and `hmp()` remain

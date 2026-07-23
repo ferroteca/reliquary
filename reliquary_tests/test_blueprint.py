@@ -34,7 +34,7 @@ class BlueprintTestCase(unittest.TestCase):
             }, handle)
 
     def parse(self, value):
-        return parse_blueprint(value, home=self.home)
+        return parse_blueprint(value, context=self.home)
 
 
 class ParseBlueprintTests(BlueprintTestCase):
@@ -282,21 +282,21 @@ class LoadBlueprintTests(BlueprintTestCase):
                 "platform": "dos",
                 "drives": {"cdrom": "freedos-1.4-livecd"},
             }, handle)
-        result = load_blueprint(path, home=self.home)
+        result = load_blueprint(path, context=self.home)
         self.assertEqual(result.drives["cdrom0"].media.item.name,
                          "freedos-1.4-livecd")
 
     def test_missing_file_has_actionable_error(self):
         path = os.path.join(self.workdir.name, "missing.json")
         with self.assertRaises(FileNotFoundError) as caught:
-            load_blueprint(path, home=self.home)
+            load_blueprint(path, context=self.home)
         self.assertIn(path, str(caught.exception))
 
 
 class NewBlueprintTests(BlueprintTestCase):
     def test_new_blueprint_creates_rlqb_with_scaffolding(self):
         from reliquary.blueprint import new_blueprint
-        new_blueprint("test-bp", home=self.home)
+        new_blueprint("test-bp", context=self.home)
         path = os.path.join(self.home, "blueprints", "test-bp.rlqb")
         self.assertTrue(os.path.exists(path))
         with open(path, "r", encoding="utf-8") as f:
@@ -308,9 +308,9 @@ class NewBlueprintTests(BlueprintTestCase):
 
     def test_new_blueprint_already_exists_raises(self):
         from reliquary.blueprint import new_blueprint
-        new_blueprint("test-bp", home=self.home)
+        new_blueprint("test-bp", context=self.home)
         with self.assertRaises(FileExistsError):
-            new_blueprint("test-bp", home=self.home)
+            new_blueprint("test-bp", context=self.home)
 
     def test_new_blueprint_legacy_json_exists_raises(self):
         from reliquary.blueprint import new_blueprint
@@ -318,14 +318,14 @@ class NewBlueprintTests(BlueprintTestCase):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f: f.write("{}")
         with self.assertRaises(FileExistsError) as caught:
-            new_blueprint("test-bp", home=self.home)
+            new_blueprint("test-bp", context=self.home)
         self.assertIn("legacy blueprint already exists", str(caught.exception))
 
 
 class DeleteBlueprintTests(BlueprintTestCase):
     def test_deletes_rlqb(self):
-        path = new_blueprint("test-bp", home=self.home)
-        removed = delete_blueprint("test-bp", home=self.home)
+        path = new_blueprint("test-bp", context=self.home)
+        removed = delete_blueprint("test-bp", context=self.home)
         self.assertEqual(removed, path)
         self.assertFalse(os.path.exists(path))
 
@@ -334,17 +334,17 @@ class DeleteBlueprintTests(BlueprintTestCase):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as handle:
             handle.write("{}\n")
-        removed = delete_blueprint("legacy", home=self.home)
+        removed = delete_blueprint("legacy", context=self.home)
         self.assertEqual(removed, path)
         self.assertFalse(os.path.exists(path))
 
     def test_missing_raises(self):
         with self.assertRaises(FileNotFoundError) as caught:
-            delete_blueprint("missing", home=self.home)
+            delete_blueprint("missing", context=self.home)
         self.assertIn("blueprint not found", str(caught.exception))
 
     def test_refuses_while_machines_exist(self):
-        new_blueprint("plain", home=self.home)
+        new_blueprint("plain", context=self.home)
         machine_dir = os.path.join(
             self.home, "cache", "machines", "plain-0")
         os.makedirs(machine_dir)
@@ -356,7 +356,7 @@ class DeleteBlueprintTests(BlueprintTestCase):
                 "phase": "ready",
             }, handle)
         with self.assertRaises(RuntimeError) as caught:
-            delete_blueprint("plain", home=self.home)
+            delete_blueprint("plain", context=self.home)
         message = str(caught.exception)
         self.assertIn("still has 1 machine(s)", message)
         self.assertIn("plain-0", message)
@@ -367,7 +367,7 @@ class DeleteBlueprintTests(BlueprintTestCase):
         # No home file; builtin-only name must not be removed from
         # the package.
         with self.assertRaises(FileNotFoundError):
-            delete_blueprint("freedos-1.4-plain", home=self.home)
+            delete_blueprint("freedos-1.4-plain", context=self.home)
 
 
 if __name__ == "__main__":

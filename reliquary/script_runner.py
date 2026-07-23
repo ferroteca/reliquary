@@ -403,7 +403,7 @@ class _Observation:
 class _ScriptEngine:
     """One run of one script against one cached machine."""
 
-    def __init__(self, script, machine_id, home, machine_home,
+    def __init__(self, script, machine_id, context, machine_home,
                  run_dir=None, script_path=None, plan=None,
                  clock=time.monotonic, sleep=time.sleep,
                  http_service_factory=_HttpService):
@@ -411,7 +411,7 @@ class _ScriptEngine:
         self._plan = plan if plan is not None else resolve_timing(script)
         self._phases = {phase.name: phase for phase in script.phases}
         self._machine_id = machine_id
-        self._home = home
+        self._context = context
         self._machine_home = machine_home
         self._run_dir = run_dir
         self._script_path = script_path
@@ -465,7 +465,7 @@ class _ScriptEngine:
     def _read_machine_phase(self):
         try:
             state = _machines.load_machine_state(
-                self._machine_id, self._home)
+                self._machine_id, self._context)
             return state.get("phase", "-")
         except FileNotFoundError:
             return "-"
@@ -523,7 +523,8 @@ class _ScriptEngine:
 
     def _establish_machine(self, display):
         """Meet the `machine` header's precondition, then bind a port."""
-        state = _machines.load_machine_state(self._machine_id, self._home)
+        state = _machines.load_machine_state(
+            self._machine_id, self._context)
         phase = state.get("phase")
         if self._script.machine == "stopped":
             # The script expects a stopped machine and performs its
@@ -538,11 +539,11 @@ class _ScriptEngine:
                     f"script (phase: {phase})")
         elif phase == "ready":
             self._port = _machines.start_machine(
-                self._machine_id, display=display, home=self._home)
+                self._machine_id, display=display, context=self._context)
         elif phase == "running":
             from .lifecycle import read_vm_state
             vm = read_vm_state(home=_machines.machine_dir_path(
-                self._machine_id, self._home))
+                self._machine_id, self._context))
             if vm is None:
                 raise self._error(
                     "machine phase is running but no vm.json found")
@@ -793,7 +794,7 @@ class _ScriptEngine:
     def _mark_stopped(self):
         self._port = None
         try:
-            _machines.mark_stopped(self._machine_id, home=self._home)
+            _machines.mark_stopped(self._machine_id, context=self._context)
         except FileNotFoundError:
             pass
 
@@ -884,18 +885,18 @@ class _ScriptEngine:
     def _machine_change(self, statement, operation, *arguments):
         """Apply a persistent machine-state change, naming failures."""
         try:
-            operation(self._machine_id, *arguments, home=self._home)
+            operation(self._machine_id, *arguments, context=self._context)
         except (RuntimeError, ValueError) as exc:
             raise self._error(str(exc), statement) from exc
 
     def _start(self, statement):
         self._log(f"line {statement.line}: start")
         self._port = _machines.start_machine(
-            self._machine_id, display=self._display, home=self._home)
+            self._machine_id, display=self._display, context=self._context)
 
     def _stop(self, statement):
         self._log(f"line {statement.line}: stop")
-        _machines.stop_machine(self._machine_id, home=self._home)
+        _machines.stop_machine(self._machine_id, context=self._context)
         self._port = None
 
     # -- run-scoped HTTP -----------------------------------------
@@ -1022,7 +1023,7 @@ def _preflight_media_slots(script, machine_state, script_path):
                     statement=statement, path=script_path)
 
 
-def execute_script(script, *, machine_id, home=None, display=False,
+def execute_script(script, *, machine_id, context=None, display=False,
                    run_dir=None, script_path=None):
     """Execute a parsed Script against a cached machine.
 
@@ -1041,38 +1042,38 @@ def execute_script(script, *, machine_id, home=None, display=False,
     if not script.phases and not script.statements:
         try:
             phase = _machines.load_machine_state(
-                machine_id, home).get("phase", "-")
+                machine_id, context).get("phase", "-")
         except FileNotFoundError:
             phase = "-"
         return "-", phase
 
     _preflight_media_slots(
-        script, _machines.load_machine_state(machine_id, home),
+        script, _machines.load_machine_state(machine_id, context),
         script_path)
     engine = _ScriptEngine(
-        script, machine_id, home,
-        _machines.machine_dir_path(machine_id, home),
+        script, machine_id, context,
+        _machines.machine_dir_path(machine_id, context),
         run_dir=run_dir, script_path=script_path)
     engine.run(display=display)
     return engine.final_phase, engine.machine_phase
 
 
 def _resolve_or_create_machine(*, machine=None, blueprint=None,
-                               home=None):
+                               context=None):
     """Resolve a selector, creating a machine when blueprint has none."""
     if machine is None and blueprint is None:
         raise ValueError(
             "select a machine with --blueprint or --machine")
     if machine is not None:
         return _machines.resolve_machine(
-            machine=machine, blueprint=blueprint, home=home), False
-    matches = _machines.list_machines(home, blueprint=blueprint)
+            machine=machine, blueprint=blueprint, context=context), False
+    matches = _machines.list_machines(context, blueprint=blueprint)
     if not matches:
         machine_id = _machines.create_machine(
-            blueprint, home=home)
+            blueprint, context=context)
         return machine_id, True
     return _machines.resolve_machine(
-        blueprint=blueprint, home=home), False
+        blueprint=blueprint, context=context), False
 
 
 def _resolve_script_stem(label, scripts_map):
@@ -1091,24 +1092,24 @@ def _resolve_script_stem(label, scripts_map):
     return label
 
 
-def _ensure_script_path(stem, home=None):
+def _ensure_script_path(stem, context=None):
     """Return the home path for ``stem``, seeding from builtins if needed."""
-    path = os.path.join(scripts_dir(home), f"{stem}.rlqs")
+    path = os.path.join(scripts_dir(context), f"{stem}.rlqs")
     if not os.path.isfile(path):
-        seed_script(stem, home=home)
+        seed_script(stem, context=context)
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"script not found: {stem}.rlqs\n"
-            f"expected under {scripts_dir(home)}")
+            f"expected under {scripts_dir(context)}")
     return path
 
 
-def _create_run_dir(machine_id, home=None):
+def _create_run_dir(machine_id, context=None):
     """Create ``runs/<timestamp>-<id>/`` under the machine cache."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_id = uuid.uuid4().hex[:8]
     run_dir = os.path.join(
-        _machines.machine_dir_path(machine_id, home),
+        _machines.machine_dir_path(machine_id, context),
         "runs",
         f"{timestamp}-{run_id}",
     )
@@ -1117,7 +1118,7 @@ def _create_run_dir(machine_id, home=None):
     return run_dir
 
 
-def run_script(label, *, blueprint=None, machine=None, home=None,
+def run_script(label, *, blueprint=None, machine=None, context=None,
                display=False):
     """Resolve ``label``, ensure a machine, and execute under ``runs/``.
 
@@ -1127,14 +1128,14 @@ def run_script(label, *, blueprint=None, machine=None, home=None,
     one.  Returns a :class:`ScriptRun` naming the run directory.
     """
     machine_id, created = _resolve_or_create_machine(
-        machine=machine, blueprint=blueprint, home=home)
-    state = _machines.load_machine_state(machine_id, home)
+        machine=machine, blueprint=blueprint, context=context)
+    state = _machines.load_machine_state(machine_id, context)
     stem = _resolve_script_stem(label, state.get("scripts") or {})
-    script_path = _ensure_script_path(stem, home=home)
+    script_path = _ensure_script_path(stem, context=context)
     script = load_script(script_path)
-    run_dir = _create_run_dir(machine_id, home=home)
+    run_dir = _create_run_dir(machine_id, context=context)
     final_phase, machine_phase = execute_script(
-        script, machine_id=machine_id, home=home, display=display,
+        script, machine_id=machine_id, context=context, display=display,
         run_dir=run_dir, script_path=script_path)
     return ScriptRun(
         machine_id=machine_id,
@@ -1146,7 +1147,7 @@ def run_script(label, *, blueprint=None, machine=None, home=None,
     )
 
 
-def check_script(name, *, blueprint=None, machine=None, home=None):
+def check_script(name, *, blueprint=None, machine=None, context=None):
     """Parse and statically check a script; return its timing plan.
 
     Read-only: does not seed the home, create a machine, write a run
@@ -1159,20 +1160,20 @@ def check_script(name, *, blueprint=None, machine=None, home=None):
     scripts_map = {}
     if machine is not None:
         machine_id = _machines.resolve_machine(
-            machine=machine, blueprint=blueprint, home=home)
-        state = _machines.load_machine_state(machine_id, home)
+            machine=machine, blueprint=blueprint, context=context)
+        state = _machines.load_machine_state(machine_id, context)
         scripts_map = state.get("scripts") or {}
     elif blueprint is not None:
         scripts_map = dict(
             load_blueprint(
-                locate_blueprint(blueprint, home=home),
-                home=home).scripts)
+                locate_blueprint(blueprint, context=context),
+                context=context).scripts)
     stem = _resolve_script_stem(name, scripts_map)
-    script_path = locate_script(stem, home=home)
+    script_path = locate_script(stem, context=context)
     script = load_script(script_path)
     if machine_id is not None:
         _preflight_media_slots(
-            script, _machines.load_machine_state(machine_id, home),
+            script, _machines.load_machine_state(machine_id, context),
             script_path)
     plan = resolve_timing(script)
     report = format_plan(plan, name=os.path.basename(script_path))

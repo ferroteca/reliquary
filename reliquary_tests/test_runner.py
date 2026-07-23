@@ -567,7 +567,7 @@ class RunnerRunTests(unittest.TestCase):
             54321, _FakeQmp.name,
             "12345678-1234-1234-1234-123456789012", 1234,
             home=self.home)
-        staging = os.path.join(reliquary.drives_dir(home=self.home),
+        staging = os.path.join(reliquary.drives_dir(context=self.home),
                                "hdd")
         log_path = os.path.join(staging, "SUITE.log")
 

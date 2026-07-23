@@ -26,17 +26,17 @@ _PLATFORM_MEMORY = {
 }
 
 
-def machine_dir_path(machine_id, home=None):
+def machine_dir_path(machine_id, context=None):
     """Return the machine's cache directory path."""
-    return os.path.join(machines_cache_dir(home), machine_id)
+    return os.path.join(machines_cache_dir(context), machine_id)
 
 
-def _machine_drives_dir(machine_id, home=None):
-    return os.path.join(machine_dir_path(machine_id, home), "drives")
+def _machine_drives_dir(machine_id, context=None):
+    return os.path.join(machine_dir_path(machine_id, context), "drives")
 
 
-def _state_path(machine_id, home=None):
-    return os.path.join(machine_dir_path(machine_id, home),
+def _state_path(machine_id, context=None):
+    return os.path.join(machine_dir_path(machine_id, context),
                         "reliquary-machine.json")
 
 
@@ -61,8 +61,8 @@ def split_machine_id(machine_id):
     return blueprint, int(number)
 
 
-def _locks_dir(home=None):
-    return os.path.join(machines_cache_dir(home), ".locks")
+def _locks_dir(context=None):
+    return os.path.join(machines_cache_dir(context), ".locks")
 
 
 def _lock_file(handle):
@@ -95,9 +95,9 @@ def _unlock_file(handle):
 
 
 @contextlib.contextmanager
-def _blueprint_alloc_lock(blueprint_name, home=None):
+def _blueprint_alloc_lock(blueprint_name, context=None):
     """Serialize machine-number allocation for one blueprint."""
-    lock_root = _locks_dir(home)
+    lock_root = _locks_dir(context)
     os.makedirs(lock_root, exist_ok=True)
     lock_path = os.path.join(lock_root, f"{blueprint_name}.lock")
     with open(lock_path, "a+b") as handle:
@@ -108,17 +108,17 @@ def _blueprint_alloc_lock(blueprint_name, home=None):
             _unlock_file(handle)
 
 
-def _allocate_machine_id(blueprint_name, home=None):
+def _allocate_machine_id(blueprint_name, context=None):
     """Return the lowest free ``<blueprint>-<n>`` id (directories count)."""
     number = 0
     while True:
         machine_id = machine_id_for(blueprint_name, number)
-        if not os.path.exists(machine_dir_path(machine_id, home)):
+        if not os.path.exists(machine_dir_path(machine_id, context)):
             return machine_id
         number += 1
 
 
-def create(blueprint, *, home=None, blueprint_name=""):
+def create(blueprint, *, context=None, blueprint_name=""):
     """Materialize one machine from a parsed Blueprint.
 
     Creates the machine cache directory under
@@ -132,9 +132,9 @@ def create(blueprint, *, home=None, blueprint_name=""):
     if not isinstance(blueprint_name, str) or not blueprint_name:
         raise ValueError("create requires a non-empty blueprint_name")
 
-    with _blueprint_alloc_lock(blueprint_name, home):
-        machine_id = _allocate_machine_id(blueprint_name, home)
-        drives_root = _machine_drives_dir(machine_id, home)
+    with _blueprint_alloc_lock(blueprint_name, context):
+        machine_id = _allocate_machine_id(blueprint_name, context)
+        drives_root = _machine_drives_dir(machine_id, context)
         os.makedirs(drives_root)
 
     resolved_drives = {}
@@ -150,7 +150,7 @@ def create(blueprint, *, home=None, blueprint_name=""):
                 "path": path,
             }
         elif drive.media is not None:
-            payload = fetch_media(drive.media.item.name, home=home)
+            payload = fetch_media(drive.media.item.name, context=context)
             resolved_drives[key] = {
                 "medium": drive.medium,
                 "slot": drive.slot,
@@ -183,11 +183,11 @@ def create(blueprint, *, home=None, blueprint_name=""):
         "scripts": dict(blueprint.scripts),
     }
 
-    _write_state(machine_id, state, home)
+    _write_state(machine_id, state, context)
     return machine_id
 
 
-def create_machine(name, *, home=None):
+def create_machine(name, *, context=None):
     """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
@@ -197,18 +197,18 @@ def create_machine(name, *, home=None):
     """
     from .library import locate_blueprint
     paths = [
-        os.path.join(blueprints_dir(home), f"{name}.rlqb"),
-        os.path.join(blueprints_dir(home), f"{name}.json"),
+        os.path.join(blueprints_dir(context), f"{name}.rlqb"),
+        os.path.join(blueprints_dir(context), f"{name}.json"),
     ]
     if not any(os.path.exists(path) for path in paths):
-        seed_blueprint(name, home=home)
-    path = locate_blueprint(name, home=home)
-    blueprint = load_blueprint(path, home=home)
-    return create(blueprint, home=home, blueprint_name=name)
+        seed_blueprint(name, context=context)
+    path = locate_blueprint(name, context=context)
+    blueprint = load_blueprint(path, context=context)
+    return create(blueprint, context=context, blueprint_name=name)
 
 
-def _write_state(machine_id, state, home=None):
-    path = _state_path(machine_id, home)
+def _write_state(machine_id, state, context=None):
+    path = _state_path(machine_id, context)
     part = path + ".part"
     with open(part, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(state, handle, indent=2)
@@ -216,9 +216,9 @@ def _write_state(machine_id, state, home=None):
     os.replace(part, path)
 
 
-def load_machine_state(machine_id, home=None):
+def load_machine_state(machine_id, context=None):
     """Read and return the machine's ``reliquary-machine.json``."""
-    path = _state_path(machine_id, home)
+    path = _state_path(machine_id, context)
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"machine state not found: {path}")
@@ -235,13 +235,13 @@ def _machine_sort_key(state):
     return (state.get("blueprint") or "", -1, machine_id)
 
 
-def list_machines(home=None, blueprint=None):
+def list_machines(context=None, blueprint=None):
     """Return state dicts for machines under the cache.
 
     Ordered by blueprint name, then ascending machine number.  When
     ``blueprint`` is set, only machines of that blueprint are returned.
     """
-    root = machines_cache_dir(home)
+    root = machines_cache_dir(context)
     if not os.path.isdir(root):
         return []
     machines = []
@@ -262,7 +262,7 @@ def list_machines(home=None, blueprint=None):
     return machines
 
 
-def resolve_machine(*, machine=None, blueprint=None, home=None):
+def resolve_machine(*, machine=None, blueprint=None, context=None):
     """Resolve a ``--machine`` / ``--blueprint`` selector to one id.
 
     Selectors are mutually exclusive:
@@ -278,11 +278,11 @@ def resolve_machine(*, machine=None, blueprint=None, home=None):
             "--blueprint and --machine are mutually exclusive; "
             "pass --machine <id> or --blueprint <name>")
     if machine is not None:
-        return _resolve_by_id(machine, home)
-    return _resolve_by_blueprint(blueprint, home)
+        return _resolve_by_id(machine, context)
+    return _resolve_by_blueprint(blueprint, context)
 
 
-def _resolve_by_id(selector, home):
+def _resolve_by_id(selector, context):
     """Resolve a full machine id — exact match only."""
     if not isinstance(selector, str) or not selector:
         raise ValueError(
@@ -291,14 +291,14 @@ def _resolve_by_id(selector, home):
         raise ValueError(
             f"machine id must be the full <blueprint>-<n> form, "
             f"got: {selector!r}")
-    for state in list_machines(home):
+    for state in list_machines(context):
         if state["id"] == selector:
             return selector
     raise ValueError(f"no machine {selector!r}")
 
 
-def _resolve_by_blueprint(name, home):
-    matches = list_machines(home, blueprint=name)
+def _resolve_by_blueprint(name, context):
+    matches = list_machines(context, blueprint=name)
     if not matches:
         raise ValueError(
             f"no machine exists for blueprint {name!r}\n"
@@ -326,20 +326,20 @@ def _boot_order(boot_keys, drives):
     return "".join(letters) or None
 
 
-def _set_phase(machine_id, phase, home=None):
-    state = load_machine_state(machine_id, home)
+def _set_phase(machine_id, phase, context=None):
+    state = load_machine_state(machine_id, context)
     state["phase"] = phase
-    _write_state(machine_id, state, home)
+    _write_state(machine_id, state, context)
     return state
 
 
-def start_machine(machine_id, *, display=False, home=None):
+def start_machine(machine_id, *, display=False, context=None):
     """Start a ready machine and return its QMP port.
 
     Re-verifies every media hash, launches QEMU under the machine's
     cache directory, and records phase ``running``.
     """
-    state = load_machine_state(machine_id, home)
+    state = load_machine_state(machine_id, context)
     phase = state.get("phase")
     if phase == "running":
         raise RuntimeError(
@@ -353,9 +353,9 @@ def start_machine(machine_id, *, display=False, home=None):
     for drive in drives.values():
         media_name = drive.get("media")
         if media_name is not None:
-            drive["path"] = fetch_media(media_name, home=home)
+            drive["path"] = fetch_media(media_name, context=context)
     state["drives"] = drives
-    _write_state(machine_id, state, home)
+    _write_state(machine_id, state, context)
 
     memory = state.get("memory")
     if memory is None:
@@ -364,27 +364,29 @@ def start_machine(machine_id, *, display=False, home=None):
     print(f"using QEMU: {qemu}")
     vm_name = f"reliquary-{machine_id}"
     args = [qemu, "-name", vm_name, "-m", str(memory)]
-    args += machine_drive_args(machine_id, home)
+    args += machine_drive_args(machine_id, context)
     boot = _boot_order(state.get("boot", []), drives)
     if boot is not None:
         args += ["-boot", f"order={boot}"]
 
-    machine_home = machine_dir_path(machine_id, home)
+    # launch_owned_qemu's home= is a plain directory, not a Context —
+    # here it's repurposed as the machine's own cache subdirectory.
+    machine_home = machine_dir_path(machine_id, context)
     port = launch_owned_qemu(
         args, vm_name=vm_name, display=display, home=machine_home)
-    _set_phase(machine_id, "running", home)
+    _set_phase(machine_id, "running", context)
     return port
 
 
-def stop_machine(machine_id, home=None):
+def stop_machine(machine_id, context=None):
     """Stop a running machine and return it to phase ``ready``."""
-    state = load_machine_state(machine_id, home)
+    state = load_machine_state(machine_id, context)
     phase = state.get("phase")
     if phase != "running":
         raise RuntimeError(
             f"machine {machine_id} is not running "
             f"(phase: {phase})")
-    machine_home = machine_dir_path(machine_id, home)
+    machine_home = machine_dir_path(machine_id, context)
     try:
         stop_owned_qemu(home=machine_home)
     except RuntimeError:
@@ -393,15 +395,15 @@ def stop_machine(machine_id, home=None):
         # closed (identity mismatch) left vm.json in place — our QEMU
         # may still be running, so the phase must not change.
         if read_vm_state(machine_home) is None:
-            _set_phase(machine_id, "ready", home)
+            _set_phase(machine_id, "ready", context)
         raise
-    _set_phase(machine_id, "ready", home)
+    _set_phase(machine_id, "ready", context)
 
 
 _REMOVABLE_MEDIA = {"floppy", "cdrom"}
 
 
-def _removable_drive(state, slot, home):
+def _removable_drive(state, slot, context):
     """Return the mutable state entry for a removable drive slot."""
     phase = state.get("phase")
     if phase != "ready":
@@ -419,7 +421,7 @@ def _removable_drive(state, slot, home):
     return drive
 
 
-def insert_media(machine_id, slot, media_name, *, home=None):
+def insert_media(machine_id, slot, media_name, *, context=None):
     """Insert a defined media item into a floppy or cdrom slot.
 
     Hard-disk slots are rejected.  The slot must already exist in
@@ -431,28 +433,28 @@ def insert_media(machine_id, slot, media_name, *, home=None):
     machine must be stopped; changing the medium of a running
     machine is not supported yet.
     """
-    state = load_machine_state(machine_id, home)
-    drive = _removable_drive(state, slot, home)
-    drive["path"] = fetch_media(media_name, home=home)
+    state = load_machine_state(machine_id, context)
+    drive = _removable_drive(state, slot, context)
+    drive["path"] = fetch_media(media_name, context=context)
     drive["media"] = media_name
-    _write_state(machine_id, state, home)
+    _write_state(machine_id, state, context)
 
 
-def eject_media(machine_id, slot, *, home=None):
+def eject_media(machine_id, slot, *, context=None):
     """Empty a declared removable slot, persisting the change.
 
     The drive itself remains — the blueprint alone defines machine
     topology — but the next ``start`` presents it without a medium.
     The machine must be stopped, as for :func:`insert_media`.
     """
-    state = load_machine_state(machine_id, home)
-    drive = _removable_drive(state, slot, home)
+    state = load_machine_state(machine_id, context)
+    drive = _removable_drive(state, slot, context)
     drive["media"] = None
     drive["path"] = None
-    _write_state(machine_id, state, home)
+    _write_state(machine_id, state, context)
 
 
-def set_boot_order(machine_id, boot_keys, *, home=None):
+def set_boot_order(machine_id, boot_keys, *, context=None):
     """Persist a new boot order on a stopped machine.
 
     Every key must name a drive the machine already declares.
@@ -461,7 +463,7 @@ def set_boot_order(machine_id, boot_keys, *, home=None):
     ``start``; the machine diverges from its blueprint until
     ``apply`` (or another ``set_boot_order``) restores it.
     """
-    state = load_machine_state(machine_id, home)
+    state = load_machine_state(machine_id, context)
     phase = state.get("phase")
     if phase != "ready":
         raise RuntimeError(
@@ -484,10 +486,10 @@ def set_boot_order(machine_id, boot_keys, *, home=None):
         seen.add(key)
         normalized.append(key)
     state["boot"] = normalized
-    _write_state(machine_id, state, home)
+    _write_state(machine_id, state, context)
 
 
-def mark_stopped(machine_id, home=None):
+def mark_stopped(machine_id, context=None):
     """Reconcile the phase of a machine whose QEMU process has gone.
 
     Used when the guest powers itself off (the script observed
@@ -495,25 +497,25 @@ def mark_stopped(machine_id, home=None):
     ``vm.json`` is removed.  A machine not in phase ``running`` is
     left untouched.
     """
-    state = load_machine_state(machine_id, home)
+    state = load_machine_state(machine_id, context)
     if state.get("phase") != "running":
         return
-    vm_path = os.path.join(machine_dir_path(machine_id, home), "vm.json")
+    vm_path = os.path.join(machine_dir_path(machine_id, context), "vm.json")
     try:
         os.remove(vm_path)
     except FileNotFoundError:
         pass
-    _set_phase(machine_id, "ready", home)
+    _set_phase(machine_id, "ready", context)
 
 
-def destroy_machine(machine_id, home=None):
+def destroy_machine(machine_id, context=None):
     """Delete a stopped machine's cache directory entirely.
 
     A deletion interrupted by a host lock can be retried.  New failed
     deletions restore the machine to ``ready`` so they do not strand it
     in the transient ``destroying`` phase.
     """
-    state = load_machine_state(machine_id, home)
+    state = load_machine_state(machine_id, context)
     phase = state.get("phase")
     if phase == "running":
         raise RuntimeError(
@@ -524,15 +526,15 @@ def destroy_machine(machine_id, home=None):
             f"machine {machine_id} cannot be destroyed "
             f"(phase: {phase})")
     if phase == "ready":
-        _set_phase(machine_id, "destroying", home)
+        _set_phase(machine_id, "destroying", context)
     try:
-        shutil.rmtree(machine_dir_path(machine_id, home))
+        shutil.rmtree(machine_dir_path(machine_id, context))
     except OSError:
-        _set_phase(machine_id, "ready", home)
+        _set_phase(machine_id, "ready", context)
         raise
 
 
-def machine_drive_args(machine_id, home=None):
+def machine_drive_args(machine_id, context=None):
     """Build QEMU ``-drive`` arguments from a machine's state.
 
     Returns a list of tokens suitable for a QEMU command line
@@ -540,7 +542,7 @@ def machine_drive_args(machine_id, home=None):
     hard disks next, and cdroms placed on the IDE bus after the
     last hard disk.
     """
-    state = load_machine_state(machine_id, home)
+    state = load_machine_state(machine_id, context)
     drives = state.get("drives", {})
     args = []
 

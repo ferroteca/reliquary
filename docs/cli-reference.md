@@ -13,6 +13,8 @@ appear before or after the command word.
 ## Global options
 
 - `--home <path>` - Override the reliquary home directory
+- `--cache <path>` - Override the cache directory (default:
+  `<home>/cache`)
 - `--blueprint <name>` - Select a blueprint's sole machine, or
   name the blueprint for `create-machine` / `list-*`
 - `--machine <id>` - Select a machine by full id

@@ -10,8 +10,9 @@ reliquary is an OS installation scripter built on its own generic QEMU
 runner, with DOS as the default and currently only complete platform
 workflow:
 
-- `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home
-  resolution, layout, and containment, `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
+- `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home and
+  cache resolution, layout, and containment, plus the `Context` type every path-resolving function accepts,
+  `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
   its media references, scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
   fails closed while any machine of that blueprint exists), `drives.py` parses declared drives, `media.py` owns media definitions
   (parsing, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
@@ -129,9 +130,18 @@ must remain the default and fallback.
 ### Home-directory containment
 
 All persistent state belongs under the reliquary home (`Documents/reliquary` by default, falling back to `~/reliquary`
-when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--home`, or `set_home()`; individual
-operations accept an explicit `home=` that overrides the process-global home for that call — the `_effective_home()`
-seam). Never write beside the module or into the source repository during normal use.
+when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--home`, or `set_home()`). The
+regenerable cache root defaults to `<home>/cache` but resolves independently — overridden by `RELIQUARY_CACHE_DIR`,
+`--cache`, or `set_cache()` — so it can live outside the home entirely (e.g. off OneDrive-synced storage). Seeding
+(`seed-blueprint` / `seed-media` / `seed-script`) always targets `<home>/blueprints` / `<home>/media` /
+`<home>/scripts`, never the cache root. Every function that resolves a path under the home or cache accepts a
+`context=` parameter (`home.py`'s `Context`, exported from the package root): omit it (the common case) to use the
+process-global default; pass a bare string as shorthand for `Context(home=that_string)`; pass a `Context(home=...,
+cache=...)` instance to pin both independently and safely per call within one process. The CLI only ever drives the
+process-global default via `--home`/`--cache` — scoped `Context` objects are an embedding-API-only capability.
+`lifecycle.py`'s and `machine.py`'s own `home=` parameters are a different, narrower concept — an already-resolved
+plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
+deliberately left alone. Never write beside the module or into the source repository during normal use.
 
 Current home layout (still the active machine model):
 
@@ -146,10 +156,10 @@ Current home layout (still the active machine model):
 - `blueprints/` — machine blueprints (`blueprints_dir`)
 - `media/` — shared media definitions (`media_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
-- `cache/downloads/` — cached source archives (`downloads_cache_dir`)
-- `cache/media/` — cached media payloads (`media_cache_dir`)
+- `cache/downloads/` — cached source archives (`downloads_cache_dir`), under the cache root
+- `cache/media/` — cached media payloads (`media_cache_dir`), under the cache root
 - `cache/machines/<blueprint>-<n>/` — machine materializations (`machines_cache_dir`;
-  parent via `cache_dir`), each with `reliquary-machine.json`, `drives/`,
+  parent via `cache_dir`), under the cache root, each with `reliquary-machine.json`, `drives/`,
   and when running `vm.json` / `qemu-stderr.log`
 
 ### VM ownership

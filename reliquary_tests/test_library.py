@@ -44,7 +44,7 @@ class SeedingTest(unittest.TestCase):
 
     def test_seed_blueprint_copies_closure(self):
         """Seeding a blueprint brings its media and scripts along."""
-        self.assertTrue(seed_blueprint(BLUEPRINT, home=self.home))
+        self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home))
         self.assertTrue(os.path.isfile(
             self._path("blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")))
         self.assertTrue(os.path.isfile(
@@ -55,7 +55,7 @@ class SeedingTest(unittest.TestCase):
 
     def test_second_seed_leaves_user_files_alone(self):
         """A seeded file that the user edited is never overwritten."""
-        seed_blueprint(BLUEPRINT, home=self.home)
+        seed_blueprint(BLUEPRINT, context=self.home)
         blueprint_path = self._path("blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")
         media_path = self._path("media", f"{MEDIA}{MEDIA_EXT}")
         with open(blueprint_path, "w", encoding="utf-8") as handle:
@@ -63,7 +63,7 @@ class SeedingTest(unittest.TestCase):
         os.remove(blueprint_path)
         with open(media_path, "w", encoding="utf-8") as handle:
             handle.write("user media")
-        self.assertTrue(seed_blueprint(BLUEPRINT, home=self.home))
+        self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home))
         with open(media_path, encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "user media")
 
@@ -77,7 +77,7 @@ class SeedingTest(unittest.TestCase):
                 os.makedirs(os.path.dirname(blueprint_path))
                 with open(blueprint_path, "w", encoding="utf-8") as handle:
                     handle.write("mine")
-                self.assertFalse(seed_blueprint(BLUEPRINT, home=self.home))
+                self.assertFalse(seed_blueprint(BLUEPRINT, context=self.home))
                 with open(blueprint_path, encoding="utf-8") as handle:
                     self.assertEqual(handle.read(), "mine")
                 self.assertFalse(os.path.exists(self._path("media")))
@@ -98,31 +98,31 @@ class SeedingTest(unittest.TestCase):
                 with open(os.path.join(media_root, f"mine{ext}"), "w",
                           encoding="utf-8") as handle:
                     json.dump(definition, handle)
-                self.assertFalse(seed_media(MEDIA, home=self.home))
+                self.assertFalse(seed_media(MEDIA, context=self.home))
                 self.assertFalse(os.path.exists(
                     os.path.join(media_root, f"{MEDIA}{MEDIA_EXT}")))
 
     def test_unknown_names_seed_nothing(self):
-        self.assertFalse(seed_blueprint("no-such", home=self.home))
-        self.assertFalse(seed_media("no-such", home=self.home))
-        self.assertFalse(seed_script("no-such", home=self.home))
+        self.assertFalse(seed_blueprint("no-such", context=self.home))
+        self.assertFalse(seed_media("no-such", context=self.home))
+        self.assertFalse(seed_script("no-such", context=self.home))
         self.assertFalse(os.path.exists(self._path("blueprints")))
         self.assertFalse(os.path.exists(self._path("media")))
         self.assertFalse(os.path.exists(self._path("scripts")))
 
     def test_seed_script_copies_once(self):
-        self.assertTrue(seed_script(SCRIPTS[0], home=self.home))
-        self.assertFalse(seed_script(SCRIPTS[0], home=self.home))
+        self.assertTrue(seed_script(SCRIPTS[0], context=self.home))
+        self.assertFalse(seed_script(SCRIPTS[0], context=self.home))
 
     def test_seed_script_brings_its_referenced_media(self):
         """`insert cdrom0 @name` seeds the definition it names."""
-        self.assertTrue(seed_script(SCRIPTS[0], home=self.home))
+        self.assertTrue(seed_script(SCRIPTS[0], context=self.home))
         self.assertTrue(os.path.isfile(
             self._path("media", f"{MEDIA}{MEDIA_EXT}")))
 
     def test_seed_script_brings_its_referenced_openbsd_media(self):
         """The OpenBSD script seeds the ISO its install inserts."""
-        self.assertTrue(seed_script(OPENBSD_SCRIPT, home=self.home))
+        self.assertTrue(seed_script(OPENBSD_SCRIPT, context=self.home))
         self.assertTrue(os.path.isfile(
             self._path("scripts", f"{OPENBSD_SCRIPT}.rlqs")))
         self.assertTrue(os.path.isfile(
@@ -142,14 +142,14 @@ class FirstReferenceTest(unittest.TestCase):
         self.home = self._temp.name
 
     def test_resolve_media_seeds_builtin_definition(self):
-        resolved = resolve_media(MEDIA, home=self.home)
+        resolved = resolve_media(MEDIA, context=self.home)
         self.assertEqual(resolved.item.file, "FD14LIVE.iso")
         self.assertTrue(os.path.isfile(
             os.path.join(self.home, "media", f"{MEDIA}{MEDIA_EXT}")))
 
     def test_resolve_media_unknown_name_still_errors(self):
         with self.assertRaises(FileNotFoundError):
-            resolve_media("no-such-media", home=self.home)
+            resolve_media("no-such-media", context=self.home)
 
     def test_create_machine_seeds_and_honors_edits(self):
         """create seeds once; a user edit governs later creates."""
@@ -157,7 +157,7 @@ class FirstReferenceTest(unittest.TestCase):
                 mock.patch("reliquary.machines.fetch_media",
                            return_value="payload.iso"):
             machine_id = create_machine(BLUEPRINT,
-                                               home=self.home)
+                                               context=self.home)
             # It should have seeded as .rlqb because codex has it.
             blueprint_path = os.path.join(
                 self.home, "blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")
@@ -173,15 +173,15 @@ class FirstReferenceTest(unittest.TestCase):
                       encoding="utf-8") as handle:
                 json.dump(data, handle)
             second_id = create_machine(BLUEPRINT,
-                                              home=self.home)
-        first = load_machine_state(machine_id, home=self.home)
-        second = load_machine_state(second_id, home=self.home)
+                                              context=self.home)
+        first = load_machine_state(machine_id, context=self.home)
+        second = load_machine_state(second_id, context=self.home)
         self.assertEqual(first["memory"], 32)
         self.assertEqual(second["memory"], 64)
 
     def test_create_machine_unknown_name_errors(self):
         with self.assertRaises(FileNotFoundError):
-            create_machine("no-such-blueprint", home=self.home)
+            create_machine("no-such-blueprint", context=self.home)
 
 
 class BuiltinMediaDefinitionTests(unittest.TestCase):
@@ -259,7 +259,7 @@ class BuiltinCodexTests(unittest.TestCase):
 
     def test_openbsd_blueprint_seed_copies_closure(self):
         with tempfile.TemporaryDirectory() as home:
-            self.assertTrue(seed_blueprint(OPENBSD_BLUEPRINT, home=home))
+            self.assertTrue(seed_blueprint(OPENBSD_BLUEPRINT, context=home))
             self.assertTrue(os.path.isfile(os.path.join(
                 home, "blueprints", f"{OPENBSD_BLUEPRINT}{BLUEPRINT_EXT}")))
             self.assertTrue(os.path.isfile(os.path.join(

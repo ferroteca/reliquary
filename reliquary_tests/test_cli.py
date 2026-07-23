@@ -23,6 +23,8 @@ class CliEmptyListingTests(unittest.TestCase):
     def setUp(self):
         saved = home._home
         self.addCleanup(setattr, home, "_home", saved)
+        saved_cache = home._cache
+        self.addCleanup(setattr, home, "_cache", saved_cache)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -156,6 +158,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def setUp(self):
         saved = home._home
         self.addCleanup(setattr, home, "_home", saved)
+        saved_cache = home._cache
+        self.addCleanup(setattr, home, "_cache", saved_cache)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -290,6 +294,35 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertNotIn("cache", stdout.getvalue())
 
+    def test_list_blueprints_ignores_redirected_cache_dir(self):
+        """--cache pointed outside home is still excluded from the scan."""
+        redirected_cache = tempfile.TemporaryDirectory()
+        self.addCleanup(redirected_cache.cleanup)
+        cache_machine_dir = os.path.join(
+            redirected_cache.name, "machines", "plain-0")
+        os.makedirs(cache_machine_dir)
+        with open(os.path.join(cache_machine_dir, "state.json"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({"platform": "dos"}, handle)
+        # A same-named "cache" directory under home that is NOT the
+        # configured cache root must still be scanned normally.
+        decoy_cache = os.path.join(self.home, "cache")
+        os.makedirs(decoy_cache)
+        with open(os.path.join(decoy_cache, "decoy.rlqb"),
+                  "w", encoding="utf-8") as handle:
+            json.dump({"platform": "dos"}, handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home", self.home, "--cache", redirected_cache.name,
+                "list-blueprints",
+            ])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("state.json", output)
+        self.assertNotIn("plain-0", output)
+        self.assertIn("decoy", output)
+
     def test_list_blueprints_ignores_unrelated_json(self):
         """A same-extension file without a platform field is skipped."""
         with open(os.path.join(self.home, "blueprints", "notes.json"),
@@ -372,11 +405,13 @@ class CliMachineLifecycleTests(unittest.TestCase):
         """--blueprint start/stop resolve the sole machine.
 
         The process-global home is pointed elsewhere before each call:
-        the global --home must reach the subcommand on its own, not by
-        leaking through earlier set_home calls — a global --home that
-        gets dropped must never let stop target a machine in another
-        home (the identity name alone cannot tell same-numbered
-        machines of two homes apart).
+        a global --home must overwrite it via set_home() before
+        dispatch, not leave a stale global in place — a dropped
+        --home must never let stop target a machine in another home
+        (the identity name alone cannot tell same-numbered machines
+        of two homes apart). The CLI drives the process-global home
+        only (never a per-call context= override), so the guarantee
+        now rests on set_home() actually having run.
         """
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
@@ -396,7 +431,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         start.assert_called_once()
-        self.assertEqual(start.call_args.kwargs["home"], self.home)
+        self.assertNotIn("home", start.call_args.kwargs)
+        self.assertNotIn("context", start.call_args.kwargs)
+        self.assertEqual(home._home, self.home)
 
         home._home = decoy
         with mock.patch("reliquary.cli.stop_machine") as stop, \
@@ -408,7 +445,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         stop.assert_called_once()
-        self.assertEqual(stop.call_args.kwargs["home"], self.home)
+        self.assertNotIn("home", stop.call_args.kwargs)
+        self.assertNotIn("context", stop.call_args.kwargs)
+        self.assertEqual(home._home, self.home)
 
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""
@@ -429,7 +468,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--machine", machine_id,
             ])
         self.assertEqual(result, 0)
-        destroy.assert_called_once_with(machine_id, home=self.home)
+        destroy.assert_called_once_with(machine_id)
 
     def test_destroy_rejects_blueprint_and_machine_together(self):
         """--blueprint and --machine are mutually exclusive."""
@@ -559,7 +598,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main(["clean-downloads", "--home", self.home])
         self.assertEqual(result, 0)
-        clean.assert_called_once_with(home=self.home)
+        clean.assert_called_once_with()
 
 
 if __name__ == "__main__":

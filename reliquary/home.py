@@ -9,12 +9,19 @@ import sys
 
 _home = os.environ.get("RELIQUARY_HOME")
 _home_announced = False
+_cache = os.environ.get("RELIQUARY_CACHE_DIR")
 
 
 def set_home(path):
     """Configure the reliquary work directory (overrides RELIQUARY_HOME)."""
     global _home
     _home = os.path.abspath(path)
+
+
+def set_cache(path):
+    """Configure the cache root (overrides RELIQUARY_CACHE_DIR)."""
+    global _cache
+    _cache = os.path.abspath(path)
 
 
 def documents_dir():
@@ -66,45 +73,118 @@ def home():
 
 
 def effective_home(explicit):
-    """Return the explicit operation home or the process-global home."""
+    """Return the explicit operation home or the process-global home.
+
+    For the small set of modules (``lifecycle.py``, ``machine.py``,
+    ``workflows.py``'s legacy root-home path) that take an
+    already-resolved plain directory rather than a ``Context`` —
+    sometimes a real reliquary home, sometimes a machine's own cache
+    subdirectory standing in for one.
+    """
     return os.path.abspath(explicit) if explicit else home()
 
 
-def drives_dir(home=None):
+class Context:
+    """An explicit (home, cache) pair scoping one call or a group of calls.
+
+    Every reliquary function that resolves a path under the home
+    accepts a ``context=`` parameter. Omitting it (the common case)
+    uses the process-global default — whatever ``set_home()`` /
+    ``set_cache()`` / ``RELIQUARY_HOME`` / ``RELIQUARY_CACHE_DIR``
+    currently resolve to, exactly as a bare ``home=None`` did
+    before. Passing a plain string is sugar for ``Context(home=...)``
+    (cache still follows the global default). Passing a ``Context``
+    instance pins both home and cache explicitly, independent of the
+    global default and safe to vary per call within one process —
+    the CLI never does this itself (it only ever drives the global
+    default via ``--home``/``--cache``); scoped contexts are an
+    embedding-API-only capability.
+    """
+
+    __slots__ = ("home", "cache")
+
+    def __init__(self, home=None, cache=None):
+        self.home = os.path.abspath(home) if home else None
+        self.cache = os.path.abspath(cache) if cache else None
+
+    def home_dir(self):
+        """The effective home for this context."""
+        return self.home if self.home else home()
+
+    def cache_dir(self):
+        """The effective cache root for this context."""
+        if self.cache:
+            return self.cache
+        if _cache:
+            return os.path.abspath(_cache)
+        return os.path.join(self.home_dir(), "cache")
+
+    def drives_dir(self):
+        return os.path.join(self.home_dir(), "drives")
+
+    def blueprints_dir(self):
+        return os.path.join(self.home_dir(), "blueprints")
+
+    def media_dir(self):
+        return os.path.join(self.home_dir(), "media")
+
+    def scripts_dir(self):
+        return os.path.join(self.home_dir(), "scripts")
+
+    def downloads_cache_dir(self):
+        return os.path.join(self.cache_dir(), "downloads")
+
+    def media_cache_dir(self):
+        return os.path.join(self.cache_dir(), "media")
+
+    def machines_cache_dir(self):
+        return os.path.join(self.cache_dir(), "machines")
+
+
+def _ctx(context):
+    """Coerce ``None``/a bare home string/a ``Context`` into a ``Context``."""
+    if context is None:
+        return Context()
+    if isinstance(context, Context):
+        return context
+    return Context(home=context)
+
+
+def drives_dir(context=None):
     """Return the declared-drive directory under the effective home."""
-    return os.path.join(effective_home(home), "drives")
+    return _ctx(context).drives_dir()
 
 
-def blueprints_dir(home=None):
+def blueprints_dir(context=None):
     """Return the machine-blueprint directory under the effective home."""
-    return os.path.join(effective_home(home), "blueprints")
+    return _ctx(context).blueprints_dir()
 
 
-def media_dir(home=None):
+def media_dir(context=None):
     """Return the shared media-definition directory under the home."""
-    return os.path.join(effective_home(home), "media")
+    return _ctx(context).media_dir()
 
 
-def scripts_dir(home=None):
+def scripts_dir(context=None):
     """Return the automation-script directory under the effective home."""
-    return os.path.join(effective_home(home), "scripts")
+    return _ctx(context).scripts_dir()
 
 
-def cache_dir(home=None):
-    """Return the regenerable-cache root under the effective home."""
-    return os.path.join(effective_home(home), "cache")
+def cache_dir(context=None):
+    """Return the regenerable-cache root under the effective context."""
+    return _ctx(context).cache_dir()
 
 
-def downloads_cache_dir(home=None):
-    """Return the cached source-archive directory under the home."""
-    return os.path.join(cache_dir(home), "downloads")
+def downloads_cache_dir(context=None):
+    """Return the cached source-archive directory under the context."""
+    return _ctx(context).downloads_cache_dir()
 
 
-def media_cache_dir(home=None):
-    """Return the cached media-payload directory under the home."""
-    return os.path.join(cache_dir(home), "media")
+def media_cache_dir(context=None):
+    """Return the cached media-payload directory under the context."""
+    return _ctx(context).media_cache_dir()
 
 
-def machines_cache_dir(home=None):
+def machines_cache_dir(context=None):
     """Return the cached machine-materialization directory."""
-    return os.path.join(cache_dir(home), "machines")
+    return _ctx(context).machines_cache_dir()

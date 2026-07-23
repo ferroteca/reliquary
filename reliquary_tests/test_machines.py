@@ -41,7 +41,7 @@ class MachineMaterializationTests(unittest.TestCase):
             self.home, "cache", "media", "freedos-1.4-livecd.iso")
 
     def _blueprint(self, value):
-        return parse_blueprint(value, home=self.home)
+        return parse_blueprint(value, context=self.home)
 
     def test_create_populates_the_machine_cache_directory(self):
         """The machine lands under cache/machines/<id>/ with a state
@@ -53,7 +53,7 @@ class MachineMaterializationTests(unittest.TestCase):
 
         with mock.patch(
                 "reliquary.machines.create_hdd_image") as create_hdd:
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="test-bp")
 
         root = machine_dir_path(machine_id, self.home)
@@ -78,7 +78,7 @@ class MachineMaterializationTests(unittest.TestCase):
         })
 
         with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="freedos")
 
         state = load_machine_state(machine_id, self.home)
@@ -98,7 +98,7 @@ class MachineMaterializationTests(unittest.TestCase):
         blueprint = self._blueprint({"platform": "dos"})
 
         with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="minimal")
 
         state = load_machine_state(machine_id, self.home)
@@ -122,7 +122,7 @@ class MachineMaterializationTests(unittest.TestCase):
 
         with mock.patch(
                 "reliquary.machines.create_hdd_image") as create_hdd:
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="sized")
 
         self.assertEqual(create_hdd.call_count, 2)
@@ -156,11 +156,11 @@ class MachineMaterializationTests(unittest.TestCase):
                 "reliquary.machines.create_hdd_image") as create_hdd, \
                 mock.patch("reliquary.machines.fetch_media",
                            return_value=self.iso_path) as fetch:
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="with-media")
 
         fetch.assert_called_once_with("freedos-1.4-livecd",
-                                      home=self.home)
+                                      context=self.home)
         state = load_machine_state(machine_id, self.home)
         cdrom = state["drives"]["cdrom0"]
         self.assertEqual(cdrom["medium"], "cdrom")
@@ -193,7 +193,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 side_effect=_fake_create_hdd), \
                 mock.patch("reliquary.machines.fetch_media",
                            return_value=self.iso_path):
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="bootable")
 
         state = load_machine_state(machine_id, self.home)
@@ -234,7 +234,7 @@ class MachineMaterializationTests(unittest.TestCase):
                     handle.write(b"qcow2\x00" * 1024)
                 return path
             create_hdd.side_effect = _fake_create
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="mixed")
 
         args = machine_drive_args(machine_id, self.home)
@@ -250,7 +250,7 @@ class MachineMaterializationTests(unittest.TestCase):
         """A machine id with no cache directory raises
         FileNotFoundError."""
         with self.assertRaises(FileNotFoundError) as caught:
-            load_machine_state("nonexistent", home=self.home)
+            load_machine_state("nonexistent", context=self.home)
         self.assertIn("nonexistent", str(caught.exception))
 
     def test_machine_id_is_numbered_per_blueprint(self):
@@ -258,20 +258,20 @@ class MachineMaterializationTests(unittest.TestCase):
         blueprint = self._blueprint({"platform": "dos"})
 
         with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create(blueprint, home=self.home,
+            first = create(blueprint, context=self.home,
                            blueprint_name="plain")
-            second = create(blueprint, home=self.home,
+            second = create(blueprint, context=self.home,
                             blueprint_name="plain")
-            other = create(blueprint, home=self.home,
+            other = create(blueprint, context=self.home,
                            blueprint_name="other")
 
         self.assertEqual(first, "plain-0")
         self.assertEqual(second, "plain-1")
         self.assertEqual(other, "other-0")
 
-        destroy_machine(second, home=self.home)
+        destroy_machine(second, context=self.home)
         with mock.patch("reliquary.machines.create_hdd_image"):
-            reused = create(blueprint, home=self.home,
+            reused = create(blueprint, context=self.home,
                             blueprint_name="plain")
         self.assertEqual(reused, "plain-1")
 
@@ -279,7 +279,7 @@ class MachineMaterializationTests(unittest.TestCase):
         """create rejects an empty blueprint_name."""
         blueprint = self._blueprint({"platform": "dos"})
         with self.assertRaises(ValueError) as caught:
-            create(blueprint, home=self.home)
+            create(blueprint, context=self.home)
         self.assertIn("blueprint_name", str(caught.exception))
 
     def test_create_exposes_public_surface(self):
@@ -296,7 +296,7 @@ class MachineMaterializationTests(unittest.TestCase):
         value.update(fields)
         blueprint = self._blueprint(value)
         with mock.patch("reliquary.machines.create_hdd_image"):
-            return create(blueprint, home=self.home,
+            return create(blueprint, context=self.home,
                           blueprint_name=blueprint_name)
 
     def test_list_machines_returns_created_states(self):
@@ -304,11 +304,11 @@ class MachineMaterializationTests(unittest.TestCase):
         first = self._create_ready("alpha")
         second = self._create_ready("beta")
 
-        listed = list_machines(home=self.home)
+        listed = list_machines(context=self.home)
         ids = {state["id"] for state in listed}
         self.assertEqual(ids, {first, second})
 
-        filtered = list_machines(home=self.home, blueprint="alpha")
+        filtered = list_machines(context=self.home, blueprint="alpha")
         self.assertEqual([state["id"] for state in filtered], [first])
 
     def test_list_machines_orders_by_number(self):
@@ -316,23 +316,23 @@ class MachineMaterializationTests(unittest.TestCase):
         self._create_ready("plain")
         self._create_ready("plain")
         self._create_ready("plain")
-        destroy_machine("plain-1", home=self.home)
+        destroy_machine("plain-1", context=self.home)
         ordered = [state["id"] for state in list_machines(
-            home=self.home, blueprint="plain")]
+            context=self.home, blueprint="plain")]
         self.assertEqual(ordered, ["plain-0", "plain-2"])
 
     def test_resolve_machine_by_blueprint_sole_match(self):
         """--blueprint selects the sole machine of that blueprint."""
         machine_id = self._create_ready("freedos")
         self.assertEqual(
-            resolve_machine(blueprint="freedos", home=self.home),
+            resolve_machine(blueprint="freedos", context=self.home),
             machine_id)
         self.assertEqual(machine_id, "freedos-0")
 
     def test_resolve_machine_by_blueprint_none_suggests_create(self):
         """No machine for a blueprint names create-machine in the error."""
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(blueprint="missing", home=self.home)
+            resolve_machine(blueprint="missing", context=self.home)
         message = str(caught.exception)
         self.assertIn("no machine exists", message)
         self.assertIn(
@@ -343,7 +343,7 @@ class MachineMaterializationTests(unittest.TestCase):
         self._create_ready("freedos")
         self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(blueprint="freedos", home=self.home)
+            resolve_machine(blueprint="freedos", context=self.home)
         message = str(caught.exception)
         self.assertIn("has 2 machines", message)
         self.assertIn("--machine <id>", message)
@@ -352,7 +352,7 @@ class MachineMaterializationTests(unittest.TestCase):
         """--machine accepts the full <blueprint>-<n> id."""
         machine_id = self._create_ready("freedos")
         self.assertEqual(
-            resolve_machine(machine=machine_id, home=self.home),
+            resolve_machine(machine=machine_id, context=self.home),
             machine_id)
 
     def test_resolve_machine_rejects_blueprint_and_machine(self):
@@ -360,21 +360,21 @@ class MachineMaterializationTests(unittest.TestCase):
         self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
             resolve_machine(blueprint="freedos", machine="freedos-0",
-                            home=self.home)
+                            context=self.home)
         self.assertIn("mutually exclusive", str(caught.exception))
 
     def test_resolve_machine_rejects_bare_number(self):
         """A bare machine number is never a machine id."""
         self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(machine="0", home=self.home)
+            resolve_machine(machine="0", context=self.home)
         self.assertIn("<blueprint>-<n>", str(caught.exception))
 
     def test_resolve_machine_rejects_prefix(self):
         """--machine requires the full id — no prefix matching."""
         self._create_ready("freedos")
         with self.assertRaises(ValueError) as caught:
-            resolve_machine(machine="freedos-", home=self.home)
+            resolve_machine(machine="freedos-", context=self.home)
         self.assertIn("no machine", str(caught.exception))
 
     def test_start_launches_qemu_and_sets_running(self):
@@ -390,7 +390,7 @@ class MachineMaterializationTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 mock.patch("reliquary.machines.fetch_media",
                            return_value=self.iso_path):
-            machine_id = create(blueprint, home=self.home,
+            machine_id = create(blueprint, context=self.home,
                                 blueprint_name="bootable")
 
         with mock.patch("reliquary.machines.find_qemu",
@@ -399,10 +399,10 @@ class MachineMaterializationTests(unittest.TestCase):
                            return_value=self.iso_path) as fetch, \
                 mock.patch("reliquary.machines.launch_owned_qemu",
                            return_value=4444) as launch:
-            port = start_machine(machine_id, home=self.home)
+            port = start_machine(machine_id, context=self.home)
 
         self.assertEqual(port, 4444)
-        fetch.assert_called_with("freedos-1.4-livecd", home=self.home)
+        fetch.assert_called_with("freedos-1.4-livecd", context=self.home)
         launch.assert_called_once()
         args = launch.call_args.args[0]
         self.assertEqual(args[0], "qemu-system-i386")
@@ -427,7 +427,7 @@ class MachineMaterializationTests(unittest.TestCase):
                   encoding="utf-8") as handle:
             json.dump(state, handle)
         with self.assertRaises(RuntimeError) as caught:
-            start_machine(machine_id, home=self.home)
+            start_machine(machine_id, context=self.home)
         self.assertIn("already running", str(caught.exception))
 
     def test_stop_returns_phase_to_ready(self):
@@ -441,7 +441,7 @@ class MachineMaterializationTests(unittest.TestCase):
             json.dump(state, handle)
 
         with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
-            stop_machine(machine_id, home=self.home)
+            stop_machine(machine_id, context=self.home)
 
         stop_qemu.assert_called_once_with(
             home=machine_dir_path(machine_id, self.home))
@@ -478,7 +478,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 side_effect=RuntimeError("QMP identity mismatch")):
             with self.assertRaisesRegex(RuntimeError,
                                         "identity mismatch"):
-                stop_machine(machine_id, home=self.home)
+                stop_machine(machine_id, context=self.home)
 
         self.assertEqual(
             load_machine_state(machine_id, self.home)["phase"],
@@ -501,7 +501,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 side_effect=RuntimeError("no longer reachable")):
             with self.assertRaisesRegex(RuntimeError,
                                         "no longer reachable"):
-                stop_machine(machine_id, home=self.home)
+                stop_machine(machine_id, context=self.home)
 
         self.assertEqual(
             load_machine_state(machine_id, self.home)["phase"],
@@ -512,9 +512,9 @@ class MachineMaterializationTests(unittest.TestCase):
         machine_id = self._create_ready()
         root = machine_dir_path(machine_id, self.home)
         self.assertTrue(os.path.isdir(root))
-        destroy_machine(machine_id, home=self.home)
+        destroy_machine(machine_id, context=self.home)
         self.assertFalse(os.path.exists(root))
-        self.assertEqual(list_machines(home=self.home), [])
+        self.assertEqual(list_machines(context=self.home), [])
 
     def test_destroy_retries_an_interrupted_destroy(self):
         """A failed deletion leaves the machine ready for another try."""
@@ -524,11 +524,11 @@ class MachineMaterializationTests(unittest.TestCase):
         with mock.patch("reliquary.machines.shutil.rmtree",
                         side_effect=PermissionError("locked output")):
             with self.assertRaises(PermissionError):
-                destroy_machine(machine_id, home=self.home)
+                destroy_machine(machine_id, context=self.home)
 
         self.assertEqual(load_machine_state(machine_id, self.home)["phase"],
                          "ready")
-        destroy_machine(machine_id, home=self.home)
+        destroy_machine(machine_id, context=self.home)
         self.assertFalse(os.path.exists(root))
 
     def test_destroy_retries_a_previously_interrupted_destroy(self):
@@ -541,7 +541,7 @@ class MachineMaterializationTests(unittest.TestCase):
         with open(state_path, "w", encoding="utf-8") as handle:
             json.dump(state, handle)
 
-        destroy_machine(machine_id, home=self.home)
+        destroy_machine(machine_id, context=self.home)
         self.assertFalse(os.path.exists(machine_dir_path(machine_id,
                                                          self.home)))
 
@@ -555,7 +555,7 @@ class MachineMaterializationTests(unittest.TestCase):
                   encoding="utf-8") as handle:
             json.dump(state, handle)
         with self.assertRaises(RuntimeError) as caught:
-            destroy_machine(machine_id, home=self.home)
+            destroy_machine(machine_id, context=self.home)
         self.assertIn("stop it before destroying", str(caught.exception))
 
     def test_create_machine_loads_blueprints_dir(self):
@@ -569,7 +569,7 @@ class MachineMaterializationTests(unittest.TestCase):
                 "drives": {"hdd": {"size": "20M"}},
             }, handle)
         with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create_machine("plain", home=self.home)
+            machine_id = create_machine("plain", context=self.home)
         state = load_machine_state(machine_id, self.home)
         self.assertEqual(state["blueprint"], "plain")
 
@@ -594,7 +594,7 @@ class MediaInsertionTests(unittest.TestCase):
             self.home, "cache", "media", "freedos-1.4-livecd.iso")
 
     def _blueprint(self, value):
-        return parse_blueprint(value, home=self.home)
+        return parse_blueprint(value, context=self.home)
 
     def _create_installer_shaped(self):
         """A machine with an empty cdrom0 booting hdd-then-cdrom."""
@@ -604,7 +604,7 @@ class MediaInsertionTests(unittest.TestCase):
             "boot": ["hdd0", "cdrom0"],
         })
         with mock.patch("reliquary.machines.create_hdd_image"):
-            return create(blueprint, home=self.home,
+            return create(blueprint, context=self.home,
                           blueprint_name="installer")
 
     def test_create_records_empty_removable_drive(self):
@@ -631,9 +631,9 @@ class MediaInsertionTests(unittest.TestCase):
         with mock.patch("reliquary.machines.fetch_media",
                         return_value=self.iso_path) as fetch:
             insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
-                         home=self.home)
+                         context=self.home)
         fetch.assert_called_once_with("freedos-1.4-livecd",
-                                      home=self.home)
+                                      context=self.home)
         cdrom = load_machine_state(machine_id, self.home)["drives"][
             "cdrom0"]
         self.assertEqual(cdrom["media"], "freedos-1.4-livecd")
@@ -645,8 +645,8 @@ class MediaInsertionTests(unittest.TestCase):
         with mock.patch("reliquary.machines.fetch_media",
                         return_value=self.iso_path):
             insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
-                         home=self.home)
-        eject_media(machine_id, "cdrom0", home=self.home)
+                         context=self.home)
+        eject_media(machine_id, "cdrom0", context=self.home)
         state = load_machine_state(machine_id, self.home)
         cdrom = state["drives"]["cdrom0"]
         self.assertIn("cdrom0", state["drives"])
@@ -659,7 +659,7 @@ class MediaInsertionTests(unittest.TestCase):
         self.assertEqual(
             load_machine_state(machine_id, self.home)["boot"],
             ["hdd0", "cdrom0"])
-        set_boot_order(machine_id, ["cdrom0", "hdd0"], home=self.home)
+        set_boot_order(machine_id, ["cdrom0", "hdd0"], context=self.home)
         self.assertEqual(
             load_machine_state(machine_id, self.home)["boot"],
             ["cdrom0", "hdd0"])
@@ -673,13 +673,13 @@ class MediaInsertionTests(unittest.TestCase):
                   encoding="utf-8") as handle:
             json.dump(state, handle)
         with self.assertRaises(RuntimeError) as caught:
-            set_boot_order(machine_id, ["cdrom0"], home=self.home)
+            set_boot_order(machine_id, ["cdrom0"], context=self.home)
         self.assertIn("must be stopped", str(caught.exception))
 
     def test_set_boot_order_rejects_undeclared_drives(self):
         machine_id = self._create_installer_shaped()
         with self.assertRaises(ValueError) as caught:
-            set_boot_order(machine_id, ["floppy0"], home=self.home)
+            set_boot_order(machine_id, ["floppy0"], context=self.home)
         self.assertIn("undeclared drive floppy0", str(caught.exception))
 
     def test_hdd_then_cdrom_boot_renders_order_cd(self):
@@ -689,7 +689,7 @@ class MediaInsertionTests(unittest.TestCase):
                         return_value="qemu"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
                            return_value=4444) as launch:
-            start_machine(machine_id, home=self.home)
+            start_machine(machine_id, context=self.home)
         args = launch.call_args.args[0]
         self.assertIn("-boot", args)
         self.assertIn("order=cd", args)
@@ -700,12 +700,12 @@ class MediaInsertionTests(unittest.TestCase):
         with mock.patch("reliquary.machines.fetch_media",
                         return_value=self.iso_path):
             insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
-                         home=self.home)
+                         context=self.home)
             with mock.patch("reliquary.machines.find_qemu",
                             return_value="qemu"), \
                     mock.patch("reliquary.machines.launch_owned_qemu",
                                return_value=4444) as launch:
-                start_machine(machine_id, home=self.home)
+                start_machine(machine_id, context=self.home)
         args = launch.call_args.args[0]
         cdrom_arg = [a for a in args if "media=cdrom" in a]
         self.assertEqual(len(cdrom_arg), 1)
@@ -716,7 +716,7 @@ class MediaInsertionTests(unittest.TestCase):
         machine_id = self._create_installer_shaped()
         with self.assertRaises(ValueError) as caught:
             insert_media(machine_id, "floppy0", "freedos-1.4-livecd",
-                         home=self.home)
+                         context=self.home)
         self.assertIn("declares no drive floppy0", str(caught.exception))
 
     def test_insert_rejects_non_removable_slot(self):
@@ -724,7 +724,7 @@ class MediaInsertionTests(unittest.TestCase):
         machine_id = self._create_installer_shaped()
         with self.assertRaises(ValueError) as caught:
             insert_media(machine_id, "hdd0", "freedos-1.4-livecd",
-                         home=self.home)
+                         context=self.home)
         self.assertIn("not a removable drive slot", str(caught.exception))
 
     def test_insert_requires_a_stopped_machine(self):
@@ -738,7 +738,7 @@ class MediaInsertionTests(unittest.TestCase):
             json.dump(state, handle)
         with self.assertRaises(RuntimeError) as caught:
             insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
-                         home=self.home)
+                         context=self.home)
         self.assertIn("must be stopped", str(caught.exception))
 
     def test_mark_stopped_reconciles_a_powered_off_guest(self):
@@ -754,7 +754,7 @@ class MediaInsertionTests(unittest.TestCase):
                   encoding="utf-8") as handle:
             json.dump({"port": 4444, "name": "reliquary-x"}, handle)
 
-        mark_stopped(machine_id, home=self.home)
+        mark_stopped(machine_id, context=self.home)
 
         self.assertEqual(
             load_machine_state(machine_id, self.home)["phase"], "ready")
@@ -763,7 +763,7 @@ class MediaInsertionTests(unittest.TestCase):
     def test_mark_stopped_leaves_a_ready_machine_alone(self):
         """A machine that is not running is untouched."""
         machine_id = self._create_installer_shaped()
-        mark_stopped(machine_id, home=self.home)
+        mark_stopped(machine_id, context=self.home)
         self.assertEqual(
             load_machine_state(machine_id, self.home)["phase"], "ready")
 

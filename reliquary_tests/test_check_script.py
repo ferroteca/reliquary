@@ -49,7 +49,7 @@ class CheckScriptTests(unittest.TestCase):
     def test_a_bare_name_reads_a_builtin_without_writing(self):
         with tempfile.TemporaryDirectory() as home:
             result = check_script(
-                "freedos-1.4-plain-install", home=home)
+                "freedos-1.4-plain-install", context=home)
             self.assertEqual(result.plan.run_deadline.spelling, "45m")
             self.assertFalse(os.path.isdir(
                 os.path.join(home, "scripts")))
@@ -63,14 +63,14 @@ class CheckScriptTests(unittest.TestCase):
             path = os.path.join(scripts, "mine.rlqs")
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(_HEAD + 'timeout 12s\nwait "x"\n')
-            result = check_script("mine", home=home)
+            result = check_script("mine", context=home)
             self.assertEqual(result.script_path, path)
             self.assertEqual(result.plan.default.spelling, "12s")
 
     def test_a_blueprint_label_resolves_without_creating_a_machine(self):
         with tempfile.TemporaryDirectory() as home:
             result = check_script(
-                "install", blueprint="freedos-1.4-plain", home=home)
+                "install", blueprint="freedos-1.4-plain", context=home)
             self.assertIn("freedos-1.4-plain-install", result.script_path)
             self.assertFalse(os.path.isdir(
                 os.path.join(home, "cache")))
@@ -84,7 +84,7 @@ class CheckScriptTests(unittest.TestCase):
                       "w", encoding="utf-8") as handle:
                 handle.write(_HEAD + "entry a\nphase a {\n    goto a\n}\n")
             with self.assertRaises(ScriptParseError) as caught:
-                check_script("bad", home=home)
+                check_script("bad", context=home)
             self.assertIn("S12", caught.exception.message)
 
     def test_with_a_machine_media_slots_are_preflighted(self):
@@ -104,7 +104,7 @@ class CheckScriptTests(unittest.TestCase):
                     "drives": {"hdd0": {"medium": "hdd"}},
                 }
                 with self.assertRaises(reliquary.ScriptRuntimeError) as caught:
-                    check_script("use-cd", machine="plain-0", home=home)
+                    check_script("use-cd", machine="plain-0", context=home)
             self.assertIn("no drive cdrom0", str(caught.exception))
 
 

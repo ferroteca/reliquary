@@ -234,7 +234,7 @@ class ObservationTests(_RuntimeCase):
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
             machines.mark_stopped.assert_called_once_with(
-                "plain-0", home="/tmp/home")
+                "plain-0", context="/tmp/home")
         self.assertIsNone(engine._port)
 
     def test_an_unreachable_vm_runtime_error_is_stopped(self):
@@ -256,7 +256,7 @@ class ObservationTests(_RuntimeCase):
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
             machines.mark_stopped.assert_called_once_with(
-                "plain-0", home="/tmp/home")
+                "plain-0", context="/tmp/home")
         self.assertIsNone(engine._port)
 
     def test_identity_mismatch_is_not_treated_as_stopped(self):
@@ -360,7 +360,7 @@ class BranchingWaitTests(_RuntimeCase):
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
             machines.eject_media.assert_called_once_with(
-                "plain-0", "cdrom0", home="/tmp/home")
+                "plain-0", "cdrom0", context="/tmp/home")
         self.assertEqual(self.console.keys, [])
 
 
@@ -531,7 +531,7 @@ class MachineOperationTests(_RuntimeCase):
             self.run_linear(engine)
             machines.insert_media.assert_called_once_with(
                 "plain-0", "cdrom0", "freedos-1.4-livecd",
-                home="/tmp/home")
+                context="/tmp/home")
 
     def test_insert_from_a_property_is_not_bound_yet(self):
         engine = self.engine(
@@ -548,7 +548,7 @@ class MachineOperationTests(_RuntimeCase):
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
             machines.eject_media.assert_called_once_with(
-                "plain-0", "cdrom0", home="/tmp/home")
+                "plain-0", "cdrom0", context="/tmp/home")
 
     def test_set_boot_replaces_the_boot_order(self):
         engine = self.engine("set-boot hdd0 cdrom0\n")
@@ -556,7 +556,7 @@ class MachineOperationTests(_RuntimeCase):
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
             machines.set_boot_order.assert_called_once_with(
-                "plain-0", ("hdd0", "cdrom0"), home="/tmp/home")
+                "plain-0", ("hdd0", "cdrom0"), context="/tmp/home")
 
     def test_a_machine_change_failure_reports_its_line(self):
         engine = self.engine("insert cdrom0 @freedos-1.4-livecd\n")
@@ -576,7 +576,7 @@ class MachineOperationTests(_RuntimeCase):
             machines.start_machine.return_value = 9999
             self.run_linear(engine)
             machines.stop_machine.assert_called_once_with(
-                "plain-0", home="/tmp/home")
+                "plain-0", context="/tmp/home")
         self.assertEqual(engine._port, 9999)
 
     def test_screenshot_lands_in_the_run_directory(self):
@@ -847,7 +847,7 @@ class ExecutePreflightTests(unittest.TestCase):
         script = parse_script(_HEAD)
         self.assertEqual(
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home),
+                           context=self.home),
             ("-", "ready"))
 
     def test_insert_to_an_undeclared_slot_fails_before_execution(self):
@@ -857,7 +857,7 @@ class ExecutePreflightTests(unittest.TestCase):
             "insert cdrom0 @freedos-1.4-livecd\nstart\n")
         with self.assertRaises(ScriptRuntimeError) as caught:
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home)
+                           context=self.home)
         self.assertIn("declares no drive cdrom0", str(caught.exception))
         self.assertIn("line 3", str(caught.exception))
 
@@ -871,7 +871,7 @@ class ExecutePreflightTests(unittest.TestCase):
             "    }\n}\n")
         with self.assertRaises(ScriptRuntimeError) as caught:
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home)
+                           context=self.home)
         self.assertIn("declares no drive floppy1", str(caught.exception))
 
     def test_set_boot_keys_are_preflighted(self):
@@ -880,7 +880,7 @@ class ExecutePreflightTests(unittest.TestCase):
             _HEAD + "machine stopped\nset-boot cdrom0 hdd0\n")
         with self.assertRaises(ScriptRuntimeError) as caught:
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home)
+                           context=self.home)
         self.assertIn("declares no drive cdrom0", str(caught.exception))
 
     def test_insert_rejects_a_hard_disk_slot(self):
@@ -889,7 +889,7 @@ class ExecutePreflightTests(unittest.TestCase):
             _HEAD + "machine stopped\ninsert hdd0 @some-image\n")
         with self.assertRaises(ScriptRuntimeError) as caught:
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home)
+                           context=self.home)
         self.assertIn("not a removable drive slot", str(caught.exception))
 
     def test_a_stopped_script_rejects_a_running_machine(self):
@@ -898,7 +898,7 @@ class ExecutePreflightTests(unittest.TestCase):
             _HEAD + "machine stopped\nstart\n")
         with self.assertRaises(ScriptRuntimeError) as caught:
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home)
+                           context=self.home)
         self.assertIn("expects a stopped machine", str(caught.exception))
 
     def test_a_stopped_script_starts_the_machine_itself(self):
@@ -916,7 +916,7 @@ class ExecutePreflightTests(unittest.TestCase):
                 "drives": {"cdrom0": {"medium": "cdrom", "slot": 0}},
             }
             execute_script(script, machine_id=self.machine_id,
-                           home=self.home)
+                           context=self.home)
             machines.start_machine.assert_not_called()
             machines.insert_media.assert_called_once()
 

@@ -242,7 +242,7 @@ def scan_media_definitions(library, name):
     return matches
 
 
-def resolve_media(name, home=None):
+def resolve_media(name, context=None):
     """Resolve a defined media item by name from the media library.
 
     Scans every definition under `media/` and returns a
@@ -251,11 +251,11 @@ def resolve_media(name, home=None):
     first reference (never overwriting user files). A name defined
     more than once is an error naming the definition files.
     """
-    library = media_dir(home)
+    library = media_dir(context)
     matches = scan_media_definitions(library, name)
     if not matches:
         from .library import seed_media
-        if seed_media(name, home=home):
+        if seed_media(name, context=context):
             matches = scan_media_definitions(library, name)
     if not matches:
         raise FileNotFoundError(
@@ -269,7 +269,7 @@ def resolve_media(name, home=None):
     return ResolvedMedia(definition=definition, item=item)
 
 
-def list_media(home=None, *, builtin=False):
+def list_media(context=None, *, builtin=False):
     """Return sorted media item names from the catalog.
 
     Home ``media/`` by default. With ``builtin=True``, the package
@@ -278,7 +278,7 @@ def list_media(home=None, *, builtin=False):
     if builtin:
         from .library import list_builtin_media
         return list(list_builtin_media())
-    library = media_dir(home)
+    library = media_dir(context)
     if not os.path.isdir(library):
         return []
     names = set()
@@ -296,7 +296,7 @@ def list_media(home=None, *, builtin=False):
     return sorted(names)
 
 
-def delete_media(name, *, home=None):
+def delete_media(name, *, context=None):
     """Remove the home definition file that defines item ``name``.
 
     Fails closed while any machine drive references any item in
@@ -305,7 +305,7 @@ def delete_media(name, *, home=None):
     """
     from .machines import list_machines
 
-    library = media_dir(home)
+    library = media_dir(context)
     matches = scan_media_definitions(library, name)
     if not matches:
         raise FileNotFoundError(
@@ -320,7 +320,7 @@ def delete_media(name, *, home=None):
     item_names = {item.name for item in definition.items}
 
     holders = []
-    for state in list_machines(home):
+    for state in list_machines(context):
         drives = state.get("drives") or {}
         for drive in drives.values():
             media_name = drive.get("media")
@@ -370,7 +370,7 @@ def _approve_refetch(path, actual, expected, on_mismatch):
         f"on_mismatch='refetch' to fetch it again")
 
 
-def _payload_path(item, home=None):
+def _payload_path(item, context=None):
     """Return where the item's payload file lives (or will land).
 
     A `local-path` item lives at that path; otherwise the payload is
@@ -383,10 +383,10 @@ def _payload_path(item, home=None):
     if extension is None:
         extension = os.path.splitext(item.file)[1].lstrip(".")
     cached = item.name + ("." + extension if extension else "")
-    return os.path.join(media_cache_dir(home), cached)
+    return os.path.join(media_cache_dir(context), cached)
 
 
-def fetch_media(name, home=None, on_mismatch="fail"):
+def fetch_media(name, context=None, on_mismatch="fail"):
     """Return the named item's verified payload path, fetching it on
     demand.
 
@@ -408,9 +408,9 @@ def fetch_media(name, home=None, on_mismatch="fail"):
         raise ValueError(
             f"on_mismatch must be one of {_MISMATCH_POLICIES}, "
             f"got: {on_mismatch!r}")
-    resolved = resolve_media(name, home)
+    resolved = resolve_media(name, context)
     definition, item = resolved.definition, resolved.item
-    destination = _payload_path(item, home)
+    destination = _payload_path(item, context)
     actual = _sha256(destination) if os.path.exists(destination) else None
     if actual == item.sha256:
         return destination
@@ -425,7 +425,7 @@ def fetch_media(name, home=None, on_mismatch="fail"):
         _approve_refetch(destination, actual, item.sha256, on_mismatch)
         os.remove(destination)
     if definition.archive is not None:
-        archive = _ensure_archive(definition, home, on_mismatch)
+        archive = _ensure_archive(definition, context, on_mismatch)
         _extract_item(archive, item, destination)
         return destination
     if definition.url is not None:
@@ -444,7 +444,7 @@ def fetch_media(name, home=None, on_mismatch="fail"):
         f"definition names no source to fetch it from")
 
 
-def _ensure_archive(definition, home, on_mismatch):
+def _ensure_archive(definition, context, on_mismatch):
     """Return the definition's verified source archive in the cache.
 
     A cached archive that verifies is reused. One that fails
@@ -452,7 +452,7 @@ def _ensure_archive(definition, home, on_mismatch):
     deleting it (and a url exists) for a fresh download; a
     mismatched or missing archive without a url is always an error.
     """
-    archive = os.path.join(downloads_cache_dir(home), definition.archive)
+    archive = os.path.join(downloads_cache_dir(context), definition.archive)
     if os.path.exists(archive):
         actual = _sha256(archive)
         if actual == definition.archive_sha256:
@@ -509,9 +509,9 @@ def _extract_item(archive, item, destination):
     return destination
 
 
-def clean_downloads(home=None):
+def clean_downloads(context=None):
     """Delete all files in the downloads cache."""
-    cache = downloads_cache_dir(home)
+    cache = downloads_cache_dir(context)
     if not os.path.isdir(cache):
         return
     for entry in os.scandir(cache):
@@ -519,9 +519,9 @@ def clean_downloads(home=None):
             os.remove(entry.path)
 
 
-def clean_media(home=None):
+def clean_media(context=None):
     """Delete all files in the media cache."""
-    cache = media_cache_dir(home)
+    cache = media_cache_dir(context)
     if not os.path.isdir(cache):
         return
     for entry in os.scandir(cache):

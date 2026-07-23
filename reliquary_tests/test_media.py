@@ -373,7 +373,7 @@ class ResolveMediaTests(MediaHomeTestCase):
             "file": "FD14LIVE.iso",
             "sha256": ISO_SHA256
         })
-        result = resolve_media("freedos-1.4-livecd", home=self.home)
+        result = resolve_media("freedos-1.4-livecd", context=self.home)
         self.assertEqual(result.item.name, "freedos-1.4-livecd")
         self.assertEqual(result.item.file, "FD14LIVE.iso")
         self.assertIsNone(result.definition.archive)
@@ -384,7 +384,7 @@ class ResolveMediaTests(MediaHomeTestCase):
             "file": "FD14LIVE.iso",
             "sha256": ISO_SHA256
         })
-        result = resolve_media("FD14LIVE", home=self.home)
+        result = resolve_media("FD14LIVE", context=self.home)
         self.assertEqual(result.item.name, "FD14LIVE")
 
     def test_resolves_item_inside_archive_definition(self):
@@ -399,14 +399,14 @@ class ResolveMediaTests(MediaHomeTestCase):
                 {"file": "FD14BOOT.img", "sha256": BOOT_SHA256}
             ]
         })
-        result = resolve_media("FD14BOOT", home=self.home)
+        result = resolve_media("FD14BOOT", context=self.home)
         self.assertEqual(result.item.file, "FD14BOOT.img")
         self.assertEqual(result.definition.archive, "FD14-LiveCD.zip")
 
     def test_missing_name_raises_filenotfound(self):
         """Requesting a non-existent name raises FileNotFoundError."""
         with self.assertRaises(FileNotFoundError) as caught:
-            resolve_media("nonexistent", home=self.home)
+            resolve_media("nonexistent", context=self.home)
         self.assertIn("nonexistent", str(caught.exception))
 
     def test_duplicate_names_raise_valueerror(self):
@@ -420,7 +420,7 @@ class ResolveMediaTests(MediaHomeTestCase):
             "sha256": ISO_SHA256
         })
         with self.assertRaises(ValueError) as caught:
-            resolve_media("duplicate", home=self.home)
+            resolve_media("duplicate", context=self.home)
         self.assertIn("duplicate", str(caught.exception))
         self.assertIn("multiple", str(caught.exception).lower())
 
@@ -428,7 +428,7 @@ class ResolveMediaTests(MediaHomeTestCase):
         """A missing media directory raises FileNotFoundError."""
         missing_home = os.path.join(self.home, "elsewhere")
         with self.assertRaises(FileNotFoundError) as caught:
-            resolve_media("any-name", home=missing_home)
+            resolve_media("any-name", context=missing_home)
         self.assertIn("media", str(caught.exception).lower())
 
     def test_skips_non_json_files(self):
@@ -438,7 +438,7 @@ class ResolveMediaTests(MediaHomeTestCase):
             "name": "test", "file": "test.img",
             "sha256": PAYLOAD_SHA256
         })
-        result = resolve_media("test", home=self.home)
+        result = resolve_media("test", context=self.home)
         self.assertEqual(result.item.name, "test")
 
     def test_skips_invalid_files(self):
@@ -450,7 +450,7 @@ class ResolveMediaTests(MediaHomeTestCase):
             "name": "test", "file": "test.img",
             "sha256": PAYLOAD_SHA256
         })
-        result = resolve_media("test", home=self.home)
+        result = resolve_media("test", context=self.home)
         self.assertEqual(result.item.name, "test")
 
 
@@ -472,7 +472,7 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
 
     def _fetch(self, urlopen, on_mismatch="fail"):
         with mock.patch("reliquary.media.urlopen", urlopen):
-            return fetch_media("msdos622-boot", home=self.home,
+            return fetch_media("msdos622-boot", context=self.home,
                                on_mismatch=on_mismatch)
 
     def test_download_lands_in_media_cache(self):
@@ -553,7 +553,7 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
     def test_invalid_on_mismatch_rejected(self):
         """An unknown on_mismatch policy raises ValueError."""
         with self.assertRaises(ValueError) as caught:
-            fetch_media("msdos622-boot", home=self.home,
+            fetch_media("msdos622-boot", context=self.home,
                         on_mismatch="heal")
         self.assertIn("on_mismatch", str(caught.exception))
 
@@ -574,7 +574,7 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
             "sha256": ISO_SHA256
         })
         with self.assertRaises(RuntimeError) as caught:
-            fetch_media("handmade", home=self.home)
+            fetch_media("handmade", context=self.home)
         message = str(caught.exception)
         self.assertIn("handmade", message)
         self.assertIn(ISO_SHA256, message)
@@ -592,7 +592,7 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
             handle.write(b"corrupted")
         corrupted_sha256 = hashlib.sha256(b"corrupted").hexdigest()
         with self.assertRaises(RuntimeError) as caught:
-            fetch_media("handmade", home=self.home)
+            fetch_media("handmade", context=self.home)
         message = str(caught.exception)
         self.assertIn("handmade", message)
         self.assertIn(ISO_SHA256, message)
@@ -607,7 +607,7 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
         })
         urlopen = mock.Mock(return_value=io.BytesIO(PAYLOAD))
         with mock.patch("reliquary.media.urlopen", urlopen):
-            result = fetch_media("renamed", home=self.home)
+            result = fetch_media("renamed", context=self.home)
         self.assertEqual(
             result,
             os.path.join(self.home, "cache", "media", "renamed.img"))
@@ -622,7 +622,7 @@ class FetchMediaItemFormTests(MediaHomeTestCase):
             "sha256": PAYLOAD_SHA256,
             "local-path": elsewhere.replace(os.sep, "/")
         })
-        result = fetch_media("win98se", home=self.home)
+        result = fetch_media("win98se", context=self.home)
         self.assertEqual(
             os.path.normpath(result), os.path.normpath(elsewhere))
         self.assertFalse(os.path.exists(
@@ -658,7 +658,7 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
     def _fetch(self, urlopen, name="freedos-1.4-livecd",
                on_mismatch="fail"):
         with mock.patch("reliquary.media.urlopen", urlopen):
-            return fetch_media(name, home=self.home,
+            return fetch_media(name, context=self.home,
                                on_mismatch=on_mismatch)
 
     def test_livecd_zip_lands_as_verified_iso(self):
@@ -754,7 +754,7 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
             handle.write(b"corrupted")
         corrupted_sha256 = hashlib.sha256(b"corrupted").hexdigest()
         with self.assertRaises(RuntimeError) as caught:
-            fetch_media("handmade-boot", home=self.home,
+            fetch_media("handmade-boot", context=self.home,
                         on_mismatch="refetch")
         message = str(caught.exception)
         self.assertIn(self.zip_sha256, message)
@@ -772,7 +772,7 @@ class FetchMediaArchiveFormTests(MediaHomeTestCase):
                        "sha256": BOOT_SHA256}]
         })
         with self.assertRaises(RuntimeError) as caught:
-            fetch_media("handmade-boot", home=self.home)
+            fetch_media("handmade-boot", context=self.home)
         self.assertIn("handmade.zip", str(caught.exception))
 
     def test_unverifiable_archive_download_is_erased_and_reported(self):
@@ -841,10 +841,10 @@ class ListMediaTests(MediaHomeTestCase):
             "sha256": ISO_SHA256,
         })
         self.assertEqual(
-            media.list_media(home=self.home), ["alpha", "beta"])
+            media.list_media(context=self.home), ["alpha", "beta"])
 
     def test_empty_home(self):
-        self.assertEqual(media.list_media(home=self.home), [])
+        self.assertEqual(media.list_media(context=self.home), [])
 
     def test_builtin_includes_freedos(self):
         names = media.list_media(builtin=True)
@@ -859,14 +859,14 @@ class DeleteMediaTests(MediaHomeTestCase):
             "sha256": ISO_SHA256,
         })
         removed = media.delete_media(
-            "freedos-1.4-livecd", home=self.home)
+            "freedos-1.4-livecd", context=self.home)
         self.assertEqual(removed, path)
         self.assertFalse(os.path.exists(path))
-        self.assertEqual(media.list_media(home=self.home), [])
+        self.assertEqual(media.list_media(context=self.home), [])
 
     def test_missing_raises(self):
         with self.assertRaises(FileNotFoundError) as caught:
-            media.delete_media("missing", home=self.home)
+            media.delete_media("missing", context=self.home)
         self.assertIn("No media definition found", str(caught.exception))
 
     def test_refuses_while_machine_holds_media(self):
@@ -894,7 +894,7 @@ class DeleteMediaTests(MediaHomeTestCase):
                 },
             }, handle)
         with self.assertRaises(RuntimeError) as caught:
-            media.delete_media("livecd", home=self.home)
+            media.delete_media("livecd", context=self.home)
         self.assertIn("still used by 1 machine(s)", str(caught.exception))
         self.assertIn("plain-0", str(caught.exception))
         self.assertTrue(os.path.exists(
@@ -903,7 +903,7 @@ class DeleteMediaTests(MediaHomeTestCase):
     def test_does_not_delete_builtin(self):
         with self.assertRaises(FileNotFoundError):
             media.delete_media(
-                "freedos-1.4-livecd", home=self.home)
+                "freedos-1.4-livecd", context=self.home)
 
 
 class CleanupTests(MediaHomeTestCase):
@@ -914,7 +914,7 @@ class CleanupTests(MediaHomeTestCase):
         with open(file_path, "w") as f:
             f.write("content")
 
-        media.clean_downloads(home=self.home)
+        media.clean_downloads(context=self.home)
         self.assertFalse(os.path.exists(file_path))
         self.assertTrue(os.path.exists(cache))
 
@@ -925,7 +925,7 @@ class CleanupTests(MediaHomeTestCase):
         with open(file_path, "w") as f:
             f.write("content")
 
-        media.clean_media(home=self.home)
+        media.clean_media(context=self.home)
         self.assertFalse(os.path.exists(file_path))
         self.assertTrue(os.path.exists(cache))
 
@@ -938,14 +938,14 @@ class CleanupTests(MediaHomeTestCase):
         with open(file_path, "w") as f:
             f.write("content")
 
-        media.clean_downloads(home=self.home)
+        media.clean_downloads(context=self.home)
         self.assertFalse(os.path.exists(file_path))
         self.assertTrue(os.path.isdir(directory))
 
     def test_clean_empty_missing_dirs(self):
         # Should not crash if dir doesn't exist
-        media.clean_downloads(home=self.home)
-        media.clean_media(home=self.home)
+        media.clean_downloads(context=self.home)
+        media.clean_media(context=self.home)
 
 
 if __name__ == "__main__":

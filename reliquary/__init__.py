@@ -5,9 +5,10 @@
 from .blueprint import (Blueprint, BlueprintDrive, delete_blueprint,
                         load_blueprint, parse_blueprint, new_blueprint)
 from .cli import main
-from .home import (blueprints_dir, cache_dir, documents_dir,
+from .home import (Context, blueprints_dir, cache_dir, documents_dir,
                    downloads_cache_dir, drives_dir, home, machines_cache_dir,
-                   media_cache_dir, media_dir, scripts_dir, set_home)
+                   media_cache_dir, media_dir, scripts_dir, set_cache,
+                   set_home)
 from .interaction import GuestExec
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
@@ -52,6 +53,7 @@ __all__ = [
     "Statement",
     "MachineConfig",
     "AgentlessGuestExec",
+    "Context",
     "GuestExec",
     "create",
     "create_hdd_image",
@@ -101,6 +103,7 @@ __all__ = [
     "send_keys",
     "send_text",
     "set_boot_order",
+    "set_cache",
     "set_home",
     "set_property",
     "start",

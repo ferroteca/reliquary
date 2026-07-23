@@ -20,7 +20,7 @@ from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from . import jsonc
 from .home import (blueprints_dir, cache_dir, effective_home, media_dir,
-                   scripts_dir, set_home)
+                   scripts_dir, set_cache, set_home)
 from .library import (list_builtin_blueprints, list_builtin_media,
                       seed_blueprint, seed_media, seed_script)
 from . import blueprint as blueprint_mod
@@ -61,6 +61,7 @@ _COMMANDS = frozenset({
 # Unknown leading tokens are left in place for argparse to reject.
 _FLAG_ARITY = {
     "--home": 1,
+    "--cache": 1,
     "--blueprint": 1,
     "--machine": 1,
     "--port": 1,
@@ -123,7 +124,12 @@ def _cli_start_overrides(arguments):
 
 
 def _require_machine_selector(arguments):
-    """Return a resolved machine id from selectors."""
+    """Return a resolved machine id from selectors.
+
+    Relies on the process-global home/cache (set from --home/--cache
+    in main() before dispatch) rather than threading arguments.home
+    through — the CLI only ever drives the global default.
+    """
     if not getattr(arguments, "blueprint", None) and not getattr(
             arguments, "machine", None):
         raise ValueError(
@@ -131,7 +137,6 @@ def _require_machine_selector(arguments):
     return resolve_machine(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None),
-        home=getattr(arguments, "home", None),
     )
 
 
@@ -144,13 +149,12 @@ def _interaction_port(arguments):
     if getattr(arguments, "blueprint", None) or getattr(
             arguments, "machine", None):
         machine_id = _require_machine_selector(arguments)
-        state = load_machine_state(machine_id, arguments.home)
+        state = load_machine_state(machine_id)
         if state.get("phase") != "running":
             raise ValueError(
                 f"machine {machine_id} is not running "
                 f"(phase: {state.get('phase')})")
-        vm = read_vm_state(home=machine_dir_path(
-            machine_id, arguments.home))
+        vm = read_vm_state(home=machine_dir_path(machine_id))
         if vm is None:
             raise ValueError(
                 f"machine {machine_id} is running but has no "
@@ -162,6 +166,8 @@ def _interaction_port(arguments):
 def _add_home(parser):
     parser.add_argument("--home", default=None,
                         help="reliquary home directory")
+    parser.add_argument("--cache", default=None,
+                        help="cache directory (default: <home>/cache)")
     return parser
 
 
@@ -424,6 +430,8 @@ def main(argv=None):
     arguments = parser.parse_args(argv)
     if arguments.home:
         set_home(arguments.home)
+    if getattr(arguments, "cache", None):
+        set_cache(arguments.cache)
     try:
         return _dispatch(arguments)
     except ScriptParseError as error:
@@ -450,8 +458,7 @@ def _create(arguments):
         raise ValueError(
             "create-machine allocates the machine number; "
             "do not pass --machine")
-    machine_id = create_machine(
-        arguments.blueprint, home=arguments.home)
+    machine_id = create_machine(arguments.blueprint)
     print(f"created machine {machine_id}")
     return 0
 
@@ -467,7 +474,6 @@ def _script(arguments):
             arguments.label,
             blueprint=blueprint_name,
             machine=machine_selector,
-            home=arguments.home,
             display=arguments.display,
         )
     except KeyboardInterrupt:
@@ -488,7 +494,6 @@ def _check_script(arguments):
         arguments.name,
         blueprint=getattr(arguments, "blueprint", None),
         machine=getattr(arguments, "machine", None),
-        home=arguments.home,
     )
     print(result.report, end="")
     return 0
@@ -503,15 +508,17 @@ def _list_blueprints(arguments):
         for name in names:
             print(name)
         return 0
-    home_path = effective_home(arguments.home)
-    cache_path = cache_dir(arguments.home)
+    home_path = effective_home(None)
+    # The cache root resolves independently (RELIQUARY_CACHE_DIR /
+    # --cache / set_cache()) and need not sit under the home at all,
+    # so it's excluded by matching the actual configured path, not
+    # by a literal "cache" directory name.
+    cache_path = cache_dir()
     found = []
     for root, dirs, files in os.walk(home_path):
         if os.path.abspath(root) == cache_path:
             dirs[:] = []
             continue
-        if os.path.abspath(root) == home_path and "cache" in dirs:
-            dirs.remove("cache")
         for entry in files:
             if entry.endswith(".rlqb"):
                 found.append(os.path.join(root, entry))
@@ -560,8 +567,8 @@ def _list_media(arguments):
         for name in names:
             print(name)
         return 0
-    names = list_media(home=arguments.home)
-    library = media_dir(arguments.home)
+    names = list_media()
+    library = media_dir()
     if not names:
         print(f"(no media in {library})")
         return 0
@@ -571,15 +578,14 @@ def _list_media(arguments):
 
 
 def _delete_media(arguments):
-    path = delete_media(arguments.name, home=arguments.home)
+    path = delete_media(arguments.name)
     print(f"deleted media {arguments.name} ({path})")
     return 0
 
 
 def _list_machines(arguments):
     filter_blueprint = getattr(arguments, "blueprint", None)
-    machines = list_machines(
-        home=arguments.home, blueprint=filter_blueprint)
+    machines = list_machines(blueprint=filter_blueprint)
     if not machines:
         if filter_blueprint:
             print(f"(no machines for blueprint {filter_blueprint})")
@@ -620,11 +626,11 @@ def _description(script):
 def _list_scripts(arguments):
     blueprint_name = getattr(arguments, "blueprint", None)
     if blueprint_name:
-        bp_path = os.path.join(blueprints_dir(arguments.home),
+        bp_path = os.path.join(blueprints_dir(),
                                f"{blueprint_name}.json")
         if not os.path.exists(bp_path):
-            seed_blueprint(blueprint_name, home=arguments.home)
-        bp = blueprint_mod.load_blueprint(bp_path, home=arguments.home)
+            seed_blueprint(blueprint_name)
+        bp = blueprint_mod.load_blueprint(bp_path)
         scripts = bp.scripts
         if not scripts:
             print(f"(blueprint {blueprint_name} declares no scripts)")
@@ -634,8 +640,7 @@ def _list_scripts(arguments):
             default=5)
         print(f"{'LABEL':<{label_width}}  DESCRIPTION")
         for label, stem in scripts.items():
-            script_path = os.path.join(scripts_dir(arguments.home),
-                                       f"{stem}.rlqs")
+            script_path = os.path.join(scripts_dir(), f"{stem}.rlqs")
             try:
                 script = load_script(script_path)
             except (FileNotFoundError, ScriptParseError) as error:
@@ -644,7 +649,7 @@ def _list_scripts(arguments):
                 description = _description(script)
             print(f"{label:<{label_width}}  {description}")
         return 0
-    _print_scripts_in_dir(scripts_dir(arguments.home))
+    _print_scripts_in_dir(scripts_dir())
     return 0
 
 
@@ -676,13 +681,13 @@ def _print_scripts_in_dir(scripts_path):
 
 
 def _fetch_media(arguments):
-    fetch_media(arguments.name, home=arguments.home)
+    fetch_media(arguments.name)
     print(f"fetched {arguments.name}")
     return 0
 
 
 def _seed_blueprint(arguments):
-    if seed_blueprint(arguments.name, home=arguments.home):
+    if seed_blueprint(arguments.name):
         print(f"seeded blueprint {arguments.name}")
     else:
         print(f"blueprint {arguments.name} already exists or not found")
@@ -690,7 +695,7 @@ def _seed_blueprint(arguments):
 
 
 def _seed_media(arguments):
-    if seed_media(arguments.name, home=arguments.home):
+    if seed_media(arguments.name):
         print(f"seeded media {arguments.name}")
     else:
         print(f"media {arguments.name} already exists or not found")
@@ -698,7 +703,7 @@ def _seed_media(arguments):
 
 
 def _seed_script(arguments):
-    if seed_script(arguments.name, home=arguments.home):
+    if seed_script(arguments.name):
         print(f"seeded script {arguments.name}")
     else:
         print(f"script {arguments.name} already exists or not found")
@@ -707,40 +712,36 @@ def _seed_script(arguments):
 
 def _new_blueprint(arguments):
     path = blueprint_mod.new_blueprint(
-        arguments.name, platform=arguments.platform or "dos",
-        home=arguments.home)
+        arguments.name, platform=arguments.platform or "dos")
     print(f"created blueprint {arguments.name} at {path}")
     return 0
 
 
 def _delete_blueprint(arguments):
-    path = blueprint_mod.delete_blueprint(
-        arguments.name, home=arguments.home)
+    path = blueprint_mod.delete_blueprint(arguments.name)
     print(f"deleted blueprint {arguments.name} ({path})")
     return 0
 
 
 def _get_property(arguments):
-    value = get_property(arguments.key, home=arguments.home)
+    value = get_property(arguments.key)
     if value is not None:
         print(value)
     return 0
 
 
 def _set_property(arguments):
-    set_property(
-        arguments.key, arguments.value, secret=arguments.secret,
-        home=arguments.home)
+    set_property(arguments.key, arguments.value, secret=arguments.secret)
     return 0
 
 
 def _unset_property(arguments):
-    unset_property(arguments.key, home=arguments.home)
+    unset_property(arguments.key)
     return 0
 
 
 def _list_properties(arguments):
-    properties = list_properties(home=arguments.home)
+    properties = list_properties()
     if not properties:
         return 0
     key_width = max(len(key) for key in properties)
@@ -754,21 +755,20 @@ def _import_vm(arguments):
 
 
 def _clean_downloads(arguments):
-    clean_downloads(home=arguments.home)
+    clean_downloads()
     print("cleaned downloads cache")
     return 0
 
 
 def _clean_media(arguments):
-    clean_media(home=arguments.home)
+    clean_media()
     print("cleaned media cache")
     return 0
 
 
 def _insert_media(arguments):
     machine_id = _require_machine_selector(arguments)
-    insert_media(machine_id, arguments.slot, arguments.media,
-                 home=arguments.home)
+    insert_media(machine_id, arguments.slot, arguments.media)
     print(f"inserted {arguments.media} into {arguments.slot} "
           f"on {machine_id}")
     return 0
@@ -776,14 +776,14 @@ def _insert_media(arguments):
 
 def _eject_media(arguments):
     machine_id = _require_machine_selector(arguments)
-    eject_media(machine_id, arguments.slot, home=arguments.home)
+    eject_media(machine_id, arguments.slot)
     print(f"ejected {arguments.slot} on {machine_id}")
     return 0
 
 
 def _set_boot_order(arguments):
     machine_id = _require_machine_selector(arguments)
-    set_boot_order(machine_id, arguments.keys, home=arguments.home)
+    set_boot_order(machine_id, arguments.keys)
     print(f"boot order on {machine_id}: {' '.join(arguments.keys)}")
     return 0
 
@@ -848,8 +848,7 @@ def _dispatch(arguments):
         if blueprint or machine:
             machine_id = _require_machine_selector(arguments)
             start_machine(
-                machine_id, display=getattr(arguments, "display", False),
-                home=home)
+                machine_id, display=getattr(arguments, "display", False))
             return 0
         # Legacy root-home start (MachineConfig / machine.json).
         config = _cli_machine_config(
@@ -862,13 +861,13 @@ def _dispatch(arguments):
     if arguments.command == "stop-machine":
         if blueprint or machine:
             machine_id = _require_machine_selector(arguments)
-            stop_machine(machine_id, home=home)
+            stop_machine(machine_id)
             return 0
         stop_legacy(port)
         return 0
     if arguments.command == "destroy-machine":
         machine_id = _require_machine_selector(arguments)
-        destroy_machine(machine_id, home=home)
+        destroy_machine(machine_id)
         print(f"destroyed machine {machine_id}")
         return 0
 

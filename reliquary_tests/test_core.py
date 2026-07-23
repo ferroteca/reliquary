@@ -68,18 +68,18 @@ class HomeTests(unittest.TestCase):
         self.addCleanup(other.cleanup)
         root = other.name
         cache = os.path.join(root, "cache")
-        self.assertEqual(reliquary.blueprints_dir(home=root),
+        self.assertEqual(reliquary.blueprints_dir(context=root),
                          os.path.join(root, "blueprints"))
-        self.assertEqual(reliquary.media_dir(home=root),
+        self.assertEqual(reliquary.media_dir(context=root),
                          os.path.join(root, "media"))
-        self.assertEqual(reliquary.scripts_dir(home=root),
+        self.assertEqual(reliquary.scripts_dir(context=root),
                          os.path.join(root, "scripts"))
-        self.assertEqual(reliquary.cache_dir(home=root), cache)
-        self.assertEqual(reliquary.downloads_cache_dir(home=root),
+        self.assertEqual(reliquary.cache_dir(context=root), cache)
+        self.assertEqual(reliquary.downloads_cache_dir(context=root),
                          os.path.join(cache, "downloads"))
-        self.assertEqual(reliquary.media_cache_dir(home=root),
+        self.assertEqual(reliquary.media_cache_dir(context=root),
                          os.path.join(cache, "media"))
-        self.assertEqual(reliquary.machines_cache_dir(home=root),
+        self.assertEqual(reliquary.machines_cache_dir(context=root),
                          os.path.join(cache, "machines"))
 
     def test_documents_dir_is_public_and_absolute_or_none(self):

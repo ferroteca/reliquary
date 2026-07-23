@@ -6,15 +6,14 @@ from collections.abc import Mapping
 
 from . import jsonc
 
-def _properties_path(home=None):
+def _properties_path(context=None):
     """Return the path to the user properties file."""
-    from .home import home as home_func
-    effective_home = home or home_func()
-    return os.path.join(effective_home, "user.properties")
+    from .home import _ctx
+    return os.path.join(_ctx(context).home_dir(), "user.properties")
 
-def _load_properties(home=None):
+def _load_properties(context=None):
     """Load the user properties from disk."""
-    path = _properties_path(home)
+    path = _properties_path(context)
     if not os.path.exists(path):
         return {}
     try:
@@ -26,36 +25,36 @@ def _load_properties(home=None):
         return {}
     return dict(value)
 
-def _save_properties(properties, home=None):
+def _save_properties(properties, context=None):
     """Save the user properties to disk."""
-    path = _properties_path(home)
+    path = _properties_path(context)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(properties, handle, indent=4)
         handle.write("\n")
 
-def get_property(key, home=None):
+def get_property(key, context=None):
     """Return the value of the named property, or None."""
-    return _load_properties(home).get(key)
+    return _load_properties(context).get(key)
 
-def set_property(key, value, secret=False, home=None):
+def set_property(key, value, secret=False, context=None):
     """Set the value of the named property.
 
     If secret is True, the value should be stored in the host's
     protected credential store (milestone 6). For now, it's just
     in the JSON file.
     """
-    properties = _load_properties(home)
+    properties = _load_properties(context)
     properties[key] = value
-    _save_properties(properties, home)
+    _save_properties(properties, context)
 
-def unset_property(key, home=None):
+def unset_property(key, context=None):
     """Remove the named property."""
-    properties = _load_properties(home)
+    properties = _load_properties(context)
     if key in properties:
         del properties[key]
-        _save_properties(properties, home)
+        _save_properties(properties, context)
 
-def list_properties(home=None):
+def list_properties(context=None):
     """Return a dictionary of all defined properties."""
-    return _load_properties(home)
+    return _load_properties(context)

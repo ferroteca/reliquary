@@ -60,36 +60,36 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
     def test_creates_when_blueprint_has_no_machine(self):
         with mock.patch("reliquary.machines.create_hdd_image"):
             machine_id, created = _resolve_or_create_machine(
-                blueprint="plain", home=self.home)
+                blueprint="plain", context=self.home)
         self.assertTrue(created)
         self.assertEqual(machine_id, "plain-0")
 
     def test_reuses_sole_machine(self):
         with mock.patch("reliquary.machines.create_hdd_image"):
             first, created = _resolve_or_create_machine(
-                blueprint="plain", home=self.home)
+                blueprint="plain", context=self.home)
             self.assertTrue(created)
             second, created = _resolve_or_create_machine(
-                blueprint="plain", home=self.home)
+                blueprint="plain", context=self.home)
         self.assertFalse(created)
         self.assertEqual(first, second)
 
     def test_machine_id_resolves(self):
         with mock.patch("reliquary.machines.create_hdd_image"):
             machine_id, _ = _resolve_or_create_machine(
-                blueprint="plain", home=self.home)
+                blueprint="plain", context=self.home)
         resolved, created = _resolve_or_create_machine(
-            machine=machine_id, home=self.home)
+            machine=machine_id, context=self.home)
         self.assertFalse(created)
         self.assertEqual(resolved, machine_id)
 
     def test_machine_id_resolves(self):
         from reliquary.machines import create_machine
         with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create_machine("plain", home=self.home)
-            second = create_machine("plain", home=self.home)
+            first = create_machine("plain", context=self.home)
+            second = create_machine("plain", context=self.home)
         resolved, created = _resolve_or_create_machine(
-            machine="plain-1", home=self.home)
+            machine="plain-1", context=self.home)
         self.assertFalse(created)
         self.assertEqual(first, "plain-0")
         self.assertEqual(resolved, second)
@@ -107,7 +107,7 @@ class CreateRunDirTests(unittest.TestCase):
         os.makedirs(root)
 
     def test_creates_transcript_layout(self):
-        run_dir = _create_run_dir(self.machine_id, home=self.home)
+        run_dir = _create_run_dir(self.machine_id, context=self.home)
         self.assertTrue(os.path.isdir(run_dir))
         self.assertTrue(
             os.path.isdir(os.path.join(run_dir, "screenshots")))
@@ -195,7 +195,7 @@ class RunScriptWiringTests(unittest.TestCase):
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")) as execute:
             result = run_script(
-                "install", blueprint="plain", home=self.home)
+                "install", blueprint="plain", context=self.home)
         self.assertIsInstance(result, ScriptRun)
         self.assertTrue(result.created_machine)
         self.assertTrue(result.script_path.endswith(
@@ -208,7 +208,7 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertEqual(kwargs["machine_id"], result.machine_id)
         self.assertEqual(kwargs["run_dir"], result.run_dir)
         self.assertEqual(kwargs["script_path"], result.script_path)
-        self.assertEqual(kwargs["home"], self.home)
+        self.assertEqual(kwargs["context"], self.home)
         self.assertFalse(kwargs["display"])
 
     def test_run_script_bare_stem_when_label_absent(self):
@@ -221,14 +221,14 @@ class RunScriptWiringTests(unittest.TestCase):
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")):
             result = run_script(
-                "extra", blueprint="plain", home=self.home)
+                "extra", blueprint="plain", context=self.home)
         self.assertTrue(result.script_path.endswith("extra.rlqs"))
 
     def test_run_script_seeds_missing_script(self):
         os.remove(os.path.join(
             self.home, "scripts", "install-script.rlqs"))
 
-        def fake_seed(stem, home=None):
+        def fake_seed(stem, context=None):
             path = os.path.join(self.home, "scripts", f"{stem}.rlqs")
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write("platform dos\n")
@@ -242,8 +242,8 @@ class RunScriptWiringTests(unittest.TestCase):
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")):
             result = run_script(
-                "install", blueprint="plain", home=self.home)
-        seed.assert_called_once_with("install-script", home=self.home)
+                "install", blueprint="plain", context=self.home)
+        seed.assert_called_once_with("install-script", context=self.home)
         self.assertTrue(os.path.isfile(result.script_path))
 
     def test_run_script_missing_script_fails(self):
@@ -255,7 +255,7 @@ class RunScriptWiringTests(unittest.TestCase):
                     return_value=False):
             with self.assertRaises(FileNotFoundError) as caught:
                 run_script(
-                    "install", blueprint="plain", home=self.home)
+                    "install", blueprint="plain", context=self.home)
         self.assertIn("install-script.rlqs", str(caught.exception))
 
     def test_run_script_forwards_display(self):
@@ -264,7 +264,7 @@ class RunScriptWiringTests(unittest.TestCase):
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")) as execute:
             run_script(
-                "install", blueprint="plain", home=self.home,
+                "install", blueprint="plain", context=self.home,
                 display=True)
         self.assertTrue(execute.call_args.kwargs["display"])
 
@@ -296,7 +296,6 @@ class RunScriptWiringTests(unittest.TestCase):
             "install",
             blueprint="plain",
             machine=None,
-            home=self.home,
             display=False,
         )
         output = stdout.getvalue()

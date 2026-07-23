@@ -13,6 +13,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The cache root (`cache/downloads/`, `cache/media/`,
+  `cache/machines/`) resolves independently of the reliquary home:
+  `RELIQUARY_CACHE_DIR`, `--cache`, and `set_cache()` mirror
+  `RELIQUARY_HOME` / `--home` / `set_home()`, defaulting to
+  `<home>/cache`. Seeding (`seed-blueprint` / `seed-media` /
+  `seed-script`) is unaffected — it always targets
+  `<home>/blueprints` / `<home>/media` / `<home>/scripts`.
+- `Context(home=None, cache=None)`, exported from the package
+  root: every function that resolves a path under the home or
+  cache now accepts a `context=` parameter (replacing the former
+  `home=`). Omitting it uses the process-global default, same as
+  before; a bare string is sugar for `Context(home=that_string)`;
+  a `Context` instance pins home and cache explicitly, safe to
+  vary per call within one embedding process. The CLI only ever
+  drives the process-global default via `--home`/`--cache` — scoped
+  contexts are an embedding-API-only capability.
 - Packaging metadata now declares the project homepage
   (`https://github.com/ferroteca/reliquary`) so PyPI can link to
   the repository.
