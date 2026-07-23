@@ -35,6 +35,57 @@ text intact, to the Retired decisions section at the bottom,
 its note naming what overruled it — a retired decision binds
 nothing but remains the record.
 
+- D28 — THE INTERFACE-CHANGE RULE COVERS PRINCIPLES — DECIDED
+  (owner, 2026-07-23). Supports P8 (which it clarifies). The
+  owner: "requests must align to principles or use cases, and a
+  change in principles requires vigorous argument, just like the
+  use case." HALF OF THAT WAS RECORDED AND HALF WAS NOT.
+  RECORDED: demand. The ROADMAP preamble already has every item
+  citing a use case (U) or a governing principle (P), "which
+  drives work just as well". NOT RECORDED: the vetting side. The
+  interface-change rule (INTERFACES.md) was written entirely
+  use-case-shaped — "the use-case list is where interface
+  changes are argued", triage "by their use-case impact", all
+  three tiers use-case framed, and the hard case demanding that
+  "Reliquary's use cases change". P8 mirrored it: "triages by
+  its impact on the use cases". SO A CHANGE MISALIGNED WITH A
+  PRINCIPLE RATHER THAN A USE CASE HAD NO PATH THROUGH THE RULE
+  — while PRINCIPLES.md asserted amendments "are argued like
+  interface changes", PRINCIPLE-PROPOSALS.md said its lifecycle
+  "mirrors the use-case one", and D25 amended P9 explicitly
+  under the rule. The practice existed; the rule never
+  authorized it. The gap was live through this whole round: D25,
+  D27's P15, and P14's reshaping are all principle-level changes
+  made under a rule that did not mention principles.
+  THE FIX: P8 is retitled "Interface and principle changes are
+  vetted" and triages by impact on the use cases AND the
+  governing principles; a change misaligned with either is
+  argued as the amendment it requires, A PRINCIPLE AMENDMENT AS
+  VIGOROUSLY AS A USE-CASE ONE, never as a feature on its own
+  merits. INTERFACES.md's rule gains the principle branch
+  throughout: the frame ("cannot be phrased as 'the use cases
+  should say …' or 'the principles should say …'"), all three
+  triage tiers, and the workflow naming PRINCIPLE-PROPOSALS.md
+  beside USE-CASE-PROPOSALS.md. One line is added that neither
+  document carried: THE TWO CARRY EQUAL WEIGHT, AND NEITHER IS
+  EDITED TO FIT A FEATURE SOMEONE HAS ALREADY DECIDED TO BUILD.
+  CLARIFICATION, NOT SUPERSESSION — and decided on evidence
+  rather than taste, under the lifecycle's own test (a
+  clarification is a wording edit no past citation would read
+  differently under). P8 has three citations; none reads
+  differently, and one reads BETTER: D27 cites "Supports P8" for
+  a decision that ADDS A PRINCIPLE, precisely the case the old
+  wording did not cover. So no number is retired and none is
+  spent. WEIGHED AND DECLINED: superseding P8 with a new
+  P-number (the lifecycle's route for a change in nature — the
+  retitle and the widened subject argued for it, but the
+  citation test governs, and churning a number that nothing
+  reads differently is cost without benefit).
+  RECORDED AS METHOD: this entry's own change was argued and
+  approved before being made, which is the discipline it adds.
+  FOLDED: this entry; PRINCIPLES.md (P8); INTERFACES.md (the
+  rule's frame, its three triage tiers, and its workflow).
+
 - D27 — THE INPUT MODEL, AND D26'S CLOSURE TEST CORRECTED —
   DECIDED (owner, 2026-07-23, the same round continued).
   Supports P8; AMENDS D26 (part D) and ADDS P15 to the standing

@@ -48,9 +48,13 @@ SPDX-License-Identifier: BSD-3-Clause
   express in a common binding language (C, Java), and the
   CLI — the fallback binding for every unbound language — must
   never be hard to drive from a program. (INTERFACES.)
-- **P8 — Interface changes are vetted.** Every
+- **P8 — Interface and principle changes are vetted.** Every
   interface-changing decision triages by its impact on the use
-  cases, under the interface-change rule. (INTERFACES.)
+  cases *and the governing principles*, under the
+  interface-change rule; a change misaligned with either is
+  argued as the amendment it requires — a principle amendment
+  as vigorously as a use-case one — never as a feature on its
+  own merits. (INTERFACES.)
 - **P9 — No backward compatibility before 1.0.** Changes land
   coherently and completely; the old shape is deleted, never
   bridged. Through beta and the rest of pre-1.0 a cushion may be

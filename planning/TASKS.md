@@ -17,9 +17,11 @@ every issue points to the use case or principle it serves —
 small ones may simply be deemed obvious; principles
 ([PRINCIPLES.md](../PRINCIPLES.md)) drive tasks just as use cases
 do — and an issue can
-easily trigger a use-case change, drafted as a proposal in
-[USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) through the
-interface-change rule (INTERFACES.md). Large work belongs in
+easily trigger a use-case or principle change, drafted as a
+proposal in [USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) or
+[PRINCIPLE-PROPOSALS.md](PRINCIPLE-PROPOSALS.md) through the
+interface-change rule (INTERFACES.md), which weighs the two
+alike. Large work belongs in
 the roadmap; a milestone item is picked up by translating it
 into a sprint tasklist here. The adjudicated design-decision
 records live in

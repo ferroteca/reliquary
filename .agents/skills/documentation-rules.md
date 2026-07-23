@@ -26,7 +26,7 @@ The `docs/` directory contains user-facing documentation for **implemented featu
 ### planning/ directory
 The `planning/` directory contains maintainer-facing design and planning documents:
 - `planning/ROADMAP.md` — architectural context, open design questions, and implementation milestones
-- `planning/TASKS.md` — the work queue, flowing from the roadmap and from issues (the GitHub tracker; the backlog section parks non-GitHub issues). A task is either scheduled for the sprint or backlogged; milestone items translate to sprint tasklists; large work belongs in the roadmap, and an issue can trigger a use-case proposal through the interface-change rule
+- `planning/TASKS.md` — the work queue, flowing from the roadmap and from issues (the GitHub tracker; the backlog section parks non-GitHub issues). A task is either scheduled for the sprint or backlogged; milestone items translate to sprint tasklists; large work belongs in the roadmap, and an issue can trigger a use-case or principle proposal through the interface-change rule, which weighs the two alike
 - `planning/PRINCIPLE-PROPOSALS.md` — proposed changes to the standing principles in root PRINCIPLES.md (shared P-numbering; same lifecycle and sweep as the use-case proposals; principles drive tasks and roadmap items just as use cases do)
 - `planning/DECISIONS.md` — the adjudicated design-decision record: settled decisions, declined alternatives, and where each folded (the guard against re-litigating). Numbered D1…; each generally supports use cases or principles; D-numbers justify design choices and code commits; overruled or no-longer-relevant entries move to its Retired list
 - `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule

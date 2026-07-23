@@ -167,42 +167,56 @@ adopted.
 
 ## The interface-change rule
 
-The use-case list ([planning/USE-CASES.md](USE-CASES.md)) is where
-interface changes are argued. A change
+The use-case list ([planning/USE-CASES.md](USE-CASES.md)) and the
+governing principles ([PRINCIPLES.md](../PRINCIPLES.md)) are
+where interface changes are argued. A change
 to an interfacing aspect of Reliquary is significant precisely
-when approving it requires the use cases to be adjusted;
+when approving it requires a use case or a principle to be
+adjusted;
 a significant change is not argued as a feature on its own merits
-— the use-case amendment is the argument, and the interface
+— the amendment is the argument, and the interface
 change follows from the amended list. A significant proposal that
-cannot be phrased as "the use cases should say ..." is not ready
-to decide.
+cannot be phrased as "the use cases should say ..." or "the
+principles should say ..." is not ready
+to decide. The two carry equal weight: a principle amendment is
+argued exactly as vigorously as a use-case one, and neither is
+edited to fit a feature someone has already decided to build.
 
-Requests triage by their use-case impact:
+Requests triage by their use-case and principle impact:
 
-- **No use-case impact, or strong alignment with the existing
-  list.** The change leaves the use cases untouched — nothing
-  any use case demands is altered — or serves them as written: a
+- **No use-case or principle impact, or strong alignment with
+  the existing lists.** The change leaves both untouched —
+  nothing any use case demands and nothing any principle
+  requires is altered — or serves them as written: a
   better spelling for an existing capability, a gap filled where
   one surface lags the others. An easy decision to approve; cite
-  the use cases served, or state that none are disturbed.
-- **Adds a new use.** The change serves a use Reliquary does not
-  yet name. More work — the new use case must be drafted and
-  numbered in
-  [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) and
-  weighed for coherence with the existing list and
+  the use cases and principles served, or state that none are
+  disturbed.
+- **Adds a new use, or a new principle.** The change serves a
+  use Reliquary does not yet name, or is demanded by a rule the
+  project honors but has never stated. More work — the new use
+  case or principle must be drafted and numbered in
+  [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) or
+  [planning/PRINCIPLE-PROPOSALS.md](PRINCIPLE-PROPOSALS.md) and
+  weighed for coherence with the existing lists and
   the ephemeral-machine principle — but, being additive, still an
   easy decision.
-- **Misaligned with the use cases.** The hard case, and
-  the one that must be argued very vigorously: approving such a
-  change in good faith would require Reliquary's use cases to
-  change, so the use-case amendment — not the feature —
-  is what gets argued. The workflow is strict: draft the
-  amendment in planning/USE-CASE-PROPOSALS.md and make the
+- **Misaligned with the use cases or a principle.** The hard
+  case, and the one that must be argued very vigorously:
+  approving such a change in good faith would require a use case
+  or a principle to change, so the amendment — not the feature —
+  is what gets argued, and a principle amendment is argued
+  exactly as vigorously as a use-case one. The workflow is
+  strict: draft the amendment in
+  planning/USE-CASE-PROPOSALS.md or
+  planning/PRINCIPLE-PROPOSALS.md and make the
   argument; if the argument wins, the work is scheduled in the
   roadmap — scheduling is acceptance, the citing roadmap item
   its record; only then does work start. Accepted use
   cases move into planning/USE-CASES.md when their delivery
-  lands, anything superseded retiring to a stub. A misaligned change that can propose no amendment
+  lands, accepted principles into PRINCIPLES.md when the project
+  honors them, anything superseded retiring to a stub. A
+  misaligned change that can propose no amendment
   has nothing to argue and is rejected, regardless of its
   elegance.
 
