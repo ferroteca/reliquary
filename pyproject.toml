@@ -43,6 +43,7 @@ include = ["reliquary*", "reliquary_tests"]
 [tool.setuptools.package-data]
 reliquary = [
     "*.lark",
+    "schemas/*.json",
     "codex/codex.json",
     "codex/blueprints/*.rlqb",
     "codex/media/*.rlqm",

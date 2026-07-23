@@ -79,6 +79,15 @@ class AssetSource:
         """Return candidate file paths of ``kind`` in this source."""
         raise NotImplementedError
 
+    def document_files(self):
+        """Return every composed ``.rlqb`` document in this source.
+
+        The composed model reads all ``.rlqb`` into one ``(name, type)``
+        component namespace (planning/design/blueprint-model.md), rather
+        than indexing one file kind per extension.
+        """
+        raise NotImplementedError
+
     def describe(self, kind):
         """Return a human location for ``kind`` for error messages."""
         raise NotImplementedError
@@ -109,6 +118,12 @@ class HomeSource(AssetSource):
                 self._dir(kind), KIND_EXTENSIONS[kind])
         return self._cache[kind]
 
+    def document_files(self):
+        files = []
+        for kind in ("blueprint", "media"):
+            files.extend(_walk_files(self._dir(kind), (".rlqb",)))
+        return files
+
     def describe(self, kind):
         return self._dir(kind) or "the home"
 
@@ -127,6 +142,9 @@ class DirSource(AssetSource):
             self._cache[kind] = _walk_files(
                 self.root, KIND_EXTENSIONS[kind])
         return self._cache[kind]
+
+    def document_files(self):
+        return _walk_files(self.root, (".rlqb",))
 
     def describe(self, kind):
         return self.root
