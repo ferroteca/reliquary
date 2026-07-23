@@ -266,4 +266,4 @@ honest against each other. The machine-state schema is authored
 beside this spec
 ([machine-state.schema.json](machine-state.schema.json)); the schema
 version tracks the Reliquary release, not a version field in user
-documents before beta.
+documents before 1.0.

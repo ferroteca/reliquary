@@ -38,7 +38,7 @@ SPDX-License-Identifier: BSD-3-Clause
   documents (`--json`), and exit codes. Twins in capability,
   divergent in presentation — a named decision, not drift
   (planning/ROADMAP.md "Asynchronous runs").
-- **No backward compatibility before beta.** The implemented
+- **No backward compatibility before 1.0.** The implemented
   binding realigns to the settled names below when the
   realignment lands; there are no aliases or shims.
 
@@ -89,10 +89,11 @@ SPDX-License-Identifier: BSD-3-Clause
   serializes — while a value-or-handle union is never allowed: a
   handle is not a value, which is why a `detach=` mode flag on
   the blocking twins was declined. Return shapes are contracted
-  additively from beta (owner, 2026-07-22): new fields may
+  additively from 1.0 (owner, 2026-07-22; the horizon moved from
+  beta with D25): new fields may
   appear, an existing field never changes type or meaning, and a
   removal or rename is a breaking change — consumers tolerate
-  unknown fields; pre-beta the shapes may change with the specs
+  unknown fields; pre-1.0 the shapes may change with the specs
   (the CLI stability contract, planning/ROADMAP.md "The CLI").
 - **Errors — the taxonomy is named** (owner, 2026-07-21):
   blocking forms raise by error class under one root. Python

@@ -51,9 +51,11 @@ SPDX-License-Identifier: BSD-3-Clause
 - **P8 — Interface changes are vetted.** Every
   interface-changing decision triages by its impact on the use
   cases, under the interface-change rule. (INTERFACES.)
-- **P9 — No backward compatibility before beta.** Changes land
+- **P9 — No backward compatibility before 1.0.** Changes land
   coherently and completely; the old shape is deleted, never
-  bridged. (AGENTS.md.)
+  bridged. Through beta and the rest of pre-1.0 a cushion may be
+  granted when warranted and cheap — never promised, never
+  accumulated. (AGENTS.md.)
 - **P10 — Nothing is inferred from guests.** Platform and
   backend come from the blueprint; probes select among
   configured control planes, never guess what is inside.

@@ -276,7 +276,7 @@ apply to files like `tsconfig.json`, and nothing more. Comments are
 the author's margin notes (provenance, review context, where a hash
 came from) and carry no meaning; anything the contract needs is a
 field. There is no version field and no `$schema` in a document
-([no backward compatibility before beta](machine-blueprint.md#format-stability-none-yet)).
+([no backward compatibility before 1.0](machine-blueprint.md#format-stability-none-yet)).
 
 The machine-checkable companion is the one published
 [blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json)

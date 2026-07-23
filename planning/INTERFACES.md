@@ -213,8 +213,8 @@ Every approved change then lands the same way:
    language grows only through its growth goals (G6, G7), and a
    document format changes with its spec. An intentionally
    single-surface change states why the others are unaffected.
-2. **Land it coherently and completely.** Pre-beta there is no
-   backward compatibility (AGENTS.md): the change updates every
+2. **Land it coherently and completely.** Pre-1.0 there is no
+   backward compatibility guarantee (AGENTS.md): the change updates every
    affected surface, document, example, and test to the new shape
    and deletes the old one. That freedom makes execution cheap; it
    does not make the decision cheap — nothing downstream cushions

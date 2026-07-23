@@ -265,9 +265,9 @@ completion and validation while authoring (U4, U5). The parser
 remains Reliquary's own validator (fail-closed, name-the-problem
 diagnostics); a shared valid/invalid fixture corpus, run against
 both parser and schema at realignment, keeps the two aligned.
-Documents carry no `$schema` field pre-beta — editors bind the
+Documents carry no `$schema` field pre-1.0 — editors bind the
 schemas by file association — with `$schema` as the leading
-candidate spelling of the version field at beta ("Decisions
+candidate spelling of the version field at 1.0 ("Decisions
 still needed"). The machine-state schema lands at milestone 6,
 once the state format settles.
 
@@ -2443,10 +2443,11 @@ no milestone may weaken.
 
 ## Roadmap constraints
 
-No backward compatibility before beta (see AGENTS.md): no format
+No backward compatibility before 1.0 (see AGENTS.md): no format
 versioning or migration, no API aliasing, no compatibility shims.
 Every milestone may reshape interfaces freely and completely until
-at least a beta-quality release exists.
+a GA 1.0 release exists — beta included, where an occasional
+cushion may be granted when warranted but none is promised.
 
 Agentless DOS operation on QEMU is the permanent base described in
 AGENTS.md; no milestone may weaken it.
@@ -2515,17 +2516,19 @@ is not gating:
   word aliases, or whether numbered ids plus blueprint selection
   make them unnecessary.
 
-Deferred to beta:
+Deferred to 1.0:
 
-- **Format versioning**: pre-beta, user documents carry no
-  version field and no `$schema` field (settled, owner 2026-07-21:
+- **Format versioning**: pre-1.0, user documents carry no
+  version field and no `$schema` field (settled, owner 2026-07-21;
+  the horizon moved from beta to 1.0 with the compatibility rule,
+  D25, on the same argument:
   a pinned schema reference is a version field in disguise, and a
-  pre-beta document has no format vintage — the only schema that
+  pre-1.0 document has no format vintage — the only schema that
   matters is the installed Reliquary's, which editors bind by file
   association; an embedded pin would go stale in seeded files
   under never-overwrite and let the editor pass what Reliquary
   rejects). When compatibility guarantees arrive — no earlier than
-  beta — the leading candidate spelling for the version field is
+  1.0 — the leading candidate spelling for the version field is
   `$schema` as a versioned URL: one field declaring the document's
   format version and binding editors to the matching published
   schema.

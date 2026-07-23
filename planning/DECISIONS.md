@@ -35,6 +35,41 @@ text intact, to the Retired decisions section at the bottom,
 its note naming what overruled it — a retired decision binds
 nothing but remains the record.
 
+- D25 — THE COMPATIBILITY HORIZON MOVES TO 1.0 — DECIDED (owner,
+  2026-07-23). Supports P9 (which it amends). A principle
+  amendment, argued and approved as one under the
+  interface-change rule — the owner noting the irony of amending
+  the standing list he had just ruled is never changed in nature
+  (D23), and approving it: a clarification this is not.
+  THE RULE: no backward compatibility is provided until a GA 1.0
+  RELEASE (was: "at least a beta-quality release"). Through beta
+  and the rest of pre-1.0, SOME effort not to break users MAY be
+  granted WHEN WARRANTED — but NO PROMISES. Read into the
+  operating rule, and vetoable: an effort granted once creates no
+  expectation of the next, a clean break stays the default, and
+  any cushion is a deliberate exception — the owner's call,
+  recorded in the CHANGELOG — never a shim left to accumulate,
+  because a shim nobody decided to keep is exactly what the rule
+  exists to prevent.
+  WHAT MOVED WITH IT: every horizon keyed to beta because it was
+  keyed to compatibility — format versioning and the `$schema`
+  spelling (ROADMAP "Deferred to 1.0", machine-blueprint.md,
+  blueprint-model.md, instance-model.md, script-spec.md's
+  format-version paragraph), and the CLI's additive-growth
+  contract for machine-readable surfaces (cli.md), which promised
+  at beta what the rule now starts at 1.0. The arguments were
+  unchanged by the move — a pre-1.0 document has no format
+  vintage exactly as a pre-beta one had none. UNMOVED: horizons
+  keyed to beta for reasons of their own, not compatibility — the
+  error-id INDEX (TASKS.md) is documentation polish and stays
+  where it is.
+  FOLDED: this entry; AGENTS.md (the normative home, its heading
+  renamed); PRINCIPLES.md P9; INTERFACES.md's landing rule;
+  ROADMAP roadmap-constraints and the deferral list; api.md,
+  cli.md, machine-blueprint.md, media-spec.md, script-spec.md,
+  blueprint-model.md, instance-model.md. CHANGELOG entries and
+  earlier DECISIONS entries keep the spellings of their time.
+
 - D24 — THE REFERENCE GRAMMAR BATTERY — DECIDED (owner,
   2026-07-23, the milestone-7 decide-first item). Supports U1, U4,
   U5; P11; G3, G6, G7. Triage under the interface-change rule: no

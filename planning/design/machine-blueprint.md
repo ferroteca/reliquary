@@ -681,15 +681,15 @@ applies to the blueprint format in full:
 
 There is deliberately no version field. Versioning is
 compatibility machinery, and the blueprint carries none until a real
-second format version exists — no earlier than beta.
+second format version exists — no earlier than 1.0.
 
 For the same reason a blueprint carries no `$schema` field: a
 document pinning the schema it was written against is a version
-field in disguise, and pre-beta a document has no format vintage —
+field in disguise, and pre-1.0 a document has no format vintage —
 the only schema that matters is the installed Reliquary's, which
 editors bind by file association (tracking the installation, where
 an embedded pin would go stale and let the editor pass what
-Reliquary rejects). When versioning arrives, no earlier than beta,
+Reliquary rejects). When versioning arrives, no earlier than 1.0,
 `$schema` as a versioned URL is the leading candidate spelling of
 the version field (planning/ROADMAP.md, "Decisions still
 needed").

@@ -1272,9 +1272,9 @@ Field names are part of the CLI contract and land with each
 twin's return contract. The stability contract is settled
 (owner, 2026-07-22): the machine surfaces — exit codes, `--json`
 documents, the `jsonl` event stream, run-record files — grow
-additively only from beta (an existing field never changes type
+additively only from 1.0 (an existing field never changes type
 or meaning; consumers ignore unknown kinds and fields); pretty
-and plain output are explicitly uncontracted, and pre-beta
+and plain output are explicitly uncontracted, and pre-1.0
 nothing is promised.
 
 There is no bare-script shorthand: an unrecognized command word is

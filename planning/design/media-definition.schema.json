@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "reliquary media definition",
-  "description": "Synchronized companion to the media specification (media-spec.md), which remains normative. This schema covers the per-document structural subset of the format checks: schema validity never implies definition validity — library-wide name uniqueness, cross-definition archive agreement, defaults derived from URL file-name components, and every resolution rule live in the specification only. One schema covers both homes of a definition: the library .rlqm file (JSONC — comments and trailing commas are invisible at this level) and the JSON island of a script's embedded media block (strict JSON). Definitions carry no $schema field pre-beta; editors bind this schema to *.rlqm by file association.",
+  "description": "Synchronized companion to the media specification (media-spec.md), which remains normative. This schema covers the per-document structural subset of the format checks: schema validity never implies definition validity — library-wide name uniqueness, cross-definition archive agreement, defaults derived from URL file-name components, and every resolution rule live in the specification only. One schema covers both homes of a definition: the library .rlqm file (JSONC — comments and trailing commas are invisible at this level) and the JSON island of a script's embedded media block (strict JSON). Definitions carry no $schema field pre-1.0; editors bind this schema to *.rlqm by file association.",
   "type": "object",
   "oneOf": [
     {"$ref": "#/$defs/itemForm"},

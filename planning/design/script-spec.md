@@ -9,7 +9,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > script surface adopted in July 2026. It supersedes the earlier
 > milestone-one syntax (`state`, `->`, `done`, `expect`, `regex`
 > strings, colon headers, comma-separated modifiers, bare media
-> names, and the bare `stopped` condition) completely; pre-beta,
+> names, and the bare `stopped` condition) completely; pre-1.0,
 > there is no compatibility between the two surfaces and none is
 > planned. The parser, the static rules, the timing plan, and the
 > runtime speak this surface, and so do the shipped built-in and
@@ -624,7 +624,7 @@ deadline    45m
   it.
 
 Each header may appear at most once. The file name supplies the
-script name. There is no format-version field before beta because
+script name. There is no format-version field before 1.0 because
 the planned format carries no compatibility promise yet.
 
 ## Script shapes
@@ -1055,7 +1055,7 @@ bound values; the secret contract applies to the stream
 exactly as it applies to transcripts.
 
 The stream is a contracted machine surface (owner, 2026-07-22):
-from beta it grows additively only — new event kinds and new
+from 1.0 it grows additively only — new event kinds and new
 fields may appear in any release, an existing field never
 changes type or meaning, and a removal or rename is a breaking
 change — and consumers must ignore unknown event kinds and

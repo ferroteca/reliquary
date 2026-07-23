@@ -127,14 +127,20 @@ implementation.
 
 ## Required invariants
 
-### No backward compatibility before beta
+### No backward compatibility before 1.0
 
-Reliquary is evolving rapidly and deliberately maintains **no backward compatibility of any kind** until at
-least a beta-quality release: no spec/config format versioning or migration, no API aliasing, no
+Reliquary is evolving rapidly and deliberately maintains **no backward compatibility of any kind** until a
+GA 1.0 release: no spec/config format versioning or migration, no API aliasing, no
 deprecated-name shims, no compatibility parsing. When an interface changes, change it coherently and
 completely — update every caller, document, and test to the new shape and delete the old one. Do not add
 transition affordances "to be safe"; stale artifacts (old machine blueprints, homes, embeddings) may simply fail
-and users recreate them. Compatibility guarantees, if any, will be defined no earlier than beta.
+and users recreate them.
+
+Through beta and the rest of pre-1.0 this softens in degree only: **some** effort not to break users may be
+granted where it is warranted and cheap, but nothing is promised, an effort granted once creates no
+expectation of the next, and a clean break remains the default. Any cushion is a deliberate exception —
+the owner's call, recorded in the CHANGELOG — never a shim left to accumulate. Compatibility guarantees
+proper are defined no earlier than 1.0.
 
 ### Interface changes are vetted
 
@@ -319,7 +325,7 @@ milestone-1 root-home runner surface — `workflows.py`'s
 the old root-home state files (a root `machine.json`, `drives/`,
 `vm.json` — distinct from the per-machine cache `machine.json` this
 model writes), and the legacy `drives.py` auto-discovery — was absorbed
-into this model and deleted (no backward compatibility before beta). The user-facing reference is
+into this model and deleted (no backward compatibility before 1.0). The user-facing reference is
 `docs/api-reference.md`; the end-goal API design (settled twin names,
 conventions, handles) is `planning/design/api.md`.
 

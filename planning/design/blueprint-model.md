@@ -58,7 +58,7 @@ unambiguous — no machine field is named `machines` / `media` /
 
 JSONC is accepted as before (RFC 8259 plus `//`, `/* */`,
 trailing commas; nothing more). No `$schema` / version field
-pre-beta.
+pre-1.0.
 
 ## Components, identity, resolution
 
