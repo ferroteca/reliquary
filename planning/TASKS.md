@@ -413,10 +413,13 @@ T5; T6 and T7 run beside it.
    `launch_owned_qemu`; `test_core.py` scan/staged/guest-program
    tests removed. AGENTS.md ("The runner surface"/"Guest program
    runs"/home layout/DOS-boot), api-reference, and cli-reference
-   rewritten. FOLLOW-UP: the README DOS walkthrough + embedding
-   sections and docs/dos-automation.md still describe the deleted
-   `run_guest_program`/`Runner` surface — a focused rewrite to the
-   cached-machine/`run-script` model rides a separate commit.
+   rewritten. FOLLOW-UP LANDED (2026-07-22): the README (platform
+   model, DOS adapter, the workflow, home-directory layout, the
+   First-session walkthrough, a guest-console selector note, Python
+   usage) and docs/dos-automation.md are rewritten from the deleted
+   `run_guest_program`/`Runner` surface to the
+   cached-machine/`run-script` model; the "Managing the VM (legacy
+   root-home path)" and Runner/MachineConfig sections are deleted.
 6. Authored-asset residency (deliverable 8): the resolution
    module (`--assets` / `--assets-only`, API `assets=` /
    `assets_only=`), root-shadows-home, and `--blueprint` selection

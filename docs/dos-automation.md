@@ -11,88 +11,64 @@ reliquary provides agentless automation for DOS guests through QEMU. No guest ag
 
 - **Input** is sent as keyboard events through QEMU's control protocol
 - **Output** is read directly from VGA text memory, without OCR
-- **Files** are exchanged through a QEMU virtual FAT drive
+- **Files** are exchanged out-of-band through a `hostdir` drive (a host
+  directory served as a virtual FAT drive)
 - **Command completion** is detected by watching for the DOS prompt
 - **Screenshots** are captured through QEMU
 
-## Declaring drives
+## Declaring the machine
 
-Place files under `<reliquary_home>/drives/`:
+A machine's platform, memory, boot order, and drives are declared in its
+blueprint (`<name>.rlqb`) — see the [blueprint guide](blueprint-guide.md)
+and the [field reference](../planning/design/machine-blueprint-reference.md).
+A drive's content comes from one of four sources: a blank `size` disk, an
+attached `media` payload, a `base` image (differenced or duplicated), or
+a `hostdir` host directory. `platform` must be `dos`; memory defaults to
+16 MB; the boot order defaults to the slot-0 floppy, else the slot-0 hard
+disk, else the first cdrom.
 
-- Image files named `floppy[_<n>].<ext>` mount as floppy drives (A:, B:)
-- Image files named `hdd[_<n>].<ext>` mount as hard disks
-- Image files named `cdrom[_<n>].<ext>` mount as CD-ROM drives
-- Directories named `floppy[_<n>]` or `hdd[_<n>]` mount as virtual FAT drives
-  (cdrom directories are rejected — vvfat emulates no ISO9660)
-
-Any QEMU-supported image format works. The extension declares the format:
-- `*.img` and `*.iso` are treated as raw
-- Other extensions (`.qcow2`, `.vmdk`) are handed to QEMU to identify
-
-## Boot order
-
-The default boot order is:
-1. Slot-0 floppy image (if declared)
-2. Slot-0 hard disk image (if declared)
-3. First CD-ROM
-
-Override with `-boot` after the known options on `rlq start-machine`.
-
-## Memory
-
-Defaults to 16 MB for DOS. Override with `-m` after the known options
-on `rlq start-machine`.
+To hand the guest its own programs, declare a `hostdir` drive: its host
+directory *is* the drive, readable and writable while the machine is
+stopped.
 
 ## Example workflow
 
 ```powershell
-# 1. Create a virtual FAT drive with your programs
-New-Item -ItemType Directory "$HOME\Documents\reliquary\drives\hdd"
-Copy-Item .\MYPROG.EXE "$HOME\Documents\reliquary\drives\hdd\"
+# Create a machine from a blueprint (seed or author one first).
+rlq create-machine --blueprint my-dos
 
-# 2. Start QEMU with your DOS boot image
-rlq start-machine --display
+# Start it (add --display for a visible QEMU window).
+rlq start-machine --blueprint my-dos
 
-# 3. Wait for the DOS prompt
-rlq wait "A:\\\\>"
-
-# 4. Switch to the staged drive
-rlq exec "c:"
-
-# 5. Run your program
-rlq exec "myprog.exe > result.log"
-
-# 6. Stop QEMU
-rlq stop-machine
+# Wait for the DOS prompt, run a program, then stop.
+rlq wait "C:\\\\>" --blueprint my-dos
+rlq exec "myprog.exe > result.log" --blueprint my-dos
+rlq stop-machine --blueprint my-dos
 ```
 
-After stopping, the `result.log` file is available in the `drives/hdd` directory.
+If `my-dos` declares a `hostdir` drive, `result.log` is in that host
+directory once the machine stops (`rlq get-machine-dir` prints the
+machine directory).
 
 ## Python API
 
 ```python
 import reliquary
 
-port = reliquary.start()
-machine = reliquary.Machine(port)
+machine_id = reliquary.create_machine("my-dos")
+port = reliquary.start_machine(machine_id)
+machine = reliquary.Machine(
+    port, home=reliquary.machine_dir_path(machine_id))
 guest = reliquary.AgentlessGuestExec(machine)
 
 try:
     guest.wait_ready()
-    guest.execute("c:", timeout=15)
-    guest.execute("myprog.exe > result.log")
-    print("\n".join(reliquary.screen_text(port=port)))
+    guest.execute("myprog.exe > result.log", timeout=30)
+    print("\n".join(machine.screen_text()))
 finally:
-    reliquary.stop(port=port)
+    reliquary.stop_machine(machine_id)
 ```
 
-## Running a guest program end-to-end
-
-```python
-log = reliquary.run_guest_program("TESTS.EXE", args="-v")
-print(log)
-```
-
-This stages the program, boots DOS, runs it with output redirected to a log file, stops QEMU, and returns the log text.
-
-For complete API details, see [README.md](../README.md).
+To run a whole `.rlqs` script instead of driving the guest step by step,
+use `run_script` (see the [API reference](api-reference.md)). For
+complete usage, see [README.md](../README.md).

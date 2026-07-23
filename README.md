@@ -98,15 +98,15 @@ reserve the generic QEMU lifecycle but their provisioning and guest-task semanti
 
 ## The platform model
 
-Omitting the platform selects DOS. This preserves a complete, immediately useful default:
-
-```python
-machine = reliquary.Runner()  # uses the established default home
-```
-
-The CLI likewise defaults to `--platform dos`. Platform-specific behavior is never inferred from an image. Future
-adapters can define how a guest is provisioned, how a remote task is launched, and how its result is collected while
-reusing the same ownership-verified QEMU machine layer.
+A blueprint names its guest platform in the required `platform` field;
+`new-blueprint` scaffolds `dos` by default. DOS is the only complete
+workflow today — other platform names reserve the generic QEMU
+lifecycle but raise `NotImplementedError` for provisioning and
+guest-task semantics until an adapter is implemented. Platform-specific
+behavior is never inferred from an image. Future adapters can define how
+a guest is provisioned, how a remote task is launched, and how its
+result is collected while reusing the same ownership-verified QEMU
+machine layer.
 
 ## Why the DOS adapter exists
 
@@ -125,34 +125,39 @@ reliquary therefore works **agentlessly**:
 The guest needs no reliquary software, network driver, serial driver, or background service. This makes the harness
 useful even while the guest is partially configured or broken.
 
-Any DOS with a bootable image works. The `<reliquary_home>/drives` directory declares the whole machine: image files
-named `floppy[_<n>].<ext>`, `hdd[_<n>].<ext>`, and `cdrom[_<n>].<ext>` mount as that medium and slot, and bare
-directories named `floppy[_<n>]` and `hdd[_<n>]` mount as virtual FAT drives. Any QEMU-supported image format works —
-the extension declares the format, with `*.img` and `*.iso` taken as raw. reliquary hands back a guest program's raw
-output, and interpreting it is left to the caller.
+Any DOS with a bootable image works. A machine's drives are declared in
+its blueprint — a blank `size` disk, an attached `media` payload, a
+differencing or duplicated `base` image, or a `hostdir` host directory
+served as a virtual FAT drive — and reliquary materializes them under
+`cache/machines/<id>/drives/`. Any QEMU-supported image format works;
+`*.img` and `*.iso` are taken as raw. reliquary hands back a guest
+program's raw output, and interpreting it is left to the caller.
 
 ## The workflow
 
-1. **Provide the guest.** Place the bootable DOS image of your choice under `<reliquary_home>/drives` — a floppy image
-   as `floppy.<ext>` (typically `floppy.img`), or a hard-disk image as `hdd.<ext>` (e.g. `hdd.qcow2`). To create an
-   empty sparse qcow2 v3 hard disk for later partitioning or imaging:
-
-   ```python
-   reliquary.create_hdd_image(
-       os.path.join(reliquary.drives_dir(), "hdd.qcow2"),
-       "2G",
-   )
-   ```
-
-2. **Stage the files.** Collect everything the guest should work with — your programs, test executables, data files, and
-   any DOS utilities they depend on — place them in a `<reliquary_home>/drives/hdd` folder (or `hdd_1` behind a
-   hard-disk boot image, which claims slot 0). reliquary attaches the folder as a virtual FAT hard disk — `C:` when it
-   is the first hard disk, one letter later per disk before it. A `floppy`/`floppy_<n>` folder is likewise attached as a
-   virtual FAT 1.44 MB floppy.
-3. **Let reliquary operate the machine.** Boot to the DOS prompt, then use reliquary as your agent at the keyboard: run
-   commands, send keystrokes, wait for text to appear, read the screen, take screenshots.
-4. **Collect the results.** Have programs write their output to files on drive C:. After the VM stops, those files are
-   left in the staging directory on the host and the caller can interrogate them to interpret the results.
+1. **Describe the machine.** Author a `<name>.rlqb` blueprint (by hand,
+   with `rlq new-blueprint`, or by seeding one from the codex) declaring
+   the platform, memory, and drives — a blank `size` disk, an attached
+   `media` payload, a `base` image to difference or duplicate, or a
+   `hostdir` directory for out-of-band file exchange. To hand the guest
+   its own files, a `hostdir` drive is the natural surface: its host
+   directory *is* the drive.
+2. **Create a machine.** `rlq create-machine --blueprint <name>`
+   materializes one under a generated id (or `run-script` creates one on
+   demand). The blueprint, media, and scripts are always enough to
+   rebuild it, so a machine is never precious.
+3. **Drive it.** Run an attached `.rlqs` script with
+   `rlq run-script <label> --blueprint <name>`, or operate the machine
+   interactively — `rlq start-machine`, then `exec` / `wait` / `screen` /
+   `press` / `select` against it, then `rlq stop-machine`.
+4. **Collect the results.** Script runs leave a transcript, screenshots,
+   and outputs under the machine's `cache/machines/<id>/runs/` records.
+   For files, `rlq get-machine-dir` prints the machine directory: while
+   the machine is stopped, its `hostdir` and image drives are ordinary
+   host state to read or prepare.
+5. **Recreate freely.** `destroy-machine` deletes a machine entirely and
+   `recreate-machine` rebuilds it under the same id; `apply-blueprint`
+   adopts blueprint edits into a stopped machine.
 
 ## Requirements
 
@@ -193,152 +198,105 @@ The layout is:
 
 ```text
 Documents/reliquary/
-├── blueprints/           machine blueprints you author
-├── media/                shared media definitions
-├── scripts/              automation scripts (.rlqs)
-├── drives/               the machine's declared drives
-│   ├── floppy.img        a boot floppy image (slot 0 = A:)
-│   ├── hdd/              a folder exposed as a virtual FAT hard disk
-│   └── ...               hdd_1.qcow2, cdrom.iso, floppy_1/, ...
-├── machine.json          optional legacy CLI config for bare `rlq start-machine`
-├── screenshots/          captured PNG files
-├── qemu-stderr.log       diagnostics from the last QEMU start
-├── vm.json               identity and port of the active VM
-└── cache/
+├── blueprints/           machine blueprints you author (<name>.rlqb)
+├── media/                shared media definitions (<name>.rlqm)
+├── scripts/              automation scripts (<name>.rlqs)
+└── cache/                regenerable; resolves independently (--cache /
+    │                     RELIQUARY_CACHE_DIR) and can live elsewhere
     ├── downloads/        cached source archives (redownloadable)
-    ├── media/            cached media payloads
-    └── machines/         materialized machine directories
+    ├── media/            cached, hash-verified media payloads
+    └── machines/<id>/    each materialized machine — its own directory
+                          with reliquary-machine.json (the state), drives/,
+                          runs/ (transcripts + screenshots), and, while
+                          running, vm.json / qemu-stderr.log
 ```
 
-All files created by reliquary stay under this home. The selected home is printed to standard error the first time it is
-used.
+A machine is wholly its `cache/machines/<id>/` directory — there is no
+root-home machine model. Authored assets (blueprints, media, scripts)
+stay under the home; everything under `cache/` is regenerable. The
+selected home is printed to standard error the first time it is used.
 
 ## First session
 
-### 1. Declare the machine's drives (optional)
+Beyond running a whole script, you can drive a machine interactively —
+useful for exploring a guest or debugging a workflow step by step. This
+session starts a machine, reaches the DOS prompt, runs a few commands,
+and stops it. Every guest-console command selects its machine with
+`--blueprint <name>` (or `--machine <id>`).
 
-Everything under `<home>/drives` whose name states a medium is mounted; reliquary never inspects the content — the name
-is the declaration. Image files mount as their medium and slot: `floppy[_<n>].<ext>` (slots 0–1, drives `A:` and
-`B:`), `hdd[_<n>].<ext>` (slots 0–3, the IDE bus), and `cdrom[_<n>].<ext>` (placed on the IDE slots after the hard
-disks; their `<n>` only orders them). An unindexed name means slot 0, so `hdd.img` and `hdd_0.img` clash. Any
-QEMU-supported image format works: the idiomatic extension declares the format — `*.img` and `*.iso` are taken as raw
-(so `floppy.img` and `cdrom.iso` mount without QEMU's format-probing warning), and any other extension (`hdd.qcow2`,
-`hdd.vmdk`, ...) is handed to QEMU to identify.
+### 1. Get a machine
 
-To use a particular DOS — MS-DOS, DR-DOS, or another distribution — copy its bootable image in as, say,
-`drives/floppy.img` or `drives/hdd.qcow2`.
-
-The boot order defaults to a best guess — the slot-0 floppy image, else the slot-0 hard-disk image, else the cdrom — and
-memory defaults to 16 MB; pass `-boot` or `-m` after `--` on `rlq start-machine` to override either.
-
-Guest drive letters follow disk order, so a hard-disk boot image at slot 0 claims `C:` and pushes a staged virtual FAT
-drive to `D:`; reliquary defaults the staged drive letter accordingly, and `staged_drive` overrides it (for example when
-a multi-partition hard-disk image pushes the drive further down the alphabet).
-
-### 2. Prepare the staged drive
-
-Create a `drives/hdd` directory containing the DOS programs and files you want the guest to see — including any DOS
-utilities your workflow needs that the boot image does not provide. It mounts as a writable virtual FAT hard disk. For
-example:
+Seed a codex blueprint (or scaffold your own with
+`rlq new-blueprint <name>`), then create a machine from it:
 
 ```powershell
-New-Item -ItemType Directory "$HOME\Documents\reliquary\drives\hdd"
-Copy-Item .\MYPROG.EXE "$HOME\Documents\reliquary\drives\hdd\"
+rlq seed-blueprint freedos-1.4-plain
+rlq create-machine --blueprint freedos-1.4-plain
 ```
 
-A directory can also be staged as a virtual 1.44 MB floppy (`drives/floppy`, or `drives/floppy_1` when a floppy image
-already claims slot 0 / drive `A:`).
+`create-machine` materializes the machine's drives under
+`cache/machines/<id>/drives/` and prints the generated id. (If a
+machine of this blueprint already exists — e.g. one installed by
+`run-script install` — you can start it directly.)
 
-### 3. Start QEMU
+### 2. Start it
 
 ```powershell
-rlq start-machine
+rlq start-machine --blueprint freedos-1.4-plain
 ```
 
-Everything declared under `drives/` is mounted. reliquary chooses an available local QMP port, starts QEMU, assigns the
-VM a unique identity, and records it in `<home>/vm.json`. Later CLI commands find the active VM from that file, so the
-port normally does not need to be copied manually.
+reliquary chooses an available local QMP port, starts QEMU headless,
+assigns the VM a unique identity, and records it in the machine's
+`vm.json`. Later commands find the running VM through the machine
+selector, so the port never needs to be copied by hand. The machine
+stays running until you stop it. Add `--display` for a visible,
+manually interactive QEMU window; `--port PORT` requests a particular
+QMP port (an occupied port is refused).
 
-For a visible, manually interactive DOS session, start QEMU with its display enabled:
+### 3. Reach the DOS prompt
+
+`start-machine` returns when QEMU is ready, not when DOS is. Wait for a
+prompt before running commands:
 
 ```powershell
-rlq start-machine --display
+rlq wait "C:\\\\>" --blueprint freedos-1.4-plain
 ```
 
-The command returns once QEMU is ready, while the VM and its display remain open. Give the QEMU window focus and use it
-like a DOS computer for as long as needed. When the manual session is finished, close the VM safely from the same
-terminal (or another terminal using the same reliquary home):
+### 4. Run DOS commands
 
 ```powershell
-rlq stop-machine
+rlq exec "dir" --blueprint freedos-1.4-plain
+rlq exec "myprog.exe > result.log" --blueprint freedos-1.4-plain
 ```
 
-This shutdown verifies the VM's recorded identity before closing it and flushes guest writes to the virtual FAT drive.
+`exec` types the command and waits for the DOS prompt to return. To
+retrieve detailed output, give the machine a `hostdir` drive in its
+blueprint and have the program write to it; while the machine is
+stopped, that directory is ordinary host state (`rlq get-machine-dir`
+prints the path).
 
-Use `--port PORT` to request a particular QMP port. reliquary refuses to use an occupied port or control a VM whose
-identity does not match its state file.
-
-### 4. Reach the DOS prompt
-
-`start-machine` returns when QEMU is ready, not when DOS is. Wait for a prompt before running commands:
+### 5. Inspect the guest
 
 ```powershell
-rlq wait "A:\\\\>"
+rlq screen --blueprint freedos-1.4-plain
+rlq screenshot after-test --blueprint freedos-1.4-plain
 ```
 
-A user-provided boot image must reach its prompt on its own, without interactive menus. Switch to the staged drive using
-an ordinary DOS command:
+`screen` prints the current 80-by-25 text screen; `screenshot` saves a
+PNG under the machine's run directory. Screenshot names are filename
+stems, not paths.
+
+### 6. Stop it
 
 ```powershell
-rlq exec "c:"
+rlq stop-machine --blueprint freedos-1.4-plain
 ```
 
-Programmatic workflows use `AgentlessGuestExec.wait_ready()`, which waits for a prompt.
-
-### 5. Run DOS commands
-
-```powershell
-rlq exec "dir"
-rlq exec "myprog.exe"
-rlq exec "myprog.exe > result.log"
-```
-
-`exec` types the command and waits for a DOS prompt to return. Redirecting output to drive C: is the most reliable way to
-retrieve detailed output. Guest writes become visible in the host staging directory after QEMU stops.
-
-### 6. Inspect the guest
-
-Print the current 80-by-25 text screen:
-
-```powershell
-rlq screen
-```
-
-Wait until the screen contains a regular expression:
-
-```powershell
-rlq wait "C:\\\\>"
-```
-
-Take a screenshot:
-
-```powershell
-rlq screenshot after-test
-```
-
-The image is saved as `<home>/screenshots/after-test.png`. Screenshot names are filename stems, not paths; directory
-separators are rejected so captures remain under the reliquary home.
-
-### 7. Stop QEMU
-
-```powershell
-rlq stop-machine
-```
-
-Stopping QEMU flushes writes from the virtual FAT drive and removes the active `vm.json` record.
-
-QEMU snapshots the host directory when the virtual FAT drive is attached. After changing staged files on the host, stop
-and restart QEMU before using them in the guest.
+Stopping verifies the VM's recorded identity before closing it and
+flushes guest writes to any virtual FAT drive. QEMU snapshots a
+`hostdir` directory when the drive is attached, so after changing its
+host files, stop and restart the machine before using them in the
+guest.
 
 ## Command guide
 
@@ -381,51 +339,6 @@ rlq clean-media
 `--builtin`). `delete-media` removes the home definition for an item
 and refuses while a machine drive still holds it.
 
-### Managing the VM (legacy root-home path)
-
-```text
-rlq start-machine [--display] [-- QEMU_ARGS...]
-rlq stop-machine
-```
-
-Without `--blueprint` / `--machine`, bare `rlq start-machine` still loads an optional versioned JSON machine document from
-`<home>/machine.json`. A missing home file means the ordinary defaults.
-
-`version` is required and must be `1`. The document uses the same field names as `MachineConfig`: `platform`, `timeout`,
-`staged_drive`,
-`memory`, `qemu`, `machine`, `qemu_args`, and `drives`. Relative drive sources resolve from the file's directory. For
-example:
-
-```json
-{
-  "version": 1,
-  "memory": 32,
-  "machine": {
-    "type": "pc",
-    "accel": "tcg"
-  },
-  "drives": {
-    "hdd_0": {
-      "source": "../images/dos.qcow2",
-      "options": {
-        "snapshot": true
-      }
-    }
-  }
-}
-```
-
-Explicit CLI controls override the loaded file for that invocation:
-`--platform`, `--qemu`, and raw QEMU arguments after `--`. Omitting
-`--platform` leaves the file's platform (or the DOS default) unchanged; passing `--platform dos` overrides a non-DOS
-file value.
-
-Additional QEMU arguments can follow `--`:
-
-```powershell
-rlq start-machine -- -cpu 486 -device virtio-rng-pci
-```
-
 ### Keyboard and command input
 
 ```text
@@ -435,6 +348,11 @@ rlq press KEY [KEY ...]
 rlq exec COMMAND
 rlq select ITEM [--exclude TEXT]
 ```
+
+Every guest-console command targets a running machine — select it with
+`--blueprint <name>` / `--machine <id>` (as in the [First
+session](#first-session)) or address a QMP port directly with
+`--port <n>`. The examples below omit the selector for brevity.
 
 `type` sends raw text with no trailing Enter; `enter` types a line and presses Enter. `exec` additionally waits for the
 prompt to return. `press` accepts the script language's portable key names (and `+` chords), such as:
@@ -487,31 +405,29 @@ Run `reliquary --help` or `reliquary COMMAND --help` for the complete current sy
 
 ## Python usage
 
-The Python interface exposes the selected interaction adapter directly.
-`start()` always returns the selected QMP port; construct the adapter with it so ownership is explicit in programmatic
-workflows:
+The CLI is a thin veneer over the embedding API: every command maps
+one-to-one onto a Python call with the same semantics. To run a whole
+script, `reliquary.run_script("install", blueprint="freedos-1.4-plain")`
+is the one call. To drive a machine directly, create and start it, then
+attach the interaction adapter to the returned port and the machine's
+directory (so ownership is verified against its recorded identity):
 
 ```python
-import os
-import shutil
-
 import reliquary
 
-stage = os.path.join(reliquary.drives_dir(), "hdd")
-os.makedirs(stage, exist_ok=True)
-shutil.copy("MYPROG.EXE", stage)
-port = reliquary.start()
-machine = reliquary.Machine(port)
+machine_id = reliquary.create_machine("freedos-1.4-plain")
+port = reliquary.start_machine(machine_id)
+home = reliquary.machine_dir_path(machine_id)
+machine = reliquary.Machine(port, home=home)
 guest = reliquary.AgentlessGuestExec(machine)
 
 try:
     guest.wait_ready()
-    guest.execute("c:", timeout=15)
-    guest.execute("myprog.exe > result.log")
-    print("\n".join(reliquary.screen_text(port=port)))
-    reliquary.screenshot("after-test", port=port)
+    guest.execute("dir", timeout=15)
+    print("\n".join(machine.screen_text()))
+    machine.screenshot("after-test")
 finally:
-    reliquary.stop(port=port)
+    reliquary.stop_machine(machine_id)
 ```
 
 `Machine` also exposes the VGA text screen directly: `machine.screen_text()`
@@ -551,98 +467,18 @@ with machine.qmp() as qmp:
     blocks = qmp.hmp("info block")
 ```
 
-### Running a guest program end to end
+### Running scripts and managing machines
 
-`run_guest_program()` performs the complete agentless lifecycle for one DOS executable: stage it, boot DOS, switch to
-C:, run it with its output redirected to a log file, stop QEMU, and return the log text.
-
-```python
-log = reliquary.run_guest_program("TESTS.EXE", args="-v")
-
-print(log)
-```
-
-For the DOS platform, the executable must have an 8.3 `.EXE` filename. This is a DOS workflow policy, not a restriction
-on guest-program workflows for other platforms. reliquary attaches no meaning to the output — interpreting it (for
-example, parsing test-framework results) is the caller's job.
-
-### Embedding reliquary as a runner
-
-Callers that manage isolated runs (test harnesses, CI drivers) can use the `Runner` surface instead of the module-level
-functions. A `Runner` is a configured DOS *test machine* bound to one home directory, which contains its drives,
-staging, diagnostics, and VM identity:
-
-```python
-machine = reliquary.Runner(
-    "run-42",
-    reliquary.MachineConfig(
-        platform="dos",
-        timeout=120,
-        memory=32,
-        machine={"type": "pc", "accel": "tcg"},
-        drives={"floppy": "images/msdos-boot.img"},
-    ),
-)
-
-log = machine.run("TESTS.EXE", "-v")
-```
-
-Media can be declared by name under the runner's `drives/` directory or through `MachineConfig.drives`. Configured keys
-are `floppy_0` through `floppy_1`, `hdd_0` through `hdd_3`, and `cdrom_0` through `cdrom_3`; `floppy` and `hdd`
-are aliases for slot zero. A path value is shorthand for `{"source": path}`. A file source is mounted as an image, while
-a floppy or hard-disk directory is mounted as vvfat; a CD-ROM directory is rejected. The object form also accepts QEMU
-drive `options`, except for lifecycle-owned properties such as `file`, `if`, `index`, and `media`:
-
-```python
-config = reliquary.MachineConfig(drives={
-    "hdd": {
-        "source": "images/dos.qcow2",
-        "options": {"snapshot": True},
-    },
-    "hdd_1": "guest-files",
-})
-```
-
-The same versioned JSON document can be loaded from Python and overridden field-by-field. Relative drive sources in the
-file resolve from the file's directory; Python overrides still resolve from the current directory:
-
-```python
-config = reliquary.MachineConfig.from_file(
-    "machines/dos.json",
-    timeout=90,
-    qemu_args=("-cpu", "pentium"),
-)
-```
-
-`MachineConfig.from_mapping(...)` accepts the same document shape in memory.
-`version` is required in the document and must be `1`; it is not a constructor field. Explicit overrides win: scalars
-replace (including `None`),
-`qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field / option name. When
-no configuration is provided, the API automatically discovers and loads `<home>/machine.json` if present; explicit API
-values override the file values.
-
-The module-level `start()`, `run_task()`, and `run_guest_program()` functions accept a `machine_config` containing a
-`MachineConfig`, versioned mapping, or machine-document path. Machine settings such as `qemu`, `timeout`, `memory`, and
-`drives` belong in that configuration; the functions expose only separate operational controls such as `display`,`port`,
-and `home`.
-
-Configured sources are mounted in place and must already exist. They conflict with a filesystem declaration for the same
-logical slot rather than overriding it. `run()` keeps present bootable media. It then performs the `run_guest_program()`
-lifecycle under the runner's home.
-`machine` maps directly to QEMU's `-machine`: a string selects only the type, while a mapping requires `type` and may
-add scalar machine properties. Booleans render as `on`/`off`; configuring both `machine` and `-machine` in
-`qemu_args` is an error.
-`memory` is a positive integer number of MiB. It defaults by platform: 16 for DOS, 64 for Win9x, and 256 for WinNT.
-Configuring both `memory` and `-m` in
-`qemu_args` is an error, while a raw `-m` alone suppresses the platform default.
-`staged_drive` declares the guest drive letter where the staged virtual FAT drive appears — the drive `run()` switches
-to and stages under (the highest staged directory declared among the hard-disk slots, or
-`drives/hdd` created on demand). Its default matches the declared machine: C: with no hard disk before the staged drive,
-one letter later per hard-disk slot before it (lower letters are rejected). Every
-`MachineConfig` field has a working default, so `reliquary.Runner()` is a complete DOS machine using the established
-default home. Pass `home=` to select another one, and create separate runners with separate homes for concurrent runs.
-The same explicit `home=` keyword is available on the module-level functions (`start`, `stop`,
-`run_guest_program`, and the path helpers) and overrides the process-global home per call.
+The lifecycle and scripting verbs are all available as Python calls
+with the same names as their CLI twins: `create_machine` /
+`start_machine` / `stop_machine` / `destroy_machine` /
+`recreate_machine` / `apply_blueprint`, and `run_script` /
+`check_script` for the `.rlqs` language. `run_script` returns a result
+describing the run (its record directory, final script phase, and the
+machine's phase) and writes a transcript and screenshots under the
+machine's `runs/` directory. See the [API reference](docs/api-reference.md)
+for the full surface and [`planning/design/api.md`](planning/design/api.md)
+for the end-goal design.
 
 ## Troubleshooting
 
@@ -654,19 +490,26 @@ Install QEMU and put `qemu-system-i386` on `PATH`, set
 
 ### A command cannot find an active VM
 
-CLI commands use `<home>/vm.json`. Ensure every command uses the same
-`--home` or `RELIQUARY_HOME` value and that `rlq start-machine` completed successfully.
+Guest-console commands find the running VM through the machine's
+`cache/machines/<id>/vm.json`. Ensure every command uses the same
+`--home` / `RELIQUARY_HOME` and the same machine selector, and that
+`rlq start-machine` completed successfully.
 
 ### The VM identity does not match
 
-reliquary verifies the unique QEMU name before sending any command. An identity error means the recorded port now
-belongs to another process or the state file is stale. The unrelated VM is not modified. Review
-`<home>/vm.json` and `<home>/qemu-stderr.log`, then start a new reliquary VM.
+reliquary verifies the unique QEMU name and per-start uuid before
+sending any command. An identity error means the recorded port now
+belongs to another process or the state file is stale. The unrelated VM
+is not modified. Review the machine's `vm.json` and `qemu-stderr.log`
+(under `cache/machines/<id>/`; `rlq get-machine-dir` prints the path),
+then start the machine again.
 
 ### QEMU exits during startup
 
-The error includes the selected port, QEMU exit status, command line, and path to `<home>/qemu-stderr.log`. That log
-normally contains QEMU's reason, such as an invalid device option or an unavailable disk image.
+The error includes the selected port, QEMU exit status, command line,
+and path to the machine's `qemu-stderr.log`. That log normally contains
+QEMU's reason, such as an invalid device option or an unavailable disk
+image.
 
 ### Guest-written files are missing
 

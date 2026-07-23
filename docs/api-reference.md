@@ -39,8 +39,7 @@ results belongs to the caller.
   embedding-API-only capability.
 - Path helpers, each accepting `context=None`: `blueprints_dir`,
   `media_dir`, `scripts_dir`, `cache_dir`, `downloads_cache_dir`,
-  `media_cache_dir`, `machines_cache_dir`, and the legacy
-  `drives_dir`.
+  `media_cache_dir`, and `machines_cache_dir`.
 
 All state lives under the home, except the regenerable cache,
 which lives under the (independently resolvable) cache root.
