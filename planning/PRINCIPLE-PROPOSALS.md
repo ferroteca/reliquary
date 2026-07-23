@@ -75,6 +75,38 @@ open. Statement:
 >   what make layering safe. (Normative:
 >   planning/design/script-properties.md; D19, D20.)
 
+**P14 — The expressive ceiling** — drafted (add, 2026-07-23;
+the format re-examination round, D26). The principle-sized
+kernel of a rule the project has been applying surface by
+surface without ever stating it as one: scripts got a
+purpose-built constrained language rather than a general one
+(D12, G7), blueprints stay logic-free in the tree (D18) and
+now in the strings (D26), and computation's designated home is
+the layer above (G2). Delivery is milestone 7, where the
+blueprint half becomes a parser that refuses an
+operator-bearing reference; citing P14 there is its
+acceptance. What is deliberately NOT in it: how far a
+reference may *reach*, which is a different axis with the
+opposite economics (widening is cheap, narrowing is not) and
+stays a design call. Statement:
+
+> - **P14 — The expressive ceiling.** Every authored surface is
+>   given an expressive ceiling and holds it: a logic-bearing
+>   surface gets a purpose-built, deliberately constrained
+>   language, and a declarative surface stays logic-free —
+>   closed in the tree and closed in the strings alike. When
+>   the ceiling binds, the answer is another layer —
+>   generation above, or an evaluation step producing the plain
+>   format — arriving as its own kind, never as a wider dialect
+>   of the surface it feeds. The ceiling is stated as a closed
+>   grammar ahead of
+>   the pressure, because each request to raise it arrives
+>   individually well justified, and a format that grants them
+>   one at a time cannot take them back. (Normative:
+>   planning/design/machine-blueprint.md "Format stability",
+>   planning/design/script-spec.md "How the vocabulary grows";
+>   D12, D18, D26.)
+
 ### Tracked
 
 - **Itemize ROADMAP's remaining design principles** — tracked
