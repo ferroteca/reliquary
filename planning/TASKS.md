@@ -421,10 +421,30 @@ T5; T6 and T7 run beside it.
    cached-machine/`run-script` model; the "Managing the VM (legacy
    root-home path)" and Runner/MachineConfig sections are deleted.
 6. Authored-asset residency (deliverable 8): the resolution
-   module (`--assets` / `--assets-only`, API `assets=` /
-   `assets_only=`), root-shadows-home, and `--blueprint` selection
-   scoped to the invocation's resolution against the recorded
+   module and `--blueprint` selection scoping against the recorded
    `blueprint-source`.
+   LANDED (2026-07-22), redesigned at implementation from the
+   2026-07-21 shadow/fallback model (DECISIONS.md, "ARTIFACT
+   RESIDENCY — REDESIGNED AT IMPLEMENTATION"): `assets.py` is the
+   source seam — `HomeSource` (the CLI default: canonical
+   `blueprints/`/`media/`/`scripts/` + codex seeding) and
+   `DirSource` (`--assets <dir>`, recursive by extension, the sole
+   hermetic source; no home, no codex, no seeding). One flag
+   `--assets` (no `--assets-only`); root replaces home (no
+   shadow/fallback). The embedding API has no default source and
+   fails closed (no home/CWD default); home mode is the explicit
+   `HOME_ASSETS` marker the CLI sets. Asset identity is the declared
+   `name` else the file stem, with a within-source conflict guard;
+   blueprint `name` became the id-safe identity (reversing the
+   2026-07-22 display-name reinstatement). `--blueprint` selection
+   is scoped to the invocation's resolution (`machines_for_blueprint`).
+   `list_blueprints`/`list_scripts` gained API twins. ObjectSource
+   (JSON-imported objects, API-only) is the settled fast-follow (its
+   own SC); the media-residency-vs-download-cache and composable-spec
+   threads are shortlisted under "Design" below. Tests in
+   `test_assets.py`; docs folded (ROADMAP, AGENTS, cli.md, api.md,
+   instance-model, machine-blueprint-reference, README, docs/,
+   CHANGELOG).
 7. Published schemas + fixture corpus + examples (deliverables 6,
    7): the machine-state schema authored once the state format
    settles; the shared valid/invalid fixture corpus run against
@@ -512,6 +532,40 @@ dependency order:
 
 ## Design
 
+- Media residency vs the download cache (SHORTLISTED, milestone-6
+  T6 fallout, 2026-07-22): media *definitions* (`.rlqm`) are now
+  residency-scoped — home mode resolves them from the home, dir mode
+  (`--assets`) from the project root as the sole source. But the
+  *payloads* they name still cache home-side keyed by item name
+  (`cache/media/<item>`, `cache/downloads/<archive>`), a single
+  namespace shared across every project and the home. Tensions to
+  adjudicate in a design round (record in DECISIONS.md / media-spec):
+  two projects (or a project and the home) defining the same item
+  name with *different* sources or hashes collide in one cache slot —
+  hash verification catches the mismatch but can thrash re-fetches;
+  what does hermeticity even mean for a `--assets` fetch, which reads
+  and writes the shared home cache (does a hermetic run get a
+  project-scoped or content-addressed cache instead of item-name
+  keying?); and how this interacts with `clean-media` /
+  `clean-downloads` and the "cache is not an interface" doctrine. T6
+  leaves payload caching exactly as it is (item-name keyed, home-side)
+  and only moves definition resolution; this is the follow-on.
+- Composable authored specs under the blueprint schema (owner
+  thought, 2026-07-22, to design alongside the media-residency
+  round): the authored surface may really be several distinct
+  specifications that today live in separate file kinds but could all
+  fall under one "blueprint" schema — at least (a) the machine
+  hardware spec (platform/memory/cpus/drives/boot), (b) a machine's
+  *media usage* (which items sit in which drives/slots), and (c)
+  media *locators* / archive definitions (where a payload comes from,
+  its hash). Users would mix and match these fragments into files as
+  they see fit and reference them for reuse, rather than each kind
+  being one rigid file type. This is the factoring/composition
+  question (relates to the include/behavior-reuse thread in ROADMAP
+  and to authored-asset resolution already serving multi-file
+  factoring); adjudicate the schema boundaries and how fragments
+  reference each other, recording in DECISIONS.md / the specs. Sits
+  next to the media-residency tension above.
 - Media lifecycle commands (`list-media`, `delete-media`, and any
   further definition-level verbs) need careful planning before
   the surface hardens: one media definition (`.rlqm`) can define

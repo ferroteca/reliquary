@@ -324,59 +324,68 @@ rlq run-script install --blueprint freedos-1.4-plain
 ## Authored-asset resolution
 
 Where reliquary looks for authored assets — blueprints, media
-definitions, and scripts — is an invocation-level setting: the
-mechanism behind the artifact-residency split (planning/USE-CASES.md).
+definitions, scripts, and landmark declarations — is an
+invocation-level setting: the mechanism behind the
+artifact-residency split (planning/USE-CASES.md). Assets are
+identified by **extension**, not location: `.rlqb` a machine
+blueprint, `.rlqm` a media definition, `.rlqs` a script, `.rlql`
+a landmark declaration (its `<name>.<n>.png` variant renderings
+attach by stem adjacency, not discovery —
+[planning/design/landmarks.md](design/landmarks.md)). An asset's
+**identity** is its declared `name` when it carries one, else its
+filename stem; two files of one kind resolving to the same
+effective name within a source are an error.
 
-- Every invocation names its **asset root**; unspecified, it
-  defaults to the **current directory**. Assets are identified by
-  extension, not location: `.rlqb` is a machine blueprint,
-  `.rlqm` a media definition, `.rlqs` a script, `.rlql` a
-  landmark declaration (its `<name>.<n>.png` variant renderings
-  attach by stem adjacency, not discovery —
-  [planning/design/landmarks.md](design/landmarks.md)).
-  Discovery walks the root for the four extensions, so a project
-  lays out its files however it likes — `blueprints/`, `media/`,
-  `scripts/`, and `landmarks/` subdirectories are optional
-  organizational dressing, the home's own convention included
-  (U3, U4). Within one root, two files of one kind with the same
-  stem are an error; the home's `cache/` is never scanned.
-- Resolution falls back to the reliquary home for assets the root
-  does not provide. Home assets are a convenience for human CLI
-  interaction — one shared place for the blueprints, media
-  definitions, and scripts a person reuses across
-  human-interaction scenarios (U1, U5). An explicit option
-  disables the fallback entirely, and automation runs with it
-  off: resolution is then strictly
-  project-scoped, and nothing outside source control — neither
-  home assets nor the codex seeded behind them — can
-  reach the run.
-- The home remains reliquary's own ground regardless of asset
-  root: machines materialize into the home cache, downloads and
-  payloads use the home caches, and the personal
-  user-properties file stays home-side (a license key never
-  enters the repo —
-  U5).
-- `--assets <dir>` names the root and `--assets-only` disables
-  the home fallback — global flags, mirrored by the API
-  parameters `assets=` / `assets_only=` under parity.
+Resolution has two modes, selected per invocation by one knob —
+`--assets` (API `assets=`). There is no shadow and no fallback:
+the selected source is the sole source.
 
-Three rules complete the model. **The root shadows the home**:
-when both define a name, the asset root wins — identical media
-descriptors coalesce, duplicates within one root remain errors,
-and run records name which root supplied each asset. **Machines
-record their blueprint's source**: the state carries the resolved
-blueprint file's absolute path, and `--blueprint <name>`
-selection matches only machines whose recorded source equals the
-invocation's own resolution of that name, so same-named
-blueprints in different projects never select — and `apply` never
-adopts — each other's machines. **reliquary reads by
-extension and writes by convention**: U6's recorder emits its
-drafts — the script, its landmark declarations, and their variant
-renderings — into the asset root the session ran with, as new
-source files their author commits. Nothing else writes an
-authored asset: a script carries no definitions to install, so an
-ordinary run leaves the asset root untouched and a CI tree
-clean.
+- **Home mode** — the CLI default, when `--assets` is absent.
+  Resolves from the home's canonical `blueprints/` / `media/` /
+  `scripts/` folders and seeds a missing name from the built-in
+  codex on first reference. Home assets are a convenience for
+  human CLI interaction — one shared place a person reuses across
+  scenarios (U1, U5).
+- **Dir mode** — `--assets <dir>`, and *every* embedding-API
+  call. The directory is walked recursively by extension (a
+  project lays its files out however it likes; dot-directories
+  like `.git`/`.venv` are pruned) and is the **sole** source: no
+  home, no codex, no seeding. Strictly project-scoped resolution,
+  so nothing outside source control can reach an automated run
+  (U3, U4). The codex is never a resolution tier for automation —
+  at most a place to copy a first draft from, the copy committed.
+
+The **embedding API has no default source**: a bare call that
+resolves a name with nothing configured fails closed, so
+automation never silently picks up user (home) assets — or a
+stray current directory, which is arbitrary for a programmatic
+caller and is not an asset default anywhere. Home mode is
+reachable only through the explicit home marker the CLI sets by
+default; it is never the API's default. The API source is
+polymorphic: a directory, or a set of JSON-imported objects
+supplied in memory with no files at all (self-identifying by
+`name` — the fileless third source, landing just after the file
+modes).
+
+The home remains reliquary's own ground regardless of mode:
+machines materialize into the home cache, downloads and payloads
+use the home caches, and the personal user-properties file stays
+home-side (a license key never enters the repo — U5).
+
+Two rules complete the model. **Machines record their blueprint's
+source**: the state carries the resolved blueprint file's
+absolute path, and `--blueprint <name>` selection matches only
+machines whose recorded source equals the invocation's own
+resolution of that name, so same-named blueprints in different
+projects never select — and `apply` never adopts — each other's
+machines (a machine with no recorded source matches by name
+alone). **reliquary reads by extension and writes by
+convention**: U6's recorder emits its drafts — the script, its
+landmark declarations, and their variant renderings — into the
+asset root the session ran with, as new source files their author
+commits. Nothing else writes an authored asset: a script carries
+no definitions to install, so an ordinary run leaves the asset
+root untouched and a CI tree clean.
 
 ## The CLI
 
@@ -466,7 +475,7 @@ flat verb-noun functions completing the `fetch_media` /
 `new_blueprint`, and the property family `get_property` /
 `set_property` / `unset_property` / `list_properties` — taking
 the CLI's selectors (`resolve_machine()` the shared seam) and the
-mirrored globals (`home=` / `assets=` / `assets_only=`),
+mirrored globals (`home=` / `assets=`),
 returning what the CLI prints (`create_machine` and
 `clone_machine` return the new id), raising by class where the
 CLI exits by code (the classes are named —
@@ -523,9 +532,10 @@ Flags are the command's parameters and **position carries no
 meaning** (owner, 2026-07-21): a flag may appear before or after
 the command word — the north star's two spellings are identical —
 with synopses canonically showing flags after the command.
-`--home`, `--assets <dir>` / `--assets-only` ("Authored-asset
-resolution" above), and `--json` (below) are accepted by every
-command, mirroring the API's shared keywords. There is no
+`--home`, `--assets <dir>` (the single asset knob — its absence is
+home mode, "Authored-asset resolution" above), and `--json`
+(below) are accepted by every command, mirroring the API's shared
+keywords. There is no
 bare-script shorthand — an unrecognized command word is an error,
 never a script lookup (`run-script <label>` is the tightest
 form).
@@ -1842,10 +1852,11 @@ Deliverables:
    --blueprint` step in its README) — or the docs corrected where
    implementation proves the planned format wrong.
 8. Authored-asset residency ("Authored-asset resolution" above):
-   the resolution module (`--assets` / `--assets-only`), the
-   `.rlqb` / `.rlqm` extension renames, the `builtins/` →
-   `codex/` package rename and the codex index, the
-   blueprint-source state field, and selection scoping.
+   the resolution module (the single `--assets` knob — home mode
+   vs a hermetic project dir), the `.rlqb` / `.rlqm` extension
+   renames, the `builtins/` → `codex/` package rename and the
+   codex index, the blueprint-source state field, and selection
+   scoping.
 9. The shared JSONC reader for authored documents (RFC 8259 plus
    `//` and `/* */` comments and trailing commas, nothing more;
    string-aware, comments replaced by spaces so error positions

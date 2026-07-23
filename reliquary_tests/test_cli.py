@@ -369,9 +369,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertNotIn("NAME", output)
         self.assertIn("no blueprints", output)
 
-    def test_list_blueprints_scans_home_recursively(self):
-        """A blueprint nested outside blueprints/ is still found."""
-        nested = os.path.join(self.home, "archive", "nested")
+    def test_list_blueprints_scans_the_blueprints_folder_recursively(self):
+        """A blueprint nested within blueprints/ is found (home mode)."""
+        nested = os.path.join(self.home, "blueprints", "vendor")
         os.makedirs(nested)
         nested_path = os.path.join(nested, "nested.rlqb")
         with open(nested_path, "w", encoding="utf-8") as handle:
@@ -403,34 +403,29 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertNotIn("cache", stdout.getvalue())
 
-    def test_list_blueprints_ignores_redirected_cache_dir(self):
-        """--cache pointed outside home is still excluded from the scan."""
-        redirected_cache = tempfile.TemporaryDirectory()
-        self.addCleanup(redirected_cache.cleanup)
-        cache_machine_dir = os.path.join(
-            redirected_cache.name, "machines", "plain-0")
-        os.makedirs(cache_machine_dir)
-        with open(os.path.join(cache_machine_dir, "state.json"),
+    def test_list_blueprints_scans_only_the_blueprints_folder(self):
+        """Home mode lists blueprints/ only — files elsewhere are ignored."""
+        # A .rlqb outside the canonical folder (here under home root and
+        # under a decoy cache/) is never listed: home mode resolves from
+        # blueprints/, not by walking the whole home.
+        with open(os.path.join(self.home, "loose.rlqb"),
                   "w", encoding="utf-8") as handle:
             json.dump({"platform": "dos"}, handle)
-        # A same-named "cache" directory under home that is NOT the
-        # configured cache root must still be scanned normally.
         decoy_cache = os.path.join(self.home, "cache")
         os.makedirs(decoy_cache)
-        with open(os.path.join(decoy_cache, "decoy.rlqb"),
+        with open(os.path.join(decoy_cache, "cached.rlqb"),
                   "w", encoding="utf-8") as handle:
             json.dump({"platform": "dos"}, handle)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "--cache", redirected_cache.name,
-                "list-blueprints",
+                "--home", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
-        self.assertNotIn("state.json", output)
-        self.assertNotIn("plain-0", output)
-        self.assertIn("decoy", output)
+        self.assertIn("plain", output)
+        self.assertNotIn("loose", output)
+        self.assertNotIn("cached", output)
 
     def test_list_blueprints_ignores_unrelated_json(self):
         """A same-extension file without a platform field is skipped."""

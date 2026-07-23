@@ -30,7 +30,6 @@ from urllib.parse import urlsplit
 
 from qemu.qmp import ConnectError
 
-from .home import scripts_dir
 from .library import locate_blueprint, locate_script, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
@@ -1067,7 +1066,10 @@ def _resolve_or_create_machine(*, machine=None, blueprint=None,
     if machine is not None:
         return _machines.resolve_machine(
             machine=machine, blueprint=blueprint, context=context), False
-    matches = _machines.list_machines(context, blueprint=blueprint)
+    # Scope the create-if-none decision to this invocation's source, so
+    # a same-named machine from another project is never adopted — a new
+    # project-scoped machine is created instead.
+    matches = _machines.machines_for_blueprint(blueprint, context)
     if not matches:
         machine_id = _machines.create_machine(
             blueprint, context=context)
@@ -1093,15 +1095,17 @@ def _resolve_script_stem(label, scripts_map):
 
 
 def _ensure_script_path(stem, context=None):
-    """Return the home path for ``stem``, seeding from builtins if needed."""
-    path = os.path.join(scripts_dir(context), f"{stem}.rlqs")
-    if not os.path.isfile(path):
+    """Resolve ``stem`` through the asset source, seeding in home mode.
+
+    Home mode seeds the script (and its media closure) from the codex
+    on first reference; dir mode (``--assets``) is the sole source and
+    seeds nothing. Resolution and its diagnostics come from
+    ``locate_script``.
+    """
+    from .assets import source_for
+    if source_for(context).seeds:
         seed_script(stem, context=context)
-    if not os.path.isfile(path):
-        raise FileNotFoundError(
-            f"script not found: {stem}.rlqs\n"
-            f"expected under {scripts_dir(context)}")
-    return path
+    return locate_script(stem, context=context)
 
 
 def _create_run_dir(machine_id, context=None):

@@ -586,6 +586,57 @@ entries now in this file.
     builtins/ → codex/ package-dir rename and the codex index, state
     field, selection scoping,
     install targeting), at the residency milestone
+  - ARTIFACT RESIDENCY — REDESIGNED AT IMPLEMENTATION (owner, milestone-6
+    T6, 2026-07-22, superseding the 2026-07-21 shadow/fallback model
+    above): building the resolution module surfaced a simpler, safer
+    shape and it was adopted through the interface-change rule (strong
+    alignment with the U3/U4 automation-hermeticity use cases — an easy
+    approval). Changes from the 2026-07-21 record:
+    - ONE flag, `--assets` (API `assets=`); `--assets-only` /
+      `assets_only=` are DROPPED. The knob is single-tier: naming a root
+      makes it the SOLE source. Root REPLACES home — the shadow/coalesce
+      and the root→home fallback are gone (a project that references an
+      asset only in the home no longer resolves it; hermetic by
+      construction).
+    - Two modes. HOME MODE (the CLI default, no `--assets`): resolve from
+      the home's canonical `blueprints/` / `media/` / `scripts/` folders,
+      seeding missing names from the codex — a human-CLI convenience.
+      DIR MODE (`--assets <dir>`, and every API call): walk that dir
+      recursively by extension as the sole source, no home, no codex, no
+      seeding. list/search follow the same split (canonical folders vs
+      recursive walk).
+    - The embedding API has NO default source: a bare call that resolves
+      a name with nothing configured fails closed ("no asset source
+      configured"), so automation can never silently pick up user (home)
+      assets or a stray CWD. CWD is NOT an asset default anywhere (the
+      2026-07-21 "defaults to the current directory" is dropped — CWD is
+      arbitrary for a programmatic agent). Home mode is reachable only via
+      the explicit `HOME_ASSETS` marker (`set_assets`, `Context(assets=…)`),
+      which the CLI sets by default; it is never the API default.
+    - Asset identity is the file's `name` field when declared, else its
+      filename stem; two files of one kind resolving to one effective name
+      is an error (the conflict guard). This makes blueprint `name` the
+      id-safe IDENTITY (selection key / machine-id segment), REVERSING the
+      2026-07-22 "name is a display name" reinstatement — human prose lives
+      in `description`. Media items already self-identify by their `name`s;
+      scripts carry no `name` and stay stem-identified. The codex FreeDOS
+      blueprint dropped its spaces-bearing `name` (falls back to the stem).
+    - Resolution flows through an asset-source seam (HomeSource / DirSource).
+      A third source — OBJECTSOURCE, JSON-imported objects supplied by an
+      embedding caller with no files at all, self-identifying by `name` —
+      is the settled fast-follow (its own SC after T6): the API source is
+      polymorphic (a dir, or a set of objects). Scripts, lacking a `name`,
+      would be a name→source map under ObjectSource — a detail for that SC.
+    - Two design threads SHORTLISTED (TASKS.md "Design"): media definitions
+      are now residency-scoped but payloads still cache home-side by item
+      name (cross-project collision / hermeticity tension); and whether the
+      machine hardware spec, a machine's media usage, and media
+      locators/archives are separable fragments composable under one
+      blueprint schema.
+    - Folded: ROADMAP "Authored-asset resolution" + "The CLI", AGENTS.md,
+      cli.md, api.md, instance-model, machine-blueprint-reference, README,
+      docs (cli-/api-reference, blueprint-guide), CHANGELOG. Blueprint-source
+      selection scoping (state field from T2) landed as specified.
   - RESOLVED (July 2026): hand-placed proprietary payloads vs the "cache is
     not an interface" doctrine — local-path (item- or archive-level) is now
     the only hand-supply path; the cache is never hand-fed; a sourceless

@@ -11,9 +11,15 @@ runner, with DOS as the default and currently only complete platform
 workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home and
-  cache resolution, layout, and containment, plus the `Context` type every path-resolving function accepts,
-  `blueprint.py` validates the full machine blueprint field reference (`platform`, `backend`, `memory`, `cpus`,
-  `drives` with the four content sources plus `controller`/`enabled`, `boot`, `name`, `description`, `scripts`,
+  cache resolution, layout, and containment, plus the `Context` type every path-resolving function accepts (now also
+  carrying the authored-asset selection — `HOME_ASSETS`/`set_assets`), `assets.py` owns authored-asset residency: the
+  resolution source seam (`HomeSource` = the home's canonical folders + codex seeding, the CLI default; `DirSource` =
+  a `--assets <dir>` project root walked recursively by extension as the sole hermetic source), `source_for`, and the
+  name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API names its
+  source or fails closed (no home/CWD default), and an `ObjectSource` of JSON-imported objects is the planned third
+  source, `blueprint.py` validates the full machine blueprint field reference (`platform`, `backend`, `memory`, `cpus`,
+  `drives` with the four content sources plus `controller`/`enabled`, `boot`, `name` (the id-safe identity, not a
+  display label), `description`, `scripts`,
   `control-planes`, `backend-settings`, `parameters`) and resolves
   its `media`/`base.media` references (backend capability checks and `base`/`hostdir` materialization ride later
   milestone-6 work), scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
@@ -161,6 +167,20 @@ process-global default via `--home`/`--cache` — scoped `Context` objects are a
 `lifecycle.py`'s and `machine.py`'s own `home=` parameters are a different, narrower concept — an already-resolved
 plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
 deliberately left alone. Never write beside the module or into the source repository during normal use.
+
+Authored-asset residency is a separate axis from the home (ROADMAP "Authored-asset resolution"; `assets.py`). Blueprints,
+media definitions, and scripts resolve in one of two modes, carried on `Context.assets` / the `set_assets` global:
+**home mode** (`HOME_ASSETS` — the CLI default when `--assets` is absent) reads the home's canonical `blueprints/` /
+`media/` / `scripts/` folders and seeds from the codex on a miss; **dir mode** (`--assets <dir>`, API `assets=<dir>`)
+walks that project root recursively by extension as the sole hermetic source — no home, no codex, no seeding. The
+root **replaces** the home (there is no shadow and no fallback; `--assets-only` never existed here). The embedding API
+has **no default source**: a bare `Context`/`None` that resolves a name with nothing configured fails closed, so
+automation never picks up home assets or a stray CWD (CWD is not an asset default). A bare-string `context=` is the
+home-mode shorthand. An asset's identity is its declared `name` (id-safe) else its filename stem; within-source
+effective-name collisions are errors. Selection scoping: `--blueprint <name>` matches only machines whose recorded
+`blueprint-source` equals this invocation's resolution (a sourceless machine matches by name alone). Seeding
+(`seed-blueprint` / `seed-media` / `seed-script`) is a home operation and still targets `<home>/blueprints` etc.,
+never a project root or the cache.
 
 Home layout. A machine is wholly its cache materialization — there is
 no root-home machine model (the legacy root-home `drives/` /

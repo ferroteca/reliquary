@@ -122,18 +122,20 @@ backend machine and resolves the blueprint afresh (see
 
 **blueprint (optional) · string · present in the state**
 
-A human-readable display name for the blueprint — `"FreeDOS 1.4
-plain"` where the file stem is `freedos-1.4-plain`. It is a label
-for presentation, **not** an identity: the file stem remains the
-blueprint's one selection key (`--blueprint <stem>`), and a
-machine's identity stays `<stem>-<n>`. `name` never selects,
-never renames, and does not affect machine behavior; it feeds
-`search` alongside [`description`](#description) and is shown in
-listings where a friendlier label than the stem helps. Omitted,
-tools fall back to the stem.
+The blueprint's **identity** — its selection key. Declared, it
+overrides the filename stem: `--blueprint <name>` selects it and a
+machine's identity is `<name>-<n>`. Omitted, identity falls back
+to the file stem (the common case — a `freedos-1.4-plain.rlqb`
+needs no `name`). Because it becomes a machine-id segment and a
+cache directory name it must be **id-safe**: a leading
+alphanumeric then alphanumerics, `.`, `_`, or `-`, and never all
+digits. Two blueprints resolving to one effective name within a
+source are an error. `name` gives fileless object-provided
+blueprints (which have no stem) a stable identity; human prose
+belongs in [`description`](#description).
 
 ```json
-{"name": "FreeDOS 1.4 plain"}
+{"name": "freedos-1.4-plain"}
 ```
 
 ---
@@ -142,11 +144,11 @@ tools fall back to the stem.
 
 **blueprint (optional) · string**
 
-Human-readable discovery prose. It does not affect machine
-behavior; it feeds `search`, which matches terms against
-filename, [`name`](#name), `description`, and platform (U5).
-Where [`name`](#name) is a short display label, `description` is
-the longer sentence. Codex blueprints carry the description
+Human-readable discovery prose — the blueprint's one free-text
+label, now that [`name`](#name) is an id-safe identity rather than
+a display string. It does not affect machine behavior; it feeds
+`search`, which matches terms against the identity name,
+`description`, and platform (U5). Codex blueprints carry the description
 through the codex's index; user blueprints are indexed by reading
 the field from the file (see [the codex](codex.md)).
 

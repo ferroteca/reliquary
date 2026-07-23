@@ -168,15 +168,16 @@ class SearchBlueprintsTest(unittest.TestCase):
     def test_user_blueprint_matches_by_description(self):
         bp_dir = os.path.join(self.home, "blueprints")
         os.makedirs(bp_dir)
+        # A declared ``name`` is the identity and overrides the stem.
         with open(os.path.join(bp_dir, "mine.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({"platform": "dos", "name": "My One",
+            json.dump({"platform": "dos", "name": "custom-rig",
                        "description": "bespoke widget rig",
                        "drives": {"hdd": {"size": "20M"}}}, handle)
         rows = search_blueprints("bespoke", context=self.home)
-        self.assertEqual([r["name"] for r in rows], ["mine"])
+        self.assertEqual([r["name"] for r in rows], ["custom-rig"])
         self.assertEqual(rows[0]["provenance"], "user")
-        self.assertEqual(rows[0]["display_name"], "My One")
+        self.assertEqual(rows[0]["description"], "bespoke widget rig")
 
     def test_empty_term_matches_all(self):
         rows = search_blueprints("", context=self.home)

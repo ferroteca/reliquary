@@ -20,7 +20,11 @@ The current implementation (milestone-1) supports a subset of the blueprint form
 
 ### Implemented fields
 
-- `name` - Blueprint name
+- `name` - Blueprint identity (the selection key). Optional: it
+  defaults to the filename stem, and when declared it overrides the
+  stem, so it must be id-safe (letters, digits, `.`, `_`, `-`; not
+  all digits). A machine's id is `<name>-<n>`. Human prose belongs
+  in `description`, not here.
 - `description` - Human-readable description
 - `platform` - Platform (default: `dos`)
 - `memory` - Memory size (e.g., `"32M"`) or positive integer MiB

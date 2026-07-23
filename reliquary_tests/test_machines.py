@@ -74,7 +74,7 @@ class MachineMaterializationTests(unittest.TestCase):
         blueprint = self._blueprint({
             "platform": "dos",
             "drives": {"hdd": {"size": "20M"}},
-            "name": "Test Machine",
+            "name": "test-machine",
             "description": "A description.",
             "scripts": {"install": "install-script"},
         })
@@ -94,7 +94,7 @@ class MachineMaterializationTests(unittest.TestCase):
         self.assertEqual(state["memory"], 16)
         self.assertEqual(state["cpus"], 1)
         self.assertEqual(state["control-planes"], ["agentless-display"])
-        self.assertEqual(state["name"], "Test Machine")
+        self.assertEqual(state["name"], "test-machine")
         self.assertEqual(state["scripts"], {"install": "install-script"})
         self.assertEqual(state["boot"], ["hdd0"])
         # Provenance.

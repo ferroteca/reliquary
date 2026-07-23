@@ -19,12 +19,11 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import read_vm_state
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from . import jsonc
-from .home import (blueprints_dir, cache_dir, effective_home, media_dir,
-                   scripts_dir, set_cache, set_home)
-from .library import (list_builtin_blueprints, list_builtin_media,
-                      search_blueprints, seed_blueprint, seed_media,
-                      seed_script)
+from .home import HOME_ASSETS, set_assets, set_cache, set_home
+from .library import (list_blueprints, list_builtin_blueprints,
+                      list_builtin_media, list_scripts, locate_blueprint,
+                      locate_script, search_blueprints, seed_blueprint,
+                      seed_media, seed_script)
 from . import blueprint as blueprint_mod
 from .machines import (apply_blueprint, create_machine, destroy_machine,
                        eject_media, get_machine_dir, insert_media,
@@ -66,6 +65,7 @@ _COMMANDS = frozenset({
 _FLAG_ARITY = {
     "--home": 1,
     "--cache": 1,
+    "--assets": 1,
     "--blueprint": 1,
     "--machine": 1,
     "--port": 1,
@@ -162,6 +162,9 @@ def _add_home(parser):
                         help="reliquary home directory")
     parser.add_argument("--cache", default=None,
                         help="cache directory (default: <home>/cache)")
+    parser.add_argument(
+        "--assets", default=None,
+        help="project asset root (sole source; default: the home)")
     parser.add_argument(
         "--json", action="store_true",
         help="print the command's result as one JSON document")
@@ -471,6 +474,10 @@ def main(argv=None):
         set_home(arguments.home)
     if getattr(arguments, "cache", None):
         set_cache(arguments.cache)
+    # The CLI always names an asset source: --assets selects a hermetic
+    # project root, its absence selects home mode (canonical folders +
+    # codex). The embedding API has no such default — it must name one.
+    set_assets(getattr(arguments, "assets", None) or HOME_ASSETS)
     try:
         return _dispatch(arguments)
     except ScriptParseError as error:
@@ -572,31 +579,7 @@ def _list_blueprints(arguments):
             for name in names:
                 print(name)
         return _emit(arguments, names, render_builtin)
-    home_path = effective_home(None)
-    # The cache root resolves independently (RELIQUARY_CACHE_DIR /
-    # --cache / set_cache()) and need not sit under the home at all,
-    # so it's excluded by matching the actual configured path, not
-    # by a literal "cache" directory name.
-    cache_path = cache_dir()
-    found = []
-    for root, dirs, files in os.walk(home_path):
-        if os.path.abspath(root) == cache_path:
-            dirs[:] = []
-            continue
-        for entry in files:
-            if entry.endswith(".rlqb"):
-                found.append(os.path.join(root, entry))
-            elif entry.endswith(".json") and _looks_like_blueprint(
-                    os.path.join(root, entry)):
-                found.append(os.path.join(root, entry))
-    rows = []
-    for path in sorted(found):
-        stem = os.path.basename(path)
-        for extension in (".rlqb", ".json"):
-            if stem.endswith(extension):
-                stem = stem[:-len(extension)]
-                break
-        rows.append({"name": stem, "path": path})
+    rows = list_blueprints()
 
     def render():
         if not rows:
@@ -607,21 +590,6 @@ def _list_blueprints(arguments):
         for row in rows:
             print(f"{row['name']:<{name_width}}  {row['path']}")
     return _emit(arguments, rows, render)
-
-
-def _looks_like_blueprint(path):
-    """Whether a legacy ``.json`` file's top level looks like a blueprint.
-
-    A cheap discriminator only, so a recursive home scan does not
-    mistake a same-extension media definition for a blueprint;
-    actual loading still validates fully.
-    """
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            value = jsonc.load(handle)
-    except (OSError, ValueError):
-        return False
-    return isinstance(value, dict) and "platform" in value
 
 
 def _print_names(names, empty):
@@ -638,9 +606,8 @@ def _list_media(arguments):
         return _emit(arguments, names,
                      lambda: _print_names(names, "(no built-in media)"))
     names = list_media()
-    library = media_dir()
     return _emit(arguments, names,
-                 lambda: _print_names(names, f"(no media in {library})"))
+                 lambda: _print_names(names, "(no media)"))
 
 
 def _delete_media(arguments):
@@ -700,18 +667,21 @@ def _script_description(script_path):
         return f"(error: {error})"
 
 
+def _script_description_by_stem(stem):
+    """A script's one-line description, resolved through the seam."""
+    try:
+        return _script_description(locate_script(stem))
+    except FileNotFoundError as error:
+        return f"(error: {error})"
+
+
 def _list_scripts(arguments):
     blueprint_name = getattr(arguments, "blueprint", None)
     if blueprint_name:
-        bp_path = os.path.join(blueprints_dir(),
-                               f"{blueprint_name}.json")
-        if not os.path.exists(bp_path):
-            seed_blueprint(blueprint_name)
-        bp = blueprint_mod.load_blueprint(bp_path)
+        bp = blueprint_mod.load_blueprint(locate_blueprint(blueprint_name))
         rows = [
             {"label": label, "stem": stem,
-             "description": _script_description(
-                 os.path.join(scripts_dir(), f"{stem}.rlqs"))}
+             "description": _script_description_by_stem(stem)}
             for label, stem in bp.scripts.items()]
 
         def render_labels():
@@ -724,21 +694,13 @@ def _list_scripts(arguments):
                 print(f"{row['label']:<{width}}  {row['description']}")
         return _emit(arguments, rows, render_labels)
 
-    scripts_path = scripts_dir()
-    stems = sorted(
-        entry[:-5] for entry in os.listdir(scripts_path)
-        if entry.endswith(".rlqs")) if os.path.isdir(scripts_path) else []
-    rows = [{"name": stem,
-             "description": _script_description(
-                 os.path.join(scripts_path, f"{stem}.rlqs"))}
-            for stem in stems]
+    rows = [{"name": row["name"],
+             "description": _script_description(row["path"])}
+            for row in list_scripts()]
 
     def render_dir():
-        if not os.path.isdir(scripts_path):
-            print(f"(no scripts directory: {scripts_path})")
-            return
         if not rows:
-            print(f"(no scripts in {scripts_path})")
+            print("(no scripts)")
             return
         width = max([4] + [len(row["name"]) for row in rows])
         print(f"{'NAME':<{width}}  DESCRIPTION")
@@ -786,7 +748,7 @@ def _search_blueprints(arguments):
               f"{'PLATFORM':<8}  DESCRIPTION")
         for row in rows:
             platform = row["platform"] or "-"
-            description = row["description"] or row["display_name"] or "-"
+            description = row["description"] or "-"
             print(f"{row['name']:<{name_width}}  "
                   f"{row['provenance']:<{prov_width}}  "
                   f"{platform:<8}  {description}")

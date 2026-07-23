@@ -15,6 +15,13 @@ appear before or after the command word.
 - `--home <path>` - Override the reliquary home directory
 - `--cache <path>` - Override the cache directory (default:
   `<home>/cache`)
+- `--assets <dir>` - Resolve authored assets (blueprints, media
+  definitions, scripts) solely from this project root, walked
+  recursively by extension — no home, no codex, no seeding. Its
+  absence is home mode: the home's canonical `blueprints/` /
+  `media/` / `scripts/` folders, seeding missing names from the
+  built-in codex. Use `--assets` for reproducible, project-scoped
+  automation
 - `--blueprint <name>` - Select a blueprint's sole machine, or
   name the blueprint for `create-machine` / `list-*`
 - `--machine <id>` - Select a machine by full id

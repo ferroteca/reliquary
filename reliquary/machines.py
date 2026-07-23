@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime, timezone
 
 from .blueprint import load_blueprint
-from .home import blueprints_dir, machines_cache_dir
+from .home import machines_cache_dir
 from .library import seed_blueprint
 from .lifecycle import (create_difference_image, create_duplicate_image,
                         create_hdd_image, find_qemu, launch_owned_qemu,
@@ -365,12 +365,12 @@ def create_machine(name, *, context=None, number=None):
     files). ``number`` pins the machine number (``recreate`` reuses
     the old id); omitted, the lowest free number is allocated.
     """
+    from .assets import source_for
     from .library import locate_blueprint
-    paths = [
-        os.path.join(blueprints_dir(context), f"{name}.rlqb"),
-        os.path.join(blueprints_dir(context), f"{name}.json"),
-    ]
-    if not any(os.path.exists(path) for path in paths):
+    # Home mode seeds the blueprint and its media/script closure from
+    # the codex on first reference (idempotent, never overwriting);
+    # dir mode (``--assets``) is hermetic and seeds nothing.
+    if source_for(context).seeds:
         seed_blueprint(name, context=context)
     path = locate_blueprint(name, context=context)
     blueprint = load_blueprint(path, context=context)
@@ -611,8 +611,36 @@ def _resolve_by_id(selector, context):
     raise ValueError(f"no machine {selector!r}")
 
 
-def _resolve_by_blueprint(name, context):
+def machines_for_blueprint(name, context=None):
+    """Machines of blueprint ``name`` scoped to this invocation's source.
+
+    Selection scoping (instance model): a machine matches when its
+    recorded ``blueprint-source`` equals the invocation's own
+    resolution of ``name``, so same-named blueprints in different
+    projects never select each other's machines — and ``apply`` never
+    adopts them. A machine with no recorded source matches by name
+    alone (there is nothing to scope it against); when ``name`` does
+    not resolve in this invocation, only such sourceless machines can
+    match. Ordered like :func:`list_machines`.
+    """
+    from .library import locate_blueprint
     matches = list_machines(context, blueprint=name)
+    try:
+        resolved = os.path.abspath(locate_blueprint(name, context=context))
+    except FileNotFoundError:
+        resolved = None
+    scoped = []
+    for state in matches:
+        source = state.get("blueprint-source")
+        if source is None:
+            scoped.append(state)
+        elif resolved is not None and os.path.abspath(source) == resolved:
+            scoped.append(state)
+    return scoped
+
+
+def _resolve_by_blueprint(name, context):
+    matches = machines_for_blueprint(name, context)
     if not matches:
         raise ValueError(
             f"no machine exists for blueprint {name!r}\n"

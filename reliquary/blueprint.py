@@ -99,6 +99,25 @@ def _nonempty_string(value, field_name):
     return value
 
 
+# A blueprint's ``name`` is its identity — the selection key that also
+# becomes a filesystem directory (``cache/machines/<name>-<n>/``) and a
+# machine-id segment. It defaults to the filename stem; when declared it
+# overrides the stem but must stay id-safe: a leading alphanumeric then
+# alphanumerics, dot, underscore, or hyphen, and never all digits (which
+# would collide with a machine number).
+_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _asset_name(value, field_name="name"):
+    """Validate an authored-asset identity name (id- and path-safe)."""
+    _nonempty_string(value, field_name)
+    if not _NAME_PATTERN.match(value) or value.isdigit():
+        raise ValueError(
+            f"{field_name} must be an identifier (letters, digits, "
+            f"'.', '_', '-'; not all digits), got: {value!r}")
+    return value
+
+
 def _size(value, field_name):
     if not isinstance(value, str):
         raise ValueError(
@@ -447,7 +466,7 @@ def parse_blueprint(value, context=None):
         drives=drives,
         boot=(_boot(value["boot"], drives)
               if "boot" in value else _default_boot(drives)),
-        name=(_nonempty_string(value["name"], "name")
+        name=(_asset_name(value["name"], "name")
               if "name" in value else None),
         description=(_nonempty_string(value["description"], "description")
                      if "description" in value else None),

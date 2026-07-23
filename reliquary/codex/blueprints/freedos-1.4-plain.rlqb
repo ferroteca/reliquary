@@ -1,7 +1,6 @@
 {
   "platform": "dos",
   "memory": "32M",
-  "name": "FreeDOS 1.4 plain",
   "description": "Plain FreeDOS 1.4 system installed from the LiveCD",
   "drives": {
     "hdd0": {"size": "20M"},

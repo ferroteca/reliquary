@@ -26,17 +26,29 @@ results belongs to the caller.
   `set_home()`, or the platform default under Documents).
 - `documents_dir()` - Resolve the user's platform Documents
   folder, or `None` when it cannot be determined.
-- `Context(home=None, cache=None)` - An explicit (home, cache) pair
-  scoping one call or a group of calls, independent of the
-  process-global default. Every function below that resolves a
-  path under the home accepts a `context=` parameter: omit it (the
-  common case) to use the process-global default; pass a bare
-  string as shorthand for `Context(home=that_string)` (cache still
-  follows the global default); pass a `Context` instance to pin
-  both home and cache explicitly, safe to vary per call within one
-  process. The CLI only ever drives the process-global default via
-  `--home`/`--cache` — scoped `Context` objects are an
-  embedding-API-only capability.
+- `Context(home=None, cache=None, assets=None)` - An explicit
+  (home, cache, asset-source) triple scoping one call or a group of
+  calls, independent of the process-global default. Every function
+  below that resolves a path under the home accepts a `context=`
+  parameter: omit it (the common case) to use the process-global
+  default; pass a bare string as shorthand for
+  `Context(home=that_string)` (cache still follows the global
+  default, and it selects home mode); pass a `Context` instance to
+  pin home, cache, and asset source explicitly, safe to vary per
+  call within one process. The CLI only ever drives the
+  process-global default via `--home`/`--cache`/`--assets` — scoped
+  `Context` objects are an embedding-API-only capability.
+- `assets=` selects where authored assets (blueprints, media
+  definitions, scripts) resolve from: a directory path is a
+  hermetic project root walked recursively by extension (the sole
+  source — no home, no codex, no seeding), and `HOME_ASSETS` is
+  home mode (the home's canonical folders plus codex seeding). The
+  embedding API has **no default source**: a call that resolves an
+  asset by name with none configured (no `assets=` and no
+  `set_assets`) raises, so automation never silently reads home
+  assets or the current directory. `set_assets(HOME_ASSETS)` /
+  `set_assets(dir)` set the process-global; the CLI sets it from
+  `--assets` (home mode when absent).
 - Path helpers, each accepting `context=None`: `blueprints_dir`,
   `media_dir`, `scripts_dir`, `cache_dir`, `downloads_cache_dir`,
   `media_cache_dir`, and `machines_cache_dir`.

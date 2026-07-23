@@ -12,6 +12,32 @@ _home_announced = False
 _cache = os.environ.get("RELIQUARY_CACHE_DIR")
 
 
+class _HomeAssets:
+    """The marker selecting home-mode authored-asset resolution.
+
+    Home mode resolves blueprints, media, and scripts from the home's
+    canonical ``blueprints/`` / ``media/`` / ``scripts/`` folders and
+    seeds missing names from the built-in codex. It is the CLI default
+    (no ``--assets``); the embedding API never selects it by default —
+    an API caller names a directory (or, later, supplies objects).
+    """
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return "HOME_ASSETS"
+
+
+HOME_ASSETS = _HomeAssets()
+
+# Sentinel distinguishing "no asset source ever configured" from an
+# explicit home/dir selection. The process-global asset mode starts
+# unset: the CLI sets it in ``main()`` (home mode, or a directory);
+# an embedding API call must name a source per resolution or fail.
+_UNSET = object()
+_assets = _UNSET
+
+
 def set_home(path):
     """Configure the reliquary work directory (overrides RELIQUARY_HOME)."""
     global _home
@@ -22,6 +48,42 @@ def set_cache(path):
     """Configure the cache root (overrides RELIQUARY_CACHE_DIR)."""
     global _cache
     _cache = os.path.abspath(path)
+
+
+def set_assets(value):
+    """Configure the process-global authored-asset source.
+
+    ``HOME_ASSETS`` selects home mode; a directory path selects that
+    directory as the sole (hermetic) asset root. The CLI drives this
+    from ``--assets`` (home mode when the flag is absent). Scoped
+    per-call selection is an embedding-API capability via
+    ``Context(assets=...)``.
+    """
+    global _assets
+    if value is HOME_ASSETS:
+        _assets = value
+    else:
+        _assets = os.path.abspath(value)
+
+
+def assets_mode(context=None):
+    """Resolve the effective authored-asset mode for ``context``.
+
+    Returns ``HOME_ASSETS`` (home mode) or an absolute directory path
+    (dir mode). Per-call ``Context(assets=...)`` wins; otherwise the
+    process-global set by ``set_assets`` applies; with neither
+    configured — the bare embedding-API case — resolution fails,
+    since automation must name where its assets live rather than
+    silently fall back to the home or the current directory.
+    """
+    mode = _ctx(context).assets
+    if mode is None:
+        mode = _assets
+    if mode is None or mode is _UNSET:
+        raise RuntimeError(
+            "no asset source configured: pass assets=<dir> to name "
+            "the project's asset root (the CLI defaults to the home)")
+    return mode
 
 
 def documents_dir():
@@ -98,13 +160,25 @@ class Context:
     the CLI never does this itself (it only ever drives the global
     default via ``--home``/``--cache``); scoped contexts are an
     embedding-API-only capability.
+
+    ``assets`` selects where authored assets (blueprints, media
+    definitions, scripts) resolve from: ``HOME_ASSETS`` for home mode
+    (the home's canonical folders plus codex seeding) or a directory
+    path for that hermetic root. ``None`` inherits the process-global
+    ``set_assets`` selection; when neither is set, resolution fails —
+    an embedding call must name its source rather than default to the
+    home or the current directory.
     """
 
-    __slots__ = ("home", "cache")
+    __slots__ = ("home", "cache", "assets")
 
-    def __init__(self, home=None, cache=None):
+    def __init__(self, home=None, cache=None, assets=None):
         self.home = os.path.abspath(home) if home else None
         self.cache = os.path.abspath(cache) if cache else None
+        if assets is None or assets is HOME_ASSETS:
+            self.assets = assets
+        else:
+            self.assets = os.path.abspath(assets)
 
     def home_dir(self):
         """The effective home for this context."""
@@ -138,12 +212,17 @@ class Context:
 
 
 def _ctx(context):
-    """Coerce ``None``/a bare home string/a ``Context`` into a ``Context``."""
+    """Coerce ``None``/a bare home string/a ``Context`` into a ``Context``.
+
+    A bare home string is the human/home shorthand, so it selects home
+    mode (``assets=HOME_ASSETS``); a fully explicit ``Context`` names
+    its own asset source (or inherits the process-global).
+    """
     if context is None:
         return Context()
     if isinstance(context, Context):
         return context
-    return Context(home=context)
+    return Context(home=context, assets=HOME_ASSETS)
 
 
 def blueprints_dir(context=None):

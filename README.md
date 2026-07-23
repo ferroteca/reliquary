@@ -212,9 +212,22 @@ Documents/reliquary/
 ```
 
 A machine is wholly its `cache/machines/<id>/` directory — there is no
-root-home machine model. Authored assets (blueprints, media, scripts)
-stay under the home; everything under `cache/` is regenerable. The
+root-home machine model. Everything under `cache/` is regenerable. The
 selected home is printed to standard error the first time it is used.
+
+Authored assets (blueprints, media definitions, scripts) resolve in one
+of two modes. By default — **home mode** — reliquary reads the home's
+`blueprints/` / `media/` / `scripts/` folders and seeds any name it does
+not find from the built-in codex; this is the convenient path for
+interactive use. Point `--assets <dir>` at a project directory instead
+and reliquary resolves **solely** from that tree (walked recursively by
+file extension): no home, no codex, no seeding. That is the mode for
+automation — assets are your project's source-controlled files, so a run
+is reproducible and never picks up whatever happens to be in your home.
+A machine records which blueprint file it was built from, so a
+`--blueprint <name>` selection only ever picks a machine built from the
+blueprint the current invocation resolves — two projects that share a
+blueprint name never disturb each other's machines.
 
 ## First session
 

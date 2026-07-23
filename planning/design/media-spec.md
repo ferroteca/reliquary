@@ -16,16 +16,15 @@ SPDX-License-Identifier: BSD-3-Clause
 
 The media catalog holds machine-independent media: installer ISOs,
 boot floppies, and driver disks. Definitions are authored assets —
-`.rlqm` files, identified by extension and discovered anywhere
-under the invocation's asset root (the current directory by
-default), falling back to the reliquary home unless
-`--assets-only` disables the fallback (planning/ROADMAP.md,
-"Authored-asset resolution"); a `media/` subdirectory is optional
-organizational dressing, the home's own convention included. The
-home library is the human
+`.rlqm` files, identified by extension. In home mode (the CLI
+default) they resolve from the home's canonical `media/` folder,
+seeding from the codex on first reference; under `--assets <dir>`
+they are discovered anywhere in that project root, which is the
+sole source (planning/ROADMAP.md, "Authored-asset resolution").
+The home library is the human
 convenience: one shared place for definitions reused across
-interactive scenarios. Automation disables the fallback
-(`--assets-only`) and resolves strictly project-scoped: neither
+interactive scenarios. Automation names a project root with
+`--assets <dir>` and resolves strictly project-scoped: neither
 home definitions nor the codex behind them can reach an automated
 run — a project commits its own copies (the artifact-residency
 split, planning/USE-CASES.md). A definition is always a file of

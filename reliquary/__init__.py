@@ -5,14 +5,16 @@
 from .blueprint import (Blueprint, BlueprintDrive, delete_blueprint,
                         load_blueprint, parse_blueprint, new_blueprint)
 from .cli import main
-from .home import (Context, blueprints_dir, cache_dir, documents_dir,
-                   downloads_cache_dir, home, machines_cache_dir,
-                   media_cache_dir, media_dir, scripts_dir, set_cache,
-                   set_home)
+from .home import (HOME_ASSETS, Context, blueprints_dir, cache_dir,
+                   documents_dir, downloads_cache_dir, home,
+                   machines_cache_dir, media_cache_dir, media_dir,
+                   scripts_dir, set_assets, set_cache, set_home)
 from .interaction import GuestExec
 from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
                         stop)
+from .library import (list_blueprints, list_scripts, search_blueprints,
+                     seed_blueprint, seed_media, seed_script)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .machines import (apply_blueprint, create, create_machine,
@@ -50,6 +52,7 @@ __all__ = [
     "Statement",
     "AgentlessGuestExec",
     "Context",
+    "HOME_ASSETS",
     "GuestExec",
     "apply_blueprint",
     "create",
@@ -75,9 +78,11 @@ __all__ = [
     "find_qemu_img",
     "get_property",
     "home",
+    "list_blueprints",
     "list_machines",
     "list_media",
     "list_properties",
+    "list_scripts",
     "load_blueprint",
     "load_script",
     "load_machine_state",
@@ -96,8 +101,13 @@ __all__ = [
     "screen_text",
     "screenshot",
     "scripts_dir",
+    "search_blueprints",
+    "seed_blueprint",
+    "seed_media",
+    "seed_script",
     "send_keys",
     "send_text",
+    "set_assets",
     "set_boot_order",
     "set_cache",
     "set_home",

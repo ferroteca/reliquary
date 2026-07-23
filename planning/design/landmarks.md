@@ -46,9 +46,9 @@ the closest variant.
 **Catalog form.** The declaration is `<name>.rlql`, a JSONC
 authored document — the fourth authored extension beside
 `.rlqb` / `.rlqm` / `.rlqs`, resolved under exactly the same
-rules (planning/ROADMAP.md "Authored-asset resolution": root discovery by
-extension, root shadows home, `--assets-only`; a `landmarks/`
-subdirectory is optional dressing). Variant renderings are plain
+rules (planning/ROADMAP.md "Authored-asset resolution": home mode
+vs a hermetic `--assets` project root, discovery by extension;
+a `landmarks/` subdirectory is optional dressing). Variant renderings are plain
 PNGs attached by stem-and-number adjacency — `<name>.<n>.png`
 beside the declaration, ordered numerically — so a U6 asset
 refresh is strictly file-creation, never file-rewrite, and

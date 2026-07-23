@@ -13,6 +13,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Authored-asset residency: a single global `--assets <dir>` flag
+  (API `assets=`) selects where blueprints, media definitions, and
+  scripts resolve from. Without it, **home mode** resolves from the
+  home's canonical `blueprints/` / `media/` / `scripts/` folders and
+  seeds missing names from the codex (the human-CLI convenience).
+  With `--assets <dir>`, **dir mode** walks that project root
+  recursively by extension as the **sole**, hermetic source — no
+  home, no codex, no seeding — for reproducible automation. The
+  embedding API has no default source and fails closed until one is
+  named, so automation never silently picks up home assets or the
+  current directory. `list-blueprints` / `list-scripts` gained API
+  twins (`list_blueprints` / `list_scripts`).
+- `--blueprint <name>` selection is scoped to the invocation's asset
+  resolution: it matches only machines whose recorded
+  `blueprint-source` equals the blueprint this invocation resolves,
+  so same-named blueprints in different projects never select — and
+  `apply` never adopts — each other's machines.
 - The cache root (`cache/downloads/`, `cache/media/`,
   `cache/machines/`) resolves independently of the reliquary home:
   `RELIQUARY_CACHE_DIR`, `--cache`, and `set_cache()` mirror
@@ -104,13 +121,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- `list-blueprints` (local listing) now scans the whole reliquary
-  home recursively instead of only `blueprints/`, skipping
-  `cache/`, and reports each blueprint's name alongside its full
-  path.
-- The blueprint `name` field is a human-readable display name,
-  distinct from the file-stem identity (which remains the one
-  selection key). `new-blueprint` no longer writes a `version`
+- `list-blueprints` (local listing) resolves through the active
+  asset source: home mode lists the home's canonical `blueprints/`
+  folder (recursively within it), and `--assets <dir>` lists the
+  project root. It reports each blueprint's identity name alongside
+  its full path.
+- The blueprint `name` field is the id-safe **identity** (selection
+  key, machine-id segment), overriding the filename stem when
+  declared — not a display label; human prose belongs in
+  `description`. `new-blueprint` no longer writes a `version`
   field — blueprints carry no version pre-beta.
 
 ### Fixed

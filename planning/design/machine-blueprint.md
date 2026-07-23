@@ -80,7 +80,7 @@ shape every binding language can express — taking the same
 selectors the CLI takes (a machine id, or the
 blueprint/machine-number pair, with `resolve_machine()` the
 shared resolution seam) plus the mirrored global keywords
-(`home=`, `assets=`, `assets_only=`). Returns mirror what the
+(`home=`, `assets=`). Returns mirror what the
 CLI prints — `create_machine` and `clone_machine` return the new
 machine id — and errors raise by class where the CLI exits by
 code. `import`'s twin is `import_vm`, because a bare `import` is
@@ -237,11 +237,12 @@ out of the
 [codex](codex.md) (implicitly on first
 reference, or explicitly with `seed-blueprint`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command.
-Seeding — implicit or explicit — is the human-convenience half of
-the artifact-residency split (planning/USE-CASES.md): automation
-runs project-scoped with the home fallback off (`--assets-only`),
-where the codex is never a resolution tier — a project seeds a
-copy once and commits it. Create a machine and run it:
+Seeding — implicit or explicit — is a home-mode (human-CLI) half
+of the artifact-residency split (planning/USE-CASES.md): it
+happens only when no `--assets` root is named. Automation runs
+project-scoped under `--assets <dir>`, where the dir is the sole
+source and the codex is never a resolution tier — a project seeds
+a copy once and commits it. Create a machine and run it:
 
 ```powershell
 rlq create-machine --blueprint msdos

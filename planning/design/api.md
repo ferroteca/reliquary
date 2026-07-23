@@ -69,8 +69,13 @@ SPDX-License-Identifier: BSD-3-Clause
   prefix matching and no bare-number form (the id *is* the
   (blueprint, number) pair composed), so the selectors bind
   cleanly in any language.
-- **Mirrored globals**: `home=`, `assets=`, and `assets_only=`
-  keywords mirror `--home`, `--assets`, and `--assets-only`.
+- **Mirrored globals**: `home=` and `assets=` keywords mirror
+  `--home` and `--assets`. `assets=` names a project asset root as
+  the sole (hermetic) source, or a set of JSON-imported objects;
+  the embedding API has no home/CWD default — a bare call that
+  resolves a name with no source configured fails closed. Home
+  mode (the CLI's default) is reachable only through the explicit
+  `HOME_ASSETS` marker, never by API default.
 - **Returns mirror what the CLI prints**: `create_machine` and
   `clone_machine` return the new machine id; `import_vm` returns
   the blueprint it wrote. Under the CLI's global `--json` the

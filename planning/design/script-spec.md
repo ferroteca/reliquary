@@ -24,11 +24,11 @@ SPDX-License-Identifier: BSD-3-Clause
 A reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
 across the VM seam. Scripts are authored assets — `.rlqs` files,
-identified by extension and discovered anywhere under the
-invocation's asset root (the current directory by default),
-falling back to the reliquary home unless `--assets-only`
-disables the fallback (planning/ROADMAP.md, "Authored-asset resolution");
-a `scripts/` subdirectory is optional organizational dressing.
+identified by extension. In home mode (the CLI default) they
+resolve from the home's canonical `scripts/` folder, seeding from
+the codex on first reference; under `--assets <dir>` they are
+discovered anywhere in that project root, which is the sole source
+(planning/ROADMAP.md, "Authored-asset resolution").
 One `<name>.rlqs` file per script; a run selects its machine with
 `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:

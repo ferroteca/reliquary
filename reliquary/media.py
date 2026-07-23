@@ -242,22 +242,10 @@ def load_definition(path):
     return parse_definition(data)
 
 
-def scan_media_definitions(library, name):
-    """Return (path, definition, item) for every definition of name.
-
-    Scans every definition file under the library directory,
-    skipping invalid files (they'll be caught by explicit
-    operations on them). A missing library directory scans empty.
-    """
-    if os.path.exists(library) and not os.path.isdir(library):
-        raise ValueError(f"Media path is not a directory: {library}")
+def _scan_media_files(files, name):
+    """Return (path, definition, item) for each file defining ``name``."""
     matches = []
-    if not os.path.isdir(library):
-        return matches
-    for filename in sorted(os.listdir(library)):
-        if not (filename.endswith(".rlqm") or filename.endswith(".json")):
-            continue
-        filepath = os.path.join(library, filename)
+    for filepath in files:
         try:
             definition = load_definition(filepath)
         except (ValueError, KeyError):
@@ -266,6 +254,27 @@ def scan_media_definitions(library, name):
             if item.name == name:
                 matches.append((filepath, definition, item))
     return matches
+
+
+def scan_media_definitions(library, name):
+    """Return (path, definition, item) for every definition of name.
+
+    Scans every definition file directly under the library directory,
+    skipping invalid files (they'll be caught by explicit operations
+    on them). A missing library directory scans empty. This is the
+    home-directory scan that ``seed_media`` / ``delete_media`` use;
+    residency-scoped resolution goes through the asset source instead.
+    """
+    if os.path.exists(library) and not os.path.isdir(library):
+        raise ValueError(f"Media path is not a directory: {library}")
+    if not os.path.isdir(library):
+        return []
+    files = [
+        os.path.join(library, filename)
+        for filename in sorted(os.listdir(library))
+        if filename.endswith(".rlqm") or filename.endswith(".json")
+    ]
+    return _scan_media_files(files, name)
 
 
 def resolve_media(name, context=None):
@@ -277,12 +286,15 @@ def resolve_media(name, context=None):
     first reference (never overwriting user files). A name defined
     more than once is an error naming the definition files.
     """
-    library = media_dir(context)
-    matches = scan_media_definitions(library, name)
-    if not matches:
+    from .assets import source_for
+    source = source_for(context)
+    matches = _scan_media_files(source.candidate_files("media"), name)
+    if not matches and source.seeds:
         from .library import seed_media
         if seed_media(name, context=context):
-            matches = scan_media_definitions(library, name)
+            source = source_for(context)
+            matches = _scan_media_files(
+                source.candidate_files("media"), name)
     if not matches:
         raise FileNotFoundError(
             f"No media definition found with name: {name}")
@@ -304,15 +316,9 @@ def list_media(context=None, *, builtin=False):
     if builtin:
         from .library import list_builtin_media
         return list(list_builtin_media())
-    library = media_dir(context)
-    if not os.path.isdir(library):
-        return []
+    from .assets import source_for
     names = set()
-    for filename in sorted(os.listdir(library)):
-        if not (filename.endswith(".rlqm")
-                or filename.endswith(".json")):
-            continue
-        filepath = os.path.join(library, filename)
+    for filepath in source_for(context).candidate_files("media"):
         try:
             definition = load_definition(filepath)
         except (ValueError, KeyError, FileNotFoundError):

@@ -34,11 +34,15 @@ have ids.
         └── backend files and logs
 ```
 
-A blueprint's name is its file stem — `<name>.rlqb`, anywhere
-under whichever asset root supplies it (planning/ROADMAP.md,
-"Authored-asset resolution"); the machine's state records which
-file it resolved from, and name selection matches only machines
-of the invocation's own resolution. A machine's
+A blueprint's name — its identity, the selection key — is its
+declared `name` field when it carries one, else its file stem
+(`<name>.rlqb`), resolved from whichever source supplies it
+(planning/ROADMAP.md, "Authored-asset resolution"). It must be
+id-safe: it becomes a machine-id segment and a cache directory
+name. Two assets of one kind resolving to one effective name in a
+source are an error. The machine's state records which file it
+resolved from, and name selection matches only machines of the
+invocation's own resolution. A machine's
 identity is `<blueprint>-<n>`, where `<n>` is the lowest free
 non-negative integer for that blueprint at `create` time (destroy
 frees the number for reuse). Allocation is serialized with a

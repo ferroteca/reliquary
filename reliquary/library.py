@@ -15,7 +15,7 @@ import os
 import re
 from importlib import resources
 
-from . import jsonc
+from . import assets, jsonc
 from .home import blueprints_dir, media_dir, scripts_dir
 from .media import parse_definition, scan_media_definitions
 
@@ -107,92 +107,144 @@ def list_builtin_media():
         yield name
 
 
-def _blueprint_fields_from_text(text):
-    """Extract (display_name, description, platform), or None."""
+def _blueprint_meta(path):
+    """Return ``{name, description, platform}`` for a blueprint, or None.
+
+    A ``.rlqb`` is a blueprint by extension — an unparseable one still
+    counts, identified by its stem. A legacy ``.json`` counts only when
+    its top level declares ``platform``, so a same-extension media
+    definition or notes file is not mistaken for one. ``name`` is the
+    declared identity or ``None`` (identity then falls to the stem).
+    """
     try:
-        raw = jsonc.loads(text)
-    except ValueError:
+        with open(path, encoding="utf-8") as handle:
+            raw = jsonc.loads(handle.read())
+    except (OSError, ValueError, UnicodeDecodeError):
+        raw = None
+    mapping = raw if isinstance(raw, collections.abc.Mapping) else None
+    if not path.endswith(".rlqb") and (
+            mapping is None or "platform" not in mapping):
         return None
-    if (not isinstance(raw, collections.abc.Mapping)
-            or "platform" not in raw):
-        return None
+    name = mapping.get("name") if mapping else None
+    if not (isinstance(name, str) and name.strip()):
+        name = None
     return {
-        "display_name": raw.get("name"),
-        "description": raw.get("description"),
-        "platform": raw.get("platform"),
+        "name": name,
+        "description": mapping.get("description") if mapping else None,
+        "platform": mapping.get("platform") if mapping else None,
     }
 
 
-def _home_blueprint_index(context=None):
-    """Map stem -> (path, fields) for blueprint files under blueprints/."""
-    root = blueprints_dir(context)
-    found = {}
-    if not os.path.isdir(root):
-        return found
-    for dirpath, _dirs, files in os.walk(root):
-        for entry in sorted(files):
-            if entry.endswith(".rlqb") or entry.endswith(".json"):
-                stem = entry.rsplit(".", 1)[0]
-            else:
-                continue
-            path = os.path.join(dirpath, entry)
-            try:
-                with open(path, encoding="utf-8") as handle:
-                    fields = _blueprint_fields_from_text(handle.read())
-            except OSError:
-                continue
-            if fields is not None:
-                found.setdefault(stem, (path, fields))
-    return found
+def _blueprint_entries(source):
+    """Map identity name -> (path, meta) for a source's blueprints.
+
+    Applies the residency conflict guard: two blueprints resolving to
+    one effective name is an error naming both.
+    """
+    entries = {}
+    for path in source.candidate_files("blueprint"):
+        meta = _blueprint_meta(path)
+        if meta is None:
+            continue
+        name = meta["name"] or assets.stem(path)
+        if name in entries:
+            raise ValueError(
+                f"two blueprint assets both resolve to the name "
+                f"{name!r}:\n  {entries[name][0]}\n  {path}")
+        entries[name] = (path, meta)
+    return entries
 
 
-def _codex_blueprint_index():
-    """Map stem -> discovery fields for codex blueprints."""
-    result = {}
+def _blueprint_index(source):
+    """Map identity name -> path for a source's blueprints (guarded)."""
+    return {name: path
+            for name, (path, _meta) in _blueprint_entries(source).items()}
+
+
+def list_blueprints(context=None):
+    """Return sorted ``[{name, path}]`` for the active source.
+
+    Home mode lists the home's canonical ``blueprints/`` folder; dir
+    mode (``--assets``) lists the project root. Unseeded codex entries
+    are not listed — ``search_blueprints`` surfaces those.
+    """
+    source = assets.source_for(context)
+    return [{"name": name, "path": path}
+            for name, path in sorted(_blueprint_index(source).items())]
+
+
+def _codex_blueprint_path(name):
+    """Return the codex blueprint path for ``name`` (by stem), or None."""
+    for ext in (".rlqb", ".json"):
+        candidate = _builtins_root() / "blueprints" / f"{name}{ext}"
+        if candidate.is_file():
+            return os.fspath(candidate)
+    return None
+
+
+def locate_blueprint(name, context=None):
+    """Resolve a blueprint by identity without seeding.
+
+    Identity is the file's ``name`` field when declared, else its
+    stem. Home mode falls back to reading the codex file directly (no
+    copy) so a read-only ``check-script`` never writes; dir mode
+    (``--assets``) is the sole source. Seeding on first reference is
+    ``create_machine``'s job. Raises ``FileNotFoundError`` when nothing
+    resolves.
+    """
+    source = assets.source_for(context)
+    path = _blueprint_index(source).get(name)
+    if path is None and source.seeds:
+        path = _codex_blueprint_path(name)
+    if path is None:
+        raise FileNotFoundError(
+            f"blueprint not found: {name}\n"
+            f"expected under {source.describe('blueprint')}")
+    return path
+
+
+def _codex_blueprint_rows():
+    """Map codex identity name -> (path, meta) for search."""
+    rows = {}
     for name in list_builtin_blueprints():
-        source = _builtins_root() / "blueprints" / f"{name}.rlqb"
-        if not source.is_file():
-            source = _builtins_root() / "blueprints" / f"{name}.json"
-        fields = None
-        if source.is_file():
-            try:
-                fields = _blueprint_fields_from_text(
-                    source.read_text(encoding="utf-8"))
-            except (UnicodeDecodeError, ValueError):
-                fields = None
-        result[name] = fields or {
-            "display_name": None, "description": None, "platform": None}
-    return result
+        path = _codex_blueprint_path(name)
+        meta = _blueprint_meta(path) if path else None
+        rows[name] = (path, meta or {
+            "name": None, "description": None, "platform": None})
+    return rows
 
 
 def search_blueprints(term, context=None):
-    """Search codex and home blueprints, returning matches with provenance.
+    """Search the active asset source (and codex) with provenance.
 
-    Each match is a dict: ``name`` (the stem — the selection key),
-    ``display_name`` (the blueprint's ``name`` field), ``description``,
-    ``platform``, ``provenance`` (``yes`` = built-in and not seeded,
-    ``seeded`` = built-in copied into the home, ``user`` = home-authored
-    with no built-in), and ``path`` (the home file, or ``None`` for an
-    unseeded built-in). The term matches case-insensitively against the
-    stem, display name, description, and platform; an empty term matches
-    everything. Results are ordered by stem.
+    Each match is a dict: ``name`` (the identity — the selection key),
+    ``description``, ``platform``, ``provenance``, and ``path``. In
+    home mode provenance is ``yes`` (codex, not seeded), ``seeded``
+    (codex copied into the home), or ``user`` (home-authored, no
+    codex), and ``path`` is the home file (``None`` for an unseeded
+    codex entry). In dir mode the codex is not a tier: every match is
+    ``user`` with its project path. The term matches case-insensitively
+    against name, description, and platform; empty matches everything.
+    Results are ordered by name.
     """
     term_l = (term or "").lower()
-    home = _home_blueprint_index(context)
-    codex = _codex_blueprint_index()
+    source = assets.source_for(context)
+    present = _blueprint_entries(source)
+    codex = _codex_blueprint_rows() if source.seeds else {}
+
     results = []
-    for stem in sorted(set(home) | set(codex)):
-        if stem in codex and stem in home:
-            provenance, (path, fields) = "seeded", home[stem]
-        elif stem in codex:
-            provenance, path, fields = "yes", None, codex[stem]
+    for name in sorted(set(present) | set(codex)):
+        if name in codex and name in present:
+            provenance, (path, meta) = "seeded", present[name]
+        elif name in codex:
+            provenance, (_codex_path, meta) = "yes", codex[name]
+            path = None
         else:
-            provenance, (path, fields) = "user", home[stem]
+            provenance, (path, meta) = "user", present[name]
         results.append({
-            "name": stem,
-            "display_name": fields.get("display_name"),
-            "description": fields.get("description"),
-            "platform": fields.get("platform"),
+            "name": name,
+            "description": meta.get("description"),
+            "platform": meta.get("platform"),
             "provenance": provenance,
             "path": path,
         })
@@ -202,8 +254,8 @@ def search_blueprints(term, context=None):
     def matches(row):
         hay = " ".join(
             str(value) for value in (
-                row["name"], row["display_name"],
-                row["description"], row["platform"]) if value).lower()
+                row["name"], row["description"],
+                row["platform"]) if value).lower()
         return term_l in hay
 
     return [row for row in results if matches(row)]
@@ -327,38 +379,43 @@ def seed_script(stem, context=None, *, only=False):
     return True
 
 
+def _script_index(source):
+    """Map stem -> path for a source's scripts (guarded).
+
+    Scripts carry no ``name`` field, so identity is always the stem.
+    """
+    return assets.index_by_name(
+        source.candidate_files("script"), lambda _path: None, "script")
+
+
+def list_scripts(context=None):
+    """Return sorted ``[{name, path}]`` scripts for the active source.
+
+    Home mode lists the home's canonical ``scripts/`` folder; dir mode
+    (``--assets``) lists the project root. Unseeded codex scripts are
+    not listed.
+    """
+    source = assets.source_for(context)
+    return [{"name": stem, "path": path}
+            for stem, path in sorted(_script_index(source).items())]
+
+
 def locate_script(stem, context=None):
     """Return an existing ``.rlqs`` path without seeding.
 
-    Prefers ``scripts/<stem>.rlqs`` under the home; otherwise the
-    matching builtin. Raises ``FileNotFoundError`` when neither
-    exists — ``check-script`` uses this so a check never writes.
+    Resolves from the active asset source; home mode falls back to the
+    codex file directly (no copy), dir mode is the sole source. Raises
+    ``FileNotFoundError`` when nothing resolves — ``check-script`` uses
+    this so a check never writes.
     """
-    destination = os.path.join(scripts_dir(context), f"{stem}.rlqs")
-    if os.path.isfile(destination):
-        return destination
-    source = _builtins_root() / "scripts" / f"{stem}.rlqs"
-    if source.is_file():
-        return os.fspath(source)
-    raise FileNotFoundError(
-        f"script not found: {stem}.rlqs\n"
-        f"expected under {scripts_dir(context)}")
-
-
-def locate_blueprint(name, context=None):
-    """Return an existing blueprint path without seeding."""
-    for ext in [".rlqb", ".json"]:
-        path = os.path.join(blueprints_dir(context), f"{name}{ext}")
-        if os.path.isfile(path):
-            return path
-
-    source = _builtins_root() / "blueprints" / f"{name}.rlqb"
-    if source.is_file():
-        return os.fspath(source)
-    source = _builtins_root() / "blueprints" / f"{name}.json"
-    if source.is_file():
-        return os.fspath(source)
-
-    raise FileNotFoundError(
-        f"blueprint not found: {name}.rlqb\n"
-        f"expected under {blueprints_dir(context)}")
+    source = assets.source_for(context)
+    path = _script_index(source).get(stem)
+    if path is None and source.seeds:
+        candidate = _builtins_root() / "scripts" / f"{stem}.rlqs"
+        if candidate.is_file():
+            path = os.fspath(candidate)
+    if path is None:
+        raise FileNotFoundError(
+            f"script not found: {stem}.rlqs\n"
+            f"expected under {source.describe('script')}")
+    return path

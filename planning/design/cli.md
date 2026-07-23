@@ -1171,10 +1171,11 @@ flag may appear before or after the command word —
 `rlq --blueprint freedos-1.4-plain run-script install` are
 identical. Synopses canonically show flags after the command.
 
-Four flags are accepted by every command, mirroring the API's
+Three flags are accepted by every command, mirroring the API's
 shared keywords: `--home` (overrides the reliquary home; default
-`Documents/reliquary`), `--assets` / `--assets-only` (the asset
-root), and `--json` (below).
+`Documents/reliquary`), `--assets <dir>` (a hermetic project asset
+root as the sole source; its absence is home mode — the home's
+canonical folders plus codex seeding), and `--json` (below).
 
 `--blueprint <name>` and `--machine <id>` are the machine
 selectors, mutually exclusive. On machine-scoped commands
