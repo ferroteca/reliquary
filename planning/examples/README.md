@@ -31,7 +31,7 @@ media owns how it materializes. So `hdd0` names `blank-20m` — a `new`
 (`"cdrom0": null`). The installer medium is the `freedos-1.4-livecd`
 media: a `read-only` member (`FD14LIVE.iso`) of the `FD14-LiveCD`
 archive, itself a `url` download with a pinned hash. A script
-references that media by name and never carries a definition; reliquary
+references that media by name and never carries a definition; Reliquary
 resolves the name against the components of whichever asset source
 supplies the blueprint.
 

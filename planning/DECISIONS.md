@@ -41,7 +41,7 @@ entries now in this file.
   across projects aliasing one slot) is rare, already guarded by
   per-use hash verification, isolable via the orthogonal
   `--cache`/`RELIQUARY_CACHE_DIR` knob, and resolvable by naming one
-  component explicitly — never blocking. Accepted because reliquary
+  component explicitly — never blocking. Accepted because Reliquary
   users target a handful of systems, not vast libraries.
   Hermeticity of a `--assets` run = committed hashes determine
   inputs; cache-location isolation is the existing `--cache` knob,
@@ -49,7 +49,7 @@ entries now in this file.
   declined: couples orthogonal axes, loses cross-project dedup).
 
   B — THE COMPOSED BLUEPRINT MODEL (topic B, expanded well past
-  "compose now or defer"). reliquary's two authored JSON formats
+  "compose now or defer"). Reliquary's two authored JSON formats
   fold into ONE — the blueprint (`.rlqb`); `.rlqm` retires. A
   `.rlqb` root is polymorphic: plural component sections
   (`machines`/`media`/`sources`/`archives`), mixed and matched
@@ -197,8 +197,8 @@ entries now in this file.
 
 - PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
   2026-07-22), following the no-JSON-in-scripts round that made it
-  possible. The grammar lives in reliquary/script_grammar.lark,
-  mirroring script-spec.md's normative EBNF; reliquary's own
+  possible. The grammar lives in Reliquary/script_grammar.lark,
+  mirroring script-spec.md's normative EBNF; Reliquary's own
   tokenizer feeds it through a custom lark lexer. Evidence from
   three probes:
   - a lark grammar carries the whole typed EBNF — headers,
@@ -207,7 +207,7 @@ entries now in this file.
     island was deleted it could not parse a script at all, which
     is what changed the answer
   - lark's OWN lexer was WEIGHED AND DECLINED: its diagnostics are
-    terminal-level ("No terminal matches '4'" where reliquary's
+    terminal-level ("No terminal matches '4'" where Reliquary's
     says "invalid duration: '45' (durations carry a unit: ms, s,
     m, or h)"), and on one case it mislabelled `timeout` as a
     keypress name. match_examples recovered only 4 of 7 authored
@@ -283,7 +283,7 @@ entries now in this file.
     forced the embedded form to accept less than the file form
   - the single-file-workflow property is GIVEN UP knowingly. Its
     cited support did not hold: U4 describes "the repository
-    carries only blueprints, media definitions, and reliquary
+    carries only blueprints, media definitions, and Reliquary
     scripts", a side-by-side repository, and U1's one-command
     path seeds three separate codex artifacts. The real loss is
     casual sharing (pasting a whole workflow into a gist or an
@@ -376,7 +376,7 @@ entries now in this file.
     drag deferred; landmarks live only in the catalog, never embedded —
     AMENDED (owner, 2026-07-21, the wrinkle round below): embedded
     landmark blocks resolve in place; the catalog remains the only
-    shared/refresh form and reliquary never rewrites a script
+    shared/refresh form and Reliquary never rewrites a script
   - OWNER WRINKLE SMOOTHED — DECIDED (owner, 2026-07-21, design round;
     folded into ROADMAP "Landmarks" + "Authored-asset resolution" +
     "Cross-script reuse" + the GUI open decision, and USE-CASES U6):
@@ -572,7 +572,7 @@ entries now in this file.
     drop, 2026-07-22 below — artifacts are read out-of-band, records
     carry no output/); the
     unit-test loop is now IN U3 itself (amended 2026-07-21: the
-    canonical journey uses reliquary twice — define and build the test
+    canonical journey uses Reliquary twice — define and build the test
     VM, then automate testing inside it; detailed per-test results,
     update a test object, re-run one test or the whole suite; granular
     results and selective re-run are first-class demands) — so the
@@ -624,7 +624,7 @@ entries now in this file.
     in ./ROADMAP.md "Authored-asset resolution"): every invocation
     names where authored assets live — the asset root — defaulting to
     the current directory (blueprints/ media/ scripts/ subdirs, the
-    home's own layout), falling back to the reliquary home unless an
+    home's own layout), falling back to the Reliquary home unless an
     explicit no-home option disables it. Automation runs with the
     fallback OFF: strictly project-scoped resolution, so neither home
     assets nor the codex behind them can reach the run
@@ -648,7 +648,7 @@ entries now in this file.
     definitions *.rlqm (scripts *.rlqs) — assets identified by
     extension, discovery walks the root, subdirs are optional
     organizational dressing (home convention included); within-root
-    same-kind stem collisions are errors; reliquary reads by
+    same-kind stem collisions are errors; Reliquary reads by
     extension and writes by convention (home media/ for home-resolved
     installs, beside the script in a project); folded across the same
     docs plus cli.md, builtin-library, README, CLAUDE.md, examples.
@@ -773,7 +773,7 @@ entries now in this file.
      / --no-snapshot pair (prompted on a tty, required
      noninteractively, API snapshot= required under parity):
      snapshot pins the definitions to the frozen extent and leaves
-     the source VM free to keep running natively (reliquary-named
+     the source VM free to keep running natively (Reliquary-named
      snapshot, provenance in the generated definitions' notes, its
      later fate the user's — verification reports a lost extent);
      no-snapshot touches nothing but running the source again breaks
@@ -1338,7 +1338,7 @@ entries now in this file.
      property-construct round); results OUT as caller-authored
      artifacts (JUnit XML, TAP) via collect/exec-capture into the
      record's output/, path reported live in events; NO test-result
-     vocabulary in reliquary (G2) — granularity comes from run
+     vocabulary in Reliquary (G2) — granularity comes from run
      structure: one iteration = one run record. The
      collect-into-runs/<n>/output/ demand is recorded as input to
      queue item 3. (The custody half — collect and output/ — was
@@ -1366,7 +1366,7 @@ entries now in this file.
      write to D:\RESULTS is the file that declares results hdd1
      "/results" — so it is NOT a blueprint item (blueprint stays
      pure topology; the letter↔key agreement is the author's
-     ordinary guest-boundary duty, reliquary never maps guest
+     ordinary guest-boundary duty, Reliquary never maps guest
      letters). stage/collect are IN-BAND COPIES resolving within
      the point (bounded host reach; no absolutes, no ..), machine
      stopped on every control plane, via the adapter's at-rest
@@ -1457,7 +1457,7 @@ entries now in this file.
      drive out as raw and materializes one from raw — the one new
      adapter obligation; exporters are their own seam family
      beside the adapters); libvirt recorded as the QEMU-ecosystem
-     answer, so the reliquary-invented bare-image-plus-launch-
+     answer, so the Reliquary-invented bare-image-plus-launch-
      config artifact is DELETED, never specced — U1's journey
      lands as install on QEMU, export-machine --to virtualbox.
      MEDIA DRIVES MATERIALIZE AS COPIES in whole-machine export
@@ -1532,10 +1532,10 @@ entries now in this file.
   OUT-OF-BAND: while a machine is stopped on every control plane
   its drives are plain host state (a hostdir drive is its
   directory; images are the user's own tools' business);
-  reliquary neither mediates nor records it; the contract with
+  Reliquary neither mediates nor records it; the contract with
   its edges (running drives untouchable, media cache read-only
   by doctrine, runs/ append-only, machine state files
-  reliquary's own) is in instance-model.md "The machine
+  Reliquary's own) is in instance-model.md "The machine
   directory and out-of-band access". NEW QUERY:
   get-machine-dir / get_machine_dir(machine=|blueprint=) — the
   machine's cache directory as an absolute path; any phase,
@@ -1715,7 +1715,7 @@ entries now in this file.
      exhausts, preflight fails). Blueprint property references
      resolve through the full stack, ask included — never a
      different key
-  12. THE FILE FORMAT — strict JSON → the reliquary line format
+  12. THE FILE FORMAT — strict JSON → the Reliquary line format
      (fork on the recommendation): one key = value per line,
      # full-line comments and blank lines PRESERVED through
      property commands (surgical line edits — the
@@ -1852,11 +1852,11 @@ entries now in this file.
     homes (library file + embedded block, the same forms)
   - $schema field: the formats stay CLOSED pre-beta — a pinned
     schema reference is a version field in disguise; editors bind
-    by file association, which tracks the installed reliquary;
+    by file association, which tracks the installed Reliquary;
     $schema-as-versioned-URL recorded as the leading candidate
     spelling of the version field at beta (ROADMAP "Decisions
     still needed")
-  - validator: the parser stays reliquary's validator (fail-closed
+  - validator: the parser stays Reliquary's validator (fail-closed
     diagnostics); a shared valid/invalid fixture corpus runs
     against both parser and schema — at realignment, with the
     static-conformance corpus already queued there
@@ -1891,5 +1891,5 @@ entries now in this file.
   artifact, a bound volume copied from, where canon is the
   abstract authority/list) — folded across INTERFACES, USE-CASES, ROADMAP,
   AGENTS, CONTRIBUTING, cli.md, README, and docs
-  (builtin-library.md renamed codex.md); reliquary/builtins/
+  (builtin-library.md renamed codex.md); Reliquary/builtins/
   package dir renames to codex/ at implementation realignment

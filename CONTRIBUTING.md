@@ -1,11 +1,11 @@
-# Contributing to reliquary
+# Contributing to Reliquary
 
-Thank you for helping improve reliquary. Bug reports, documentation fixes,
+Thank you for helping improve Reliquary. Bug reports, documentation fixes,
 tests, and code changes are welcome when they preserve the project's BSD
 licensing and its role as a self-contained OS installation scripter
 with an agentless QEMU guest automation layer.
 
-reliquary is pre-release. Contributions that add built-in blueprints
+Reliquary is pre-release. Contributions that add built-in blueprints
 (with their media, source, and archive components) or scripts should
 follow the repository structure in AGENTS.md and keep user-facing
 documentation synchronized.
@@ -20,7 +20,7 @@ Keep changes narrowly scoped and avoid unrelated cleanup.
 
 ## Development setup
 
-reliquary supports Python 3.9 and newer. Create and use the project-local
+Reliquary supports Python 3.9 and newer. Create and use the project-local
 virtual environment:
 
 ```powershell
@@ -53,18 +53,18 @@ git diff --check
 
 ## Contribution licensing
 
-reliquary is licensed under the [BSD 3-Clause License](LICENSE). By submitting
+Reliquary is licensed under the [BSD 3-Clause License](LICENSE). By submitting
 a contribution, you agree to license that contribution under the same
 BSD-3-Clause terms. You retain copyright in your contribution.
 
-The project name **reliquary** is owned by Paul Galbraith and is not
+The project name **Reliquary** is owned by Paul Galbraith and is not
 part of the BSD grant. Forks and redistributions must use a different
 name; see [TRADEMARKS.md](TRADEMARKS.md).
 
 Only submit work that you have the right to contribute on those terms. This
 means, as applicable, obtaining permission from an employer or other rights
 holder and identifying third-party material and its license. Contributions
-that would prevent reliquary from being used or distributed under its existing
+that would prevent Reliquary from being used or distributed under its existing
 BSD-3-Clause license cannot be accepted.
 
 Codex media components follow an additional

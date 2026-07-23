@@ -1,12 +1,12 @@
 # AGENTS.md — repository guidance
 
-This is the canonical, agent-agnostic guidance for working on reliquary. Human usage documentation belongs
+This is the canonical, agent-agnostic guidance for working on Reliquary. Human usage documentation belongs
 in [README.md](README.md); keep this file focused on repository structure, engineering constraints, verification, and
 maintenance context.
 
 ## Project state and layout
 
-reliquary is an OS installation scripter built on its own generic QEMU
+Reliquary is an OS installation scripter built on its own generic QEMU
 runner, with DOS as the default and currently only complete platform
 workflow:
 
@@ -82,7 +82,7 @@ workflow:
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 - `planning/ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
-- `planning/INTERFACES.md` is the governing document for reliquary's world-facing interfaces: it names the interface
+- `planning/INTERFACES.md` is the governing document for Reliquary's world-facing interfaces: it names the interface
   inventory (CLI, embedding API, scripting language, and machine blueprints — media, source, and archive are
   components inside the blueprint — plus the
   script properties, recorded outputs, and the home layout) and the
@@ -115,7 +115,7 @@ implementation.
 
 ### No backward compatibility before beta
 
-reliquary is evolving rapidly and deliberately maintains **no backward compatibility of any kind** until at
+Reliquary is evolving rapidly and deliberately maintains **no backward compatibility of any kind** until at
 least a beta-quality release: no spec/config format versioning or migration, no API aliasing, no
 deprecated-name shims, no compatibility parsing. When an interface changes, change it coherently and
 completely — update every caller, document, and test to the new shape and delete the old one. Do not add
@@ -126,7 +126,7 @@ and users recreate them. Compatibility guarantees, if any, will be defined no ea
 
 The CLI, the embedding API, the scripting language, and the machine blueprint (media, source, and archive
 components included) are
-reliquary's primary interfaces to the world; the script properties, recorded outputs (run records,
+Reliquary's primary interfaces to the world; the script properties, recorded outputs (run records,
 transcripts), and the home layout are world-facing contracts alongside them. Any decision that
 changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
 numbered primary use cases ([planning/USE-CASES.md](planning/USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
@@ -169,7 +169,7 @@ must remain the default and fallback.
 
 ### Home-directory containment
 
-All persistent state belongs under the reliquary home (`Documents/reliquary` by default, falling back to `~/reliquary`
+All persistent state belongs under the Reliquary home (`Documents/reliquary` by default, falling back to `~/reliquary`
 when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--home`, or `set_home()`). The
 regenerable cache root defaults to `<home>/cache` but resolves independently — overridden by `RELIQUARY_CACHE_DIR`,
 `--cache`, or `set_cache()` — so it can live outside the home entirely (e.g. off OneDrive-synced storage). Seeding
@@ -311,7 +311,7 @@ conventions, handles) is `planning/design/api.md`.
 
 Doctrine to preserve:
 
-- reliquary attaches no meaning to guest program output —
+- Reliquary attaches no meaning to guest program output —
   test-framework semantics (command-line flags, result parsing) belong
   to consuming projects. A CppUTest adapter that once lived here was
   removed to enforce that boundary; do not reintroduce
@@ -348,7 +348,7 @@ Doctrine to preserve:
 ## Licensing
 
 The project is BSD-3-Clause and follows REUSE conventions. The name
-**reliquary** is reserved to Paul Galbraith under [TRADEMARKS.md](TRADEMARKS.md);
+**Reliquary** is reserved to Paul Galbraith under [TRADEMARKS.md](TRADEMARKS.md);
 do not weaken or contradict that policy in docs or packaging metadata.
 
 Every new file authored for the project by Paul needs:
@@ -430,7 +430,7 @@ Use stdlib `unittest` and `unittest.mock` unless a compelling reason justifies a
 
 ## Documentation maintenance
 
-README.md is a human-facing guide to what reliquary does, why it exists, and how to use it. Keep it explanatory and
+README.md is a human-facing guide to what Reliquary does, why it exists, and how to use it. Keep it explanatory and
 task-oriented. Do not move agent instructions, implementation constraints, roadmap discussion, or maintenance notes into
 it.
 
@@ -442,20 +442,20 @@ subcommand help.
 
 ## Architecture and prior art
 
-reliquary uses QEMU's published `qemu.qmp` library for protocol handling and implements the machine-lifecycle role
+Reliquary uses QEMU's published `qemu.qmp` library for protocol handling and implements the machine-lifecycle role
 locally. QEMU's in-tree `QEMUMachine`
 is not published independently; if that changes, reassess whether replacing local lifecycle code would reduce
 maintenance without weakening ownership checks or the public interface.
 
 QEMU's own functional tests validate the broad model of scripting a guest over QMP and asserting on observable state.
-reliquary adds the DOS-specific layer: keyboard conventions, VGA text scraping, prompt
+Reliquary adds the DOS-specific layer: keyboard conventions, VGA text scraping, prompt
 completion, and vvfat staging.
 
-SUSE's os-autoinst (the engine under openQA) is the closest prior art to reliquary as a whole: it drives OS
+SUSE's os-autoinst (the engine under openQA) is the closest prior art to Reliquary as a whole: it drives OS
 installers by screen matching and key injection over QMP/VNC, with per-operation "consoles" (VNC, serial,
-virtio-terminal, ssh) mirroring reliquary's control planes, multiple backends (qemu, svirt, bare metal) mirroring the
+virtio-terminal, ssh) mirroring Reliquary's control planes, multiple backends (qemu, svirt, bare metal) mirroring the
 adapter seam, command completion over serial via echoed marker strings, per-step screenshot records, and snapshot
-"milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend implementations — reliquary learns from its
+"milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend implementations — Reliquary learns from its
 designs (the input event model, needle area types, console seams), never from its code: it is GPL-2.0-or-later, so no
 code, needles, or test modules may ever be ported or closely translated into this BSD-3-Clause project. Study the
 documentation and the ideas; reimplement from scratch. Deliberate divergences to preserve: VGA text scraping instead of image needles for

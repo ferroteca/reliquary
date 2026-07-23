@@ -111,4 +111,4 @@ Machines live under `cache/machines/<name>-<n>/`. Each machine has:
 - `runs/` - Run records (transcripts, screenshots, outputs)
 - `<backend>/` - The backend's own files (e.g. `qemu/qemu-stderr.log`)
 
-For the complete blueprint specification, see [planning/design/machine-blueprint.md](../planning/design/machine-blueprint.md); the machine, media, source, and archive components validate against the published [blueprint-schema-v1.json](../reliquary/schemas/blueprint-schema-v1.json).
+For the complete blueprint specification, see [planning/design/machine-blueprint.md](../planning/design/machine-blueprint.md); the machine, media, source, and archive components validate against the published [blueprint-schema-v1.json](../Reliquary/schemas/blueprint-schema-v1.json).

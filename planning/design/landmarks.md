@@ -86,7 +86,7 @@ mouse cursor — a normalization, never an option:
 - Where the control plane can capture a cursor-free framebuffer
   (RFB cursor pseudo-encodings), that is used automatically.
 - While recording, the human drives and cannot be parked — but
-  reliquary is the console, so the cursor position at capture
+  Reliquary is the console, so the cursor position at capture
   time is always known; proposed assets mask that neighborhood,
   flagged as a generated comment (U6).
 - Diagnostics capture reality: explicit `screenshot` and failure

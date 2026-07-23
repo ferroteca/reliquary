@@ -54,16 +54,16 @@ Blueprint files describe a kind of machine, composed of named
 under `blueprints/` alongside scripts (`scripts/`); a blueprint
 carries its media, source, and archive components inside itself.
 Author them by hand, scaffold them with `new-blueprint`, or let
-reliquary extract them from its codex.
+Reliquary extract them from its codex.
 
-**The codex.** reliquary ships a set of blueprints (media
+**The codex.** Reliquary ships a set of blueprints (media
 components included) and scripts for popular open source operating
 systems. In a source checkout these live as ordinary files under
 `codex/blueprints/` and `codex/scripts/`; when packaged for
 distribution they are bundled
-in a zip archive within the reliquary package. Either way, when you
+in a zip archive within the Reliquary package. Either way, when you
 reference a codex artifact that doesn't yet exist in your home,
-reliquary copies it out. From that point on it is an ordinary
+Reliquary copies it out. From that point on it is an ordinary
 user-owned file — edit it, delete it, version it. A file already
 present in your home is never overwritten; the codex is a seed,
 not a live resolution tier.
@@ -348,7 +348,7 @@ an error:
   first — the one thing import may do to the source VM, and only
   with this consent: the definitions pin the frozen extent and
   the source VM stays free to keep running natively. The
-  snapshot is reliquary-named and noted in the generated
+  snapshot is Reliquary-named and noted in the generated
   definitions; its later fate in native tooling is yours
   (verification reports a lost extent). `--no-snapshot` touches
   nothing — but running the source VM again breaks verification
@@ -382,7 +382,7 @@ the media component is yours.
 Machines are disposable realizations of a blueprint, each identified
 by `<blueprint>-<n>` and stored entirely under
 `cache/machines/<blueprint>-<n>/`. Everything under `cache/` is
-reliquary's and disposable — and, run records excepted, regenerates
+Reliquary's and disposable — and, run records excepted, regenerates
 from blueprints (media components and all) and scripts (records are
 evidence: copy out any worth keeping).
 
@@ -551,7 +551,7 @@ capabilities, two commands, twins `export_drive` /
 stream-bearing (disk copies are long): transfer events render
 under `--progress`, the terminal event is the result, and
 `--json` is rejected naming `--progress jsonl`. The exported
-artifact is independent and permanently outside reliquary's
+artifact is independent and permanently outside Reliquary's
 purview; the machine itself is untouched.
 
 **`export-drive`** takes one drive out as a standalone image
@@ -583,7 +583,7 @@ like `create-machine` — with drive content converted through the
 adapters' raw interchange; `media`-referenced drives and
 state-inserted media materialize as payload copies inside the
 export's native location, so the exported VM stands alone
-(reliquary's cache is disposable and never referenced).
+(Reliquary's cache is disposable and never referenced).
 `<destination>` defaults to the target's native machine
 location.
 
@@ -807,7 +807,7 @@ deferred in-band file operations land (planning/ROADMAP.md
 "Horizon"): while the machine is stopped on every control
 plane, its drives are plain host state — a `hostdir` drive *is*
 its directory, and image drives are readable and writable with
-the user's own tools. reliquary neither mediates nor records
+the user's own tools. Reliquary neither mediates nor records
 out-of-band access. The contract, including what stays
 untouchable (`cache/media/` payloads, `runs/` records), lives
 in the [instance model](instance-model.md).
@@ -847,7 +847,7 @@ caller — and while it is open, every machine-targeting command
 on that machine (this family, the state operations, lifecycle)
 appends the same event kinds a script action emits; `end-run`
 (twin `end_run`) closes it with the neutral `ended` terminal
-event. reliquary attaches no outcome to an interaction run —
+event. Reliquary attaches no outcome to an interaction run —
 interpreting the loop is the caller's computation. One run may
 be open per machine: a second `begin-run` or a `run-script`
 fails closed naming it. `run status` shows an open run with its
@@ -1109,7 +1109,7 @@ rlq fetch-media freedos-1.4-livecd
 
 `clean-archives` reclaims cached source archives under
 `cache/archives/`. `clean-media` reclaims fetched payload files
-under `cache/media/` that reliquary can re-fetch. Nothing
+under `cache/media/` that Reliquary can re-fetch. Nothing
 irreplaceable — `local` source files, sourceless payloads — is
 cleanable. (There is no `delete-media`: media are components inside
 a `.rlqb`, so removing one means editing the blueprint.)
@@ -1183,7 +1183,7 @@ flag may appear before or after the command word —
 identical. Synopses canonically show flags after the command.
 
 Three flags are accepted by every command, mirroring the API's
-shared keywords: `--home` (overrides the reliquary home; default
+shared keywords: `--home` (overrides the Reliquary home; default
 `Documents/reliquary`), `--assets <dir>` (a hermetic project asset
 root as the sole source; its absence is home mode — the home's
 canonical folders plus codex seeding), and `--json` (below).

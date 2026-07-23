@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The backend adapter API
 
-> **Status:** the design doctrine for reliquary's backend adapter
+> **Status:** the design doctrine for Reliquary's backend adapter
 > seam (owner, 2026-07-21) — an internal engineering contract,
 > deliberately **not** one of the world-facing interfaces
 > (planning/INTERFACES.md names those; the watch that would revisit
@@ -21,7 +21,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 One API, four adapters — QEMU, VirtualBox, VMware Workstation,
 Hyper-V (planning/ROADMAP.md "Backend adapters"). It is the
-*provider* contract behind reliquary's semantic surface, and it is
+*provider* contract behind Reliquary's semantic surface, and it is
 none of the things the primary interfaces are:
 
 - **Never a twin family.** No adapter operation appears on the CLI
@@ -37,7 +37,7 @@ none of the things the primary interfaces are:
   fails capability preflight by name; nothing is silently
   approximated.
 - **In-repo consumers only, for now.** All four adapters ship with
-  reliquary. If a third-party adapter story ever becomes real, the
+  Reliquary. If a third-party adapter story ever becomes real, the
   seam is elevated into the INTERFACES inventory through the
   interface-change rule — that elevation is the recorded watch,
   not the default.
@@ -88,7 +88,7 @@ extraction.
   creation in its backend's native format — `new` and
   `difference` media alike (qcow2 under QEMU; VDI/VMDK/VHDX
   and native differencing elsewhere; the blueprint reference makes
-  the format reliquary's per-backend choice) — plus whatever
+  the format Reliquary's per-backend choice) — plus whatever
   registration the backend requires, with every backend file kept
   inside `cache/machines/<id>/` so the cache directory remains the
   whole materialization. Dispose removes the backend's machine
@@ -107,7 +107,7 @@ extraction.
   where the tools coincide), consuming the machine's resolved
   blueprint shape plus this interchange.
 - **Start, stop, liveness.** Start consumes the machine's resolved
-  state document — reliquary drive vocabulary in, backend
+  state document — Reliquary drive vocabulary in, backend
   configuration out; raw backend arguments never cross the seam
   from callers — accepts control-plane endpoint contributions
   before launch (below), and returns an identity-verified session
@@ -183,10 +183,10 @@ materialization.
 - **Screenshots stay diagnostics.** Outside `GuestExec`,
   independent of the selected control plane.
 - **No long-running host agents, schedulers, or services.** The
-  adapter drives backend tools and endpoints; reliquary remains a
+  adapter drives backend tools and endpoints; Reliquary remains a
   local ephemeral-machine tool.
 - **Not a general hypervisor library.** The seam covers exactly
-  what reliquary's machine model and control planes need.
+  what Reliquary's machine model and control planes need.
 - **Accelerators are not backends.** KVM/WHPX/HVF/TCG are the
   QEMU adapter's internal capability choice — host-probed, at
   most a `backend-settings` override — never backend identity

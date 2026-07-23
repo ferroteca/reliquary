@@ -48,7 +48,7 @@ The cache holds two collision-free, name-keyed namespaces:
 `cache/media/` the payload files machines mount, `cache/archives/`
 the source archives they were extracted from. Both are entirely
 reconstructible — nothing there is authored or hand-fed; a bare file
-dropped into either does nothing, because the caches are reliquary's,
+dropped into either does nothing, because the caches are Reliquary's,
 not an interface.
 
 ## The media component
@@ -104,7 +104,7 @@ would fail on every edit); hermetic workflows add the hash when they
 want the pin. The hash is the build pin *independent of the source
 kind* — a trusted `local` source can still verify the media is the
 exact build the scripts target. Hex, accepted in either case;
-reliquary's canonical writes are lowercase.
+Reliquary's canonical writes are lowercase.
 
 ### `read-only`
 
@@ -279,7 +279,7 @@ field. There is no version field and no `$schema` in a document
 ([no backward compatibility before beta](machine-blueprint.md#format-stability-none-yet)).
 
 The machine-checkable companion is the one published
-[blueprint-schema-v1.json](../../reliquary/schemas/blueprint-schema-v1.json)
+[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json)
 — the machine, media, source, and archive components in one schema.
 It captures the per-document structural subset of the format's
 rules, for editor completion while authoring; this prose stays
@@ -348,7 +348,7 @@ machine never boots against silently changed media (U1, U4).
 
 ### Fetch progress
 
-Fetching is reliquary's longest operation outside a run, and it
+Fetching is Reliquary's longest operation outside a run, and it
 reports progress under the same feedback model as script runs
 (the feedback split, planning/USE-CASES.md): one event
 vocabulary, every surface a renderer of it. Media movement —
@@ -392,9 +392,9 @@ the interactive checkpoint.
 An existing payload or cached archive that fails its hash is
 never silently discarded — the file may be evidence, or the
 media may simply pin the wrong hash. What happens instead depends on
-how reliquary is running:
+how Reliquary is running:
 
-- **Interactively**, the mismatch is a checkpoint: reliquary asks
+- **Interactively**, the mismatch is a checkpoint: Reliquary asks
   (`Existing file <path> does not match its pinned hash … Delete
   it and fetch again? [y/N]`) and only deletes and refetches on a
   yes. Declining keeps the file and fails the operation.
@@ -437,12 +437,12 @@ rlq clean-media
 - `clean-archives` deletes cached source archives (under
   `cache/archives/`). Always safe: archives exist only to spare a
   re-download.
-- `clean-media` deletes payload files reliquary can fetch again —
+- `clean-media` deletes payload files Reliquary can fetch again —
   media whose source is a `url` (or a cached, or `local`, verifying
   archive). It never touches `local` source files or payloads
   without a download source: nothing irreplaceable is cleanable.
 
-To reclaim everything for a media reliquary can restore, run both;
+To reclaim everything for a media Reliquary can restore, run both;
 the next reference fetches it fresh. The API counterparts are
 `clean_archives(context=None)` and `clean_media(context=None)`.
 

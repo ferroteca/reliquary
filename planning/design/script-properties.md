@@ -31,7 +31,7 @@ sources let
 automation inject the values it may not check in without
 touching a personal file.
 
-Each reliquary home has one user properties file:
+Each Reliquary home has one user properties file:
 
 ```text
 <reliquary_home>/user.properties
@@ -66,7 +66,7 @@ ASCII letters, digits, `_`, and `-`, must start with a letter, and are
 case-sensitive. Lowercase names are recommended. Names such as
 `identity.full-name`, `products.<product>.install-key`, and
 `accounts.<purpose>.password` make ownership clear. The top-level
-`rlq` and `reliquary` namespaces are reserved for reliquary-owned
+`rlq` and `reliquary` namespaces are reserved for Reliquary-owned
 run facts and future system properties; user-authored properties,
 blueprint parameters, environment bindings, and property-file
 entries may not use `rlq`, `rlq.*`, `reliquary`, or any
@@ -139,7 +139,7 @@ document owns the operator-side mechanics:
   process environment, a warned protection class; the credential
   store remains the durable home
   for secrets.
-- **The properties file** — `user.properties` in the reliquary
+- **The properties file** — `user.properties` in the Reliquary
   home, or the file named by `--properties <path>` (environment
   `RELIQUARY_PROPERTIES`; API `properties_file=`), which
   *replaces* the home file for that invocation rather than
@@ -163,7 +163,7 @@ resolves its target key through the non-blueprint sources here: a
 CI run may satisfy a redirect to
 `products.windows-98.install-key` from its own
 secret store via the environment, without pre-provisioning
-a reliquary home.
+a Reliquary home.
 
 ## Maintaining properties
 
@@ -224,7 +224,7 @@ The JSON file and a host credential service cannot provide one atomic
 transaction. Reliquary therefore orders updates fail-safely: it stores a new
 credential before publishing its marker, and removes a marker before deleting
 its credential. An interrupted operation may leave an inaccessible orphaned
-credential, but never a plaintext fallback or a marker that reliquary reported
+credential, but never a plaintext fallback or a marker that Reliquary reported
 as successfully bound. A later property command reports any orphan it can
 identify and gives explicit cleanup guidance; read-only commands never remove
 credentials.
@@ -273,7 +273,7 @@ override this file's standing defaults, an explicit `--property`
 overrides even the blueprint for one run, and when no source
 answers, an interactive run asks and a
 noninteractive run fails before the machine starts. Asked
-values are invocation-local; reliquary never changes the user's properties
+values are invocation-local; Reliquary never changes the user's properties
 unless the user runs a property command or calls the corresponding
 embedding API.
 
@@ -305,7 +305,7 @@ argument as sensitive:
   secret entry, with the suppression recorded in the transcript; and
 - secret values are retained in memory only for the run that binds them.
 
-These rules protect reliquary's host-side records. They cannot prevent a guest
+These rules protect Reliquary's host-side records. They cannot prevent a guest
 installer from displaying a value, storing it in its own logs or command
 history, or exposing it in an explicitly requested screenshot. Script authors
 must still use the guest's password or product-key entry fields correctly.

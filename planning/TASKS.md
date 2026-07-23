@@ -65,9 +65,9 @@ Use case in planning/USE-CASES.md; design in
 planning/design/recorder.md. Work items, in rough
 dependency order:
 
-- reliquary-owned console viewer over the vnc control plane
+- Reliquary-owned console viewer over the vnc control plane
   (recording prerequisite: backend display-window input is
-  invisible to reliquary)
+  invisible to Reliquary)
 - text-mode recorder first (no new language surface: waits from
   VGA scrapes, type/press actions, generated-comment
   uncertainty flags)
@@ -94,7 +94,7 @@ dependency order:
   (hardened 2026-07-21: .rlql is the fourth authored extension —
   the INTERFACES listing is due at the asset-spec/realignment
   pass)
-- published JSON Schemas elevating reliquary-machine.json into a
+- published JSON Schemas elevating `reliquary-machine.json` into a
   public contract (the blueprint and media-definition schemas
   are authored — DECISIONS.md; the state schema and its
   public-contract elevation stay with milestone 6)

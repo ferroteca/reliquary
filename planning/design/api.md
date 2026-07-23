@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The embedding API
 
-> **Status:** the end-goal design for reliquary's embedding API —
+> **Status:** the end-goal design for Reliquary's embedding API —
 > the second primary interface (planning/INTERFACES.md). The
 > implemented Python binding is documented in
 > [docs/api-reference.md](../../docs/api-reference.md); this page
@@ -28,7 +28,7 @@ SPDX-License-Identifier: BSD-3-Clause
   express cleanly: flat functions, plain values, pull-only
   handles, no callbacks.
 - **Computation belongs to the caller** (language goal G2).
-  reliquary attaches no meaning to guest output; result
+  Reliquary attaches no meaning to guest output; result
   interpretation and test-framework semantics live in consuming
   projects. In-repo consumers (the media layer, the script
   runtime) drive the same public surface available to external
@@ -96,7 +96,7 @@ SPDX-License-Identifier: BSD-3-Clause
   (the CLI stability contract, planning/ROADMAP.md "The CLI").
 - **Errors — the taxonomy is named** (owner, 2026-07-21):
   blocking forms raise by error class under one root. Python
-  spells the root `ReliquaryError` — every deliberate reliquary
+  spells the root `ReliquaryError` — every deliberate Reliquary
   error subclasses it, on every surface, so
   `except ReliquaryError` is always the catch-all — and the run
   surface's classes `StaticError` (exit 2), `PreflightError`
@@ -107,7 +107,7 @@ SPDX-License-Identifier: BSD-3-Clause
   spec "Error classes and exit codes"). Deliberate errors
   outside the run surface subclass the root directly until the
   general programmatic-contract work names finer classes —
-  growth is additive, never a break. Exit `1` — reliquary's own
+  growth is additive, never a break. Exit `1` — Reliquary's own
   unexpected fault — is precisely an error outside the taxonomy.
   Other bindings spell the same classes natively.
 - **Async starters — sync is async plus attach** (owner,
@@ -134,7 +134,7 @@ SPDX-License-Identifier: BSD-3-Clause
   failed: the operation is still live, the handle stays valid,
   and the call may be repeated (owner, 2026-07-21) —
   deliberately outside `except ReliquaryError`'s reach, because
-  an expiry is not a reliquary error. A handle is
+  an expiry is not a Reliquary error. A handle is
   a follower, never the owner: dropping one never affects its
   operation — `cancel()` is the only cancellation.
 

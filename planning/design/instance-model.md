@@ -84,7 +84,7 @@ operations are a deferred capability, planning/ROADMAP.md
 "Horizon"). While the machine is stopped on every control
 plane, the content under `media/` is plain host state: a
 `hostdir` drive *is* its directory, and image drives are
-readable and writable with the user's own tools. reliquary
+readable and writable with the user's own tools. Reliquary
 neither mediates nor records out-of-band access — what the
 next `start` finds on the drives is simply the machine's state,
 exactly as if the guest had written it.
@@ -100,7 +100,7 @@ The blessing has edges:
   copying them out is the sanctioned custody move, writing into
   them is not;
 - `machine.json` (its live `vm` section included) and lock files
-  are reliquary's own state, not an editing surface.
+  are Reliquary's own state, not an editing surface.
 
 ## Lifecycle
 
@@ -125,7 +125,7 @@ stateDiagram-v2
 half-destroyed resting phase, because a machine is nothing but
 its cache directory. `recreate` is `destroy` + `create` as one
 command, reusing the same id; `clone` and `export` require
-`ready`. On startup reliquary detects a machine stranded in a
+`ready`. On startup Reliquary detects a machine stranded in a
 transitional phase and completes a safe rollback or fails with
 recovery instructions (see below).
 
@@ -216,7 +216,7 @@ when the machine stops. It must never be edited by hand.
 The phase is one of `creating`, `ready`, `running`, `stopping`,
 or `destroying`. Every mutating operation takes an exclusive
 per-machine lock before inspecting backend state. On startup
-reliquary detects an interrupted phase, verifies backend
+Reliquary detects an interrupted phase, verifies backend
 identity, and either completes a safe rollback or fails with
 explicit recovery instructions. Atomic file replacement protects
 JSON writes; it does not pretend a host file write and a
@@ -227,7 +227,7 @@ per-machine lock and per-start identity model already make
 concurrency safe — each machine is its own cache directory, its
 own backend process, and its own auto-allocated port — so the
 honest ceiling is host resources (memory, free ports), surfaced
-as an ordinary `start` failure. reliquary invents no cap of its
+as an ordinary `start` failure. Reliquary invents no cap of its
 own.
 
 There is no `installed` boolean. Script outcomes belong to the
@@ -257,13 +257,13 @@ with strict schemas and benefit from editor completion, stable
 formatting, and precise diagnostics. The script language remains the
 separate line-oriented behavioral format. Reliquary publishes one
 composed-blueprint JSON Schema, versioned and packaged as
-[blueprint-schema-v1.json](../../reliquary/schemas/blueprint-schema-v1.json)
+[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json)
 so editors can bind it today; it stays a synchronized companion to
-the prose specs, which remain normative, with reliquary's own
+the prose specs, which remain normative, with Reliquary's own
 validation the parser's and a shared valid/invalid fixture corpus —
 run against both parser and schema at realignment — keeping the two
 honest against each other. The machine-state schema is authored
 beside this spec
 ([machine-state.schema.json](machine-state.schema.json)); the schema
-version tracks the reliquary release, not a version field in user
+version tracks the Reliquary release, not a version field in user
 documents before beta.

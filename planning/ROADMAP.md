@@ -7,12 +7,12 @@ SPDX-License-Identifier: BSD-3-Clause
 
 ## Vision
 
-reliquary automates guest operating systems — installing them from
+Reliquary automates guest operating systems — installing them from
 vendor media, booting them, and scripting them — across multiple
 virtualization backends, driven by named machine blueprints and a
-reliquary scripting language.
+Reliquary scripting language.
 
-reliquary manages **ephemeral machines**. A reliquary machine is a
+Reliquary manages **ephemeral machines**. A Reliquary machine is a
 disposable rig: created to run a scripted install or an automated
 task, then recreated or deleted. The machine itself is never the
 product. Often there is no durable artifact at all — the whole
@@ -20,12 +20,12 @@ point was to run some tests and observe the results. When there
 is interest in something more durable, it is **exported** —
 either a media image (a disk image taken out of the machine) or
 an entire machine (handed to a hypervisor built for long-lived
-machines). reliquary is not a VM manager for machines you keep;
+machines). Reliquary is not a VM manager for machines you keep;
 every design choice may assume machines are cheap to destroy and
 rebuild.
 
 [planning/INTERFACES.md](INTERFACES.md) names the interfaces through which
-the world drives reliquary and the vetting rule every
+the world drives Reliquary and the vetting rule every
 interface-changing decision must follow; the primary use cases
 they serve live in [planning/USE-CASES.md](USE-CASES.md).
 
@@ -96,7 +96,7 @@ Design rules:
   availability; it never changes a machine's recorded backend.
 - **Default backend assignment.** When a machine blueprint does not name
   a backend, assignment happens at materialization (`create` /
-  `recreate`): reliquary walks its internal backend priority list
+  `recreate`): Reliquary walks its internal backend priority list
   one by one, probing each for availability, and picks the first
   available (and capable) backend. Capability is judged against
   the whole blueprint: referenced media and image types the
@@ -115,7 +115,7 @@ Design rules:
   `.vbox`, `.vmx`, Hyper-V VM/VHD paths) inside
   `cache/machines/<id>/`, so a machine's cache directory is the
   whole materialization.
-- **Guest agents are consumed, never built.** reliquary consumes
+- **Guest agents are consumed, never built.** Reliquary consumes
   native guest agents — QGA, Guest Additions, VMware Tools,
   Hyper-V integration services — through their backend adapters
   and never builds or ships a guest-side agent of its own
@@ -158,7 +158,7 @@ machine is durable: a machine **is** its cache directory (see
 └── <backend>/               the backend's own files (e.g. qemu/)
 ```
 
-Everything under `cache/machines/<id>/` is reliquary's and
+Everything under `cache/machines/<id>/` is Reliquary's and
 disposable: drives and backend files regenerate from the blueprint
 (plus media definitions and scripts); run records are evidence —
 retained for the machine's life, never regenerable, copied out to
@@ -178,11 +178,11 @@ its [field reference](design/machine-blueprint-reference.md) and
 locking, and recovery model in
 [planning/design/instance-model.md](design/instance-model.md).
 
-The blueprint is reliquary's own backend-agnostic format — never a thin
+The blueprint is Reliquary's own backend-agnostic format — never a thin
 veneer over one backend's configuration. Two documents, one owner
 each: the **blueprint** (`<name>.rlqb`) is the machine
 shape as the user defined it — authored by hand, by `init`, or by
-`import`; reliquary reads it and — once authored — never writes
+`import`; Reliquary reads it and — once authored — never writes
 it. The **state**
 (`cache/machines/<id>/machine.json`) is the machine as
 it actually is — fully resolved (aliases canonicalized, defaults
@@ -250,7 +250,7 @@ planning/design/media-definition.schema.json; decided owner,
 never implies document validity — the schemas capture the
 per-document structural subset of the format checks, for editor
 completion and validation while authoring (U4, U5). The parser
-remains reliquary's own validator (fail-closed, name-the-problem
+remains Reliquary's own validator (fail-closed, name-the-problem
 diagnostics); a shared valid/invalid fixture corpus, run against
 both parser and schema at realignment, keeps the two aligned.
 Documents carry no `$schema` field pre-beta — editors bind the
@@ -294,7 +294,7 @@ is pre-release, so this is a replacement, not a migration.
 
 ### The codex
 
-reliquary ships the codex — built-in blueprints, media
+Reliquary ships the codex — built-in blueprints, media
 definitions, and scripts for popular open source operating
 systems: see
 [planning/design/codex.md](design/codex.md). The codex is
@@ -325,7 +325,7 @@ rlq run-script install --blueprint freedos-1.4-plain
 
 ## Authored-asset resolution
 
-Where reliquary looks for authored assets — blueprints, media
+Where Reliquary looks for authored assets — blueprints, media
 definitions, scripts, and landmark declarations — is an
 invocation-level setting: the mechanism behind the
 artifact-residency split (planning/USE-CASES.md). Assets are
@@ -369,7 +369,7 @@ supplied in memory with no files at all (self-identifying by
 `name` — the fileless third source, landing just after the file
 modes).
 
-The home remains reliquary's own ground regardless of mode:
+The home remains Reliquary's own ground regardless of mode:
 machines materialize into the home cache, downloads and payloads
 use the home caches, and the personal user-properties file stays
 home-side (a license key never enters the repo — U5).
@@ -381,7 +381,7 @@ machines whose recorded source equals the invocation's own
 resolution of that name, so same-named blueprints in different
 projects never select — and `apply` never adopts — each other's
 machines (a machine with no recorded source matches by name
-alone). **reliquary reads by extension and writes by
+alone). **Reliquary reads by extension and writes by
 convention**: U6's recorder emits its drafts — the script, its
 landmark declarations, and their variant renderings — into the
 asset root the session ran with, as new source files their author
@@ -411,7 +411,7 @@ the shared surface lands on both presentations in the same
 change, never deferred (a required invariant — AGENTS.md).
 
 The API expects native bindings in multiple languages; Python is
-the first. Any other language that wants reliquary automation but
+the first. Any other language that wants Reliquary automation but
 has no native binding automates via the CLI. The CLI therefore
 serves programs as well as people, and the one-to-one mapping is
 what keeps that fallback complete: a capability missing from the
@@ -510,7 +510,7 @@ machine's cache directory as an absolute path; a query, any
 machine phase) is the door, and while a machine is stopped on
 every control plane its drives are plain host state — a
 `hostdir` drive *is* its directory, and image drives are the
-user's own tools' business; reliquary neither mediates nor
+user's own tools' business; Reliquary neither mediates nor
 records out-of-band access (contract:
 planning/design/instance-model.md). In-band file operations are
 deferred to a late milestone ("Horizon" below), and the script
@@ -727,7 +727,7 @@ Lifecycle semantics:
   `--properties <path>`, maintaining a selected file in place of
   the home's `user.properties`.
 - `clean-archives` / `clean-media` reclaim the two caches:
-  cached source archives, and payload files reliquary can fetch
+  cached source archives, and payload files Reliquary can fetch
   again. Nothing irreplaceable (definitions, `local-path` files,
   payloads without a download source) is cleanable.
 - `recreate-machine` is exactly destroy + create under the same
@@ -748,7 +748,7 @@ Lifecycle semantics:
 
 - Export is two commands (owner, 2026-07-22), stopped-only and
   stream-bearing, the artifact independent and permanently
-  outside reliquary's purview.
+  outside Reliquary's purview.
   `export-drive <key> <destination>` takes one drive out as a
   standalone image — the drive's native format, or raw by
   destination extension (the adapters' raw interchange; other
@@ -758,7 +758,7 @@ Lifecycle semantics:
   an **exporter** — virtualbox, vmware, hyperv, libvirt, ... — a
   vocabulary of its own, probed on the host and deliberately
   decoupled from the backend list (libvirt is the QEMU
-  ecosystem's answer; the reliquary-invented
+  ecosystem's answer; the Reliquary-invented
   bare-image-plus-launch-config artifact is dead). The target is
   presented, never defaulted: a tty prompts listing the
   exporters available on this host, noninteractively it is an
@@ -767,7 +767,7 @@ Lifecycle semantics:
   (capability-checked like `create-machine`) with drive content
   through the adapters' raw interchange, and media payloads
   materialize as copies so the export stands alone. Ownership
-  verification guarantees reliquary can never touch the exported
+  verification guarantees Reliquary can never touch the exported
   VM afterward. Import mirrors the decoupling in vocabulary:
   `import-vm` reads a native VM source through an **importer**,
   no same-named backend required.
@@ -794,7 +794,7 @@ Lifecycle semantics:
   2026-07-21): `--snapshot` has the native hypervisor snapshot
   the disks first — the definitions pin the frozen extent, the
   source VM stays free to keep running natively, the snapshot is
-  reliquary-named with provenance recorded in the generated
+  Reliquary-named with provenance recorded in the generated
   definitions' `notes`, and its later fate in native tooling is
   the user's (verification reports a lost extent);
   `--no-snapshot` touches nothing, and running the source again
@@ -848,7 +848,7 @@ from a built-in blueprint.
 
 ## The scripting language
 
-reliquary gets its own scripting language for automating guests.
+Reliquary gets its own scripting language for automating guests.
 Scripts are stored in `<reliquary_home>/scripts` and invoked as
 `rlq run-script <label>` against a machine selected with
 `--machine <id>` or `--blueprint <name>`.
@@ -911,7 +911,7 @@ keywords: `on`, a one-shot case inside a branching `wait`, and
 `always`, a standing rule in a reactive phase — the lifetime
 readable from the first word. `machine=stopped` is the machine no-longer-running
 condition; it does not claim that the shutdown was graceful. A
-guest reboot has no reliquary verb or event: the script types the
+guest reboot has no Reliquary verb or event: the script types the
 guest command, makes a menu choice, or sends the appropriate key
 sequence, then watches for the screen that follows. There is
 likewise no `run` verb: `enter` delivers a console line, and
@@ -958,7 +958,7 @@ fallback.
 record property keys and supplying sources, never values or expanded
 secret-bearing arguments; textual diagnostics redact known secret
 values, and automatic failure screenshots are suppressed after secret
-entry. This protects reliquary's records, not guest logs, history, or
+entry. This protects Reliquary's records, not guest logs, history, or
 an explicitly requested screenshot. The complete planned contract is
 in [planning/design/script-properties.md](design/script-properties.md).
 
@@ -1043,7 +1043,7 @@ seam early is what keeps later decisions consistent; most of the
 language's prohibitions exist to keep it clean.
 
 **The governing rule: the script is declarative about everything
-reliquary owns, and procedural at the seam with the guest.**
+Reliquary owns, and procedural at the seam with the guest.**
 
 Everything knowable before the run starts is declared — the
 platform, the machine state the script expects, which phases exist,
@@ -1064,7 +1064,7 @@ in. The seam falls where our knowledge ends:
 declarative form — Kickstart, preseed, AutoYaST, Windows
 `unattend.xml` — in which the author states what the installed
 system should be and the installer does the rest. Where those
-exist they are strictly better: reliquary does not invent a
+exist they are strictly better: Reliquary does not invent a
 competing declarative install language. For guests that accept
 them, it serves the answer file the way Packer does today — a
 local HTTP server the installer fetches from (milestone 5;
@@ -1144,8 +1144,8 @@ the GUI-era backlog's "Decide first" round.
 
 ## Script authoring by recording
 
-U6's authoring recorder — reliquary supervises a person doing
-the task once in a reliquary-owned console over the `vnc`
+U6's authoring recorder — Reliquary supervises a person doing
+the task once in a Reliquary-owned console over the `vnc`
 control plane, drafts the script and landmark assets, and on
 later sessions anchors new fragments by playback position, never
 regenerating or text-merging what the author wrote — is designed
@@ -1237,7 +1237,7 @@ it is open, every machine-targeting command on that machine —
 the guest-console family, the state operations, lifecycle —
 appends the event kinds the execution model defines for the
 same actions, and `end-run` closes the record with the neutral
-`ended` terminal event (reliquary attaches no outcome to an
+`ended` terminal event (Reliquary attaches no outcome to an
 interaction run — G2). With no open run, primitives record
 nothing: recording is opt-in, so the automator opts in exactly
 when the record is the product (U3) and interactive fiddling
@@ -1257,7 +1257,7 @@ U3's per-test loop rides these mechanics: selection in as
 script properties, results out as caller-authored artifacts
 the caller reads out-of-band from the stopped machine's drives
 at rest, and deliberately no
-test-result vocabulary in reliquary (G2) — one iteration is
+test-result vocabulary in Reliquary (G2) — one iteration is
 one run record. Contract home: script-spec.md "Failure, runs,
 and transcripts".
 
@@ -1383,7 +1383,7 @@ rlq run-script install --blueprint freedos-1.4-plain
 
 From a clean home, that one command must end with a fully
 installed FreeDOS machine that can then be started and stopped
-from the reliquary command line. Everything in this milestone is
+from the Reliquary command line. Everything in this milestone is
 the minimum vertical slice of the documented design needed to get
 there — each piece grows to its full spec in later milestones. The
 built-in blueprint bundle is the public vertical slice for this
@@ -1545,7 +1545,7 @@ Deliverables:
    `on_mismatch="refetch"` in the API); a mismatched file with no
    source is always kept and reported (see the media spec's
    mismatched-files rules).
-4. `rlq fetch <media_name>` and `reliquary clean
+4. `rlq fetch <media_name>` and `Reliquary clean
    downloads` / `clean media` (nothing irreplaceable —
    definitions, `local-path` files, sourceless payloads — is
    cleanable). `fetch --script` follows in milestone 3 with
@@ -1694,7 +1694,7 @@ anywhere.
 ### Milestone 5 — Local HTTP server for installer answer files (complete)
 
 Packer's host-side pattern for serving Kickstart, preseed,
-AutoYaST, `unattend.xml`, and kin: during a run, reliquary
+AutoYaST, `unattend.xml`, and kin: during a run, Reliquary
 starts an ephemeral local HTTP server that exposes authored
 answer files to the guest installer over the VM network, then
 tears the server down when the run ends. This is how guests
@@ -1725,7 +1725,7 @@ Settled design:
   `$rlq.http.ip`, `$rlq.http.port`, and `$rlq.http.url`, usable
   only where text property expansion is legal. The whole `rlq.*`
   and `reliquary.*` property namespaces are reserved for
-  reliquary-owned run facts and future system properties.
+  Reliquary-owned run facts and future system properties.
 - QEMU uses user-mode networking as the milestone-5 interim
   reachability path, with `$rlq.http.ip` resolving to the
   guest-visible host gateway `10.0.2.2`; richer portable NIC
@@ -1763,7 +1763,7 @@ Deliverables:
    fetch.
 
 Done when: a scripted install fetches its answer file from
-reliquary's local HTTP server exactly as under Packer — server
+Reliquary's local HTTP server exactly as under Packer — server
 up for the run, address available to the script, file served,
 server gone afterward — and the FreeDOS keystroke install is
 untouched.
@@ -2137,7 +2137,7 @@ recreates from its bases like any authored machine.
 
 Native guest agents as control planes, per
 [planning/design/guest-communication.md](design/guest-communication.md):
-reliquary consumes the agents guests already have
+Reliquary consumes the agents guests already have
 — QGA first — and never builds its own (planning/USE-CASES.md,
 the control-plane arc). This milestone must not weaken the
 permanent agentless DOS path; guests without a native agent
@@ -2266,7 +2266,7 @@ VNC and on Hyper-V through its decided screen strategy.
 
 - The U6 authoring recorder
   ([planning/design/recorder.md](design/recorder.md)): the
-  reliquary-owned console viewer, text-mode
+  Reliquary-owned console viewer, text-mode
   recording, run-to-point / breakpoint / human takeover,
   round-trip fragments, and the `record` command family (work
   items in planning/TASKS.md).
@@ -2399,9 +2399,9 @@ Deferred to beta:
   version field and no `$schema` field (settled, owner 2026-07-21:
   a pinned schema reference is a version field in disguise, and a
   pre-beta document has no format vintage — the only schema that
-  matters is the installed reliquary's, which editors bind by file
+  matters is the installed Reliquary's, which editors bind by file
   association; an embedded pin would go stale in seeded files
-  under never-overwrite and let the editor pass what reliquary
+  under never-overwrite and let the editor pass what Reliquary
   rejects). When compatibility guarantees arrive — no earlier than
   beta — the leading candidate spelling for the version field is
   `$schema` as a versioned URL: one field declaring the document's

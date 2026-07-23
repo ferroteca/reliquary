@@ -15,7 +15,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > model itself is worked out in
 > [the composed blueprint model](blueprint-model.md).
 
-Every reliquary machine begins with a reusable JSON **blueprint** and is
+Every Reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create
 many machines. The blueprint is one file holding named **components** —
 a `machine` and the `media`, `source`, and `archive` components it
@@ -25,7 +25,7 @@ in [Machine blueprints and machines](instance-model.md).
 ## The model at a glance
 
 A **blueprint** is a design you author and keep. A **machine** is
-a disposable realization reliquary builds from it — identified by
+a disposable realization Reliquary builds from it — identified by
 a generated id, cheap to destroy and rebuild, never the product.
 When a result should outlive its machine, `export` carries it out.
 
@@ -101,7 +101,7 @@ Two rules carry the whole model:
   `insert`/`eject`) may legitimately diverge it from the
   baseline, and `start` runs the machine as its state describes,
   never silently reverting it.
-- **Everything reliquary materialized is disposable.** `destroy` +
+- **Everything Reliquary materialized is disposable.** `destroy` +
   `recreate` rebuilds a machine wholesale from the blueprint — its
   machine, media, and archive components — and its scripts; nothing
   under `cache/` is ever precious.
@@ -124,25 +124,25 @@ Two rules carry the whole model:
 
 - The **blueprint** (`<name>.rlqb`) is the reusable machine shape
   you defined — the machine plus the media, source, and archive
-  components it draws on, all in one file. You own it: reliquary
+  components it draws on, all in one file. You own it: Reliquary
   reads it and never writes it — `import` and the future `init`
   author one once, at your request, and never touch it again;
   `delete`, equally at your request, removes it.
 - The **state** (`cache/machines/<id>/machine.json`)
   describes one machine: its identity, blueprint, lifecycle
   phase, and resolved configuration, at the root of the
-  machine's directory — which holds everything reliquary
+  machine's directory — which holds everything Reliquary
   materialized for it: state, per-machine media images, run
   records, backend files. The machine **is** this directory;
   nothing about a machine lives outside `cache/`, because a machine
-  lives and dies as one thing. reliquary writes all of it; the one
+  lives and dies as one thing. Reliquary writes all of it; the one
   part written *for you* is `runs/` — the machine's run records
   (the event stream, transcripts, screenshots), which the world
   reads in place and copies out to keep (see below). Everything
   else you never need to touch.
 
-The split reflects what reliquary machines are for: **ephemeral
-work**. A reliquary machine is a disposable rig — created to run a
+The split reflects what Reliquary machines are for: **ephemeral
+work**. A Reliquary machine is a disposable rig — created to run a
 scripted OS install or an automated task, recreated freely, and
 deleted when done. The blueprint makes rebuilding cheap; the
 entire cached materialization is safe to throw away, because
@@ -158,15 +158,15 @@ outlive the machine
 When the durable thing is bigger, `export` it — either a media
 image (a disk image taken out of the machine) or the entire
 machine, handed to a hypervisor built for long-lived machines.
-reliquary is not the place to keep a machine you care about.
+Reliquary is not the place to keep a machine you care about.
 
-The same ownership line runs through the whole reliquary home:
+The same ownership line runs through the whole Reliquary home:
 everything outside `cache/` is durable data you own. Blueprints —
 each carrying its own media and archive components — and scripts
 are small, shareable, and worth versioning. The [user properties
 file](script-properties.md)
 is also durable but personal and normally not shared or committed.
-Everything under `cache/` is reliquary's and disposable — and, run
+Everything under `cache/` is Reliquary's and disposable — and, run
 records excepted, reconstructible: the records are evidence, kept
 for the machine's life and never regenerable, so copy out any
 record that should outlive its machine. There is no dropping of
@@ -205,7 +205,7 @@ doesn't use it is portable by construction — one checked-in
 blueprint serves every developer's host (U4).
 
 **A blueprint and its state are not the same format.** The blueprint is the
-portable JSON document you author. The reliquary-owned machine
+portable JSON document you author. The Reliquary-owned machine
 state wraps its resolved form with identity, lifecycle, and
 backend facts. See [the instance model](instance-model.md).
 
@@ -238,7 +238,7 @@ A minimal blueprint that boots a DOS floppy image:
 
 This is a **bare root** — a lone machine, its fields at top level,
 no component sections. The `floppy` drive names a `media` component,
-`msdos622-boot`, that reliquary resolves from the namespace: a
+`msdos622-boot`, that Reliquary resolves from the namespace: a
 `media` entry in a sibling `.rlqb`, or a codex media seeded on first
 reference. To ship the machine and its media as one self-contained
 file, add the sections — `{ "machines": [ … ], "media": [ … ] }` (see
@@ -246,7 +246,7 @@ file, add the sections — `{ "machines": [ … ], "media": [ … ] }` (see
 [cookbook](machine-blueprint-cookbook.md)).
 
 Save it as `msdos.rlqb` anywhere under your asset root — the
-current directory by default, or the reliquary home for the
+current directory by default, or the Reliquary home for the
 shared personal collection; a `blueprints/` subdirectory is
 optional organizational dressing (planning/ROADMAP.md, "Authored-asset
 resolution"). Blueprints arrive written by hand, seeded
@@ -281,7 +281,7 @@ A `.rlqb` file holds the machine shape as you defined it —
 the file you authored, and whatever you edit it to later. Write as
 little as possible and let resolution fill in the rest:
 
-- Omit `backend` and reliquary picks the best available one.
+- Omit `backend` and Reliquary picks the best available one.
 - Omit `memory`, `cpus`, or `control-planes` and the platform's
   defaults apply.
 - Use shorthand: `"hdd"` instead of `"hdd0"`, a bare media-name
@@ -289,7 +289,7 @@ little as possible and let resolution fill in the rest:
 
 Omissions are preserved, not baked in: a blueprint that omits
 `memory` keeps tracking the platform default, even if that default
-changes in a later reliquary.
+changes in a later Reliquary.
 
 A blueprint may not contain
 [state-only fields](machine-blueprint-reference.md#state-only-fields);
@@ -304,14 +304,14 @@ existing machine, stop it and run
 [`apply`](#applying-blueprint-edits). Nothing is ever adopted
 implicitly at `start`.
 
-### The state — reliquary's
+### The state — Reliquary's
 
 `cache/machines/<id>/machine.json` describes the machine as
-it actually is, and reliquary maintains it: whenever reliquary
+it actually is, and Reliquary maintains it: whenever Reliquary
 changes the machine — inserts media, changes memory, reorders
 boot devices — it updates the state in the same operation. A
 state document that disagrees with the hypervisor's actual
-configuration is a bug in reliquary, not an ambiguity you have to
+configuration is a bug in Reliquary, not an ambiguity you have to
 resolve. While the machine is running the state also carries a
 `vm` section — the live VM's identity and port — written
 atomically with the lifecycle `phase` and cleared when it stops.
@@ -364,13 +364,13 @@ names, how that media `materialize`s, and the realized cache
 section.
 
 Don't edit the state — or anything else under
-`cache/machines/<id>/`. reliquary rewrites the state as it
+`cache/machines/<id>/`. Reliquary rewrites the state as it
 operates the machine, and reconciliation regenerates the backend's
 configuration from the state; hand edits
 are overwritten without notice. There is never a reason to: the
 blueprint is your interface.
 
-reliquary rewrites the state carefully: in the same operation as
+Reliquary rewrites the state carefully: in the same operation as
 the machine change it records, atomically
 (write-temp-and-replace), and in canonical formatting — strict
 JSON, stable key order, two-space indent, UTF-8, trailing
@@ -393,9 +393,9 @@ runs as; the baseline enters only through `create` and `apply`:
    against silently changed media.
 3. The state is compared with the actual backend machine (verified
    by identity — see [backend assignment](#backend-assignment)),
-   and differences reliquary can apply to the backend — its
+   and differences Reliquary can apply to the backend — its
    configuration regenerated to match the state — are applied.
-4. Contradictions reliquary cannot reconcile — an unknown
+4. Contradictions Reliquary cannot reconcile — an unknown
    `backend-id`, a missing image file, a capability the backend
    lacks — stop the start with an error naming both sides. Nothing
    is silently adopted from either side.
@@ -498,9 +498,9 @@ is built from the machine's resolved blueprint shape, drives
 converted through the adapters' raw interchange, and media
 payloads copied in so the export stands alone.
 This is the first-class form of the intended endgame:
-reliquary machines are ephemeral, and when something should live
+Reliquary machines are ephemeral, and when something should live
 on, you export it (U1). An exported machine is independent and
-permanently outside reliquary's purview — reliquary will never
+permanently outside Reliquary's purview — Reliquary will never
 touch it again.
 
 **`import <source> --platform <platform>`** goes the other way:
@@ -527,7 +527,7 @@ noninteractively it is an error:
   source VM, and only with this consent. Snapshotting pins the
   definitions to the frozen extent while the source VM stays
   free to keep running natively; the snapshot is
-  reliquary-named, recorded in the generated media components'
+  Reliquary-named, recorded in the generated media components'
   `notes`, and thereafter yours in native tooling (verification
   reports a lost extent). `--no-snapshot` touches nothing — but
   running the source VM again rewrites its disks, and
@@ -562,7 +562,7 @@ to remove, never a machine.)
 ## Backend assignment
 
 `backend` is optional in a blueprint. When omitted, `create`
-walks reliquary's internal backend priority order and assigns the
+walks Reliquary's internal backend priority order and assigns the
 first backend that is:
 
 1. **available** — actually installed and working on this host
@@ -582,7 +582,7 @@ Declaring `backend` explicitly pins the choice, and fails at
 falling back to another.
 
 Alongside the assignment, the state records `backend-id` — the
-backend's own identifier for the machine. reliquary never sends a
+backend's own identifier for the machine. Reliquary never sends a
 control command to a hypervisor object until its identity matches
 `backend-id`, so a stale or foreign machine is detected and
 refused rather than manipulated.
@@ -619,7 +619,7 @@ was written for.
 
 ## Validation: fail closed, name the problem
 
-reliquary never guesses what a blueprint means and never
+Reliquary never guesses what a blueprint means and never
 silently degrades it. Two kinds of checks apply:
 
 **Format checks** reject malformed documents outright: unknown
@@ -639,7 +639,7 @@ by silently dropping or emulating the feature.
 
 The format checks have a machine-checkable companion: the
 published JSON Schema
-([blueprint-schema-v1.json](../../reliquary/schemas/blueprint-schema-v1.json))
+([blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json))
 — one schema for the whole composed document, covering the machine,
 media, source, and archive components — captures their per-document
 structural subset, for editor completion and validation while
@@ -666,7 +666,7 @@ the resolved values appear in the state:
 
 ## Format stability: none, yet
 
-reliquary is evolving rapidly and **maintains no backward
+Reliquary is evolving rapidly and **maintains no backward
 compatibility before at least a beta-quality release**. That
 applies to the blueprint format in full:
 
@@ -674,7 +674,7 @@ applies to the blueprint format in full:
   support.
 - There is no in-place upgrading of old documents, no
   compatibility parsing, no deprecated-field aliasing.
-- A blueprint written for an older reliquary may simply fail
+- A blueprint written for an older Reliquary may simply fail
   validation after an update. The remedy is to recreate the
   machine (or update the blueprint by hand to the current format
   as documented here).
@@ -686,17 +686,17 @@ second format version exists — no earlier than beta.
 For the same reason a blueprint carries no `$schema` field: a
 document pinning the schema it was written against is a version
 field in disguise, and pre-beta a document has no format vintage —
-the only schema that matters is the installed reliquary's, which
+the only schema that matters is the installed Reliquary's, which
 editors bind by file association (tracking the installation, where
 an embedded pin would go stale and let the editor pass what
-reliquary rejects). When versioning arrives, no earlier than beta,
+Reliquary rejects). When versioning arrives, no earlier than beta,
 `$schema` as a versioned URL is the leading candidate spelling of
 the version field (planning/ROADMAP.md, "Decisions still
 needed").
 
 The blueprint's value grammar is JSON, and JSON only — there is
 no YAML form, and none is planned. Because a blueprint is a
-document you author and reliquary only ever reads (`import` and
+document you author and Reliquary only ever reads (`import` and
 `init` write one once, then never again), the file accepts the
 JSONC dialect: JSON (RFC 8259) plus `//` and `/* */` comments
 and trailing commas in arrays and objects — the dialect editors
@@ -704,12 +704,12 @@ already apply to files like `tsconfig.json`, and nothing more
 (no unquoted keys, no single-quoted strings, no other JSON5
 extensions). Comments are the author's margin notes — a seeded
 built-in blueprint uses them to point out its customization
-seams (U5) — and carry no meaning: reliquary never reads them,
+seams (U5) — and carry no meaning: Reliquary never reads them,
 and nothing normative may live in one; anything the contract
 needs is a field. A blueprint without comments remains valid
 strict JSON; one with them is not parseable by strict JSON
 tooling — a deliberate trade. Machine-written documents are
-different: the state — and every other file reliquary writes —
+different: the state — and every other file Reliquary writes —
 is strict canonical JSON, always.
 
 ## Where to next

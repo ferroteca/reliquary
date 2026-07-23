@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Changelog
 
-All notable changes to reliquary are documented here. The format is based
+All notable changes to Reliquary are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -39,7 +39,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   so same-named blueprints in different projects never select — and
   `apply` never adopts — each other's machines.
 - The cache root (`cache/downloads/`, `cache/media/`,
-  `cache/machines/`) resolves independently of the reliquary home:
+  `cache/machines/`) resolves independently of the Reliquary home:
   `RELIQUARY_CACHE_DIR`, `--cache`, and `set_cache()` mirror
   `RELIQUARY_HOME` / `--home` / `set_home()`, defaulting to
   `<home>/cache`. Seeding (`seed-blueprint` / `seed-media` /
@@ -129,7 +129,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Composed blueprint model.** reliquary's two authored JSON formats
+- **Composed blueprint model.** Reliquary's two authored JSON formats
   fold into one composable blueprint `.rlqb` of named components —
   `machine` / `media` / `source` / `archive` — mixed and matched
   across files, or a lone machine as a bare root. A machine's drive
@@ -195,7 +195,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (selector required) and `run-script`. No backward compatibility is
   kept before beta.
 - The media-definition `redistributable-under` field is removed as
-  overkill: reliquary attaches no licensing metadata to a definition.
+  overkill: Reliquary attaches no licensing metadata to a definition.
   Whether a codex definition may carry a `url` is now a maintainer
   discipline (the codex may only link to legally redistributable
   downloads), not a per-definition field.
@@ -208,7 +208,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- [TRADEMARKS.md](TRADEMARKS.md): the name **reliquary** is owned by
+- [TRADEMARKS.md](TRADEMARKS.md): the name **Reliquary** is owned by
   Paul Galbraith and is not licensed for forks or redistributions;
   the BSD-3-Clause grant covers the software only. Linked from
   README and CONTRIBUTING.
@@ -272,7 +272,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The redesigned script surface now has a typed parser:
   `reliquary/script_grammar.lark` mirrors the normative EBNF in
   `planning/design/script-spec.md`, and `reliquary.script_parser`
-  builds the typed tree from it. reliquary's own lexer feeds lark's
+  builds the typed tree from it. Reliquary's own lexer feeds lark's
   LALR(1) parser through a custom lexer, so lexical diagnostics keep
   their authored wording — `lark` joins the runtime dependencies.
   The runtime still consumes the superseded surface; wiring it over
@@ -388,12 +388,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.1.0.dev0 - 2026-07-20
 
-The relict project — the agentless QEMU guest automation harness reliquary
-was built on — has been folded into reliquary. Its modules now live in the
+The relict project — the agentless QEMU guest automation harness Reliquary
+was built on — has been folded into Reliquary. Its modules now live in the
 `reliquary` package (its drive-inventory module renamed to `drives.py`), its
 CLI commands are `reliquary` subcommands alongside `install`, and its home,
 `RELICT_HOME`/`RELICT_QEMU_HOME` environment variables, and default
-`Documents/relict` directory are replaced by the reliquary equivalents
+`Documents/relict` directory are replaced by the Reliquary equivalents
 (`RELIQUARY_HOME`, `RELIQUARY_QEMU_HOME`, `Documents/reliquary`). The notes
 below merge both projects' unreleased histories with the relict entries
 renamed accordingly.
@@ -420,7 +420,7 @@ offline file-exchange semantics are specified consistently ahead of
 implementation.
 
 Added the `freedos-plain` recipe's preparation steps: the FreeDOS 1.4
-LiveCD ISO is downloaded into the reliquary home (the distribution
+LiveCD ISO is downloaded into the Reliquary home (the distribution
 zip is deleted after extraction) and SHA-256 verified on every run,
 and
 a 20 MiB dynamically allocated qcow2 (v3) target disk is created. The
@@ -612,13 +612,13 @@ machine-layer notes below); `rlq install` no longer exists.
   (each accepts optional `home=`). The existing `drives/` /
   `machine.json` / `vm.json` machine model is unchanged.
 - `cursor_menu_select(item, timeout=30, exclude=(), port=None,
-  home=None)` and the `reliquary menu ITEM [--exclude TEXT]` CLI command
+  home=None)` and the `Reliquary menu ITEM [--exclude TEXT]` CLI command
   select an entry in a cursor-key driven text menu (for example a boot
   menu). Rows containing an `exclude` text are never selected. Menus
   that rewrite their rows as the highlight moves (the FreeDOS
   installer's language chooser) are navigated by the row where the
   item last matched. Navigation is feedback-driven:
-  reliquary presses the up/down cursor keys, follows the selection
+  Reliquary presses the up/down cursor keys, follows the selection
   highlight through the VGA attribute bytes, and presses Enter only
   once the highlight sits on the single screen row matching the given
   text (case-insensitively; an exact row match wins over rows merely
@@ -655,7 +655,7 @@ machine-layer notes below); `rlq install` no longer exists.
   `wait_text()` now delegate to these methods.
 - `documents_dir()` publicly resolves the user's platform Documents
   folder (or `None` when it cannot be determined), so embedding
-  projects can anchor their own state directories the same way reliquary
+  projects can anchor their own state directories the same way Reliquary
   anchors its home.
 
 ### Removed
@@ -709,7 +709,7 @@ machine-layer notes below); `rlq install` no longer exists.
   shared; unimplemented non-DOS platform workflows fail explicitly instead of borrowing DOS assumptions.
 - DOS 8.3 executable-name validation now belongs to the DOS platform module rather than generic workflow
   orchestration, so future guest-program workflows are not constrained by DOS naming rules.
-- `Runner`/`MachineConfig`: the generic embedding surface for callers driving reliquary as a runner.
+- `Runner`/`MachineConfig`: the generic embedding surface for callers driving Reliquary as a runner.
   `Runner(home=None, config=None)` is a configured DOS test machine bound to one absolute home (the established
   process default when omitted), and
   `run(exe_path, args)` automatically ensures bootable media before performing the full `run_guest_program()`
@@ -740,7 +740,7 @@ machine-layer notes below); `rlq install` no longer exists.
   `run_guest_program()` (valid C–Z, normalized uppercase; default: match the declared machine, one letter per
   hard-disk slot before the staged drive, so C: on a floppy-boot machine and D: behind a slot-0 hard-disk image;
   letters below the default are rejected) declares where the staged vvfat hard disk appears in the guest — the drive
-  reliquary switches to for guest program runs. Staging targets the highest staged directory declared among the
+  Reliquary switches to for guest program runs. Staging targets the highest staged directory declared among the
   hard-disk slots, or `drives/hdd` created on demand.
 - Explicit `home=` keyword on `download()`, `start()`, `stop()`, `run_guest_program()`, and the `drives_dir` path
   helper, overriding the process-global home per call. The
@@ -755,8 +755,8 @@ machine-layer notes below); `rlq install` no longer exists.
   (`run_guest_program`, returning the program's redirected output).
 - Visible manual VM sessions with `reliquary start --display`: the command returns once QEMU is ready, leaves the DOS VM
   running for direct interaction, and `reliquary stop` closes it through the same ownership-verified lifecycle.
-- Bring-your-own boot image: reliquary boots whatever the user declares under `drives/`.
-- Test-framework result parsing is out of scope: reliquary hands back raw guest output, and interpreting it belongs to
+- Bring-your-own boot image: Reliquary boots whatever the user declares under `drives/`.
+- Test-framework result parsing is out of scope: Reliquary hands back raw guest output, and interpreting it belongs to
   the caller.
 - QEMU binary discovery: `RELIQUARY_QEMU_HOME` / `QEMU_HOME`, then PATH, then well-known install locations; `--qemu`
   overrides.
@@ -766,9 +766,9 @@ machine-layer notes below); `rlq install` no longer exists.
   `set_home()`.
 - Native PNG screendump on QEMU >= 7.1 with a zero-dependency PPM-to-PNG fallback for older QEMU.
 - Automatic QMP port selection with the selected port returned by
-  `start()`, active-VM metadata under the reliquary home for separate CLI invocations, and unique-name verification
+  `start()`, active-VM metadata under the Reliquary home for separate CLI invocations, and unique-name verification
   before any VM is controlled.
 - DOS startup commands such as switching to C: use the ordinary
   `AgentlessGuestExec.execute()` interface rather than special boot options.
-- Screenshot names are constrained to filenames so captured images cannot be written outside the reliquary home.
+- Screenshot names are constrained to filenames so captured images cannot be written outside the Reliquary home.
 - The installable test suite uses Python 3.9-compatible syntax, matching the package's declared minimum version.

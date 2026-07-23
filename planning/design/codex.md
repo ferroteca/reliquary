@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > The index, provenance columns, `search-`, and `seed-` are still
 > planned; details may change before first release.
 
-The codex is reliquary's built-in seed content: a shipped
+The codex is Reliquary's built-in seed content: a shipped
 collection of blueprints (their media, source, and archive
 components included) and scripts for
 popular open source operating systems, so the common case is one
@@ -26,13 +26,13 @@ verifies the installation media, and runs the scripted install.
 
 ## A seed, not a resolution tier
 
-The codex ships inside the reliquary package as ordinary files
+The codex ships inside the Reliquary package as ordinary files
 under `reliquary/codex/` (`blueprints/`, `scripts/`),
 so it travels with every distribution form, including zip-bundled
 installs. Wherever it lives, the codex is
 never consulted at run time as a fallback layer. Instead, when you
 reference a codex artifact that does not yet exist in your home,
-reliquary **copies it out**. From that point on it is an ordinary
+Reliquary **copies it out**. From that point on it is an ordinary
 user-owned file — edit it, delete it, version it. (The codex
 serves the home's human-interaction side only: it is never used
 for machine automation — a project commits its own copies. See
@@ -98,12 +98,12 @@ copies files verbatim, comments included.
 
 **Top-priority rule: a codex media (or its `source`) may carry a
 `url` only when that download is legally redistributable — media
-whose own licensing permits reliquary to point at and fetch it**
+whose own licensing permits Reliquary to point at and fetch it**
 (e.g. the FreeDOS LiveCD under the GNU GPL, or the official OpenBSD
 install media). This is a maintainer discipline enforced at review,
-not a per-component field: reliquary attaches no licensing
+not a per-component field: Reliquary attaches no licensing
 metadata to a media and cannot verify a license. The rule is
-what keeps the codex shippable — reliquary never points at, or
+what keeps the codex shippable — Reliquary never points at, or
 induces the download of, media it has no right to distribute.
 
 The codex deliberately includes blueprints for operating systems

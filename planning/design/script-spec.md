@@ -21,7 +21,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > transcript contract remain later milestones; details may still
 > change before first release.
 
-A reliquary script automates a guest: it watches observable guest
+A Reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
 across the VM seam. Scripts are authored assets — `.rlqs` files,
 identified by extension. In home mode (the CLI default) they
@@ -49,7 +49,7 @@ diagnosis; no command implicitly tears it down. The embedding
 API's twin is `run_script`, taking the same identifiers under
 CLI–API parity.
 
-Scripts are authored documents: reliquary reads but never rewrites
+Scripts are authored documents: Reliquary reads but never rewrites
 them — with one named exception: the authoring recorder's opt-in
 fragment apply (U6; [planning/ROADMAP.md](../ROADMAP.md), "Script authoring
 by recording") inserts a captured fragment at its playback anchor
@@ -100,7 +100,7 @@ Three design rules govern the whole surface:
   the grammar enforces the boundary.
 
 That third rule reflects a deliberate split: **a script is
-declarative about everything reliquary owns, and procedural at the
+declarative about everything Reliquary owns, and procedural at the
 seam with the guest.** What is knowable before the run starts is
 declared — the platform, the expected machine state, which phases
 exist, their budgets, the properties it binds. What the guest dictates
@@ -512,7 +512,7 @@ the CFG. Each has a stable id; diagnostics cite them:
   reserved `rlq` or `reliquary` namespaces, durations are
   positive.
 - **S6** — every `$` reference names a declared property or a
-  reliquary-owned run property in a reserved namespace made
+  Reliquary-owned run property in a reserved namespace made
   available by the script's declarations.
 - **S7** — an observation carries **exactly one** condition — a
   bare string/regex beside a `machine=` modifier, or two
@@ -760,7 +760,7 @@ seams](machine-blueprint.md#customization-seams)).
 
 ### The property sources
 
-Before the machine starts, reliquary binds each declared property
+Before the machine starts, Reliquary binds each declared property
 from the first source that answers. Everything that can answer is
 a property source, in one flattened order; each source answers
 for a different owner (owner, 2026-07-21 — the property-construct
@@ -1597,14 +1597,14 @@ classes, matching the enforcement tiers:
 | PREFLIGHT ERROR | machine rules | 3 |
 | RUN FAILURE | dynamic semantics | 4 |
 
-`0` is success; `1` is reserved for reliquary's own unexpected
+`0` is success; `1` is reserved for Reliquary's own unexpected
 faults; `5` is a cancelled run — a deliberate `run cancel` (API
 `cancel()`) that ended the run at an event boundary with a
 `cancelled` terminal event, neither success nor RUN FAILURE. The
 classes are the CLI's exit codes and the API's
 exception taxonomy — one mapping, under parity: Python spells it
 `StaticError` / `PreflightError` / `RunFailure` / `RunCancelled`
-under the `ReliquaryError` root every deliberate reliquary error
+under the `ReliquaryError` root every deliberate Reliquary error
 subclasses (planning/design/api.md), and exit `1` is precisely
 an error outside the taxonomy. Every diagnostic
 carries a stable dotted identifier naming its rule
@@ -1651,7 +1651,7 @@ no export verb for it — the record is already host-side plain
 files at a path `run status` and `list runs` report, and the
 shape contract here is what makes the copy readable. The run
 record is often the product of the whole exercise (U3):
-reliquary retains it with the machine and delivers its contents
+Reliquary retains it with the machine and delivers its contents
 live through the event stream; durability beyond the machine is
 the consumer's claim.
 
@@ -1671,7 +1671,7 @@ writer and closes only by `end-run` (below).
 
 `transcript.txt` is a pure rendering of the stream (owner,
 2026-07-22), written live beside it so a copied-out record
-stands alone for a human with no reliquary installed: every
+stands alone for a human with no Reliquary installed: every
 line derives from an event, it adds no information the stream
 does not carry, and deriving is one-way — stream to transcript,
 never scraped back. Its format is a human surface, deliberately
@@ -1720,7 +1720,7 @@ mixed-driver composition — script playback and human takeover
 in one record — is U6's recorder machinery, which grows out of
 this shape through the reserved handover kinds). `end-run`
 closes the record with the neutral `ended` terminal event:
-reliquary attaches no outcome to an interaction run —
+Reliquary attaches no outcome to an interaction run —
 interpreting what the loop did is the caller's computation
 (G2). An open interaction run is visible, never inferred:
 `run status` shows it open with its last-event time,
@@ -1738,7 +1738,7 @@ caller-authored artifact (JUnit XML, TAP) that the caller takes
 directly — read out-of-band from the stopped machine's drives
 at rest (a `hostdir` results drive makes this a plain directory
 read), or captured as text through `exec` — and keeps on its
-own side of the seam; and reliquary has
+own side of the seam; and Reliquary has
 deliberately no test-result vocabulary — no pass/fail schema,
 no result parsing (G2). Granularity comes from run structure:
 one iteration is one run record.
@@ -1864,7 +1864,7 @@ needed.
 The second visit to `cd-boot` reaches the other branch of its
 closing `wait` because the disk has been partitioned. The
 guest-driven reboot is expressed by the installer selection and the
-resulting screen, not by a reliquary reboot command.
+resulting screen, not by a Reliquary reboot command.
 
 Verification is a separate script needing no machine
 reconfiguration at all: after the install script's final `eject`,

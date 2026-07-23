@@ -23,7 +23,7 @@ Guests whose installers already accept a declarative answer file
 should consume that path rather than a keystroke script that
 reinvents it. Packer's builders solve delivery with an ephemeral
 local HTTP server the guest fetches from during the build.
-reliquary adopts the same pattern.
+Reliquary adopts the same pattern.
 
 This does not compete with those formats, and it does not weaken
 agentless keystroke scripting for guests that lack them
@@ -55,7 +55,7 @@ The feature is a run-scoped answer-file server:
   stops it if running and succeeds as a no-op if it is already
   stopped. A final `http stop` is implied on every terminal path:
   success, run failure, cancellation, or process exit.
-- The guest reaches the server over the VM network. reliquary does
+- The guest reaches the server over the VM network. Reliquary does
   not push answer files into the guest.
 
 This is strong alignment with U1, U4, and U5: installer-native
@@ -98,7 +98,7 @@ one final LF unless the file is empty, which is rejected.
 
 An inline body is a triple-quoted text body, not a statement list.
 By default,
-reliquary applies Java-text-block-style indentation cleanup before
+Reliquary applies Java-text-block-style indentation cleanup before
 serving: it finds the common leading whitespace of all non-blank
 body lines and removes exactly that prefix from every body line
 that has it. This lets authors indent the response inside the
@@ -183,7 +183,7 @@ http start {
 
 ## Address Binding
 
-When an `http` block is present, reliquary binds three reserved
+When an `http` block is present, Reliquary binds three reserved
 run properties:
 
 ```rlqs
@@ -202,7 +202,7 @@ primarily `type` and `enter`:
 enter "linux inst.ks=${rlq.http.url}/ks.cfg"
 ```
 
-The whole `rlq.*` property namespace is reserved for reliquary, as
+The whole `rlq.*` property namespace is reserved for Reliquary, as
 is the long-form `reliquary.*` namespace. User-authored
 properties, blueprint parameters, environment bindings, and
 property-file entries may not declare or supply any `rlq`,
@@ -243,7 +243,7 @@ or kind-mismatched property fails before the machine starts.
 
 Secret properties may be expanded into generated content. This is
 the answer-file equivalent of typing a product key into an
-installer: reliquary protects its own host-side records, but cannot
+installer: Reliquary protects its own host-side records, but cannot
 prevent the guest or installer from storing or displaying the
 secret. The protection rules are:
 
@@ -364,7 +364,7 @@ stop
 eject cdrom0
 ```
 
-The script controls how the installer learns the URL; reliquary
+The script controls how the installer learns the URL; Reliquary
 only supplies the guest-reachable address and serves the bytes.
 
 ## Validation Summary
@@ -398,7 +398,7 @@ Run-time checks:
 
 ## Non-goals
 
-- A reliquary-owned declarative install language.
+- A Reliquary-owned declarative install language.
 - Replacing the FreeDOS (or other answer-file-less) keystroke
   path.
 - A long-lived or home-wide HTTP service - the server is

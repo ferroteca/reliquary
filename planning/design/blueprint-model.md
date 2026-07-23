@@ -12,7 +12,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > [media-spec.md](media-spec.md)) and the published JSON Schemas
 > realign to it, and stay normative until they do.
 
-This round folds reliquary's two authored JSON formats — the
+This round folds Reliquary's two authored JSON formats — the
 machine blueprint (`.rlqb`) and the media definition (`.rlqm`) —
 into **one composable format**. There is a single authored JSON
 kind, the **blueprint** (`.rlqb`); `.rlqm` retires. A blueprint
@@ -330,7 +330,7 @@ already-orthogonal `--cache` / `RELIQUARY_CACHE_DIR` knob
 The residual exposure is **accepted**: two same-named components
 in different projects can alias one cache slot, but hash
 verification catches any actual byte mismatch, and the exposure
-stays small by design — a reliquary user targets a handful of
+stays small by design — a Reliquary user targets a handful of
 systems, not a vast library, so the odds of a genuine name clash
 are low. Content addressing's cost (opaque hash-named cache,
 against the "cache is not an interface" grain) is not worth paying
@@ -418,7 +418,7 @@ Yields media `FD14LIVE`, `FDBOOT`, `FDSTD01…07` (+ the explicit
       "drives": { "hdd0": "vbox-snap" }, "boot": ["hdd0"] } ] }
 ```
 
-reliquary's overlay protects the `.vdi`; local source ⇒ hash
+Reliquary's overlay protects the `.vdi`; local source ⇒ hash
 optional.
 
 ### 3 — pinned but unlocated "Windows Install CD"

@@ -22,7 +22,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 ## Purpose
 
-reliquary needs to support modern guests without weakening its
+Reliquary needs to support modern guests without weakening its
 permanent agentless DOS path. The current DOS interaction combines
 QMP keyboard events with VGA text-memory inspection. Future guests
 may instead expose a serial console, a service over virtio-serial,
@@ -53,7 +53,7 @@ elsewhere) is not a useful general automation path for Win9x,
 Windows NT, Linux, or BSD guests. It can provide lifecycle control,
 keyboard and pointing-device input, screenshots, and other
 machine-level observations, which can automate bounded firmware,
-installer, recovery, or GUI scenarios when reliquary knows the
+installer, recovery, or GUI scenarios when Reliquary knows the
 exact screen sequence.
 
 It does not provide the primitives needed for reliable general
@@ -66,7 +66,7 @@ control plane rather than a substitute for an OS communication protocol.
 
 Linux and BSD can be useful through a configured serial console,
 and modern guests through a guest agent, but those cease to be
-management-interface-only communication. reliquary keeps agentless
+management-interface-only communication. Reliquary keeps agentless
 interaction for the DOS workflow and bounded machine-level
 automation; it is not the general fallback for modern platforms.
 
@@ -135,7 +135,7 @@ An emulated UART connected to a host endpoint supplies a duplex
 byte stream on every backend. Many operating systems already
 contain UART drivers, so a custom driver is not inherently
 required. The guest must nevertheless attach a console, shell, or
-listener to the selected port before reliquary can do useful work.
+listener to the selected port before Reliquary can do useful work.
 
 A serial-console protocol may provide text input, streamed text
 output, and prompt-based completion. It does not inherently provide
@@ -158,23 +158,23 @@ operations:
 
 Guests without a native agent are not a gap to fill: they stay
 agentless (planning/USE-CASES.md — writing an agent would be a
-whole project unto itself, outside reliquary's scope).
+whole project unto itself, outside Reliquary's scope).
 
 ## Consuming native guest agents
 
-reliquary consumes the guest agents that already exist —
+Reliquary consumes the guest agents that already exist —
 [QGA](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html),
 VirtualBox Guest Additions, VMware Tools, Hyper-V integration
 services — and never builds or ships a guest-side agent of its
 own (planning/USE-CASES.md, the control-plane arc): agents may
 not exist for some operating systems, but writing one would be a
-whole project unto itself, outside reliquary's scope. Guests
+whole project unto itself, outside Reliquary's scope. Guests
 without a native agent — DOS-era systems above all — are served
 by the agentless control planes permanently, U3's loop included.
 
-The host side is a client module inside reliquary, never another
+The host side is a client module inside Reliquary, never another
 long-running host agent: the backend adapter owns the carrier
-endpoint and reliquary owns the VM lifecycle. The QGA client
+endpoint and Reliquary owns the VM lifecycle. The QGA client
 depends on QEMU's published guest-agent protocol — the wire
 contract — never on one particular guest implementation, and its
 initial command set is small: `guest-sync-delimited` for
@@ -252,7 +252,7 @@ duplicate monitor methods on their own interfaces.
 ## Configuration and lifecycle
 
 Platform selection and the allowed control plane policy must be explicit
-through the machine blueprint or per-invocation configuration. reliquary
+through the machine blueprint or per-invocation configuration. Reliquary
 must never infer the platform from the guest image, screen, or
 device behavior; capability probes only choose among control planes
 already permitted by that policy. The DOS policy is permanently
@@ -273,7 +273,7 @@ deadline.
 The selected candidate is reported in diagnostics and remains fixed
 after the first command is dispatched. A timeout or transport
 failure after dispatch must surface as an ambiguous execution
-failure; reliquary must not resend the command through the next
+failure; Reliquary must not resend the command through the next
 candidate. The agentless final fallback applies only to platform
 workflows, currently DOS, that explicitly support keyboard and
 screen automation. It is not a general fallback for modern guests.

@@ -1,15 +1,15 @@
-# reliquary
+# Reliquary
 
-reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
+Reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
 produce bootable disk images without manual interaction. It can help execute one-off commands and capture the results.
 It is built on its own agentless QEMU guest automation layer, which owns QEMU lifecycle, media, QMP identity checks,
 keyboard input, screen access, screenshots, and per-run state.
 
-reliquary machines are ephemeral: disposable rigs for scripted installs and automated guest tasks, cheap to destroy and
+Reliquary machines are ephemeral: disposable rigs for scripted installs and automated guest tasks, cheap to destroy and
 recreate. The machine is never the product — often nothing durable comes out at all (the point was to run some tests).
-reliquary is not a VM manager for machines you keep.
+Reliquary is not a VM manager for machines you keep.
 
-## When to use Vagrant, Packer, openQA, or reliquary
+## When to use Vagrant, Packer, openQA, or Reliquary
 
 For modern, standard operating-system testing in VMs, start with
 Vagrant and Packer. Packer is the established tool for defining
@@ -20,7 +20,7 @@ test environments: bring a VM up from a box, sync project files, run
 provisioners, execute guest commands over SSH or WinRM, collect normal
 test output, and destroy or recreate the environment when needed.
 
-reliquary is for the cases where that cooperative guest channel is not
+Reliquary is for the cases where that cooperative guest channel is not
 available, not trustworthy, or is itself the thing being created or
 tested. It drives a guest through the VM's observable console: keyboard
 events in, screen text and screenshots out, with media changes and run
@@ -31,7 +31,7 @@ tests where the screen or installer behavior is the assertion surface.
 
 If your guest can already accept SSH, WinRM, cloud-init, a guest agent,
 or a normal configuration-management/provisioning path, Vagrant and
-Packer are usually the better default. Use reliquary when the important
+Packer are usually the better default. Use Reliquary when the important
 part of the workflow lives before that point, below it, or outside it.
 
 openQA covers much of that console-driven ground at production scale.
@@ -45,7 +45,7 @@ especially live debugging and creating or updating needles from captured
 screenshots; its tests are still primarily authored as test modules plus
 needles.
 
-reliquary lives in the smaller local-tool and embedding-library space.
+Reliquary lives in the smaller local-tool and embedding-library space.
 It is meant to be run directly from a source tree or a user's machine,
 as a QEMU automation harness a script, test runner, CI job, or coding
 agent can call without adopting a scheduler, worker farm, web service,
@@ -60,12 +60,12 @@ asset files that can be reviewed and edited.
 
 ## Blueprints and machines
 
-The first thing to learn is reliquary's central model. A **blueprint** is a reusable JSON design you author and keep —
-a `<name>.rlqb` file, conventionally under `<reliquary_home>/blueprints/`. A **machine** is a disposable realization reliquary builds from it,
+The first thing to learn is Reliquary's central model. A **blueprint** is a reusable JSON design you author and keep —
+a `<name>.rlqb` file, conventionally under `<reliquary_home>/blueprints/`. A **machine** is a disposable realization Reliquary builds from it,
 identified by a generated id — one blueprint, many machines. The blueprint is one file holding named components — a
 `machine` plus the `media`, `source`, and `archive` components it draws on. Machines are created, run, destroyed, and
 recreated freely: the blueprint (media components and all) and its scripts are always enough to rebuild one, so nothing
-reliquary materializes is ever precious. Editing a blueprint never changes an existing machine by itself; a machine
+Reliquary materializes is ever precious. Editing a blueprint never changes an existing machine by itself; a machine
 keeps the snapshot it was created from. To adopt blueprint edits, destroy the machine and create it again.
 
 Read the [Blueprint guide](docs/blueprint-guide.md) for the implemented
@@ -138,7 +138,7 @@ when debugging a script.
 
 ## The machine layer
 
-Beneath the scripts, reliquary is a general automation harness for running remote tasks in QEMU guests, usable on its
+Beneath the scripts, Reliquary is a general automation harness for running remote tasks in QEMU guests, usable on its
 own through the CLI and Python interfaces documented below.
 
 DOS is the default and currently the only complete platform workflow. It boots a DOS guest, types at its keyboard, reads
@@ -164,7 +164,7 @@ Automating a modern virtual machine usually means installing a guest agent, open
 serial console. Those options are often unavailable in DOS, and they are especially unsuitable when the software under
 test is the driver that would provide that communication.
 
-reliquary therefore works **agentlessly**:
+Reliquary therefore works **agentlessly**:
 
 - Input is sent as keyboard events through QEMU's control protocol.
 - Text is read directly from VGA text memory, without OCR.
@@ -172,16 +172,16 @@ reliquary therefore works **agentlessly**:
 - Command completion is detected by watching for the DOS prompt.
 - Screenshots are captured through QEMU.
 
-The guest needs no reliquary software, network driver, serial driver, or background service. This makes the harness
+The guest needs no Reliquary software, network driver, serial driver, or background service. This makes the harness
 useful even while the guest is partially configured or broken.
 
 Any DOS with a bootable image works. A machine's drives each name a
 **media** component, and the media owns its content — a blank
 `materialize: new` disk of `size`, a `difference`/`copy` over a
 payload, or a `use` attach (an ISO, or a host directory served as a
-virtual FAT drive) — and reliquary materializes any per-machine image
+virtual FAT drive) — and Reliquary materializes any per-machine image
 under `cache/machines/<id>/media/`. Any QEMU-supported image format
-works; `*.img` and `*.iso` are taken as raw. reliquary hands back a
+works; `*.img` and `*.iso` are taken as raw. Reliquary hands back a
 guest program's raw output, and interpreting it is left to the caller.
 
 ## The workflow
@@ -213,7 +213,7 @@ guest program's raw output, and interpreting it is left to the caller.
 
 ## Requirements
 
-reliquary requires:
+Reliquary requires:
 
 - Python 3.9 or newer
 - QEMU with `qemu-system-i386` (and `qemu-img` to create hard-disk images)
@@ -221,7 +221,7 @@ reliquary requires:
 The Python package installs QEMU's official `qemu.qmp` library. QEMU itself is a separate application and must be
 installed on the host.
 
-reliquary searches for QEMU in this order:
+Reliquary searches for QEMU in this order:
 
 1. `RELIQUARY_QEMU_HOME` environment variable
 2. `QEMU_HOME` environment variable
@@ -230,9 +230,9 @@ reliquary searches for QEMU in this order:
 
 `--qemu PATH` and the Python `qemu=` argument can select a specific binary.
 
-## The reliquary home directory
+## The Reliquary home directory
 
-reliquary keeps its persistent state in one visible home directory. The default is `reliquary/` under your Documents
+Reliquary keeps its persistent state in one visible home directory. The default is `reliquary/` under your Documents
 folder (the Windows known Documents folder — including when redirected, e.g. into OneDrive — `~/Documents` on macOS, and
 `xdg-user-dir DOCUMENTS` on Linux/BSD). When no Documents folder can be determined, it falls back to `~/reliquary`.
 
@@ -271,11 +271,11 @@ selected home is printed to standard error the first time it is used.
 
 Authored assets (blueprints — with their media/source/archive
 components — and scripts) resolve in one of two modes. By default —
-**home mode** — reliquary reads the home's `blueprints/` / `scripts/`
+**home mode** — Reliquary reads the home's `blueprints/` / `scripts/`
 folders and seeds any name it does not find from the built-in codex;
 this is the convenient path for interactive use. Point `--assets <dir>`
 at a project directory instead
-and reliquary resolves **solely** from that tree (walked recursively by
+and Reliquary resolves **solely** from that tree (walked recursively by
 file extension): no home, no codex, no seeding. That is the mode for
 automation — assets are your project's source-controlled files, so a run
 is reproducible and never picks up whatever happens to be in your home.
@@ -313,7 +313,7 @@ machine of this blueprint already exists — e.g. one installed by
 rlq start-machine --blueprint freedos-1.4-plain
 ```
 
-reliquary chooses an available local QMP port, starts QEMU headless,
+Reliquary chooses an available local QMP port, starts QEMU headless,
 assigns the VM a unique identity, and records it in the machine's
 `machine.json` (as a `vm` section, written while running). Later
 commands find the running VM through the machine selector, so the port
@@ -471,7 +471,7 @@ rlq hmp "info block"
 ```
 
 `hmp` sends a raw QEMU human-monitor command. It is intended for QEMU operations that do not yet have a dedicated
-reliquary command.
+Reliquary command.
 
 Run `reliquary --help` or `reliquary COMMAND --help` for the complete current syntax.
 
@@ -569,7 +569,7 @@ selector, and that `rlq start-machine` completed successfully.
 
 ### The VM identity does not match
 
-reliquary verifies the unique QEMU name and per-start uuid before
+Reliquary verifies the unique QEMU name and per-start uuid before
 sending any command. An identity error means the recorded port now
 belongs to another process or the state file is stale. The unrelated VM
 is not modified. Review the machine's `machine.json` (its `vm` section)
@@ -591,5 +591,5 @@ Stop QEMU before reading files written to the virtual FAT drive. Writes are flus
 
 BSD-3-Clause. See [LICENSE](LICENSE).
 
-The name **reliquary** is owned by Paul Galbraith and is not licensed
+The name **Reliquary** is owned by Paul Galbraith and is not licensed
 for use by forks or redistributions. See [TRADEMARKS.md](TRADEMARKS.md).

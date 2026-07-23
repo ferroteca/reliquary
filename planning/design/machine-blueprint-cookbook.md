@@ -13,7 +13,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Complete, working blueprints for common machine shapes. Each
 entry shows the blueprint (what you write) and, where instructive,
-the state document reliquary resolves it into. A drive names a
+the state document Reliquary resolves it into. A drive names a
 **media** component; the media owns its content (see the
 [media spec](media-spec.md)). Concepts — including the blueprint/state
 split — are in [the guide](machine-blueprint.md); every rule is in the
@@ -116,7 +116,7 @@ The `hdd` drive names the `blank-20m` media — `materialize: new`,
 so rlq creates a 20 MiB dynamically-allocated image at the
 media-keyed path (`media/blank-20m.qcow2` on QEMU — the
 [naming and format](machine-blueprint-reference.md#image-naming-and-formats)
-are reliquary's choice, not yours). Installation itself is an
+are Reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
 blueprint and state make no claim about the guest's contents. After

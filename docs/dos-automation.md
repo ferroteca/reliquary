@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # DOS automation
 
-reliquary provides agentless automation for DOS guests through QEMU. No guest agent, network driver, or serial driver is required.
+Reliquary provides agentless automation for DOS guests through QEMU. No guest agent, network driver, or serial driver is required.
 
 ## How it works
 

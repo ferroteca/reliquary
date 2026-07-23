@@ -14,14 +14,14 @@ SPDX-License-Identifier: BSD-3-Clause
 > planning/TASKS.md.
 
 The authoring recorder serves U6: a person performs the task once
-in a console session reliquary supervises, and reliquary drafts
+in a console session Reliquary supervises, and Reliquary drafts
 the script and captures the landmark assets that reproduce it.
 Settled design:
 
-**Recording requires reliquary to be the console.** Input typed
+**Recording requires Reliquary to be the console.** Input typed
 into a backend's own display window never passes through
-reliquary and cannot be followed; recording happens in a
-reliquary-owned viewer over the `vnc` control plane, where every
+Reliquary and cannot be followed; recording happens in a
+Reliquary-owned viewer over the `vnc` control plane, where every
 keystroke, click, and media swap is observable. The viewer is a
 real component, and the recording prerequisite on every backend —
 QEMU included.
@@ -69,7 +69,7 @@ the author to splice in their editor; an explicit opt-in apply
 may perform the surgical insertion at the anchor, touching no
 other byte — a named exception in the family of installing an
 embedded definition. Round-trip is append-shaped everywhere;
-nothing reliquary wrote once is rewritten.
+nothing Reliquary wrote once is rewritten.
 
 **Shared machinery.** Run-to-point, breakpoints, and human
 takeover are runner features that also serve ordinary debugging —

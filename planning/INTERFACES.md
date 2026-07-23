@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Interfaces to the world
 
-> **Status:** reliquary's guiding principles, and the governing
+> **Status:** Reliquary's guiding principles, and the governing
 > document. It names the world-facing interfaces, the primary use
 > cases they serve — the numbered list itself lives in
 > [planning/USE-CASES.md](USE-CASES.md) — and the rule every
@@ -16,7 +16,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > the guiding principles and use cases govern: the roadmap is
 > realigned to them, never the other way around.
 
-reliquary meets the world through its primary interfaces:
+Reliquary meets the world through its primary interfaces:
 
 1. **The CLI** — the `rlq` / `reliquary` command.
 2. **The embedding API** — native language bindings (Python is
@@ -58,7 +58,7 @@ under the twin-name identity rule a command *is* its API twin's
 name, dash-separated (the guest-console family instead spells as
 the script language's verbs, and the `run` family maps to the run
 handle — planning/ROADMAP.md "The CLI"). It is also the
-universal automation path: any language that wants reliquary
+universal automation path: any language that wants Reliquary
 automation but has no native API binding automates via the CLI, so
 the CLI serves programs as well as people — and, like the API, it
 must never make working from a common language difficult: a
@@ -77,7 +77,7 @@ binding, not the definition of the surface. A language without a
 native binding automates via the CLI instead. The API must never
 make working in a common binding language (C, Java) difficult: a
 semantic shape that cannot be expressed cleanly across bindings
-is the wrong shape, whatever its elegance in Python. reliquary attaches
+is the wrong shape, whatever its elegance in Python. Reliquary attaches
 no meaning to guest output; interpretation belongs to the caller.
 In-repo consumers (the media layer, the script runtime) must drive
 the same public interfaces available to external callers. Design:
@@ -128,7 +128,7 @@ covers them equally:
   `user.properties` file, edited directly in an editor, and the
   `RELIQUARY_PROPERTY_*` environment spelling:
   [planning/design/script-properties.md](design/script-properties.md).
-- **The codex** — reliquary's built-in seed content and its
+- **The codex** — Reliquary's built-in seed content and its
   index: seed-not-a-resolution-tier semantics, never-overwrite,
   delete-to-refresh, provenance, and the licensing rule
   for shipped media URLs:
@@ -162,7 +162,7 @@ be rejected by naming the use case it costs.
 
 The use-case list ([planning/USE-CASES.md](USE-CASES.md)) is where
 interface changes are argued. A change
-to an interfacing aspect of reliquary is significant precisely
+to an interfacing aspect of Reliquary is significant precisely
 when approving it requires the primary use cases to be adjusted;
 a significant change is not argued as a feature on its own merits
 — the use-case amendment is the argument, and the interface
@@ -178,14 +178,14 @@ Requests triage by their use-case impact:
   better spelling for an existing capability, a gap filled where
   one surface lags the others. An easy decision to approve; cite
   the use cases served, or state that none are disturbed.
-- **Adds a new use.** The change serves a use reliquary does not
+- **Adds a new use.** The change serves a use Reliquary does not
   yet name. More work — the new use case must be drafted,
   numbered, and weighed for coherence with the existing list and
   the ephemeral-machine principle — but, being additive, still an
   easy decision.
 - **Misaligned with the primary use cases.** The hard case, and
   the one that must be argued very vigorously: approving such a
-  change in good faith would require reliquary's primary use
+  change in good faith would require Reliquary's primary use
   cases to change, so the use-case amendment — not the feature —
   is what gets argued. The workflow is strict: make the argument;
   if the argument wins, amend the use cases in planning/USE-CASES.md; only

@@ -20,7 +20,7 @@ SPDX-License-Identifier: BSD-3-Clause
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`<name>.rlqb`, yours) and each
 machine's **state** (`cache/machines/<id>/machine.json`,
-reliquary's). A drive names a **media** component; the media's own
+Reliquary's). A drive names a **media** component; the media's own
 fields (`materialize`, `size`, `source`, `read-only`, …) live in
 [the media spec](media-spec.md). For the blueprint/state model, read
 [the guide](machine-blueprint.md) first; for complete examples, see
@@ -32,7 +32,7 @@ Each field is marked with where it may appear:
   author and realize as a machine with
   `rlq create-machine --blueprint <name>`). Every blueprint field is also
   valid in the state, where it always appears fully resolved.
-- **state-only** — written by reliquary into the state; rejected
+- **state-only** — written by Reliquary into the state; rejected
   in a blueprint.
 
 All fields are present in the state unless noted otherwise.
@@ -44,7 +44,7 @@ dialect — per the same section; the state is strict canonical
 JSON, always.
 
 The machine-checkable companion is the one published
-[blueprint-schema-v1.json](../../reliquary/schemas/blueprint-schema-v1.json)
+[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json)
 (machine, media, source, and archive components in one schema) —
 the structural subset of the format checks only; this reference
 is normative.
@@ -71,7 +71,7 @@ command syntax, prompt handling) and the
 fields. The list is extended deliberately, one platform workflow at
 a time.
 
-The platform is **never inferred**. reliquary does not inspect disk
+The platform is **never inferred**. Reliquary does not inspect disk
 images, watch the guest screen, or probe devices to decide what OS
 a machine runs; the blueprint says so, or nothing does.
 
@@ -91,7 +91,7 @@ The virtualization backend hosting the machine:
 | `hyperv`     | Hyper-V            |
 
 Omitted from the blueprint, the backend is assigned when the
-machine is materialized (`create` or `recreate`): reliquary walks
+machine is materialized (`create` or `recreate`): Reliquary walks
 its backend priority order one by one, probing each for
 availability on the host, and assigns the first entry that is
 available and capable of everything the blueprint asks for.
@@ -307,7 +307,7 @@ The backend's own identifier for this machine:
 | `vmware`     | path to the `.vmx` file     |
 | `hyperv`     | Hyper-V VM id               |
 
-This is the anchor for **ownership verification**: reliquary never
+This is the anchor for **ownership verification**: Reliquary never
 sends a control command to a hypervisor object until the object's
 identity matches `backend-id`. A stale or foreign machine is
 detected and refused rather than manipulated.
@@ -453,12 +453,12 @@ preflight (and a script's `insert` targets) can be checked before
 anything runs. Fixed drives
 (`hdd`) cannot be empty.
 
-There are no paths to reliquary-managed images anywhere in the
+There are no paths to Reliquary-managed images anywhere in the
 blueprint. A drive whose media materializes a per-machine image
-(`new` / `difference` / `copy`) gets it created by reliquary inside
+(`new` / `difference` / `copy`) gets it created by Reliquary inside
 the cached materialization, named for the **media** —
 `cache/machines/<id>/media/blank-20m.qcow2` for a media `blank-20m`
-on QEMU — with the extension of the format reliquary chose (see
+on QEMU — with the extension of the format Reliquary chose (see
 [image naming](#image-naming-and-formats)). You never name, place,
 or reference these files; the media name is the handle.
 
@@ -529,7 +529,7 @@ What the blueprint deliberately does **not** say:
 Controller support is a backend capability, checked like any
 other. Every backend supports `ide` except Hyper-V Generation 2
 machines (SCSI only); paravirtual types need both a backend that
-offers them and a guest with the driver — reliquary checks the
+offers them and a guest with the driver — Reliquary checks the
 backend half and leaves the driver half to you. A declared
 controller the machine's backend cannot provide is a capability
 error naming both.
@@ -537,7 +537,7 @@ error naming both.
 One ordering caveat: slot order is authoritative *within* a
 controller type. When a machine mixes controller types, the
 guest's firmware decides how the controllers themselves enumerate,
-and reliquary cannot promise a global disk order across types —
+and Reliquary cannot promise a global disk order across types —
 prefer one controller type per machine when drive lettering
 matters (as it does under DOS).
 
@@ -567,7 +567,7 @@ keeps its own image and a re-insert reuses it. There are no other
 image names, ever: the blueprint has no image-path field, and
 nothing is hand-placed in the cache.
 
-The format is reliquary's choice, made per backend. A `new` blank,
+The format is Reliquary's choice, made per backend. A `new` blank,
 or a `copy` of a payload (converting when needed), uses the
 backend's preferred dynamically-allocated format; a `difference`
 media uses the backend-native differencing format:
@@ -579,7 +579,7 @@ media uses the backend-native differencing format:
 | `vmware`     | VMDK         |
 | `hyperv`     | VHDX         |
 
-Because reliquary owns image creation and naming, every
+Because Reliquary owns image creation and naming, every
 blueprint is format-portable by construction: the right format
 arrives on whatever backend is assigned, and `recreate` onto a
 different backend regenerates the images in the new backend's
@@ -629,9 +629,9 @@ capability error rather than silently booting from something else.
 
 **blueprint (optional) · array of strings**
 
-The ordered control-plane policy: which control planes reliquary
+The ordered control-plane policy: which control planes Reliquary
 may use for guest-facing operations on this machine, in preference
-order. reliquary probes readiness in this order and never uses a
+order. Reliquary probes readiness in this order and never uses a
 control plane the policy doesn't list. Entries are unique — a
 control plane listed twice fails validation.
 
@@ -683,7 +683,7 @@ Rules:
 - This is the **only** place backend-specific configuration may
   appear. A blueprint with no `backend-settings` is portable by
   construction.
-- Settings may not touch what reliquary owns through first-class
+- Settings may not touch what Reliquary owns through first-class
   fields — memory, drives, boot order, CPU count, machine identity.
   Each backend adapter validates its section and rejects overlap.
 - The available keys in each backend's section are defined and
@@ -709,7 +709,7 @@ Format checks (reject the document):
 - a `media` name no media component provides (plus every media /
   source / archive rule in [the media spec](media-spec.md));
 - a `cdrom` drive naming a media that is not read-only `use`;
-- `backend-settings` sections overlapping reliquary-owned fields;
+- `backend-settings` sections overlapping Reliquary-owned fields;
 - `parameters` values that are neither a string nor a
   `{"property": "<key>"}` object, or with invalid input or
   property names.

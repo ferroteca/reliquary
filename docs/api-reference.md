@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Python API reference
 
-This is the reference for reliquary's implemented Python surface —
+This is the reference for Reliquary's implemented Python surface —
 the first binding of the embedding API. Everything below is
 importable from the `reliquary` package and mirrors the CLI: the
 two are one semantic surface. The end-goal API design, including
@@ -13,12 +13,12 @@ the surface still ahead of implementation and the settled naming
 it realigns to, is in
 [planning/design/api.md](../planning/design/api.md).
 
-reliquary attaches no meaning to guest output; interpreting
+Reliquary attaches no meaning to guest output; interpreting
 results belongs to the caller.
 
 ## Home, cache, and Context
 
-- `set_home(path)` - Set the process-global reliquary home
+- `set_home(path)` - Set the process-global Reliquary home
   (overrides `RELIQUARY_HOME`).
 - `set_cache(path)` - Set the process-global cache root (overrides
   `RELIQUARY_CACHE_DIR`); defaults to `<home>/cache`.
@@ -182,10 +182,10 @@ survive stop/start:
 
 `Machine(port=None, home=None, deadline=None)` is the
 platform-neutral interaction handle for a running,
-reliquary-owned VM. Every operation verifies VM identity before
+Reliquary-owned VM. Every operation verifies VM identity before
 sending anything. `Machine.home` is a plain already-resolved
 directory, not a `Context` — typically a specific machine's own
-cache subdirectory, not the reliquary home itself.
+cache subdirectory, not the Reliquary home itself.
 
 - `Machine.qmp()` - Context manager yielding the
   identity-verified QMP session (its `cmd()` and `hmp()` remain

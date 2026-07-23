@@ -12,7 +12,7 @@ appear before or after the command word.
 
 ## Global options
 
-- `--home <path>` - Override the reliquary home directory
+- `--home <path>` - Override the Reliquary home directory
 - `--cache <path>` - Override the cache directory (default:
   `<home>/cache`)
 - `--assets <dir>` - Resolve authored assets (blueprints, with
