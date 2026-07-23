@@ -30,10 +30,10 @@ from urllib.parse import urlsplit
 
 from qemu.qmp import ConnectError
 
-from .library import locate_blueprint, locate_script, seed_script
+from .library import locate_script, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
-from .blueprint import load_blueprint
+from .resolve import load_namespace
 from .script_parser import load_script
 from .script_timing import (format_plan, parse_duration,
                             resolve as resolve_timing)
@@ -1168,10 +1168,12 @@ def check_script(name, *, blueprint=None, machine=None, context=None):
         state = _machines.load_machine_state(machine_id, context)
         scripts_map = state.get("scripts") or {}
     elif blueprint is not None:
-        scripts_map = dict(
-            load_blueprint(
-                locate_blueprint(blueprint, context=context),
-                context=context).scripts)
+        namespace = load_namespace(context)
+        machine_component = namespace.machines.get(blueprint)
+        if machine_component is None:
+            raise FileNotFoundError(
+                f"no machine blueprint named {blueprint!r}")
+        scripts_map = dict(machine_component.scripts)
     stem = _resolve_script_stem(name, scripts_map)
     script_path = locate_script(stem, context=context)
     script = load_script(script_path)

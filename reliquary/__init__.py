@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """OS installation scripting over agentless QEMU guest automation."""
 
-from .blueprint import (Blueprint, BlueprintDrive, delete_blueprint,
-                        load_blueprint, parse_blueprint, new_blueprint)
+from .blueprint import delete_blueprint, new_blueprint
 from .cli import main
+from .document import Document, load_document, parse_document
 from .home import (HOME_ASSETS, Context, blueprints_dir, cache_dir,
                    documents_dir, downloads_cache_dir, home,
                    machines_cache_dir, media_cache_dir, media_dir,
@@ -24,9 +24,9 @@ from .machines import (apply_blueprint, create, create_machine,
                        recreate_machine, resolve_machine, set_boot_order,
                        start_machine,
                        stop_machine)
-from .media import (MediaDefinition, MediaItem, ResolvedMedia,
-                    fetch_media, resolve_media, clean_downloads,
-                    clean_media, delete_media, list_media)
+from .media import (fetch_media, clean_downloads, clean_media,
+                    delete_media, list_media)
+from .resolve import load_namespace
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
 from .script_nodes import ScriptParseError
@@ -36,9 +36,8 @@ from .script_runner import (ScriptCheck, ScriptRun, ScriptRuntimeError,
                             check_script, execute_script, run_script)
 
 __all__ = [
-    "Blueprint",
-    "BlueprintDrive",
     "Condition",
+    "Document",
     "Handler",
     "Machine",
     "Qmp",
@@ -65,9 +64,6 @@ __all__ = [
     "eject_media",
     "get_machine_dir",
     "insert_media",
-    "MediaDefinition",
-    "MediaItem",
-    "ResolvedMedia",
     "blueprints_dir",
     "cache_dir",
     "clean_downloads",
@@ -83,7 +79,8 @@ __all__ = [
     "list_media",
     "list_properties",
     "list_scripts",
-    "load_blueprint",
+    "load_document",
+    "load_namespace",
     "load_script",
     "load_machine_state",
     "machine_dir_path",
@@ -94,7 +91,7 @@ __all__ = [
     "media_cache_dir",
     "media_dir",
     "new_blueprint",
-    "parse_blueprint",
+    "parse_document",
     "parse_script",
     "recreate_machine",
     "resolve_machine",

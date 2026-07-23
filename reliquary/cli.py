@@ -678,11 +678,13 @@ def _script_description_by_stem(stem):
 def _list_scripts(arguments):
     blueprint_name = getattr(arguments, "blueprint", None)
     if blueprint_name:
-        bp = blueprint_mod.load_blueprint(locate_blueprint(blueprint_name))
+        from .resolve import load_namespace
+        machine_component = load_namespace().machines.get(blueprint_name)
+        scripts = dict(machine_component.scripts) if machine_component else {}
         rows = [
             {"label": label, "stem": stem,
              "description": _script_description_by_stem(stem)}
-            for label, stem in bp.scripts.items()]
+            for label, stem in scripts.items()]
 
         def render_labels():
             if not rows:

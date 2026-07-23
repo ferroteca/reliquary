@@ -46,7 +46,6 @@ reliquary = [
     "schemas/*.json",
     "codex/codex.json",
     "codex/blueprints/*.rlqb",
-    "codex/media/*.rlqm",
     "codex/scripts/*.rlqs",
 ]
 reliquary_tests = ["fixtures/*", "fixtures/**/*"]

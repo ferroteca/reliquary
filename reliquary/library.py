@@ -15,9 +15,8 @@ import os
 import re
 from importlib import resources
 
-from . import assets, jsonc
-from .home import blueprints_dir, media_dir, scripts_dir
-from .media import parse_definition, scan_media_definitions
+from . import assets, document, jsonc
+from .home import blueprints_dir, scripts_dir
 
 
 def _builtins_root():
@@ -41,27 +40,23 @@ def _copy_out(source, destination):
     return True
 
 
-def _referenced_media(blueprint_data):
-    """Yield the media names a raw blueprint object references."""
-    drives = blueprint_data.get("drives")
-    if not isinstance(drives, collections.abc.Mapping):
-        return
-    for declaration in drives.values():
-        if isinstance(declaration, str):
-            yield declaration
-        elif (isinstance(declaration, collections.abc.Mapping)
-                and isinstance(declaration.get("media"), str)):
-            yield declaration["media"]
+def _machine_objects(blueprint_data):
+    """Yield the machine component objects in a raw composed document."""
+    machines = blueprint_data.get("machines")
+    entries = machines if isinstance(machines, list) else [blueprint_data]
+    for machine in entries:
+        if isinstance(machine, collections.abc.Mapping):
+            yield machine
 
 
 def _referenced_scripts(blueprint_data):
-    """Yield the script stems a raw blueprint object references."""
-    scripts = blueprint_data.get("scripts")
-    if not isinstance(scripts, collections.abc.Mapping):
-        return
-    for stem in scripts.values():
-        if isinstance(stem, str):
-            yield stem
+    """Yield the script stems a composed blueprint's machines reference."""
+    for machine in _machine_objects(blueprint_data):
+        scripts = machine.get("scripts")
+        if isinstance(scripts, collections.abc.Mapping):
+            for stem in scripts.values():
+                if isinstance(stem, str):
+                    yield stem
 
 
 def list_builtin_blueprints():
@@ -87,22 +82,25 @@ def list_builtin_blueprints():
 
 
 def list_builtin_media():
-    """Yield item names defined by the built-in media library."""
-    root = _builtins_root() / "media"
+    """Yield media component names defined by the built-in codex blueprints.
+
+    Media are components inside the composed ``.rlqb`` blueprints now,
+    so this parses the codex blueprints and collects their media names.
+    """
+    root = _builtins_root() / "blueprints"
     if not root.is_dir():
         return
     names = set()
     for entry in sorted(root.iterdir(), key=lambda item: item.name):
-        if not (entry.name.endswith(".rlqm")
-                or entry.name.endswith(".json")):
+        if not entry.name.endswith(".rlqb"):
             continue
         try:
-            definition = parse_definition(
-                jsonc.loads(entry.read_text(encoding="utf-8")))
-        except (ValueError, UnicodeDecodeError, KeyError):
+            doc = document.parse_document(
+                jsonc.loads(entry.read_text(encoding="utf-8")),
+                stem=entry.name[:-5])
+        except (ValueError, KeyError, UnicodeDecodeError):
             continue
-        for item in definition.items:
-            names.add(item.name)
+        names.update(doc.media)
     for name in sorted(names):
         yield name
 
@@ -122,16 +120,23 @@ def _blueprint_meta(path):
     except (OSError, ValueError, UnicodeDecodeError):
         raw = None
     mapping = raw if isinstance(raw, collections.abc.Mapping) else None
-    if not path.endswith(".rlqb") and (
-            mapping is None or "platform" not in mapping):
+    machine = None
+    if mapping is not None:
+        machines = mapping.get("machines")
+        if (isinstance(machines, list) and machines
+                and isinstance(machines[0], collections.abc.Mapping)):
+            machine = machines[0]
+        elif "machines" not in mapping and "platform" in mapping:
+            machine = mapping
+    if not path.endswith(".rlqb") and machine is None:
         return None
-    name = mapping.get("name") if mapping else None
+    name = machine.get("name") if machine else None
     if not (isinstance(name, str) and name.strip()):
         name = None
     return {
         "name": name,
-        "description": mapping.get("description") if mapping else None,
-        "platform": mapping.get("platform") if mapping else None,
+        "description": machine.get("description") if machine else None,
+        "platform": machine.get("platform") if machine else None,
     }
 
 
@@ -302,81 +307,39 @@ def seed_blueprint(name, context=None, *, only=False):
         return False
 
     if not only and isinstance(data, collections.abc.Mapping):
-        # Resolve everything relative to the home this seed is into
-        for media_name in _referenced_media(data):
-            seed_media(media_name, context=context)
+        # Media travel inside the composed blueprint; only the scripts
+        # its machines reference are separate files to seed.
         for stem in _referenced_scripts(data):
             seed_script(stem, context=context)
     return True
 
 
 def seed_media(name, context=None, *, only=False):
-    """Seed the built-in media definition defining item ``name``.
+    """Deprecated no-op in the composed model.
 
-    Returns whether a definition file was copied out. A home
-    definition already supplying the name, a home file already
-    occupying the builtin's filename, or no builtin defining the
-    name: nothing happens. ``only`` is accepted for a uniform seed
-    surface but inert — a media definition has no closure.
+    Media are components inside a blueprint ``.rlqb`` and are seeded
+    with it (``seed_blueprint``), so there is no standalone media
+    definition to copy out. Retained so the ``seed-media`` surface
+    still resolves; it seeds nothing and returns ``False``. The
+    command's fate rides the media-lifecycle design round.
     """
-    if scan_media_definitions(media_dir(context), name):
-        return False
-    root = _builtins_root() / "media"
-    if not root.is_dir():
-        return False
-    for entry in sorted(root.iterdir(), key=lambda item: item.name):
-        if not (entry.name.endswith(".rlqm") or entry.name.endswith(".json")):
-            continue
-        try:
-            definition = parse_definition(
-                jsonc.loads(entry.read_text(encoding="utf-8")))
-        except (ValueError, UnicodeDecodeError, KeyError):
-            continue
-        if any(item.name == name for item in definition.items):
-            stem = entry.name.rsplit(".", 1)[0]
-            os.makedirs(media_dir(context), exist_ok=True)
-            destination = os.path.join(media_dir(context), f"{stem}.rlqm")
-            return _copy_out(entry, destination)
     return False
-
-
-# A deliberate text scan, not a parse: seeding must work on a file
-# the parser may reject. Only the `@name` form names an item a
-# definition can be seeded for -- `$key` is a property reference,
-# resolved per run once binding exists.
-_INSERT_MEDIA = re.compile(r"^\s*insert\s+\S+\s+@(\S+)", re.MULTILINE)
-
-
-def _referenced_insert_media(script_text):
-    """Yield the media names a script's ``insert`` statements use."""
-    yield from _INSERT_MEDIA.findall(script_text)
 
 
 def seed_script(stem, context=None, *, only=False):
     """Seed ``scripts/<stem>.rlqs`` from the built-in library.
 
-    Returns whether the script file was copied out. The media
-    definitions the script's ``insert`` statements reference come
-    along (each obeying the never-overwrite rule), so a seeded
-    script resolves its media without a live fetch first.
-    ``only=True`` copies just the script file, not its media.
+    Returns whether the script file was copied out. Scripts have no
+    seed closure of their own now — the media a script's ``insert``
+    statements reference live inside the composed blueprint that named
+    the script. ``only`` is accepted for a uniform seed surface.
     """
     source = _builtins_root() / "scripts" / f"{stem}.rlqs"
     if not source.is_file():
         return False
     os.makedirs(scripts_dir(context), exist_ok=True)
     destination = os.path.join(scripts_dir(context), f"{stem}.rlqs")
-    if not _copy_out(source, destination):
-        return False
-    if only:
-        return True
-    try:
-        text = source.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return True
-    for media_name in _referenced_insert_media(text):
-        seed_media(media_name, context=context)
-    return True
+    return _copy_out(source, destination)
 
 
 def _script_index(source):

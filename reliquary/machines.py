@@ -9,13 +9,21 @@ import os
 import shutil
 from datetime import datetime, timezone
 
-from .blueprint import load_blueprint
+from .acquire import fetch_media as _acquire_fetch
 from .home import machines_cache_dir
 from .library import seed_blueprint
 from .lifecycle import (create_difference_image, create_duplicate_image,
                         create_hdd_image, find_qemu, launch_owned_qemu,
                         read_vm_state, stop as stop_owned_qemu)
-from .media import fetch_media
+from .resolve import load_namespace, resolve_media
+
+
+def _fetch(media_name, context, *, namespace=None, on_mismatch="fail"):
+    """Resolve a media by name against the source namespace and fetch
+    its verified payload path (or ``None`` for a ``new`` blank)."""
+    namespace = namespace if namespace is not None else load_namespace(context)
+    media = resolve_media(media_name, namespace)
+    return _acquire_fetch(media, namespace, context, on_mismatch)
 
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
@@ -216,47 +224,52 @@ def _drive_common(key, drive):
     return entry
 
 
-def _materialize_drive(key, drive, drives_root, source, context):
+def _materialize_drive(key, drive, drives_root, namespace, context):
     """Materialize one enabled drive, returning its resolved state entry.
 
-    The entry carries the drive's logical shape plus the cache
-    ``path`` reliquary realized (an image file, a host directory, or
-    ``None`` for an empty removable slot). ``source`` is the blueprint
-    file path a relative ``hostdir`` resolves against.
+    The drive names a media (or is an empty removable slot); the media
+    owns materialization. ``new`` is a fresh blank of its ``size``;
+    ``use`` attaches the fetched payload directly (a directory payload
+    renders as vvfat); ``difference``/``copy`` build a per-machine image
+    over/of the fetched payload. The entry records the realized ``path``
+    plus the media name and mode.
     """
     entry = _drive_common(key, drive)
-    if drive.size is not None:
+    if drive.media is None:
+        # An empty removable slot: guest-visible hardware with no medium
+        # until a script inserts one.
+        entry.update(media=None, materialize=None, path=None)
+        return entry
+    media = resolve_media(drive.media, namespace)
+    mode = media.materialize
+    if drive.medium == "cdrom" and mode != "use":
+        raise ValueError(
+            f"drives.{key}: a cdrom is read-only, so its media must "
+            f"'use' (attach), not '{mode}'")
+    entry["media"] = media.name
+    entry["materialize"] = mode
+    if mode == "new":
         path = os.path.join(drives_root, f"{key}.qcow2")
-        create_hdd_image(path, drive.size)
-        entry.update(size=drive.size, path=path)
-    elif drive.media is not None:
-        entry.update(
-            media=drive.media.item.name,
-            path=fetch_media(drive.media.item.name, context=context))
-    elif drive.base is not None:
-        base_payload = fetch_media(drive.base.item.name, context=context)
+        create_hdd_image(path, media.size)
+        entry.update(size=media.size, path=path)
+    elif mode == "use":
+        entry["path"] = _acquire_fetch(media, namespace, context)
+    elif mode in ("difference", "copy"):
+        base_payload = _acquire_fetch(media, namespace, context)
         dest = os.path.join(drives_root, f"{key}.qcow2")
-        if drive.base_type == "duplicate":
+        if mode == "copy":
             create_duplicate_image(dest, base_payload)
         else:
             create_difference_image(dest, base_payload)
-        entry.update(
-            base={"media": drive.base.item.name, "type": drive.base_type},
-            path=dest)
-    elif drive.hostdir is not None:
-        entry.update(
-            hostdir=drive.hostdir,
-            path=_resolve_hostdir(drive.hostdir, source))
+        entry["path"] = dest
     else:
-        # An empty removable drive: guest-visible hardware with no
-        # medium until a script inserts one.
-        entry.update(media=None, path=None)
+        raise ValueError(f"unknown materialize mode {mode!r} for {key}")
     return entry
 
 
-def create(blueprint, *, context=None, blueprint_name="", source=None,
-           number=None):
-    """Materialize one machine from a parsed Blueprint.
+def create(machine, namespace, *, context=None, blueprint_name="",
+           source=None, number=None):
+    """Materialize one machine from a parsed composed machine component.
 
     Creates the machine cache directory under
     ``cache/machines/<blueprint>-<n>/``, writes
@@ -298,7 +311,7 @@ def create(blueprint, *, context=None, blueprint_name="", source=None,
     with _machine_lock(machine_id, context):
         try:
             return _materialize_machine(
-                blueprint, machine_id, blueprint_name, created,
+                machine, namespace, machine_id, blueprint_name, created,
                 drives_root, source, context)
         except BaseException:
             # Roll back a failed create: the machine never reached a
@@ -308,34 +321,34 @@ def create(blueprint, *, context=None, blueprint_name="", source=None,
             raise
 
 
-def _materialize_machine(blueprint, machine_id, blueprint_name, created,
-                         drives_root, source, context):
+def _materialize_machine(machine, namespace, machine_id, blueprint_name,
+                         created, drives_root, source, context):
     resolved_drives = {}
-    for key, drive in sorted(blueprint.drives.items()):
+    for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
             # `enabled: false` removes the drive from the machine
             # entirely (machine-blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
-            key, drive, drives_root, source, context)
+            key, drive, drives_root, namespace, context)
 
-    memory = blueprint.memory
+    memory = machine.memory
     if memory is None:
-        memory = _PLATFORM_MEMORY.get(blueprint.platform, 16)
+        memory = _PLATFORM_MEMORY.get(machine.platform, 16)
     resolved = {
-        "platform": blueprint.platform,
-        "backend": blueprint.backend or "qemu",
+        "platform": machine.platform,
+        "backend": machine.backend or "qemu",
         "memory": memory,
-        "cpus": blueprint.cpus if blueprint.cpus is not None else 1,
-        "boot": list(blueprint.boot),
-        "name": blueprint.name,
-        "description": blueprint.description,
-        "scripts": dict(blueprint.scripts),
-        "control-planes": (list(blueprint.control_planes)
-                           or _default_control_planes(blueprint.platform)),
+        "cpus": machine.cpus if machine.cpus is not None else 1,
+        "boot": list(machine.boot),
+        "name": machine.name,
+        "description": machine.description,
+        "scripts": dict(machine.scripts),
+        "control-planes": (list(machine.control_planes)
+                           or _default_control_planes(machine.platform)),
         "backend-settings": {
             name: dict(section)
-            for name, section in blueprint.backend_settings.items()},
+            for name, section in machine.backend_settings.items()},
     }
 
     state = {
@@ -366,16 +379,19 @@ def create_machine(name, *, context=None, number=None):
     the old id); omitted, the lowest free number is allocated.
     """
     from .assets import source_for
-    from .library import locate_blueprint
-    # Home mode seeds the blueprint and its media/script closure from
-    # the codex on first reference (idempotent, never overwriting);
+    # Home mode seeds the blueprint (and the media/scripts it carries)
+    # from the codex on first reference (idempotent, never overwriting);
     # dir mode (``--assets``) is hermetic and seeds nothing.
     if source_for(context).seeds:
         seed_blueprint(name, context=context)
-    path = locate_blueprint(name, context=context)
-    blueprint = load_blueprint(path, context=context)
-    return create(blueprint, context=context, blueprint_name=name,
-                  source=path, number=number)
+    namespace = load_namespace(context)
+    if name not in namespace.machines:
+        raise FileNotFoundError(
+            f"no machine blueprint named {name!r} in the resolution source")
+    machine = namespace.machines[name]
+    source = namespace.origin.get(("machines", name))
+    return create(machine, namespace, context=context, blueprint_name=name,
+                  source=source, number=number)
 
 
 def recreate_machine(*, machine=None, blueprint=None, context=None):
@@ -407,56 +423,58 @@ def get_machine_dir(*, machine=None, blueprint=None, context=None):
     return os.path.abspath(machine_dir_path(machine_id, context))
 
 
-def _reconcile_drives(blueprint, old_drives, drives_root, source, context):
-    """Reconcile a machine's drives to a re-resolved blueprint.
+_OWNED_MODES = ("new", "difference", "copy")
+
+
+def _reconcile_drives(machine, namespace, old_drives, drives_root, context):
+    """Reconcile a machine's drives to a re-resolved machine component.
 
     Absorbable changes are applied: added, removed, enabled/disabled
-    drives, and every ``media`` / ``hostdir`` / empty-slot drive
-    (re-fetched, re-resolved, or emptied — this also reconciles away a
-    script's divergence). A drive whose image reliquary already
-    materialized (``size`` or ``base``) is kept only when its spec is
-    unchanged; any change to it fails closed, naming ``recreate`` as
-    the honest alternative. Returns the new drive-state mapping; a
-    removed materialized image is deleted.
+    drives, and every ``use``/empty-slot drive (re-fetched or emptied —
+    this also reconciles away a script's divergence). A drive whose
+    image reliquary already materialized (``new``/``difference``/``copy``)
+    is kept only when its media name and mode (and ``new`` size) are
+    unchanged; any change to it fails closed, naming ``recreate`` as the
+    honest alternative. Returns the new drive-state mapping; a removed
+    materialized image is deleted.
     """
     new_drives = {}
-    enabled = {key: drive for key, drive in blueprint.drives.items()
+    enabled = {key: drive for key, drive in machine.drives.items()
                if drive.enabled}
     for key, drive in sorted(enabled.items()):
         old = old_drives.get(key)
-        owns_image = old is not None and ("size" in old or "base" in old)
-        if not owns_image:
-            # No reliquary-owned image at this key: materialize or
-            # re-point freely (media re-fetch, hostdir re-resolve,
-            # empty slot, or a brand-new image).
+        old_owns = old is not None and old.get("materialize") in _OWNED_MODES
+        if not old_owns:
+            # No reliquary-owned image here: (re)materialize/re-point
+            # freely (media re-fetch, empty slot, or a new image).
             new_drives[key] = _materialize_drive(
-                key, drive, drives_root, source, context)
+                key, drive, drives_root, namespace, context)
             continue
         # An existing materialized image may only be kept unchanged.
-        if drive.size is not None and old.get("size") == drive.size:
+        media = resolve_media(drive.media, namespace) if drive.media else None
+        unchanged = (
+            media is not None
+            and media.name == old.get("media")
+            and media.materialize == old.get("materialize")
+            and (media.materialize != "new" or media.size == old.get("size")))
+        if unchanged:
             entry = _drive_common(key, drive)
-            entry.update(size=drive.size, path=old.get("path"))
-            new_drives[key] = entry
-        elif (drive.base is not None
-              and old.get("base") == {"media": drive.base.item.name,
-                                      "type": drive.base_type}):
-            entry = _drive_common(key, drive)
-            entry.update(
-                base={"media": drive.base.item.name,
-                      "type": drive.base_type},
-                path=old.get("path"))
+            entry.update(media=media.name, materialize=media.materialize,
+                         path=old.get("path"))
+            if media.materialize == "new":
+                entry["size"] = media.size
             new_drives[key] = entry
         else:
             raise RuntimeError(
-                f"drive {key} changes an already-materialized image "
-                "(size/base); apply cannot regenerate drives — "
-                "recreate the machine instead")
+                f"drive {key} changes an already-materialized image; "
+                "apply cannot regenerate drives — recreate the machine "
+                "instead")
     # Delete materialized images for drives the blueprint dropped.
     for key, old in old_drives.items():
         if key in new_drives:
             continue
         path = old.get("path")
-        if path and ("size" in old or "base" in old):
+        if path and old.get("materialize") in _OWNED_MODES:
             try:
                 os.remove(path)
             except OSError:
@@ -478,7 +496,6 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
-    from .library import locate_blueprint
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
@@ -487,12 +504,16 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
                 f"machine {machine_id} must be stopped to apply "
                 f"(phase: {phase})")
         blueprint_name = state["blueprint"]
-        path = locate_blueprint(blueprint_name, context=context)
-        parsed = load_blueprint(path, context=context)
+        namespace = load_namespace(context)
+        if blueprint_name not in namespace.machines:
+            raise FileNotFoundError(
+                f"no machine blueprint named {blueprint_name!r} to apply")
+        parsed = namespace.machines[blueprint_name]
+        path = namespace.origin.get(("machines", blueprint_name))
 
         drives_root = _machine_drives_dir(machine_id, context)
         new_drives = _reconcile_drives(
-            parsed, state.get("drives", {}), drives_root, path, context)
+            parsed, namespace, state.get("drives", {}), drives_root, context)
 
         memory = parsed.memory
         if memory is None:
@@ -515,7 +536,8 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
         state.update(resolved)
         state["drives"] = new_drives
         state["blueprint-digest"] = _blueprint_digest(resolved, new_drives)
-        state["blueprint-source"] = os.path.abspath(path)
+        if path is not None:
+            state["blueprint-source"] = os.path.abspath(path)
         state["generation"] = state.get("generation", 0) + 1
         _write_state(machine_id, state, context)
     return machine_id
@@ -756,10 +778,15 @@ def start_machine(machine_id, *, display=False, context=None):
                 f"(phase: {phase})")
 
         drives = state.get("drives", {})
+        namespace = load_namespace(context)
         for drive in drives.values():
             media_name = drive.get("media")
-            if media_name is not None:
-                drive["path"] = fetch_media(media_name, context=context)
+            # Re-resolve attached (`use`) payloads and re-verify their
+            # hashes; per-machine images (new/difference/copy) keep their
+            # recorded path.
+            if media_name is not None and drive.get("materialize") == "use":
+                drive["path"] = _fetch(
+                    media_name, context, namespace=namespace)
         state["drives"] = drives
         _write_state(machine_id, state, context)
 
@@ -860,12 +887,13 @@ def insert_media(machine_id, slot, media_name, *, context=None):
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         _removable_drive(state, slot)
-        path = fetch_media(media_name, context=context)
+        path = _fetch(media_name, context)
         if state.get("phase") == "running":
             _change_media_live(machine_id, slot, path, context)
         drive = state["drives"][slot]
         drive["path"] = path
         drive["media"] = media_name
+        drive["materialize"] = "use"
         state["generation"] = state.get("generation", 0) + 1
         _write_state(machine_id, state, context)
 
@@ -885,6 +913,7 @@ def eject_media(machine_id, slot, *, context=None):
             _change_media_live(machine_id, slot, None, context)
         drive = state["drives"][slot]
         drive["media"] = None
+        drive["materialize"] = None
         drive["path"] = None
         state["generation"] = state.get("generation", 0) + 1
         _write_state(machine_id, state, context)

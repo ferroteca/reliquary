@@ -1,13 +1,34 @@
 {
-  "platform": "openbsd",
-  "memory": "512M",
-  "description": "OpenBSD 7.9 amd64 installed from install79.iso using autoinstall over reliquary's run-scoped HTTP server",
-  "drives": {
-    "hdd0": {"size": "4G"},
-    "cdrom0": null
-  },
-  "boot": ["hdd0", "cdrom0"],
-  "scripts": {
-    "install": "openbsd-7.9-install"
-  }
+  "machines": [
+    {
+      "name": "openbsd-7.9-amd64",
+      "platform": "openbsd",
+      "memory": "512M",
+      "description": "OpenBSD 7.9 amd64 installed from install79.iso using autoinstall over reliquary's run-scoped HTTP server",
+      "drives": {
+        "hdd0": "blank-4g",
+        "cdrom0": null
+      },
+      "boot": ["hdd0", "cdrom0"],
+      "scripts": {
+        "install": "openbsd-7.9-install"
+      }
+    }
+  ],
+  "media": [
+    {
+      "name": "blank-4g",
+      "materialize": "new",
+      "size": "4G"
+    },
+    {
+      "name": "openbsd-7.9-amd64-install",
+      "materialize": "use",
+      "read-only": true,
+      "source": {
+        "url": "https://cdn.openbsd.org/pub/OpenBSD/7.9/amd64/install79.iso",
+        "sha256": "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102cf8a5130449f"
+      }
+    }
+  ]
 }
