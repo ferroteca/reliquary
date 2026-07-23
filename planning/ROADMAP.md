@@ -1783,6 +1783,18 @@ adapter seam that makes it real is milestone 9. Capability checks
 are real from the start, derived from what the QEMU
 implementation can actually do.
 
+> **Supersession (owner, 2026-07-23):** the 2026-07-23
+> media/composition round folds the machine blueprint and the
+> media definition into one composable `.rlqb` **blueprint** of
+> named components (machine/media/source/archive), retiring
+> `.rlqm` — see [planning/design/blueprint-model.md](design/blueprint-model.md)
+> and the DECISIONS.md entry. This reshapes several milestone-6
+> deliverables (the drive model, the media surface, the machine
+> directory layout, the two published schemas). The composed
+> model is the target; the deliverables below are read through it,
+> and the realignment lands coherently per the no-backward-compat
+> rule.
+
 Decide first:
 
 - Running-machine reconfiguration: how hot media changes vs.

@@ -19,6 +19,77 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- COMPOSED BLUEPRINT MODEL + MEDIA-RESIDENCY CACHE — DECIDED
+  (owner, 2026-07-23, the media/composition design round). Full
+  worked design: planning/design/blueprint-model.md (the source of
+  truth, normative until the specs realign to it). Interface triage
+  (planning/INTERFACES.md): the machine blueprint and the media
+  definition are both world-facing interfaces, so this is a MAJOR
+  interface change, landed under the interface-change rule and
+  use-case-aligned (U1 lazy install, U3/U4 hermetic automation and
+  artifact residency, U5 customization) — no use-case amendment
+  needed. Two threads settled together.
+
+  A — MEDIA RESIDENCY vs THE DOWNLOAD CACHE (the SHORTLISTED
+  topic). Payload and archive caches stay NAME-KEYED and home-side
+  (`cache/media/<name>.<ext>`, `cache/archives/<name>.<ext>` —
+  `downloads/` renamed `archives/`), independent of `--assets`; the
+  cached filename tracks the component `name`, not the source
+  basename. CONTENT ADDRESSING WEIGHED AND DECLINED: an opaque
+  hash-named cache cuts against "the cache is not an interface", and
+  the residual clash it would close (two same-named components
+  across projects aliasing one slot) is rare, already guarded by
+  per-use hash verification, isolable via the orthogonal
+  `--cache`/`RELIQUARY_CACHE_DIR` knob, and resolvable by naming one
+  component explicitly — never blocking. Accepted because reliquary
+  users target a handful of systems, not vast libraries.
+  Hermeticity of a `--assets` run = committed hashes determine
+  inputs; cache-location isolation is the existing `--cache` knob,
+  decoupled from `--assets` (dir-mode-implies-project-cache
+  declined: couples orthogonal axes, loses cross-project dedup).
+
+  B — THE COMPOSED BLUEPRINT MODEL (topic B, expanded well past
+  "compose now or defer"). reliquary's two authored JSON formats
+  fold into ONE — the blueprint (`.rlqb`); `.rlqm` retires. A
+  `.rlqb` root is polymorphic: plural component sections
+  (`machines`/`media`/`sources`/`archives`), mixed and matched
+  across files, a bare-root lone machine still valid. Four component
+  types, identity `(name, type)`; NAMES DEFAULT TO THE SOURCE/PATH
+  STEM (portable — the payload filename travels with the source; the
+  `.rlqb`-file stem stays forbidden as identity), explicit only
+  where there is no filename-bearing source. MEDIA OWNS
+  MATERIALIZATION (`materialize` = new/difference/copy/use, default
+  use; the machine drive shrinks to a media name or `null`, losing
+  `size`/`base`/`hostdir`); `sha256` required on a `url` source,
+  optional on local/from-archive (the "evolving drive" liveness
+  case); `read-only` default true on cdrom; hostdir folds in as a
+  `use` payload shape. SOURCES are named locators (mirror lists
+  live here); ARCHIVES are RECURSIVE TREES — a node with `members`
+  is an archive, a leaf is a media, the tree is the extraction, so
+  nested archives need no special chaining. Machine directory
+  reorganizes: `drives/` → `media/` (materializations named by
+  media item, not slot, so removable-slot swaps never clobber),
+  backend files into a backend-named subdir (`qemu/`/`virtualbox/`
+  /…), `reliquary-machine.json` → `machine.json` with `vm.json`
+  folded in as a while-running state section.
+
+  WEIGHED AND DECLINED / PARKED: content addressing (A); the
+  globbed media-set auto-expander (dropped — members are itemized
+  explicitly under a shared archive tree; a succinct extraction
+  short-circuit PARKED as a wish); create-at-destination media
+  (fuses source with destination, duplicates `export-drive`);
+  keeping `.rlqm` a separate kind (superseding the round's own
+  earlier "model now, defer mechanism" lean — the owner drove the
+  full unification); mandatory-name-without-derivation (relaxed to
+  stem defaults). FOLDED: blueprint-model.md (new); TASKS.md (the
+  two Design items retired here); ROADMAP pointer. REALIGNMENT
+  AHEAD (implementation, milestone-scale, landed coherently per the
+  no-BC rule): machine-blueprint.md + reference + cookbook,
+  media-spec.md, the two published `*.schema.json` + conformance
+  corpus (collapse to one blueprint schema), instance-model.md +
+  the ROADMAP home-layout, AGENTS.md, machines.py / lifecycle.py /
+  media.py, the codex, planning/examples.
+
 - BLUEPRINT `name` FIELD REINSTATED — DECIDED (owner, 2026-07-22),
   reversing the 2026-07-21 drop. `name` returns as an optional
   human-readable display name for the blueprint, distinct from the
