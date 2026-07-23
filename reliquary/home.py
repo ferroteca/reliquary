@@ -204,6 +204,9 @@ class Context:
     def downloads_cache_dir(self):
         return os.path.join(self.cache_dir(), "downloads")
 
+    def archives_cache_dir(self):
+        return os.path.join(self.cache_dir(), "archives")
+
     def media_cache_dir(self):
         return os.path.join(self.cache_dir(), "media")
 
@@ -248,6 +251,11 @@ def cache_dir(context=None):
 def downloads_cache_dir(context=None):
     """Return the cached source-archive directory under the context."""
     return _ctx(context).downloads_cache_dir()
+
+
+def archives_cache_dir(context=None):
+    """Return the cached source-archive directory (composed model)."""
+    return _ctx(context).archives_cache_dir()
 
 
 def media_cache_dir(context=None):
