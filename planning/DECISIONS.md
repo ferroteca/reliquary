@@ -19,6 +19,63 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- MILESTONE 6 DECIDE-FIRST ROUND — DECIDED (owner, 2026-07-22):
+  the three "Decide first" questions ROADMAP milestone 6 gated its
+  implementation on. Interface triage (planning/INTERFACES.md): the
+  state ops and the blueprint format are world-facing interfaces;
+  Q1 confirms already-specced, use-case-aligned behavior (U1's
+  install pattern and mid-run media swaps), Q3 tightens validation
+  with no use-case impact (easy approval), Q2 changes no interface
+  (internal policy) — no use-case amendment.
+  - Q1 RUNNING-MACHINE RECONFIGURATION: insert/eject are
+    running-or-stopped, set-boot and apply stopped-only. Hot media
+    changes are ALLOWED — an `insert`/`eject` on a running machine
+    is a live media change the guest observes; on a stopped
+    machine it is a pure state edit reconciled at the next
+    `start`. This CONFIRMS the existing contract
+    (script-spec.md "Insert and eject": "Both verbs work on a
+    running machine ... and on a stopped one"; cli.md / the CLI
+    gap-queue item 3's "running-or-stopped for insert/eject"), not
+    a change to it. `set-boot` stays stopped-only (a launch-time
+    firmware order — no live effect) and `apply` stays stopped-only
+    (memory/cpus/drives are hardware topology). Uniform
+    stopped-only was WEIGHED AND DECLINED (the recommendation): it
+    would have contradicted the already-specced running-or-stopped
+    rule and the script language's own live-dispatch semantics,
+    where a script drives a running guest and swaps media mid-run.
+    CONSEQUENCE — an implementation gap, not a spec change: today's
+    `machines.py` guards insert/eject as stopped-only (the
+    milestone-1 shortcut), so the milestone-6 work must grow a
+    live-QMP change path (identity-verified session) when the
+    machine is running, and AGENTS.md's "all three require a
+    stopped machine" line is that shortcut, corrected when hot
+    insert/eject lands.
+  - Q2 CONCURRENT MACHINES: no home-wide limit on machines running
+    at once. The per-machine lock and per-start identity model make
+    concurrency safe — each machine is its own cache directory,
+    backend process, and auto-allocated port — so the honest
+    ceiling is host resources (memory, free ports), surfaced as an
+    ordinary `start` failure. A configurable cap was WEIGHED AND
+    DECLINED: policy surface with no invariant behind it. Folded:
+    instance-model.md ("The machine state").
+  - Q3 SIZE/BASE ON CDROM: rejected. A `cdrom` drive's only content
+    source is `media` (or the empty `null`) — the read-only optical
+    medium has nothing to size, difference, or synthesize, so
+    `size`, `base`, and `hostdir` all require a writable medium
+    (`hdd`/`floppy`), symmetric with `hostdir`'s pre-existing cdrom
+    prohibition. This closes the JSON-schema round's open find (the
+    schema encoded only the stated rules, and the field reference's
+    "meaningful for hdd and floppy" did not prohibit elsewhere).
+    Leaving it permissive was WEIGHED AND DECLINED (a nonsensical
+    blank/writable-optical shape validating). Folded:
+    machine-blueprint-reference.md (`size`, `base`, and the Values
+    rule), machine-blueprint.schema.json (`cdromDrive` drops
+    `size`/`base`, requires `media`). Enforced in `blueprint.py` at
+    the field-reference-validation task.
+  Folded across: planning/TASKS.md (the milestone-6 task list — T0
+  landed), instance-model.md, machine-blueprint-reference.md,
+  machine-blueprint.schema.json.
+
 - MILESTONE INJECTION: LOCAL HTTP SERVER FOR INSTALLER ANSWER
   FILES — DECIDED (owner, 2026-07-22). A new ROADMAP milestone 5
   lands Packer's ephemeral local HTTP server for Kickstart /

@@ -273,6 +273,83 @@ umbrella list stays complete; not milestone 4):
   with the properties-file path as the service and the property
   name as the username
 
+## Milestone 6 — the instance model and machine blueprints
+
+The whole machine model beyond milestone 1's core (ROADMAP
+milestone 6, deliverables 1–9). Much of the plumbing already
+landed on the realignment: the `builtins/` → `codex/` rename and
+`codex.json` index, the JSONC reader (`jsonc.py`), the `.rlqb` /
+`.rlqm` extensions, `cache/machines/<id>/` materialization with
+atomic `reliquary-machine.json`, the per-blueprint allocation
+lock, selector-based console/state ops, and the authored
+blueprint / media-definition schemas. What remains is broken into
+tasks in dependency order — the spine is T0 → T1 → T2 → T3 → T4 →
+T5; T6 and T7 run beside it.
+
+0. Decide-first design round: the three ROADMAP "Decide first"
+   questions — running-machine reconfiguration surfacing (hot
+   media vs stopped-only), a home-wide concurrent-machine limit,
+   and whether `size`/`base` are valid on `cdrom` drives.
+   Adjudicate through the interface-change rule and fold into
+   DECISIONS.md + the specs. Gates T1 (cdrom size/base) and T3
+   (concurrency).
+   LANDED (owner, 2026-07-22 — DECISIONS.md, the milestone-6
+   decide-first round): Q1 insert/eject running-or-stopped (hot
+   media confirmed, matching the existing script-spec/cli
+   contract), set-boot and apply stopped-only; Q2 no home-wide
+   concurrency limit; Q3 `size`/`base` rejected on `cdrom` (a
+   cdrom is `media`-or-empty only). Folded into
+   instance-model.md, machine-blueprint-reference.md, and
+   machine-blueprint.schema.json. Two consequences ride the
+   later tasks: T1 enforces the cdrom rule in `blueprint.py`, and
+   T4 grows the hot-insert/eject implementation.
+1. Full blueprint field-reference validation (deliverable 1) +
+   the remaining media-definition surface (part of deliverable
+   9): extend `blueprint.py` past the milestone-1 subset to
+   `backend`, `cpus`, per-drive `controller`, `base`
+   (difference/duplicate), `hostdir`, `enabled`, `control-planes`,
+   `backend-settings`, and `parameters`, with format and
+   QEMU-derived capability checks failing closed; add
+   definition-level `description` / `notes` /
+   `redistributable-under` to `MediaDefinition`.
+2. Drive materialization + state provenance (rest of deliverable
+   2, part of deliverable 8): qcow2 `base` triad
+   (difference/duplicate) and `hostdir` vvfat materialization in
+   `create`; record the resolved `blueprint-digest`,
+   `blueprint-source` path, and `backend-id` in the state.
+3. Lifecycle integrity (deliverable 3): operation generations,
+   exclusive per-machine operation locks (beyond today's
+   allocation lock), and startup detection of interrupted
+   transitional phases with safe rollback or explicit recovery
+   instructions.
+4. Lifecycle CLI completion + reconciliation + the global
+   `--json` flag (deliverable 4, `get-machine-dir` from
+   deliverable 5): `apply-blueprint`, `recreate-machine`,
+   `search-blueprints` (index + user files, with provenance),
+   `seed-blueprint --only`, `get-machine-dir`; grow `start` to
+   full baseline/state/backend-identity reconciliation with media
+   re-verification; `--json` defined by the twin's-return rule.
+   Also lift the milestone-1 stopped-only guard on
+   `insert-media`/`eject-media`: a running machine performs the
+   media change live over an identity-verified QMP session and
+   persists it to the state (T0/Q1); AGENTS.md's "all three
+   require a stopped machine" line is corrected here.
+5. Absorb and delete the legacy path (deliverable 2's deletion):
+   `MachineConfig`, the root-home `machine.json` / `vm.json`
+   layer, and the legacy `Runner` start/stop path fold into the
+   cached-machine model and are deleted; AGENTS.md "The runner
+   surface" and the tests follow.
+6. Authored-asset residency (deliverable 8): the resolution
+   module (`--assets` / `--assets-only`, API `assets=` /
+   `assets_only=`), root-shadows-home, and `--blueprint` selection
+   scoped to the invocation's resolution against the recorded
+   `blueprint-source`.
+7. Published schemas + fixture corpus + examples (deliverables 6,
+   7): the machine-state schema authored once the state format
+   settles; the shared valid/invalid fixture corpus run against
+   both parser and schema; `planning/examples/` audited to the
+   implemented shapes.
+
 ## Language
 
 - residual language problems catalogued in

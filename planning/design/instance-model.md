@@ -212,6 +212,14 @@ explicit recovery instructions. Atomic file replacement protects
 JSON writes; it does not pretend a host file write and a
 hypervisor operation are one transaction.
 
+No home-wide limit caps how many machines run at once. The
+per-machine lock and per-start identity model already make
+concurrency safe — each machine is its own cache directory, its
+own backend process, and its own auto-allocated port — so the
+honest ceiling is host resources (memory, free ports), surfaced
+as an ordinary `start` failure. reliquary invents no cap of its
+own.
+
 There is no `installed` boolean. Script outcomes belong to the
 append-only run records under the instance cache, where they can name
 the script, its source digest, result, transcript, and produced

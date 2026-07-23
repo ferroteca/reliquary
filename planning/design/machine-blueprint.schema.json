@@ -221,16 +221,12 @@
         },
         {
           "type": "object",
+          "description": "A cdrom's only content source is media (or the empty null): the read-only optical medium rejects size, base, and hostdir — nothing to size, difference, or synthesize.",
           "properties": {
             "media": {
               "$ref": "#/$defs/mediaName",
               "description": "Attach the named media payload itself — machine-independent media the machine carries at rest."
             },
-            "size": {
-              "$ref": "#/$defs/sizeString",
-              "description": "Start the drive as a blank image of this size."
-            },
-            "base": {"$ref": "#/$defs/base"},
             "controller": {"$ref": "#/$defs/controller"},
             "enabled": {
               "description": "false removes the drive from the machine entirely — no slot, no hardware — while keeping the entry in the document.",
@@ -238,11 +234,7 @@
             }
           },
           "additionalProperties": false,
-          "oneOf": [
-            {"required": ["media"]},
-            {"required": ["size"]},
-            {"required": ["base"]}
-          ]
+          "required": ["media"]
         }
       ]
     }

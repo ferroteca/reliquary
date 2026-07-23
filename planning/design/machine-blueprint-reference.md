@@ -388,6 +388,11 @@ from; a
 drive object with none of them, or more than one, fails
 validation.
 
+The three writable/materialized sources — `size`, `base`, and
+`hostdir` — require a writable medium: on a `cdrom` drive only
+`media` (or the empty `null`) is valid, because the read-only
+optical medium has nothing to size, difference, or synthesize.
+
 A removable drive (`cdrom`, `floppy`) may instead be declared
 **empty** with the value `null`:
 
@@ -449,8 +454,10 @@ wiring — they configure script binding, never machine shape.)
 
 #### `size` — optional · string
 
-Start the drive as a blank image of this size — meaningful for
-`hdd` and `floppy` drives:
+Start the drive as a blank image of this size. Valid on `hdd` and
+`floppy` drives; **rejected on `cdrom`** — a blank optical disc has
+nothing to size, so a `cdrom` takes only [`media`](#media--optional--string)
+or the empty `null`:
 
 ```json
 {"size": "20M"}
@@ -471,7 +478,10 @@ suffix — `K`, `M`, `G`, or `T` (powers of 1024) — case-insensitive.
 
 A **starting-point image** for the drive: a media item the
 drive's own image is materialized from — at `create`, or at the
-first `start`. As an object it has two fields — `media` (required)
+first `start`. Valid on `hdd` and `floppy` drives; **rejected on
+`cdrom`** — optical media is read-only, so there is nothing to
+difference or duplicate into (attach an ISO with
+[`media`](#media--optional--string) instead). As an object it has two fields — `media` (required)
 and `type` (how to materialize, optional). `base.media` names an
 defined item in the media catalog, exactly like the
 [`media` field](#media--optional--string): the name must resolve to a
