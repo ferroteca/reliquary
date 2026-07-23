@@ -49,12 +49,14 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
         self.home = self.workdir.name
         blueprints = os.path.join(self.home, "blueprints")
         os.makedirs(blueprints)
-        with open(os.path.join(blueprints, "plain.json"), "w",
+        with open(os.path.join(blueprints, "plain.rlqb"), "w",
                   encoding="utf-8") as handle:
             json.dump({
-                "platform": "dos",
-                "drives": {"hdd": {"size": "20M"}},
-                "scripts": {"install": "install-script"},
+                "machines": [{"name": "plain", "platform": "dos",
+                              "drives": {"hdd0": "blank-20m"},
+                              "scripts": {"install": "install-script"}}],
+                "media": [{"name": "blank-20m", "materialize": "new",
+                           "size": "20M"}],
             }, handle)
 
     def test_creates_when_blueprint_has_no_machine(self):
@@ -177,12 +179,14 @@ class RunScriptWiringTests(unittest.TestCase):
         scripts = os.path.join(self.home, "scripts")
         os.makedirs(blueprints)
         os.makedirs(scripts)
-        with open(os.path.join(blueprints, "plain.json"), "w",
+        with open(os.path.join(blueprints, "plain.rlqb"), "w",
                   encoding="utf-8") as handle:
             json.dump({
-                "platform": "dos",
-                "drives": {"hdd": {"size": "20M"}},
-                "scripts": {"install": "install-script"},
+                "machines": [{"name": "plain", "platform": "dos",
+                              "drives": {"hdd0": "blank-20m"},
+                              "scripts": {"install": "install-script"}}],
+                "media": [{"name": "blank-20m", "materialize": "new",
+                           "size": "20M"}],
             }, handle)
         with open(os.path.join(scripts, "install-script.rlqs"), "w",
                   encoding="utf-8", newline="\n") as handle:

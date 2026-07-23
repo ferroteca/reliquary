@@ -1168,12 +1168,16 @@ def check_script(name, *, blueprint=None, machine=None, context=None):
         state = _machines.load_machine_state(machine_id, context)
         scripts_map = state.get("scripts") or {}
     elif blueprint is not None:
-        namespace = load_namespace(context)
-        machine_component = namespace.machines.get(blueprint)
-        if machine_component is None:
-            raise FileNotFoundError(
-                f"no machine blueprint named {blueprint!r}")
-        scripts_map = dict(machine_component.scripts)
+        from .library import locate_blueprint
+        from .document import load_document
+        # Read-only: locate resolves the codex file directly in home mode
+        # without seeding, so check-script never writes.
+        doc = load_document(locate_blueprint(blueprint, context=context))
+        machine_component = doc.machines.get(blueprint)
+        if machine_component is None and len(doc.machines) == 1:
+            machine_component = next(iter(doc.machines.values()))
+        scripts_map = (dict(machine_component.scripts)
+                       if machine_component is not None else {})
     stem = _resolve_script_stem(name, scripts_map)
     script_path = locate_script(stem, context=context)
     script = load_script(script_path)

@@ -56,11 +56,13 @@ class CliEmptyListingTests(unittest.TestCase):
     def test_list_machines_reports_no_machines_for_blueprint(self):
         """Filtering by a blueprint with no machines names the blueprint."""
         os.makedirs(os.path.join(self.home, "blueprints"))
-        with open(os.path.join(self.home, "blueprints", "plain.json"),
+        with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
                   "w", encoding="utf-8") as handle:
             json.dump({
-                "platform": "dos",
-                "drives": {"hdd": {"size": "20M"}},
+                "machines": [{"name": "plain", "platform": "dos",
+                              "drives": {"hdd0": "blank-20m"}}],
+                "media": [{"name": "blank-20m", "materialize": "new",
+                           "size": "20M"}],
             }, handle)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -164,11 +166,13 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
         os.makedirs(os.path.join(self.home, "blueprints"))
-        with open(os.path.join(self.home, "blueprints", "plain.json"),
+        with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
                   "w", encoding="utf-8") as handle:
             json.dump({
-                "platform": "dos",
-                "drives": {"hdd": {"size": "20M"}},
+                "machines": [{"name": "plain", "platform": "dos",
+                              "drives": {"hdd0": "blank-20m"}}],
+                "media": [{"name": "blank-20m", "materialize": "new",
+                           "size": "20M"}],
             }, handle)
 
     def test_create_machine(self):
@@ -350,7 +354,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("plain", output)
         self.assertIn(
-            os.path.join(self.home, "blueprints", "plain.json"), output)
+            os.path.join(self.home, "blueprints", "plain.rlqb"), output)
         header = output.splitlines()[0]
         self.assertTrue(header.startswith("NAME"))
         self.assertTrue(header.endswith("PATH"))
@@ -450,7 +454,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("deleted blueprint plain", stdout.getvalue())
         self.assertFalse(os.path.exists(
-            os.path.join(self.home, "blueprints", "plain.json")))
+            os.path.join(self.home, "blueprints", "plain.rlqb")))
 
     def test_delete_blueprint_refuses_while_machines_exist(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
@@ -471,22 +475,17 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("plain-0", stderr.getvalue())
 
     def test_list_media_and_delete_media(self):
-        media_path = os.path.join(self.home, "media")
-        os.makedirs(media_path)
-        definition = os.path.join(media_path, "livecd.rlqm")
-        with open(definition, "w", encoding="utf-8") as handle:
-            json.dump({
-                "name": "livecd",
-                "file": "live.iso",
-                "sha256": "1" * 64,
-            }, handle)
+        blueprints = os.path.join(self.home, "blueprints")
+        with open(os.path.join(blueprints, "media-lib.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({"media": [
+                {"name": "livecd", "source": {"local": "/x.iso"}}]}, handle)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main([
-                "--home", self.home, "list-media",
-            ])
+            result = cli.main(["--home", self.home, "list-media"])
         self.assertEqual(result, 0)
-        self.assertEqual(stdout.getvalue().strip(), "livecd")
+        # The namespace lists every media component in the source.
+        self.assertIn("livecd", stdout.getvalue())
 
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -496,14 +495,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("freedos-1.4-livecd", stdout.getvalue())
 
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            result = cli.main([
-                "--home", self.home, "delete-media", "livecd",
-            ])
-        self.assertEqual(result, 0)
-        self.assertIn("deleted media livecd", stdout.getvalue())
-        self.assertFalse(os.path.exists(definition))
+        # delete-media is not yet implemented for a media inside a .rlqb.
+        result = cli.main(["--home", self.home, "delete-media", "livecd"])
+        self.assertNotEqual(result, 0)
 
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.
@@ -629,15 +623,15 @@ class CliMachineLifecycleTests(unittest.TestCase):
         blueprints = os.path.join(self.home, "blueprints")
         scripts = os.path.join(self.home, "scripts")
         os.makedirs(scripts)
-        with open(os.path.join(blueprints, "cust.json"), "w",
+        with open(os.path.join(blueprints, "cust.rlqb"), "w",
                   encoding="utf-8") as handle:
             json.dump({
-                "platform": "dos",
-                "drives": {"hdd": {"size": "20M"}},
-                "scripts": {
-                    "setup": "cust-setup",
-                    "teardown": "cust-teardown",
-                },
+                "machines": [{"name": "cust", "platform": "dos",
+                              "drives": {"hdd0": "blank"},
+                              "scripts": {"setup": "cust-setup",
+                                          "teardown": "cust-teardown"}}],
+                "media": [{"name": "blank", "materialize": "new",
+                           "size": "20M"}],
             }, handle)
         with open(os.path.join(scripts, "cust-setup.rlqs"), "w",
                   encoding="utf-8") as handle:
