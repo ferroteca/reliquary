@@ -108,64 +108,74 @@ dependency order:
 
 - Media residency vs the download cache AND composable authored
   specs — RESOLVED together (owner, 2026-07-23, the media/composition
-  design round): folded into the COMPOSED BLUEPRINT MODEL (DECISIONS.md;
-  worked design planning/design/blueprint-model.md). Cache stays
-  name-keyed (content addressing declined); the authored surface
-  unifies into one `.rlqb` blueprint of composable components
-  (machine/media/source/archive), `.rlqm` retiring. The
-  spec/schema/codex/example/code realignment enumerated in the
-  worked design is the milestone-scale implementation follow-on.
+  design round), then REVISED same day by the blueprint revision
+  round (both in DECISIONS.md; ROADMAP milestone 7 is the
+  retargeted implementation): two spec types (machine / media —
+  archive absorbed as the container reading), a flat typed root
+  array, one schemed `location` field, no source component, no
+  composition (identity-dedup instead), and the single name-keyed
+  `cache/media/` with the identity ledger (content addressing
+  declined in both rounds). blueprint-model.md describes the
+  superseded first-round shape until its milestone-7 rewrite —
+  the revision-round DECISIONS entry is normative meanwhile.
 - Media lifecycle commands (`list-media`, `delete-media`, and any
   further definition-level verbs) need careful planning before
-  the surface hardens: one media definition (`.rlqm`) can define
-  several items (archive form). Open questions to adjudicate and
+  the surface hardens: one `.rlqb` can define several media (the
+  `children` form). Open questions to adjudicate and
   record in DECISIONS.md / media-spec / cli.md — what does the
-  command noun name (item vs definition stem)? does
-  `delete-media` remove the whole file, edit items out, or refuse
+  command noun name (media vs owning file)? does
+  `delete-media` remove the whole file, edit specs out, or refuse
   when siblings remain? how should `list-media` present file vs
-  item identity (and multi-item provenance)? `seed-media` already
-  seeds by item name and copies the whole definition — keep or
+  media identity (and multi-media provenance)? `seed-media`
+  already
+  seeds by media name and copies the whole file — keep or
   revisit that invariant together with delete/list. The current
-  provisional twins (item-name delete of the owning file; list of
-  item names) are placeholders pending this round, not settled
-  design.
+  provisional twins (media-name delete of the owning file; list
+  of media names) are placeholders pending this round, not
+  settled design.
 
 ## Wishlist
 
-- `download-media` command (owner request, 2026-07-22; shape refined
-  2026-07-23 for the composed model): `rlq download-media
+- `download-media` command (owner request, 2026-07-22; shape to
+  re-derive under the revised model — milestone 7's `add-media`
+  covers its cache-warming half): `rlq download-media
   https://freedos.org/downloads/FreeDOS14.zip` downloads the file
-  into `cache/archives/` (a non-archive payload into `cache/media/`),
-  computes its sha256, and scaffolds a standalone `.rlqb` blueprint
-  into the home library carrying the url + sha256 — an `archive`
-  component when the payload is a container, a `source`/`media`
-  otherwise. It is smart enough to treat an archive as an archive, so
-  the `-media` suffix is a slight misnomer in the container case —
-  accepted for family consistency with `extract-media`. A home-mode
+  into `cache/media/`,
+  computes its sha256, and scaffolds a standalone `.rlqb` into
+  the home library carrying the url + sha256 — a media spec,
+  with `children` left for the user to add when the payload is a
+  container. A home-mode
   convenience: it warms the cache and writes the committed-source
   stub so the user need not hand-author it and then `fetch`. Open
-  shape under the composed model: the archive's members can't be
-  inferred, so the stub names the archive and the user adds the
-  extraction tree (with `extract-media`); stem-default naming from
-  the URL filename; a `--local <file>` variant for non-downloadable
-  payloads; CLI+API parity (a twin returning the written blueprint
+  shape: members can't be
+  inferred, so the stub stops at the container and the user adds
+  the extraction tree (with `extract-media`); stem-default naming
+  from
+  the URL filename; a `--local <file>` variant for
+  non-downloadable
+  payloads (overlaps `add-media` — reconcile when picked up);
+  CLI+API parity (a twin returning the written blueprint
   path).
-- `extract-media` command (owner request, 2026-07-23) — the
+- `extract-media` command (owner request, 2026-07-23; re-derive
+  under the revised model) — the
   incremental companion to `download-media`: `rlq extract-media
-  --archive FreeDOS14 FreeDOS14-LiveCD.zip` extracts the member from
-  the named archive,
-  computes its sha256, and records it against the archive by
-  **appending a `members` node** (member path + sha256) to the
-  existing archive blueprint's recursive tree (the leaning option)
-  rather than writing a separate file. A member that is itself an
-  archive becomes another node to drill into (`extract` it again); a
-  payload member becomes a leaf media extracted to `cache/media/`. So
+  --parent FreeDOS14 FreeDOS14-LiveCD.zip` extracts the child
+  from
+  the named media,
+  computes its sha256, and records it by
+  **appending a child** (path + sha256) to the
+  existing media spec's `children` (the leaning option)
+  rather than writing a separate file — or as a flat
+  `${media:…}`-located spec; reconcile when picked up. A child
+  that is itself a
+  container becomes another node to drill into (`extract` it
+  again); a
+  payload child is extracted to `cache/media/`. So
   a nested source is hand-authored by walking down it one
-  `extract-media` at a time, the recursive archive tree
-  (blueprint-model.md) growing
+  `extract-media` at a time, the `children` tree growing
   in place. Open: new-file vs append-to-existing (lean append);
-  leaf-vs-node selection (member is itself a container → node, else
-  leaf).
+  node shape (child is itself a container → node with its own
+  `children`, else leaf).
 - new command diff-blueprint <name>: diff the user blueprint
   against the codex blueprint of the same name
 - CLI, from cli help: --version should be `version` with an
@@ -189,7 +199,10 @@ dependency order:
   QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
   specific floppy image mounted; QEMU machine #4 with 16 MB of
   memory and a specific cdrom mounted
-- CLI clean, beyond the settled clean-archives / clean-media
-  invariants: delete completely unreferenced media? all
-  downloads? unreferenced only? (machine-cache cleaning is an
-  open decision in ROADMAP "Decisions still needed")
+- CLI clean — RESOLVED by the blueprint revision round
+  (DECISIONS.md, 2026-07-23): `clean-media` (blunt + targeted
+  eviction) and `prune-media` (attachment-closure prune of
+  unneeded entries) land at milestone 7; `clean-archives`
+  retires with the single cache dir. Machine-cache cleaning
+  remains the open decision in ROADMAP "Decisions still
+  needed".

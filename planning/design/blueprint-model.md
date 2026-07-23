@@ -5,12 +5,25 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The composed blueprint model
 
-> **Status:** worked design of the 2026-07-23 media/composition
-> round. Source of truth for the composed authored model; the
-> existing specs ([machine-blueprint.md](machine-blueprint.md),
-> its [field reference](machine-blueprint-reference.md),
-> [media-spec.md](media-spec.md)) and the published JSON Schemas
-> realign to it, and stay normative until they do.
+> **Status:** worked design of the first 2026-07-23
+> media/composition round — **superseded in part** by the second
+> same-day round (DECISIONS.md, "THE BLUEPRINT REVISION ROUND"),
+> which collapses the model further: two spec types (machine /
+> media, archive absorbed as the container reading under
+> parent/children containment), a flat typed
+> root array (sections retired; a lone spec object survives as
+> sugar for the array of one — the bare-root-machine reading
+> retires), one schemed
+> `location` field (the source type retired), no composition
+> (identity-dedup), and the single-directory identity-ledger
+> cache. The DECISIONS entry is normative for the revised model
+> until this document is rewritten (ROADMAP milestone 7,
+> deliverable 6); the sections below describe the superseded
+> first-round shape, and the existing specs
+> ([machine-blueprint.md](machine-blueprint.md), its
+> [field reference](machine-blueprint-reference.md),
+> [media-spec.md](media-spec.md)) stay normative for the
+> implemented surface until the milestone realigns them.
 
 This round folds Reliquary's two authored JSON formats — the
 machine blueprint (`.rlqb`) and the media definition (`.rlqm`) —

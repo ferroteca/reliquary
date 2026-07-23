@@ -19,6 +19,134 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- THE BLUEPRINT REVISION ROUND — DECIDED (owner, 2026-07-23, the
+  second same-day round; supersedes the four-component shape of
+  the media/composition round below, before any of it was
+  implemented — ROADMAP milestone 7 is the retargeted
+  implementation). The composed model collapses further. TWO SPEC
+  TYPES: `machine` and `media` — the archive/media distinction was
+  never a property of the artifact, only of the use, so ARCHIVE IS
+  ABSORBED INTO MEDIA, and the containment vocabulary is
+  PARENT/CHILDREN (owner — "archive" and "members" exit the format
+  language): any media may declare `children` (batch, recursive),
+  and any media may declare its `parent` from the child side — a
+  `${media:<name>}/<path>` location string, or the
+  `{"parent": …, "path": …}` object (`parent` taking a media name
+  or an inline media spec). `children` IS PURE SUGAR: every
+  containment edge resolves to child-declares-parent; a `children`
+  entry is a media spec declared in place (path-form only, no
+  `location` key; a bare string is the path), desugaring to a
+  standalone spec with a parent location — one semantic, two
+  spellings, zero new rules (the identity dedup/collision rules
+  are position-independent). BARE-STRING SPECS: a root array
+  element that is a string is a media, desugaring to
+  `{"location": <string>}` — invalid where the location kind
+  demands a pin (a bare url string fails closed naming the object
+  form). THE STRING-POSITION TABLE: at a drive → a media name; at
+  a spec position → a location; in `children` → a path — each
+  position with exactly one object desugaring. The mount-vs-
+  container READING is decided at each reference site (a drive or
+  script `insert` mounts; a parent location or `children` walk
+  extracts). Dual roles are legal — one ISO mounted at `cdrom0`
+  and container-read for its boot floppy. Container reading is
+  ROSTER-GATED by format (zip at milestone 7; ISO9660 incl.
+  `[BOOT]` El Torito virtual paths the recorded follow-on;
+  filesystem-image reading out pre-beta).
+  THE ROOT is a flat array of specs — the plural component
+  sections retire; a lone spec OBJECT is kept as PURE SUGAR for
+  the array of one (owner — minimalism convenience), same rules
+  as any element, so the historical bare-root-machine reading
+  (object ⟹ machine, no announcement) retires: an untyped lone
+  object is a media. `type` is OPTIONAL, DEFAULTS
+  TO `media`; a machine declares `"type": "machine"`
+  (mandatory-everywhere argued hard and DECLINED by owner:
+  blueprints are small, loose typing wins on convenience at this
+  scale; the codex and examples always write `type` — model good
+  code, don't enforce; the media-branch error carries a
+  did-you-mean hint when machine vocabulary appears). An optional
+  `type` anywhere nested is a checked echo — mismatch is an error.
+  INLINE + ANONYMOUS: a media is definable inline at its drive
+  (full spec, or the `{ "size": … }` blank — `size` implies
+  `new`); the NAME IS THE MEMBERSHIP BIT — named (explicit, or
+  stem-derived from content-intrinsic material: url/path stems,
+  never the slot) → the one global catalog; the content-free
+  blank is the SOLE ANONYMOUS citizen — in no namespace, site
+  identity only, slot-named file at materialization,
+  unreferenceable from scripts. THE SOURCE TYPE RETIRES; ONE
+  `location` FIELD on media: strings interpreted by scheme —
+  bare path (relative from the referencing file), `https:`/
+  `http:`, `${media:<name>}/<path>`, `${<key>}` — and
+  OBJECTS EXPLICIT (`url` / `local` / `parent`+`path` incl. an
+  inline parent spec / `property`), under the format-wide law
+  STRINGS ARE INTERPRETED, OBJECTS ARE EXPLICIT: every
+  interpreted string has exactly one object desugaring (the
+  canonical/state form), the object is the escape and the option
+  point. Unrecognized scheme-shaped strings are parse errors
+  (single-char drive-letter exemption). Mirror lists are lists of
+  locations, mixed schemes allowed, `sha256` required once any
+  remote rung is present; a property reference is
+  whole-field-only, no
+  chaining, resolved at `create`/`apply` into the state (never at
+  `start`), binding through the property sources at milestone 8
+  (grammar lands at 7, resolution fails closed naming 8 until
+  then). THE UNIVERSAL REFERENCE: `${…}` is the one reference
+  syntax everywhere — unqualified `${a.b.c}` ≡
+  `{"property": "a.b.c"}` (one spelling across locations,
+  `parameters` values, and the milestone-8 derivation grammar's
+  `${key}` cross-references); qualified `${media:<name>}` reads
+  the catalog, and `${media:<name>}/<path>` is the containment
+  location, desugaring to `{"parent": "<name>", "path": …}` —
+  the path suffix is the second component of one location, never
+  string interpolation (property references take no suffix;
+  other qualifiers reserved, fail closed). THE MEDIA LOCATOR:
+  one shared parser (Spring-style dispatch) turns every accepted
+  string into its typed object desugaring — locations,
+  bare-string specs, `children` paths, `${…}` references — so
+  shorthand intelligence lives in exactly one component. COMPOSITION DECLINED (fragment merge worked through and
+  killed — it was a second personal-values mechanism in
+  disguise): same-`(name, type)` canonically identical specs
+  DEDUP (self-contained blueprints coexist); differing specs
+  collide naming both; in-file duplicates always error. The
+  supply seam is edit-your-seeded-copy (home) or a
+  property-valued location (project/CI). THE CACHE: one
+  name-keyed `cache/media/` (`cache/archives/` retires) with an
+  IDENTITY LEDGER — recorded sha256, derivation keys
+  `(parent-sha, path)`, provenance
+  refetchable/derived/supplied, source lineage — giving a
+  deterministic preflight identity check before any fetch,
+  feeding the standing on-mismatch contract with
+  lineage-informed messages (version bump vs cross-project
+  collision distinguishable at a glance). CONTENT ADDRESSING
+  RE-WEIGHED AND RE-DECLINED (the ledger closes the detection
+  gap name-keying had; CAS stays the recorded escalation if
+  collision friction proves real). Command family: `clean-media`
+  (blunt; spares `supplied`; skips running-machine attachments),
+  `clean-media <name>` (targeted eviction), `prune-media`
+  (attachment-closure prune; scope-relative; `--dry-run`),
+  `add-media <name> <file>` (the guarded door — a pinned
+  unlocated media resolves by cache hit). WEIGHED AND DECLINED
+  along the way: wrapper-key root discrimination (self-describing
+  `type` travels with pasted fragments); document-scoped
+  anonymous names (a middle scoping tier — anonymous means
+  absent, not private); the `literal:` escape scheme (the object
+  form escapes out-of-band); `file://` (bare paths carry relative
+  resolution; RFC file: is absolute-only); union-of-channels via
+  composition (a single author's mixed mirror list serves the
+  case); child-side-only containment (dropping the batch
+  `children` form — declined: sugar over the one semantic, not a
+  rival spelling); the path glob in `children` (names must be
+  static — the catalog can never depend on a download); the
+  `property:` and `parent:` scheme spellings (superseded before
+  landing by the universal `${…}` reference — `${key}` for
+  properties, `${media:<name>}/<path>` for containment);
+  mandatory root `type` (above).
+  FOLDED: this entry;
+  ROADMAP milestone 7 retargeted + the milestone-8
+  property-binding deliverable; TASKS.md design/wishlist entries;
+  blueprint-model.md banner marked superseded pending its
+  milestone-7 rewrite (this entry is normative for the revised
+  model until then).
+
 - CODEX NAMING: A LAUNCHING POINT, NEVER A VERSION LIBRARY —
   DECIDED (owner, 2026-07-23, closing the open point from the
   generic-blueprint walkthrough): no versioned items in the

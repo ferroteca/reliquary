@@ -1900,65 +1900,118 @@ per the instance model; blueprint edits round-trip through
 
 ### Milestone 7 — The composed blueprint model
 
-Realign the authored surface to the composed blueprint model
-decided in the 2026-07-23 media/composition round
-([planning/design/blueprint-model.md](design/blueprint-model.md);
-DECISIONS.md). Milestone 6 completed on the pre-composition
+Realign the authored surface to the composed blueprint model as
+revised by the second 2026-07-23 design round (DECISIONS.md, "THE
+BLUEPRINT REVISION ROUND" — it supersedes the first round's
+four-component shape before any of it was implemented, and is
+normative for the model until blueprint-model.md is rewritten,
+deliverable 6). Milestone 6 completed on the pre-composition
 formats; this milestone folds the machine blueprint and the media
-definition into one composable `.rlqb` blueprint of named
-components (machine / media / source / archive) and lands the
-consequent reorganizations. Still DOS-on-QEMU only — a format and
+definition into one `.rlqb` format of two spec types — machine
+and media — and lands the consequent cache and materialization
+reorganizations. Still DOS-on-QEMU only — a format and
 materialization reshape, no new capability. No backward
 compatibility: the pre-composition formats are replaced, not
 bridged.
 
-Decide first: nothing — the model is settled in the design round.
+Decide first: one item. The `${…}` reference / media-locator
+grammar (the qualifier set — `${media:…}` today, others
+reserved — the containment path-suffix rule, escapes, and list
+positions) was settled fast at the close of the revision round;
+run it through a scenario battery like the one that hardened the
+location field, and record the outcome in DECISIONS.md, before
+deliverable 1's parser is written. Everything else is settled
+(optional root `type` defaulting to media; the plural sections
+retired, a lone spec object kept as sugar for the array of one;
+the source type and composition declined).
 
 Deliverables:
 
-1. The composed `.rlqb` parser/validator: the polymorphic root
-   with plural component sections
-   (`machines`/`media`/`sources`/`archives`) and the bare-root
-   machine; `(name, type)` identity with source/path-stem-default
-   names; the recursive archive tree (node-with-`members` = an
-   archive, leaf = a media); `source` locators (url + mirrors /
-   local / from-archive / by-name); and medium-compatibility
-   checks — fail-closed, naming the problem. `.rlqm` retired.
+1. The revised `.rlqb` parser/validator: the root an array of
+   specs (a lone spec object accepted as sugar for the array of
+   one, same rules — an untyped lone object is a media);
+   `type` optional defaulting to `media`, a machine
+   declaring `"type": "machine"` (the media branch's
+   unknown-field error carries a did-you-mean hint when machine
+   vocabulary appears), optional checked `type` echoes at nested
+   positions; media absorbing archive under parent/children
+   containment — any media may declare `children` (batch sugar,
+   recursive, path-form entries, a bare string being the path)
+   or its `parent` from the child side, every edge resolving to
+   child-declares-parent, the mount/container reading decided
+   per reference site; bare-string root specs desugaring to
+   `{ "location": … }`; inline media at drives (a full spec, or
+   the `{ "size": … }` blank, `size` implying `new`);
+   name-or-nothing identity (explicit or content-stem names into
+   the one catalog; the anonymous blank site-identified,
+   slot-named at materialization); identity-dedup (identical
+   same-`(name, type)` specs coexist, differing collide, in-file
+   duplicates error); and the location grammar — one `location`
+   field: bare-path / `https:`-`http:` /
+   `${media:<name>}/<path>` / `${<key>}` strings,
+   the explicit object forms (`url` / `local` / `parent`+`path`
+   incl. an inline parent spec / `property`) as canonical form
+   and escape, mirror lists (mixed schemes; `sha256` required
+   once any remote rung is present), unrecognized-scheme-shape
+   parse errors, `${key}` whole-value references with binding
+   deferred to milestone 8 (fails closed naming it until then) —
+   all parsed by the one shared media-locator component. `.rlqm`
+   retired. All fail-closed, naming the problem.
 2. Media and materialization realigned (media.py / machines.py):
    the `materialize` modes (`new`/`difference`/`copy`/`use`),
-   `read-only`, conditional `sha256` (required on a `url` source),
-   sources/archives resolution with recursive extraction, the
-   name-keyed `cache/media/` + `cache/archives/` caches
-   (`downloads/` renamed), and per-machine materializations under
-   `cache/machines/<id>/media/` keyed by media item (so
-   removable-slot swaps never clobber).
-3. The machine directory reorganization: `drives/` → `media/`,
+   `read-only` (default true on cdrom), conditional `sha256`,
+   recursive child extraction under the container-format
+   roster (zip only this milestone — ISO9660 and its `[BOOT]`
+   virtual paths are the recorded follow-on), and per-machine
+   materializations under `cache/machines/<id>/media/` keyed by
+   media name — slot name for the anonymous blank — so
+   removable-slot swaps never clobber.
+3. The cache rework: the single name-keyed `cache/media/`
+   (`cache/archives/` retired), the identity ledger (recorded
+   sha256, derivation keys, provenance
+   refetchable/derived/supplied, source lineage), the
+   deterministic preflight identity check feeding the
+   on-mismatch contract with lineage-informed messages; the
+   command family with API twins — `clean-media` (blunt; spares
+   `supplied`; skips running-machine attachments), `clean-media
+   <name>` (targeted eviction), `prune-media`
+   (attachment-closure prune; scope-relative; `--dry-run`), and
+   `add-media <name> <file>` (the guarded door — a pinned
+   unlocated media resolves by cache hit).
+4. The machine directory reorganization: `drives/` → `media/`,
    backend files into a backend-named subdir,
    `reliquary-machine.json` → `machine.json` with `vm.json` folded
    in as a while-running state section written atomically with
    `phase`.
-4. One published blueprint JSON Schema with per-component variants
-   replacing the two milestone-6 schemas; the conformance corpus
-   reworked to the composed format.
-5. The specs realigned as normative to the composed model:
-   machine-blueprint.md + field reference + cookbook, media-spec.md
-   (folded in), instance-model.md, and the AGENTS / ROADMAP
-   home-layout descriptions — blueprint-model.md's "supersedes"
-   list is the checklist.
-6. The codex and `planning/examples/` re-authored to the composed
-   format and renamed to the launching-point doctrine
+5. One published blueprint JSON Schema — the two-variant root,
+   machine requiring its declared `type`, media accepting its
+   absence — replacing the two milestone-6 schemas; the
+   conformance corpus reworked to the revised format.
+6. The specs realigned as normative: blueprint-model.md rewritten
+   first as the revision's worked design, then
+   machine-blueprint.md + field reference + cookbook,
+   media-spec.md (the location grammar, the readings, and
+   parent/children containment replacing the source/archive
+   sections),
+   instance-model.md, and the AGENTS / ROADMAP home-layout
+   descriptions.
+7. The codex and `planning/examples/` re-authored to the revised
+   format — explicit `type` on every spec (the good-code
+   doctrine: the format doesn't enforce it, the shipped corpus
+   models it) — and renamed to the launching-point doctrine
    (DECISIONS.md, 2026-07-23): `freedos-1.4-plain.rlqb` →
    `freedos.rlqb`, `freedos-1.4-plain-install.rlqs` →
    `freedos-install.rlqs`, the mentions across script-spec,
    machine-blueprint.md, cli.md, docs, and tests following; the
-   FreeDOS install kept green end to end (including the
-   recursive-archive example).
+   FreeDOS install kept green end to end.
 
 Done when: the FreeDOS install script runs from a clean home
-against a machine created from a composed `.rlqb` blueprint;
-`destroy-machine` + `create-machine` regenerates from the composed
-blueprint and media alone; the recursive-archive FreeDOS example
-resolves and installs; and one blueprint schema validates the
+against a machine created from a revised-format `.rlqb` (inline
+anonymous blank hdd, empty cdrom, the LiveCD reached through its
+zip); `destroy-machine` + `create-machine` regenerates from the
+blueprint alone; `prune-media` after the install leaves exactly
+the attachment closure (the extracted ISO stays, the zip husk
+goes); and the one blueprint schema validates the reworked
 conformance corpus.
 
 ### Milestone 8 — Script properties
@@ -2001,13 +2054,21 @@ Deliverables:
    dead literal candidates and any secret involvement static
    errors, and the supplying candidate named by `check-script`
    and transcripts.
+6. `${key}` location references (grammar landed at milestone
+   7) binding through the same source order at `create` /
+   `apply` — the resolved location recorded in the state, never
+   adopted at `start`; a resolved value that is itself a
+   reference fails closed (no chaining); noninteractive misses
+   fail closed naming the media and the key.
 
 Done when: ordinary and secret properties round-trip through the
 CLI with no secret material ever in the file, interrupting an
 update cannot produce a plaintext value or a marker whose
-credential was reported bound but is absent, and a
+credential was reported bound but is absent, a
 derivation-backed key binds without an ask, naming its winning
-candidate as the supplying source.
+candidate as the supplying source, and a media whose `location`
+is a `${key}` reference materializes through the same order
+with its resolved location recorded in the state.
 
 ### Milestone 9 — Run records and asynchronous runs
 
