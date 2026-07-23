@@ -22,7 +22,9 @@ workflow:
   machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
-  `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
+  `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` /
+  `recreate_machine` (destroy+create under the same id) / `get_machine_dir` (the out-of-band door) /
+  `list_machines` /
   `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
   numbering and an exclusive per-machine operation lock

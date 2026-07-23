@@ -11,9 +11,11 @@ from unittest import mock
 from reliquary.blueprint import parse_blueprint
 from reliquary.machines import (insert_media, create,
                                 create_machine, destroy_machine,
-                                eject_media, list_machines,
+                                eject_media, get_machine_dir,
+                                list_machines,
                                 load_machine_state, machine_dir_path,
                                 machine_drive_args, mark_stopped,
+                                recreate_machine,
                                 resolve_machine, set_boot_order,
                                 start_machine, stop_machine)
 
@@ -757,6 +759,47 @@ class MachineMaterializationTests(unittest.TestCase):
             list_machines(context=self.home, blueprint="doomed"), [])
         self.assertFalse(
             os.path.exists(machine_dir_path("doomed-0", self.home)))
+
+    def _write_blueprint(self, name):
+        bp_dir = os.path.join(self.home, "blueprints")
+        os.makedirs(bp_dir, exist_ok=True)
+        with open(os.path.join(bp_dir, f"{name}.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({"platform": "dos",
+                       "drives": {"hdd": {"size": "20M"}}}, handle)
+
+    def test_get_machine_dir_returns_absolute_path(self):
+        machine_id = self._create_ready()
+        result = get_machine_dir(machine=machine_id, context=self.home)
+        self.assertTrue(os.path.isabs(result))
+        self.assertEqual(
+            os.path.normpath(result),
+            os.path.normpath(machine_dir_path(machine_id, self.home)))
+
+    def test_recreate_reuses_the_same_id(self):
+        self._write_blueprint("rc")
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine("rc", context=self.home)
+            again = recreate_machine(machine=machine_id, context=self.home)
+        self.assertEqual(again, machine_id)
+        self.assertEqual(
+            [m["id"] for m in list_machines(
+                context=self.home, blueprint="rc")],
+            [machine_id])
+
+    def test_recreate_keeps_the_id_at_a_gap(self):
+        """recreate reuses the exact id even when a lower one is free."""
+        self._write_blueprint("g")
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            create_machine("g", context=self.home)          # g-0
+            create_machine("g", context=self.home)          # g-1
+            two = create_machine("g", context=self.home)    # g-2
+            destroy_machine("g-0", context=self.home)       # frees g-0
+            again = recreate_machine(machine=two, context=self.home)
+        self.assertEqual(again, "g-2")
+        ids = {m["id"] for m in list_machines(
+            context=self.home, blueprint="g")}
+        self.assertEqual(ids, {"g-1", "g-2"})
 
     def test_create_machine_loads_blueprints_dir(self):
         """create_machine reads blueprints/<name>.json."""

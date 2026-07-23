@@ -51,6 +51,18 @@ root-home VM.
 
 Destroy a machine. Frees the machine number for reuse.
 
+### `rlq recreate-machine (--blueprint NAME | --machine ID)`
+
+Destroy a machine and recreate it under the same id — exactly
+`destroy-machine` + `create-machine`. The current blueprint is
+re-resolved, so drives regenerate as declared.
+
+### `rlq get-machine-dir (--blueprint NAME | --machine ID)`
+
+Print the machine's cache directory as an absolute path — the door
+to out-of-band file exchange (valid in any phase, touching
+nothing).
+
 ### `rlq list-machines [--blueprint NAME]`
 
 List all machines, optionally filtered by blueprint.

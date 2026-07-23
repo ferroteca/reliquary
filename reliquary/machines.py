@@ -238,7 +238,8 @@ def _materialize_drive(key, drive, drives_root, source, context):
     return entry
 
 
-def create(blueprint, *, context=None, blueprint_name="", source=None):
+def create(blueprint, *, context=None, blueprint_name="", source=None,
+           number=None):
     """Materialize one machine from a parsed Blueprint.
 
     Creates the machine cache directory under
@@ -250,7 +251,8 @@ def create(blueprint, *, context=None, blueprint_name="", source=None):
     payload for ``media``, a resolved host directory for ``hostdir``.
     ``source`` is the absolute path of the blueprint file this machine
     resolved from, recorded for selection scoping. The machine number
-    is the lowest free non-negative integer for that blueprint.
+    is the lowest free non-negative integer for that blueprint, unless
+    ``number`` pins a specific one (``recreate`` reuses the old id).
     Returns the generated machine id.
     """
     if not isinstance(blueprint_name, str) or not blueprint_name:
@@ -258,7 +260,13 @@ def create(blueprint, *, context=None, blueprint_name="", source=None):
 
     created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with _blueprint_alloc_lock(blueprint_name, context):
-        machine_id = _allocate_machine_id(blueprint_name, context)
+        if number is None:
+            machine_id = _allocate_machine_id(blueprint_name, context)
+        else:
+            machine_id = machine_id_for(blueprint_name, number)
+            if os.path.exists(machine_dir_path(machine_id, context)):
+                raise RuntimeError(
+                    f"machine {machine_id} already exists")
         drives_root = _machine_drives_dir(machine_id, context)
         os.makedirs(drives_root)
         # Mark the machine `creating` before materialization begins, so
@@ -332,13 +340,14 @@ def _materialize_machine(blueprint, machine_id, blueprint_name, created,
     return machine_id
 
 
-def create_machine(name, *, context=None):
+def create_machine(name, *, context=None, number=None):
     """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
     built-in library on this first reference, along with the media
     definitions and scripts it references (never overwriting user
-    files).
+    files). ``number`` pins the machine number (``recreate`` reuses
+    the old id); omitted, the lowest free number is allocated.
     """
     from .library import locate_blueprint
     paths = [
@@ -350,7 +359,36 @@ def create_machine(name, *, context=None):
     path = locate_blueprint(name, context=context)
     blueprint = load_blueprint(path, context=context)
     return create(blueprint, context=context, blueprint_name=name,
-                  source=path)
+                  source=path, number=number)
+
+
+def recreate_machine(*, machine=None, blueprint=None, context=None):
+    """Destroy the selected machine and recreate it under the same id.
+
+    Exactly ``destroy`` + ``create`` (instance model): the current
+    blueprint is re-resolved and backend assignment re-runs, so drives
+    regenerate as declared and the machine may land differently than
+    before. Returns the reused machine id.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    parsed = split_machine_id(machine_id)
+    if parsed is None:
+        raise ValueError(f"cannot parse machine id {machine_id!r}")
+    blueprint_name, number = parsed
+    destroy_machine(machine_id, context)
+    return create_machine(blueprint_name, context=context, number=number)
+
+
+def get_machine_dir(*, machine=None, blueprint=None, context=None):
+    """Return the absolute cache directory of the selected machine.
+
+    The out-of-band door (instance model): a query valid in any
+    phase, touching nothing.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    return os.path.abspath(machine_dir_path(machine_id, context))
 
 
 def _write_state(machine_id, state, context=None):

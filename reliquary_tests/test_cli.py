@@ -195,6 +195,31 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("created machine plain-0", stdout.getvalue())
 
+    def test_get_machine_dir(self):
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main(["--home", self.home, "create-machine",
+                      "--blueprint", "plain"])
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "get-machine-dir",
+                               "--machine", "plain-0"])
+        self.assertEqual(result, 0)
+        self.assertIn("plain-0", stdout.getvalue())
+
+    def test_recreate_machine(self):
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main(["--home", self.home, "create-machine",
+                      "--blueprint", "plain"])
+        stdout = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "recreate-machine",
+                               "--machine", "plain-0"])
+        self.assertEqual(result, 0)
+        self.assertIn("recreated machine plain-0", stdout.getvalue())
+
     def test_list_machines_table(self):
         """list-machines prints blueprint, number, phase, and backend."""
         with mock.patch("reliquary.machines.create_hdd_image"), \

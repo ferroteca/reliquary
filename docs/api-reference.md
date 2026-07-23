@@ -69,6 +69,13 @@ which lives under the (independently resolvable) cache root.
 - `destroy_machine(machine_id, context=None)` - Delete the machine
   entirely; frees its number for reuse. CLI twin:
   `destroy-machine`.
+- `recreate_machine(*, machine=None, blueprint=None, context=None)` -
+  Destroy the selected machine and recreate it under the same id,
+  re-resolving the current blueprint. Returns the reused id. CLI
+  twin: `recreate-machine`.
+- `get_machine_dir(*, machine=None, blueprint=None, context=None)` -
+  The selected machine's cache directory as an absolute path (any
+  phase). CLI twin: `get-machine-dir`.
 - `mark_stopped(machine_id, context=None)` - Reconcile the phase of
   a machine whose QEMU process has gone.
 - `load_machine_state(machine_id, context=None)` - Read the

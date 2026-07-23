@@ -25,8 +25,9 @@ from .library import (list_builtin_blueprints, list_builtin_media,
                       seed_blueprint, seed_media, seed_script)
 from . import blueprint as blueprint_mod
 from .machines import (create_machine, destroy_machine, eject_media,
-                       insert_media, list_machines, load_machine_state,
-                       machine_dir_path, resolve_machine,
+                       get_machine_dir, insert_media, list_machines,
+                       load_machine_state, machine_dir_path,
+                       recreate_machine, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
 from .media import (fetch_media, clean_downloads, clean_media,
@@ -45,7 +46,8 @@ from .workflows import _cli_machine_config, start as start_legacy
 # are identical without a parent-parser SUPPRESS twin.
 _COMMANDS = frozenset({
     "create-machine", "start-machine", "stop-machine",
-    "destroy-machine", "run-script", "check-script", "fetch-media",
+    "destroy-machine", "recreate-machine", "get-machine-dir",
+    "run-script", "check-script", "fetch-media",
     "seed-blueprint", "seed-media", "seed-script", "new-blueprint",
     "delete-blueprint",
     "get-property", "set-property", "unset-property",
@@ -243,6 +245,18 @@ def main(argv=None):
     # destroy-machine
     command = subcommands.add_parser(
         "destroy-machine", help="delete a stopped machine")
+    _add_selectors(command)
+
+    # recreate-machine
+    command = subcommands.add_parser(
+        "recreate-machine",
+        help="destroy and recreate a machine under the same id")
+    _add_selectors(command)
+
+    # get-machine-dir
+    command = subcommands.add_parser(
+        "get-machine-dir",
+        help="print a machine's cache directory (out-of-band door)")
     _add_selectors(command)
 
     # run-script
@@ -460,6 +474,20 @@ def _create(arguments):
             "do not pass --machine")
     machine_id = create_machine(arguments.blueprint)
     print(f"created machine {machine_id}")
+    return 0
+
+
+def _recreate_machine(arguments):
+    machine_id = recreate_machine(
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    print(f"recreated machine {machine_id}")
+    return 0
+
+
+def _get_machine_dir(arguments):
+    machine_id = _require_machine_selector(arguments)
+    print(get_machine_dir(machine=machine_id))
     return 0
 
 
@@ -870,6 +898,10 @@ def _dispatch(arguments):
         destroy_machine(machine_id)
         print(f"destroyed machine {machine_id}")
         return 0
+    if arguments.command == "recreate-machine":
+        return _recreate_machine(arguments)
+    if arguments.command == "get-machine-dir":
+        return _get_machine_dir(arguments)
 
     interaction_port = _interaction_port(arguments)
     if arguments.command == "type":

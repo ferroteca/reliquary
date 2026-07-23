@@ -64,6 +64,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `blueprint-source` (the resolved blueprint path), `blueprint-digest`
   (the resolved-snapshot baseline), and `backend-id`. Non-`ide`
   controllers fail closed pending the adapter seam.
+- `recreate-machine` / `recreate_machine()` destroys a machine and
+  recreates it under the same id (re-resolving the current
+  blueprint), and `get-machine-dir` / `get_machine_dir()` prints a
+  machine's cache directory as an absolute path — the out-of-band
+  file-exchange door, valid in any phase.
 - Machine lifecycle is crash-safe: every mutating operation takes an
   exclusive per-machine lock and carries an operation generation, and
   the transitional phases `creating` / `stopping` / `destroying` are
