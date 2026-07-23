@@ -103,27 +103,21 @@
       "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
     },
     "driveState": {
-      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; exactly one content shape (size, media, base, or hostdir) is realized, with path the cache location (or null for an empty removable slot). media is null in an empty removable slot.",
+      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; media names the resolved media (null in an empty removable slot) and materialize records how it is realized (new/difference/copy/use, null for an empty slot); size is present for a 'new' image; path is the cache location (or null for an empty removable slot).",
       "type": "object",
       "properties": {
         "medium": {"enum": ["floppy", "hdd", "cdrom"]},
         "slot": {"type": "integer", "minimum": 0},
         "controller": {"enum": ["ide", "sata", "scsi", "nvme", "virtio"]},
+        "media": {"type": ["string", "null"]},
+        "materialize": {
+          "type": ["string", "null"],
+          "enum": ["new", "difference", "copy", "use", null]
+        },
         "size": {
           "type": "string",
           "pattern": "^[1-9][0-9]*[KkMmGgTt]$"
         },
-        "media": {"type": ["string", "null"]},
-        "base": {
-          "type": "object",
-          "properties": {
-            "media": {"type": "string", "minLength": 1},
-            "type": {"enum": ["difference", "duplicate"]}
-          },
-          "required": ["media", "type"],
-          "additionalProperties": false
-        },
-        "hostdir": {"type": "string", "minLength": 1},
         "path": {"type": ["string", "null"]}
       },
       "required": ["medium", "slot"],

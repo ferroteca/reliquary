@@ -1,5 +1,5 @@
-// a JSONC blueprint: comments and a trailing comma
 {
-  "platform": "dos", /* the compatibility default */
-  "memory": 16,
+  // a bare machine with comments and a trailing comma
+  "platform": "dos",
+  "drives": {"cdrom0": null,},
 }

@@ -11,11 +11,11 @@ import unittest
 from reliquary import Context, HOME_ASSETS
 from reliquary.assets import (DirSource, HomeSource, index_by_name,
                               source_for, stem)
-from reliquary.blueprint import parse_blueprint
+from reliquary.document import parse_document
 from reliquary.library import (list_blueprints, locate_blueprint,
                                search_blueprints)
 from reliquary.machines import create_machine, resolve_machine
-from reliquary.media import resolve_media
+from reliquary.resolve import load_namespace, resolve_media
 
 SHA256 = "1" * 64
 
@@ -150,14 +150,15 @@ class DirSourceResolutionTests(unittest.TestCase):
         self.assertEqual(search_blueprints("", context=self.ctx()), [])
 
     def test_media_resolves_from_the_project_root(self):
-        _write(os.path.join(self.root, "media", "m.rlqm"),
-               {"name": "proj-media", "file": "X.iso", "sha256": SHA256})
-        resolved = resolve_media("proj-media", context=self.ctx())
-        self.assertEqual(resolved.item.file, "X.iso")
+        _write(os.path.join(self.root, "lib.rlqb"),
+               {"media": [{"name": "proj-media",
+                           "source": {"local": "/X.iso"}}]})
+        resolved = resolve_media("proj-media", load_namespace(self.ctx()))
+        self.assertEqual(resolved.name, "proj-media")
 
     def test_media_missing_in_dir_mode_does_not_seed(self):
-        with self.assertRaises(FileNotFoundError):
-            resolve_media("freedos-1.4-livecd", context=self.ctx())
+        with self.assertRaises(KeyError):
+            resolve_media("freedos-1.4-livecd", load_namespace(self.ctx()))
 
 
 class SelectionScopingTests(unittest.TestCase):
@@ -192,18 +193,17 @@ class BlueprintNameIdentityTests(unittest.TestCase):
     """``name`` is an id-safe identity, not a prose label."""
 
     def test_id_safe_name_is_accepted(self):
-        result = parse_blueprint(
-            {"platform": "dos", "name": "freedos-1.4-plain"}, context="h")
-        self.assertEqual(result.name, "freedos-1.4-plain")
+        doc = parse_document(
+            {"platform": "dos", "name": "freedos-1.4-plain"}, stem="h")
+        self.assertIn("freedos-1.4-plain", doc.machines)
 
     def test_name_with_spaces_is_rejected(self):
         with self.assertRaises(ValueError):
-            parse_blueprint(
-                {"platform": "dos", "name": "Not An Id"}, context="h")
+            parse_document({"platform": "dos", "name": "Not An Id"}, stem="h")
 
     def test_all_digit_name_is_rejected(self):
         with self.assertRaises(ValueError):
-            parse_blueprint({"platform": "dos", "name": "12"}, context="h")
+            parse_document({"platform": "dos", "name": "12"}, stem="h")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,15 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Built-in library seeding: copy-out on first reference."""
+"""Built-in library seeding for the composed blueprint model.
 
-import json
+Media are components inside the blueprint ``.rlqb`` now, so seeding a
+blueprint brings its media along inside the same file — there is no
+separate media definition to copy out (``seed_media`` is a deprecated
+no-op).
+"""
+
 import importlib
+import json
 import os
 import shutil
 import tempfile
@@ -11,11 +17,11 @@ import unittest
 from unittest import mock
 
 import reliquary
-from reliquary.library import (search_blueprints, seed_blueprint,
-                               seed_media, seed_script)
-from reliquary.machines import (create_machine,
-                                load_machine_state)
-from reliquary.media import parse_definition, resolve_media
+from reliquary import document, jsonc
+from reliquary.library import (list_builtin_blueprints, search_blueprints,
+                               seed_blueprint, seed_media, seed_script)
+from reliquary.machines import create_machine, load_machine_state
+from reliquary.resolve import load_namespace, resolve_media
 
 BLUEPRINT = "freedos-1.4-plain"
 MEDIA = "freedos-1.4-livecd"
@@ -23,14 +29,10 @@ SCRIPTS = ("freedos-1.4-plain-install", "freedos-1.4-verify")
 OPENBSD_BLUEPRINT = "openbsd-7.9-amd64"
 OPENBSD_MEDIA = "openbsd-7.9-amd64-install"
 OPENBSD_SCRIPT = "openbsd-7.9-install"
-
-BLUEPRINT_EXT = ".rlqb"
-MEDIA_EXT = ".rlqm"
+EXT = ".rlqb"
 
 
-class SeedingTest(unittest.TestCase):
-    """seed_blueprint / seed_media / seed_script behavior."""
-
+class _HomeTest(unittest.TestCase):
     def setUp(self):
         home_mod = importlib.import_module("reliquary.home")
         saved = home_mod._home
@@ -43,43 +45,39 @@ class SeedingTest(unittest.TestCase):
     def _path(self, *parts):
         return os.path.join(self.home, *parts)
 
+
+class SeedingTest(_HomeTest):
     def test_seed_blueprint_copies_closure(self):
-        """Seeding a blueprint brings its media and scripts along."""
+        """Seeding a blueprint brings its scripts along; media ride the
+        blueprint file itself."""
         self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home))
-        self.assertTrue(os.path.isfile(
-            self._path("blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")))
-        self.assertTrue(os.path.isfile(
-            self._path("media", f"{MEDIA}{MEDIA_EXT}")))
+        blueprint_path = self._path("blueprints", f"{BLUEPRINT}{EXT}")
+        self.assertTrue(os.path.isfile(blueprint_path))
         for stem in SCRIPTS:
-            self.assertTrue(os.path.isfile(
-                self._path("scripts", f"{stem}.rlqs")))
+            self.assertTrue(os.path.isfile(self._path("scripts", f"{stem}.rlqs")))
+        # The media travels inside the seeded blueprint.
+        doc = document.load_document(blueprint_path)
+        self.assertIn(MEDIA, doc.media)
 
     def test_seed_blueprint_only_skips_closure(self):
-        """--only copies just the blueprint, not its media/scripts."""
-        self.assertTrue(
-            seed_blueprint(BLUEPRINT, context=self.home, only=True))
-        self.assertTrue(os.path.isfile(
-            self._path("blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")))
-        self.assertFalse(os.path.isdir(self._path("media")))
+        self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home, only=True))
+        self.assertTrue(os.path.isfile(self._path("blueprints", f"{BLUEPRINT}{EXT}")))
         self.assertFalse(os.path.isdir(self._path("scripts")))
 
     def test_second_seed_leaves_user_files_alone(self):
-        """A seeded file that the user edited is never overwritten."""
         seed_blueprint(BLUEPRINT, context=self.home)
-        blueprint_path = self._path("blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")
-        media_path = self._path("media", f"{MEDIA}{MEDIA_EXT}")
-        with open(blueprint_path, "w", encoding="utf-8") as handle:
+        # Remove the blueprint so re-seeding runs the closure again; the
+        # user-edited script it references must not be overwritten.
+        os.remove(self._path("blueprints", f"{BLUEPRINT}{EXT}"))
+        script_path = self._path("scripts", f"{SCRIPTS[0]}.rlqs")
+        with open(script_path, "w", encoding="utf-8") as handle:
             handle.write("user edit")
-        os.remove(blueprint_path)
-        with open(media_path, "w", encoding="utf-8") as handle:
-            handle.write("user media")
         self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home))
-        with open(media_path, encoding="utf-8") as handle:
-            self.assertEqual(handle.read(), "user media")
+        with open(script_path, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "user edit")
 
     def test_existing_home_blueprint_is_untouched(self):
-        """A present home blueprint suppresses seeding entirely."""
-        for ext in [".json", BLUEPRINT_EXT]:
+        for ext in (".json", EXT):
             with self.subTest(ext=ext):
                 shutil.rmtree(self.home)
                 os.makedirs(self.home)
@@ -90,67 +88,24 @@ class SeedingTest(unittest.TestCase):
                 self.assertFalse(seed_blueprint(BLUEPRINT, context=self.home))
                 with open(blueprint_path, encoding="utf-8") as handle:
                     self.assertEqual(handle.read(), "mine")
-                self.assertFalse(os.path.exists(self._path("media")))
                 self.assertFalse(os.path.exists(self._path("scripts")))
 
-    def test_seed_media_skips_home_definition_of_same_name(self):
-        """A home definition supplying the item name wins."""
-        media_root = self._path("media")
-        os.makedirs(media_root)
-        definition = {
-            "name": MEDIA, "file": "mine.iso",
-            "sha256": "0" * 64,
-        }
-        for ext in [".json", MEDIA_EXT]:
-            with self.subTest(ext=ext):
-                shutil.rmtree(media_root)
-                os.makedirs(media_root)
-                with open(os.path.join(media_root, f"mine{ext}"), "w",
-                          encoding="utf-8") as handle:
-                    json.dump(definition, handle)
-                self.assertFalse(seed_media(MEDIA, context=self.home))
-                self.assertFalse(os.path.exists(
-                    os.path.join(media_root, f"{MEDIA}{MEDIA_EXT}")))
+    def test_seed_media_is_a_no_op(self):
+        self.assertFalse(seed_media(MEDIA, context=self.home))
 
     def test_unknown_names_seed_nothing(self):
         self.assertFalse(seed_blueprint("no-such", context=self.home))
         self.assertFalse(seed_media("no-such", context=self.home))
         self.assertFalse(seed_script("no-such", context=self.home))
         self.assertFalse(os.path.exists(self._path("blueprints")))
-        self.assertFalse(os.path.exists(self._path("media")))
         self.assertFalse(os.path.exists(self._path("scripts")))
 
     def test_seed_script_copies_once(self):
         self.assertTrue(seed_script(SCRIPTS[0], context=self.home))
         self.assertFalse(seed_script(SCRIPTS[0], context=self.home))
 
-    def test_seed_script_brings_its_referenced_media(self):
-        """`insert cdrom0 @name` seeds the definition it names."""
-        self.assertTrue(seed_script(SCRIPTS[0], context=self.home))
-        self.assertTrue(os.path.isfile(
-            self._path("media", f"{MEDIA}{MEDIA_EXT}")))
 
-    def test_seed_script_brings_its_referenced_openbsd_media(self):
-        """The OpenBSD script seeds the ISO its install inserts."""
-        self.assertTrue(seed_script(OPENBSD_SCRIPT, context=self.home))
-        self.assertTrue(os.path.isfile(
-            self._path("scripts", f"{OPENBSD_SCRIPT}.rlqs")))
-        self.assertTrue(os.path.isfile(
-            self._path("media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")))
-
-
-class SearchBlueprintsTest(unittest.TestCase):
-    """search_blueprints over codex + home with provenance."""
-
-    def setUp(self):
-        home_mod = importlib.import_module("reliquary.home")
-        saved = home_mod._home
-        self.addCleanup(setattr, home_mod, "_home", saved)
-        home_mod._home = None
-        self._temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._temp.cleanup)
-        self.home = self._temp.name
-
+class SearchBlueprintsTest(_HomeTest):
     def test_codex_blueprint_is_available(self):
         rows = search_blueprints("freedos", context=self.home)
         row = next(r for r in rows if r["name"] == BLUEPRINT)
@@ -168,159 +123,95 @@ class SearchBlueprintsTest(unittest.TestCase):
     def test_user_blueprint_matches_by_description(self):
         bp_dir = os.path.join(self.home, "blueprints")
         os.makedirs(bp_dir)
-        # A declared ``name`` is the identity and overrides the stem.
         with open(os.path.join(bp_dir, "mine.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({"platform": "dos", "name": "custom-rig",
-                       "description": "bespoke widget rig",
-                       "drives": {"hdd": {"size": "20M"}}}, handle)
+            json.dump({"machines": [{"name": "custom-rig", "platform": "dos",
+                                     "description": "bespoke widget rig",
+                                     "drives": {"cdrom0": None}}]}, handle)
         rows = search_blueprints("bespoke", context=self.home)
         self.assertEqual([r["name"] for r in rows], ["custom-rig"])
         self.assertEqual(rows[0]["provenance"], "user")
         self.assertEqual(rows[0]["description"], "bespoke widget rig")
 
     def test_empty_term_matches_all(self):
-        rows = search_blueprints("", context=self.home)
-        self.assertGreaterEqual(len(rows), 2)
+        self.assertGreaterEqual(
+            len(search_blueprints("", context=self.home)), 2)
 
     def test_no_match_returns_empty(self):
         self.assertEqual(
             search_blueprints("zzzznomatch", context=self.home), [])
 
 
-class FirstReferenceTest(unittest.TestCase):
-    """Implicit seeding through the resolution seams."""
+class FirstReferenceTest(_HomeTest):
+    def test_media_travels_with_a_seeded_blueprint(self):
+        seed_blueprint(BLUEPRINT, context=self.home)
+        self.assertIn(MEDIA, load_namespace(self.home).media)
 
-    def setUp(self):
-        home_mod = importlib.import_module("reliquary.home")
-        saved = home_mod._home
-        self.addCleanup(setattr, home_mod, "_home", saved)
-        home_mod._home = None
-        self._temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._temp.cleanup)
-        self.home = self._temp.name
-
-    def test_resolve_media_seeds_builtin_definition(self):
-        resolved = resolve_media(MEDIA, context=self.home)
-        self.assertEqual(resolved.item.file, "FD14LIVE.iso")
-        self.assertTrue(os.path.isfile(
-            os.path.join(self.home, "media", f"{MEDIA}{MEDIA_EXT}")))
-
-    def test_resolve_media_unknown_name_still_errors(self):
-        with self.assertRaises(FileNotFoundError):
-            resolve_media("no-such-media", context=self.home)
+    def test_resolve_media_unknown_name_errors(self):
+        with self.assertRaises(KeyError):
+            resolve_media("no-such-media", load_namespace(self.home))
 
     def test_create_machine_seeds_and_honors_edits(self):
-        """create seeds once; a user edit governs later creates."""
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch("reliquary.machines.fetch_media",
-                           return_value="payload.iso"):
-            machine_id = create_machine(BLUEPRINT,
-                                               context=self.home)
-            # It should have seeded as .rlqb because codex has it.
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine(BLUEPRINT, context=self.home)
             blueprint_path = os.path.join(
-                self.home, "blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")
-
-            self.assertTrue(
-                os.path.isfile(blueprint_path),
-                f"Blueprint should have been seeded at {blueprint_path}")
+                self.home, "blueprints", f"{BLUEPRINT}{EXT}")
+            self.assertTrue(os.path.isfile(blueprint_path))
             with open(blueprint_path, encoding="utf-8") as handle:
-                from reliquary import jsonc
                 data = jsonc.load(handle)
-            data["memory"] = 64
-            with open(blueprint_path, "w",
-                      encoding="utf-8") as handle:
+            data["machines"][0]["memory"] = 64
+            with open(blueprint_path, "w", encoding="utf-8") as handle:
                 json.dump(data, handle)
-            second_id = create_machine(BLUEPRINT,
-                                              context=self.home)
-        first = load_machine_state(machine_id, context=self.home)
-        second = load_machine_state(second_id, context=self.home)
-        self.assertEqual(first["memory"], 32)
-        self.assertEqual(second["memory"], 64)
+            second_id = create_machine(BLUEPRINT, context=self.home)
+        self.assertEqual(
+            load_machine_state(machine_id, context=self.home)["memory"], 32)
+        self.assertEqual(
+            load_machine_state(second_id, context=self.home)["memory"], 64)
 
     def test_create_machine_unknown_name_errors(self):
         with self.assertRaises(FileNotFoundError):
             create_machine("no-such-blueprint", context=self.home)
 
 
-class BuiltinMediaDefinitionTests(unittest.TestCase):
-    """The shipped freedos-1.4-livecd definition carries correct content."""
+class CodexMediaTests(unittest.TestCase):
+    """The shipped codex blueprints carry the pinned media hashes."""
 
     @classmethod
-    def setUpClass(cls):
-        path = os.path.join(
-            os.path.dirname(reliquary.__file__),
-            "codex", "media", f"{MEDIA}{MEDIA_EXT}")
-        from reliquary import jsonc
-        with open(path, encoding="utf-8") as handle:
-            cls._raw = jsonc.load(handle)
-        cls._parsed = parse_definition(cls._raw)
+    def _codex_doc(cls, name):
+        path = os.path.join(os.path.dirname(reliquary.__file__),
+                            "codex", "blueprints", f"{name}.rlqb")
+        return document.load_document(path)
 
-    def test_url_carrying_definition_parses(self):
-        """The shipped LiveCD definition carries a URL and parses."""
-        self.assertIn("url", self._raw)
-        self.assertEqual(self._parsed.url, self._raw["url"])
-
-    def test_livecd_item_identifies_correct_file(self):
-        self.assertEqual(self._parsed.items[0].name, "freedos-1.4-livecd")
-        self.assertEqual(self._parsed.items[0].file, "FD14LIVE.iso")
-
-    def test_iso_sha256_matches_known_good_hash(self):
-        """The ISO hash is the known-good FreeDOS 1.4 LiveCD payload hash."""
+    def test_freedos_livecd_media_pins_the_iso_hash(self):
+        media = self._codex_doc(BLUEPRINT).media[MEDIA]
         self.assertEqual(
-            self._parsed.items[0].sha256,
+            media.sha256,
             "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e"
             "6ef2deb0477f81fb")
 
-
-class BuiltinOpenBsdDefinitionTests(unittest.TestCase):
-    """The shipped OpenBSD 7.9 definition pins the official ISO."""
-
-    @classmethod
-    def setUpClass(cls):
-        path = os.path.join(
-            os.path.dirname(reliquary.__file__),
-            "codex", "media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")
-        from reliquary import jsonc
-        with open(path, encoding="utf-8") as handle:
-            cls._raw = jsonc.load(handle)
-        cls._parsed = parse_definition(cls._raw)
-
-    def test_url_carrying_definition_parses(self):
-        self.assertIn("url", self._raw)
-        self.assertEqual(self._parsed.url, self._raw["url"])
-
-    def test_install_iso_item_identifies_correct_file(self):
-        self.assertEqual(self._parsed.items[0].name, OPENBSD_MEDIA)
-        self.assertEqual(self._parsed.items[0].file, "install79.iso")
-
-    def test_install_iso_sha256_matches_openbsd_7_9_amd64(self):
+    def test_openbsd_install_media_pins_the_iso(self):
+        media = self._codex_doc(OPENBSD_BLUEPRINT).media[OPENBSD_MEDIA]
+        self.assertEqual(media.source.kind, "url")
         self.assertEqual(
-            self._parsed.items[0].sha256,
+            media.source.sha256,
             "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102"
             "cf8a5130449f")
 
 
 class BuiltinCodexTests(unittest.TestCase):
-    """The packaged codex index and files agree."""
-
-    def test_builtin_blueprint_index_names_existing_blueprint_files(self):
-        from reliquary.library import list_builtin_blueprints
-
+    def test_builtin_blueprint_index_names_existing_files(self):
         root = os.path.join(os.path.dirname(reliquary.__file__), "codex")
         for name in list_builtin_blueprints():
             self.assertTrue(os.path.isfile(
-                os.path.join(root, "blueprints", f"{name}{BLUEPRINT_EXT}")))
+                os.path.join(root, "blueprints", f"{name}{EXT}")))
 
     def test_openbsd_blueprint_seed_copies_closure(self):
         with tempfile.TemporaryDirectory() as home:
             self.assertTrue(seed_blueprint(OPENBSD_BLUEPRINT, context=home))
             self.assertTrue(os.path.isfile(os.path.join(
-                home, "blueprints", f"{OPENBSD_BLUEPRINT}{BLUEPRINT_EXT}")))
+                home, "blueprints", f"{OPENBSD_BLUEPRINT}{EXT}")))
             self.assertTrue(os.path.isfile(os.path.join(
                 home, "scripts", f"{OPENBSD_SCRIPT}.rlqs")))
-            self.assertTrue(os.path.isfile(os.path.join(
-                home, "media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")))
 
 
 if __name__ == "__main__":

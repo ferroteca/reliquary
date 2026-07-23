@@ -149,6 +149,21 @@ def _nonempty_string(value, field_name):
     return value
 
 
+# A machine's name becomes its id segment (``<name>-<n>``) and cache
+# directory, so it must be id- and path-safe: a leading alphanumeric
+# then alphanumerics, dot, underscore, or hyphen, and never all digits.
+_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _asset_name(value, field_name="name"):
+    _nonempty_string(value, field_name)
+    if not _NAME_PATTERN.match(value) or value.isdigit():
+        raise ValueError(
+            f"{field_name} must be an identifier (letters, digits, "
+            f"'.', '_', '-'; not all digits), got: {value!r}")
+    return value
+
+
 def _sha256(value, field_name):
     if not isinstance(value, str) or not _SHA256.fullmatch(value):
         raise ValueError(
@@ -623,9 +638,10 @@ def _machine(value, register, *, name=None):
         allowed = ", ".join(sorted(_PLATFORMS))
         raise ValueError(f"platform must be one of {allowed}, got: {platform!r}")
     if "name" in value:
-        name = _nonempty_string(value["name"], "name")
+        name = value["name"]
     if name is None:
         raise ValueError("a machine in a machines[] list requires a name")
+    name = _asset_name(name, "name")
     drives = _drives(value["drives"]) if "drives" in value \
         else types.MappingProxyType({})
     empty = types.MappingProxyType({})

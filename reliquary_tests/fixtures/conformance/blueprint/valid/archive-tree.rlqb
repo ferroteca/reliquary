@@ -1,0 +1,2 @@
+{"sources": [{"url": "https://x/a.zip", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],
+ "archives": [{"source": "a", "members": [{"path": "inner.zip", "members": [{"path": "p.img"}]}]}]}
