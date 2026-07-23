@@ -19,7 +19,192 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
-- THE BLUEPRINT REVISION ROUND — DECIDED (owner, 2026-07-23, the
+Decisions are numbered in the order first recorded — D1 the
+earliest — and a number is never reused; the list reads
+newest-first, so the top entry carries the highest number and
+a new entry prepends with the next free one. The D-number is
+the decision's citation handle everywhere: a decision
+generally supports use cases (U-numbers), governing principles
+([PRINCIPLES.md](PRINCIPLES.md), P-numbers), or language goals
+(G-numbers), and names what it supports; and it is citable
+downstream — design docs, specs, and code commits justify
+choices by citing D-numbers. New entries carry their supports;
+retrofitting the older ones is a queued sweep (TASKS.md). An
+overruled or no-longer-relevant decision moves, number and
+text intact, to the Retired decisions section at the bottom,
+its note naming what overruled it — a retired decision binds
+nothing but remains the record.
+
+- D23 — USE-CASE LIFECYCLE: THE CURRENT LIST + THE PROPOSALS DOC —
+  DECIDED (owner, 2026-07-23). The use-case surface
+  splits in two: planning/USE-CASES.md is the CURRENT STATE —
+  every numbered use case in force — and the new
+  planning/USE-CASE-PROPOSALS.md tracks proposed changes (new
+  use cases being drafted, proposed retirements and
+  supersessions) until adopted under the interface-change rule.
+  THE LIFECYCLE (owner): a use case in force is never changed
+  in nature — it may be CLARIFIED (an in-place wording edit no
+  past citation would read differently under — clarify, never
+  change; needs no argument; an undelivered clarification may
+  park in the proposals doc against its use case's number until
+  applied — owner follow-up, same day) or RETIRED:
+  dropped without replacement, or SUPERSEDED by one or more new
+  use cases carrying the need forward in a changed shape. ONE
+  NAMESPACE (owner): proposed and in-force use cases number
+  from the same global U-sequence; a proposal keeps its number
+  for life and moves over verbatim on adoption; numbers are
+  never reused — a dead proposal retires its number, and a
+  superseded use case leaves the list stubless (amended by the
+  no-placeholder follow-up below): DECISIONS.md records it and
+  successors name it, so citations always resolve. DEAD-PROPOSAL SWEEP (owner): a
+  proposal declined, withdrawn, or lapsed unimplemented is
+  removed, and its removal triggers a planning-doc sweep —
+  downstream design docs, ROADMAP items, and TASKS entries
+  predicated on it fall out in the same pass; the death is
+  recorded here with its reason. TRACEABILITY (owner): every
+  ROADMAP item cites the use case — in force or proposed — that
+  demands it, so a dead proposal's U-number is the sweep's
+  search key (the citation-retrofit sweep is an open issue).
+  THE PLANNING FLOW (owner, same-day follow-ups): use cases
+  drive the roadmap; a roadmap milestone item is picked up by
+  translating it into a sprint tasklist; tasks flow from the
+  roadmap and from issues, and a task is either scheduled for
+  the sprint or backlogged. Small one-offs really just are
+  issues; issues live on the GitHub tracker, and TASKS.md's
+  backlog — the section formerly named Wishlist: small,
+  obvious, just hasn't met the bar for scheduling — is the
+  parking place for non-GitHub issues; a small, obvious,
+  needed fix goes directly to tasks. In theory every issue
+  points to the use case it serves, small ones may simply be
+  deemed obvious; an issue can easily trigger a use-case
+  proposal (triage through the interface-change rule). A
+  separate planning/ISSUES.md was weighed and REVERTED
+  in-round (owner steer: tasks is the parking place — one
+  local doc, GitHub the tracker). TASKS' Language / Watches /
+  Design sections stay put pending their own sprint/backlog
+  sort [agent's boundary call, veto cheap]. NAMING (owner):
+  "primary use cases" is just "use cases" — the qualifier
+  drops across the living docs (historical entries here keep
+  their spellings; the primary interfaces and the primary
+  language goals keep their names). MOVE TRIGGER — DELIVERY
+  (owner, 2026-07-23, vetoing the agent's adoption-time
+  encoding): "moved over when implemented" means what it says.
+  ACCEPTANCE (the argument won) authorizes work and makes a
+  proposal citable; DELIVERY makes it current and moves it
+  over. The current list is not an implementation claim: a use
+  case is current while its delivery is landed or SCHEDULED on
+  the numbered arc ("I'm sure we don't meet most of the use
+  cases as the code stands today" — owner); UNSCHEDULED
+  delivery is the relocation trigger, and the door swings both
+  ways. First instance: U5 moved back as
+  accepted-awaiting-delivery (owner — its customized-Windows
+  scenario waits on the unscheduled GUI era). NO STUB (owner
+  follow-up, same day, rejecting the agent's stub): an
+  undelivered case lives ONLY in the proposals doc — the
+  shared U-namespace keeps its citations valid. U6 followed
+  the same day (owner, confirming the flag: the recorder — its
+  whole delivery — is unscheduled Horizon work; only milestone
+  9's reserved handover kinds touch it). U2 joined the same
+  position when milestone 12 demoted — still flagged, owner's
+  call pending.
+  THE MAPPING + SWEEP DIRECTIVES (owner, 2026-07-23): the
+  roadmap–use-case mapping found three gaps — the
+  multi-backend pillar demand-free, U5/U6
+  delivery-unscheduled, the multi-language binding expectation
+  unscheduled — and the owner directed: gap 1 addressed by a
+  drafted proposal (U7); gap 2 by U5's relocation (above);
+  gap 3 by a proposed use case and NO roadmap item (U9 — the
+  CLI fallback carries unbound languages until a second
+  binding earns scheduling on its own). GENERAL DIRECTIVE
+  (owner): the use cases break down into much smaller chunks
+  where possible — calibrating example: "a user at the
+  keyboard should be able to easily find a codex blueprint …
+  and seed it into their library" — and people read them, so
+  each must be succinct, digestible, and justified. Drafts
+  U7–U17 and the pending U1/U2 condensations sit in
+  USE-CASE-PROPOSALS.md awaiting adjudication — drafting is
+  not acceptance; nothing folded into the current list.
+  DECISIONS NUMBERED + THE RETIRED LIST + ITEMIZED PRINCIPLES
+  (owner, 2026-07-23, same-day follow-ups): decisions carry
+  permanent D-numbers — D1 the earliest, this entry D23 — and
+  generally support use cases or governing principles, naming
+  them; the D-number is citation currency beyond planning —
+  design choices and code commits justify themselves by citing
+  it (owner). Overruled or no-longer-relevant decisions move,
+  number and text intact, to the Retired list at the bottom of
+  this file: D2 (overruled by D16) and D17 (superseded by D22)
+  open it. The governing principles are itemized in the new
+  planning/PRINCIPLES.md (P1–P12, each indexed at its
+  normative home), feeding use cases and decisions; the
+  supports retrofit for D1–D22 is queued in TASKS.md.
+  ACCEPTANCE IS SCHEDULING (owner, 2026-07-23, closing the
+  acceptance semantics): a proposal is accepted when the
+  roadmap schedules the work its use case demands — the citing
+  roadmap item is the acceptance record; no separate
+  acceptance stamp exists. A chunk whose demanded work already
+  landed is accepted and delivered in one act. U5's acceptance
+  rides milestone 8 (scheduled, citing it); its unscheduled
+  canonical scenario is why it is not current.
+  MILESTONE 12 DEMOTED TO HORIZON (owner, 2026-07-23): machine
+  mobility — clone, export, import — leaves the numbered arc
+  for lack of use-case backing (clone has none; export stands
+  only on the U8 draft; import's U2 loses its scheduled
+  delivery — the U2 relocation question is flagged alongside
+  U6's). Guest agents renumber 13 → 12; historical entries
+  keep the milestone numbers of their time, forward-looking
+  pointers move (the renumber rule, D14). The remaining
+  unjustified Horizon items — fork-blueprint, the media verbs
+  beyond fetch, pytest-reliquary — are flagged "currently
+  unjustified" in place (owner).
+  IMPLEMENTED-ONLY, RESTATED (owner, 2026-07-23, correcting
+  the agent's landed-or-scheduled softening): the current list
+  carries NO unimplemented use case and no placeholder — it is
+  an implementation claim, every entry met by the code today;
+  the placeholder is the proposals doc. Applied: U1 (the
+  export clause is unimplemented Horizon work), U2 (import
+  unimplemented), and U3 (granular results and selective
+  re-run ride milestones 8–9) moved to
+  accepted-awaiting-delivery; U4 alone is met as written (its
+  proprietary-OS mention read as example, not demand — agent's
+  judgment, veto cheap). THE PRINCIPLES PROSE MOVES (owner:
+  seams, axes, models, and concepts are not use cases): the
+  cross-cutting prose — ephemeral machine, the control-plane
+  arc, the artifact-residency split, the feedback split —
+  leaves USE-CASES.md for PRINCIPLES.md, now its normative
+  home (P1/P3/P4/P5); PRINCIPLES.md over a new
+  ARCHITECTURE.md was the agent's choice (veto cheap), and
+  citations across ROADMAP, INTERFACES, TASKS, media-spec,
+  machine-blueprint, guest-communication, and codex re-point
+  to P-numbers.
+  TERMINOLOGY (agent's proposal, veto cheap): the owner's
+  candidate "obsolete" set aside for the two words already in
+  house usage — RETIRED (removed, no successor; "the source
+  type retires") and SUPERSEDED (replaced, successors named;
+  this file's own preamble vocabulary) — "deprecated" rejected
+  outright (implies still-usable-but-discouraged, clashing
+  with the no-BC rule). SEEDED: the break-out expectations U3
+  and U6 carried in-line ("dense, will likely be broken out")
+  move to the proposals doc as tracked proposals; removing the
+  sentences is a clarification (meta-commentary, not nature).
+  Today nothing hangs on a proposal: every design doc, ROADMAP
+  item, and TASKS entry cites in-force use cases or
+  principles, so nothing downstream falls out if the two
+  tracked break-outs die. (Amended same day: with U5 relocated,
+  milestone 8 and the GUI-era backlog hang on an accepted
+  proposal — by design; acceptance authorizes the work.) FOLDED: USE-CASES.md (status +
+  lifecycle preamble; the two sentences removed),
+  USE-CASE-PROPOSALS.md (new), INTERFACES.md (triage bullets,
+  the strict workflow, Record-it, the use-cases
+  section, the qualifier drop), ROADMAP preamble (the
+  traceability rule + the flow), TASKS.md (preamble — the
+  flow, sprint/backlog, the
+  milestone-tasklist translation; Wishlist renamed Backlog;
+  the citation-sweep one-off added), PRINCIPLES.md (new), this
+  file (preamble, the D-numbers, the Retired list), AGENTS.md
+  (layout bullets), .agents/skills/documentation-rules.md
+  (planning/ inventory).
+
+- D22 — THE BLUEPRINT REVISION ROUND — DECIDED (owner, 2026-07-23, the
   second same-day round; supersedes the four-component shape of
   the media/composition round below, before any of it was
   implemented — ROADMAP milestone 7 is the retargeted
@@ -147,7 +332,7 @@ entries now in this file.
   milestone-7 rewrite (this entry is normative for the revised
   model until then).
 
-- CODEX NAMING: A LAUNCHING POINT, NEVER A VERSION LIBRARY —
+- D21 — CODEX NAMING: A LAUNCHING POINT, NEVER A VERSION LIBRARY —
   DECIDED (owner, 2026-07-23, closing the open point from the
   generic-blueprint walkthrough): no versioned items in the
   codex — generic `openbsd`, generic `freedos`; "the codex is a
@@ -184,7 +369,7 @@ entries now in this file.
   under Naming conventions; the table examples; both
   `run-script` examples).
 
-- THE DECLARED DERIVATION RANK (HOST-DERIVED DEFAULTS LANDED) —
+- D20 — THE DECLARED DERIVATION RANK (HOST-DERIVED DEFAULTS LANDED) —
   DECIDED (owner, 2026-07-23, same-day follow-up settling the
   forks the source-model governance entry below left pending;
   supersedes that entry's closed-@host-token sketch). The use
@@ -256,7 +441,7 @@ entries now in this file.
   (order summary, the derivation bullet, the system-fact
   catalog, the binding short form, check-script's source list).
 
-- PROPERTY SOURCE MODEL: THE ORDER IS CLOSED, THE SEAMS ARE
+- D19 — PROPERTY SOURCE MODEL: THE ORDER IS CLOSED, THE SEAMS ARE
   NAMED; BESPOKE IMPLEMENTATION — DECIDED (owner, 2026-07-23,
   the source-model governance round). The owner probed the
   chain's extensibility — injectable custom providers, end-user
@@ -331,7 +516,7 @@ entries now in this file.
   "Growth: the order is closed, the seams are named"),
   script-spec.md (The property sources — closure note).
 
-- BLUEPRINT FORMAT: JSONC AFFIRMED + THE COMPUTATIONAL-GROWTH
+- D18 — BLUEPRINT FORMAT: JSONC AFFIRMED + THE COMPUTATIONAL-GROWTH
   RULE — DECIDED (owner, 2026-07-23, the format-review round).
   The owner re-opened "blueprints are authored source, not data —
   is JSON right?" and separately flagged computational/
@@ -402,78 +587,7 @@ entries now in this file.
   ROADMAP "Decisions still needed" (Blueprint computational
   constructs).
 
-- COMPOSED BLUEPRINT MODEL + MEDIA-RESIDENCY CACHE — DECIDED
-  (owner, 2026-07-23, the media/composition design round). Full
-  worked design: planning/design/blueprint-model.md (the source of
-  truth, normative until the specs realign to it). Interface triage
-  (planning/INTERFACES.md): the machine blueprint and the media
-  definition are both world-facing interfaces, so this is a MAJOR
-  interface change, landed under the interface-change rule and
-  use-case-aligned (U1 lazy install, U3/U4 hermetic automation and
-  artifact residency, U5 customization) — no use-case amendment
-  needed. Two threads settled together.
-
-  A — MEDIA RESIDENCY vs THE DOWNLOAD CACHE (the SHORTLISTED
-  topic). Payload and archive caches stay NAME-KEYED and home-side
-  (`cache/media/<name>.<ext>`, `cache/archives/<name>.<ext>` —
-  `downloads/` renamed `archives/`), independent of `--assets`; the
-  cached filename tracks the component `name`, not the source
-  basename. CONTENT ADDRESSING WEIGHED AND DECLINED: an opaque
-  hash-named cache cuts against "the cache is not an interface", and
-  the residual clash it would close (two same-named components
-  across projects aliasing one slot) is rare, already guarded by
-  per-use hash verification, isolable via the orthogonal
-  `--cache`/`RELIQUARY_CACHE_DIR` knob, and resolvable by naming one
-  component explicitly — never blocking. Accepted because Reliquary
-  users target a handful of systems, not vast libraries.
-  Hermeticity of a `--assets` run = committed hashes determine
-  inputs; cache-location isolation is the existing `--cache` knob,
-  decoupled from `--assets` (dir-mode-implies-project-cache
-  declined: couples orthogonal axes, loses cross-project dedup).
-
-  B — THE COMPOSED BLUEPRINT MODEL (topic B, expanded well past
-  "compose now or defer"). Reliquary's two authored JSON formats
-  fold into ONE — the blueprint (`.rlqb`); `.rlqm` retires. A
-  `.rlqb` root is polymorphic: plural component sections
-  (`machines`/`media`/`sources`/`archives`), mixed and matched
-  across files, a bare-root lone machine still valid. Four component
-  types, identity `(name, type)`; NAMES DEFAULT TO THE SOURCE/PATH
-  STEM (portable — the payload filename travels with the source; the
-  `.rlqb`-file stem stays forbidden as identity), explicit only
-  where there is no filename-bearing source. MEDIA OWNS
-  MATERIALIZATION (`materialize` = new/difference/copy/use, default
-  use; the machine drive shrinks to a media name or `null`, losing
-  `size`/`base`/`hostdir`); `sha256` required on a `url` source,
-  optional on local/from-archive (the "evolving drive" liveness
-  case); `read-only` default true on cdrom; hostdir folds in as a
-  `use` payload shape. SOURCES are named locators (mirror lists
-  live here); ARCHIVES are RECURSIVE TREES — a node with `members`
-  is an archive, a leaf is a media, the tree is the extraction, so
-  nested archives need no special chaining. Machine directory
-  reorganizes: `drives/` → `media/` (materializations named by
-  media item, not slot, so removable-slot swaps never clobber),
-  backend files into a backend-named subdir (`qemu/`/`virtualbox/`
-  /…), `reliquary-machine.json` → `machine.json` with `vm.json`
-  folded in as a while-running state section.
-
-  WEIGHED AND DECLINED / PARKED: content addressing (A); the
-  globbed media-set auto-expander (dropped — members are itemized
-  explicitly under a shared archive tree; a succinct extraction
-  short-circuit PARKED as a wish); create-at-destination media
-  (fuses source with destination, duplicates `export-drive`);
-  keeping `.rlqm` a separate kind (superseding the round's own
-  earlier "model now, defer mechanism" lean — the owner drove the
-  full unification); mandatory-name-without-derivation (relaxed to
-  stem defaults). FOLDED: blueprint-model.md (new); TASKS.md (the
-  two Design items retired here); ROADMAP pointer. REALIGNMENT
-  AHEAD (implementation, milestone-scale, landed coherently per the
-  no-BC rule): machine-blueprint.md + reference + cookbook,
-  media-spec.md, the two published `*.schema.json` + conformance
-  corpus (collapse to one blueprint schema), instance-model.md +
-  the ROADMAP home-layout, AGENTS.md, machines.py / lifecycle.py /
-  media.py, the codex, planning/examples.
-
-- BLUEPRINT `name` FIELD REINSTATED — DECIDED (owner, 2026-07-22),
+- D16 — BLUEPRINT `name` FIELD REINSTATED — DECIDED (owner, 2026-07-22),
   reversing the 2026-07-21 drop. `name` returns as an optional
   human-readable display name for the blueprint, distinct from the
   file-stem identity: the stem stays the one selection key
@@ -497,7 +611,7 @@ entries now in this file.
   so the milestone-6 field-validation task keeps it and the codex
   `freedos-1.4-plain.rlqb` `name` stays valid.
 
-- MILESTONE 6 DECIDE-FIRST ROUND — DECIDED (owner, 2026-07-22):
+- D15 — MILESTONE 6 DECIDE-FIRST ROUND — DECIDED (owner, 2026-07-22):
   the three "Decide first" questions ROADMAP milestone 6 gated its
   implementation on. Interface triage (planning/INTERFACES.md): the
   state ops and the blueprint format are world-facing interfaces;
@@ -554,7 +668,7 @@ entries now in this file.
   landed), instance-model.md, machine-blueprint-reference.md,
   machine-blueprint.schema.json.
 
-- MILESTONE INJECTION: LOCAL HTTP SERVER FOR INSTALLER ANSWER
+- D14 — MILESTONE INJECTION: LOCAL HTTP SERVER FOR INSTALLER ANSWER
   FILES — DECIDED (owner, 2026-07-22). A new ROADMAP milestone 5
   lands Packer's ephemeral local HTTP server for Kickstart /
   preseed / AutoYaST / `unattend.xml` and kin
@@ -578,7 +692,7 @@ entries now in this file.
   backend-adapter / guest-communication / landmarks status
   banners.
 
-- PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
+- D13 — PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
   2026-07-22), following the no-JSON-in-scripts round that made it
   possible. The grammar lives in Reliquary/script_grammar.lark,
   mirroring script-spec.md's normative EBNF; Reliquary's own
@@ -617,7 +731,7 @@ entries now in this file.
     "over the parse tree rather than encoded in the CFG" is what
     protects the diagnostics, not an implementation detail
 
-- NO JSON IN SCRIPTS — DECIDED (owner, 2026-07-22): a script
+- D12 — NO JSON IN SCRIPTS — DECIDED (owner, 2026-07-22): a script
   carries no embedded assets. The `media <label> { ... }` block
   and the `landmark <name> { ... }` block are both deleted;
   media definitions (`.rlqm`) and landmark declarations (`.rlql`
@@ -681,7 +795,7 @@ entries now in this file.
     embedded-install targeting; the recorder emits its draft as
     script plus asset files, one mode instead of two
 
-- THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED;
+- D11 — THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED;
   planning/design/script-spec.md is the source of truth (full typed
   EBNF included) and planning/design/script-examples/design-install.rlqs
   the reference script. Realigning the implementation is ROADMAP
@@ -901,7 +1015,7 @@ entries now in this file.
     imports: container-determined semantics rule (hits [04] — a construct's
     lifetime should be recoverable from its own text), reserve future
     keyword space now, naming freeze is free before v1 and never after
-- GUIDING-PRINCIPLES GAP QUEUE (planning/INTERFACES.md necessity/sufficiency panel,
+- D10 — GUIDING-PRINCIPLES GAP QUEUE (planning/INTERFACES.md necessity/sufficiency panel,
   adversarially walked per use case; evidence in workflow journal
   wf_92864b8e-623) — verdict: the five primary interfaces are necessary and
   minimal; every gap below is a spec lagging the principles, and this queue
@@ -1096,7 +1210,7 @@ entries now in this file.
     the only hand-supply path; the cache is never hand-fed; a sourceless
     definition pins hashes but fails resolution naming the definition to
     edit (specced in media-spec.md + codex.md)
-- BLUEPRINT-SPEC GAP QUEUE (owner-requested review, 2026-07-21: the media
+- D9 — BLUEPRINT-SPEC GAP QUEUE (owner-requested review, 2026-07-21: the media
   and blueprint specs walked against planning/INTERFACES.md / planning/USE-CASES.md; the
   media spec tracks the principles closely — the gaps cluster in the
   blueprint spec: machine-blueprint.md + -reference.md + -cookbook.md):
@@ -1228,7 +1342,7 @@ entries now in this file.
   QUEUE COMPLETE (2026-07-21): all nine items resolved — items 1-4
   above; items 5-9 were editorial sweeps, fully landed and not
   retained here (git history keeps their records)
-- CLI DESIGN GAP QUEUE (owner-requested review, 2026-07-21: the complete
+- D8 — CLI DESIGN GAP QUEUE (owner-requested review, 2026-07-21: the complete
   CLI design — cli.md + ROADMAP "The CLI" + api.md's parity table —
   walked against planning/INTERFACES.md / planning/USE-CASES.md and
   modern CLI practice; verdict: the two-layer lifecycle vocabulary, the
@@ -1465,7 +1579,7 @@ entries now in this file.
       (verb table gains the CLI/twin column), -reference,
       -cookbook, instance-model, media-spec, property-registry.
       docs/ and README follow at implementation realignment
-- API DESIGN GAP QUEUE (owner-requested review, 2026-07-21:
+- D7 — API DESIGN GAP QUEUE (owner-requested review, 2026-07-21:
   planning/design/api.md walked against planning/INTERFACES.md /
   planning/USE-CASES.md, the CLI design, and Python practice; verdict:
   the twin-name identity rule, the --json twin's-return rule, pull-only
@@ -1640,7 +1754,7 @@ entries now in this file.
      ("Backend adapters" doctrine paragraph, agentless-display
      recognizer sentence, milestone 6 intro), the
      guiding-principles watch list
-- GAP-CLOSURE DESIGN QUEUE (owner-requested, 2026-07-21: the five gaps
+- D6 — GAP-CLOSURE DESIGN QUEUE (owner-requested, 2026-07-21: the five gaps
   left standing in the guiding-principles queue above once the
   blueprint-spec, CLI, API, and property queues closed — itemized for
   design rounds, in leverage order; everything else open is
@@ -1900,7 +2014,7 @@ entries now in this file.
   stands, as watches); everything still open anywhere is parked in
   ROADMAP "Decisions still needed" by design, with implementation
   work owned by the realignment and later milestones
-- THE RUN-COLLECTION DROP — DECIDED (owner, 2026-07-22, the
+- D5 — THE RUN-COLLECTION DROP — DECIDED (owner, 2026-07-22, the
   out-of-band round; an owner revisit of gap-closure items 2 and 3
   settled through "what use case cannot be met without it?" —
   answer: none; the mechanism was custody and ergonomics, never
@@ -1953,7 +2067,7 @@ entries now in this file.
   labor), codex.md (naming prose), planning/design/script-examples/05 rewritten
   as a regression note + README row. Gap-closure items 2 and 3
   annotated SUPERSEDED IN PART above
-- THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
+- D4 — THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
   the docker-comparison round; all three forks on the
   recommendations). The docker model largely CONFIRMS the design
   (marker-file + host credential store = credential helpers;
@@ -2223,7 +2337,7 @@ entries now in this file.
      file-selection variable, loses one-secret-one-var CI
      injection, and sits inside platform environment-block size
      limits; per-key RELIQUARY_PROPERTY_<KEY> stands
-- JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
+- D3 — JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
   design round; all three forks settled on the recommendations):
   - planning/design/machine-blueprint.schema.json +
     media-definition.schema.json AUTHORED (draft 2020-12,
@@ -2250,7 +2364,99 @@ entries now in this file.
     (milestone 3 item 6); media/item name, script-label, and
     input-name grammars stay open with the asset-spec work (the
     schemas say non-empty string)
-- BLUEPRINT `name` FIELD DROPPED — DECIDED (owner, 2026-07-21,
+- D1 — RESOLVED (owner, 2026-07-21): the built-in library is named THE
+  CODEX (was "change 'builtin library' concept to 'template
+  library' ??"; "canon" was weighed and rejected — codex is the
+  artifact, a bound volume copied from, where canon is the
+  abstract authority/list) — folded across INTERFACES, USE-CASES, ROADMAP,
+  AGENTS, CONTRIBUTING, cli.md, README, and docs
+  (builtin-library.md renamed codex.md); Reliquary/builtins/
+  package dir renames to codex/ at implementation realignment
+
+## Retired decisions
+
+Overruled or no-longer-relevant decisions, moved out of the
+active list with numbers and text intact (entries keep the
+spellings of their time); each retirement note names what
+overruled it. A retired decision binds nothing but remains the
+record — and the guard against re-litigating still applies:
+reopening one is argued through the interface-change rule.
+
+- D17 — RETIRED (superseded by D22, the blueprint revision
+  round, before any of it was implemented) — COMPOSED BLUEPRINT
+  MODEL + MEDIA-RESIDENCY CACHE — DECIDED
+  (owner, 2026-07-23, the media/composition design round). Full
+  worked design: planning/design/blueprint-model.md (the source of
+  truth, normative until the specs realign to it). Interface triage
+  (planning/INTERFACES.md): the machine blueprint and the media
+  definition are both world-facing interfaces, so this is a MAJOR
+  interface change, landed under the interface-change rule and
+  use-case-aligned (U1 lazy install, U3/U4 hermetic automation and
+  artifact residency, U5 customization) — no use-case amendment
+  needed. Two threads settled together.
+
+  A — MEDIA RESIDENCY vs THE DOWNLOAD CACHE (the SHORTLISTED
+  topic). Payload and archive caches stay NAME-KEYED and home-side
+  (`cache/media/<name>.<ext>`, `cache/archives/<name>.<ext>` —
+  `downloads/` renamed `archives/`), independent of `--assets`; the
+  cached filename tracks the component `name`, not the source
+  basename. CONTENT ADDRESSING WEIGHED AND DECLINED: an opaque
+  hash-named cache cuts against "the cache is not an interface", and
+  the residual clash it would close (two same-named components
+  across projects aliasing one slot) is rare, already guarded by
+  per-use hash verification, isolable via the orthogonal
+  `--cache`/`RELIQUARY_CACHE_DIR` knob, and resolvable by naming one
+  component explicitly — never blocking. Accepted because Reliquary
+  users target a handful of systems, not vast libraries.
+  Hermeticity of a `--assets` run = committed hashes determine
+  inputs; cache-location isolation is the existing `--cache` knob,
+  decoupled from `--assets` (dir-mode-implies-project-cache
+  declined: couples orthogonal axes, loses cross-project dedup).
+
+  B — THE COMPOSED BLUEPRINT MODEL (topic B, expanded well past
+  "compose now or defer"). Reliquary's two authored JSON formats
+  fold into ONE — the blueprint (`.rlqb`); `.rlqm` retires. A
+  `.rlqb` root is polymorphic: plural component sections
+  (`machines`/`media`/`sources`/`archives`), mixed and matched
+  across files, a bare-root lone machine still valid. Four component
+  types, identity `(name, type)`; NAMES DEFAULT TO THE SOURCE/PATH
+  STEM (portable — the payload filename travels with the source; the
+  `.rlqb`-file stem stays forbidden as identity), explicit only
+  where there is no filename-bearing source. MEDIA OWNS
+  MATERIALIZATION (`materialize` = new/difference/copy/use, default
+  use; the machine drive shrinks to a media name or `null`, losing
+  `size`/`base`/`hostdir`); `sha256` required on a `url` source,
+  optional on local/from-archive (the "evolving drive" liveness
+  case); `read-only` default true on cdrom; hostdir folds in as a
+  `use` payload shape. SOURCES are named locators (mirror lists
+  live here); ARCHIVES are RECURSIVE TREES — a node with `members`
+  is an archive, a leaf is a media, the tree is the extraction, so
+  nested archives need no special chaining. Machine directory
+  reorganizes: `drives/` → `media/` (materializations named by
+  media item, not slot, so removable-slot swaps never clobber),
+  backend files into a backend-named subdir (`qemu/`/`virtualbox/`
+  /…), `reliquary-machine.json` → `machine.json` with `vm.json`
+  folded in as a while-running state section.
+
+  WEIGHED AND DECLINED / PARKED: content addressing (A); the
+  globbed media-set auto-expander (dropped — members are itemized
+  explicitly under a shared archive tree; a succinct extraction
+  short-circuit PARKED as a wish); create-at-destination media
+  (fuses source with destination, duplicates `export-drive`);
+  keeping `.rlqm` a separate kind (superseding the round's own
+  earlier "model now, defer mechanism" lean — the owner drove the
+  full unification); mandatory-name-without-derivation (relaxed to
+  stem defaults). FOLDED: blueprint-model.md (new); TASKS.md (the
+  two Design items retired here); ROADMAP pointer. REALIGNMENT
+  AHEAD (implementation, milestone-scale, landed coherently per the
+  no-BC rule): machine-blueprint.md + reference + cookbook,
+  media-spec.md, the two published `*.schema.json` + conformance
+  corpus (collapse to one blueprint schema), instance-model.md +
+  the ROADMAP home-layout, AGENTS.md, machines.py / lifecycle.py /
+  media.py, the codex, planning/examples.
+
+- D2 — RETIRED (overruled by D16, the `name` reinstatement) —
+  BLUEPRINT `name` FIELD DROPPED — DECIDED (owner, 2026-07-21,
   digression round during the CLI queue): the blueprint's one name
   is its file stem; `description` is the single discovery-prose
   field, uniform across the authored formats (scripts already had
@@ -2268,11 +2474,3 @@ entries now in this file.
   codex index). This supersedes the old wishlist ask for a NAME
   column in 'list blueprints'; its other half survives in
   TASKS.md (the list-blueprints top-line announcement)
-- RESOLVED (owner, 2026-07-21): the built-in library is named THE
-  CODEX (was "change 'builtin library' concept to 'template
-  library' ??"; "canon" was weighed and rejected — codex is the
-  artifact, a bound volume copied from, where canon is the
-  abstract authority/list) — folded across INTERFACES, USE-CASES, ROADMAP,
-  AGENTS, CONTRIBUTING, cli.md, README, and docs
-  (builtin-library.md renamed codex.md); Reliquary/builtins/
-  package dir renames to codex/ at implementation realignment

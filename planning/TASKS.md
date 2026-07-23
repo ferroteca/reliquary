@@ -5,12 +5,39 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # TASKS
 
-Small to-do tasks. Large tasks belong in the roadmap; the
-adjudicated design-decision records live in
-[DECISIONS.md](DECISIONS.md). Completed milestone task-breakdowns
-are pruned once the milestone lands — the record survives in git
-history, DECISIONS.md, and the ROADMAP milestone notes (the
-milestone-4 and milestone-6 breakdowns were pruned 2026-07-23).
+The work queue — and the parking place for non-GitHub issues
+(the tracker:
+<https://github.com/ferroteca/reliquary/issues>). Tasks flow
+from the roadmap and from issues; small one-offs really just
+are issues, and a small, obvious, needed fix goes directly to
+tasks. A task is either scheduled for the sprint or
+backlogged — the [backlog](#backlog) holds the small, obvious
+items that just haven't met the bar for scheduling. In theory
+every issue points to the use case it serves —
+small ones may simply be deemed obvious — and an issue can
+easily trigger a use-case change, drafted as a proposal in
+[USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) through the
+interface-change rule (INTERFACES.md). Large work belongs in
+the roadmap; a milestone item is picked up by translating it
+into a sprint tasklist here. The adjudicated design-decision
+records live in
+[DECISIONS.md](DECISIONS.md). Completed milestone
+task-breakdowns are pruned once the milestone lands — the
+record survives in git history, DECISIONS.md, and the ROADMAP
+milestone notes (the milestone-4 and milestone-6 breakdowns
+were pruned 2026-07-23).
+
+## Planning docs
+
+- sweep ROADMAP items for use-case citations: every item names
+  the U-number — in force or proposed — that demands it (the
+  traceability rule, ROADMAP preamble / USE-CASE-PROPOSALS.md,
+  owner 2026-07-23). Many sections already cite U-numbers; the
+  sweep fills the gaps.
+- retrofit supports onto DECISIONS.md entries D1–D22: each
+  names the use cases (U), principles (P), or goals (G) it
+  supports (the numbering round, D23, owner 2026-07-23). New
+  entries carry supports from the start.
 
 ## Future implementation hints
 
@@ -61,7 +88,8 @@ milestone-4 and milestone-6 breakdowns were pruned 2026-07-23).
 
 ## U6 authoring recorder
 
-Use case in planning/USE-CASES.md; design in
+Use case U6 in planning/USE-CASE-PROPOSALS.md (accepted,
+awaiting delivery — moved 2026-07-23); design in
 planning/design/recorder.md. Work items, in rough
 dependency order:
 
@@ -88,7 +116,7 @@ dependency order:
 ## Watches (re-ask as these harden)
 
 - live-run progress surface (G4 during the run — ties to
-  run-events; the USE-CASES feedback split, 2026-07-21, names
+  run-events; the feedback split, PRINCIPLES.md P5, names
   the demand)
 - GUI/landmark assets forming a new authored artifact class
   (hardened 2026-07-21: .rlql is the fourth authored extension —
@@ -134,7 +162,11 @@ dependency order:
   of media names) are placeholders pending this round, not
   settled design.
 
-## Wishlist
+## Backlog
+
+The task backlog — small, obvious, just hasn't met the bar for
+scheduling (the section formerly named Wishlist). Parked
+non-GitHub issues land here.
 
 - `download-media` command (owner request, 2026-07-22; shape to
   re-derive under the revised model — milestone 7's `add-media`

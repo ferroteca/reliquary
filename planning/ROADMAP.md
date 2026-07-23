@@ -26,8 +26,17 @@ rebuild.
 
 [planning/INTERFACES.md](INTERFACES.md) names the interfaces through which
 the world drives Reliquary and the vetting rule every
-interface-changing decision must follow; the primary use cases
-they serve live in [planning/USE-CASES.md](USE-CASES.md).
+interface-changing decision must follow; the use cases
+they serve live in [planning/USE-CASES.md](USE-CASES.md). Every
+roadmap item cites the use case that demands it — its U-number,
+whether in force there or still proposed in
+[planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) — so when
+a proposal dies, the sweep (the removal rule there) finds every
+item that falls out with it. The flow runs one way: the roadmap
+flows from the use cases, and the task list
+([planning/TASKS.md](TASKS.md)) flows from the roadmap and from
+issues — the GitHub tracker, with TASKS.md's backlog the
+parking place for non-GitHub issues.
 
 The unit of design is the **operation** performed against a
 machine: start it, stop it, insert media, send input, run a guest
@@ -119,7 +128,7 @@ Design rules:
   native guest agents — QGA, Guest Additions, VMware Tools,
   Hyper-V integration services — through their backend adapters
   and never builds or ships a guest-side agent of its own
-  (planning/USE-CASES.md, the control-plane arc). A guest without
+  (planning/PRINCIPLES.md P3, the control-plane arc). A guest without
   a native agent stays agentless permanently.
 
 The adapter seam's design doctrine is consolidated in
@@ -328,7 +337,7 @@ rlq run-script install --blueprint freedos-1.4-plain
 Where Reliquary looks for authored assets — blueprints, media
 definitions, scripts, and landmark declarations — is an
 invocation-level setting: the mechanism behind the
-artifact-residency split (planning/USE-CASES.md). Assets are
+artifact-residency split (planning/PRINCIPLES.md P4). Assets are
 identified by **extension**, not location: `.rlqb` a machine
 blueprint, `.rlqm` a media definition, `.rlqs` a script, `.rlql`
 a landmark declaration (its `<name>.<n>.png` variant renderings
@@ -1161,7 +1170,8 @@ sits in "Horizon" below; work items in planning/TASKS.md.
 ## Asynchronous runs
 
 A script run can be started without blocking and observed while
-it goes — the consumer story for the feedback split (USE-CASES):
+it goes — the consumer story for the feedback split
+(planning/PRINCIPLES.md P5):
 a person leaves an hour-long install and checks back (U1), an
 automating program follows machine-readable events as they
 happen (U3). Settled design (owner, 2026-07-21):
@@ -1232,7 +1242,7 @@ sanctioned way to keep a record beyond its machine, and there is
 deliberately no export verb for it — the record is already
 host-side plain files at a reported path. Contract home:
 script-spec.md "Failure, runs, and transcripts"; custody model
-in USE-CASES (the artifact-residency split) and INTERFACES
+in PRINCIPLES.md (P4, the artifact-residency split) and INTERFACES
 (recorded outputs).
 
 **Interaction runs — the opt-in bracket (owner, 2026-07-22).**
@@ -1364,8 +1374,10 @@ documented design — the script properties, and run records with
 asynchronous runs — still for the DOS platform on the QEMU
 backend alone. Only then does the design generalize: the adapter
 seam is extracted from working code (10), proven by a second
-backend (11), and extended with machine mobility (12) and native
-guest agents (13); the arc's endpoint — the GUI era: the VNC
+backend (11), and extended with native guest agents (12);
+machine mobility — clone, export, import — moved to Horizon
+(2026-07-23, for lack of use-case backing); the arc's
+endpoint — the GUI era: the VNC
 control plane, GUI installer scripting, and the last backends,
 Hyper-V deliberately last — now sits in the backlog, not yet
 scheduled.
@@ -2074,7 +2086,7 @@ with its resolved location recorded in the state.
 
 The implementation of "Asynchronous runs" above — the run-events
 stream and everything that renders it — completing the feedback
-split (planning/USE-CASES.md) for the DOS-on-QEMU vertical.
+split (planning/PRINCIPLES.md P5) for the DOS-on-QEMU vertical.
 
 Deliverables:
 
@@ -2174,56 +2186,13 @@ Deliverables:
 Done when: the FreeDOS install script runs unmodified on both
 backends from the same blueprint (minus a pinned backend field).
 
-### Milestone 12 — Machine mobility: clone, export, import
-
-The durable-artifact exits, once two backends make them
-meaningful. Export's design is settled (owner, 2026-07-22).
-
-Decide first:
-
-- `import-vm` scope: which backend config translates into the
-  synthesized blueprint (memory, drives, controllers are clear;
-  what of NICs and other devices the blueprint doesn't model
-  yet), whether untranslatable configuration fails the import or
-  lands in `backend-settings`, and whether import can target a
-  named native snapshot in a VM's disk chain rather than the
-  current head (the generated definition would point at that
-  snapshot's file).
-
-Deliverables:
-
-1. `clone-machine`: a new machine under a new UUID retaining the
-   source's
-   resolved blueprint snapshot, with the source's writable drive
-   images copied — a snapshot of a machine, never a shared
-   state or backend registration.
-2. `export-drive` and `export-machine` per the settled design
-   (owner, 2026-07-22): native-or-raw drive images;
-   exporter-registered native VMs — `--to` presented, never
-   defaulted, the exporter vocabulary decoupled from backends;
-   the initial exporter set is scoped at this milestone
-   (virtualbox first; libvirt the recorded QEMU-ecosystem
-   answer); media payloads materialized in; both commands
-   stream-bearing.
-3. `import-vm`: synthesize a blueprint from a native VM's
-   configuration through an importer,
-   disks preserved as generated media definitions taken as
-   `base`; source at rest only, with the `--snapshot` /
-   `--no-snapshot` and `--hdd-images` consent points presented
-   per the settled design ("The CLI" above); `--platform`
-   required; never materializes a machine.
-
-Done when: an exported FreeDOS machine boots under the backend's
-own tooling, and a machine created from an imported blueprint
-recreates from its bases like any authored machine.
-
-### Milestone 13 — Guest agent communication
+### Milestone 12 — Guest agent communication
 
 Native guest agents as control planes, per
 [planning/design/guest-communication.md](design/guest-communication.md):
 Reliquary consumes the agents guests already have
-— QGA first — and never builds its own (planning/USE-CASES.md,
-the control-plane arc). This milestone must not weaken the
+— QGA first — and never builds its own (planning/PRINCIPLES.md
+P3, the control-plane arc). This milestone must not weaken the
 permanent agentless DOS path; guests without a native agent
 (DOS-era systems included) remain agentless, and where a guest
 holds both planes the same suites validate agentless and
@@ -2358,8 +2327,25 @@ VNC and on Hyper-V through its decided screen strategy.
   recording, run-to-point / breakpoint / human takeover,
   round-trip fragments, and the `record` command family (work
   items in planning/TASKS.md).
+- Machine mobility: clone, export, import — the former
+  milestone 12, moved here 2026-07-23 for lack of use-case
+  backing: clone has no use case at all, export's stands only
+  as the U8 draft, and import's U2 loses its scheduled
+  delivery with this move. Scheduling it back onto the
+  numbered arc is the acceptance of those use cases. The
+  designs stay settled ("The CLI" above; owner, 2026-07-22):
+  `export-drive` / `export-machine` with the decoupled
+  exporter vocabulary, `import-vm` with its consent points,
+  `clone-machine` as the machine snapshot; the `import-vm`
+  scope round (NIC/device translation, untranslatable config,
+  named-snapshot targets) remains its decide-first when it
+  returns. The durable-artifact exits become meaningful once
+  two backends exist — sequence at or after the second
+  backend.
 - `fork-blueprint` (a fire-and-forget authoring convenience;
-  `new-blueprint` scaffolding lands in milestone 6).
+  `new-blueprint` scaffolding lands in milestone 6) —
+  currently unjustified: no use case demands it, and
+  `seed-blueprint` already serves the seed-and-customize seam.
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.
@@ -2378,10 +2364,20 @@ VNC and on Hyper-V through its decided screen strategy.
   Value concentrates where out-of-band access thins — non-QEMU
   backends (no `hostdir`) and non-FAT guest filesystems — so
   sequence at or soon after milestone 11's second backend.
-- Media commands beyond `fetch-media` (verify, remove).
-- A `pytest-reliquary` plugin (per AGENTS.md prior art).
+- Media commands beyond `fetch-media` (verify, remove) —
+  currently unjustified: no use case demands them; `verify`
+  would stand on the U13 draft if accepted.
+- A `pytest-reliquary` plugin (per AGENTS.md prior art) —
+  currently unjustified: adjacent to the U14/U15 drafts at
+  best, and test-framework semantics belong to consumers (the
+  doctrine boundary).
 
 ## Design principles
+
+The project-wide governing principles are itemized as
+P-numbers in [planning/PRINCIPLES.md](PRINCIPLES.md); the
+list below carries the roadmap-scoped ones and remains
+normative prose for what it states.
 
 - **Machines are ephemeral.** A machine exists to run its scripted
   task; disk images are the durable artifact. Prefer designs that
@@ -2417,7 +2413,7 @@ lifecycle rules — is consolidated in
 [planning/design/guest-communication.md](design/guest-communication.md).
 The `GuestExec` protocol, the isolated agentless adapter, and
 its use by the DOS workflow are implemented; native-agent
-control planes land at milestone 13 and the VNC plane in the
+control planes land at milestone 12 and the VNC plane in the
 backlog GUI era. Agentless DOS operation remains the permanent base
 no milestone may weaken.
 
@@ -2441,7 +2437,7 @@ arguments.
 The bootstrap direction is important: agentless operation is how
 a machine reaches the point where a guest agent exists inside it
 — the OS, and with it the OS's own agent package, is installed
-through the agentless workflow (planning/USE-CASES.md, the
+through the agentless workflow (planning/PRINCIPLES.md P3, the
 control-plane arc). Where a guest holds both planes, the same
 suites should validate agentless and guest-agent control planes
 with equivalent results.

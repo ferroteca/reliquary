@@ -6,8 +6,10 @@ SPDX-License-Identifier: BSD-3-Clause
 # Interfaces to the world
 
 > **Status:** Reliquary's guiding principles, and the governing
-> document. It names the world-facing interfaces, the primary use
-> cases they serve — the numbered list itself lives in
+> document. The itemized principles themselves are P-numbered
+> in [planning/PRINCIPLES.md](PRINCIPLES.md). It names the
+> world-facing interfaces, the use cases
+> they serve — the numbered list itself lives in
 > [planning/USE-CASES.md](USE-CASES.md) — and the rule every
 > interface-changing decision must follow. Settled design decisions
 > live in [planning/ROADMAP.md](ROADMAP.md) and the user-facing contracts in
@@ -147,23 +149,28 @@ covers them equally:
   caches, and locate everything above:
   [planning/design/instance-model.md](design/instance-model.md).
 
-## Primary use cases
+## Use cases
 
-The numbered primary use cases — the decision surface every
+The numbered use cases — the decision surface every
 interface decision is weighed against — live in
-[planning/USE-CASES.md](USE-CASES.md), together with the cross-cutting
-principles that run through them: the ephemeral-machine
-principle, the control-plane arc, and the artifact-residency
-split. They are numbered so a decision, review, or spec section
+[planning/USE-CASES.md](USE-CASES.md); the cross-cutting
+principles that run through them — the ephemeral-machine
+principle, the control-plane arc, the artifact-residency
+split, the feedback split — are itemized with their normative
+prose in [planning/PRINCIPLES.md](PRINCIPLES.md). They are numbered so a decision, review, or spec section
 can cite the use case it serves — and so a proposed change can
-be rejected by naming the use case it costs.
+be rejected by naming the use case it costs. That list holds
+only what is in force; proposed changes to it are tracked in
+[planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md),
+numbering from the same global U-sequence and moving over when
+adopted.
 
 ## The interface-change rule
 
 The use-case list ([planning/USE-CASES.md](USE-CASES.md)) is where
 interface changes are argued. A change
 to an interfacing aspect of Reliquary is significant precisely
-when approving it requires the primary use cases to be adjusted;
+when approving it requires the use cases to be adjusted;
 a significant change is not argued as a feature on its own merits
 — the use-case amendment is the argument, and the interface
 change follows from the amended list. A significant proposal that
@@ -179,17 +186,23 @@ Requests triage by their use-case impact:
   one surface lags the others. An easy decision to approve; cite
   the use cases served, or state that none are disturbed.
 - **Adds a new use.** The change serves a use Reliquary does not
-  yet name. More work — the new use case must be drafted,
-  numbered, and weighed for coherence with the existing list and
+  yet name. More work — the new use case must be drafted and
+  numbered in
+  [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) and
+  weighed for coherence with the existing list and
   the ephemeral-machine principle — but, being additive, still an
   easy decision.
-- **Misaligned with the primary use cases.** The hard case, and
+- **Misaligned with the use cases.** The hard case, and
   the one that must be argued very vigorously: approving such a
-  change in good faith would require Reliquary's primary use
-  cases to change, so the use-case amendment — not the feature —
-  is what gets argued. The workflow is strict: make the argument;
-  if the argument wins, amend the use cases in planning/USE-CASES.md; only
-  then does work start. A misaligned change that can propose no amendment
+  change in good faith would require Reliquary's use cases to
+  change, so the use-case amendment — not the feature —
+  is what gets argued. The workflow is strict: draft the
+  amendment in planning/USE-CASE-PROPOSALS.md and make the
+  argument; if the argument wins, the work is scheduled in the
+  roadmap — scheduling is acceptance, the citing roadmap item
+  its record; only then does work start. Accepted use
+  cases move into planning/USE-CASES.md when their delivery
+  lands, anything superseded retiring to a stub. A misaligned change that can propose no amendment
   has nothing to argue and is rejected, regardless of its
   elegance.
 
@@ -206,8 +219,11 @@ Every approved change then lands the same way:
    and deletes the old one. That freedom makes execution cheap; it
    does not make the decision cheap — nothing downstream cushions
    a wrong one.
-3. **Record it.** Use-case amendments land in
-   [planning/USE-CASES.md](USE-CASES.md); settled decisions go to their
+3. **Record it.** Use-case amendments are drafted in
+   [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md),
+   accepted by roadmap scheduling, and move into
+   [planning/USE-CASES.md](USE-CASES.md) when delivered,
+   keeping their numbers; settled decisions go to their
    planning/ROADMAP.md sections; user-facing contracts to their `planning/`
    design specs; examples stay synchronized.
 

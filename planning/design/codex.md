@@ -36,7 +36,7 @@ Reliquary **copies it out**. From that point on it is an ordinary
 user-owned file — edit it, delete it, version it. (The codex
 serves the home's human-interaction side only: it is never used
 for machine automation — a project commits its own copies. See
-[planning/USE-CASES.md](../USE-CASES.md), the artifact-residency split.)
+[planning/PRINCIPLES.md](../PRINCIPLES.md) P4, the artifact-residency split.)
 
 Two rules carry the model:
 

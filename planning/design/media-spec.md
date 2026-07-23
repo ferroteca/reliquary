@@ -32,7 +32,7 @@ bind by name. In home mode (the CLI default) that is the whole home,
 seeding from the codex on a miss; under `--assets <dir>` it is the
 whole project root — the sole hermetic source, where neither home
 components nor the codex behind them reach an automated run (the
-artifact-residency split, planning/USE-CASES.md). Two media of one
+artifact-residency split, planning/PRINCIPLES.md P4). Two media of one
 name within a source are a collision error naming both.
 
 ```text
@@ -350,7 +350,7 @@ machine never boots against silently changed media (U1, U4).
 
 Fetching is Reliquary's longest operation outside a run, and it
 reports progress under the same feedback model as script runs
-(the feedback split, planning/USE-CASES.md): one event
+(the feedback split, planning/PRINCIPLES.md P5): one event
 vocabulary, every surface a renderer of it. Media movement —
 download, extraction, verification — emits the same transfer
 and verification event kinds the run-event stream defines

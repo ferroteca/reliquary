@@ -81,13 +81,24 @@ workflow:
   media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
-- `planning/ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture.
+- `planning/ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture. The
+  flow runs one way: the roadmap flows from the use cases, and `planning/TASKS.md` flows from the roadmap and from
+  issues — the GitHub tracker, with the TASKS.md backlog the parking place for non-GitHub issues. A task is either
+  scheduled for the sprint or backlogged, and a milestone item is picked up by translating it into a sprint
+  tasklist; small one-offs are issues, and a small obvious needed fix goes directly to tasks. In theory every
+  issue points to a use case; small ones may be deemed obvious.
 - `planning/INTERFACES.md` is the governing document for Reliquary's world-facing interfaces: it names the interface
   inventory (CLI, embedding API, scripting language, and machine blueprints — media, source, and archive are
   components inside the blueprint — plus the
   script properties, recorded outputs, and the home layout) and the
-  vetting rule every interface-changing decision must follow. The numbered primary use cases — the decision
-  surface that rule weighs against — live in `planning/USE-CASES.md`.
+  vetting rule every interface-changing decision must follow. The numbered use cases — the decision
+  surface that rule weighs against — live in `planning/USE-CASES.md` (implemented-only: every use case there is
+  met by the code today, no placeholders); everything else is tracked in `planning/USE-CASE-PROPOSALS.md`, numbering from the
+  same global U-sequence and moving over when delivered (scheduling in the roadmap is acceptance; delivery
+  makes it current). Every roadmap item cites the use case — in force or proposed — that demands it. The governing
+  principles are itemized as P-numbers in `planning/PRINCIPLES.md`; decisions in `planning/DECISIONS.md` carry
+  permanent D-numbers, generally support use cases or principles, and are the citation handle for design choices
+  and code commits — overruled decisions sit in that file's Retired list.
 - `planning/examples/` contains a complete FreeDOS example: a composed `.rlqb` blueprint (the machine plus its media and
   archive components) and scripts, the install script inserting the LiveCD media the blueprint carries. Its README
   carries the status note. Keep the examples synchronized with `planning/design/` when the formats change.
@@ -129,7 +140,7 @@ components included) are
 Reliquary's primary interfaces to the world; the script properties, recorded outputs (run records,
 transcripts), and the home layout are world-facing contracts alongside them. Any decision that
 changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
-numbered primary use cases ([planning/USE-CASES.md](planning/USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
+numbered use cases ([planning/USE-CASES.md](planning/USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
 work starting only after the amendment lands — then the change is named across every surface it touches
 and landed coherently on all of them. Where planning/ROADMAP.md and planning/INTERFACES.md or planning/USE-CASES.md disagree, the

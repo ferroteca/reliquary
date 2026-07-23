@@ -24,10 +24,12 @@ The `docs/` directory contains user-facing documentation for **implemented featu
 ### planning/ directory
 The `planning/` directory contains maintainer-facing design and planning documents:
 - `planning/ROADMAP.md` — architectural context, open design questions, and implementation milestones
-- `planning/TASKS.md` — small to-do tasks (large tasks belong in the roadmap)
-- `planning/DECISIONS.md` — the adjudicated design-decision record: settled decisions, declined alternatives, and where each folded (the guard against re-litigating)
+- `planning/TASKS.md` — the work queue, flowing from the roadmap and from issues (the GitHub tracker; the backlog section parks non-GitHub issues). A task is either scheduled for the sprint or backlogged; milestone items translate to sprint tasklists; large work belongs in the roadmap, and an issue can trigger a use-case proposal through the interface-change rule
+- `planning/PRINCIPLES.md` — the itemized governing principles (P-numbers), feeding use cases and decisions; each entry points at its normative home
+- `planning/DECISIONS.md` — the adjudicated design-decision record: settled decisions, declined alternatives, and where each folded (the guard against re-litigating). Numbered D1…; each generally supports use cases or principles; D-numbers justify design choices and code commits; overruled or no-longer-relevant entries move to its Retired list
 - `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule
-- `planning/USE-CASES.md` — primary use cases that guide interface decisions (may include unimplemented aspirations)
+- `planning/USE-CASES.md` — the implemented use cases that guide interface decisions (every entry is met by the code today; anything unimplemented lives in USE-CASE-PROPOSALS.md, with no placeholder here)
+- `planning/USE-CASE-PROPOSALS.md` — proposed changes to the use-case list, undelivered clarifications included (shared U-numbering; scheduling in the roadmap is acceptance, delivery moves the entry to USE-CASES.md; a dead proposal triggers a planning-doc sweep)
 - `planning/design/` — design documents for specific interfaces and features (end-goal designs, not current truth)
 - `planning/examples/` — example blueprints and scripts in planned formats
 
