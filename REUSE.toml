@@ -11,6 +11,7 @@ path = [
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "TRADEMARKS.md",
+    "schemas/*.json",
     "planning/design/*.schema.json",
     "planning/examples/**/*.json",
     "planning/examples/**/*.rlqb",
