@@ -38,9 +38,13 @@ workflow:
   reconciled at the next op — `stopping` completes, `creating` /
   `destroying` roll forward to removal) and persistent machine-state mutations
   (`insert_media` / `eject_media` / `set_boot_order` /
-  `mark_stopped` — insert/eject are floppy and cdrom only;
-  boot-order keys may name any declared drive; all three require
-  a stopped machine and survive stop/start), `lifecycle.py` owns QMP,
+  `mark_stopped` — insert/eject are floppy and cdrom only and work
+  running-or-stopped (a running change is applied live over the
+  identity-verified QMP session by drive id, then persisted to state)
+  or stopped (persisted for the next start); `set_boot_order` is
+  stopped-only (a launch-time firmware order); boot-order keys may name
+  any declared drive; all three persist and survive stop/start),
+  `lifecycle.py` owns QMP,
   QEMU processes, and host-side `qemu-img` helpers,
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction

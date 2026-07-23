@@ -770,13 +770,8 @@ def stop_machine(machine_id, context=None):
 _REMOVABLE_MEDIA = {"floppy", "cdrom"}
 
 
-def _removable_drive(state, slot, context):
+def _removable_drive(state, slot):
     """Return the mutable state entry for a removable drive slot."""
-    phase = state.get("phase")
-    if phase != "ready":
-        raise RuntimeError(
-            f"machine {state['id']} must be stopped "
-            f"to change media (phase: {phase})")
     drive = state.get("drives", {}).get(slot)
     if drive is None:
         raise ValueError(
@@ -788,22 +783,50 @@ def _removable_drive(state, slot, context):
     return drive
 
 
+def _change_media_live(machine_id, slot, path, context):
+    """Change a removable drive's medium on a running machine over QMP.
+
+    The medium is swapped through the machine's identity-verified QMP
+    session (HMP ``eject`` / ``change`` against the drive's launch id,
+    which is the slot key), so the change the guest sees and the change
+    persisted to the state stay one operation.
+    """
+    from .machine import Machine
+    machine_home = machine_dir_path(machine_id, context)
+    vm = read_vm_state(machine_home)
+    if vm is None:
+        raise RuntimeError(
+            f"machine {machine_id} is running but has no vm.json")
+    with Machine(port=vm["port"], home=machine_home).qmp() as qmp:
+        if path is None:
+            qmp.hmp(f"eject {slot}")
+        else:
+            target = os.fspath(path).replace("\\", "/")
+            extension = os.path.splitext(target)[1].lower()
+            fmt = " raw" if extension in (".img", ".iso") else ""
+            qmp.hmp(f"change {slot} {target}{fmt}")
+
+
 def insert_media(machine_id, slot, media_name, *, context=None):
     """Insert a defined media item into a floppy or cdrom slot.
 
     Hard-disk slots are rejected.  The slot must already exist in
     the machine's state — drives are guest-visible hardware the
-    blueprint declares, so ``insert`` never creates one.  The
-    change persists in ``reliquary-machine.json`` across
-    stop/start: the machine diverges from its blueprint until a
-    later ``insert``/``eject`` changes the slot again.  The
-    machine must be stopped; changing the medium of a running
-    machine is not supported yet.
+    blueprint declares, so ``insert`` never creates one.  Running or
+    stopped: on a running machine the medium is changed live over QMP
+    (a change the guest observes); on a stopped machine it is present
+    at the next ``start``.  The change persists in
+    ``reliquary-machine.json`` across stop/start — the machine diverges
+    from its blueprint until a later ``insert``/``eject`` or ``apply``.
     """
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
-        drive = _removable_drive(state, slot, context)
-        drive["path"] = fetch_media(media_name, context=context)
+        _removable_drive(state, slot)
+        path = fetch_media(media_name, context=context)
+        if state.get("phase") == "running":
+            _change_media_live(machine_id, slot, path, context)
+        drive = state["drives"][slot]
+        drive["path"] = path
         drive["media"] = media_name
         state["generation"] = state.get("generation", 0) + 1
         _write_state(machine_id, state, context)
@@ -813,12 +836,16 @@ def eject_media(machine_id, slot, *, context=None):
     """Empty a declared removable slot, persisting the change.
 
     The drive itself remains — the blueprint alone defines machine
-    topology — but the next ``start`` presents it without a medium.
-    The machine must be stopped, as for :func:`insert_media`.
+    topology.  Running or stopped, as for :func:`insert_media`: on a
+    running machine the medium is ejected live over QMP; on a stopped
+    machine the next ``start`` presents it without a medium.
     """
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
-        drive = _removable_drive(state, slot, context)
+        _removable_drive(state, slot)
+        if state.get("phase") == "running":
+            _change_media_live(machine_id, slot, None, context)
+        drive = state["drives"][slot]
         drive["media"] = None
         drive["path"] = None
         state["generation"] = state.get("generation", 0) + 1
@@ -929,16 +956,19 @@ def machine_drive_args(machine_id, context=None):
 
     floppies = [(k, v) for k, v in drives.items()
                  if v["medium"] == "floppy"]
-    for _key, drive in sorted(floppies, key=lambda kv: kv[1]["slot"]):
+    for key, drive in sorted(floppies, key=lambda kv: kv[1]["slot"]):
         path = drive["path"]
+        # id=<key> names the drive so a running insert/eject can target
+        # it over QMP (the slot key is the launch id).
         if path is None:
-            args += ["-drive", f"if=floppy,index={drive['slot']}"]
+            args += ["-drive",
+                     f"if=floppy,index={drive['slot']},id={key}"]
             continue
         is_dir = os.path.isdir(path)
         source = (f"fat:floppy:rw:{path},format=raw,"
                   if is_dir else path + ",")
         args += ["-drive",
-                 f"file={source}if=floppy,index={drive['slot']}"]
+                 f"file={source}if=floppy,index={drive['slot']},id={key}"]
 
     hdds = [(k, v) for k, v in drives.items()
             if v["medium"] == "hdd"]
@@ -958,16 +988,17 @@ def machine_drive_args(machine_id, context=None):
             (d["slot"] for k, d in drives.items() if d["medium"] == "hdd"),
             default=-1,
         ) + 1
-        for ordinal, (_key, drive) in enumerate(
+        for ordinal, (key, drive) in enumerate(
                 sorted(cdroms, key=lambda kv: kv[1]["slot"])):
             path = drive["path"]
             index = next_ide + ordinal
             if path is None:
                 args += ["-drive",
-                         f"media=cdrom,if=ide,index={index}"]
+                         f"media=cdrom,if=ide,index={index},id={key}"]
                 continue
             inferred = format_options(path)
             args += ["-drive",
-                     f"file={path},{inferred}media=cdrom,if=ide,index={index}"]
+                     f"file={path},{inferred}media=cdrom,if=ide,"
+                     f"index={index},id={key}"]
 
     return args

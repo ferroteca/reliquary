@@ -153,9 +153,17 @@ Reclaim files under `cache/downloads/` or `cache/media/`.
 
 ### `rlq eject-media <slot> (--blueprint NAME | --machine ID)`
 
+Insert or eject removable media (floppy/cdrom slots). Works
+running or stopped: on a running machine the change is applied live
+over QMP (a change the guest observes); on a stopped machine it is
+present at the next `start`. Either way it persists in the machine
+state until a later `insert`/`eject` or `apply-blueprint`.
+
 ### `rlq set-boot-order <key>... (--blueprint NAME | --machine ID)`
 
-Persistent media and boot-order changes on a stopped machine.
+Set the boot order on a **stopped** machine (a launch-time firmware
+order). Persists in the machine state until the next `set-boot-order`
+or `apply-blueprint`.
 
 ## Keyboard and command input
 

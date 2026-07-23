@@ -64,6 +64,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `blueprint-source` (the resolved blueprint path), `blueprint-digest`
   (the resolved-snapshot baseline), and `backend-id`. Non-`ide`
   controllers fail closed pending the adapter seam.
+- `insert-media` / `eject-media` now work on a **running** machine,
+  not just a stopped one: the medium change is applied live over the
+  machine's identity-verified QMP session (each removable drive is
+  launched with a stable QMP id) and persisted to the machine state,
+  so the change the guest sees and the recorded state stay one
+  operation. On a stopped machine they remain a pure state edit
+  present at the next `start`. `set-boot-order` stays stopped-only.
 - The global `--json` flag prints a command's result as one JSON
   document on stdout — exactly what its API twin returns, with a void
   twin printing `{}` — while diagnostics stay on stderr and exit codes

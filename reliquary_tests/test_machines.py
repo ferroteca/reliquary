@@ -946,7 +946,8 @@ class MediaInsertionTests(unittest.TestCase):
         values = [args[i + 1] for i, a in enumerate(args)
                   if a == "-drive"]
         cdrom_arg = [v for v in values if "media=cdrom" in v]
-        self.assertEqual(cdrom_arg, ["media=cdrom,if=ide,index=1"])
+        self.assertEqual(cdrom_arg,
+                         ["media=cdrom,if=ide,index=1,id=cdrom0"])
 
     def test_insert_persists_media_in_machine_state(self):
         """insert fetches the item and records it on the slot."""
@@ -1050,19 +1051,81 @@ class MediaInsertionTests(unittest.TestCase):
                          context=self.home)
         self.assertIn("not a removable drive slot", str(caught.exception))
 
-    def test_insert_requires_a_stopped_machine(self):
-        """Changing media on a running machine is not supported yet."""
-        machine_id = self._create_installer_shaped()
+    def _force_running(self, machine_id):
+        """Mark a machine running with a vm.json for the live path."""
+        path = os.path.join(machine_dir_path(machine_id, self.home),
+                            "reliquary-machine.json")
         state = load_machine_state(machine_id, self.home)
         state["phase"] = "running"
-        with open(os.path.join(machine_dir_path(machine_id, self.home),
-                               "reliquary-machine.json"), "w",
-                  encoding="utf-8") as handle:
+        with open(path, "w", encoding="utf-8") as handle:
             json.dump(state, handle)
-        with self.assertRaises(RuntimeError) as caught:
+        with open(os.path.join(machine_dir_path(machine_id, self.home),
+                               "vm.json"), "w", encoding="utf-8") as handle:
+            json.dump({"port": 54321, "name": f"reliquary-{machine_id}",
+                       "uuid": "1" * 32, "pid": 1234}, handle)
+
+    def test_insert_on_running_machine_changes_media_live(self):
+        """A running insert performs a live QMP change and persists state."""
+        machine_id = self._create_installer_shaped()
+        self._force_running(machine_id)
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path), \
+                mock.patch("reliquary.machines._change_media_live") as live:
             insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
                          context=self.home)
-        self.assertIn("must be stopped", str(caught.exception))
+        live.assert_called_once()
+        self.assertEqual(live.call_args.args[1], "cdrom0")
+        self.assertEqual(live.call_args.args[2], self.iso_path)
+        state = load_machine_state(machine_id, self.home)
+        self.assertEqual(state["drives"]["cdrom0"]["media"],
+                         "freedos-1.4-livecd")
+
+    def test_eject_on_running_machine_ejects_live(self):
+        machine_id = self._create_installer_shaped()
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path):
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         context=self.home)
+        self._force_running(machine_id)
+        with mock.patch("reliquary.machines._change_media_live") as live:
+            eject_media(machine_id, "cdrom0", context=self.home)
+        live.assert_called_once()
+        self.assertIsNone(live.call_args.args[2])  # eject passes path=None
+        self.assertIsNone(load_machine_state(
+            machine_id, self.home)["drives"]["cdrom0"]["media"])
+
+    def test_change_media_live_hmp_commands(self):
+        """_change_media_live sends the expected HMP change/eject."""
+        from reliquary import machines as machines_mod
+        machine_id = self._create_installer_shaped()
+        self._force_running(machine_id)
+        fake_qmp = mock.MagicMock()
+        session = mock.MagicMock()
+        session.__enter__.return_value = fake_qmp
+        session.__exit__.return_value = False
+        with mock.patch("reliquary.machine.Machine.qmp",
+                        return_value=session):
+            machines_mod._change_media_live(
+                machine_id, "cdrom0", self.iso_path, self.home)
+            machines_mod._change_media_live(
+                machine_id, "cdrom0", None, self.home)
+        lines = [call.args[0] for call in fake_qmp.hmp.call_args_list]
+        self.assertTrue(any(line.startswith("change cdrom0 ")
+                            and line.endswith(" raw") for line in lines))
+        self.assertIn("eject cdrom0", lines)
+
+    def test_insert_on_stopped_machine_is_state_only(self):
+        """A stopped insert never touches QMP."""
+        machine_id = self._create_installer_shaped()
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path), \
+                mock.patch("reliquary.machines._change_media_live") as live:
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         context=self.home)
+        live.assert_not_called()
+        self.assertEqual(load_machine_state(
+            machine_id, self.home)["drives"]["cdrom0"]["media"],
+            "freedos-1.4-livecd")
 
     def test_mark_stopped_reconciles_a_powered_off_guest(self):
         """mark_stopped returns phase to ready and drops vm.json."""

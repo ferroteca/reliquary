@@ -382,6 +382,18 @@ T5; T6 and T7 run beside it.
    media change live over an identity-verified QMP session and
    persists it to the state (T0/Q1); AGENTS.md's "all three
    require a stopped machine" line is corrected here.
+   LANDED (2026-07-22), in five sub-commits: SC1 `recreate-machine`
+   + `get-machine-dir`; SC2 `search-blueprints` (provenance
+   yes/seeded/user) + `seed --only`; SC3 `apply-blueprint`
+   (reconcile absorbable diffs, fail closed on changed size/base of
+   an existing image, re-record the digest); SC4 the global
+   `--json` flag (each command prints its API twin's return, void →
+   `{}`, stream commands reject it); SC5 hot `insert`/`eject`
+   (removable drives launch with a stable QMP id; a running change
+   goes live over HMP `change`/`eject` on the identity-verified
+   session, then persists). `start` already reconciles (media
+   re-verify + backend regen from state; the baseline is
+   deliberately not re-applied at start).
 5. Absorb and delete the legacy path (deliverable 2's deletion):
    `MachineConfig`, the root-home `machine.json` / `vm.json`
    layer, and the legacy `Runner` start/stop path fold into the

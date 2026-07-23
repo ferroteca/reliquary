@@ -90,9 +90,10 @@ which lives under the (independently resolvable) cache root.
 - `machine_drive_args(machine_id, context=None)` - Render QEMU
   `-drive` arguments from the machine's state.
 
-Persistent machine-state changes — stopped machines only;
-insert/eject are floppy and cdrom slots; all three survive
-stop/start:
+Persistent machine-state changes — insert/eject are floppy and cdrom
+slots and work running-or-stopped (a running change is applied live
+over QMP); `set_boot_order` is stopped-only; all three persist and
+survive stop/start:
 
 - `insert_media(machine_id, slot, media_name, *, context=None)`
   (`insert-media`)
