@@ -17,7 +17,7 @@ workflow:
   `control-planes`, `backend-settings`, `parameters`) and resolves
   its `media`/`base.media` references (backend capability checks and `base`/`hostdir` materialization ride later
   milestone-6 work), scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
-  fails closed while any machine of that blueprint exists), `drives.py` parses declared drives, `media.py` owns media definitions
+  fails closed while any machine of that blueprint exists), `media.py` owns media definitions
   (parsing including the definition-level `description`/`notes`/`redistributable-under` annotations, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
   machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
@@ -49,7 +49,7 @@ workflow:
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
-  `platform_dos.py` owns DOS provisioning, facades, `workflows.py` orchestrates configured runs. The
+  `platform_dos.py` owns DOS provisioning and facades. The
   `.rlqs` language is four layers: `script_nodes.py` (the lexer and its diagnostics),
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
   `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
@@ -125,7 +125,7 @@ change, never deferred to a later pass.
 ### Platform selection
 
 DOS is the compatibility default when no platform is specified. Platform-specific behavior must be selected through
-`MachineConfig.platform` or `--platform`, never inferred by inspecting an image or guest screen. The reusable machine
+the blueprint's `platform` field (or `--platform` where a command takes one), never inferred by inspecting an image or guest screen. The reusable machine
 layer may remain platform-neutral, but provisioning, readiness, remote-task execution, and result collection belong to
 platform workflows. Until a non-DOS workflow is complete and tested, it must raise `NotImplementedError` rather than
 using DOS assumptions.
@@ -162,30 +162,26 @@ process-global default via `--home`/`--cache` — scoped `Context` objects are a
 plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
 deliberately left alone. Never write beside the module or into the source repository during normal use.
 
-Current home layout (still the active machine model):
+Home layout. A machine is wholly its cache materialization — there is
+no root-home machine model (the legacy root-home `drives/` /
+`machine.json` / `vm.json` were absorbed and deleted):
 
-- `drives/` — the machine's declared drives (images and virtual FAT directories; see "DOS boot and scripting")
-- `machine.json` — optional legacy CLI machine configuration for bare
-  `rlq start-machine` without `--blueprint` / `--machine` (not loaded by Python
-  workflows)
-- `screenshots/` — screenshots
-- `qemu-stderr.log` — startup diagnostics
-- `vm.json` — active VM identity, port, and PID (legacy root-home path;
-  cached machines keep theirs under `cache/machines/<blueprint>-<n>/vm.json`)
 - `blueprints/` — machine blueprints (`blueprints_dir`)
 - `media/` — shared media definitions (`media_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
 - `cache/downloads/` — cached source archives (`downloads_cache_dir`), under the cache root
 - `cache/media/` — cached media payloads (`media_cache_dir`), under the cache root
 - `cache/machines/<blueprint>-<n>/` — machine materializations (`machines_cache_dir`;
-  parent via `cache_dir`), under the cache root, each with `reliquary-machine.json`, `drives/`,
-  and when running `vm.json` / `qemu-stderr.log`
+  parent via `cache_dir`), under the cache root, each with `reliquary-machine.json`,
+  `drives/` (the machine's declared drive images and vvfat directories, named
+  canonically after the drive key), and when running `vm.json` (VM identity, port,
+  PID) / `qemu-stderr.log`
 
 ### VM ownership
 
 Never send a control command to a QMP server until its identity is verified.
 
-`start()` assigns a readable QEMU name plus a fresh per-start `-uuid`,
+`launch_owned_qemu()` assigns a readable QEMU name plus a fresh per-start `-uuid`,
 records both with the selected port in `vm.json`, and returns the port.
 Every later connection checks `query-name` **and** `query-uuid` against
 that record. The name alone must never authorize a command: same-numbered
@@ -199,41 +195,40 @@ identity-verified QMP session, whose `cmd()` and `hmp()` methods remain
 available to callers. Interaction adapters receive a `Machine` and must use
 this seam rather than opening QMP connections directly.
 
-When `port=None`, `start()` selects an available local port. An explicit port must be free. Startup failure and timeout
+When `port=None`, `launch_owned_qemu()` selects an available local port. An explicit port must be free. Startup failure and timeout
 paths must terminate the child so they cannot leave an untracked QEMU process.
 
-The CLI may resolve the active port from `vm.json`; Python workflows should propagate the port returned by `start()`
-explicitly.
+The CLI resolves the active port from the machine's `vm.json`; `start_machine()` returns the port for callers to
+propagate explicitly.
 
 ### DOS boot and scripting
 
-The `drives/` directory declares the whole machine, each entry's name stating its medium, slot, and format — image
-content is never interrogated (`_scan_drives()`, `_drive_args()`). Image files `floppy[_<n>].<ext>` (slots 0–1, A:
-and B:), `hdd[_<n>].<ext>` (slots 0–3, the IDE bus), and `cdrom[_<n>].<ext>` (`media=cdrom`, placed on the IDE slots
-after the hard disks; their `<n>` only orders them) mount as that medium; bare directories `floppy[_<n>]` and
-`hdd[_<n>]` mount as virtual FAT drives (cdrom directories are rejected — vvfat emulates no ISO9660). An unindexed
-name means slot 0; slot clashes and out-of-range slots fail closed. The extension, kept idiomatic for the format,
-declares the format (`_format_options()`): any QEMU-supported image format works, with `*.img` and `*.iso` pinned to
-`format=raw` (avoiding QEMU's format-probing warning) and any other extension handed to QEMU to identify.
-
-Memory defaults to 16 MB and the boot order to a best guess from the declared media — the slot-0 floppy image, else
-the slot-0 hard-disk image, else any cdrom (`_boot_guess()`); a `-m` or `-boot` in `qemu_args` suppresses the
-corresponding default.
+A machine's drives are declared in its blueprint (the field reference,
+`planning/design/machine-blueprint-reference.md`) and materialized into
+`cache/machines/<id>/drives/`, named canonically after the drive key.
+`machine_drive_args()` (`machines.py`) renders them from the machine
+state: floppies first (slots 0–1, A: and B:), hard disks next (slots
+0–3, the IDE bus), then cdroms placed on the IDE slots after the hard
+disks; each removable drive carries a stable QMP `id=<key>` so a running
+`insert`/`eject` can target it. An image path's extension declares the
+format (`format_options()`): `*.img` / `*.iso` are pinned to
+`format=raw` (avoiding QEMU's format-probing warning), any other
+extension is handed to QEMU to identify; a `hostdir` drive's directory
+path renders as a vvfat drive (vvfat emulates no ISO9660, so cdrom
+hostdirs are rejected at blueprint validation). Memory and boot order
+resolve into the state at `create` (boot best-guess: the slot-0 floppy,
+else the slot-0 hard disk, else the first cdrom).
 
 `AgentlessGuestExec.wait_ready()` only waits out the boot process to a native DOS prompt, detected generically as a
 bare prompt on the bottom-most non-blank screen row. Do not add special boot parameters for ordinary DOS commands. Drive changes, directory changes,
 environment variables, and program invocations belong in `AgentlessGuestExec.execute()` scripting.
 
-Higher-level workflows may issue those ordinary commands internally. For example, `run_guest_program()` runs `c:` before
-invoking the staged executable.
-
 ### Virtual FAT behavior
 
 QEMU snapshots a vvfat staging directory when the drive is attached. Host changes require a stop/start cycle. Guest
-writes should be read after QEMU stops so write-back has completed.
-
-Staged directories are declared under `drives/` like any other drive: `hdd[_<n>]` attaches as a vvfat hard disk,
-`floppy[_<n>]` as a vvfat 1.44M FAT12 floppy, each at its named slot.
+writes should be read after QEMU stops so write-back has completed. A
+`hostdir` drive attaches its directory as vvfat (`hdd` as a vvfat hard
+disk, `floppy` as a vvfat 1.44M FAT12 floppy).
 
 ### Script dispatch
 
@@ -255,70 +250,43 @@ model". Preserve these when touching `script_runner.py`:
   lifecycle's wrapped "no longer reachable" `RuntimeError` (after clearing `vm.json`) as
   `machine=stopped` and calls `mark_stopped`. Identity-mismatch `RuntimeError`s still fail closed.
 
-## Guest program runs
+## The embedding surface
 
-`run_guest_program()` is the one-shot lifecycle: stage an executable on the staged guest drive, boot, run it with
-its output redirected to a log on that drive, stop, and return the log text. Staging targets the highest staged
-directory declared among the hard-disk slots, or `drives/hdd` (the first free slot) created on demand
-(`_staged_hdd_plan()`). The guest assigns drive letters by disk order, so `staged_drive` is the caller declaring
-where that drive appears; its default assumes one letter per hard-disk slot before the staged one (C: when none
-precede it), and letters below the default are rejected. reliquary uses the letter only for the drive-switch
-command. The current DOS platform validates its own 8.3 `.EXE` naming requirement in `platform_dos.py`; generic
-workflow orchestration must not impose that rule on other platforms. reliquary attaches no meaning to that output — test-framework semantics (
-command-line flags, result parsing) belong to consuming projects. The CppUTest adapter that used to live here was
-removed to enforce that boundary; do not reintroduce framework-specific code. Refer to consumers only in the general
-instructional sense ("the caller", "consuming projects", generic usage examples) — never name specific downstream
-projects; the machine layer stays ignorant of who builds on it. The
-media layer (`media.py`, `library.py`) and the script runtime
-(`script_runner.py`) are in-repo consumers of that surface and must
-drive it only through the same public interfaces available to external
-callers.
-
-## The runner surface
-
-This section is the engineering contract agents must preserve for the
-implemented binding. The user-facing reference is
+The cached-machine model is the sole embedding surface: `machines.py`'s
+flat verb-noun functions (`create_machine` / `start_machine` /
+`stop_machine` / `destroy_machine` / `recreate_machine` /
+`apply_blueprint` / `get_machine_dir` / `resolve_machine` / …) and the
+script runtime (`script_runner.py`'s `run_script` / `check_script`). The
+milestone-1 root-home runner surface — `workflows.py`'s
+`Runner` / `MachineConfig` / `run_guest_program` / `run_task` / `start`,
+the root-home `machine.json` / `drives/` / `vm.json`, and the legacy
+`drives.py` auto-discovery — was absorbed into this model and deleted
+(no backward compatibility before beta). The user-facing reference is
 `docs/api-reference.md`; the end-goal API design (settled twin names,
 conventions, handles) is `planning/design/api.md`.
 
-`Runner`/`MachineConfig` is the generic embedding surface (a soft contract with callers): a
-`Runner(home=None, config=None)` instance is a configured QEMU test machine bound to one absolute `home`, exposing
-`platform` (default "dos") and `config` (frozen dataclass: `platform`, `staged_drive`, `timeout`, `memory`, `qemu`,
-`qemu_args`, `drives`, `machine`; every field has a working default), and `run(exe_path, args)`. `machine` is either a non-empty
-QEMU machine-type string or an immutable mapping with required `type` and scalar properties; it renders as one
-`-machine` argument, with booleans normalized to `on`/`off`, and conflicts with raw `-machine`/`-M` in `qemu_args`.
-`memory` is either `None` or a positive integer MiB value. `None` resolves to the platform default: 16 MiB for DOS,
-64 MiB for Win9x, and 256 MiB for WinNT. An explicit value conflicts with raw `-m` in `qemu_args`.
-Configured drives use canonical keys
-`floppy_0..1`, `hdd_0..3`, and `cdrom_0..3`, with `floppy` and `hdd` accepted as slot-zero aliases. Each value is a
-source path or a mapping with `source` and `options`; values are normalized and deeply frozen. Files are images,
-floppy/hdd directories are vvfat, and cdrom directories fail validation. Configured sources compose with filesystem declarations by logical slot; two sources for one slot fail closed, unless the configured entry sets an explicit `enabled: true`, which deliberately replaces the filesystem drive (`enabled: false` unmounts it; an omitted `enabled` is not an override). `MachineConfig.from_file(path, **overrides)` and
-`from_mapping(value, base_dir=None, **overrides)` load the same versioned document shape (`version` required and
-must be `1`; not a constructor field). Relative drive sources resolve from the file directory via `from_file`, or
-from `base_dir` / the current directory via `from_mapping`. Explicit overrides win: scalars replace (including
-`None`), `qemu_args` and `machine` replace wholesale, and `drives` merge by logical slot then by entry field /
-option name. Construction and `Runner` do not implicitly load `<home>/machine.json`. The CLI loads
-`<effective-home>/machine.json` for bare `rlq start-machine` (no `--blueprint` / `--machine`
-selector); this is a transitional convenience and does not apply to Python workflows or to
-the cached-machine lifecycle (`rlq create-machine|start-machine|stop-machine|destroy-machine
---blueprint NAME`, `rlq list-machines`). Explicit `--platform`, `--qemu`, and raw QEMU arguments
-override the loaded file on that legacy path; an omitted `--platform` must not clobber a
-file platform (so argparse must not default `--platform` to `"dos"`). `run()` privately ensures that
-the resolved inventory declares something bootable — keep present declared media;
-never overwrite — before invoking `run_guest_program()` with the runner's home explicit. Machine configuration has no
-special boot-image fields: custom media is declared through the same drive inventory as every other image.
-The module-level `start()`, `run_task()`, and `run_guest_program()` functions accept one optional `machine_config`
-containing a `MachineConfig`, versioned mapping, or path. Machine settings have no parallel individual function
-parameters; only operational controls such as display, port, and home remain separate.
-There is no public provisioning step. An omitted home resolves the established process default once at construction.
-Invariants to preserve: all state for an instance lives under its resolved constructor home; concurrent runs use
-distinct `Runner` instances with distinct homes (per-home `vm.json` keeps VM ownership
-sound); the stored home must never fall back to the process-global home (`test_runner.py` guards this by making
-`home()` unreachable). The project is pre-release; prefer a coherent interface over compatibility shims when its
-architecture changes. The embedding API expects native bindings beyond Python (planning/INTERFACES.md; planning/ROADMAP.md "The
-CLI"): when shaping the public surface, never adopt a design that would be difficult to express in a common
-binding language such as C or Java. The CLI is under the same constraint as the fallback binding for unbound
-languages — never make it difficult to drive from a program.
+Doctrine to preserve:
+
+- reliquary attaches no meaning to guest program output —
+  test-framework semantics (command-line flags, result parsing) belong
+  to consuming projects. A CppUTest adapter that once lived here was
+  removed to enforce that boundary; do not reintroduce
+  framework-specific code.
+- Refer to consumers only in the general instructional sense ("the
+  caller", "consuming projects", generic usage examples) — never name
+  specific downstream projects; the machine layer stays ignorant of who
+  builds on it.
+- The media layer (`media.py`, `library.py`) and the script runtime
+  (`script_runner.py`) are in-repo consumers of this surface and must
+  drive it only through the same public interfaces available to
+  external callers.
+- The project is pre-release; prefer a coherent interface over
+  compatibility shims when its architecture changes. The embedding API
+  expects native bindings beyond Python (planning/INTERFACES.md;
+  planning/ROADMAP.md "The CLI"): never adopt a design that would be
+  difficult to express in a common binding language such as C or Java,
+  and hold the CLI to the same constraint as the fallback binding for
+  unbound languages — never make it difficult to drive from a program.
 
 ## Dependencies and style
 

@@ -674,13 +674,13 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("teardown", output)
         self.assertIn("-", output)
 
-    def test_start_without_selector_uses_legacy_path(self):
-        """Bare start-machine still loads the root-home MachineConfig path."""
-        with mock.patch("reliquary.cli.start_legacy") as start, \
-                contextlib.redirect_stdout(io.StringIO()):
+    def test_start_without_selector_errors(self):
+        """The legacy root-home start path is gone: a selector is required."""
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
             result = cli.main(["--home", self.home, "start-machine"])
-        self.assertEqual(result, 0)
-        start.assert_called_once()
+        self.assertEqual(result, 1)
+        self.assertIn("--blueprint", stderr.getvalue())
 
     def test_type_sends_without_enter(self):
         with mock.patch("reliquary.cli.send_text") as send:

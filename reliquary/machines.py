@@ -10,7 +10,6 @@ import shutil
 from datetime import datetime, timezone
 
 from .blueprint import load_blueprint
-from .drives import format_options
 from .home import blueprints_dir, machines_cache_dir
 from .library import seed_blueprint
 from .lifecycle import (create_difference_image, create_duplicate_image,
@@ -26,6 +25,17 @@ _PLATFORM_MEMORY = {
     "win9x": 64,
     "winnt": 256,
 }
+
+
+def format_options(image):
+    """The QEMU ``format=`` option for an image, by extension.
+
+    ``.img`` / ``.iso`` are pinned to ``format=raw`` (avoiding QEMU's
+    format-probing warning); any other extension is left for QEMU to
+    identify.
+    """
+    extension = os.path.splitext(image)[1].lower()
+    return "format=raw," if extension in (".img", ".iso") else ""
 
 
 def _default_control_planes(platform):

@@ -119,6 +119,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   invoked (`reliquary -h` says `usage: reliquary ...`, `rlq -h`
   says `usage: rlq ...`) instead of always hardcoding `rlq`.
 
+### Removed
+
+- The milestone-1 root-home machine model is gone, absorbed into the
+  cached-machine model: `reliquary.Runner`, `MachineConfig`,
+  `run_guest_program()`, `run_task()`, and the module-level `start()`
+  (all of `workflows.py`), the root-home `machine.json` / `drives/` /
+  `vm.json` layout and the `drives_dir()` path helper, the legacy
+  filesystem drive auto-discovery (`drives.py`), and bare
+  `rlq start-machine` / `rlq stop-machine` without a selector. Machines
+  are created and driven through `create-machine` / `start-machine`
+  (selector required) and `run-script`. No backward compatibility is
+  kept before beta.
+
 ## 0.1.0.dev1 - 2026-07-22
 
 ### Added

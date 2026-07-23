@@ -75,11 +75,10 @@ def home():
 def effective_home(explicit):
     """Return the explicit operation home or the process-global home.
 
-    For the small set of modules (``lifecycle.py``, ``machine.py``,
-    ``workflows.py``'s legacy root-home path) that take an
-    already-resolved plain directory rather than a ``Context`` —
-    sometimes a real reliquary home, sometimes a machine's own cache
-    subdirectory standing in for one.
+    For the small set of modules (``lifecycle.py``, ``machine.py``)
+    that take an already-resolved plain directory rather than a
+    ``Context`` — sometimes a real reliquary home, sometimes a
+    machine's own cache subdirectory standing in for one.
     """
     return os.path.abspath(explicit) if explicit else home()
 
@@ -119,9 +118,6 @@ class Context:
             return os.path.abspath(_cache)
         return os.path.join(self.home_dir(), "cache")
 
-    def drives_dir(self):
-        return os.path.join(self.home_dir(), "drives")
-
     def blueprints_dir(self):
         return os.path.join(self.home_dir(), "blueprints")
 
@@ -148,11 +144,6 @@ def _ctx(context):
     if isinstance(context, Context):
         return context
     return Context(home=context)
-
-
-def drives_dir(context=None):
-    """Return the declared-drive directory under the effective home."""
-    return _ctx(context).drives_dir()
 
 
 def blueprints_dir(context=None):

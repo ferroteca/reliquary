@@ -20,8 +20,9 @@ appear before or after the command word.
 - `--machine <id>` - Select a machine by full id
   (`<blueprint>-<n>`), exactly — no prefix matching and no
   bare-number form
-- `--port <n>` - QMP port (legacy root-home interaction and
-  bare `start-machine` / `stop-machine`)
+- `--port <n>` - QMP port for direct guest-console interaction
+  (`type` / `enter` / `press` / …) against a running machine by
+  port instead of a selector
 - `--platform <name>` - Guest platform adapter (default: `dos`)
 - `--qemu <path>` - Path to the QEMU binary
 - `--timeout <seconds>` - Default timeout for commands
@@ -45,13 +46,12 @@ Create a new machine from a blueprint.
 
 ### `rlq start-machine (--blueprint NAME | --machine ID) [--display]`
 
-Start a machine. Returns when QEMU is ready. Without a selector,
-loads the legacy root-home `machine.json` path.
+Start a machine (a selector is required). Returns when QEMU is
+ready.
 
 ### `rlq stop-machine (--blueprint NAME | --machine ID)`
 
-Stop a running machine. Without a selector, stops the legacy
-root-home VM.
+Stop a running machine (a selector is required).
 
 ### `rlq destroy-machine (--blueprint NAME | --machine ID)`
 

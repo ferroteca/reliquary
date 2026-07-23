@@ -16,7 +16,7 @@ except importlib.metadata.PackageNotFoundError:
 from qemu.qmp import ConnectError
 
 from .interaction_agentless import AgentlessGuestExec
-from .lifecycle import read_vm_state, stop as stop_legacy
+from .lifecycle import read_vm_state
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from . import jsonc
@@ -40,7 +40,6 @@ from .script_runner import (ScriptRuntimeError, check_script,
                             run_script, _resolve_key)
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
-from .workflows import _cli_machine_config, start as start_legacy
 
 
 # Command words recognised when rewriting leading flags so that
@@ -116,18 +115,6 @@ def _reorder_argv(argv):
             return rest[:1] + leading + rest[1:]
         break
     return list(argv)
-
-
-def _cli_start_overrides(arguments):
-    """CLI controls that override a loaded machine configuration."""
-    overrides = {}
-    if arguments.platform is not None:
-        overrides["platform"] = arguments.platform
-    if arguments.qemu is not None:
-        overrides["qemu"] = arguments.qemu
-    if getattr(arguments, "qemu_args", None):
-        overrides["qemu_args"] = arguments.qemu_args
-    return overrides
 
 
 def _require_machine_selector(arguments):
@@ -257,20 +244,11 @@ def main(argv=None):
         "start-machine", help="start a machine")
     _add_selectors(command)
     command.add_argument("--display", action="store_true")
-    command.add_argument("--port", type=int, default=None,
-                         help="QMP port (legacy root-home start)")
-    command.add_argument("--qemu", default=None, help="QEMU path")
-    command.add_argument("--platform", default=None,
-                         help="guest platform")
-    command.add_argument("qemu_args", nargs="*",
-                         help=argparse.SUPPRESS)
 
     # stop-machine
     command = subcommands.add_parser(
         "stop-machine", help="stop a machine")
     _add_selectors(command)
-    command.add_argument("--port", type=int, default=None,
-                         help="QMP port (legacy root-home stop)")
 
     # destroy-machine
     command = subcommands.add_parser(
@@ -902,11 +880,7 @@ def _set_boot_order(arguments):
 
 def _dispatch(arguments):
     platform = getattr(arguments, "platform", None) or "dos"
-    port = getattr(arguments, "port", None)
     timeout = getattr(arguments, "timeout", None)
-    home = getattr(arguments, "home", None)
-    blueprint = getattr(arguments, "blueprint", None)
-    machine = getattr(arguments, "machine", None)
 
     if arguments.command == "create-machine":
         return _create(arguments)
@@ -959,26 +933,14 @@ def _dispatch(arguments):
     if arguments.command == "set-boot-order":
         return _set_boot_order(arguments)
     if arguments.command == "start-machine":
-        if blueprint or machine:
-            machine_id = _require_machine_selector(arguments)
-            started_port = start_machine(
-                machine_id, display=getattr(arguments, "display", False))
-            return _emit(arguments, started_port, lambda: None)
-        # Legacy root-home start (MachineConfig / machine.json).
-        config = _cli_machine_config(
-            None, home,
-            **_cli_start_overrides(arguments))
-        start_legacy(
-            config, display=getattr(arguments, "display", False),
-            port=port)
-        return 0
+        machine_id = _require_machine_selector(arguments)
+        started_port = start_machine(
+            machine_id, display=getattr(arguments, "display", False))
+        return _emit(arguments, started_port, lambda: None)
     if arguments.command == "stop-machine":
-        if blueprint or machine:
-            machine_id = _require_machine_selector(arguments)
-            stop_machine(machine_id)
-            return _emit(arguments, {}, lambda: None)
-        stop_legacy(port)
-        return 0
+        machine_id = _require_machine_selector(arguments)
+        stop_machine(machine_id)
+        return _emit(arguments, {}, lambda: None)
     if arguments.command == "destroy-machine":
         machine_id = _require_machine_selector(arguments)
         destroy_machine(machine_id)

@@ -6,7 +6,7 @@ from .blueprint import (Blueprint, BlueprintDrive, delete_blueprint,
                         load_blueprint, parse_blueprint, new_blueprint)
 from .cli import main
 from .home import (Context, blueprints_dir, cache_dir, documents_dir,
-                   downloads_cache_dir, drives_dir, home, machines_cache_dir,
+                   downloads_cache_dir, home, machines_cache_dir,
                    media_cache_dir, media_dir, scripts_dir, set_cache,
                    set_home)
 from .interaction import GuestExec
@@ -32,8 +32,6 @@ from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
 from .script_runner import (ScriptCheck, ScriptRun, ScriptRuntimeError,
                             check_script, execute_script, run_script)
-from .workflows import (MachineConfig, Runner, run_guest_program, run_task,
-                        start)
 
 __all__ = [
     "Blueprint",
@@ -42,7 +40,6 @@ __all__ = [
     "Handler",
     "Machine",
     "Qmp",
-    "Runner",
     "Script",
     "ScriptCheck",
     "ScriptParseError",
@@ -51,7 +48,6 @@ __all__ = [
     "Phase",
     "Property",
     "Statement",
-    "MachineConfig",
     "AgentlessGuestExec",
     "Context",
     "GuestExec",
@@ -75,7 +71,6 @@ __all__ = [
     "clean_media",
     "documents_dir",
     "downloads_cache_dir",
-    "drives_dir",
     "find_qemu",
     "find_qemu_img",
     "get_property",
@@ -98,8 +93,6 @@ __all__ = [
     "parse_script",
     "recreate_machine",
     "resolve_machine",
-    "run_guest_program",
-    "run_task",
     "screen_text",
     "screenshot",
     "scripts_dir",
@@ -109,7 +102,6 @@ __all__ = [
     "set_cache",
     "set_home",
     "set_property",
-    "start",
     "start_machine",
     "stop",
     "stop_machine",

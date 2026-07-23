@@ -3,7 +3,6 @@
 """Ownership-safe QEMU process and QMP lifecycle."""
 
 import asyncio
-import collections.abc
 import contextlib
 import json
 import os
@@ -12,68 +11,16 @@ import socket
 import subprocess
 import sys
 import time
-import types
 import uuid
 
 from qemu.qmp import ConnectError, QMPClient
 
-from .home import drives_dir, effective_home
-from .drives import boot_guess, drive_args, resolve_media
+from .home import effective_home
 
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
 _QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
 _VM_STATE_FILE = "vm.json"
-
-
-def normalize_machine(value):
-    """Normalize one QEMU ``-machine`` specification."""
-    if value is None:
-        return None
-    if isinstance(value, str):
-        value = {"type": value}
-    if not isinstance(value, collections.abc.Mapping):
-        raise TypeError("machine must be a string or mapping")
-    machine_type = value.get("type")
-    if not isinstance(machine_type, str) or not machine_type.strip():
-        raise ValueError("machine.type must be a non-empty string")
-    normalized = {"type": machine_type}
-    for name, option in value.items():
-        if name == "type":
-            continue
-        if not isinstance(name, str) or not name:
-            raise ValueError(
-                "machine option names must be non-empty strings")
-        if not isinstance(option, (str, int, float, bool)):
-            raise TypeError(
-                f"machine.{name} must be a scalar value")
-        normalized[name] = option
-    return types.MappingProxyType(normalized)
-
-
-def machine_argument(value):
-    """Render a normalized machine specification for QEMU."""
-    machine = normalize_machine(value)
-    if machine is None:
-        return None
-    parts = [machine["type"]]
-    for name in sorted(name for name in machine if name != "type"):
-        option = machine[name]
-        if isinstance(option, bool):
-            option = "on" if option else "off"
-        parts.append(f"{name}={option}")
-    return ",".join(parts)
-
-
-def normalize_memory(value):
-    """Normalize an optional guest-memory size in MiB."""
-    if value is None:
-        return None
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise TypeError("memory must be a positive integer MiB value")
-    if value <= 0:
-        raise ValueError("memory must be a positive integer MiB value")
-    return value
 
 
 def _qemu_fallback_dirs():
@@ -528,38 +475,6 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     print(f"QEMU started: {vm_name} (QMP on 127.0.0.1:{port})")
     print(f"command line: {subprocess.list2cmdline(command)}")
     return port
-
-
-def _start_configured_machine(config, display=False, port=None, home=None):
-    """Start an owned QEMU process described by one machine config.
-
-    ``config`` is a validated machine configuration (the workflow
-    layer's ``MachineConfig``); this function does not know whether it
-    came from JSON, a Python mapping, or direct construction.
-    """
-    qemu = config.qemu or find_qemu()
-    print(f"using QEMU: {qemu}")
-    drives = drives_dir(home)
-    media = resolve_media(drives, config.drives)
-    # Uniqueness comes from the per-start uuid recorded by
-    # launch_owned_qemu, so the window title can stay readable.
-    vm_name = "reliquary-machine"
-    qemu_args = list(config.qemu_args)
-    machine_value = machine_argument(config.machine)
-    args = [qemu, "-name", vm_name]
-    if machine_value is not None:
-        args += ["-machine", machine_value]
-    if (config.memory is not None
-            and not any(argument == "-m" or argument.startswith("-m=")
-                        for argument in qemu_args)):
-        args += ["-m", str(config.memory)]
-    args += drive_args(media)
-    boot = boot_guess(media)
-    if boot is not None and "-boot" not in qemu_args:
-        args += ["-boot", boot]
-    args += qemu_args
-    return launch_owned_qemu(
-        args, vm_name=vm_name, display=display, port=port, home=home)
 
 
 def stop(port=None, home=None):

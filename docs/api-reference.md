@@ -185,34 +185,6 @@ home=None, directory=None)`.
 `AgentlessGuestExec` is the concrete agentless DOS adapter over a
 `Machine`.
 
-## The legacy runner surface (root-home model)
-
-Superseded by the blueprint machine model at the realignment,
-but still the generic embedding surface for guest-program runs
-today:
-
-- `Runner(home=None, config=None)` - A configured QEMU test
-  machine bound to one absolute home; `run(task, args="")`
-  performs the full stage-boot-run-collect lifecycle and returns
-  the program's redirected output.
-- `MachineConfig` - Frozen configuration dataclass (`platform`,
-  `staged_drive`, `timeout`, `memory`, `qemu`, `qemu_args`,
-  `drives`, `machine`; every field has a working default), with
-  `MachineConfig.from_file(path, **overrides)` and
-  `from_mapping(value, base_dir=None, **overrides)` loading the
-  versioned document shape (`version` must be `1`).
-- `start(machine_config=None, *, display=False, port=None,
-  home=None)` - Start the root-home machine; returns the QMP
-  port.
-- `stop(port=None, home=None)` - Stop it, identity-verified.
-- `run_task(task, machine_config=None, *, display=False,
-  port=None, home=None)` and `run_guest_program(exe_path,
-  args="", machine_config=None, *, port=None, home=None)` -
-  One-shot guest-program lifecycles.
-
-Concurrent runs use distinct `Runner` instances with distinct
-homes; per-home `vm.json` keeps VM ownership sound.
-
 ## QEMU helpers
 
 - `find_qemu()` / `find_qemu_img()` - Locate the binaries

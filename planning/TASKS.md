@@ -399,6 +399,24 @@ T5; T6 and T7 run beside it.
    layer, and the legacy `Runner` start/stop path fold into the
    cached-machine model and are deleted; AGENTS.md "The runner
    surface" and the tests follow.
+   LANDED (2026-07-22, full deletion — DECISIONS-scope owner
+   choice): `workflows.py` (`Runner`/`MachineConfig`/
+   `run_guest_program`/`run_task`/`start`) and `drives.py` (the
+   root-home filesystem auto-discovery) are deleted; `lifecycle.py`
+   lost `normalize_machine`/`machine_argument`/`normalize_memory`/
+   `_start_configured_machine`; `home.py` lost `drives_dir`;
+   `format_options` moved into `machines.py`; the CLI's bare
+   `start-machine`/`stop-machine` root-home path and its
+   `--port`/`--qemu`/`--platform`/`qemu_args` legacy flags are
+   gone (a selector is now required). `test_runner.py` deleted;
+   `test_lifecycle.py` ownership guarantees rewritten over
+   `launch_owned_qemu`; `test_core.py` scan/staged/guest-program
+   tests removed. AGENTS.md ("The runner surface"/"Guest program
+   runs"/home layout/DOS-boot), api-reference, and cli-reference
+   rewritten. FOLLOW-UP: the README DOS walkthrough + embedding
+   sections and docs/dos-automation.md still describe the deleted
+   `run_guest_program`/`Runner` surface — a focused rewrite to the
+   cached-machine/`run-script` model rides a separate commit.
 6. Authored-asset residency (deliverable 8): the resolution
    module (`--assets` / `--assets-only`, API `assets=` /
    `assets_only=`), root-shadows-home, and `--blueprint` selection
