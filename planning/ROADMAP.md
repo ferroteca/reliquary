@@ -130,7 +130,7 @@ planning/TASKS.md); adapters own drive-image materialization in
 their native formats; adapters provide carriers and control planes
 compose them (one shared fixed-font recognizer serves text
 readback where no native text carrier exists). The doctrine is
-settled ahead; signatures land with the milestone-9 extraction,
+settled ahead; signatures land with the milestone-10 extraction,
 defined by the working code.
 
 ## The machine model
@@ -1137,7 +1137,7 @@ by construction; whole-screen exact match with `fuzzy`/`ignore`
 modifier regions; the `.rlql` catalog form under authored-asset
 resolution — declarations are files, never script content; and the
 always-on cursor normalization contract. What remains open is
-milestone 13's "Decide first" round.
+the GUI-era backlog's "Decide first" round.
 
 ## Script authoring by recording
 
@@ -1345,17 +1345,21 @@ whole arc runs from text-mode DOS on QEMU to the GUI era ending
 on Hyper-V. Milestones 1–3 are history: the north-star vertical
 slice, the media library, and the scripting language on its
 first, now-superseded surface. Milestone 4 is complete: the
-tree speaks the July 2026 redesign. Milestone 5 adds Packer's
-local HTTP server for installer answer files. Milestones 6–8
-complete the documented design — the instance model and machine
-blueprints with authored-asset residency, the script properties,
-and run records with asynchronous runs — still for the DOS
-platform on the QEMU backend alone. Only then does the design
-generalize: the adapter seam is extracted from working code (9),
-proven by a second backend (10), and extended with machine
-mobility (11) and native guest agents (12); the arc ends at the
-GUI era (13) — the VNC control plane, GUI installer scripting,
-and the last backends, Hyper-V deliberately last.
+tree speaks the July 2026 redesign. Milestone 5 (complete) added
+Packer's local HTTP server for installer answer files, and
+Milestone 6 (complete) delivered the instance model and machine
+blueprints with authored-asset residency. Milestone 7 folds the
+blueprint and media formats into one composable blueprint (the
+2026-07-23 composition round); milestones 8–9 then complete the
+documented design — the script properties, and run records with
+asynchronous runs — still for the DOS platform on the QEMU
+backend alone. Only then does the design generalize: the adapter
+seam is extracted from working code (10), proven by a second
+backend (11), and extended with machine mobility (12) and native
+guest agents (13); the arc's endpoint — the GUI era: the VNC
+control plane, GUI installer scripting, and the last backends,
+Hyper-V deliberately last — now sits in the backlog, not yet
+scheduled.
 
 A milestone that needs decisions opens with them: its "Decide
 first" block is the design round to run before its deliverables
@@ -1770,7 +1774,7 @@ on `http stop`, and implies teardown on terminal paths. The shipped
 OpenBSD 7.9 amd64 install blueprint exercises the response-file
 path, while the FreeDOS keystroke install remains unchanged.
 
-### Milestone 6 — The instance model and machine blueprints
+### Milestone 6 — The instance model and machine blueprints (complete)
 
 The whole machine model beyond milestone 1's core —
 [planning/design/instance-model.md](design/instance-model.md)
@@ -1779,21 +1783,17 @@ plus the [machine blueprint](design/machine-blueprint.md) with its
 [cookbook](design/machine-blueprint-cookbook.md) — still scoped to
 one backend. The `backend` field is parsed and validated in full,
 but with QEMU the only implementation, assignment is trivial; the
-adapter seam that makes it real is milestone 9. Capability checks
+adapter seam that makes it real is milestone 10. Capability checks
 are real from the start, derived from what the QEMU
 implementation can actually do.
 
-> **Supersession (owner, 2026-07-23):** the 2026-07-23
-> media/composition round folds the machine blueprint and the
-> media definition into one composable `.rlqb` **blueprint** of
-> named components (machine/media/source/archive), retiring
-> `.rlqm` — see [planning/design/blueprint-model.md](design/blueprint-model.md)
-> and the DECISIONS.md entry. This reshapes several milestone-6
-> deliverables (the drive model, the media surface, the machine
-> directory layout, the two published schemas). The composed
-> model is the target; the deliverables below are read through it,
-> and the realignment lands coherently per the no-backward-compat
-> rule.
+> **Completed on the pre-composition authored formats** (`.rlqb`
+> machine blueprint + `.rlqm` media definition, flat `drives/`,
+> two schemas). The 2026-07-23 media/composition round folds these
+> into one composable `.rlqb` **blueprint** of named components —
+> that realignment is **Milestone 7** below
+> ([planning/design/blueprint-model.md](design/blueprint-model.md);
+> DECISIONS.md).
 
 Decide first:
 
@@ -1889,7 +1889,65 @@ alone; a process killed mid-operation is detected and recovered
 per the instance model; blueprint edits round-trip through
 `apply-blueprint` with drive-regenerating changes failing closed.
 
-### Milestone 7 — Script properties
+### Milestone 7 — The composed blueprint model
+
+Realign the authored surface to the composed blueprint model
+decided in the 2026-07-23 media/composition round
+([planning/design/blueprint-model.md](design/blueprint-model.md);
+DECISIONS.md). Milestone 6 completed on the pre-composition
+formats; this milestone folds the machine blueprint and the media
+definition into one composable `.rlqb` blueprint of named
+components (machine / media / source / archive) and lands the
+consequent reorganizations. Still DOS-on-QEMU only — a format and
+materialization reshape, no new capability. No backward
+compatibility: the pre-composition formats are replaced, not
+bridged.
+
+Decide first: nothing — the model is settled in the design round.
+
+Deliverables:
+
+1. The composed `.rlqb` parser/validator: the polymorphic root
+   with plural component sections
+   (`machines`/`media`/`sources`/`archives`) and the bare-root
+   machine; `(name, type)` identity with source/path-stem-default
+   names; the recursive archive tree (node-with-`members` = an
+   archive, leaf = a media); `source` locators (url + mirrors /
+   local / from-archive / by-name); and medium-compatibility
+   checks — fail-closed, naming the problem. `.rlqm` retired.
+2. Media and materialization realigned (media.py / machines.py):
+   the `materialize` modes (`new`/`difference`/`copy`/`use`),
+   `read-only`, conditional `sha256` (required on a `url` source),
+   sources/archives resolution with recursive extraction, the
+   name-keyed `cache/media/` + `cache/archives/` caches
+   (`downloads/` renamed), and per-machine materializations under
+   `cache/machines/<id>/media/` keyed by media item (so
+   removable-slot swaps never clobber).
+3. The machine directory reorganization: `drives/` → `media/`,
+   backend files into a backend-named subdir,
+   `reliquary-machine.json` → `machine.json` with `vm.json` folded
+   in as a while-running state section written atomically with
+   `phase`.
+4. One published blueprint JSON Schema with per-component variants
+   replacing the two milestone-6 schemas; the conformance corpus
+   reworked to the composed format.
+5. The specs realigned as normative to the composed model:
+   machine-blueprint.md + field reference + cookbook, media-spec.md
+   (folded in), instance-model.md, and the AGENTS / ROADMAP
+   home-layout descriptions — blueprint-model.md's "supersedes"
+   list is the checklist.
+6. The codex and `planning/examples/` re-authored to the composed
+   format; the FreeDOS install kept green end to end (including the
+   recursive-archive example).
+
+Done when: the FreeDOS install script runs from a clean home
+against a machine created from a composed `.rlqb` blueprint;
+`destroy-machine` + `create-machine` regenerates from the composed
+blueprint and media alone; the recursive-archive FreeDOS example
+resolves and installs; and one blueprint schema validates the
+conformance corpus.
+
+### Milestone 8 — Script properties
 
 All of [planning/design/script-properties.md](design/script-properties.md)
 — the sources script-declared properties bind through. Small and
@@ -1925,7 +1983,7 @@ CLI with no secret material ever in the file, and interrupting an
 update cannot produce a plaintext value or a marker whose
 credential was reported bound but is absent.
 
-### Milestone 8 — Run records and asynchronous runs
+### Milestone 9 — Run records and asynchronous runs
 
 The implementation of "Asynchronous runs" above — the run-events
 stream and everything that renders it — completing the feedback
@@ -1966,7 +2024,7 @@ session; and a failure report names the route and revisits, the
 expired clock and its source scope, the nearest miss, the
 screenshot, and the suggested next command.
 
-### Milestone 9 — The backend adapter seam
+### Milestone 10 — The backend adapter seam
 
 Extract the adapter API from the now-complete QEMU implementation
 — the only adapter with a full control plane set — so the seam is
@@ -2004,7 +2062,7 @@ Deliverables:
 Done when: all QEMU interaction flows through the adapter API and
 the FreeDOS install script passes unchanged.
 
-### Milestone 10 — Second backend: VirtualBox
+### Milestone 11 — Second backend: VirtualBox
 
 The first non-QEMU adapter end to end, proving the adapter API
 against a genuinely different hypervisor. VirtualBox is the
@@ -2029,7 +2087,7 @@ Deliverables:
 Done when: the FreeDOS install script runs unmodified on both
 backends from the same blueprint (minus a pinned backend field).
 
-### Milestone 11 — Machine mobility: clone, export, import
+### Milestone 12 — Machine mobility: clone, export, import
 
 The durable-artifact exits, once two backends make them
 meaningful. Export's design is settled (owner, 2026-07-22).
@@ -2072,7 +2130,7 @@ Done when: an exported FreeDOS machine boots under the backend's
 own tooling, and a machine created from an imported blueprint
 recreates from its bases like any authored machine.
 
-### Milestone 12 — Guest agent communication
+### Milestone 13 — Guest agent communication
 
 Native guest agents as control planes, per
 [planning/design/guest-communication.md](design/guest-communication.md):
@@ -2112,7 +2170,11 @@ Done when: a guest command runs through QGA on QEMU with
 truthful capability reporting, and the agentless suite still
 passes byte-for-byte.
 
-### Milestone 13 — The GUI era: VNC, GUI scripting, and the last backends
+### The GUI era: VNC, GUI scripting, and the last backends (backlog)
+
+> **Dropped from the numbered arc to the backlog** (owner,
+> 2026-07-23): the former Milestone 13, not yet scheduled —
+> sequenced alongside the Horizon items below when its turn comes.
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,
@@ -2173,7 +2235,7 @@ Deliverables:
    framebuffer capture, key events, pointer events — behind the
    same input and screen capabilities as agentless display,
    reusing the pixel-level text recognition built for the
-   VirtualBox display plane in milestone 10.
+   VirtualBox display plane in milestone 11.
    `control-planes: ["vnc"]` honored end to end, with a
    capability error naming Hyper-V where it cannot exist.
 2. The three portable input primitives exposed at the
@@ -2224,7 +2286,7 @@ VNC and on Hyper-V through its decided screen strategy.
   `get-files`' destination default are that round's to settle).
   Value concentrates where out-of-band access thins — non-QEMU
   backends (no `hostdir`) and non-FAT guest filesystems — so
-  sequence at or soon after milestone 10's second backend.
+  sequence at or soon after milestone 11's second backend.
 - Media commands beyond `fetch-media` (verify, remove).
 - A `pytest-reliquary` plugin (per AGENTS.md prior art).
 
@@ -2264,8 +2326,8 @@ lifecycle rules — is consolidated in
 [planning/design/guest-communication.md](design/guest-communication.md).
 The `GuestExec` protocol, the isolated agentless adapter, and
 its use by the DOS workflow are implemented; native-agent
-control planes land at milestone 12 and the VNC plane at
-milestone 13. Agentless DOS operation remains the permanent base
+control planes land at milestone 13 and the VNC plane in the
+backlog GUI era. Agentless DOS operation remains the permanent base
 no milestone may weaken.
 
 ## Roadmap constraints

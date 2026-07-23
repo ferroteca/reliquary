@@ -331,7 +331,7 @@ without rendering or printing secret values.
 The run-event stream added later records server lifecycle events:
 server started, request served, request failed, and server stopped.
 Until run records land, pretty progress may still mention these
-events, but the stable record contract waits for milestone 8.
+events, but the stable record contract waits for milestone 9.
 
 ## Example
 

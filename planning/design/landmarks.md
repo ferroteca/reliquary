@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > adjudication trail is in planning/DECISIONS.md). The full asset
 > spec — the `.rlql` JSON schema, the similarity metric, and
 > landmark-block placement within a script — is settled at
-> planning/ROADMAP.md milestone 13's "Decide first" round, where
+> planning/ROADMAP.md's GUI-era backlog "Decide first" round, where
 > implementation lands; pointer input and the match-and-click
 > verbs land with it.
 

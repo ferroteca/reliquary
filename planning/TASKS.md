@@ -7,467 +7,23 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Small to-do tasks. Large tasks belong in the roadmap; the
 adjudicated design-decision records live in
-[DECISIONS.md](DECISIONS.md).
+[DECISIONS.md](DECISIONS.md). Completed milestone task-breakdowns
+are pruned once the milestone lands — the record survives in git
+history, DECISIONS.md, and the ROADMAP milestone notes (the
+milestone-4 and milestone-6 breakdowns were pruned 2026-07-23).
 
-## Implementation realignment (ROADMAP milestone 4 — complete)
+## Future implementation hints
 
-Realign the implementation with the redesigned script language
-and the July 2026 decisions (DECISIONS.md).
-planning/design/script-spec.md is the source of truth (full
-typed EBNF) with
-reliquary/codex/scripts/freedos-1.4-plain-install.rlqs the
-reference script; ROADMAP milestone 4 owned this work, and no
-later milestone started before it landed. No backward
-compatibility: the old surface is deleted entirely, not
-bridged.
-
-Numbered tasks, in dependency order — the spine is 1 → 2 →
-3/4 → 5 → 6; task 9 runs parallel to the spine; 7/8 start once
-the parser stack validates scripts; 10–12 close out:
-
-1. Parser retarget, node grammar: rebuild script.py on the
-   typed EBNF's three-production skeleton — every line a node
-   of name, positional arguments, name=value properties, and
-   an optional brace block; the lexer's five spellings
-   ("..." guest text, /.../ regex, @name media references,
-   $key / ${key} property references, bare words) plus #
-   comments. Colon, comma, expect, ->, and regex-keyword
-   handling all deleted — the parser should shrink.
-2. Parser retarget, vocabulary and node signatures: phase
-   (was state), goto (was ->), finish (was done), expect
-   folded into the branching wait { on ... }, always for
-   reactive handlers (on only in branching waits), set-boot
-   (was boot), no <key> tokens (key names only after press);
-   the colon-free noun-first headers with entry and the
-   run-level deadline; per-node signature validation.
-   LANDED as own-lexer + lark parser (owner, 2026-07-22 —
-   DECISIONS.md): script_grammar.lark mirrors the normative
-   EBNF, reliquary's tokenizer feeds it through a custom lark
-   lexer so the lexical diagnostics stay authored, and
-   script_parser.py's transformer checks per-node modifier
-   signatures and builds the typed tree. The grammar stays
-   permissive where an S-rule owns the diagnostic (S8's
-   two-handler minimum, S9's phase purity, S11's terminators),
-   so tasks 3-4 can cite ids and name the problem.
-3. Static validation, shapes and observation channels: the
-   two non-mixing script shapes; phases sequential or
-   reactive, never hybrid; every sequential phase ends in
-   goto/finish; the two-handler minimum in branching waits;
-   the screen-default conditions (a bare string or regex the
-   only screen spelling — screen= does not exist;
-   machine=stopped the only machine spelling — no bare
-   stopped); one condition per observation; unknown or
-   wrong-kind channels are validation errors.
-   LANDED as script_validation.py (owner, 2026-07-22): the
-   rules the grammar deliberately does not carry, checked over
-   the typed tree, each diagnostic naming the construct and
-   citing its id — S3/S10 (the shapes, entry, goto targets), S5
-   (unique phase names), S7 (one condition, known channel, right
-   kind), S8 (the branching wait's shape and its one-level depth
-   limit), S9 (sequential or reactive, on vs always), S11 (the
-   terminating-statement rules). Two grammar consequences: a
-   handler's condition became optional so `on machine=stopped`
-   parses (the normative EBNF always allowed it — the channel is
-   part of `condition`, not a modifier) and a bare word is
-   admitted as a condition so S7 can name it (`wait stopped`).
-   Non-timing modifiers on an observation are channels, not
-   signature errors; the timing set stays the node's own.
-4. Static validation, timing model: lexically scoped
-   timeout/stable defaults (innermost wins), per-activation
-   deadline budgets (fresh per phase entry; the header
-   deadline backstops the run, and S12 requires one of a
-   cyclable phase graph), and the placement matrix enforced as
-   parse errors.
-   LANDED as script_timing.py (owner, 2026-07-22): resolve()
-   computes the plan up front — each observation's effective
-   timeout with the scope that supplied it (innermost-wins:
-   statement > branching wait > phase > header > built-in 60s),
-   each phase's budget, the run's — so the runner is handed its
-   bounds and check-script can report them without running
-   anything. A branching wait is a real scope level: the
-   observations inside its handler bodies inherit its timeout.
-   Budgets resolve trivially because they are never inherited.
-   The placement matrix stays in the node signatures (a parse
-   error, per the task), but each timing rejection now gives its
-   reason and cites S2; S5's positive durations and S12's cycle
-   check (reachable phases only, naming the route) are in
-   script_validation.py with the other S-rules.
-5. Runner retarget: rebuild script_runner.py on the new
-   graph — phase transitions, branching-wait dispatch,
-   reactive run-to-completion dispatch with the
-   once-per-episode rearm rule, the timing runtime honoring
-   task 4's scoping. Run records keep the superseded
-   <timestamp>-<run_id>/ layout (the runs/<n>/ move is
-   milestone 8's, run records).
-   LANDED (owner, 2026-07-22): script_runner.py rebuilt on the
-   typed tree — the phase graph, branching-wait dispatch,
-   reactive run-to-completion with the once-per-episode rearm,
-   and the clocks read from the parse-time plan, so failures
-   already name the expired clock and its source scope (task 6's
-   first half falls out of the model). Consequences:
-   - script.py is deleted, not bridged; parse_script and
-     load_script moved onto the new stack in script_parser.py
-     and the exports follow (State/ExpectBranch out,
-     Phase/Handler/Property in). test_script.py went with it.
-   - a sample reads every channel together, so a branching wait
-     can mix screen and machine=stopped handlers; a sample whose
-     session is gone IS the stopped observation, and it
-     reconciles the machine phase.
-   - sessions go through Machine.qmp(), so the runtime verifies
-     VM identity (the old runner opened a raw Qmp(port)) and
-     never holds a session while a statement list runs.
-   - the engine takes an injected clock/sleep: the dispatch
-     tests are deterministic and the suite no longer sleeps.
-   - properties parse but do not bind: ${key} and insert $key
-     raise a named runtime error until the property family
-     (milestone 7).
-   - NOT YET: the shipped codex and planning/examples scripts
-     are old-surface and no longer parse — task 7.
-6. Diagnostics and check-script: failure diagnostics name
-   the expired clock and its source scope; check-script
-   grows to report the resolved timing plan (each
-   observation's effective timeout and source scope).
-   LANDED (owner, 2026-07-22): the runner already named clocks
-   (task 5); `check_script()` / `rlq check-script` now resolve a
-   script read-only (home or builtin, no seeding), print
-   `format_plan()` (defaults, phase budgets, every observation's
-   timeout and source scope), and with a machine selector also
-   run media-slot preflight. Static errors exit 2.
-7. Convert the shipped scripts: the codex scripts
-   (freedos-1.4-plain-install, freedos-1.4-verify) and
-   planning/examples/scripts/ move to the new surface;
-   planning/design/script-examples/design-install.rlqs
-   retires into the converted codex scripts.
-   LANDED (owner, 2026-07-22): all four scripts converted and
-   parsing; design-install.rlqs deleted, and
-   freedos-1.4-plain-install.rlqs IS the reference script now
-   (spec status note, ROADMAP, the script-examples README).
-   Two things the conversion caught:
-   - library.py's insert-media text scan still expected the
-     bare media name and captured `@name` with its sigil, so a
-     seeded script no longer brought its definition. Fixed to
-     match the `@` form only ($key names no static item), with
-     a test.
-   - the reference-script tests read design-install.rlqs from
-     planning/, which is not packaged; they now resolve the
-     builtin through reliquary.__file__, so they pass against an
-     installed artifact too.
-   The examples' install script needed a header deadline it
-   never had: its cd-boot <-> partitioning cycle is exactly what
-   S12 requires one for.
-8. Confirm the portable key vocabulary (the one in-milestone
-   confirmation — ROADMAP milestone 4): check the spec's
-   closed press key-name set against what the converted
-   scripts actually need; adjudicate any gap.
-   LANDED (owner, 2026-07-22): the converted scripts need only
-   `enter`, already in the published set, so no vocabulary
-   change was needed. The confirmation exposed an enforcement
-   gap instead: S14 said the set was checked statically, while
-   the runner rejected unknown names only after execution began.
-   `script_validation.py` now owns the portable set and rejects
-   unknown names, bare printable characters, and malformed chords
-   during parsing; chords retain their one-character member
-   (`ctrl+c`). The QEMU runner now only translates the validated
-   language names to backend spellings.
-9. CLI/API renames under the twin-name identity rule
-   (DECISIONS.md, CLI queue item 14): run-script,
-   fetch-media, the seed- family, new-blueprint, import-vm
-   --name, check-script, the dashed list-/search- forms, the
-   property family noun-last; create_from_blueprint →
-   create_machine; machines.start/stop/destroy →
-   start_machine / stop_machine / destroy_machine
-   (lifecycle.py's legacy start_machine(config) collision
-   dies with the root-home model); id-only --machine
-   selectors; uniform flag position (the cli.py SUPPRESS
-   workaround retires).
-   LANDED (2026-07-22): CLI commands and API twins share one
-   name under the dash↔underscore transform; the guest-console
-   family matches the script language; `--machine` is id-only
-   and mutually exclusive with `--blueprint`; leading flags are
-   rewritten onto the subparser so SUPPRESS is gone. Nested
-   `list …` and the singular aliases are deleted. `clean-*`
-   and the state ops (`insert-media` / `eject-media` /
-   `set-boot-order`) land with their twins. search-* twins that
-   have no implementation yet stay with later milestones.
-10. Documentation sweep: every doc that quotes script syntax
-    (README, planning/examples/README); docs/ and
-    docs/cli-reference.md follow the CLI renames.
-    LANDED (2026-07-22): planning/examples/README and the
-    script-spec / media-spec / instance-model / api design pages
-    quote `run-script` and the colon-free `machine` header;
-    docs/ (cli-reference, api-reference, dos-automation,
-    blueprint-guide) and README already follow the twin-name
-    CLI. Released CHANGELOG history is left untouched.
-11. Test realignment and the old-surface purge: the test
-    suite retargeted to the new parser, runner, and command
-    names, then a whole-tree sweep for surviving old-surface
-    spellings (state, ->, done, expect, bare stopped, <key>
-    tokens, boot, superseded command names) — none survive
-    anywhere.
-    LANDED (2026-07-22): tests speak the twin-name CLI and the
-    redesigned surface; `test_old_surface_purge.py` enforces the
-    live-tree sweep (package, tests, docs, README, AGENTS,
-    planning/examples, shipped codex scripts) — superseded API
-    names and CLI commands are absent, old-surface samples fail
-    to parse, and forbidden spellings do not appear outside the
-    intentional negative-test fixtures. Released CHANGELOG,
-    DECISIONS, completed ROADMAP notes, and
-    planning/design/script-examples regression notes remain
-    historical and are outside the live sweep.
-12. Milestone gate: the FreeDOS install and verify scripts
-    run end to end on the new surface and check-script
-    reports the timing plan (ROADMAP milestone 4's "Done
-    when").
-    LANDED (2026-07-22): `check-script` prints the timing plan
-    for the FreeDOS install/verify scripts; `run-script install
-    --blueprint freedos-1.4-plain` and `run-script verify` both
-    finished `result: ok` with machine phase `ready` on a
-    scratch home. Guest `fdapm poweroff` samples treat
-    lifecycle's "no longer reachable" RuntimeError as
-    `machine=stopped` (script_runner `_read`), so shutdown
-    completes after QEMU exits.
-
-Realignment items riding later milestones (kept here so the
-umbrella list stays complete; not milestone 4):
-
-- the static-conformance fixture corpus (ROADMAP milestone 6,
-  deliverable 6): valid and invalid documents, run against
-  both the parsers and the authored JSON Schemas
-  (DECISIONS.md, the schema round) — LANDED with milestone 6 T7
-  (see below): `test_conformance_corpus.py` +
-  `reliquary_tests/fixtures/conformance/`
-- the error taxonomy under parity (ROADMAP milestone 8):
-  ReliquaryError the root; StaticError(2) / PreflightError(3) /
-  RunFailure(4) / RunCancelled(5)
-- authored-asset residency (ROADMAP milestone 6): the resolution
-  module (--assets / --assets-only), the extension renames
-  (.rlqb / .rlqm), the builtins/ → codex/ package-dir rename and
-  the codex index, the state blueprint-source field, and
-  selection scoping
-- shared JSONC reader for authored documents (ROADMAP
-  milestone 6) — blueprints, standalone media definitions:
-  RFC 8259 + // and /* */
-  comments + trailing commas, nothing more (no JSON5 features);
-  string-aware tokenizer, comments replaced by spaces so error
-  line/col survive; every machine-written file stays strict JSON
-  (user properties speak their own line format); survey PyPI first, but the published
-  JSONC/JSON5 readers looked either too permissive (JSON5
-  features the spec excludes) or position-losing, and the
-  comments-become-spaces rule that keeps error line/col exact is
-  the unusual requirement to check them against
-- new media definition surface (ROADMAP milestone 6):
-  definition-level description /
-  notes, archive-level local-path;
-  sourceless definitions fail resolution with the
-  edit-the-definition error
-- CLI fetch/clean commands + API parity (ROADMAP milestone 6):
-  fetch_media(), clean_downloads(), clean_media()
-- codex: teaching comments at blueprint seams once the JSONC
-  reader lands (ROADMAP milestone 6)
-- the hostdir drive content source (vvfat on the QEMU
-  adapter — ROADMAP milestone 6)
-- user.properties and the property command family (ROADMAP
-  milestone 7) — use the `keyring` package for the protected host
+- The error taxonomy under parity (ROADMAP milestone 9):
+  `ReliquaryError` the root; `StaticError(2)` / `PreflightError(3)`
+  / `RunFailure(4)` / `RunCancelled(5)`.
+- `user.properties` and the property command family (ROADMAP
+  milestone 8): use the `keyring` package for the protected host
   credential store rather than hand-rolling Windows Credential
   Manager / macOS Keychain / Secret Service backends; its
-  (service, username) model takes the spec's scoping directly,
-  with the properties-file path as the service and the property
-  name as the username
-
-## Milestone 6 — the instance model and machine blueprints
-
-The whole machine model beyond milestone 1's core (ROADMAP
-milestone 6, deliverables 1–9). Much of the plumbing already
-landed on the realignment: the `builtins/` → `codex/` rename and
-`codex.json` index, the JSONC reader (`jsonc.py`), the `.rlqb` /
-`.rlqm` extensions, `cache/machines/<id>/` materialization with
-atomic `reliquary-machine.json`, the per-blueprint allocation
-lock, selector-based console/state ops, and the authored
-blueprint / media-definition schemas. What remains is broken into
-tasks in dependency order — the spine is T0 → T1 → T2 → T3 → T4 →
-T5; T6 and T7 run beside it.
-
-0. Decide-first design round: the three ROADMAP "Decide first"
-   questions — running-machine reconfiguration surfacing (hot
-   media vs stopped-only), a home-wide concurrent-machine limit,
-   and whether `size`/`base` are valid on `cdrom` drives.
-   Adjudicate through the interface-change rule and fold into
-   DECISIONS.md + the specs. Gates T1 (cdrom size/base) and T3
-   (concurrency).
-   LANDED (owner, 2026-07-22 — DECISIONS.md, the milestone-6
-   decide-first round): Q1 insert/eject running-or-stopped (hot
-   media confirmed, matching the existing script-spec/cli
-   contract), set-boot and apply stopped-only; Q2 no home-wide
-   concurrency limit; Q3 `size`/`base` rejected on `cdrom` (a
-   cdrom is `media`-or-empty only). Folded into
-   instance-model.md, machine-blueprint-reference.md, and
-   machine-blueprint.schema.json. Two consequences ride the
-   later tasks: T1 enforces the cdrom rule in `blueprint.py`, and
-   T4 grows the hot-insert/eject implementation.
-1. Full blueprint field-reference validation (deliverable 1) +
-   the remaining media-definition surface (part of deliverable
-   9): extend `blueprint.py` past the milestone-1 subset to
-   `backend`, `cpus`, per-drive `controller`, `base`
-   (difference/duplicate), `hostdir`, `enabled`, `control-planes`,
-   `backend-settings`, and `parameters`, with format and
-   QEMU-derived capability checks failing closed; add
-   definition-level `description` / `notes` to `MediaDefinition`
-   (`redistributable-under` was added here and later removed in T7).
-   LANDED (2026-07-22): `blueprint.py` validates the full field
-   reference — all four drive content sources plus
-   `controller`/`enabled`, and the top-level `backend` / `cpus` /
-   `control-planes` / `backend-settings` / `parameters` — each
-   failing closed and naming the problem; the Q3 cdrom rule and
-   state-only-field rejection are enforced; `media`/`base.media`
-   resolve. Media definitions gained the three annotation fields.
-   `new-blueprint` stopped writing the invalid `version` field.
-   Scope notes: (a) capability checks are backend-scoped and QEMU
-   satisfies the whole vocabulary, so they move to backend
-   assignment at materialization (T2 / the m9 adapter seam) — the
-   parser stays pure format validation; (b) `base`/`hostdir` drive
-   materialization is fail-closed in `create` (a clear
-   NotImplementedError) pending T2; (c) full state resolution
-   (digest, backend-id, cpus/control-planes into state) is T2.
-   The blueprint `name` field was REINSTATED as a display name
-   (owner, 2026-07-22 — DECISIONS.md, reversing the 2026-07-21
-   drop), so it stays in the parser and the codex `name` stays
-   valid.
-2. Drive materialization + state provenance (rest of deliverable
-   2, part of deliverable 8): qcow2 `base` triad
-   (difference/duplicate) and `hostdir` vvfat materialization in
-   `create`; record the resolved `blueprint-digest`,
-   `blueprint-source` path, and `backend-id` in the state.
-   LANDED (2026-07-22): `lifecycle.py` gained
-   `create_difference_image` (qcow2 backed by the base, format
-   probed for the explicit `-F`), `create_duplicate_image`
-   (`qemu-img convert`), and `probe_image_format`; `create`
-   materializes `size`/`media`/`base`/`hostdir` drives (a relative
-   `hostdir` resolves against the blueprint source dir — the asset
-   root supersedes this at T6 — and a missing directory fails
-   closed), resolves platform defaults (`memory`/`cpus`/
-   `control-planes`) into the state, and records `backend-id`
-   (`reliquary-<id>`), `blueprint-digest` (`sha256:` over the
-   resolved snapshot with cache paths excluded, so two machines of
-   one blueprint share it), and `blueprint-source`. Non-`ide`
-   controllers fail closed (the adapter seam owns richer
-   topology). Real `qemu-img` difference/duplicate materialization
-   smoke-verified. `apply` (T4) consumes the digest.
-3. Lifecycle integrity (deliverable 3): operation generations,
-   exclusive per-machine operation locks (beyond today's
-   allocation lock), and startup detection of interrupted
-   transitional phases with safe rollback or explicit recovery
-   instructions.
-   LANDED (2026-07-22): `machines.py` gained `_machine_lock`
-   (`.locks/<id>.op.lock`), held by every mutating op
-   (create materialization, start, stop, destroy, insert/eject/
-   set-boot, mark_stopped); a `generation` counter in the state
-   bumped once per operation; and the transitional phases —
-   `create` writes `creating`→`ready` (rolling back a failed
-   materialization), `stop` writes `running`→`stopping`→`ready`,
-   `destroy` writes `ready`→`destroying`. `_reconcile_phase` runs
-   under the lock at each op's start: `stopping` completes the
-   interrupted stop (identity-mismatch still fails closed, keeping
-   `running`), `creating`/`destroying` roll forward to removal and
-   fail closed naming the recovery. `destroy` accepts a
-   rolled-back `creating` machine. Atomic JSON replacement was
-   already in place.
-4. Lifecycle CLI completion + reconciliation + the global
-   `--json` flag (deliverable 4, `get-machine-dir` from
-   deliverable 5): `apply-blueprint`, `recreate-machine`,
-   `search-blueprints` (index + user files, with provenance),
-   `seed-blueprint --only`, `get-machine-dir`; grow `start` to
-   full baseline/state/backend-identity reconciliation with media
-   re-verification; `--json` defined by the twin's-return rule.
-   Also lift the milestone-1 stopped-only guard on
-   `insert-media`/`eject-media`: a running machine performs the
-   media change live over an identity-verified QMP session and
-   persists it to the state (T0/Q1); AGENTS.md's "all three
-   require a stopped machine" line is corrected here.
-   LANDED (2026-07-22), in five sub-commits: SC1 `recreate-machine`
-   + `get-machine-dir`; SC2 `search-blueprints` (provenance
-   yes/seeded/user) + `seed --only`; SC3 `apply-blueprint`
-   (reconcile absorbable diffs, fail closed on changed size/base of
-   an existing image, re-record the digest); SC4 the global
-   `--json` flag (each command prints its API twin's return, void →
-   `{}`, stream commands reject it); SC5 hot `insert`/`eject`
-   (removable drives launch with a stable QMP id; a running change
-   goes live over HMP `change`/`eject` on the identity-verified
-   session, then persists). `start` already reconciles (media
-   re-verify + backend regen from state; the baseline is
-   deliberately not re-applied at start).
-5. Absorb and delete the legacy path (deliverable 2's deletion):
-   `MachineConfig`, the root-home `machine.json` / `vm.json`
-   layer, and the legacy `Runner` start/stop path fold into the
-   cached-machine model and are deleted; AGENTS.md "The runner
-   surface" and the tests follow.
-   LANDED (2026-07-22, full deletion — DECISIONS-scope owner
-   choice): `workflows.py` (`Runner`/`MachineConfig`/
-   `run_guest_program`/`run_task`/`start`) and `drives.py` (the
-   root-home filesystem auto-discovery) are deleted; `lifecycle.py`
-   lost `normalize_machine`/`machine_argument`/`normalize_memory`/
-   `_start_configured_machine`; `home.py` lost `drives_dir`;
-   `format_options` moved into `machines.py`; the CLI's bare
-   `start-machine`/`stop-machine` root-home path and its
-   `--port`/`--qemu`/`--platform`/`qemu_args` legacy flags are
-   gone (a selector is now required). `test_runner.py` deleted;
-   `test_lifecycle.py` ownership guarantees rewritten over
-   `launch_owned_qemu`; `test_core.py` scan/staged/guest-program
-   tests removed. AGENTS.md ("The runner surface"/"Guest program
-   runs"/home layout/DOS-boot), api-reference, and cli-reference
-   rewritten. FOLLOW-UP LANDED (2026-07-22): the README (platform
-   model, DOS adapter, the workflow, home-directory layout, the
-   First-session walkthrough, a guest-console selector note, Python
-   usage) and docs/dos-automation.md are rewritten from the deleted
-   `run_guest_program`/`Runner` surface to the
-   cached-machine/`run-script` model; the "Managing the VM (legacy
-   root-home path)" and Runner/MachineConfig sections are deleted.
-6. Authored-asset residency (deliverable 8): the resolution
-   module and `--blueprint` selection scoping against the recorded
-   `blueprint-source`.
-   LANDED (2026-07-22), redesigned at implementation from the
-   2026-07-21 shadow/fallback model (DECISIONS.md, "ARTIFACT
-   RESIDENCY — REDESIGNED AT IMPLEMENTATION"): `assets.py` is the
-   source seam — `HomeSource` (the CLI default: canonical
-   `blueprints/`/`media/`/`scripts/` + codex seeding) and
-   `DirSource` (`--assets <dir>`, recursive by extension, the sole
-   hermetic source; no home, no codex, no seeding). One flag
-   `--assets` (no `--assets-only`); root replaces home (no
-   shadow/fallback). The embedding API has no default source and
-   fails closed (no home/CWD default); home mode is the explicit
-   `HOME_ASSETS` marker the CLI sets. Asset identity is the declared
-   `name` else the file stem, with a within-source conflict guard;
-   blueprint `name` became the id-safe identity (reversing the
-   2026-07-22 display-name reinstatement). `--blueprint` selection
-   is scoped to the invocation's resolution (`machines_for_blueprint`).
-   `list_blueprints`/`list_scripts` gained API twins. ObjectSource
-   (JSON-imported objects, API-only) is the settled fast-follow (its
-   own SC); the media-residency-vs-download-cache and composable-spec
-   threads are shortlisted under "Design" below. Tests in
-   `test_assets.py`; docs folded (ROADMAP, AGENTS, cli.md, api.md,
-   instance-model, machine-blueprint-reference, README, docs/,
-   CHANGELOG).
-7. Published schemas + fixture corpus + examples (deliverables 6,
-   7): the machine-state schema authored once the state format
-   settles; the shared valid/invalid fixture corpus run against
-   both parser and schema; `planning/examples/` audited to the
-   implemented shapes.
-   LANDED (2026-07-23): `planning/design/machine-state.schema.json`
-   authored for `reliquary-machine.json` (identity core required,
-   resolved fields + drives typed, transitional partial states
-   allowed); the blueprint schema's `name`/`description` synced to
-   the T6 id-safe-identity semantics. The shared corpus lives at
-   `reliquary_tests/fixtures/conformance/{blueprint,media}/{valid,invalid}/`
-   and `test_conformance_corpus.py` runs every fixture against both
-   the parser (always) and the schema (skipped when `jsonschema` — a
-   new dev dep — or the repo schemas are absent), plus a real
-   materialized state against the state schema. The corpus forced two
-   parser/schema reconciliations: the media parser now rejects unknown
-   keys (it silently ignored them), and the codex media definitions'
-   mis-spelled `redistribution` key was caught — the whole
-   `redistributable-under` field was then removed as overkill (owner,
-   2026-07-23; the codex URL-licensing rule is now maintainer
-   discipline, not a field). `planning/examples/` audited clean:
-   blueprint + media parse and are schema-valid, both scripts parse.
+  `(service, username)` model takes the spec's scoping directly —
+  the properties-file path as the service, the property name as
+  the username.
 
 ## Language
 
@@ -576,20 +132,40 @@ dependency order:
 
 ## Wishlist
 
-- new command to download a file and add its definition to the user
-  asset library in one step (owner request, 2026-07-22): point it at
-  a URL (or local file), it downloads/reads the payload, computes the
-  sha256, and scaffolds a `.rlqm` media definition into the home
-  `media/` (the user asset library — home mode), so a user need not
-  hand-author a definition and then `fetch-media` it. Open shape
-  questions: the command noun (`add-media` / `import-media` /
-  `capture-media`?); item- vs archive-form scaffolding (an archive
-  needs itemization the tool can't infer — prompt or item-form only?);
-  name/file derivation (reuse the media-spec derivation chain); how it
-  relates to `fetch-media` (which downloads an already-authored
-  definition) and to the residency model (it targets the home library,
-  so it is a home-mode convenience, not a `--assets` project action);
-  and CLI+API parity (a twin returning the written definition path).
+- `download-media` command (owner request, 2026-07-22; shape refined
+  2026-07-23 for the composed model): `rlq download-media
+  https://freedos.org/downloads/FreeDOS14.zip` downloads the file
+  into `cache/archives/` (a non-archive payload into `cache/media/`),
+  computes its sha256, and scaffolds a standalone `.rlqb` blueprint
+  into the home library carrying the url + sha256 — an `archive`
+  component when the payload is a container, a `source`/`media`
+  otherwise. It is smart enough to treat an archive as an archive, so
+  the `-media` suffix is a slight misnomer in the container case —
+  accepted for family consistency with `extract-media`. A home-mode
+  convenience: it warms the cache and writes the committed-source
+  stub so the user need not hand-author it and then `fetch`. Open
+  shape under the composed model: the archive's members can't be
+  inferred, so the stub names the archive and the user adds the
+  extraction tree (with `extract-media`); stem-default naming from
+  the URL filename; a `--local <file>` variant for non-downloadable
+  payloads; CLI+API parity (a twin returning the written blueprint
+  path).
+- `extract-media` command (owner request, 2026-07-23) — the
+  incremental companion to `download-media`: `rlq extract-media
+  --archive FreeDOS14 FreeDOS14-LiveCD.zip` extracts the member from
+  the named archive,
+  computes its sha256, and records it against the archive by
+  **appending a `members` node** (member path + sha256) to the
+  existing archive blueprint's recursive tree (the leaning option)
+  rather than writing a separate file. A member that is itself an
+  archive becomes another node to drill into (`extract` it again); a
+  payload member becomes a leaf media extracted to `cache/media/`. So
+  a nested source is hand-authored by walking down it one
+  `extract-media` at a time, the recursive archive tree
+  (blueprint-model.md) growing
+  in place. Open: new-file vs append-to-existing (lean append);
+  leaf-vs-node selection (member is itself a container → node, else
+  leaf).
 - new command diff-blueprint <name>: diff the user blueprint
   against the codex blueprint of the same name
 - CLI, from cli help: --version should be `version` with an
