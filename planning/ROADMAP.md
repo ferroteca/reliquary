@@ -755,7 +755,8 @@ Lifecycle semantics:
   conversions declined as growth). `export-machine --to
   <exporter>` creates and registers a native VM with a
   management platform built for keeping machines: `--to` names
-  an **exporter** — virtualbox, vmware, hyperv, libvirt, ... — a
+  an **exporter** — virtualbox, vmware, hyperv, libvirt, vagrant,
+  ... — a
   vocabulary of its own, probed on the host and deliberately
   decoupled from the backend list (libvirt is the QEMU
   ecosystem's answer; the Reliquary-invented
@@ -770,7 +771,12 @@ Lifecycle semantics:
   verification guarantees Reliquary can never touch the exported
   VM afterward. Import mirrors the decoupling in vocabulary:
   `import-vm` reads a native VM source through an **importer**,
-  no same-named backend required.
+  no same-named backend required. Vagrant belongs here as a
+  handoff vocabulary entry — `export-machine --to vagrant`
+  generating the Vagrantfile / box-side artifact, and a matching
+  importer reading Vagrant metadata where it can — not as a
+  backend, because the actual machine capabilities belong to the
+  selected provider underneath.
 - `import-vm` synthesizes a blueprint from a native VM source's
   configuration (memory, drives, controllers — translation of
   native config read by an importer, not guest inference),

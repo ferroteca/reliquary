@@ -102,7 +102,7 @@ extraction.
   content travels between formats as raw. Exporters themselves
   are *not* adapter operations: they are their own module family
   beside the adapters (the `--to` vocabulary — virtualbox,
-  vmware, hyperv, libvirt, ... — probed on the host
+  vmware, hyperv, libvirt, vagrant, ... — probed on the host
   independently of the backend list, sharing discovery helpers
   where the tools coincide), consuming the machine's resolved
   blueprint shape plus this interchange.
@@ -201,6 +201,11 @@ materialization.
   tool as a separate process, and collect its records. That does
   not make os-autoinst an implementation source for this seam, nor
   part of the default backend list.
+- **Orchestrators are handoff targets, not backends.** Vagrant may
+  be an exporter/importer vocabulary entry — generating or reading
+  a Vagrantfile / box handoff around a provider VM — but it does
+  not own the native virtualization capabilities Reliquary needs to
+  verify. The real backend remains the provider underneath.
 
 ## Extraction map
 
