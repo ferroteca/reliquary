@@ -12,10 +12,13 @@ workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home and
   cache resolution, layout, and containment, plus the `Context` type every path-resolving function accepts,
-  `blueprint.py` parses the milestone-1 machine blueprint subset and resolves
-  its media references, scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
+  `blueprint.py` validates the full machine blueprint field reference (`platform`, `backend`, `memory`, `cpus`,
+  `drives` with the four content sources plus `controller`/`enabled`, `boot`, `name`, `description`, `scripts`,
+  `control-planes`, `backend-settings`, `parameters`) and resolves
+  its `media`/`base.media` references (backend capability checks and `base`/`hostdir` materialization ride later
+  milestone-6 work), scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
   fails closed while any machine of that blueprint exists), `drives.py` parses declared drives, `media.py` owns media definitions
-  (parsing, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
+  (parsing including the definition-level `description`/`notes`/`redistributable-under` annotations, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
   machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under

@@ -19,6 +19,30 @@ argued through the interface-change rule
 time; mentions of "TASKS" records inside entries refer to
 entries now in this file.
 
+- BLUEPRINT `name` FIELD REINSTATED — DECIDED (owner, 2026-07-22),
+  reversing the 2026-07-21 drop. `name` returns as an optional
+  human-readable display name for the blueprint, distinct from the
+  file-stem identity: the stem stays the one selection key
+  (`--blueprint <stem>`) and a machine's id stays `<stem>-<n>`, so
+  `name` never selects, never renames, and does not affect machine
+  behavior — it feeds `search` alongside `description`, appears in
+  listings where a friendlier label than the stem helps, and is
+  resolved into the state. WHY: owner — "name should be part of the
+  spec, we'll regret not having it at some point"; reserving a
+  display label distinct from the stem is cheap now and a naming
+  freeze is free before v1, never after (the reserve-space
+  principle already recorded here). The original drop's concern (a
+  second name can drift from the stem and duplicate the
+  description) is accepted as a UX caveat, not a reason to omit the
+  field — tools fall back to the stem when `name` is absent. FOLDED:
+  machine-blueprint-reference.md (new `name` section; the
+  `description` section's "there is no display-name field" claim
+  removed and `search` now matches `name` too),
+  machine-blueprint.schema.json (`name` property). The
+  implementation already carried `name` (the drop was never coded),
+  so the milestone-6 field-validation task keeps it and the codex
+  `freedos-1.4-plain.rlqb` `name` stays valid.
+
 - MILESTONE 6 DECIDE-FIRST ROUND — DECIDED (owner, 2026-07-22):
   the three "Decide first" questions ROADMAP milestone 6 gated its
   implementation on. Interface triage (planning/INTERFACES.md): the

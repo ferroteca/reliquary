@@ -312,6 +312,25 @@ T5; T6 and T7 run beside it.
    QEMU-derived capability checks failing closed; add
    definition-level `description` / `notes` /
    `redistributable-under` to `MediaDefinition`.
+   LANDED (2026-07-22): `blueprint.py` validates the full field
+   reference — all four drive content sources plus
+   `controller`/`enabled`, and the top-level `backend` / `cpus` /
+   `control-planes` / `backend-settings` / `parameters` — each
+   failing closed and naming the problem; the Q3 cdrom rule and
+   state-only-field rejection are enforced; `media`/`base.media`
+   resolve. Media definitions gained the three annotation fields.
+   `new-blueprint` stopped writing the invalid `version` field.
+   Scope notes: (a) capability checks are backend-scoped and QEMU
+   satisfies the whole vocabulary, so they move to backend
+   assignment at materialization (T2 / the m9 adapter seam) — the
+   parser stays pure format validation; (b) `base`/`hostdir` drive
+   materialization is fail-closed in `create` (a clear
+   NotImplementedError) pending T2; (c) full state resolution
+   (digest, backend-id, cpus/control-planes into state) is T2.
+   The blueprint `name` field was REINSTATED as a display name
+   (owner, 2026-07-22 — DECISIONS.md, reversing the 2026-07-21
+   drop), so it stays in the parser and the codex `name` stays
+   valid.
 2. Drive materialization + state provenance (rest of deliverable
    2, part of deliverable 8): qcow2 `base` triad
    (difference/duplicate) and `hostdir` vvfat materialization in

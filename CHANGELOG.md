@@ -42,6 +42,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `openbsd-7.9-amd64` blueprint, install ISO media definition, and
   install script using OpenBSD autoinstall over the run-scoped HTTP
   server.
+- Machine blueprints are now validated against the full field
+  reference: `backend`, `cpus`, per-drive `controller`, `base`
+  (with `difference`/`duplicate`), `hostdir`, `enabled`,
+  `control-planes`, `backend-settings`, and `parameters` join the
+  parser, each failing closed and naming the problem. A `cdrom`
+  drive accepts only a `media` reference or an empty slot (`size`,
+  `base`, and `hostdir` are rejected on optical media); state-only
+  fields (`blueprint-digest`, `blueprint-source`, `backend-id`,
+  `id`) are rejected in a blueprint by name. Materialization of
+  `base`/`hostdir` drives and backend capability checks ride later
+  milestone-6 work.
+- Media definitions accept the definition-level annotation fields
+  `description`, `notes`, and `redistributable-under` (both the
+  item and archive forms).
 
 ### Changed
 
@@ -49,6 +63,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   home recursively instead of only `blueprints/`, skipping
   `cache/`, and reports each blueprint's name alongside its full
   path.
+- The blueprint `name` field is a human-readable display name,
+  distinct from the file-stem identity (which remains the one
+  selection key). `new-blueprint` no longer writes a `version`
+  field — blueprints carry no version pre-beta.
 
 ### Fixed
 

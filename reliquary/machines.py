@@ -139,6 +139,14 @@ def create(blueprint, *, context=None, blueprint_name=""):
 
     resolved_drives = {}
     for key, drive in sorted(blueprint.drives.items()):
+        if not drive.enabled:
+            # `enabled: false` removes the drive from the machine
+            # entirely (machine-blueprint-reference.md).
+            continue
+        if drive.base is not None or drive.hostdir is not None:
+            raise NotImplementedError(
+                f"drive {key!r} uses base/hostdir; materialization of "
+                "base and hostdir drives lands later in milestone 6")
         if drive.size is not None:
             filename = f"{key}.qcow2"
             path = os.path.join(drives_root, filename)

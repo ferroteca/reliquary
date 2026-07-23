@@ -153,16 +153,26 @@ class ParseBlueprintTests(BlueprintTestCase):
 
     def test_unknown_top_level_field_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
-            self.parse({"platform": "dos", "backend": "qemu"})
-        self.assertIn("backend", str(caught.exception))
+            self.parse({"platform": "dos", "frobnicate": True})
+        self.assertIn("frobnicate", str(caught.exception))
+
+    def test_state_only_field_is_rejected_by_name(self):
+        for field_name in ("blueprint-digest", "blueprint-source",
+                           "backend-id", "id"):
+            with self.subTest(field=field_name):
+                with self.assertRaises(ValueError) as caught:
+                    self.parse({"platform": "dos", field_name: "x"})
+                message = str(caught.exception)
+                self.assertIn(field_name, message)
+                self.assertIn("state-only", message)
 
     def test_unknown_drive_field_is_rejected(self):
         with self.assertRaises(ValueError) as caught:
             self.parse({
                 "platform": "dos",
-                "drives": {"hdd": {"size": "20M", "base": "old"}},
+                "drives": {"hdd": {"size": "20M", "frobnicate": 1}},
             })
-        self.assertIn("drives.hdd0.base", str(caught.exception))
+        self.assertIn("drives.hdd0.frobnicate", str(caught.exception))
 
     def test_drive_requires_exactly_one_source(self):
         for declaration in ({}, {
@@ -272,6 +282,196 @@ class ParseBlueprintTests(BlueprintTestCase):
             result.scripts["verify"] = "verify"
 
 
+class FullFieldReferenceTests(BlueprintTestCase):
+    """The fields beyond the milestone-1 subset (T1)."""
+
+    def test_backend_enum(self):
+        self.assertEqual(
+            self.parse({"platform": "dos", "backend": "qemu"}).backend,
+            "qemu")
+        with self.assertRaises(ValueError) as caught:
+            self.parse({"platform": "dos", "backend": "kvm"})
+        self.assertIn("backend", str(caught.exception))
+
+    def test_backend_omitted_is_none(self):
+        self.assertIsNone(self.parse({"platform": "dos"}).backend)
+
+    def test_cpus_positive_integer(self):
+        self.assertEqual(
+            self.parse({"platform": "dos", "cpus": 4}).cpus, 4)
+        for bad in (0, -1, True, "2", 1.5):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    self.parse({"platform": "dos", "cpus": bad})
+
+    def test_controller_on_hdd_and_cdrom(self):
+        result = self.parse({
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M", "controller": "scsi"}},
+        })
+        self.assertEqual(result.drives["hdd0"].controller, "scsi")
+
+    def test_controller_rejected_on_floppy(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "drives": {"floppy0": {"size": "1440K",
+                                       "controller": "ide"}},
+            })
+        self.assertIn("controller", str(caught.exception))
+
+    def test_controller_unknown_value_rejected(self):
+        with self.assertRaises(ValueError):
+            self.parse({
+                "platform": "dos",
+                "drives": {"hdd0": {"size": "20M", "controller": "usb"}},
+            })
+
+    def test_base_string_shorthand_defaults_to_difference(self):
+        result = self.parse({
+            "platform": "dos",
+            "drives": {"hdd0": {"base": "freedos-1.4-livecd"}},
+        })
+        drive = result.drives["hdd0"]
+        self.assertEqual(drive.base.item.name, "freedos-1.4-livecd")
+        self.assertEqual(drive.base_type, "difference")
+        self.assertIsNone(drive.size)
+
+    def test_base_object_with_type(self):
+        result = self.parse({
+            "platform": "dos",
+            "drives": {"hdd0": {"base": {"media": "freedos-1.4-livecd",
+                                         "type": "duplicate"}}},
+        })
+        self.assertEqual(result.drives["hdd0"].base_type, "duplicate")
+
+    def test_base_bad_type_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "drives": {"hdd0": {"base": {"media": "freedos-1.4-livecd",
+                                             "type": "snapshot"}}},
+            })
+        self.assertIn("type", str(caught.exception))
+
+    def test_base_rejected_on_cdrom(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "drives": {"cdrom0": {"base": "freedos-1.4-livecd"}},
+            })
+        self.assertIn("cdrom0", str(caught.exception))
+
+    def test_hostdir_string(self):
+        result = self.parse({
+            "platform": "dos",
+            "drives": {"hdd1": {"hostdir": "work/"}},
+        })
+        self.assertEqual(result.drives["hdd1"].hostdir, "work/")
+
+    def test_hostdir_rejected_on_cdrom(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "drives": {"cdrom0": {"hostdir": "work/"}},
+            })
+        self.assertIn("cdrom0", str(caught.exception))
+
+    def test_disabled_drive_excluded_from_default_boot(self):
+        result = self.parse({
+            "platform": "dos",
+            "drives": {
+                "hdd0": {"size": "20M", "enabled": False},
+                "cdrom0": "freedos-1.4-livecd",
+            },
+        })
+        self.assertFalse(result.drives["hdd0"].enabled)
+        # Default boot skips the disabled hdd0 and falls to the cdrom.
+        self.assertEqual(result.boot, ("cdrom0",))
+
+    def test_boot_naming_disabled_drive_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "drives": {"hdd0": {"size": "20M", "enabled": False}},
+                "boot": ["hdd0"],
+            })
+        self.assertIn("disabled", str(caught.exception))
+
+    def test_enabled_must_be_boolean(self):
+        with self.assertRaises(ValueError):
+            self.parse({
+                "platform": "dos",
+                "drives": {"hdd0": {"size": "20M", "enabled": "no"}},
+            })
+
+    def test_control_planes(self):
+        result = self.parse({
+            "platform": "dos",
+            "control-planes": ["guest-agent", "agentless-display"],
+        })
+        self.assertEqual(result.control_planes,
+                         ("guest-agent", "agentless-display"))
+
+    def test_control_planes_duplicate_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "control-planes": ["vnc", "vnc"],
+            })
+        self.assertIn("duplicate", str(caught.exception))
+
+    def test_control_planes_unknown_rejected(self):
+        with self.assertRaises(ValueError):
+            self.parse({
+                "platform": "dos",
+                "control-planes": ["telepathy"],
+            })
+
+    def test_backend_settings(self):
+        result = self.parse({
+            "platform": "dos",
+            "backend-settings": {"qemu": {"machine": "pc"}},
+        })
+        self.assertEqual(result.backend_settings["qemu"]["machine"], "pc")
+
+    def test_backend_settings_unknown_backend_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            self.parse({
+                "platform": "dos",
+                "backend-settings": {"parallels": {}},
+            })
+        self.assertIn("parallels", str(caught.exception))
+
+    def test_parameters_direct_value_and_redirect(self):
+        result = self.parse({
+            "platform": "dos",
+            "parameters": {
+                "identity.full-name": "testuser",
+                "os.install-key": {"property": "products.win98.key"},
+            },
+        })
+        self.assertEqual(result.parameters["identity.full-name"],
+                         "testuser")
+        self.assertEqual(
+            result.parameters["os.install-key"]["property"],
+            "products.win98.key")
+
+    def test_parameters_invalid_binding_rejected(self):
+        for binding in ([], {"property": ""}, {"property": "x", "y": 1},
+                        {"nope": "x"}, 3):
+            with self.subTest(binding=binding):
+                with self.assertRaises(ValueError):
+                    self.parse({
+                        "platform": "dos",
+                        "parameters": {"k": binding},
+                    })
+
+    def test_parameters_not_carried_by_result_is_a_mapping(self):
+        result = self.parse({"platform": "dos"})
+        self.assertEqual(dict(result.parameters), {})
+
+
 class LoadBlueprintTests(BlueprintTestCase):
     """Loading a blueprint JSON document from disk."""
 
@@ -303,8 +503,10 @@ class NewBlueprintTests(BlueprintTestCase):
             content = f.read()
             self.assertIn("// Machine blueprint for test-bp", content)
             data = json.loads("\n".join(line for line in content.splitlines() if not line.strip().startswith("//")))
-            self.assertEqual(data["version"], 1)
+            self.assertNotIn("version", data)
             self.assertEqual(data["platform"], "dos")
+        # The scaffold must parse under the full field reference.
+        self.assertIsInstance(self.parse(data), Blueprint)
 
     def test_new_blueprint_already_exists_raises(self):
         from reliquary.blueprint import new_blueprint

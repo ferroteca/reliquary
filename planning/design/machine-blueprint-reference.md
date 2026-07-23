@@ -5,13 +5,17 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Machine blueprint — field reference
 
-> **Status:** the milestone-1 subset (`platform`, `memory`, `drives` with
-> `size`/`media` and empty removable slots (`null`), `boot`,
-> `description`, and `scripts`) is implemented: parsing, validation,
-> media-name resolution, machine materialization, and persistent
-> script-driven `insert`/`eject`. The remaining fields, and JSONC
-> acceptance, are not implemented yet; details may still change
-> before first release.
+> **Status:** the full field reference is validated at parse time —
+> `platform`, `backend`, `memory`, `cpus`, `drives` (all four content
+> sources plus `controller` and `enabled`), `boot`, `name`,
+> `description`, `scripts`, `control-planes`, `backend-settings`, and
+> `parameters` — with JSONC acceptance and `media`/`base.media`
+> resolution. Machine materialization currently realizes `size` and
+> `media` drives and persistent script-driven `insert`/`eject`;
+> `base` and `hostdir` drive materialization, full state resolution
+> (digest, backend-id, defaults), and backend capability checks land
+> later in milestone 6 and with the adapter seam. Details may still
+> change before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`<name>.rlqb`, yours) and each
@@ -114,19 +118,37 @@ backend machine and resolves the blueprint afresh (see
 
 ---
 
+## `name`
+
+**blueprint (optional) · string · present in the state**
+
+A human-readable display name for the blueprint — `"FreeDOS 1.4
+plain"` where the file stem is `freedos-1.4-plain`. It is a label
+for presentation, **not** an identity: the file stem remains the
+blueprint's one selection key (`--blueprint <stem>`), and a
+machine's identity stays `<stem>-<n>`. `name` never selects,
+never renames, and does not affect machine behavior; it feeds
+`search` alongside [`description`](#description) and is shown in
+listings where a friendlier label than the stem helps. Omitted,
+tools fall back to the stem.
+
+```json
+{"name": "FreeDOS 1.4 plain"}
+```
+
+---
+
 ## `description`
 
 **blueprint (optional) · string**
 
 Human-readable discovery prose. It does not affect machine
 behavior; it feeds `search`, which matches terms against
-filename, `description`, and platform (U5). The blueprint's one
-name is its file stem — there is no display-name field (a
-`name` field was weighed and dropped, owner 2026-07-21: a second
-name drifts from the stem and adds nothing over the
-description). Codex blueprints carry the description through the
-codex's index; user blueprints are indexed by reading the field
-from the file (see [the codex](codex.md)).
+filename, [`name`](#name), `description`, and platform (U5).
+Where [`name`](#name) is a short display label, `description` is
+the longer sentence. Codex blueprints carry the description
+through the codex's index; user blueprints are indexed by reading
+the field from the file (see [the codex](codex.md)).
 
 ```json
 {

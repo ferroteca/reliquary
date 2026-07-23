@@ -67,11 +67,21 @@ class MediaDefinition:
     no archive fields; the archive form names a source archive whose
     entries its items are extracted from. Mirror URL lists and
     several definitions sharing one archive are milestone 2.
+
+    ``description``, ``notes``, and ``redistributable_under`` are the
+    optional definition-level annotations (valid in either form):
+    a one-line description read into listings and ``search``,
+    free-form provenance/licensing prose reliquary never interprets,
+    and the explicit redistribution-licensing assertion naming the
+    license (the codex's URL licensing rule — media-spec.md).
     """
     items: Tuple[MediaItem, ...]
     url: Optional[str] = None
     archive: Optional[str] = None
     archive_sha256: Optional[str] = None
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    redistributable_under: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +171,20 @@ def _parse_item(data, url=None, archived=False):
     )
 
 
+def _definition_annotations(data):
+    """Return the optional definition-level annotation fields.
+
+    ``description`` / ``notes`` / ``redistributable-under`` are valid
+    at the top level of either definition form (media-spec.md).
+    """
+    return {
+        "description": _optional_string(data, "description"),
+        "notes": _optional_string(data, "notes"),
+        "redistributable_under": _optional_string(
+            data, "redistributable-under"),
+    }
+
+
 def parse_definition(data):
     """Parse and validate one media definition object.
 
@@ -178,7 +202,8 @@ def parse_definition(data):
         raise ValueError(
             "archive is only valid in the archive form (with items)")
     url = _parse_url(data)
-    return MediaDefinition(items=(_parse_item(data, url=url),), url=url)
+    return MediaDefinition(items=(_parse_item(data, url=url),), url=url,
+                           **_definition_annotations(data))
 
 
 def _parse_archive_definition(data):
@@ -204,7 +229,8 @@ def _parse_archive_definition(data):
                 f"duplicate item name in definition: {item.name}")
         seen.add(item.name)
     return MediaDefinition(items=items, url=url, archive=archive,
-                           archive_sha256=data["sha256"])
+                           archive_sha256=data["sha256"],
+                           **_definition_annotations(data))
 
 
 def load_definition(path):

@@ -6,13 +6,13 @@ SPDX-License-Identifier: BSD-3-Clause
 # The media spec
 
 > **Status:** the definition core is implemented: both forms with
-> their derived defaults, `file-extension`, `local-path`, library
-> scanning with duplicate detection, and hash-verified fetching
-> and extraction with the mismatched-file contract. Mirror URL
-> lists, the `fetch-media` and `clean-` commands,
-> JSONC acceptance, and the definition-level annotation fields
-> are not implemented yet; details may still change before first
-> release.
+> their derived defaults, `file-extension`, `local-path`, the
+> definition-level annotation fields (`description`, `notes`,
+> `redistributable-under`), library scanning with duplicate
+> detection, hash-verified fetching and extraction with the
+> mismatched-file contract, JSONC acceptance, and the `fetch-media`
+> and `clean-` commands. Mirror URL lists are not implemented yet;
+> details may still change before first release.
 
 The media catalog holds machine-independent media: installer ISOs,
 boot floppies, and driver disks. Definitions are authored assets —

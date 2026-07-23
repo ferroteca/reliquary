@@ -97,6 +97,28 @@ class ParseItemDefinitionTests(unittest.TestCase):
         item = parse_definition(data).items[0]
         self.assertEqual(item.file_extension, "img")
 
+    def test_definition_annotations(self):
+        """description / notes / redistributable-under parse."""
+        data = {
+            "sha256": PAYLOAD_SHA256,
+            "url": "https://mirror.example/msdos/msdos622-boot.img",
+            "description": "MS-DOS 6.22 boot floppy",
+            "notes": "Provenance: dumped from an original diskette.",
+            "redistributable-under": "MIT",
+        }
+        result = parse_definition(data)
+        self.assertEqual(result.description, "MS-DOS 6.22 boot floppy")
+        self.assertIn("Provenance", result.notes)
+        self.assertEqual(result.redistributable_under, "MIT")
+
+    def test_annotations_absent_are_none(self):
+        data = {"sha256": PAYLOAD_SHA256,
+                "url": "https://mirror.example/x.img"}
+        result = parse_definition(data)
+        self.assertIsNone(result.description)
+        self.assertIsNone(result.notes)
+        self.assertIsNone(result.redistributable_under)
+
     def test_missing_sha256_raises_keyerror(self):
         """A definition without sha256 raises KeyError."""
         with self.assertRaises(KeyError) as caught:
@@ -206,6 +228,20 @@ class ParseArchiveDefinitionTests(unittest.TestCase):
         self.assertEqual(livecd.sha256, ISO_SHA256)
         self.assertEqual(boot.name, "FD14BOOT")
         self.assertEqual(boot.path, "boot/FD14BOOT.img")
+
+    def test_archive_annotations(self):
+        """Definition-level annotations parse in the archive form too."""
+        data = {
+            "archive": "FD14-LiveCD.zip",
+            "sha256": self.ARCHIVE_SHA256,
+            "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
+            "description": "FreeDOS 1.4 LiveCD",
+            "redistributable-under": "GPL-2.0-or-later",
+            "items": [{"file": "FD14LIVE.iso", "sha256": ISO_SHA256}],
+        }
+        result = parse_definition(data)
+        self.assertEqual(result.description, "FreeDOS 1.4 LiveCD")
+        self.assertEqual(result.redistributable_under, "GPL-2.0-or-later")
 
     def test_archive_derived_from_url(self):
         """An omitted archive defaults to the url's file name."""
