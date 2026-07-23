@@ -35,6 +35,53 @@ text intact, to the Retired decisions section at the bottom,
 its note naming what overruled it — a retired decision binds
 nothing but remains the record.
 
+An entry only PARTLY overruled stays where it is and is
+ANNOTATED, NEVER REWRITTEN: the amending entry governs, and a
+bracketed one-line pointer at the affected clause names it,
+leaving every other clause standing. This is the retirement
+note's instinct applied at clause granularity, and it is the
+limit of the spellings rule above. That rule protects the
+record's fidelity to its own moment — it is not licence to
+leave a WRONG INSTRUCTION standing where a reader arriving by
+search will act on it. A dated word cannot cause a bug; a
+wrong test can. Correcting an entry's prose in place is never
+the answer either: an error and its discovery are part of the
+record, and often the most useful part of it (D29).
+
+- D29 — PARTLY-OVERRULED ENTRIES ARE ANNOTATED, NEVER REWRITTEN
+  — DECIDED (owner, 2026-07-23). A convention for this record
+  itself, settled on its first instance rather than after the
+  second. D27 corrected one clause of D26 — the claim that the
+  character class was "the whole closure, and the only test
+  needed" — leaving parts A, B, C and E standing. The
+  spellings rule offered no guidance for that shape: it governs
+  ENTRY-level retirement and word-level drift, not a single
+  wrong clause inside a live entry.
+  THE RULE: an entry only partly overruled STAYS WHERE IT IS and
+  is ANNOTATED — a bracketed one-line pointer at the affected
+  clause naming the amending entry, every other clause
+  untouched. It is the retirement note's instinct at clause
+  granularity. Correcting the prose in place is NEVER the
+  answer: an error and its discovery are part of the record, and
+  here the most useful part of it — D26's part D listed
+  `${key:-x}` as an excluded operator in the same paragraph that
+  claimed the class excluded it, which is the whole argument for
+  why a stated test must be testable.
+  WHY THE SPELLINGS RULE DOES NOT COVER IT: that rule protects
+  the record's fidelity to its own moment, and it is not licence
+  to leave a WRONG INSTRUCTION standing where a reader arriving
+  by search will act on it. A DATED WORD CANNOT CAUSE A BUG; A
+  WRONG TEST CAN — and this one was aimed squarely at milestone
+  7's next deliverable, where someone greps for the closure,
+  finds "the only test needed", and ships a parser accepting
+  `${mem:-512M}`. The mirror of this round's own find: a
+  boundary nobody stated cannot be checked against, and a stated
+  boundary that is wrong is worse than none, because it gets
+  checked against and passes the wrong things.
+  FOLDED: this entry; the DECISIONS preamble (the convention
+  beside the retirement and spellings rules); D26 part D (the
+  pointer, its first application).
+
 - D28 — THE INTERFACE-CHANGE RULE COVERS PRINCIPLES — DECIDED
   (owner, 2026-07-23). Supports P8 (which it clarifies). The
   owner: "requests must align to principles or use cases, and a
@@ -273,6 +320,13 @@ nothing but remains the record.
   is — the whole closure, and the only test needed:
 
       ^\$\{[A-Za-z0-9._:/-]+\}$
+
+  [AMENDED BY D27 — the class is a FIRST SCREEN, not the whole
+  test. `${key:-x}`, listed below as a closed-out operator,
+  MATCHES it (`:` and `-` are both legal) and is refused by the
+  production instead: the text before the first colon is the
+  qualifier, and `key` is not one. The closure held; only this
+  statement of it was wrong. The rest of part D stands.]
 
   Every character is load-bearing today: `:` separates the
   qualifier (the text before the first colon), `/` separates the
