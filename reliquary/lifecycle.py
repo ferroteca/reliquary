@@ -20,7 +20,7 @@ from .home import effective_home
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
 _QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
-_VM_STATE_FILE = "vm.json"
+_MACHINE_STATE_FILE = "machine.json"
 
 
 def _qemu_fallback_dirs():
@@ -234,54 +234,46 @@ class Qmp:
 
 
 def state_path(home=None):
-    return os.path.join(effective_home(home), _VM_STATE_FILE)
+    """Path to the machine-state file that carries the live-VM section."""
+    return os.path.join(effective_home(home), _MACHINE_STATE_FILE)
 
 
 def read_vm_state(home=None):
+    """Return the recorded live-VM identity for a machine, or ``None``.
+
+    The identity lives in the ``vm`` section of the machine's
+    ``machine.json`` — written by ``machines.py`` atomically with the
+    machine ``phase``. Lifecycle reads it only to verify the QMP
+    session it is about to talk to. A state file with no ``vm`` section
+    (a stopped machine, or a plain reliquary home) reads as ``None``; a
+    malformed section fails closed.
+    """
     path = state_path(home)
     try:
         with open(path, encoding="utf-8") as state_file:
-            state = json.load(state_file)
-        port = state["port"]
-        name = state["name"]
-        vm_uuid = state["uuid"]
+            document = json.load(state_file)
+    except FileNotFoundError:
+        return None
+    except (ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            f"invalid reliquary machine state file: {path}: {error}"
+        ) from error
+    vm = document.get("vm") if isinstance(document, dict) else None
+    if vm is None:
+        return None
+    try:
+        port = vm["port"]
+        name = vm["name"]
+        vm_uuid = vm["uuid"]
         if (not isinstance(port, int) or isinstance(port, bool)
                 or not 1 <= port <= 65535
                 or not isinstance(name, str) or not name
                 or not isinstance(vm_uuid, str) or not vm_uuid):
             raise ValueError("invalid port, name, or uuid")
-        return state
-    except FileNotFoundError:
-        return None
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+    except (KeyError, TypeError, ValueError) as error:
         raise RuntimeError(
-            f"invalid reliquary VM state file: {path}: {error}") from error
-
-
-def write_vm_state(port, name, vm_uuid, pid, home=None):
-    os.makedirs(effective_home(home), exist_ok=True)
-    path = state_path(home)
-    part = path + ".part"
-    with open(part, "w", encoding="utf-8", newline="\n") as state_file:
-        json.dump({"port": port, "name": name, "uuid": vm_uuid,
-                   "pid": pid},
-                  state_file, indent=2)
-        state_file.write("\n")
-    os.replace(part, path)
-
-
-def remove_vm_state(port=None, name=None, home=None):
-    state = read_vm_state(home)
-    if not state:
-        return
-    if port is not None and state["port"] != port:
-        return
-    if name is not None and state["name"] != name:
-        return
-    try:
-        os.remove(state_path(home))
-    except FileNotFoundError:
-        pass
+            f"invalid reliquary VM state in {path}: {error}") from error
+    return vm
 
 
 def resolve_vm(port=None, home=None):
@@ -338,12 +330,14 @@ def qmp_session(port=None, home=None):
                 verify_vm(qmp, actual_port, expected_name, expected_uuid)
                 yield qmp
         except (OSError, ConnectError) as error:
-            remove_vm_state(actual_port, expected_name, home)
+            # The recorded VM is gone. Lifecycle no longer owns the
+            # machine state, so it does not clear it here — the caller
+            # (a lifecycle operation, or ``mark_stopped``) reconciles
+            # the phase and the ``vm`` section on the next operation.
             raise RuntimeError(
                 "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {expected_name} on "
-                f"127.0.0.1:{actual_port}\n"
-                "  stale VM state was removed") from error
+                f"127.0.0.1:{actual_port}") from error
 
 
 def available_port():
@@ -388,13 +382,19 @@ def _terminate_started_process(proc):
 
 
 def launch_owned_qemu(args, *, vm_name, display=False, port=None,
-                      home=None):
-    """Launch an owned QEMU process under ``home``.
+                      current_vm=None, log_dir=None):
+    """Launch an owned QEMU process and return its verified identity.
 
     ``args`` is the command line including the QEMU binary and
-    ``-name``, but excluding ``-qmp`` and ``-display`` (added here).
-    Returns the QMP port after identity verification and ``vm.json``
-    recording.
+    ``-name``, but excluding ``-qmp`` / ``-display`` / ``-uuid`` (added
+    here). ``current_vm`` is the machine's previously recorded VM
+    identity (or ``None``): a still-reachable one refuses the launch so
+    a live VM is never orphaned; a stale one is ignored (the caller
+    overwrites the recorded identity). ``log_dir`` receives
+    ``qemu-stderr.log`` — the machine's backend subdirectory. Returns
+    the identity dict ``{port, name, uuid, pid}``; the caller persists
+    it, atomically with the machine phase. Lifecycle no longer owns any
+    state file.
     """
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -405,20 +405,19 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         raise RuntimeError(
             f"QMP port 127.0.0.1:{port} is already in use "
             f"({selection}); choose another --port or stop its owner")
-    old_state = read_vm_state(home)
-    if old_state:
+    if current_vm:
         try:
-            with Qmp(old_state["port"]) as old_qmp:
-                verify_vm(old_qmp, old_state["port"],
-                          old_state["name"], old_state["uuid"])
+            with Qmp(current_vm["port"]) as old_qmp:
+                verify_vm(old_qmp, current_vm["port"],
+                          current_vm["name"], current_vm["uuid"])
         except (OSError, ConnectError):
-            remove_vm_state(old_state["port"], old_state["name"], home)
+            pass  # stale identity; the caller overwrites it
         else:
             raise RuntimeError(
                 "a reliquary VM is already active\n"
-                f"  name: {old_state['name']}\n"
-                f"  QMP port: 127.0.0.1:{old_state['port']}\n"
-                "stop it before starting another VM in this home")
+                f"  name: {current_vm['name']}\n"
+                f"  QMP port: 127.0.0.1:{current_vm['port']}\n"
+                "stop it before starting another VM for this machine")
     # The readable -name repeats across homes (same-numbered machines
     # of one blueprint); the per-start uuid is what makes this exact
     # QEMU instance verifiable.
@@ -432,7 +431,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     if os.name == "nt":
         kwargs["creationflags"] = (subprocess.DETACHED_PROCESS
                                    | subprocess.CREATE_NEW_PROCESS_GROUP)
-    base = effective_home(home)
+    base = effective_home(log_dir)
     os.makedirs(base, exist_ok=True)
     stderr_log = os.path.join(base, "qemu-stderr.log")
     with open(stderr_log, "wb") as error_file:
@@ -463,22 +462,27 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         except RuntimeError:
             _terminate_started_process(proc)
             raise
-    try:
-        write_vm_state(port, vm_name, vm_uuid, proc.pid, home)
-    except OSError as error:
-        _terminate_started_process(proc)
-        raise RuntimeError(
-            "QEMU started but its identity could not be recorded; "
-            "the new QEMU process was terminated\n"
-            f"  state file: {state_path(home)}\n"
-            f"  error: {error}") from error
     print(f"QEMU started: {vm_name} (QMP on 127.0.0.1:{port})")
     print(f"command line: {subprocess.list2cmdline(command)}")
-    return port
+    return {"port": port, "name": vm_name, "uuid": vm_uuid, "pid": proc.pid}
 
 
-def stop(port=None, home=None):
-    port, expected_name, expected_uuid = resolve_vm(port, home)
+def stop(vm):
+    """Power off the identified owned VM (no persistence).
+
+    ``vm`` is the recorded identity dict ``{port, name, uuid, ...}``.
+    The QMP session is identity-verified before ``quit``, so an
+    unrelated VM on the same port is never touched. Fails closed on an
+    identity mismatch or an unreachable VM; the caller reconciles the
+    machine ``phase`` and clears the ``vm`` section.
+    """
+    if not vm:
+        # A machine caught with no recorded VM identity — treat as
+        # already gone so the caller reconciles it to a resting phase.
+        raise RuntimeError("no recorded reliquary VM to stop")
+    port = vm["port"]
+    expected_name = vm["name"]
+    expected_uuid = vm["uuid"]
     try:
         with Qmp(port) as qmp:
             verify_vm(qmp, port, expected_name, expected_uuid)
@@ -487,11 +491,9 @@ def stop(port=None, home=None):
             except Exception:
                 pass
     except (OSError, ConnectError):
-        remove_vm_state(port, expected_name, home)
         raise RuntimeError(
             "the recorded reliquary VM is no longer reachable\n"
-            f"  expected: {expected_name} on 127.0.0.1:{port}\n"
-            "  stale VM state was removed")
+            f"  expected: {expected_name} on 127.0.0.1:{port}")
     deadline = time.monotonic() + 15
     while True:
         try:
@@ -504,4 +506,3 @@ def stop(port=None, home=None):
                 "a following start() on the same port would collide")
         time.sleep(0.5)
     print("VM stopped.")
-    remove_vm_state(port, expected_name, home)

@@ -108,8 +108,14 @@ class MachineStateSchemaTests(unittest.TestCase):
                              '"drives": {"cdrom0": null}}]}')
             context = Context(home=os.path.join(tmp, "home"), assets=root)
             machine_id = create_machine("state-bp", context=context)
-            jsonschema.validate(
-                load_machine_state(machine_id, context), schema)
+            state = load_machine_state(machine_id, context)
+            jsonschema.validate(state, schema)
+            # A running machine folds the live-VM identity into the same
+            # document as a `vm` section — validate that shape too.
+            running = dict(state, phase="running", vm={
+                "port": 5555, "name": f"reliquary-{machine_id}",
+                "uuid": "0" * 32, "pid": 4242})
+            jsonschema.validate(running, schema)
 
 
 if __name__ == "__main__":

@@ -146,13 +146,16 @@ machine is durable: a machine **is** its cache directory (see
 <reliquary_home>/blueprints/
 └── <name>.rlqb              the blueprint (user-owned)
 <reliquary_home>/cache/machines/<id>/
-├── reliquary-machine.json   the machine's state (reliquary-owned:
+├── machine.json             the machine's state (reliquary-owned:
 │                            id, blueprint reference, phase,
-│                            resolved configuration)
-├── drives/                  the machine's disk/floppy images
+│                            resolved configuration — and, while
+│                            running, the live VM identity as a
+│                            `vm` section)
+├── media/                   per-machine materialized images, by
+│                            media name
 ├── runs/                    append-only run records (transcripts,
 │                            screenshots, outputs)
-└── ...                      backend files and logs
+└── <backend>/               the backend's own files (e.g. qemu/)
 ```
 
 Everything under `cache/machines/<id>/` is reliquary's and
@@ -181,7 +184,7 @@ each: the **blueprint** (`<name>.rlqb`) is the machine
 shape as the user defined it — authored by hand, by `init`, or by
 `import`; reliquary reads it and — once authored — never writes
 it. The **state**
-(`cache/machines/<id>/reliquary-machine.json`) is the machine as
+(`cache/machines/<id>/machine.json`) is the machine as
 it actually is — fully resolved (aliases canonicalized, defaults
 materialized, the resolved blueprint digest, the blueprint's
 source path, and backend identity

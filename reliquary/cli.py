@@ -151,8 +151,8 @@ def _interaction_port(arguments):
         vm = read_vm_state(home=machine_dir_path(machine_id))
         if vm is None:
             raise ValueError(
-                f"machine {machine_id} is running but has no "
-                "vm.json")
+                f"machine {machine_id} is running but has no recorded "
+                "VM identity")
         return vm["port"]
     return getattr(arguments, "port", None)
 

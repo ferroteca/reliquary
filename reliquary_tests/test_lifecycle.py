@@ -87,13 +87,13 @@ class LifecycleTests(unittest.TestCase):
         self.tempdir.cleanup()
 
     def _remove_generated_files(self):
-        for name in ("vm.json", "vm.json.part", "qemu-stderr.log"):
+        for name in ("machine.json", "machine.json.part", "qemu-stderr.log"):
             try:
                 os.remove(os.path.join(self.home, name))
             except FileNotFoundError:
                 pass
 
-    def test_launch_returns_port_and_records_identity(self):
+    def test_launch_returns_verified_identity(self):
         proc = _FakeProcess()
         with mock.patch.object(lifecycle_module, "available_port",
                                return_value=54321), \
@@ -104,12 +104,13 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc) as popen:
-            port = lifecycle_module.launch_owned_qemu(
+            identity = lifecycle_module.launch_owned_qemu(
                 ["qemu", "-name", "reliquary-machine"],
-                vm_name="reliquary-machine")
+                vm_name="reliquary-machine", log_dir=self.home)
 
-        self.assertEqual(port, 54321)
-        self.assertEqual(lifecycle_module.read_vm_state(), {
+        # Lifecycle no longer owns a state file: it returns the verified
+        # identity for the caller (machines.py) to persist.
+        self.assertEqual(identity, {
             "port": 54321,
             "name": "reliquary-machine",
             "uuid": "00000000-0000-0000-0000-000000000000",
@@ -151,34 +152,30 @@ class LifecycleTests(unittest.TestCase):
         self.assertIsNone(lifecycle_module.read_vm_state())
 
     def test_stop_does_not_quit_vm_with_wrong_identity(self):
-        lifecycle_module.write_vm_state(
-            54321, "reliquary-expected",
-            "00000000-0000-0000-0000-000000000000", 1234)
+        vm = {"port": 54321, "name": "reliquary-expected",
+              "uuid": "00000000-0000-0000-0000-000000000000", "pid": 1234}
         _FakeQmp.name = "unrelated-vm"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
-                reliquary.stop()
+                lifecycle_module.stop(vm)
 
         self.assertEqual(_FakeQmp.commands, ["query-name"])
-        self.assertIsNotNone(lifecycle_module.read_vm_state())
 
     def test_stop_does_not_quit_same_named_vm_of_another_home(self):
         # two homes materialize same-numbered machines with the same
         # readable name; only the per-start uuid tells their VMs
         # apart, so a name match alone must never authorize quit
-        lifecycle_module.write_vm_state(
-            54321, "reliquary-machine",
-            "11111111-1111-1111-1111-111111111111", 1234)
+        vm = {"port": 54321, "name": "reliquary-machine",
+              "uuid": "11111111-1111-1111-1111-111111111111", "pid": 1234}
         _FakeQmp.name = "reliquary-machine"
         _FakeQmp.vm_uuid = "22222222-2222-2222-2222-222222222222"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
-                reliquary.stop()
+                lifecycle_module.stop(vm)
 
         self.assertNotIn("quit", _FakeQmp.commands)
-        self.assertIsNotNone(lifecycle_module.read_vm_state())
 
 
 class QmpTests(unittest.TestCase):

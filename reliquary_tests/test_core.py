@@ -82,51 +82,42 @@ class HomeTests(unittest.TestCase):
         if documents is not None:
             self.assertTrue(os.path.isabs(documents))
 
-    def test_vm_state_round_trip(self):
-        lifecycle_module.write_vm_state(
-            54321, "reliquary-test",
-            "12345678-1234-1234-1234-123456789012", 1234)
-
-        self.assertEqual(lifecycle_module.read_vm_state(), {
-            "port": 54321,
-            "name": "reliquary-test",
-            "uuid": "12345678-1234-1234-1234-123456789012",
-            "pid": 1234,
-        })
-        self.assertFalse(os.path.exists(
-            lifecycle_module.state_path() + ".part"))
-
-    def test_invalid_vm_state_is_rejected(self):
+    def _write_state(self, document):
+        # The live-VM identity is folded into machine.json's `vm`
+        # section now; author the machine-state file directly.
         os.makedirs(self.tempdir.name, exist_ok=True)
         with open(lifecycle_module.state_path(), "w",
                   encoding="utf-8") as state:
-            json.dump({"port": True, "name": "reliquary-test"}, state)
+            json.dump(document, state)
+
+    def test_vm_state_round_trip(self):
+        vm = {"port": 54321, "name": "reliquary-test",
+              "uuid": "12345678-1234-1234-1234-123456789012", "pid": 1234}
+        self._write_state({"id": "reliquary-test-0", "phase": "running",
+                           "vm": vm})
+
+        self.assertEqual(lifecycle_module.read_vm_state(), vm)
+
+    def test_no_vm_section_reads_as_none(self):
+        # A stopped machine (or a plain reliquary home) has no `vm`
+        # section — that is not-running, not an error.
+        self._write_state({"id": "reliquary-test-0", "phase": "ready"})
+        self.assertIsNone(lifecycle_module.read_vm_state())
+
+    def test_invalid_vm_state_is_rejected(self):
+        self._write_state({"vm": {"port": True, "name": "reliquary-test"}})
 
         with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
             lifecycle_module.read_vm_state()
 
     def test_vm_state_without_uuid_is_rejected(self):
-        # a name alone cannot identify a VM instance; state files
-        # predating the per-start uuid are invalid, not grandfathered
-        os.makedirs(self.tempdir.name, exist_ok=True)
-        with open(lifecycle_module.state_path(), "w",
-                  encoding="utf-8") as state:
-            json.dump({"port": 54321, "name": "reliquary-test",
-                       "pid": 1234}, state)
+        # a name alone cannot identify a VM instance; a `vm` section
+        # predating the per-start uuid is invalid, not grandfathered
+        self._write_state({"vm": {"port": 54321, "name": "reliquary-test",
+                                  "pid": 1234}})
 
         with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
             lifecycle_module.read_vm_state()
-
-    def test_remove_vm_state_requires_matching_identity(self):
-        lifecycle_module.write_vm_state(
-            54321, "reliquary-test",
-            "12345678-1234-1234-1234-123456789012", 1234)
-
-        lifecycle_module.remove_vm_state(54321, "another-vm")
-        self.assertIsNotNone(lifecycle_module.read_vm_state())
-
-        lifecycle_module.remove_vm_state(54321, "reliquary-test")
-        self.assertIsNone(lifecycle_module.read_vm_state())
 
     def test_resolve_vm_rejects_unrecorded_explicit_port(self):
         with self.assertRaisesRegex(RuntimeError, "not the recorded"):

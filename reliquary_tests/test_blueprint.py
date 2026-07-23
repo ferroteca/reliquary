@@ -71,7 +71,7 @@ class DeleteBlueprintTests(BlueprintFileTestCase):
         machine_dir = os.path.join(
             self.home, "cache", "machines", "plain-0")
         os.makedirs(machine_dir)
-        with open(os.path.join(machine_dir, "reliquary-machine.json"),
+        with open(os.path.join(machine_dir, "machine.json"),
                   "w", encoding="utf-8") as handle:
             json.dump({"id": "plain-0", "blueprint": "plain",
                        "phase": "ready"}, handle)

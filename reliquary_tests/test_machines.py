@@ -59,18 +59,21 @@ class _HomeCase(unittest.TestCase):
     def _state(self, machine_id):
         return load_machine_state(machine_id, self.home)
 
+    def _identity(self, machine_id, port=4444):
+        return {"port": port, "name": f"reliquary-{machine_id}",
+                "uuid": "1" * 32, "pid": 1234}
+
     def _force(self, machine_id, phase, *, vm=False):
         state = self._state(machine_id)
         state["phase"] = phase
+        if vm:
+            # The live-VM identity is folded into machine.json now.
+            state["vm"] = {"port": 54321, "name": f"reliquary-{machine_id}",
+                           "uuid": "1" * 32, "pid": 1234}
         path = os.path.join(machine_dir_path(machine_id, self.home),
-                            "reliquary-machine.json")
+                            "machine.json")
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(state, handle)
-        if vm:
-            with open(os.path.join(machine_dir_path(machine_id, self.home),
-                                   "vm.json"), "w", encoding="utf-8") as handle:
-                json.dump({"port": 54321, "name": f"reliquary-{machine_id}",
-                           "uuid": "1" * 32, "pid": 1234}, handle)
 
 
 class MaterializationTests(_HomeCase):
@@ -80,8 +83,8 @@ class MaterializationTests(_HomeCase):
             media=[_BLANK])
         root = machine_dir_path(machine_id, self.home)
         self.assertTrue(os.path.isfile(
-            os.path.join(root, "reliquary-machine.json")))
-        self.assertTrue(os.path.isdir(os.path.join(root, "drives")))
+            os.path.join(root, "machine.json")))
+        self.assertTrue(os.path.isdir(os.path.join(root, "media")))
 
     def test_state_records_bookkeeping_and_defaults(self):
         machine_id = self._create(
@@ -121,8 +124,9 @@ class MaterializationTests(_HomeCase):
             machine_id = create_machine("sized", context=self.home)
         calls = sorted((os.path.basename(c.args[0]), c.args[1])
                        for c in create_hdd.call_args_list)
-        self.assertEqual(calls, [("floppy1.qcow2", "720K"),
-                                 ("hdd0.qcow2", "20M")])
+        # Per-machine images are named for the media, not the slot.
+        self.assertEqual(calls, [("blank.qcow2", "20M"),
+                                 ("boot.qcow2", "720K")])
         state = self._state(machine_id)
         self.assertEqual(state["drives"]["hdd0"]["size"], "20M")
         self.assertEqual(state["drives"]["hdd0"]["materialize"], "new")
@@ -147,7 +151,7 @@ class MaterializationTests(_HomeCase):
                 "reliquary.machines.create_difference_image") as diff:
             machine_id = create_machine("based", context=self.home)
         self.assertEqual(os.path.basename(diff.call_args.args[0]),
-                         "hdd0.qcow2")
+                         "base.qcow2")
         self.assertEqual(diff.call_args.args[1], self.iso_path)
         self.assertEqual(self._state(machine_id)["drives"]["hdd0"][
             "materialize"], "difference")
@@ -289,7 +293,7 @@ class LifecycleTests(_HomeCase):
     def _start(self, machine_id):
         with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=4444):
+                           return_value=self._identity(machine_id)):
             return start_machine(machine_id, context=self.home)
 
     def test_list_and_filter_machines(self):
@@ -348,15 +352,20 @@ class LifecycleTests(_HomeCase):
         with mock.patch("reliquary.machines.find_qemu",
                         return_value="qemu-system-i386"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=4444) as launch:
+                           return_value=self._identity(machine_id)) as launch:
             port = start_machine(machine_id, context=self.home)
         self.assertEqual(port, 4444)
         args = launch.call_args.args[0]
         self.assertEqual(args[0], "qemu-system-i386")
         self.assertIn("order=dc", args)
-        self.assertEqual(launch.call_args.kwargs["home"],
-                         machine_dir_path(machine_id, self.home))
-        self.assertEqual(self._state(machine_id)["phase"], "running")
+        # QEMU's stderr log lands in the machine's backend subdirectory.
+        self.assertEqual(
+            launch.call_args.kwargs["log_dir"],
+            os.path.join(machine_dir_path(machine_id, self.home), "qemu"))
+        state = self._state(machine_id)
+        self.assertEqual(state["phase"], "running")
+        # The live-VM identity is folded into the state, atomic with phase.
+        self.assertEqual(state["vm"]["port"], 4444)
 
     def test_start_rejects_already_running(self):
         machine_id = self._ready()
@@ -367,12 +376,15 @@ class LifecycleTests(_HomeCase):
 
     def test_stop_returns_phase_to_ready(self):
         machine_id = self._ready()
-        self._force(machine_id, "running")
+        self._force(machine_id, "running", vm=True)
         with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
             stop_machine(machine_id, context=self.home)
-        stop_qemu.assert_called_once_with(
-            home=machine_dir_path(machine_id, self.home))
-        self.assertEqual(self._state(machine_id)["phase"], "ready")
+        # Lifecycle is handed the recorded VM identity, not a home dir.
+        stop_qemu.assert_called_once()
+        self.assertEqual(stop_qemu.call_args.args[0]["port"], 54321)
+        state = self._state(machine_id)
+        self.assertEqual(state["phase"], "ready")
+        self.assertNotIn("vm", state)
 
     def test_stop_keeps_running_on_identity_mismatch(self):
         machine_id = self._ready()
@@ -381,7 +393,9 @@ class LifecycleTests(_HomeCase):
                         side_effect=RuntimeError("QMP identity mismatch")):
             with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
                 stop_machine(machine_id, context=self.home)
-        self.assertEqual(self._state(machine_id)["phase"], "running")
+        state = self._state(machine_id)
+        self.assertEqual(state["phase"], "running")
+        self.assertIn("vm", state)
 
     def test_stop_reconciles_when_vm_gone(self):
         machine_id = self._ready()
@@ -541,9 +555,10 @@ class LifecycleTests(_HomeCase):
                    "drives": {"hdd0": "blank", "hdd1": "big"}},
             media=[_BLANK, {"name": "big", "materialize": "new",
                             "size": "30M"}])
-        drives_root = os.path.join(
-            machine_dir_path(machine_id, self.home), "drives")
-        open(os.path.join(drives_root, "hdd1.qcow2"), "w").close()
+        media_root = os.path.join(
+            machine_dir_path(machine_id, self.home), "media")
+        # The dropped drive's per-machine image is named for its media.
+        open(os.path.join(media_root, "big.qcow2"), "w").close()
         self._write("ar", {"platform": "dos",
                           "drives": {"hdd0": "blank", "cdrom0": None}},
                    media=[_BLANK])
@@ -552,7 +567,7 @@ class LifecycleTests(_HomeCase):
         self.assertNotIn("hdd1", state["drives"])
         self.assertIn("cdrom0", state["drives"])
         self.assertFalse(os.path.exists(
-            os.path.join(drives_root, "hdd1.qcow2")))
+            os.path.join(media_root, "big.qcow2")))
 
     def test_apply_requires_stopped(self):
         machine_id = self._ready()
@@ -620,7 +635,7 @@ class MediaInsertionTests(_HomeCase):
         machine_id = self._installer()
         with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=4444) as launch:
+                           return_value=self._identity(machine_id)) as launch:
             start_machine(machine_id, context=self.home)
         self.assertIn("order=cd", launch.call_args.args[0])
 
@@ -630,7 +645,7 @@ class MediaInsertionTests(_HomeCase):
                      context=self.home)
         with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=4444) as launch:
+                           return_value=self._identity(machine_id)) as launch:
             start_machine(machine_id, context=self.home)
         cdrom_arg = [a for a in launch.call_args.args[0] if "media=cdrom" in a]
         self.assertEqual(len(cdrom_arg), 1)
@@ -700,9 +715,9 @@ class MediaInsertionTests(_HomeCase):
         machine_id = self._installer()
         self._force(machine_id, "running", vm=True)
         mark_stopped(machine_id, context=self.home)
-        root = machine_dir_path(machine_id, self.home)
-        self.assertEqual(self._state(machine_id)["phase"], "ready")
-        self.assertFalse(os.path.exists(os.path.join(root, "vm.json")))
+        state = self._state(machine_id)
+        self.assertEqual(state["phase"], "ready")
+        self.assertNotIn("vm", state)
 
     def test_mark_stopped_leaves_ready_alone(self):
         machine_id = self._installer()

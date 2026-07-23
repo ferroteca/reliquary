@@ -28,10 +28,11 @@ have ids.
 │   └── freedos.rlqb          user-owned reusable blueprint
 └── cache/machines/
     └── freedos-0/            the machine — disposable
-        ├── reliquary-machine.json
-        ├── drives/
+        ├── machine.json      state; while running, the live VM
+        │                     identity folds in as a `vm` section
+        ├── media/            per-machine images, by media name
         ├── runs/
-        └── backend files and logs
+        └── <backend>/        the backend's own files (e.g. qemu/)
 ```
 
 A blueprint's name — its identity, the selection key — is its
@@ -81,7 +82,7 @@ sanctioned way files cross the host/guest boundary (owner,
 2026-07-22 — the run-collection model was dropped; in-band file
 operations are a deferred capability, planning/ROADMAP.md
 "Horizon"). While the machine is stopped on every control
-plane, the content under `drives/` is plain host state: a
+plane, the content under `media/` is plain host state: a
 `hostdir` drive *is* its directory, and image drives are
 readable and writable with the user's own tools. reliquary
 neither mediates nor records out-of-band access — what the
@@ -98,8 +99,8 @@ The blessing has edges:
 - `runs/` records stay append-only evidence — reading and
   copying them out is the sanctioned custody move, writing into
   them is not;
-- `reliquary-machine.json`, `vm.json`, and lock files are
-  reliquary's own state, not an editing surface.
+- `machine.json` (its live `vm` section included) and lock files
+  are reliquary's own state, not an editing surface.
 
 ## Lifecycle
 
@@ -188,7 +189,7 @@ is intentionally not implicit in clone.
 
 The blueprint remains the plain machine JSON object described by the
 [machine blueprint](machine-blueprint.md). The machine's one document is
-`cache/machines/<id>/reliquary-machine.json` — the resolved
+`cache/machines/<id>/machine.json` — the resolved
 blueprint fields plus the machine's own bookkeeping, not a second
 spelling of the blueprint schema:
 
@@ -206,9 +207,11 @@ It contains the machine's own id (repeated inside the file as a
 safety check — it must match the directory it sits in, so a
 hand-copied or misplaced machine directory fails closed), the
 source blueprint name, creation time, lifecycle phase, operation
-generation, the resolved blueprint digest, backend ID, realized
-drive/controller addresses, and transient runtime attachments. It
-must never be edited by hand.
+generation, the resolved blueprint digest, backend ID, and realized
+drive/controller addresses. While running it also carries a `vm`
+section (name, uuid, port, pid) — the live-VM identity, written
+atomically with `phase` so the two can never disagree, and cleared
+when the machine stops. It must never be edited by hand.
 
 The phase is one of `creating`, `ready`, `running`, `stopping`,
 or `destroying`. Every mutating operation takes an exclusive

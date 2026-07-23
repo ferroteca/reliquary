@@ -545,7 +545,7 @@ class _ScriptEngine:
                 self._machine_id, self._context))
             if vm is None:
                 raise self._error(
-                    "machine phase is running but no vm.json found")
+                    "machine phase is running but no VM identity recorded")
             self._port = vm["port"]
         else:
             raise self._error(

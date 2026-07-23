@@ -835,10 +835,10 @@ class ExecutePreflightTests(unittest.TestCase):
             "phase": phase,
             "drives": drives if drives is not None else {
                 "hdd0": {"medium": "hdd", "slot": 0, "size": "20M",
-                         "path": "hdd0.qcow2"},
+                         "path": "blank.qcow2"},
             },
         }
-        with open(os.path.join(root, "reliquary-machine.json"), "w",
+        with open(os.path.join(root, "machine.json"), "w",
                   encoding="utf-8") as handle:
             json.dump(state, handle)
 

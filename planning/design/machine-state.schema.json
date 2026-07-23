@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "reliquary machine state",
-  "description": "Synchronized companion to the instance model (instance-model.md), which remains normative. Describes reliquary-machine.json — the per-machine state document reliquary writes under cache/machines/<id>/. reliquary authors this file (canonical strict JSON, no comments); the schema documents the recorded-output contract for consumers reading it out-of-band. Schema validity never implies a live, consistent machine: identity verification, lifecycle reconciliation, media re-verification, and the blueprint-digest/blueprint-source selection rules live in the instance model only. Only the identity core (id, blueprint, created, phase, generation) is required, because a machine caught mid-create carries just that transitional subset; a fully materialized (ready/running) machine additionally carries the resolved fields and drives below. The running VM's identity and port live in a separate vm.json, not here. No $schema field is written pre-beta.",
+  "description": "Synchronized companion to the instance model (instance-model.md), which remains normative. Describes machine.json — the per-machine state document reliquary writes under cache/machines/<id>/. reliquary authors this file (canonical strict JSON, no comments); the schema documents the recorded-output contract for consumers reading it out-of-band. Schema validity never implies a live, consistent machine: identity verification, lifecycle reconciliation, media re-verification, and the blueprint-digest/blueprint-source selection rules live in the instance model only. Only the identity core (id, blueprint, created, phase, generation) is required, because a machine caught mid-create carries just that transitional subset; a fully materialized (ready/running) machine additionally carries the resolved fields and drives below. While running, the live VM identity and port are folded into this file as the 'vm' section (written atomically with phase, so a stopped machine never carries a stale identity); it is absent when not running. No $schema field is written pre-beta.",
   "type": "object",
   "properties": {
     "id": {
@@ -90,9 +90,13 @@
       "type": "object"
     },
     "drives": {
-      "description": "The resolved, enabled drives keyed by drive key. Each entry carries the drive's medium and slot plus the realized cache path (an image file, a host directory, or null for an empty removable slot).",
+      "description": "The resolved, enabled drives keyed by drive key. Each entry carries the drive's medium and slot plus the realized cache path (a per-machine image under media/, an attached payload, a host directory, or null for an empty removable slot).",
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/driveState"}
+    },
+    "vm": {
+      "description": "The live VM identity, present only while phase is 'running' and written atomically with phase (the former standalone vm.json, folded in). reliquary verifies a QMP session against name+uuid before touching the VM, so a same-named VM of another home is never mistaken for this one.",
+      "$ref": "#/$defs/vmState"
     }
   },
   "required": ["id", "blueprint", "created", "phase", "generation"],
@@ -121,6 +125,18 @@
         "path": {"type": ["string", "null"]}
       },
       "required": ["medium", "slot"],
+      "additionalProperties": false
+    },
+    "vmState": {
+      "description": "The running VM's identity. port is the auto-allocated QMP port; name is the readable -name (shared across same-numbered machines of one blueprint); uuid is the per-start identifier that disambiguates them; pid is the launched process id.",
+      "type": "object",
+      "properties": {
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "name": {"type": "string", "minLength": 1},
+        "uuid": {"type": "string", "minLength": 1},
+        "pid": {"type": "integer", "minimum": 0}
+      },
+      "required": ["port", "name", "uuid", "pid"],
       "additionalProperties": false
     }
   }

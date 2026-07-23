@@ -101,13 +101,31 @@ def machine_dir_path(machine_id, context=None):
     return os.path.join(machines_cache_dir(context), machine_id)
 
 
-def _machine_drives_dir(machine_id, context=None):
-    return os.path.join(machine_dir_path(machine_id, context), "drives")
+def _machine_media_dir(machine_id, context=None):
+    """Per-machine materialized-image directory, keyed by media item.
+
+    Images are named for the media (``<media-name>.<ext>``), not the
+    slot, so media swapping through one removable slot each keep their
+    own materialization and a re-insert reuses the existing image.
+    """
+    return os.path.join(machine_dir_path(machine_id, context), "media")
+
+
+def _backend_dir(machine_id, backend, context=None):
+    """The backend's own-artifacts subdirectory (``<backend>/``).
+
+    reliquary quarantines each backend's files in a backend-named
+    subdir so the machine root holds only ``machine.json`` and the
+    ``media/`` and ``runs/`` directories. For QEMU it holds just the
+    captured ``qemu-stderr.log``.
+    """
+    return os.path.join(machine_dir_path(machine_id, context),
+                        backend or "qemu")
 
 
 def _state_path(machine_id, context=None):
     return os.path.join(machine_dir_path(machine_id, context),
-                        "reliquary-machine.json")
+                        "machine.json")
 
 
 def machine_id_for(blueprint_name, number):
@@ -224,15 +242,18 @@ def _drive_common(key, drive):
     return entry
 
 
-def _materialize_drive(key, drive, drives_root, namespace, context):
+def _materialize_drive(key, drive, media_root, namespace, context):
     """Materialize one enabled drive, returning its resolved state entry.
 
     The drive names a media (or is an empty removable slot); the media
     owns materialization. ``new`` is a fresh blank of its ``size``;
     ``use`` attaches the fetched payload directly (a directory payload
     renders as vvfat); ``difference``/``copy`` build a per-machine image
-    over/of the fetched payload. The entry records the realized ``path``
-    plus the media name and mode.
+    over/of the fetched payload. Per-machine images live under
+    ``media/`` keyed by the media name (``<media-name>.qcow2``), not the
+    slot, so a media moving through a removable slot keeps its own
+    image. The entry records the realized ``path`` plus the media name
+    and mode.
     """
     entry = _drive_common(key, drive)
     if drive.media is None:
@@ -249,14 +270,14 @@ def _materialize_drive(key, drive, drives_root, namespace, context):
     entry["media"] = media.name
     entry["materialize"] = mode
     if mode == "new":
-        path = os.path.join(drives_root, f"{key}.qcow2")
+        path = os.path.join(media_root, f"{media.name}.qcow2")
         create_hdd_image(path, media.size)
         entry.update(size=media.size, path=path)
     elif mode == "use":
         entry["path"] = _acquire_fetch(media, namespace, context)
     elif mode in ("difference", "copy"):
         base_payload = _acquire_fetch(media, namespace, context)
-        dest = os.path.join(drives_root, f"{key}.qcow2")
+        dest = os.path.join(media_root, f"{media.name}.qcow2")
         if mode == "copy":
             create_duplicate_image(dest, base_payload)
         else:
@@ -272,17 +293,17 @@ def create(machine, namespace, *, context=None, blueprint_name="",
     """Materialize one machine from a parsed composed machine component.
 
     Creates the machine cache directory under
-    ``cache/machines/<blueprint>-<n>/``, writes
-    ``reliquary-machine.json`` with the fully resolved configuration
-    and its provenance (``blueprint-source``, ``blueprint-digest``,
-    ``backend-id``), and materializes every enabled drive: qcow2 for
-    ``size`` and ``base`` (differencing or duplicated), the fetched
-    payload for ``media``, a resolved host directory for ``hostdir``.
-    ``source`` is the absolute path of the blueprint file this machine
-    resolved from, recorded for selection scoping. The machine number
-    is the lowest free non-negative integer for that blueprint, unless
-    ``number`` pins a specific one (``recreate`` reuses the old id).
-    Returns the generated machine id.
+    ``cache/machines/<blueprint>-<n>/``, writes ``machine.json`` with
+    the fully resolved configuration and its provenance
+    (``blueprint-source``, ``blueprint-digest``, ``backend-id``), and
+    materializes every enabled drive: a per-machine qcow2 under
+    ``media/`` for ``new``/``difference``/``copy`` media, the fetched
+    payload attached in place for ``use``. ``source`` is the absolute
+    path of the blueprint file this machine resolved from, recorded for
+    selection scoping. The machine number is the lowest free
+    non-negative integer for that blueprint, unless ``number`` pins a
+    specific one (``recreate`` reuses the old id). Returns the
+    generated machine id.
     """
     if not isinstance(blueprint_name, str) or not blueprint_name:
         raise ValueError("create requires a non-empty blueprint_name")
@@ -296,8 +317,8 @@ def create(machine, namespace, *, context=None, blueprint_name="",
             if os.path.exists(machine_dir_path(machine_id, context)):
                 raise RuntimeError(
                     f"machine {machine_id} already exists")
-        drives_root = _machine_drives_dir(machine_id, context)
-        os.makedirs(drives_root)
+        media_root = _machine_media_dir(machine_id, context)
+        os.makedirs(media_root)
         # Mark the machine `creating` before materialization begins, so
         # an interrupted create is detectable and recoverable.
         _write_state(machine_id, {
@@ -312,7 +333,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
         try:
             return _materialize_machine(
                 machine, namespace, machine_id, blueprint_name, created,
-                drives_root, source, context)
+                media_root, source, context)
         except BaseException:
             # Roll back a failed create: the machine never reached a
             # usable phase, so its partial materialization is discarded.
@@ -322,7 +343,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 
 
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
-                         created, drives_root, source, context):
+                         created, media_root, source, context):
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
@@ -330,7 +351,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             # entirely (machine-blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
-            key, drive, drives_root, namespace, context)
+            key, drive, media_root, namespace, context)
 
     memory = machine.memory
     if memory is None:
@@ -426,7 +447,7 @@ def get_machine_dir(*, machine=None, blueprint=None, context=None):
 _OWNED_MODES = ("new", "difference", "copy")
 
 
-def _reconcile_drives(machine, namespace, old_drives, drives_root, context):
+def _reconcile_drives(machine, namespace, old_drives, media_root, context):
     """Reconcile a machine's drives to a re-resolved machine component.
 
     Absorbable changes are applied: added, removed, enabled/disabled
@@ -448,7 +469,7 @@ def _reconcile_drives(machine, namespace, old_drives, drives_root, context):
             # No reliquary-owned image here: (re)materialize/re-point
             # freely (media re-fetch, empty slot, or a new image).
             new_drives[key] = _materialize_drive(
-                key, drive, drives_root, namespace, context)
+                key, drive, media_root, namespace, context)
             continue
         # An existing materialized image may only be kept unchanged.
         media = resolve_media(drive.media, namespace) if drive.media else None
@@ -511,9 +532,9 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
         parsed = namespace.machines[blueprint_name]
         path = namespace.origin.get(("machines", blueprint_name))
 
-        drives_root = _machine_drives_dir(machine_id, context)
+        media_root = _machine_media_dir(machine_id, context)
         new_drives = _reconcile_drives(
-            parsed, namespace, state.get("drives", {}), drives_root, context)
+            parsed, namespace, state.get("drives", {}), media_root, context)
 
         memory = parsed.memory
         if memory is None:
@@ -553,7 +574,7 @@ def _write_state(machine_id, state, context=None):
 
 
 def load_machine_state(machine_id, context=None):
-    """Read and return the machine's ``reliquary-machine.json``."""
+    """Read and return the machine's ``machine.json``."""
     path = _state_path(machine_id, context)
     if not os.path.exists(path):
         raise FileNotFoundError(
@@ -582,7 +603,7 @@ def list_machines(context=None, blueprint=None):
         return []
     machines = []
     for entry in os.listdir(root):
-        path = os.path.join(root, entry, "reliquary-machine.json")
+        path = os.path.join(root, entry, "machine.json")
         if not os.path.isfile(path):
             continue
         with open(path, encoding="utf-8") as handle:
@@ -706,25 +727,40 @@ def _write_phase(machine_id, phase, context=None, *, bump=False):
     return state
 
 
-def _complete_stop(machine_id, context=None):
-    """Power off the owned VM and reconcile the phase.
+def _clear_vm(machine_id, phase, context=None):
+    """Drop the running ``vm`` section and set a resting phase, one write.
 
-    On success the phase becomes ``ready``. If the lifecycle stop
-    fails closed, the phase is reconciled without lying: a recorded VM
-    found already gone (``vm.json`` cleared) becomes ``ready``, while
-    an identity mismatch (``vm.json`` intact — our VM may still be
-    running) restores ``running``; either way the error propagates.
+    Phase and VM identity live in the same ``machine.json`` and are
+    written together, so a stopped machine can never carry a stale VM
+    identity beside a ``ready`` phase.
     """
-    machine_home = machine_dir_path(machine_id, context)
+    state = load_machine_state(machine_id, context)
+    state.pop("vm", None)
+    state["phase"] = phase
+    _write_state(machine_id, state, context)
+
+
+def _complete_stop(machine_id, context=None):
+    """Power off the owned VM and reconcile phase + VM identity.
+
+    On success the machine returns to ``ready`` and its ``vm`` section
+    is cleared, written together. If the lifecycle stop fails closed,
+    the phase is reconciled without lying: a machine whose ``vm``
+    section is already gone becomes ``ready``, while one still recorded
+    (our VM may yet be running — a stuck port or an identity mismatch)
+    restores ``running``; either way the error propagates.
+    """
+    state = load_machine_state(machine_id, context)
+    vm = state.get("vm")
     try:
-        stop_owned_qemu(home=machine_home)
+        stop_owned_qemu(vm)
     except RuntimeError:
-        if read_vm_state(machine_home) is None:
+        if load_machine_state(machine_id, context).get("vm") is None:
             _write_phase(machine_id, "ready", context)
         else:
             _write_phase(machine_id, "running", context)
         raise
-    _write_phase(machine_id, "ready", context)
+    _clear_vm(machine_id, "ready", context)
 
 
 def _reconcile_phase(machine_id, context=None):
@@ -802,13 +838,28 @@ def start_machine(machine_id, *, display=False, context=None):
         if boot is not None:
             args += ["-boot", f"order={boot}"]
 
-        # launch_owned_qemu's home= is a plain directory, not a Context —
-        # here it's repurposed as the machine's own cache subdirectory.
-        machine_home = machine_dir_path(machine_id, context)
-        port = launch_owned_qemu(
-            args, vm_name=vm_name, display=display, home=machine_home)
-        _write_phase(machine_id, "running", context, bump=True)
-        return port
+        # QEMU's own artifacts (the captured stderr log) live in the
+        # machine's backend subdirectory; lifecycle returns the VM
+        # identity and machines.py persists it into machine.json
+        # atomically with the running phase, so the two never disagree.
+        backend_dir = _backend_dir(
+            machine_id, state.get("backend", "qemu"), context)
+        vm = launch_owned_qemu(
+            args, vm_name=vm_name, display=display,
+            current_vm=state.get("vm"), log_dir=backend_dir)
+        try:
+            fresh = load_machine_state(machine_id, context)
+            fresh["vm"] = vm
+            fresh["phase"] = "running"
+            fresh["generation"] = fresh.get("generation", 0) + 1
+            _write_state(machine_id, fresh, context)
+        except BaseException:
+            # The VM came up but its identity could not be recorded;
+            # stop it rather than orphan an unrecorded process.
+            with contextlib.suppress(Exception):
+                stop_owned_qemu(vm)
+            raise
+        return vm["port"]
 
 
 def stop_machine(machine_id, context=None):
@@ -861,7 +912,8 @@ def _change_media_live(machine_id, slot, path, context):
     vm = read_vm_state(machine_home)
     if vm is None:
         raise RuntimeError(
-            f"machine {machine_id} is running but has no vm.json")
+            f"machine {machine_id} is running but has no recorded VM "
+            "identity")
     with Machine(port=vm["port"], home=machine_home).qmp() as qmp:
         if path is None:
             qmp.hmp(f"eject {slot}")
@@ -880,9 +932,9 @@ def insert_media(machine_id, slot, media_name, *, context=None):
     blueprint declares, so ``insert`` never creates one.  Running or
     stopped: on a running machine the medium is changed live over QMP
     (a change the guest observes); on a stopped machine it is present
-    at the next ``start``.  The change persists in
-    ``reliquary-machine.json`` across stop/start — the machine diverges
-    from its blueprint until a later ``insert``/``eject`` or ``apply``.
+    at the next ``start``.  The change persists in ``machine.json``
+    across stop/start — the machine diverges from its blueprint until a
+    later ``insert``/``eject`` or ``apply``.
     """
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
@@ -923,10 +975,10 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
     """Persist a new boot order on a stopped machine.
 
     Every key must name a drive the machine already declares.
-    Duplicates are rejected.  The change lives in
-    ``reliquary-machine.json`` and takes effect on the next
-    ``start``; the machine diverges from its blueprint until
-    ``apply`` (or another ``set_boot_order``) restores it.
+    Duplicates are rejected.  The change lives in ``machine.json`` and
+    takes effect on the next ``start``; the machine diverges from its
+    blueprint until ``apply`` (or another ``set_boot_order``) restores
+    it.
     """
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
@@ -960,21 +1012,18 @@ def mark_stopped(machine_id, context=None):
     """Reconcile the phase of a machine whose QEMU process has gone.
 
     Used when the guest powers itself off (the script observed
-    ``stopped``): the phase returns to ``ready`` and the stale
-    ``vm.json`` is removed.  A machine not in phase ``running`` is
-    left untouched.
+    ``stopped``): the phase returns to ``ready`` and the stale ``vm``
+    section is cleared, written together.  A machine not in phase
+    ``running`` is left untouched.
     """
     with _machine_lock(machine_id, context):
         state = load_machine_state(machine_id, context)
         if state.get("phase") != "running":
             return
-        vm_path = os.path.join(
-            machine_dir_path(machine_id, context), "vm.json")
-        try:
-            os.remove(vm_path)
-        except FileNotFoundError:
-            pass
-        _write_phase(machine_id, "ready", context, bump=True)
+        state.pop("vm", None)
+        state["phase"] = "ready"
+        state["generation"] = state.get("generation", 0) + 1
+        _write_state(machine_id, state, context)
 
 
 def destroy_machine(machine_id, context=None):
