@@ -11,7 +11,8 @@ import unittest
 from unittest import mock
 
 import reliquary
-from reliquary.library import seed_blueprint, seed_media, seed_script
+from reliquary.library import (search_blueprints, seed_blueprint,
+                               seed_media, seed_script)
 from reliquary.machines import (create_machine,
                                 load_machine_state)
 from reliquary.media import parse_definition, resolve_media
@@ -52,6 +53,15 @@ class SeedingTest(unittest.TestCase):
         for stem in SCRIPTS:
             self.assertTrue(os.path.isfile(
                 self._path("scripts", f"{stem}.rlqs")))
+
+    def test_seed_blueprint_only_skips_closure(self):
+        """--only copies just the blueprint, not its media/scripts."""
+        self.assertTrue(
+            seed_blueprint(BLUEPRINT, context=self.home, only=True))
+        self.assertTrue(os.path.isfile(
+            self._path("blueprints", f"{BLUEPRINT}{BLUEPRINT_EXT}")))
+        self.assertFalse(os.path.isdir(self._path("media")))
+        self.assertFalse(os.path.isdir(self._path("scripts")))
 
     def test_second_seed_leaves_user_files_alone(self):
         """A seeded file that the user edited is never overwritten."""
@@ -127,6 +137,54 @@ class SeedingTest(unittest.TestCase):
             self._path("scripts", f"{OPENBSD_SCRIPT}.rlqs")))
         self.assertTrue(os.path.isfile(
             self._path("media", f"{OPENBSD_MEDIA}{MEDIA_EXT}")))
+
+
+class SearchBlueprintsTest(unittest.TestCase):
+    """search_blueprints over codex + home with provenance."""
+
+    def setUp(self):
+        home_mod = importlib.import_module("reliquary.home")
+        saved = home_mod._home
+        self.addCleanup(setattr, home_mod, "_home", saved)
+        home_mod._home = None
+        self._temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._temp.cleanup)
+        self.home = self._temp.name
+
+    def test_codex_blueprint_is_available(self):
+        rows = search_blueprints("freedos", context=self.home)
+        row = next(r for r in rows if r["name"] == BLUEPRINT)
+        self.assertEqual(row["provenance"], "yes")
+        self.assertEqual(row["platform"], "dos")
+        self.assertIsNone(row["path"])
+
+    def test_seeded_blueprint_reports_seeded_provenance(self):
+        seed_blueprint(BLUEPRINT, context=self.home, only=True)
+        row = next(r for r in search_blueprints(BLUEPRINT, context=self.home)
+                   if r["name"] == BLUEPRINT)
+        self.assertEqual(row["provenance"], "seeded")
+        self.assertIsNotNone(row["path"])
+
+    def test_user_blueprint_matches_by_description(self):
+        bp_dir = os.path.join(self.home, "blueprints")
+        os.makedirs(bp_dir)
+        with open(os.path.join(bp_dir, "mine.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({"platform": "dos", "name": "My One",
+                       "description": "bespoke widget rig",
+                       "drives": {"hdd": {"size": "20M"}}}, handle)
+        rows = search_blueprints("bespoke", context=self.home)
+        self.assertEqual([r["name"] for r in rows], ["mine"])
+        self.assertEqual(rows[0]["provenance"], "user")
+        self.assertEqual(rows[0]["display_name"], "My One")
+
+    def test_empty_term_matches_all(self):
+        rows = search_blueprints("", context=self.home)
+        self.assertGreaterEqual(len(rows), 2)
+
+    def test_no_match_returns_empty(self):
+        self.assertEqual(
+            search_blueprints("zzzznomatch", context=self.home), [])
 
 
 class FirstReferenceTest(unittest.TestCase):

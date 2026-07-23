@@ -240,6 +240,26 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("plain", output)
         self.assertIn("ready", output)
 
+    def test_search_blueprints(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "search-blueprints",
+                               "freedos"])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue()
+        self.assertIn("PROVENANCE", output)
+        self.assertIn("freedos-1.4-plain", output)
+
+    def test_seed_blueprint_only_flag(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "seed-blueprint",
+                               "freedos-1.4-plain", "--only"])
+        self.assertEqual(result, 0)
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "blueprints", "freedos-1.4-plain.rlqb")))
+        self.assertFalse(os.path.isdir(os.path.join(self.home, "media")))
+
     def test_list_blueprints_builtin(self):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):

@@ -21,7 +21,9 @@ workflow:
   (parsing including the definition-level `description`/`notes`/`redistributable-under` annotations, name resolution), listing (`list_media`), definition removal (`delete_media` — fails closed while a
   machine drive still holds an item from that definition), and hash-verified acquisition of OS installation media into the
   `cache/downloads/` and `cache/media/` caches, `library.py` owns the codex — the built-in seed library
-  (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
+  (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
+  `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
+  matches codex + home blueprints and reports provenance `yes`/`seeded`/`user`), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` /
   `recreate_machine` (destroy+create under the same id) / `get_machine_dir` (the out-of-band door) /
   `list_machines` /

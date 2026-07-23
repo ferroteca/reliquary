@@ -64,6 +64,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `blueprint-source` (the resolved blueprint path), `blueprint-digest`
   (the resolved-snapshot baseline), and `backend-id`. Non-`ide`
   controllers fail closed pending the adapter seam.
+- `search-blueprints` / `search_blueprints()` searches codex and home
+  blueprints, matching a term against name, description, and platform
+  and reporting provenance (`yes` built-in, `seeded`, or `user`). The
+  `seed-blueprint` / `seed-media` / `seed-script` commands gain
+  `--only` (API `only=`) to copy just the named file without its
+  closure.
 - `recreate-machine` / `recreate_machine()` destroys a machine and
   recreates it under the same id (re-resolving the current
   blueprint), and `get-machine-dir` / `get_machine_dir()` prints a

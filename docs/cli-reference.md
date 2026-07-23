@@ -71,6 +71,20 @@ List all machines, optionally filtered by blueprint.
 
 List blueprints. With `--builtin`, list only built-in blueprints.
 
+### `rlq search-blueprints [TERM]`
+
+Search codex and home blueprints, printing name, provenance
+(`yes` = built-in and not seeded, `seeded` = built-in copied into
+the home, `user` = home-authored), platform, and description. The
+term is matched case-insensitively against name, description, and
+platform; omitted, everything is listed.
+
+### `rlq (seed-blueprint | seed-media | seed-script) <name> [--only]`
+
+Copy a built-in artifact into the home. By default a blueprint or
+script also brings its closure (referenced media and scripts);
+`--only` copies just the named file.
+
 ### `rlq delete-blueprint <name>`
 
 Remove the home blueprint file (``.rlqb`` or legacy ``.json``).

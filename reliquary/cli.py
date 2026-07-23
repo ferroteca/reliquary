@@ -22,7 +22,8 @@ from . import jsonc
 from .home import (blueprints_dir, cache_dir, effective_home, media_dir,
                    scripts_dir, set_cache, set_home)
 from .library import (list_builtin_blueprints, list_builtin_media,
-                      seed_blueprint, seed_media, seed_script)
+                      search_blueprints, seed_blueprint, seed_media,
+                      seed_script)
 from . import blueprint as blueprint_mod
 from .machines import (create_machine, destroy_machine, eject_media,
                        get_machine_dir, insert_media, list_machines,
@@ -49,7 +50,7 @@ _COMMANDS = frozenset({
     "destroy-machine", "recreate-machine", "get-machine-dir",
     "run-script", "check-script", "fetch-media",
     "seed-blueprint", "seed-media", "seed-script", "new-blueprint",
-    "delete-blueprint",
+    "delete-blueprint", "search-blueprints",
     "get-property", "set-property", "unset-property",
     "list-properties", "import-vm", "list-blueprints",
     "list-machines", "list-scripts", "list-media",
@@ -285,6 +286,17 @@ def main(argv=None):
             help=f"copy built-in {kind} to home")
         _add_home(command)
         command.add_argument("name", help=f"built-in {kind} name")
+        command.add_argument(
+            "--only", action="store_true",
+            help="copy just this file, not its closure")
+
+    # search-blueprints
+    command = subcommands.add_parser(
+        "search-blueprints",
+        help="search codex and home blueprints")
+    _add_home(command)
+    command.add_argument("term", nargs="?", default="",
+                         help="term matched against name/description/platform")
 
     # new-blueprint
     command = subcommands.add_parser(
@@ -715,7 +727,7 @@ def _fetch_media(arguments):
 
 
 def _seed_blueprint(arguments):
-    if seed_blueprint(arguments.name):
+    if seed_blueprint(arguments.name, only=getattr(arguments, "only", False)):
         print(f"seeded blueprint {arguments.name}")
     else:
         print(f"blueprint {arguments.name} already exists or not found")
@@ -723,7 +735,7 @@ def _seed_blueprint(arguments):
 
 
 def _seed_media(arguments):
-    if seed_media(arguments.name):
+    if seed_media(arguments.name, only=getattr(arguments, "only", False)):
         print(f"seeded media {arguments.name}")
     else:
         print(f"media {arguments.name} already exists or not found")
@@ -731,10 +743,28 @@ def _seed_media(arguments):
 
 
 def _seed_script(arguments):
-    if seed_script(arguments.name):
+    if seed_script(arguments.name, only=getattr(arguments, "only", False)):
         print(f"seeded script {arguments.name}")
     else:
         print(f"script {arguments.name} already exists or not found")
+    return 0
+
+
+def _search_blueprints(arguments):
+    rows = search_blueprints(arguments.term)
+    if not rows:
+        print("(no matching blueprints)")
+        return 0
+    name_width = max([4] + [len(row["name"]) for row in rows])
+    prov_width = max([10] + [len(row["provenance"]) for row in rows])
+    print(f"{'NAME':<{name_width}}  {'PROVENANCE':<{prov_width}}  "
+          f"{'PLATFORM':<8}  DESCRIPTION")
+    for row in rows:
+        platform = row["platform"] or "-"
+        description = row["description"] or row["display_name"] or "-"
+        print(f"{row['name']:<{name_width}}  "
+              f"{row['provenance']:<{prov_width}}  "
+              f"{platform:<8}  {description}")
     return 0
 
 
@@ -838,6 +868,8 @@ def _dispatch(arguments):
         return _seed_media(arguments)
     if arguments.command == "seed-script":
         return _seed_script(arguments)
+    if arguments.command == "search-blueprints":
+        return _search_blueprints(arguments)
     if arguments.command == "new-blueprint":
         return _new_blueprint(arguments)
     if arguments.command == "delete-blueprint":

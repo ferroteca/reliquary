@@ -107,13 +107,117 @@ def list_builtin_media():
         yield name
 
 
-def seed_blueprint(name, context=None):
+def _blueprint_fields_from_text(text):
+    """Extract (display_name, description, platform), or None."""
+    try:
+        raw = jsonc.loads(text)
+    except ValueError:
+        return None
+    if (not isinstance(raw, collections.abc.Mapping)
+            or "platform" not in raw):
+        return None
+    return {
+        "display_name": raw.get("name"),
+        "description": raw.get("description"),
+        "platform": raw.get("platform"),
+    }
+
+
+def _home_blueprint_index(context=None):
+    """Map stem -> (path, fields) for blueprint files under blueprints/."""
+    root = blueprints_dir(context)
+    found = {}
+    if not os.path.isdir(root):
+        return found
+    for dirpath, _dirs, files in os.walk(root):
+        for entry in sorted(files):
+            if entry.endswith(".rlqb") or entry.endswith(".json"):
+                stem = entry.rsplit(".", 1)[0]
+            else:
+                continue
+            path = os.path.join(dirpath, entry)
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    fields = _blueprint_fields_from_text(handle.read())
+            except OSError:
+                continue
+            if fields is not None:
+                found.setdefault(stem, (path, fields))
+    return found
+
+
+def _codex_blueprint_index():
+    """Map stem -> discovery fields for codex blueprints."""
+    result = {}
+    for name in list_builtin_blueprints():
+        source = _builtins_root() / "blueprints" / f"{name}.rlqb"
+        if not source.is_file():
+            source = _builtins_root() / "blueprints" / f"{name}.json"
+        fields = None
+        if source.is_file():
+            try:
+                fields = _blueprint_fields_from_text(
+                    source.read_text(encoding="utf-8"))
+            except (UnicodeDecodeError, ValueError):
+                fields = None
+        result[name] = fields or {
+            "display_name": None, "description": None, "platform": None}
+    return result
+
+
+def search_blueprints(term, context=None):
+    """Search codex and home blueprints, returning matches with provenance.
+
+    Each match is a dict: ``name`` (the stem — the selection key),
+    ``display_name`` (the blueprint's ``name`` field), ``description``,
+    ``platform``, ``provenance`` (``yes`` = built-in and not seeded,
+    ``seeded`` = built-in copied into the home, ``user`` = home-authored
+    with no built-in), and ``path`` (the home file, or ``None`` for an
+    unseeded built-in). The term matches case-insensitively against the
+    stem, display name, description, and platform; an empty term matches
+    everything. Results are ordered by stem.
+    """
+    term_l = (term or "").lower()
+    home = _home_blueprint_index(context)
+    codex = _codex_blueprint_index()
+    results = []
+    for stem in sorted(set(home) | set(codex)):
+        if stem in codex and stem in home:
+            provenance, (path, fields) = "seeded", home[stem]
+        elif stem in codex:
+            provenance, path, fields = "yes", None, codex[stem]
+        else:
+            provenance, (path, fields) = "user", home[stem]
+        results.append({
+            "name": stem,
+            "display_name": fields.get("display_name"),
+            "description": fields.get("description"),
+            "platform": fields.get("platform"),
+            "provenance": provenance,
+            "path": path,
+        })
+    if not term_l:
+        return results
+
+    def matches(row):
+        hay = " ".join(
+            str(value) for value in (
+                row["name"], row["display_name"],
+                row["description"], row["platform"]) if value).lower()
+        return term_l in hay
+
+    return [row for row in results if matches(row)]
+
+
+def seed_blueprint(name, context=None, *, only=False):
     """Seed ``blueprints/<name>.rlqb`` from the built-in library.
 
     A home blueprint of that name already exists, or no builtin
     does: nothing happens. Otherwise the blueprint is copied out
     along with the media definitions and scripts it references
     (each obeying the never-overwrite rule), and True is returned.
+    ``only=True`` copies just the single blueprint file, not its
+    closure.
     """
     source = _builtins_root() / "blueprints" / f"{name}.rlqb"
     if not source.is_file():
@@ -145,7 +249,7 @@ def seed_blueprint(name, context=None):
     if not _copy_out(source, destination):
         return False
 
-    if isinstance(data, collections.abc.Mapping):
+    if not only and isinstance(data, collections.abc.Mapping):
         # Resolve everything relative to the home this seed is into
         for media_name in _referenced_media(data):
             seed_media(media_name, context=context)
@@ -154,13 +258,14 @@ def seed_blueprint(name, context=None):
     return True
 
 
-def seed_media(name, context=None):
+def seed_media(name, context=None, *, only=False):
     """Seed the built-in media definition defining item ``name``.
 
     Returns whether a definition file was copied out. A home
     definition already supplying the name, a home file already
     occupying the builtin's filename, or no builtin defining the
-    name: nothing happens.
+    name: nothing happens. ``only`` is accepted for a uniform seed
+    surface but inert — a media definition has no closure.
     """
     if scan_media_definitions(media_dir(context), name):
         return False
@@ -195,13 +300,14 @@ def _referenced_insert_media(script_text):
     yield from _INSERT_MEDIA.findall(script_text)
 
 
-def seed_script(stem, context=None):
+def seed_script(stem, context=None, *, only=False):
     """Seed ``scripts/<stem>.rlqs`` from the built-in library.
 
     Returns whether the script file was copied out. The media
     definitions the script's ``insert`` statements reference come
     along (each obeying the never-overwrite rule), so a seeded
     script resolves its media without a live fetch first.
+    ``only=True`` copies just the script file, not its media.
     """
     source = _builtins_root() / "scripts" / f"{stem}.rlqs"
     if not source.is_file():
@@ -210,6 +316,8 @@ def seed_script(stem, context=None):
     destination = os.path.join(scripts_dir(context), f"{stem}.rlqs")
     if not _copy_out(source, destination):
         return False
+    if only:
+        return True
     try:
         text = source.read_text(encoding="utf-8")
     except UnicodeDecodeError:
