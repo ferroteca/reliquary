@@ -1,9 +1,39 @@
 {
-  "platform": "dos",
-  "memory": "32M",
-  "drives": {
-    "hdd0": {"size": "20M"},
-    "cdrom0": null
-  },
-  "boot": ["hdd0", "cdrom0"]
+  "machines": [
+    {
+      "name": "freedos",
+      "platform": "dos",
+      "memory": "32M",
+      "description": "FreeDOS 1.4 plain install from the LiveCD",
+      "drives": {
+        "hdd0": "blank-20m",
+        "cdrom0": null
+      },
+      "boot": ["hdd0", "cdrom0"]
+    }
+  ],
+  "media": [
+    {
+      "name": "blank-20m",
+      "materialize": "new",
+      "size": "20M"
+    }
+  ],
+  "archives": [
+    {
+      "name": "FD14-LiveCD",
+      "source": {
+        "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
+        "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339"
+      },
+      "members": [
+        {
+          "path": "FD14LIVE.iso",
+          "name": "freedos-1.4-livecd",
+          "read-only": true,
+          "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
+        }
+      ]
+    }
+  ]
 }

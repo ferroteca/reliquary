@@ -15,11 +15,9 @@ path = [
     "planning/design/*.schema.json",
     "planning/examples/**/*.json",
     "planning/examples/**/*.rlqb",
-    "planning/examples/**/*.rlqm",
     "reliquary_tests/fixtures/**",
     "reliquary/codex/**/*.json",
     "reliquary/codex/**/*.rlqb",
-    "reliquary/codex/**/*.rlqm",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Paul Galbraith"
