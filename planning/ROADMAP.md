@@ -2213,6 +2213,10 @@ Decide first:
   fixed-font, animation-free — asset churn should be far below
   openQA's — and NT-era setup is largely keyboard-drivable, so
   keyboard-first remains the preferred path where it works.
+  A future openQA/os-autoinst bridge belongs as an external-runner
+  adapter or export target — generate an openQA-style test
+  distribution and invoke isotovideo out of process — not as
+  Reliquary's native machine engine.
   Throughout, os-autoinst is a **concept reference only** — its
   designs are studied and reimplemented, never its code (see
   AGENTS.md prior art for the licensing boundary).

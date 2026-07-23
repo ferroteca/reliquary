@@ -194,6 +194,13 @@ materialization.
   exporter today and would be a distinct adapter if it ever
   became a backend; the two roles are independent (owner,
   2026-07-22).
+- **External harnesses are not core backends.** os-autoinst /
+  isotovideo, the engine under openQA, may be worth a future
+  external-runner adapter or export target: Reliquary could lower
+  a scenario into an openQA-style test distribution, run the GPL
+  tool as a separate process, and collect its records. That does
+  not make os-autoinst an implementation source for this seam, nor
+  part of the default backend list.
 
 ## Extraction map
 
