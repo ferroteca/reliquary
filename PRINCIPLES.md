@@ -8,13 +8,22 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** the itemized governing principles — P-numbered so
 > use cases, decisions, designs, and commits can cite them.
 > Principles feed into the use cases
-> ([planning/USE-CASES.md](USE-CASES.md)) and the decisions
-> ([planning/DECISIONS.md](DECISIONS.md)); use cases and
-> decisions name the principles they serve. Each entry indexes
+> ([planning/USE-CASES.md](planning/USE-CASES.md)) and the
+> decisions
+> ([planning/DECISIONS.md](planning/DECISIONS.md)); use cases
+> and decisions name the principles they serve — and principles
+> drive work directly: a roadmap item or task may be demanded
+> by a principle just as by a use case, citing its P-number.
+> Each entry indexes
 > the principle at its normative home — the pointer is where
-> the full prose lives — and a new principle lands here first.
-> Amendments are argued like interface changes and recorded in
-> DECISIONS.md.
+> the full prose lives. This list is a claim: every principle
+> here is real — the project honors it as the code stands
+> today (it lives at the root for that reason). A proposed or
+> not-yet-honored principle lives in
+> [planning/PRINCIPLE-PROPOSALS.md](planning/PRINCIPLE-PROPOSALS.md)
+> instead, with no placeholder here, under the same global
+> P-numbering; amendments are argued like interface changes
+> and recorded in DECISIONS.md.
 
 - **P1 — Machines are ephemeral.** A machine exists to run its
   task and is cheap to destroy and rebuild; the machine is
@@ -30,10 +39,6 @@ SPDX-License-Identifier: BSD-3-Clause
   CLI convenience; automation artifacts are source code in the
   consuming project's tree and never live in the home; the
   codex never feeds automation. (Prose below.)
-- **P5 — The feedback split.** One run, two renderings: pretty
-  and legible for a person, machine-readable and just as
-  timely for a program — neither scraped from the other.
-  (Prose below.)
 - **P6 — One semantic surface.** The CLI and the embedding API
   are twin presentations of one surface: every command is its
   API twin, nothing is CLI-only, and no capability is
@@ -111,23 +116,11 @@ from the source tree, with nothing copied into a home to make
 them usable. One cache artifact is disposable without being
 reconstructible: run records are evidence, not regenerable
 output. Their contents are delivered live to whoever drives the
-run (the feedback split below), and the record is retained for
+run (the feedback split, P5), and the record is retained for
 its machine's life; durability beyond the machine is the
 consumer's claim — copy the record out while the machine exists
 (U3, U4).
 
-Alongside these runs a feedback split (P5). Reliquary's runs
-are
-long, and whoever drives one gets timely progress — presented
-for the driver. A person at the CLI (U1, U5) gets pretty,
-legible, real-time progress; an automating program (U3, U4) gets
-machine-readable output that is just as timely. The two are
-renderings of the same run, and neither is derived by scraping
-the other: the pretty rendering is never what a program parses,
-and the machine rendering is never what a person is left to
-read.
-
-Candidates not yet itemized: ROADMAP's remaining design
-principles (one script, one target; installation media is
-input, disk images are output; dependencies pull their
-weight) — absorbed here as each proves cross-cutting.
+Proposed changes to this list — new principles, absorptions,
+retirements — are tracked in
+[planning/PRINCIPLE-PROPOSALS.md](planning/PRINCIPLE-PROPOSALS.md).

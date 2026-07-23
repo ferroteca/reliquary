@@ -13,8 +13,10 @@ are issues, and a small, obvious, needed fix goes directly to
 tasks. A task is either scheduled for the sprint or
 backlogged — the [backlog](#backlog) holds the small, obvious
 items that just haven't met the bar for scheduling. In theory
-every issue points to the use case it serves —
-small ones may simply be deemed obvious — and an issue can
+every issue points to the use case or principle it serves —
+small ones may simply be deemed obvious; principles
+([PRINCIPLES.md](../PRINCIPLES.md)) drive tasks just as use cases
+do — and an issue can
 easily trigger a use-case change, drafted as a proposal in
 [USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) through the
 interface-change rule (INTERFACES.md). Large work belongs in
@@ -29,11 +31,12 @@ were pruned 2026-07-23).
 
 ## Planning docs
 
-- sweep ROADMAP items for use-case citations: every item names
-  the U-number — in force or proposed — that demands it (the
-  traceability rule, ROADMAP preamble / USE-CASE-PROPOSALS.md,
-  owner 2026-07-23). Many sections already cite U-numbers; the
-  sweep fills the gaps.
+- sweep ROADMAP items for demand citations: every item names
+  the U-number — in force or proposed — or P-number that
+  demands it (the traceability rule, ROADMAP preamble /
+  USE-CASE-PROPOSALS.md / PRINCIPLES.md, owner 2026-07-23).
+  Many sections already cite U-numbers; the sweep fills the
+  gaps.
 - retrofit supports onto DECISIONS.md entries D1–D22: each
   names the use cases (U), principles (P), or goals (G) it
   supports (the numbering round, D23, owner 2026-07-23). New
@@ -167,6 +170,15 @@ dependency order:
 The task backlog — small, obvious, just hasn't met the bar for
 scheduling (the section formerly named Wishlist). Parked
 non-GitHub issues land here.
+
+- validate declared control-planes at materialization: the
+  parser accepts `vnc` / `serial-console` / `guest-agent` as
+  `control-planes` values, but nothing refuses them at create
+  or start — a blueprint declaring an unimplemented plane is
+  accepted silently, against P11 (capability gaps fail closed
+  naming themselves). Refuse anything but `agentless-display`
+  until the plane exists (found by the P1–P12 delivery pass,
+  2026-07-23).
 
 - `download-media` command (owner request, 2026-07-22; shape to
   re-derive under the revised model — milestone 7's `add-media`

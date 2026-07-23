@@ -24,8 +24,12 @@ force while proposals churn here.
 
 ## The use-case lifecycle
 
-A use case in force is never changed in nature. Three moves
-exist, and they are the only three:
+A use case in force is never changed in nature. A *proposed*
+one is different: until it enters force it may be reshaped
+freely here — its number stays, and work already scheduled
+against it (an accepted proposal) is re-checked in the same
+edit. For the standing list, three moves exist, and they are
+the only three:
 
 - **Clarify.** An in-place wording edit that sharpens what the
   use case already meant — clarify, never change. The test: no
@@ -76,9 +80,9 @@ the land-coherently rule (INTERFACES.md). The death is
 recorded in DECISIONS.md with its reason, so it is not
 re-proposed blindly. Nothing downstream may keep citing a
 use case that never entered force. The sweep is findable by
-construction: every roadmap item cites the use case that
-demands it (the traceability rule in ROADMAP's preamble), so
-the dead proposal's U-number is the search key.
+construction: every roadmap item cites the use case or
+principle that demands it (the traceability rule in ROADMAP's
+preamble), so the dead proposal's U-number is the search key.
 
 ## Open proposals
 

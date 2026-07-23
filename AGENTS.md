@@ -86,7 +86,7 @@ workflow:
   issues — the GitHub tracker, with the TASKS.md backlog the parking place for non-GitHub issues. A task is either
   scheduled for the sprint or backlogged, and a milestone item is picked up by translating it into a sprint
   tasklist; small one-offs are issues, and a small obvious needed fix goes directly to tasks. In theory every
-  issue points to a use case; small ones may be deemed obvious.
+  issue points to a use case or principle; small ones may be deemed obvious.
 - `planning/INTERFACES.md` is the governing document for Reliquary's world-facing interfaces: it names the interface
   inventory (CLI, embedding API, scripting language, and machine blueprints — media, source, and archive are
   components inside the blueprint — plus the
@@ -95,8 +95,11 @@ workflow:
   surface that rule weighs against — live in `planning/USE-CASES.md` (implemented-only: every use case there is
   met by the code today, no placeholders); everything else is tracked in `planning/USE-CASE-PROPOSALS.md`, numbering from the
   same global U-sequence and moving over when delivered (scheduling in the roadmap is acceptance; delivery
-  makes it current). Every roadmap item cites the use case — in force or proposed — that demands it. The governing
-  principles are itemized as P-numbers in `planning/PRINCIPLES.md`; decisions in `planning/DECISIONS.md` carry
+  makes it current). Every roadmap item cites the use case — in force or proposed — or the governing principle
+  that demands it: principles drive tasks and roadmap items just as use cases do. The governing
+  principles are itemized as P-numbers in root `PRINCIPLES.md` — standing-only, every entry honored by the code
+  today (proposed changes in
+  `planning/PRINCIPLE-PROPOSALS.md`, same lifecycle); decisions in `planning/DECISIONS.md` carry
   permanent D-numbers, generally support use cases or principles, and are the citation handle for design choices
   and code commits — overruled decisions sit in that file's Retired list.
 - `planning/examples/` contains a complete FreeDOS example: a composed `.rlqb` blueprint (the machine plus its media and

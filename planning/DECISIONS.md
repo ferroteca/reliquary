@@ -25,7 +25,7 @@ newest-first, so the top entry carries the highest number and
 a new entry prepends with the next free one. The D-number is
 the decision's citation handle everywhere: a decision
 generally supports use cases (U-numbers), governing principles
-([PRINCIPLES.md](PRINCIPLES.md), P-numbers), or language goals
+([PRINCIPLES.md](../PRINCIPLES.md), P-numbers), or language goals
 (G-numbers), and names what it supports; and it is citable
 downstream — design docs, specs, and code commits justify
 choices by citing D-numbers. New entries carry their supports;
@@ -134,7 +134,7 @@ nothing but remains the record.
   number and text intact, to the Retired list at the bottom of
   this file: D2 (overruled by D16) and D17 (superseded by D22)
   open it. The governing principles are itemized in the new
-  planning/PRINCIPLES.md (P1–P12, each indexed at its
+  PRINCIPLES.md (P1–P12, each indexed at its
   normative home), feeding use cases and decisions; the
   supports retrofit for D1–D22 is queued in TASKS.md.
   ACCEPTANCE IS SCHEDULING (owner, 2026-07-23, closing the
@@ -175,7 +175,50 @@ nothing but remains the record.
   ARCHITECTURE.md was the agent's choice (veto cheap), and
   citations across ROADMAP, INTERFACES, TASKS, media-spec,
   machine-blueprint, guest-communication, and codex re-point
-  to P-numbers.
+  to P-numbers. PRINCIPLES DRIVE WORK (owner, 2026-07-23,
+  closing the round): principles drive tasks and roadmap items
+  just as use cases do — the traceability rule accepts a
+  P-number as the demanding citation, and the ROADMAP citation
+  sweep covers both. AND PROPOSED PRINCIPLES (owner, same
+  message thread): principles get the same proposals
+  machinery — planning/PRINCIPLE-PROPOSALS.md (new), the same
+  global P-namespace, lifecycle, no-placeholder rule, and
+  sweep; the ROADMAP design-principle absorption candidates
+  move there as its first tracked entry. SAME EVOLUTION MODEL
+  (owner): clarify yes, retire yes, add yes, change no — for
+  STANDING principles and use cases; a proposed U or P may be
+  reshaped freely until it enters force (number kept; work
+  scheduled against an accepted one is re-checked in the same
+  edit). THE P1–P12 DELIVERY PASS (owner-prompted, 2026-07-23,
+  verified against the code, not the docs): P1–P4 and P6–P12
+  are real — evidence: create/destroy/recreate and the
+  machine-is-its-cache-dir model (P1); no guest-cooperation
+  dependency anywhere (P2); no guest agent built or shipped
+  (P3); assets.py's fail-closed no-default source and the two
+  modes (P4); the landed twin renames, omissions named never
+  drifted (P6); --json printing the twin's return (P7); this
+  round itself (P8); the deletions throughout (P9); explicit
+  platform gates and no guest probing — probe_image_format
+  reads host image formats, not guests (P10);
+  NotImplementedError discipline naming gaps — controller,
+  exec platform, import-vm (P11); home.py containment with its
+  tests (P12). P5 FAILED the bar: the feedback split is
+  run-scoped and the machine-readable run rendering does not
+  exist — no run-events stream, no --progress renderers (the
+  flag lives only in an error message) — moved to
+  PRINCIPLE-PROPOSALS.md as accepted (milestone 9, scheduled,
+  cites it). One P11 LEAK found and filed to the TASKS
+  backlog: declared control-planes are vocabulary-checked but
+  never refused at materialization — an unimplemented plane is
+  accepted silently. STANDING PRINCIPLES LIVE AT ROOT (owner):
+  PRINCIPLES.md moves from planning/ to the repository root —
+  it describes current reality, the placement rule's own
+  test; references re-pointed. P13 DRAFTED (owner, 2026-07-23,
+  naming it "property sources" — the house noun): the
+  custody-and-introspection kernel of the property source
+  model drafted into PRINCIPLE-PROPOSALS.md; the tier list
+  stays design in script-properties.md, and milestone 8's
+  citation, when made, is its acceptance.
   TERMINOLOGY (agent's proposal, veto cheap): the owner's
   candidate "obsolete" set aside for the two words already in
   house usage — RETIRED (removed, no successor; "the source

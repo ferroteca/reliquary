@@ -18,6 +18,8 @@ Documentation in the repository should primarily reflect **current reality** —
 ### Root directory
 Root-level documents (README.md, CONTRIBUTING.md, CHANGELOG.md, etc.) must describe the current state of the project. They may occasionally mention future plans in small, clearly-marked asides, but the focus is on what users can do today.
 
+- `PRINCIPLES.md` — the standing governing principles (P-numbers): every entry is honored by the code today, which is why it lives at the root; proposed changes live in `planning/PRINCIPLE-PROPOSALS.md`
+
 ### docs/ directory
 The `docs/` directory contains user-facing documentation for **implemented features**. Every document here must describe functionality that exists and works in the current codebase. Examples include CLI reference guides, platform-specific automation guides, and blueprint usage guides. Design documents, planned features, and unimplemented interfaces belong elsewhere.
 
@@ -25,7 +27,7 @@ The `docs/` directory contains user-facing documentation for **implemented featu
 The `planning/` directory contains maintainer-facing design and planning documents:
 - `planning/ROADMAP.md` — architectural context, open design questions, and implementation milestones
 - `planning/TASKS.md` — the work queue, flowing from the roadmap and from issues (the GitHub tracker; the backlog section parks non-GitHub issues). A task is either scheduled for the sprint or backlogged; milestone items translate to sprint tasklists; large work belongs in the roadmap, and an issue can trigger a use-case proposal through the interface-change rule
-- `planning/PRINCIPLES.md` — the itemized governing principles (P-numbers), feeding use cases and decisions; each entry points at its normative home
+- `planning/PRINCIPLE-PROPOSALS.md` — proposed changes to the standing principles in root PRINCIPLES.md (shared P-numbering; same lifecycle and sweep as the use-case proposals; principles drive tasks and roadmap items just as use cases do)
 - `planning/DECISIONS.md` — the adjudicated design-decision record: settled decisions, declined alternatives, and where each folded (the guard against re-litigating). Numbered D1…; each generally supports use cases or principles; D-numbers justify design choices and code commits; overruled or no-longer-relevant entries move to its Retired list
 - `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule
 - `planning/USE-CASES.md` — the implemented use cases that guide interface decisions (every entry is met by the code today; anything unimplemented lives in USE-CASE-PROPOSALS.md, with no placeholder here)

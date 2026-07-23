@@ -7,7 +7,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** Reliquary's guiding principles, and the governing
 > document. The itemized principles themselves are P-numbered
-> in [planning/PRINCIPLES.md](PRINCIPLES.md). It names the
+> in root [PRINCIPLES.md](../PRINCIPLES.md). It names the
 > world-facing interfaces, the use cases
 > they serve — the numbered list itself lives in
 > [planning/USE-CASES.md](USE-CASES.md) — and the rule every
@@ -157,7 +157,7 @@ interface decision is weighed against — live in
 principles that run through them — the ephemeral-machine
 principle, the control-plane arc, the artifact-residency
 split, the feedback split — are itemized with their normative
-prose in [planning/PRINCIPLES.md](PRINCIPLES.md). They are numbered so a decision, review, or spec section
+prose in root [PRINCIPLES.md](../PRINCIPLES.md). They are numbered so a decision, review, or spec section
 can cite the use case it serves — and so a proposed change can
 be rejected by naming the use case it costs. That list holds
 only what is in force; proposed changes to it are tracked in

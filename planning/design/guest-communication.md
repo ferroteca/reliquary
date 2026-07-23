@@ -8,7 +8,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** the control-plane design for guest communication:
 > the carrier / protocol / guest-integration vocabulary, the
 > control plane families, the consume-native-agents-only doctrine
-> (planning/PRINCIPLES.md P3, the control-plane arc), and the
+> (PRINCIPLES.md P3, the control-plane arc), and the
 > capability seam between control planes and platform workflows.
 > The `GuestExec` protocol, isolated agentless adapter, and its
 > use by the DOS workflow are implemented; later control planes
@@ -157,7 +157,7 @@ operations:
   where they earn their keep.
 
 Guests without a native agent are not a gap to fill: they stay
-agentless (planning/PRINCIPLES.md P3 — writing an agent would be a
+agentless (PRINCIPLES.md P3 — writing an agent would be a
 whole project unto itself, outside Reliquary's scope).
 
 ## Consuming native guest agents
@@ -166,7 +166,7 @@ Reliquary consumes the guest agents that already exist —
 [QGA](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html),
 VirtualBox Guest Additions, VMware Tools, Hyper-V integration
 services — and never builds or ships a guest-side agent of its
-own (planning/PRINCIPLES.md P3, the control-plane arc): agents may
+own (PRINCIPLES.md P3, the control-plane arc): agents may
 not exist for some operating systems, but writing one would be a
 whole project unto itself, outside Reliquary's scope. Guests
 without a native agent — DOS-era systems above all — are served

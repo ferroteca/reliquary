@@ -255,7 +255,7 @@ out of the
 reference, or explicitly with `seed-blueprint`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command.
 Seeding — implicit or explicit — is a home-mode (human-CLI) half
-of the artifact-residency split (planning/PRINCIPLES.md P4): it
+of the artifact-residency split (PRINCIPLES.md P4): it
 happens only when no `--assets` root is named. Automation runs
 project-scoped under `--assets <dir>`, where the dir is the sole
 source and the codex is never a resolution tier — a project seeds

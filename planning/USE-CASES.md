@@ -36,7 +36,9 @@ any unimplemented demand — however settled — lives in the
 proposals doc instead, and moves here only when its delivery
 lands.
 
-A use case in force is never changed in nature. It may be
+A use case in force is never changed in nature (a proposed
+one may still be reshaped freely in the proposals doc). It
+may be
 **clarified** — an in-place wording edit no past citation would
 read differently under; clarify, never change, and an
 undelivered clarification may park in the proposals doc — or

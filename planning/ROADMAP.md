@@ -28,9 +28,12 @@ rebuild.
 the world drives Reliquary and the vetting rule every
 interface-changing decision must follow; the use cases
 they serve live in [planning/USE-CASES.md](USE-CASES.md). Every
-roadmap item cites the use case that demands it — its U-number,
+roadmap item cites what demands it — a use case (its U-number,
 whether in force there or still proposed in
-[planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) — so when
+[planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md)) or a
+governing principle
+([PRINCIPLES.md](../PRINCIPLES.md), its P-number), which
+drives work just as well — so when
 a proposal dies, the sweep (the removal rule there) finds every
 item that falls out with it. The flow runs one way: the roadmap
 flows from the use cases, and the task list
@@ -128,7 +131,7 @@ Design rules:
   native guest agents — QGA, Guest Additions, VMware Tools,
   Hyper-V integration services — through their backend adapters
   and never builds or ships a guest-side agent of its own
-  (planning/PRINCIPLES.md P3, the control-plane arc). A guest without
+  (PRINCIPLES.md P3, the control-plane arc). A guest without
   a native agent stays agentless permanently.
 
 The adapter seam's design doctrine is consolidated in
@@ -337,7 +340,7 @@ rlq run-script install --blueprint freedos-1.4-plain
 Where Reliquary looks for authored assets — blueprints, media
 definitions, scripts, and landmark declarations — is an
 invocation-level setting: the mechanism behind the
-artifact-residency split (planning/PRINCIPLES.md P4). Assets are
+artifact-residency split (PRINCIPLES.md P4). Assets are
 identified by **extension**, not location: `.rlqb` a machine
 blueprint, `.rlqm` a media definition, `.rlqs` a script, `.rlql`
 a landmark declaration (its `<name>.<n>.png` variant renderings
@@ -1171,7 +1174,7 @@ sits in "Horizon" below; work items in planning/TASKS.md.
 
 A script run can be started without blocking and observed while
 it goes — the consumer story for the feedback split
-(planning/PRINCIPLES.md P5):
+(PRINCIPLES.md P5):
 a person leaves an hour-long install and checks back (U1), an
 automating program follows machine-readable events as they
 happen (U3). Settled design (owner, 2026-07-21):
@@ -2086,7 +2089,7 @@ with its resolved location recorded in the state.
 
 The implementation of "Asynchronous runs" above — the run-events
 stream and everything that renders it — completing the feedback
-split (planning/PRINCIPLES.md P5) for the DOS-on-QEMU vertical.
+split (PRINCIPLES.md P5) for the DOS-on-QEMU vertical.
 
 Deliverables:
 
@@ -2191,7 +2194,7 @@ backends from the same blueprint (minus a pinned backend field).
 Native guest agents as control planes, per
 [planning/design/guest-communication.md](design/guest-communication.md):
 Reliquary consumes the agents guests already have
-— QGA first — and never builds its own (planning/PRINCIPLES.md
+— QGA first — and never builds its own (PRINCIPLES.md
 P3, the control-plane arc). This milestone must not weaken the
 permanent agentless DOS path; guests without a native agent
 (DOS-era systems included) remain agentless, and where a guest
@@ -2375,7 +2378,7 @@ VNC and on Hyper-V through its decided screen strategy.
 ## Design principles
 
 The project-wide governing principles are itemized as
-P-numbers in [planning/PRINCIPLES.md](PRINCIPLES.md); the
+P-numbers in root [PRINCIPLES.md](../PRINCIPLES.md); the
 list below carries the roadmap-scoped ones and remains
 normative prose for what it states.
 
@@ -2437,7 +2440,7 @@ arguments.
 The bootstrap direction is important: agentless operation is how
 a machine reaches the point where a guest agent exists inside it
 — the OS, and with it the OS's own agent package, is installed
-through the agentless workflow (planning/PRINCIPLES.md P3, the
+through the agentless workflow (PRINCIPLES.md P3, the
 control-plane arc). Where a guest holds both planes, the same
 suites should validate agentless and guest-agent control planes
 with equivalent results.
