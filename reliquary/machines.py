@@ -192,14 +192,8 @@ def _allocate_machine_id(blueprint_name, context=None):
         number += 1
 
 
-def _materialize_drive(key, drive, drives_root, source, context):
-    """Materialize one enabled drive, returning its resolved state entry.
-
-    The entry carries the drive's logical shape plus the cache
-    ``path`` reliquary realized (an image file, a host directory, or
-    ``None`` for an empty removable slot). ``source`` is the blueprint
-    file path a relative ``hostdir`` resolves against.
-    """
+def _drive_common(key, drive):
+    """The medium/slot/controller fields common to every drive entry."""
     entry = {"medium": drive.medium, "slot": drive.slot}
     if drive.medium != "floppy":
         controller = drive.controller or "ide"
@@ -209,6 +203,18 @@ def _materialize_drive(key, drive, drives_root, source, context):
                 "only ide is wired on QEMU so far (the adapter seam "
                 "owns richer controller topology)")
         entry["controller"] = controller
+    return entry
+
+
+def _materialize_drive(key, drive, drives_root, source, context):
+    """Materialize one enabled drive, returning its resolved state entry.
+
+    The entry carries the drive's logical shape plus the cache
+    ``path`` reliquary realized (an image file, a host directory, or
+    ``None`` for an empty removable slot). ``source`` is the blueprint
+    file path a relative ``hostdir`` resolves against.
+    """
+    entry = _drive_common(key, drive)
     if drive.size is not None:
         path = os.path.join(drives_root, f"{key}.qcow2")
         create_hdd_image(path, drive.size)
@@ -389,6 +395,120 @@ def get_machine_dir(*, machine=None, blueprint=None, context=None):
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
     return os.path.abspath(machine_dir_path(machine_id, context))
+
+
+def _reconcile_drives(blueprint, old_drives, drives_root, source, context):
+    """Reconcile a machine's drives to a re-resolved blueprint.
+
+    Absorbable changes are applied: added, removed, enabled/disabled
+    drives, and every ``media`` / ``hostdir`` / empty-slot drive
+    (re-fetched, re-resolved, or emptied — this also reconciles away a
+    script's divergence). A drive whose image reliquary already
+    materialized (``size`` or ``base``) is kept only when its spec is
+    unchanged; any change to it fails closed, naming ``recreate`` as
+    the honest alternative. Returns the new drive-state mapping; a
+    removed materialized image is deleted.
+    """
+    new_drives = {}
+    enabled = {key: drive for key, drive in blueprint.drives.items()
+               if drive.enabled}
+    for key, drive in sorted(enabled.items()):
+        old = old_drives.get(key)
+        owns_image = old is not None and ("size" in old or "base" in old)
+        if not owns_image:
+            # No reliquary-owned image at this key: materialize or
+            # re-point freely (media re-fetch, hostdir re-resolve,
+            # empty slot, or a brand-new image).
+            new_drives[key] = _materialize_drive(
+                key, drive, drives_root, source, context)
+            continue
+        # An existing materialized image may only be kept unchanged.
+        if drive.size is not None and old.get("size") == drive.size:
+            entry = _drive_common(key, drive)
+            entry.update(size=drive.size, path=old.get("path"))
+            new_drives[key] = entry
+        elif (drive.base is not None
+              and old.get("base") == {"media": drive.base.item.name,
+                                      "type": drive.base_type}):
+            entry = _drive_common(key, drive)
+            entry.update(
+                base={"media": drive.base.item.name,
+                      "type": drive.base_type},
+                path=old.get("path"))
+            new_drives[key] = entry
+        else:
+            raise RuntimeError(
+                f"drive {key} changes an already-materialized image "
+                "(size/base); apply cannot regenerate drives — "
+                "recreate the machine instead")
+    # Delete materialized images for drives the blueprint dropped.
+    for key, old in old_drives.items():
+        if key in new_drives:
+            continue
+        path = old.get("path")
+        if path and ("size" in old or "base" in old):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    return new_drives
+
+
+def apply_blueprint(*, machine=None, blueprint=None, context=None):
+    """Adopt the current blueprint into a stopped machine.
+
+    Re-resolves the blueprint the machine was created from (never at
+    ``start``) and reconciles the machine to it: memory, cpus, boot,
+    control-planes, backend-settings, metadata, and the absorbable
+    drive changes are applied; a changed ``size`` or ``base`` on an
+    already-materialized image fails closed (``recreate`` is the
+    alternative). The new resolved snapshot becomes the baseline
+    (``blueprint-digest`` / ``blueprint-source`` re-recorded). Returns
+    the machine id.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    from .library import locate_blueprint
+    with _machine_lock(machine_id, context):
+        state = _reconcile_phase(machine_id, context)
+        phase = state.get("phase")
+        if phase != "ready":
+            raise RuntimeError(
+                f"machine {machine_id} must be stopped to apply "
+                f"(phase: {phase})")
+        blueprint_name = state["blueprint"]
+        path = locate_blueprint(blueprint_name, context=context)
+        parsed = load_blueprint(path, context=context)
+
+        drives_root = _machine_drives_dir(machine_id, context)
+        new_drives = _reconcile_drives(
+            parsed, state.get("drives", {}), drives_root, path, context)
+
+        memory = parsed.memory
+        if memory is None:
+            memory = _PLATFORM_MEMORY.get(parsed.platform, 16)
+        resolved = {
+            "platform": parsed.platform,
+            "backend": parsed.backend or "qemu",
+            "memory": memory,
+            "cpus": parsed.cpus if parsed.cpus is not None else 1,
+            "boot": list(parsed.boot),
+            "name": parsed.name,
+            "description": parsed.description,
+            "scripts": dict(parsed.scripts),
+            "control-planes": (list(parsed.control_planes)
+                               or _default_control_planes(parsed.platform)),
+            "backend-settings": {
+                name: dict(section)
+                for name, section in parsed.backend_settings.items()},
+        }
+        state.update(resolved)
+        state["drives"] = new_drives
+        state["blueprint-digest"] = _blueprint_digest(resolved, new_drives)
+        state["blueprint-source"] = os.path.abspath(path)
+        state["generation"] = state.get("generation", 0) + 1
+        _write_state(machine_id, state, context)
+    return machine_id
 
 
 def _write_state(machine_id, state, context=None):

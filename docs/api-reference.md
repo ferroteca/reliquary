@@ -73,6 +73,11 @@ which lives under the (independently resolvable) cache root.
   Destroy the selected machine and recreate it under the same id,
   re-resolving the current blueprint. Returns the reused id. CLI
   twin: `recreate-machine`.
+- `apply_blueprint(*, machine=None, blueprint=None, context=None)` -
+  Adopt the current blueprint into a stopped machine: absorbable
+  changes are applied and the baseline digest re-recorded; a changed
+  `size`/`base` on an existing image fails closed. Returns the id.
+  CLI twin: `apply-blueprint`.
 - `get_machine_dir(*, machine=None, blueprint=None, context=None)` -
   The selected machine's cache directory as an absolute path (any
   phase). CLI twin: `get-machine-dir`.

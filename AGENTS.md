@@ -25,7 +25,9 @@ workflow:
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
   matches codex + home blueprints and reports provenance `yes`/`seeded`/`user`), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` /
-  `recreate_machine` (destroy+create under the same id) / `get_machine_dir` (the out-of-band door) /
+  `recreate_machine` (destroy+create under the same id) / `apply_blueprint` (adopt blueprint edits into a
+  stopped machine, reconciling absorbable diffs and failing closed on a changed size/base of an existing
+  image) / `get_machine_dir` (the out-of-band door) /
   `list_machines` /
   `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes

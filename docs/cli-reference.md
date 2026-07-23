@@ -57,6 +57,15 @@ Destroy a machine and recreate it under the same id — exactly
 `destroy-machine` + `create-machine`. The current blueprint is
 re-resolved, so drives regenerate as declared.
 
+### `rlq apply-blueprint (--blueprint NAME | --machine ID)`
+
+Adopt the current blueprint into a **stopped** machine, and return
+a script-diverged machine to its blueprint shape. Absorbable
+changes — memory, cpus, boot order, control planes, metadata, and
+added/removed/`media`/`hostdir`/empty drives — are applied and the
+baseline digest re-recorded; a changed `size` or `base` on an
+already-materialized image fails closed (use `recreate-machine`).
+
 ### `rlq get-machine-dir (--blueprint NAME | --machine ID)`
 
 Print the machine's cache directory as an absolute path — the door

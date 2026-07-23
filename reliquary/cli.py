@@ -25,9 +25,9 @@ from .library import (list_builtin_blueprints, list_builtin_media,
                       search_blueprints, seed_blueprint, seed_media,
                       seed_script)
 from . import blueprint as blueprint_mod
-from .machines import (create_machine, destroy_machine, eject_media,
-                       get_machine_dir, insert_media, list_machines,
-                       load_machine_state, machine_dir_path,
+from .machines import (apply_blueprint, create_machine, destroy_machine,
+                       eject_media, get_machine_dir, insert_media,
+                       list_machines, load_machine_state, machine_dir_path,
                        recreate_machine, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
@@ -47,7 +47,8 @@ from .workflows import _cli_machine_config, start as start_legacy
 # are identical without a parent-parser SUPPRESS twin.
 _COMMANDS = frozenset({
     "create-machine", "start-machine", "stop-machine",
-    "destroy-machine", "recreate-machine", "get-machine-dir",
+    "destroy-machine", "recreate-machine", "apply-blueprint",
+    "get-machine-dir",
     "run-script", "check-script", "fetch-media",
     "seed-blueprint", "seed-media", "seed-script", "new-blueprint",
     "delete-blueprint", "search-blueprints",
@@ -252,6 +253,12 @@ def main(argv=None):
     command = subcommands.add_parser(
         "recreate-machine",
         help="destroy and recreate a machine under the same id")
+    _add_selectors(command)
+
+    # apply-blueprint
+    command = subcommands.add_parser(
+        "apply-blueprint",
+        help="adopt blueprint edits into a stopped machine")
     _add_selectors(command)
 
     # get-machine-dir
@@ -500,6 +507,14 @@ def _recreate_machine(arguments):
 def _get_machine_dir(arguments):
     machine_id = _require_machine_selector(arguments)
     print(get_machine_dir(machine=machine_id))
+    return 0
+
+
+def _apply_blueprint(arguments):
+    machine_id = apply_blueprint(
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    print(f"applied blueprint to machine {machine_id}")
     return 0
 
 
@@ -932,6 +947,8 @@ def _dispatch(arguments):
         return 0
     if arguments.command == "recreate-machine":
         return _recreate_machine(arguments)
+    if arguments.command == "apply-blueprint":
+        return _apply_blueprint(arguments)
     if arguments.command == "get-machine-dir":
         return _get_machine_dir(arguments)
 

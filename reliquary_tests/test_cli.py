@@ -220,6 +220,20 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("recreated machine plain-0", stdout.getvalue())
 
+    def test_apply_blueprint(self):
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            cli.main(["--home", self.home, "create-machine",
+                      "--blueprint", "plain"])
+        stdout = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home, "apply-blueprint",
+                               "--machine", "plain-0"])
+        self.assertEqual(result, 0)
+        self.assertIn("applied blueprint to machine plain-0",
+                      stdout.getvalue())
+
     def test_list_machines_table(self):
         """list-machines prints blueprint, number, phase, and backend."""
         with mock.patch("reliquary.machines.create_hdd_image"), \

@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 from reliquary.blueprint import parse_blueprint
-from reliquary.machines import (insert_media, create,
+from reliquary.machines import (apply_blueprint, insert_media, create,
                                 create_machine, destroy_machine,
                                 eject_media, get_machine_dir,
                                 list_machines,
@@ -800,6 +800,86 @@ class MachineMaterializationTests(unittest.TestCase):
         ids = {m["id"] for m in list_machines(
             context=self.home, blueprint="g")}
         self.assertEqual(ids, {"g-1", "g-2"})
+
+    def _write_blueprint_obj(self, name, obj):
+        bp_dir = os.path.join(self.home, "blueprints")
+        os.makedirs(bp_dir, exist_ok=True)
+        with open(os.path.join(bp_dir, f"{name}.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(obj, handle)
+
+    def test_apply_absorbs_memory_and_boot(self):
+        self._write_blueprint_obj("ap", {
+            "platform": "dos", "memory": "16M",
+            "drives": {"hdd0": {"size": "20M"}, "cdrom0": None},
+            "boot": ["hdd0", "cdrom0"]})
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine("ap", context=self.home)
+        digest0 = load_machine_state(machine_id, self.home)["blueprint-digest"]
+        self._write_blueprint_obj("ap", {
+            "platform": "dos", "memory": "32M",
+            "drives": {"hdd0": {"size": "20M"}, "cdrom0": None},
+            "boot": ["cdrom0", "hdd0"]})
+        apply_blueprint(machine=machine_id, context=self.home)
+        state = load_machine_state(machine_id, self.home)
+        self.assertEqual(state["memory"], 32)
+        self.assertEqual(state["boot"], ["cdrom0", "hdd0"])
+        self.assertNotEqual(state["blueprint-digest"], digest0)
+
+    def test_apply_fails_closed_on_size_change(self):
+        self._write_blueprint_obj("sz", {
+            "platform": "dos", "drives": {"hdd0": {"size": "20M"}}})
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine("sz", context=self.home)
+        self._write_blueprint_obj("sz", {
+            "platform": "dos", "drives": {"hdd0": {"size": "50M"}}})
+        with self.assertRaises(RuntimeError) as caught:
+            apply_blueprint(machine=machine_id, context=self.home)
+        self.assertIn("recreate", str(caught.exception))
+
+    def test_apply_reconciles_diverged_media(self):
+        self._write_blueprint_obj("dv", {
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M"}, "cdrom0": None},
+            "boot": ["hdd0", "cdrom0"]})
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine("dv", context=self.home)
+        with mock.patch("reliquary.machines.fetch_media",
+                        return_value=self.iso_path):
+            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+                         context=self.home)
+        self.assertIsNotNone(load_machine_state(
+            machine_id, self.home)["drives"]["cdrom0"]["media"])
+        apply_blueprint(machine=machine_id, context=self.home)
+        self.assertIsNone(load_machine_state(
+            machine_id, self.home)["drives"]["cdrom0"]["media"])
+
+    def test_apply_adds_and_removes_drives(self):
+        self._write_blueprint_obj("ar", {
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M"}, "hdd1": {"size": "30M"}}})
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine("ar", context=self.home)
+        drives_root = os.path.join(
+            machine_dir_path(machine_id, self.home), "drives")
+        # hdd1's image exists on disk, so its removal deletes it.
+        open(os.path.join(drives_root, "hdd1.qcow2"), "w").close()
+        self._write_blueprint_obj("ar", {
+            "platform": "dos",
+            "drives": {"hdd0": {"size": "20M"}, "cdrom0": None}})
+        apply_blueprint(machine=machine_id, context=self.home)
+        state = load_machine_state(machine_id, self.home)
+        self.assertNotIn("hdd1", state["drives"])
+        self.assertIn("cdrom0", state["drives"])
+        self.assertFalse(
+            os.path.exists(os.path.join(drives_root, "hdd1.qcow2")))
+
+    def test_apply_requires_stopped_machine(self):
+        machine_id = self._create_ready()
+        self._force_phase(machine_id, "running")
+        with self.assertRaises(RuntimeError) as caught:
+            apply_blueprint(machine=machine_id, context=self.home)
+        self.assertIn("must be stopped", str(caught.exception))
 
     def test_create_machine_loads_blueprints_dir(self):
         """create_machine reads blueprints/<name>.json."""

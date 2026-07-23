@@ -75,6 +75,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   blueprint), and `get-machine-dir` / `get_machine_dir()` prints a
   machine's cache directory as an absolute path — the out-of-band
   file-exchange door, valid in any phase.
+- `apply-blueprint` / `apply_blueprint()` adopts the current
+  blueprint into a stopped machine (and returns a script-diverged
+  machine to its blueprint shape): memory, cpus, boot order, control
+  planes, metadata, and added/removed/`media`/`hostdir`/empty drive
+  changes are applied and the baseline digest re-recorded, while a
+  changed `size` or `base` on an already-materialized image fails
+  closed, naming `recreate-machine`.
 - Machine lifecycle is crash-safe: every mutating operation takes an
   exclusive per-machine lock and carries an operation generation, and
   the transitional phases `creating` / `stopping` / `destroying` are
