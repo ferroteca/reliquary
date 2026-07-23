@@ -220,6 +220,56 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("recreated machine plain-0", stdout.getvalue())
 
+    def _json_out(self, args):
+        stdout = io.StringIO()
+        with mock.patch("reliquary.machines.create_hdd_image"), \
+                contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home", self.home] + args + ["--json"])
+        return result, stdout.getvalue().strip()
+
+    def test_json_create_returns_id_scalar(self):
+        result, out = self._json_out(
+            ["create-machine", "--blueprint", "plain"])
+        self.assertEqual(result, 0)
+        self.assertEqual(json.loads(out), "plain-0")
+
+    def test_json_list_machines_is_array(self):
+        self._json_out(["create-machine", "--blueprint", "plain"])
+        result, out = self._json_out(["list-machines"])
+        self.assertEqual(result, 0)
+        data = json.loads(out)
+        self.assertIsInstance(data, list)
+        self.assertEqual(data[0]["id"], "plain-0")
+
+    def test_json_void_twin_is_empty_object(self):
+        self._json_out(["create-machine", "--blueprint", "plain"])
+        result, out = self._json_out(
+            ["destroy-machine", "--machine", "plain-0"])
+        self.assertEqual(result, 0)
+        self.assertEqual(json.loads(out), {})
+
+    def test_json_search_blueprints_is_array(self):
+        result, out = self._json_out(["search-blueprints", "freedos"])
+        self.assertEqual(result, 0)
+        rows = json.loads(out)
+        self.assertTrue(any(r["name"] == "freedos-1.4-plain" for r in rows))
+
+    def test_json_rejected_on_stream_command(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = cli.main(["--home", self.home, "fetch-media",
+                               "x", "--json"])
+        self.assertEqual(result, 1)
+        self.assertIn("jsonl", stderr.getvalue())
+
+    def test_json_flag_before_command(self):
+        # --json before the command word must reorder correctly.
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            rc = cli.main(["--home", self.home, "--json", "list-machines"])
+        self.assertEqual(rc, 0)
+        self.assertIsInstance(json.loads(stdout.getvalue()), list)
+
     def test_apply_blueprint(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):

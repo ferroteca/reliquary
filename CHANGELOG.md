@@ -64,6 +64,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `blueprint-source` (the resolved blueprint path), `blueprint-digest`
   (the resolved-snapshot baseline), and `backend-id`. Non-`ide`
   controllers fail closed pending the adapter seam.
+- The global `--json` flag prints a command's result as one JSON
+  document on stdout — exactly what its API twin returns, with a void
+  twin printing `{}` — while diagnostics stay on stderr and exit codes
+  are unchanged. The stream-bearing `run-script` and `fetch-media`
+  reject `--json`, naming `--progress jsonl` as their machine-readable
+  form.
 - `search-blueprints` / `search_blueprints()` searches codex and home
   blueprints, matching a term against name, description, and platform
   and reporting provenance (`yes` built-in, `seeded`, or `user`). The

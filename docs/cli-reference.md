@@ -25,9 +25,15 @@ appear before or after the command word.
 - `--platform <name>` - Guest platform adapter (default: `dos`)
 - `--qemu <path>` - Path to the QEMU binary
 - `--timeout <seconds>` - Default timeout for commands
+- `--json` - Print the command's result as one JSON document on
+  stdout: exactly what the command's API twin returns (a void twin
+  prints `{}`). Diagnostics stay on stderr and exit codes are
+  unchanged. Stream-bearing commands (`run-script`, `fetch-media`)
+  reject `--json` — their machine-readable form is `--progress jsonl`.
 - `--version` - Show version and exit
 
 `--display` is accepted on `start-machine` and `run-script`.
+Flags may appear before or after the command word.
 
 `--blueprint` and `--machine` are mutually exclusive.
 

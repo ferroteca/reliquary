@@ -4,6 +4,7 @@
 
 import argparse
 import importlib.metadata
+import json
 import os
 import sys
 
@@ -75,6 +76,8 @@ _FLAG_ARITY = {
     "--display": 0,
     "--builtin": 0,
     "--secret": 0,
+    "--json": 0,
+    "--only": 0,
     "--name": 1,
     "--exclude": 1,
 }
@@ -172,7 +175,32 @@ def _add_home(parser):
                         help="reliquary home directory")
     parser.add_argument("--cache", default=None,
                         help="cache directory (default: <home>/cache)")
+    parser.add_argument(
+        "--json", action="store_true",
+        help="print the command's result as one JSON document")
     return parser
+
+
+def _emit(arguments, value, render):
+    """Render a command result as JSON or human text.
+
+    Under ``--json`` the twin's return ``value`` is printed as one
+    JSON document on stdout (a void twin passes ``{}``); otherwise
+    ``render()`` prints the human form. Returns exit code 0.
+    """
+    if getattr(arguments, "json", False):
+        print(json.dumps(value, default=str))
+    else:
+        render()
+    return 0
+
+
+def _reject_stream_json(arguments, command):
+    """Stream-bearing commands reject ``--json`` (they are event streams)."""
+    if getattr(arguments, "json", False):
+        raise ValueError(
+            f"{command} is a stream, not a document; use "
+            "--progress jsonl for machine-readable output")
 
 
 def _add_selectors(parser):
@@ -492,33 +520,34 @@ def _create(arguments):
             "create-machine allocates the machine number; "
             "do not pass --machine")
     machine_id = create_machine(arguments.blueprint)
-    print(f"created machine {machine_id}")
-    return 0
+    return _emit(arguments, machine_id,
+                 lambda: print(f"created machine {machine_id}"))
 
 
 def _recreate_machine(arguments):
     machine_id = recreate_machine(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
-    print(f"recreated machine {machine_id}")
-    return 0
+    return _emit(arguments, machine_id,
+                 lambda: print(f"recreated machine {machine_id}"))
 
 
 def _get_machine_dir(arguments):
     machine_id = _require_machine_selector(arguments)
-    print(get_machine_dir(machine=machine_id))
-    return 0
+    path = get_machine_dir(machine=machine_id)
+    return _emit(arguments, path, lambda: print(path))
 
 
 def _apply_blueprint(arguments):
     machine_id = apply_blueprint(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
-    print(f"applied blueprint to machine {machine_id}")
-    return 0
+    return _emit(arguments, machine_id,
+                 lambda: print(f"applied blueprint to machine {machine_id}"))
 
 
 def _script(arguments):
+    _reject_stream_json(arguments, "run-script")
     blueprint_name = getattr(arguments, "blueprint", None)
     machine_selector = getattr(arguments, "machine", None)
     if not blueprint_name and not machine_selector:
@@ -550,19 +579,21 @@ def _check_script(arguments):
         blueprint=getattr(arguments, "blueprint", None),
         machine=getattr(arguments, "machine", None),
     )
-    print(result.report, end="")
-    return 0
+    return _emit(arguments, {"report": result.report},
+                 lambda: print(result.report, end=""))
 
 
 def _list_blueprints(arguments):
     if getattr(arguments, "builtin", False):
-        names = list_builtin_blueprints()
-        if not names:
-            print("(no built-in blueprints)")
-            return 0
-        for name in names:
-            print(name)
-        return 0
+        names = list(list_builtin_blueprints())
+
+        def render_builtin():
+            if not names:
+                print("(no built-in blueprints)")
+                return
+            for name in names:
+                print(name)
+        return _emit(arguments, names, render_builtin)
     home_path = effective_home(None)
     # The cache root resolves independently (RELIQUARY_CACHE_DIR /
     # --cache / set_cache()) and need not sit under the home at all,
@@ -580,9 +611,6 @@ def _list_blueprints(arguments):
             elif entry.endswith(".json") and _looks_like_blueprint(
                     os.path.join(root, entry)):
                 found.append(os.path.join(root, entry))
-    if not found:
-        print("(no blueprints)")
-        return 0
     rows = []
     for path in sorted(found):
         stem = os.path.basename(path)
@@ -590,12 +618,17 @@ def _list_blueprints(arguments):
             if stem.endswith(extension):
                 stem = stem[:-len(extension)]
                 break
-        rows.append((stem, path))
-    name_width = max([4] + [len(name) for name, _ in rows])
-    print(f"{'NAME':<{name_width}}  PATH")
-    for name, path in rows:
-        print(f"{name:<{name_width}}  {path}")
-    return 0
+        rows.append({"name": stem, "path": path})
+
+    def render():
+        if not rows:
+            print("(no blueprints)")
+            return
+        name_width = max([4] + [len(row["name"]) for row in rows])
+        print(f"{'NAME':<{name_width}}  PATH")
+        for row in rows:
+            print(f"{row['name']:<{name_width}}  {row['path']}")
+    return _emit(arguments, rows, render)
 
 
 def _looks_like_blueprint(path):
@@ -613,40 +646,45 @@ def _looks_like_blueprint(path):
     return isinstance(value, dict) and "platform" in value
 
 
+def _print_names(names, empty):
+    if not names:
+        print(empty)
+        return
+    for name in names:
+        print(name)
+
+
 def _list_media(arguments):
     if getattr(arguments, "builtin", False):
         names = list(list_builtin_media())
-        if not names:
-            print("(no built-in media)")
-            return 0
-        for name in names:
-            print(name)
-        return 0
+        return _emit(arguments, names,
+                     lambda: _print_names(names, "(no built-in media)"))
     names = list_media()
     library = media_dir()
-    if not names:
-        print(f"(no media in {library})")
-        return 0
-    for name in names:
-        print(name)
-    return 0
+    return _emit(arguments, names,
+                 lambda: _print_names(names, f"(no media in {library})"))
 
 
 def _delete_media(arguments):
     path = delete_media(arguments.name)
-    print(f"deleted media {arguments.name} ({path})")
-    return 0
+    return _emit(arguments, path,
+                 lambda: print(f"deleted media {arguments.name} ({path})"))
 
 
 def _list_machines(arguments):
     filter_blueprint = getattr(arguments, "blueprint", None)
     machines = list_machines(blueprint=filter_blueprint)
+    return _emit(arguments, machines,
+                 lambda: _render_machines(machines, filter_blueprint))
+
+
+def _render_machines(machines, filter_blueprint):
     if not machines:
         if filter_blueprint:
             print(f"(no machines for blueprint {filter_blueprint})")
         else:
             print("(no machines)")
-        return 0
+        return
     bp_width = max(
         [9] + [len(state.get("blueprint") or "-")
                 for state in machines],
@@ -666,7 +704,6 @@ def _list_machines(arguments):
         backend = state.get("backend") or "qemu"
         print(f"{blueprint:<{bp_width}}  {number:>{num_width}}  "
               f"{phase:<8}  {backend}")
-    return 0
 
 
 def _description(script):
@@ -678,6 +715,13 @@ def _description(script):
     return script.description.spelling
 
 
+def _script_description(script_path):
+    try:
+        return _description(load_script(script_path))
+    except (FileNotFoundError, ScriptParseError) as error:
+        return f"(error: {error})"
+
+
 def _list_scripts(arguments):
     blueprint_name = getattr(arguments, "blueprint", None)
     if blueprint_name:
@@ -686,141 +730,135 @@ def _list_scripts(arguments):
         if not os.path.exists(bp_path):
             seed_blueprint(blueprint_name)
         bp = blueprint_mod.load_blueprint(bp_path)
-        scripts = bp.scripts
-        if not scripts:
-            print(f"(blueprint {blueprint_name} declares no scripts)")
-            return 0
-        label_width = max(
-            [5] + [len(label) for label in scripts],
-            default=5)
-        print(f"{'LABEL':<{label_width}}  DESCRIPTION")
-        for label, stem in scripts.items():
-            script_path = os.path.join(scripts_dir(), f"{stem}.rlqs")
-            try:
-                script = load_script(script_path)
-            except (FileNotFoundError, ScriptParseError) as error:
-                description = f"(error: {error})"
-            else:
-                description = _description(script)
-            print(f"{label:<{label_width}}  {description}")
-        return 0
-    _print_scripts_in_dir(scripts_dir())
-    return 0
+        rows = [
+            {"label": label, "stem": stem,
+             "description": _script_description(
+                 os.path.join(scripts_dir(), f"{stem}.rlqs"))}
+            for label, stem in bp.scripts.items()]
 
+        def render_labels():
+            if not rows:
+                print(f"(blueprint {blueprint_name} declares no scripts)")
+                return
+            width = max([5] + [len(row["label"]) for row in rows])
+            print(f"{'LABEL':<{width}}  DESCRIPTION")
+            for row in rows:
+                print(f"{row['label']:<{width}}  {row['description']}")
+        return _emit(arguments, rows, render_labels)
 
-def _print_scripts_in_dir(scripts_path):
-    if not os.path.isdir(scripts_path):
-        print(f"(no scripts directory: {scripts_path})")
-        return 0
+    scripts_path = scripts_dir()
     stems = sorted(
         entry[:-5] for entry in os.listdir(scripts_path)
-        if entry.endswith(".rlqs")
-    )
-    if not stems:
-        print(f"(no scripts in {scripts_path})")
-        return 0
-    label_width = max(
-        [4] + [len(stem) for stem in stems],
-        default=4)
-    print(f"{'NAME':<{label_width}}  DESCRIPTION")
-    for stem in stems:
-        script_path = os.path.join(scripts_path, f"{stem}.rlqs")
-        try:
-            script = load_script(script_path)
-        except (FileNotFoundError, ScriptParseError) as error:
-            description = f"(error: {error})"
-        else:
-            description = _description(script)
-        print(f"{stem:<{label_width}}  {description}")
-    return 0
+        if entry.endswith(".rlqs")) if os.path.isdir(scripts_path) else []
+    rows = [{"name": stem,
+             "description": _script_description(
+                 os.path.join(scripts_path, f"{stem}.rlqs"))}
+            for stem in stems]
+
+    def render_dir():
+        if not os.path.isdir(scripts_path):
+            print(f"(no scripts directory: {scripts_path})")
+            return
+        if not rows:
+            print(f"(no scripts in {scripts_path})")
+            return
+        width = max([4] + [len(row["name"]) for row in rows])
+        print(f"{'NAME':<{width}}  DESCRIPTION")
+        for row in rows:
+            print(f"{row['name']:<{width}}  {row['description']}")
+    return _emit(arguments, rows, render_dir)
 
 
 def _fetch_media(arguments):
+    _reject_stream_json(arguments, "fetch-media")
     fetch_media(arguments.name)
     print(f"fetched {arguments.name}")
     return 0
 
 
+def _seed(arguments, seeder, kind):
+    seeded = seeder(arguments.name, only=getattr(arguments, "only", False))
+    message = (f"seeded {kind} {arguments.name}" if seeded
+               else f"{kind} {arguments.name} already exists or not found")
+    return _emit(arguments, seeded, lambda: print(message))
+
+
 def _seed_blueprint(arguments):
-    if seed_blueprint(arguments.name, only=getattr(arguments, "only", False)):
-        print(f"seeded blueprint {arguments.name}")
-    else:
-        print(f"blueprint {arguments.name} already exists or not found")
-    return 0
+    return _seed(arguments, seed_blueprint, "blueprint")
 
 
 def _seed_media(arguments):
-    if seed_media(arguments.name, only=getattr(arguments, "only", False)):
-        print(f"seeded media {arguments.name}")
-    else:
-        print(f"media {arguments.name} already exists or not found")
-    return 0
+    return _seed(arguments, seed_media, "media")
 
 
 def _seed_script(arguments):
-    if seed_script(arguments.name, only=getattr(arguments, "only", False)):
-        print(f"seeded script {arguments.name}")
-    else:
-        print(f"script {arguments.name} already exists or not found")
-    return 0
+    return _seed(arguments, seed_script, "script")
 
 
 def _search_blueprints(arguments):
     rows = search_blueprints(arguments.term)
-    if not rows:
-        print("(no matching blueprints)")
-        return 0
-    name_width = max([4] + [len(row["name"]) for row in rows])
-    prov_width = max([10] + [len(row["provenance"]) for row in rows])
-    print(f"{'NAME':<{name_width}}  {'PROVENANCE':<{prov_width}}  "
-          f"{'PLATFORM':<8}  DESCRIPTION")
-    for row in rows:
-        platform = row["platform"] or "-"
-        description = row["description"] or row["display_name"] or "-"
-        print(f"{row['name']:<{name_width}}  "
-              f"{row['provenance']:<{prov_width}}  "
-              f"{platform:<8}  {description}")
-    return 0
+
+    def render():
+        if not rows:
+            print("(no matching blueprints)")
+            return
+        name_width = max([4] + [len(row["name"]) for row in rows])
+        prov_width = max([10] + [len(row["provenance"]) for row in rows])
+        print(f"{'NAME':<{name_width}}  {'PROVENANCE':<{prov_width}}  "
+              f"{'PLATFORM':<8}  DESCRIPTION")
+        for row in rows:
+            platform = row["platform"] or "-"
+            description = row["description"] or row["display_name"] or "-"
+            print(f"{row['name']:<{name_width}}  "
+                  f"{row['provenance']:<{prov_width}}  "
+                  f"{platform:<8}  {description}")
+    return _emit(arguments, rows, render)
 
 
 def _new_blueprint(arguments):
     path = blueprint_mod.new_blueprint(
         arguments.name, platform=arguments.platform or "dos")
-    print(f"created blueprint {arguments.name} at {path}")
-    return 0
+    return _emit(arguments, path,
+                 lambda: print(f"created blueprint {arguments.name} "
+                               f"at {path}"))
 
 
 def _delete_blueprint(arguments):
     path = blueprint_mod.delete_blueprint(arguments.name)
-    print(f"deleted blueprint {arguments.name} ({path})")
-    return 0
+    return _emit(
+        arguments, path,
+        lambda: print(f"deleted blueprint {arguments.name} ({path})"))
 
 
 def _get_property(arguments):
     value = get_property(arguments.key)
-    if value is not None:
-        print(value)
-    return 0
+
+    def render():
+        if value is not None:
+            print(value)
+    return _emit(arguments, value, render)
 
 
 def _set_property(arguments):
     set_property(arguments.key, arguments.value, secret=arguments.secret)
-    return 0
+    return _emit(arguments, {}, lambda: None)
 
 
 def _unset_property(arguments):
     unset_property(arguments.key)
-    return 0
+    return _emit(arguments, {}, lambda: None)
 
 
 def _list_properties(arguments):
     properties = list_properties()
-    if not properties:
-        return 0
-    key_width = max(len(key) for key in properties)
-    for key, value in sorted(properties.items()):
-        print(f"{key:<{key_width}}  {value}")
-    return 0
+
+    def render():
+        if not properties:
+            return
+        key_width = max(len(key) for key in properties)
+        for key, value in sorted(properties.items()):
+            print(f"{key:<{key_width}}  {value}")
+    return _emit(arguments, properties, render)
 
 
 def _import_vm(arguments):
@@ -829,36 +867,37 @@ def _import_vm(arguments):
 
 def _clean_downloads(arguments):
     clean_downloads()
-    print("cleaned downloads cache")
-    return 0
+    return _emit(arguments, {}, lambda: print("cleaned downloads cache"))
 
 
 def _clean_media(arguments):
     clean_media()
-    print("cleaned media cache")
-    return 0
+    return _emit(arguments, {}, lambda: print("cleaned media cache"))
 
 
 def _insert_media(arguments):
     machine_id = _require_machine_selector(arguments)
     insert_media(machine_id, arguments.slot, arguments.media)
-    print(f"inserted {arguments.media} into {arguments.slot} "
-          f"on {machine_id}")
-    return 0
+    return _emit(
+        arguments, {},
+        lambda: print(f"inserted {arguments.media} into {arguments.slot} "
+                      f"on {machine_id}"))
 
 
 def _eject_media(arguments):
     machine_id = _require_machine_selector(arguments)
     eject_media(machine_id, arguments.slot)
-    print(f"ejected {arguments.slot} on {machine_id}")
-    return 0
+    return _emit(arguments, {},
+                 lambda: print(f"ejected {arguments.slot} on {machine_id}"))
 
 
 def _set_boot_order(arguments):
     machine_id = _require_machine_selector(arguments)
     set_boot_order(machine_id, arguments.keys)
-    print(f"boot order on {machine_id}: {' '.join(arguments.keys)}")
-    return 0
+    return _emit(
+        arguments, {},
+        lambda: print(f"boot order on {machine_id}: "
+                      f"{' '.join(arguments.keys)}"))
 
 
 def _dispatch(arguments):
@@ -922,9 +961,9 @@ def _dispatch(arguments):
     if arguments.command == "start-machine":
         if blueprint or machine:
             machine_id = _require_machine_selector(arguments)
-            start_machine(
+            started_port = start_machine(
                 machine_id, display=getattr(arguments, "display", False))
-            return 0
+            return _emit(arguments, started_port, lambda: None)
         # Legacy root-home start (MachineConfig / machine.json).
         config = _cli_machine_config(
             None, home,
@@ -937,14 +976,14 @@ def _dispatch(arguments):
         if blueprint or machine:
             machine_id = _require_machine_selector(arguments)
             stop_machine(machine_id)
-            return 0
+            return _emit(arguments, {}, lambda: None)
         stop_legacy(port)
         return 0
     if arguments.command == "destroy-machine":
         machine_id = _require_machine_selector(arguments)
         destroy_machine(machine_id)
-        print(f"destroyed machine {machine_id}")
-        return 0
+        return _emit(arguments, {},
+                     lambda: print(f"destroyed machine {machine_id}"))
     if arguments.command == "recreate-machine":
         return _recreate_machine(arguments)
     if arguments.command == "apply-blueprint":
@@ -955,30 +994,37 @@ def _dispatch(arguments):
     interaction_port = _interaction_port(arguments)
     if arguments.command == "type":
         send_text(arguments.text, enter=False, port=interaction_port)
-    elif arguments.command == "enter":
+        return _emit(arguments, {}, lambda: None)
+    if arguments.command == "enter":
         send_text(arguments.line, enter=True, port=interaction_port)
-    elif arguments.command == "press":
+        return _emit(arguments, {}, lambda: None)
+    if arguments.command == "press":
         combos = [_resolve_key(name) for name in arguments.names]
         send_keys(combos, interaction_port)
-    elif arguments.command == "exec":
+        return _emit(arguments, {}, lambda: None)
+    if arguments.command == "exec":
         if platform != "dos":
             raise NotImplementedError("exec requires platform='dos'")
         AgentlessGuestExec(Machine(interaction_port)).execute(
             arguments.dos_command, timeout or 120)
-    elif arguments.command == "select":
+        return _emit(arguments, {}, lambda: None)
+    if arguments.command == "select":
         selected = cursor_menu_select(
             arguments.item, timeout or 30,
             getattr(arguments, "exclude", []), interaction_port)
-        print(f"selected: {selected}")
-    elif arguments.command == "screen":
-        print("\n".join(screen_text(interaction_port)))
-    elif arguments.command == "wait":
-        wait_text(arguments.pattern, timeout or 60,
-                  interaction_port)
-        print("matched.")
-    elif arguments.command == "screenshot":
+        return _emit(arguments, selected,
+                     lambda: print(f"selected: {selected}"))
+    if arguments.command == "screen":
+        rows = screen_text(interaction_port)
+        return _emit(arguments, rows, lambda: print("\n".join(rows)))
+    if arguments.command == "wait":
+        wait_text(arguments.pattern, timeout or 60, interaction_port)
+        return _emit(arguments, {}, lambda: print("matched."))
+    if arguments.command == "screenshot":
         screenshot(arguments.name, interaction_port)
-    elif arguments.command == "hmp":
+        return _emit(arguments, {}, lambda: None)
+    if arguments.command == "hmp":
         with Machine(interaction_port).qmp() as qmp:
-            print(qmp.hmp(arguments.line))
+            output = qmp.hmp(arguments.line)
+        return _emit(arguments, output, lambda: print(output))
     return 0
