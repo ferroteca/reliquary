@@ -1940,9 +1940,11 @@ that a reference may supply any value that does not participate
 in identity or resolution structure — as trimmed by D26 (the
 reach trim and the string-grammar closure), which adds one clause
 to that rule, no reference may supply a closed-vocabulary value,
-and closes the `${…}` body itself: operations closed at the
-character class `[A-Za-z0-9._:/-]`, namespaces (new qualifiers)
-open. Everything else was already
+and closes the `${…}` body itself: operations closed at its two
+productions — the character class `[A-Za-z0-9._:/-]` screening
+and the productions deciding, D27 correcting D26's claim that
+the class alone was the test — while namespaces (new
+qualifiers) stay open. Everything else was already
 settled (optional root `type` defaulting to media; the plural
 sections retired, a lone spec object kept as sugar for the array
 of one; the source type and composition declined).
@@ -1991,9 +1993,13 @@ Deliverables:
    paths / object keys and — under D26's trim — in the closed
    vocabularies (`platform`, `backend`, `materialize`,
    `controller`, `control-planes` items), the `${…}` body itself
-   closed to the character class `[A-Za-z0-9._:/-]` so that a
-   body carrying any operator is a parse error naming the
-   malformed reference, qualified `${media:…}` whole-value with
+   closed to its two productions — the character class
+   `[A-Za-z0-9._:/-]` screening and the productions deciding
+   (D27), so that a body carrying any operator is a parse error
+   naming the malformed reference — this is where the spec half of
+   P14 (the expressive ceiling) is honored, and this deliverable
+   is that principle's acceptance, its script half being honored
+   already; qualified `${media:…}` whole-value with
    its optional `/<path>` second component (bare form =
    `{"parent": …}`, no path), unknown and reserved qualifiers
    failing closed, path suffixes normalized against `..` /

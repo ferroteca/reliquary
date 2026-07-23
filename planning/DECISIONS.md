@@ -35,6 +35,110 @@ text intact, to the Retired decisions section at the bottom,
 its note naming what overruled it — a retired decision binds
 nothing but remains the record.
 
+- D27 — THE INPUT MODEL, AND D26'S CLOSURE TEST CORRECTED —
+  DECIDED (owner, 2026-07-23, the same round continued).
+  Supports P8; AMENDS D26 (part D) and ADDS P15 to the standing
+  list. Three findings, one of them a defect in D26 as written.
+
+  A — THE CLOSURE TEST WAS MIS-STATED. D26 called the character
+  class `[A-Za-z0-9._:/-]` "the whole closure, and the only test
+  needed", on the claim that EVERY operator needs a character
+  outside it. THAT CLAIM IS FALSE, and the counter-example is the
+  likeliest request of all: `${mem:-512M}` is built entirely from
+  legal characters, because `:` is the qualifier separator and
+  `-` is a media-name character. It is still refused — the
+  qualifier is the text before the first colon, `mem` is not a
+  known qualifier, and unknown qualifiers fail closed (D24) — so
+  THE CLOSURE HOLDS AND ONLY ITS STATEMENT WAS WRONG.
+  THE CORRECTED FORMULATION: the closure is that THE BODY IS ONE
+  OF D24'S TWO PRODUCTIONS — qualified
+  `qualifier:media-name[/path]`, or a dotted property key — AND
+  NEITHER HAS A POSITION AN OPERATOR COULD OCCUPY. The character
+  class is a FIRST SCREEN, catching `|`, `(`, `[`, `?`, `=`, and
+  whitespace; the productions catch everything assembled from
+  already-legal characters. Both are needed, neither alone is the
+  test. Found by working the examples the principle asked for —
+  recorded because a closure whose stated test is wrong invites
+  exactly the feature it exists to refuse.
+
+  B — P15, THE CLOSED INPUT MODEL, JOINS THE STANDING LIST.
+  Everything reaches Reliquary through FOUR CHANNELS: three
+  AUTHORED — specs (`.rlqb`, `.rlql`) carry the data, scripts
+  (`.rlqs`) carry the logic, properties carry the values — and
+  one INVOCATION, the CLI/API twins, carrying the command. It
+  goes to the standing list rather than the proposals doc because
+  it is honored as the code stands: the sweep found only
+  `RELIQUARY_HOME` / `RELIQUARY_CACHE_DIR` / `RELIQUARY_QEMU_HOME`,
+  each an invocation knob twinned with a flag, and no
+  config-file reading of any kind. THE SET IS CLOSED AGAINST
+  ACCRETION, NOT AGAINST DECISION (owner — "I wouldn't rule out
+  an rc file at some point, but it needs justification"): a new
+  input is ASSIGNED to an existing channel, and a new channel is
+  ARGUED AND RECORDED under the interface-change rule before it
+  exists — NEVER ARRIVED AT BY NAIVELY IMPLEMENTING A SMALL
+  REQUEST ACROSS A STATED BOUNDARY (owner's framing, and the
+  operative form of the whole round). The scoping is what makes
+  it usable: not every small request is suspect, only one that
+  crosses a written line, which turns the check mechanical —
+  does this cross a stated ceiling or channel edge? If so it is
+  a DECISION, not an implementation. The implementation is not
+  unskilled; it is LOCALLY CORRECT, which is exactly why nothing
+  stops it, and naive only about the line it crosses. And it is
+  why the lines are written down at all: a boundary nobody
+  stated cannot be checked against. This is the kernel P14 shares: both principles
+  are ANTI-ACCRETION, NOT ANTI-GROWTH, because the precedents
+  they guard against never failed by decision. Nobody at Helm
+  decided to build a template engine; each feature landed
+  individually justified. The principles exist to manufacture the
+  moment where the big thing is visibly being decided.
+  WORKED, NOT DECIDED: an rc file is most likely NOT a fifth
+  channel but PERSISTENCE FOR THE FOURTH — invocation defaults,
+  a memory the CLI channel does not have — and the argument it
+  would have to win is already visible from the model: P4 (home
+  convenience is unobjectionable; a project-tree rc silently
+  changing `rlq` behavior breaks the runnable-in-place property
+  U4 depends on, so "home only, never discovered upward" is the
+  shape that survives), P6/P7 (a default that changes what a
+  command does makes the CLI harder to drive from a program —
+  mitigable by explicit flags always winning and the effective
+  configuration being visible, but argued, not assumed), and P12
+  (where it would live). Nothing here adopts one.
+
+  C — P14 RESTATED OVER THREE AUTHORED CHANNELS, NOT TWO. The
+  owner's challenge — the two-pillar language was hard to anchor,
+  and properties is a third — is upheld, and the evidence was
+  already normative: script-properties.md has "transforms in
+  derivation syntax are permanently out — normalization lives in
+  a fact's definition, arbitrary computation in the embedding
+  API's provider seam", which is P14 written for the property
+  pillar and never recognized as the same rule. THREE CHANNELS,
+  THREE CEILINGS, ONE ESCAPE. The invocation channel is governed
+  OPPOSITELY and stays with P6/P7: the authored channels are
+  CAPPED (no more than this), the invocation channel is FLOORED
+  (no less than this, and no cleverer) — which is why one
+  principle could never cover all four.
+  AND THE ESCAPE IS RESTATED: "computation's designated home is
+  the embedding API" was imprecise and manufactured a P6 tension,
+  since P6 forbids capability reachable from the API but not the
+  CLI. COMPUTATION IS NOT A RELIQUARY CAPABILITY AT ALL — it
+  lives OUTSIDE the pillars, in the caller's own language, and
+  the API and CLI are two doors to it. The CLI user's host
+  language is the shell, which P7 already guarantees is easy to
+  drive Reliquary from. WHAT THIS SHARPENS: the evaluation
+  layer's constituency is the HOME CLI USER (U1, U5) who has no
+  project and no language — not the automating user (U4), who
+  has both and for whom generation above is natural. The
+  residency split (P4) predicts it.
+
+  FOLDED: this entry; PRINCIPLES.md (P15 added, and the
+  four-channel chart into the cross-cutting prose);
+  PRINCIPLE-PROPOSALS.md (P14 restated over three channels, its
+  architecture preamble moved out to P15); machine-blueprint.md
+  ("Format stability" — the corrected closure test, and the
+  worked standing answer and adoption test); ROADMAP milestone 7
+  deliverable 1 (the corrected test). D26 keeps its text; this
+  entry is the amendment of record.
+
 - D26 — THE REACH TRIM AND THE STRING-GRAMMAR CLOSURE — DECIDED
   (owner, 2026-07-23, the format re-examination round). Supports
   U4, U5; P7, P10. AMENDS D18 (its HCL2 decline and its growth

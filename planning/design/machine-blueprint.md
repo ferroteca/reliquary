@@ -738,20 +738,101 @@ The tree rule has a twin governing the *strings*, because a
 format of this kind dies from the inside as readily as from the
 top (planning/DECISIONS.md, D26): **the `${…}` reference body is
 closed, and operations are closed while namespaces are open.**
-What may appear between the braces is the character class
-`[A-Za-z0-9._:/-]` and nothing else — every character in it
-load-bearing already, `:` separating the qualifier, `/` the
-containment path, `.` the property dot-path, `_` and `-` the
-media-name charter. No operator ever joins them: no defaults, no
-filters or pipes, no calls, no indexing, no arithmetic, no
-comparison, no nesting, no second escape. The test is
-mechanical rather than a matter of judgment, because every such
-feature needs a character outside the class — a proposal that
-does not fit the class is a layer switch, not a grammar
-extension. What stays open is new *qualifiers* (`env:`, `file:`,
+The body is one of exactly two productions — a qualified
+`qualifier:media-name[/path]`, or a dotted property key — and
+neither has a position an operator could occupy. No operator
+ever joins them: no defaults, no filters or pipes, no calls, no
+indexing, no arithmetic, no comparison, no nesting, no second
+escape.
+
+Two tests apply in order, and both are needed (D27). The
+character class `[A-Za-z0-9._:/-]` is the **first screen** —
+every character in it is load-bearing already (`:` separates the
+qualifier, `/` the containment path, `.` the property dot-path,
+`_` and `-` the media-name charter), so anything reaching for
+`|`, `(`, `[`, `?`, `=`, or whitespace is rejected on sight. The
+**productions decide** the rest, which matters because an
+operator can be assembled from legal characters: `${mem:-512M}`
+passes the class and is still refused, the text before the first
+colon being the qualifier and `mem` not being one. A proposal
+that fails either test is a layer switch, not a grammar
+extension.
+
+What stays open is new *qualifiers* (`env:`, `file:`,
 `machine:`, `script:`, `landmark:`, `secret:` are reserved): a
 qualifier names a namespace to look in, never an operation to
-perform, and costs no new character.
+perform, and adds no position an operator could take.
+
+### When a request arrives
+
+The standing answer is not "no." An author writes: *"CI needs
+2G, my laptop 512M — let `memory` take `${mem:-512M}` so an
+unset property still boots."* The answer is **that already
+works, one channel over.** A default is not missing from
+Reliquary; it lives in the property channel, which is built to
+have exactly this argument — the project's properties file gives
+CI its 2G, the user file gives the laptop its 512M, and the
+blueprint says `${mem}` and needs no fallback at all. Where a
+value must survive an unset property, that is a question about
+property sources and their precedence
+([script-properties.md](script-properties.md), the repeatable
+`default=` candidates), answered where defaults already live.
+
+This is the shape of nearly every such request. The feature is
+not absent from the project; it is present in another channel
+and has been addressed to the grammar because the grammar is the
+surface the author had open. The first move is always to find
+where it already lives.
+
+The danger of simply agreeing is not the default itself but what
+the default makes sayable next. `${mem:-512M}` requires deciding
+what an unset property *is* (absent? empty? null?), which is a
+specification. Then comes `${mem:-${fallback}}`, because a
+literal default is obviously less useful than a computed one.
+Then a conditional, because two defaults need choosing between.
+None of those is a stretch; each follows from the one before.
+Meanwhile the published schema can no longer say what a valid
+`memory` is, and the editor stops completing the field — which
+is what the plain format was chosen to buy (U4, U5).
+
+### When it is time for a layer
+
+Not a threshold — a conjunction. Volume is not a signal: a
+hundred requests for defaults and conditionals mean the property
+channel is under-documented, not that the ceiling is wrong. The
+signal is all four of these holding at once.
+
+1. **The need is structural, not value-shaped.** It asks *how
+   many specs exist*, or *which*, rather than what goes in a
+   field. Value-shaped needs always have an answer; structural
+   ones may not. Twelve near-identical blueprints differing only
+   in a localized ISO's URL and hash is structural.
+2. **It recurs across independent authors.** Not one project's
+   convenience — a shape two or more unrelated consumers hit, or
+   one the codex itself wants.
+3. **The declarative escape was tried and failed.** The ceiling
+   has its own growth route: a bounded construct that enriches
+   values, expanded by Reliquary. A variant matrix must be
+   designed against the real case first, and must either fail to
+   express it or turn into a language when specified. Skipping
+   this gate is how a layer gets adopted for a problem a
+   twenty-line construct would have solved.
+4. **Generation above fails for the user who has no project and
+   no language.** The embedding API can emit twelve blueprints
+   today, and P4 puts the generator and its output in the
+   consuming project's tree — so for the automating author (U4)
+   this gate is rarely passed. It is the *home* CLI user (U1,
+   U5), with no repository and no host language beyond the
+   shell, for whom both routes are genuinely poor. That user is
+   the layer's constituency, and the residency split predicts
+   it.
+
+With all four holding, the answer is an evaluation step: a
+`freedos.rlqb.jsonnet` producing an ordinary `freedos.rlqb`, as
+its own file kind. Argued and recorded under the
+interface-change rule when it happens — never pre-committed
+here, and never as a mode flag that makes the existing parser
+evaluate.
 
 When the layer switch does come, it arrives as a **separate file
 kind or an explicit step** — never as a widening of what `.rlqb`
