@@ -24,7 +24,13 @@ workflow:
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` / `list_machines` /
   `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
-  lowest-free reuse and a per-blueprint allocation lock) and persistent machine-state mutations
+  lowest-free reuse; a per-blueprint allocation lock serializes
+  numbering and an exclusive per-machine operation lock
+  (`.locks/<id>.op.lock`) serializes every mutating op; each carries an
+  operation generation and writes the transitional phases
+  `creating` / `stopping` / `destroying`, so an interrupted operation is
+  reconciled at the next op — `stopping` completes, `creating` /
+  `destroying` roll forward to removal) and persistent machine-state mutations
   (`insert_media` / `eject_media` / `set_boot_order` /
   `mark_stopped` — insert/eject are floppy and cdrom only;
   boot-order keys may name any declared drive; all three require

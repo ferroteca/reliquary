@@ -675,6 +675,89 @@ class MachineMaterializationTests(unittest.TestCase):
             destroy_machine(machine_id, context=self.home)
         self.assertIn("stop it before destroying", str(caught.exception))
 
+    def _force_phase(self, machine_id, phase, **extra):
+        """Write a phase directly, simulating an interrupted operation."""
+        path = os.path.join(machine_dir_path(machine_id, self.home),
+                            "reliquary-machine.json")
+        state = load_machine_state(machine_id, self.home)
+        state["phase"] = phase
+        state.update(extra)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+
+    def _start(self, machine_id):
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu"), \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=4444):
+            return start_machine(machine_id, context=self.home)
+
+    def test_generation_advances_across_operations(self):
+        machine_id = self._create_ready()
+        gen0 = load_machine_state(machine_id, self.home)["generation"]
+        self.assertEqual(gen0, 0)
+        self._start(machine_id)
+        gen1 = load_machine_state(machine_id, self.home)["generation"]
+        self.assertGreater(gen1, gen0)
+        with mock.patch("reliquary.machines.stop_owned_qemu"):
+            stop_machine(machine_id, context=self.home)
+        gen2 = load_machine_state(machine_id, self.home)["generation"]
+        self.assertGreater(gen2, gen1)
+
+    def test_operation_takes_a_per_machine_lock(self):
+        machine_id = self._create_ready()
+        self._start(machine_id)
+        lock = os.path.join(self.home, "cache", "machines", ".locks",
+                            f"{machine_id}.op.lock")
+        self.assertTrue(os.path.exists(lock))
+
+    def test_interrupted_stop_is_completed_on_next_operation(self):
+        """A machine stranded in `stopping` completes its stop when the
+        next operation reconciles it."""
+        machine_id = self._create_ready()
+        self._force_phase(machine_id, "stopping")
+        with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
+            stop_machine(machine_id, context=self.home)
+        stop_qemu.assert_called_once()
+        self.assertEqual(
+            load_machine_state(machine_id, self.home)["phase"], "ready")
+
+    def test_interrupted_create_is_rolled_back(self):
+        """An operation on a machine stranded in `creating` rolls it
+        back (removes it) and fails closed with recovery guidance."""
+        machine_id = self._create_ready()
+        self._force_phase(machine_id, "creating")
+        with self.assertRaises(RuntimeError) as caught:
+            self._start(machine_id)
+        self.assertIn("rolled back", str(caught.exception))
+        self.assertFalse(
+            os.path.exists(machine_dir_path(machine_id, self.home)))
+
+    def test_interrupted_destroy_completes_on_other_operation(self):
+        machine_id = self._create_ready()
+        self._force_phase(machine_id, "destroying")
+        with self.assertRaises(RuntimeError) as caught:
+            self._start(machine_id)
+        self.assertIn("removed", str(caught.exception))
+        self.assertFalse(
+            os.path.exists(machine_dir_path(machine_id, self.home)))
+
+    def test_failed_materialization_rolls_back_create(self):
+        """A create that fails mid-materialization leaves nothing
+        behind — no half-made machine, no leaked id."""
+        blueprint = self._blueprint({
+            "platform": "dos",
+            "drives": {"hdd": {"size": "20M"}},
+        })
+        with mock.patch("reliquary.machines.create_hdd_image",
+                        side_effect=RuntimeError("disk full")):
+            with self.assertRaises(RuntimeError):
+                create(blueprint, context=self.home, blueprint_name="doomed")
+        self.assertEqual(
+            list_machines(context=self.home, blueprint="doomed"), [])
+        self.assertFalse(
+            os.path.exists(machine_dir_path("doomed-0", self.home)))
+
     def test_create_machine_loads_blueprints_dir(self):
         """create_machine reads blueprints/<name>.json."""
         blueprints = os.path.join(self.home, "blueprints")

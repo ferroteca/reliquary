@@ -356,6 +356,20 @@ T5; T6 and T7 run beside it.
    allocation lock), and startup detection of interrupted
    transitional phases with safe rollback or explicit recovery
    instructions.
+   LANDED (2026-07-22): `machines.py` gained `_machine_lock`
+   (`.locks/<id>.op.lock`), held by every mutating op
+   (create materialization, start, stop, destroy, insert/eject/
+   set-boot, mark_stopped); a `generation` counter in the state
+   bumped once per operation; and the transitional phases —
+   `create` writes `creating`→`ready` (rolling back a failed
+   materialization), `stop` writes `running`→`stopping`→`ready`,
+   `destroy` writes `ready`→`destroying`. `_reconcile_phase` runs
+   under the lock at each op's start: `stopping` completes the
+   interrupted stop (identity-mismatch still fails closed, keeping
+   `running`), `creating`/`destroying` roll forward to removal and
+   fail closed naming the recovery. `destroy` accepts a
+   rolled-back `creating` machine. Atomic JSON replacement was
+   already in place.
 4. Lifecycle CLI completion + reconciliation + the global
    `--json` flag (deliverable 4, `get-machine-dir` from
    deliverable 5): `apply-blueprint`, `recreate-machine`,

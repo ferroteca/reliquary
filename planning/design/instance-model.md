@@ -10,8 +10,11 @@ SPDX-License-Identifier: BSD-3-Clause
 > `destroy-machine` / `list-machines`, `--blueprint` / `--machine`
 > selection) for the QEMU-only subset. Spike 10 adds append-only run
 > directories under `cache/machines/<id>/runs/` for `run-script <label>`.
-> Locking, recovery, `apply`, `recreate`, clone / export, and absorbing
-> the legacy root-home model remain later milestones.
+> Exclusive per-machine operation locks, operation generations, and
+> startup reconciliation of interrupted transitional phases
+> (`creating` / `stopping` / `destroying`) are implemented; `apply`,
+> `recreate`, clone / export, and absorbing the legacy root-home model
+> remain later milestones.
 
 A **blueprint** is a reusable, user-owned JSON description of a kind of
 machine. A **machine** is one realization of that blueprint: its

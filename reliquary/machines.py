@@ -160,6 +160,28 @@ def _blueprint_alloc_lock(blueprint_name, context=None):
             _unlock_file(handle)
 
 
+@contextlib.contextmanager
+def _machine_lock(machine_id, context=None):
+    """Hold the exclusive per-machine operation lock.
+
+    Every mutating operation on one machine (create materialization,
+    start, stop, destroy, media/boot changes) takes this before
+    inspecting or changing backend state, so operations on one
+    machine never interleave. The lock file lives beside the
+    allocation locks; its ``.op.lock`` suffix keeps it distinct from
+    any blueprint's allocation lock.
+    """
+    lock_root = _locks_dir(context)
+    os.makedirs(lock_root, exist_ok=True)
+    lock_path = os.path.join(lock_root, f"{machine_id}.op.lock")
+    with open(lock_path, "a+b") as handle:
+        _lock_file(handle)
+        try:
+            yield
+        finally:
+            _unlock_file(handle)
+
+
 def _allocate_machine_id(blueprint_name, context=None):
     """Return the lowest free ``<blueprint>-<n>`` id (directories count)."""
     number = 0
@@ -234,11 +256,36 @@ def create(blueprint, *, context=None, blueprint_name="", source=None):
     if not isinstance(blueprint_name, str) or not blueprint_name:
         raise ValueError("create requires a non-empty blueprint_name")
 
+    created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with _blueprint_alloc_lock(blueprint_name, context):
         machine_id = _allocate_machine_id(blueprint_name, context)
         drives_root = _machine_drives_dir(machine_id, context)
         os.makedirs(drives_root)
+        # Mark the machine `creating` before materialization begins, so
+        # an interrupted create is detectable and recoverable.
+        _write_state(machine_id, {
+            "id": machine_id,
+            "blueprint": blueprint_name,
+            "created": created,
+            "phase": "creating",
+            "generation": 0,
+        }, context)
 
+    with _machine_lock(machine_id, context):
+        try:
+            return _materialize_machine(
+                blueprint, machine_id, blueprint_name, created,
+                drives_root, source, context)
+        except BaseException:
+            # Roll back a failed create: the machine never reached a
+            # usable phase, so its partial materialization is discarded.
+            shutil.rmtree(
+                machine_dir_path(machine_id, context), ignore_errors=True)
+            raise
+
+
+def _materialize_machine(blueprint, machine_id, blueprint_name, created,
+                         drives_root, source, context):
     resolved_drives = {}
     for key, drive in sorted(blueprint.drives.items()):
         if not drive.enabled:
@@ -270,9 +317,9 @@ def create(blueprint, *, context=None, blueprint_name="", source=None):
     state = {
         "id": machine_id,
         "blueprint": blueprint_name,
-        "created": datetime.now(timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"),
+        "created": created,
         "phase": "ready",
+        "generation": 0,
         "backend-id": f"reliquary-{machine_id}",
         "blueprint-digest": _blueprint_digest(resolved, resolved_drives),
         **resolved,
@@ -425,78 +472,141 @@ def _boot_order(boot_keys, drives):
     return "".join(letters) or None
 
 
-def _set_phase(machine_id, phase, context=None):
+def _write_phase(machine_id, phase, context=None, *, bump=False):
+    """Set a machine's phase, optionally advancing its generation.
+
+    The operation generation is a monotonic counter bumped once when
+    an operation begins (entering its transitional or target phase),
+    so an interrupted operation is detectable by phase and generation.
+    Completing steps within an operation write ``bump=False``.
+    """
     state = load_machine_state(machine_id, context)
     state["phase"] = phase
+    if bump:
+        state["generation"] = state.get("generation", 0) + 1
     _write_state(machine_id, state, context)
     return state
+
+
+def _complete_stop(machine_id, context=None):
+    """Power off the owned VM and reconcile the phase.
+
+    On success the phase becomes ``ready``. If the lifecycle stop
+    fails closed, the phase is reconciled without lying: a recorded VM
+    found already gone (``vm.json`` cleared) becomes ``ready``, while
+    an identity mismatch (``vm.json`` intact — our VM may still be
+    running) restores ``running``; either way the error propagates.
+    """
+    machine_home = machine_dir_path(machine_id, context)
+    try:
+        stop_owned_qemu(home=machine_home)
+    except RuntimeError:
+        if read_vm_state(machine_home) is None:
+            _write_phase(machine_id, "ready", context)
+        else:
+            _write_phase(machine_id, "running", context)
+        raise
+    _write_phase(machine_id, "ready", context)
+
+
+def _reconcile_phase(machine_id, context=None):
+    """Recover a machine found in an interrupted transitional phase.
+
+    Called under the machine lock at the start of each mutating
+    operation (``destroy`` handles its own phases). A resting phase
+    (``ready``/``running``) returns unchanged. ``stopping`` completes
+    the interrupted stop; ``creating`` and ``destroying`` are rolled
+    forward by removing the incomplete materialization, then the
+    caller fails closed with recovery guidance.
+    """
+    state = load_machine_state(machine_id, context)
+    phase = state.get("phase")
+    if phase in ("ready", "running"):
+        return state
+    machine_home = machine_dir_path(machine_id, context)
+    if phase == "creating":
+        shutil.rmtree(machine_home, ignore_errors=True)
+        raise RuntimeError(
+            f"machine {machine_id} was interrupted during creation and "
+            "has been rolled back; create it again with create-machine")
+    if phase == "destroying":
+        shutil.rmtree(machine_home, ignore_errors=True)
+        raise RuntimeError(
+            f"machine {machine_id} was interrupted during destruction "
+            "and has now been removed")
+    if phase == "stopping":
+        _complete_stop(machine_id, context)
+        return load_machine_state(machine_id, context)
+    raise RuntimeError(
+        f"machine {machine_id} is in an unrecognized phase {phase!r}")
 
 
 def start_machine(machine_id, *, display=False, context=None):
     """Start a ready machine and return its QMP port.
 
-    Re-verifies every media hash, launches QEMU under the machine's
+    Under the per-machine lock, reconciles any interrupted phase,
+    re-verifies every media hash, launches QEMU under the machine's
     cache directory, and records phase ``running``.
     """
-    state = load_machine_state(machine_id, context)
-    phase = state.get("phase")
-    if phase == "running":
-        raise RuntimeError(
-            f"machine {machine_id} is already running")
-    if phase != "ready":
-        raise RuntimeError(
-            f"machine {machine_id} cannot start "
-            f"(phase: {phase})")
+    with _machine_lock(machine_id, context):
+        state = _reconcile_phase(machine_id, context)
+        phase = state.get("phase")
+        if phase == "running":
+            raise RuntimeError(
+                f"machine {machine_id} is already running")
+        if phase != "ready":
+            raise RuntimeError(
+                f"machine {machine_id} cannot start "
+                f"(phase: {phase})")
 
-    drives = state.get("drives", {})
-    for drive in drives.values():
-        media_name = drive.get("media")
-        if media_name is not None:
-            drive["path"] = fetch_media(media_name, context=context)
-    state["drives"] = drives
-    _write_state(machine_id, state, context)
+        drives = state.get("drives", {})
+        for drive in drives.values():
+            media_name = drive.get("media")
+            if media_name is not None:
+                drive["path"] = fetch_media(media_name, context=context)
+        state["drives"] = drives
+        _write_state(machine_id, state, context)
 
-    memory = state.get("memory")
-    if memory is None:
-        memory = _PLATFORM_MEMORY.get(state.get("platform"), 16)
-    qemu = find_qemu()
-    print(f"using QEMU: {qemu}")
-    vm_name = f"reliquary-{machine_id}"
-    args = [qemu, "-name", vm_name, "-m", str(memory)]
-    args += machine_drive_args(machine_id, context)
-    boot = _boot_order(state.get("boot", []), drives)
-    if boot is not None:
-        args += ["-boot", f"order={boot}"]
+        memory = state.get("memory")
+        if memory is None:
+            memory = _PLATFORM_MEMORY.get(state.get("platform"), 16)
+        qemu = find_qemu()
+        print(f"using QEMU: {qemu}")
+        vm_name = f"reliquary-{machine_id}"
+        args = [qemu, "-name", vm_name, "-m", str(memory)]
+        args += machine_drive_args(machine_id, context)
+        boot = _boot_order(state.get("boot", []), drives)
+        if boot is not None:
+            args += ["-boot", f"order={boot}"]
 
-    # launch_owned_qemu's home= is a plain directory, not a Context —
-    # here it's repurposed as the machine's own cache subdirectory.
-    machine_home = machine_dir_path(machine_id, context)
-    port = launch_owned_qemu(
-        args, vm_name=vm_name, display=display, home=machine_home)
-    _set_phase(machine_id, "running", context)
-    return port
+        # launch_owned_qemu's home= is a plain directory, not a Context —
+        # here it's repurposed as the machine's own cache subdirectory.
+        machine_home = machine_dir_path(machine_id, context)
+        port = launch_owned_qemu(
+            args, vm_name=vm_name, display=display, home=machine_home)
+        _write_phase(machine_id, "running", context, bump=True)
+        return port
 
 
 def stop_machine(machine_id, context=None):
-    """Stop a running machine and return it to phase ``ready``."""
-    state = load_machine_state(machine_id, context)
-    phase = state.get("phase")
-    if phase != "running":
-        raise RuntimeError(
-            f"machine {machine_id} is not running "
-            f"(phase: {phase})")
-    machine_home = machine_dir_path(machine_id, context)
-    try:
-        stop_owned_qemu(home=machine_home)
-    except RuntimeError:
-        # A stop that found the recorded VM gone removed the stale
-        # vm.json; only then is `ready` true. A stop that failed
-        # closed (identity mismatch) left vm.json in place — our QEMU
-        # may still be running, so the phase must not change.
-        if read_vm_state(machine_home) is None:
-            _set_phase(machine_id, "ready", context)
-        raise
-    _set_phase(machine_id, "ready", context)
+    """Stop a running machine and return it to phase ``ready``.
+
+    Under the per-machine lock: reconciles any interrupted phase
+    (an already-completed stop returns quietly), records the
+    transitional ``stopping`` phase, then powers off the owned VM.
+    """
+    with _machine_lock(machine_id, context):
+        state = _reconcile_phase(machine_id, context)
+        phase = state.get("phase")
+        if phase == "ready":
+            # A reconciled interrupted stop already returned it here.
+            return
+        if phase != "running":
+            raise RuntimeError(
+                f"machine {machine_id} is not running "
+                f"(phase: {phase})")
+        _write_phase(machine_id, "stopping", context, bump=True)
+        _complete_stop(machine_id, context)
 
 
 _REMOVABLE_MEDIA = {"floppy", "cdrom"}
@@ -532,11 +642,13 @@ def insert_media(machine_id, slot, media_name, *, context=None):
     machine must be stopped; changing the medium of a running
     machine is not supported yet.
     """
-    state = load_machine_state(machine_id, context)
-    drive = _removable_drive(state, slot, context)
-    drive["path"] = fetch_media(media_name, context=context)
-    drive["media"] = media_name
-    _write_state(machine_id, state, context)
+    with _machine_lock(machine_id, context):
+        state = _reconcile_phase(machine_id, context)
+        drive = _removable_drive(state, slot, context)
+        drive["path"] = fetch_media(media_name, context=context)
+        drive["media"] = media_name
+        state["generation"] = state.get("generation", 0) + 1
+        _write_state(machine_id, state, context)
 
 
 def eject_media(machine_id, slot, *, context=None):
@@ -546,11 +658,13 @@ def eject_media(machine_id, slot, *, context=None):
     topology — but the next ``start`` presents it without a medium.
     The machine must be stopped, as for :func:`insert_media`.
     """
-    state = load_machine_state(machine_id, context)
-    drive = _removable_drive(state, slot, context)
-    drive["media"] = None
-    drive["path"] = None
-    _write_state(machine_id, state, context)
+    with _machine_lock(machine_id, context):
+        state = _reconcile_phase(machine_id, context)
+        drive = _removable_drive(state, slot, context)
+        drive["media"] = None
+        drive["path"] = None
+        state["generation"] = state.get("generation", 0) + 1
+        _write_state(machine_id, state, context)
 
 
 def set_boot_order(machine_id, boot_keys, *, context=None):
@@ -562,30 +676,32 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
     ``start``; the machine diverges from its blueprint until
     ``apply`` (or another ``set_boot_order``) restores it.
     """
-    state = load_machine_state(machine_id, context)
-    phase = state.get("phase")
-    if phase != "ready":
-        raise RuntimeError(
-            f"machine {machine_id} must be stopped "
-            f"to change boot order (phase: {phase})")
-    drives = state.get("drives", {})
-    if not isinstance(boot_keys, (list, tuple)) or not boot_keys:
-        raise ValueError("boot order requires at least one drive key")
-    normalized = []
-    seen = set()
-    for index, key in enumerate(boot_keys):
-        if not isinstance(key, str) or not key:
-            raise ValueError(
-                f"boot[{index}] must be a non-empty drive key")
-        if key not in drives:
-            raise ValueError(
-                f"boot[{index}] references undeclared drive {key}")
-        if key in seen:
-            raise ValueError(f"boot contains duplicate drive {key}")
-        seen.add(key)
-        normalized.append(key)
-    state["boot"] = normalized
-    _write_state(machine_id, state, context)
+    with _machine_lock(machine_id, context):
+        state = _reconcile_phase(machine_id, context)
+        phase = state.get("phase")
+        if phase != "ready":
+            raise RuntimeError(
+                f"machine {machine_id} must be stopped "
+                f"to change boot order (phase: {phase})")
+        drives = state.get("drives", {})
+        if not isinstance(boot_keys, (list, tuple)) or not boot_keys:
+            raise ValueError("boot order requires at least one drive key")
+        normalized = []
+        seen = set()
+        for index, key in enumerate(boot_keys):
+            if not isinstance(key, str) or not key:
+                raise ValueError(
+                    f"boot[{index}] must be a non-empty drive key")
+            if key not in drives:
+                raise ValueError(
+                    f"boot[{index}] references undeclared drive {key}")
+            if key in seen:
+                raise ValueError(f"boot contains duplicate drive {key}")
+            seen.add(key)
+            normalized.append(key)
+        state["boot"] = normalized
+        state["generation"] = state.get("generation", 0) + 1
+        _write_state(machine_id, state, context)
 
 
 def mark_stopped(machine_id, context=None):
@@ -596,41 +712,49 @@ def mark_stopped(machine_id, context=None):
     ``vm.json`` is removed.  A machine not in phase ``running`` is
     left untouched.
     """
-    state = load_machine_state(machine_id, context)
-    if state.get("phase") != "running":
-        return
-    vm_path = os.path.join(machine_dir_path(machine_id, context), "vm.json")
-    try:
-        os.remove(vm_path)
-    except FileNotFoundError:
-        pass
-    _set_phase(machine_id, "ready", context)
+    with _machine_lock(machine_id, context):
+        state = load_machine_state(machine_id, context)
+        if state.get("phase") != "running":
+            return
+        vm_path = os.path.join(
+            machine_dir_path(machine_id, context), "vm.json")
+        try:
+            os.remove(vm_path)
+        except FileNotFoundError:
+            pass
+        _write_phase(machine_id, "ready", context, bump=True)
 
 
 def destroy_machine(machine_id, context=None):
-    """Delete a stopped machine's cache directory entirely.
+    """Delete a machine's cache directory entirely.
 
-    A deletion interrupted by a host lock can be retried.  New failed
-    deletions restore the machine to ``ready`` so they do not strand it
-    in the transient ``destroying`` phase.
+    Under the per-machine lock. A ``ready`` machine passes through the
+    transitional ``destroying`` phase; a machine already ``destroying``
+    or rolled-back-from ``creating`` completes its removal. A running
+    machine is refused. A deletion interrupted by a host lock can be
+    retried — a failure from ``ready`` restores ``ready`` so it does
+    not strand the machine in ``destroying``.
     """
-    state = load_machine_state(machine_id, context)
-    phase = state.get("phase")
-    if phase == "running":
-        raise RuntimeError(
-            f"machine {machine_id} is running; "
-            "stop it before destroying")
-    if phase not in ("ready", "destroying"):
-        raise RuntimeError(
-            f"machine {machine_id} cannot be destroyed "
-            f"(phase: {phase})")
-    if phase == "ready":
-        _set_phase(machine_id, "destroying", context)
-    try:
-        shutil.rmtree(machine_dir_path(machine_id, context))
-    except OSError:
-        _set_phase(machine_id, "ready", context)
-        raise
+    with _machine_lock(machine_id, context):
+        state = load_machine_state(machine_id, context)
+        phase = state.get("phase")
+        if phase == "running":
+            raise RuntimeError(
+                f"machine {machine_id} is running; "
+                "stop it before destroying")
+        if phase not in ("ready", "destroying", "creating"):
+            raise RuntimeError(
+                f"machine {machine_id} cannot be destroyed "
+                f"(phase: {phase})")
+        if phase == "ready":
+            _write_phase(machine_id, "destroying", context, bump=True)
+        try:
+            shutil.rmtree(machine_dir_path(machine_id, context))
+        except OSError:
+            # Leave the machine in a retry-able phase.
+            if phase == "ready":
+                _write_phase(machine_id, "ready", context)
+            raise
 
 
 def machine_drive_args(machine_id, context=None):
