@@ -189,6 +189,22 @@ to decide. The two carry equal weight: a principle amendment is
 argued exactly as vigorously as a use-case one, and neither is
 edited to fit a feature someone has already decided to build.
 
+One class of work is exempt, and its boundary is drawn here
+because here is where it would be walked around. **Housekeeping**
+(planning/DECISIONS.md D38) approves small cleanups and small
+reported defects as a standing class — tiny in scope *and* clearly
+a problem — so they need no citation and no adjudication.
+
+**It stops at the interfaces, absolutely: a change that touches
+any surface named above is automatically not housekeeping**,
+whatever its diff looks like, and takes the rule below instead.
+That test is asked first and answered by lookup — the inventory
+above enumerates the surfaces, so it is a checklist, not a
+judgement. This matters because housekeeping's other two tests
+("tiny", "clearly a problem") are judged by whoever wants to do
+the work, and the smallest-looking change is the one most likely
+to be a contract change wearing a small diff.
+
 Requests triage by their use-case and principle impact:
 
 - **No use-case or principle impact, or strong alignment with

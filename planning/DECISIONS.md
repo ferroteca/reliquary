@@ -86,6 +86,65 @@ record, and often the most useful part of it (D29).
   discovery may be fixed within the work that found it, and
   anything else is filed. Left for the round that settles it.
 
+- D38 — HOUSEKEEPING IS A STANDING APPROVAL BUCKET — DECIDED
+  (owner, 2026-07-24). Supports P8; sharpens TASKS.md's passive
+  "small ones may simply be deemed obvious", which named no test,
+  no deemer, and no act.
+  THE BUCKET. Small code cleanups and small reported defects —
+  tiny in scope **and** crystal clear that they are a problem
+  needing addressing — are approved as a class, in advance. They
+  need no use case, no principle, no issue, and no D-number of
+  their own. Whoever lands the work invokes the bucket by naming
+  it in the commit; the commit is the record (the CHANGELOG
+  follows its own existing rule — a user-visible change earns an
+  entry, invisible tidying does not).
+  WHAT IT IS FOR: work that has *no citation available*. Tidiness
+  with no defect behind it — dead code, a stale path, a clunky
+  help string — and defects too small to be worth an issue. A
+  defect against a *standing* principle is deliberately **not** in
+  this bucket: the principle is already its demand (the
+  gap-is-a-bug rule), so it needs no approval, only fixing.
+  REJECTION IS A DUTY, NOT AN OMISSION (owner). Anything that
+  fails the test is **refused** under housekeeping and routed to
+  the governance mechanism — an issue, a use-case or principle
+  proposal, the interface-change rule, a roadmap item. This is
+  what makes the bucket a gate rather than a shortcut: the
+  question is asked on every candidate, and "no" has somewhere to
+  go. Also never admissible: a use-case or principle amendment,
+  or a design decision.
+  THE FIRST TEST IS MECHANICAL, AND IT IS ABSOLUTE (owner,
+  2026-07-24): **anything that changes an interface is
+  automatically not housekeeping.** It is asked first and answered
+  by lookup, not judgement — INTERFACES.md *enumerates* the
+  surfaces, so this is a checklist rather than an opinion: the
+  four primary interfaces (CLI, embedding API, scripting language,
+  machine blueprint) and the supporting world-facing contracts
+  (script properties, the codex, the run's returned output, the
+  home layout). Touch one and the answer is no, whatever the diff
+  looks like. That property is what makes the exclusion hold up
+  against the bucket's real failure mode, which is self-assessment
+  — "tiny" and "clearly a problem" are judged by whoever wants to
+  do the work, and everyone's own change feels like both.
+  THE TIE-BREAK, for what survives that test: **doubt escalates.
+  If it has to be argued into the bucket, it does not belong in
+  it.** Both remaining halves must hold — tiny alone is not
+  enough, and obvious alone is not enough.
+  THE TRAP, from milestone 9's own landing. Three changes that
+  day were all small: the codex install script's `press enter` →
+  `select "Yes"` (a defect, no interface touched — housekeeping);
+  the guest-console family passing the machine's directory so its
+  identity check could pass (restores behavior that never worked
+  — housekeeping); and the output-discipline sweep that made
+  `create-machine` print `plain-0` rather than "created machine
+  plain-0". The third felt smallest and was the only one that
+  changed a world-facing contract on every command — it needed
+  milestone 9's deliverable behind it, and under this rule would
+  be refused. Size is not the test on its own.
+  FOLDED: this entry; TASKS.md's preamble (the operative rule
+  replacing the passive sentence); INTERFACES.md (the exclusion
+  stated where the interface-change rule lives, so the bypass is
+  closed at the door it would be walked through).
+
 - D37 — MILESTONE 9 DELIVERS U14 AND U20; BOTH PROMOTE —
   DECIDED (2026-07-24, landing milestone 9). Supports P8, P11,
   P17, P18; applies D34's promotion-on-delivery rule and D36's
