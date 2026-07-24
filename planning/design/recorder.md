@@ -6,7 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 # Script authoring by recording
 
 > **Status:** the settled design for U6's authoring recorder
-> (planning/USE-CASES.md U6; owner rounds, 2026-07-21 — the
+> (USE-CASES.md U6; owner rounds, 2026-07-21 — the
 > adjudication trail is in planning/DECISIONS.md). Delivery is
 > deliberately unscheduled: the recorder sits in
 > planning/ROADMAP.md "Horizon", earning a numbered milestone

@@ -92,7 +92,7 @@ workflow:
   components inside the blueprint — plus the
   script properties, recorded outputs, and the home layout) and the
   vetting rule every interface-changing decision must follow. The numbered use cases — the decision
-  surface that rule weighs against — live in `planning/USE-CASES.md` (implemented-only: every use case there is
+  surface that rule weighs against — live in root `USE-CASES.md` (implemented-only: every use case there is
   met by the code today, no placeholders); everything else is tracked in `planning/USE-CASE-PROPOSALS.md`, numbering from the
   same global U-sequence and moving over when delivered (scheduling in the roadmap is acceptance; delivery
   makes it current). Every roadmap item cites the use case — in force or proposed — or the governing principle
@@ -149,10 +149,10 @@ components included) are
 Reliquary's primary interfaces to the world; the script properties, recorded outputs (run records,
 transcripts), and the home layout are world-facing contracts alongside them. Any decision that
 changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
-numbered use cases ([planning/USE-CASES.md](planning/USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
+numbered use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
 work starting only after the amendment lands — then the change is named across every surface it touches
-and landed coherently on all of them. Where planning/ROADMAP.md and planning/INTERFACES.md or planning/USE-CASES.md disagree, the
+and landed coherently on all of them. Where planning/ROADMAP.md and planning/INTERFACES.md or USE-CASES.md disagree, the
 principles and use cases govern; the roadmap is realigned to them.
 
 ### CLI–API parity

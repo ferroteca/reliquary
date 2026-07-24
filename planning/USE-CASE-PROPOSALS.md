@@ -7,7 +7,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the staging ground for changes to the
 > use-case list. Nothing here is delivered: the current list —
-> [planning/USE-CASES.md](USE-CASES.md) — holds only the use
+> [USE-CASES.md](../USE-CASES.md) — holds only the use
 > cases the code meets today. A proposal is argued
 > under the
 > [interface-change rule](INTERFACES.md#the-interface-change-rule);
@@ -35,14 +35,14 @@ the only three:
   use case already meant — clarify, never change. The test: no
   past decision citing the use case would have come out
   differently under the new wording. A clarification needs no
-  argument: it may land directly in planning/USE-CASES.md, or —
+  argument: it may land directly in root USE-CASES.md, or —
   undelivered — park here as an entry against its use case's
   number until it is applied. When it is arguable whether an
   edit is a clarification, it is not one — it is a supersession
   and is argued like any other proposal.
 - **Add.** A new use case, drafted here, argued under the
   interface-change rule, accepted, and moved to
-  planning/USE-CASES.md when its delivery lands.
+  root USE-CASES.md when its delivery lands.
 - **Retire.** A use case leaves force: **retired** without
   replacement, or **superseded** by one or more successors that
   carry the need forward in a changed shape. A use case whose
@@ -53,7 +53,7 @@ the only three:
 
 Proposed and in-force use cases share one global namespace: a
 proposal drafted here takes the next free U-number, keeps it
-for life, and moves to planning/USE-CASES.md under that number
+for life, and moves to root USE-CASES.md under that number
 when its delivery lands. Scheduling in the roadmap is
 acceptance: the argument wins by the roadmap taking the work,
 the citing item the record, and the accepted proposal is

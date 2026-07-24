@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > in root [PRINCIPLES.md](../PRINCIPLES.md). It names the
 > world-facing interfaces, the use cases
 > they serve — the numbered list itself lives in
-> [planning/USE-CASES.md](USE-CASES.md) — and the rule every
+> [USE-CASES.md](../USE-CASES.md) — and the rule every
 > interface-changing decision must follow. Settled design decisions
 > live in [planning/ROADMAP.md](ROADMAP.md) and the user-facing contracts in
 > `planning/`; this document says where every other interface decision
@@ -153,7 +153,7 @@ covers them equally:
 
 The numbered use cases — the decision surface every
 interface decision is weighed against — live in
-[planning/USE-CASES.md](USE-CASES.md); the cross-cutting
+[USE-CASES.md](../USE-CASES.md); the cross-cutting
 principles that run through them — the ephemeral-machine
 principle, the control-plane arc, the artifact-residency
 split, the feedback split — are itemized with their normative
@@ -167,7 +167,7 @@ adopted.
 
 ## The interface-change rule
 
-The use-case list ([planning/USE-CASES.md](USE-CASES.md)) and the
+The use-case list ([USE-CASES.md](../USE-CASES.md)) and the
 governing principles ([PRINCIPLES.md](../PRINCIPLES.md)) are
 where interface changes are argued. A change
 to an interfacing aspect of Reliquary is significant precisely
@@ -213,7 +213,7 @@ Requests triage by their use-case and principle impact:
   argument; if the argument wins, the work is scheduled in the
   roadmap — scheduling is acceptance, the citing roadmap item
   its record; only then does work start. Accepted use
-  cases move into planning/USE-CASES.md when their delivery
+  cases move into root USE-CASES.md when their delivery
   lands, accepted principles into PRINCIPLES.md when the project
   honors them, anything superseded retiring to a stub. A
   misaligned change that can propose no amendment
@@ -236,7 +236,7 @@ Every approved change then lands the same way:
 3. **Record it.** Use-case amendments are drafted in
    [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md),
    accepted by roadmap scheduling, and move into
-   [planning/USE-CASES.md](USE-CASES.md) when delivered,
+   [USE-CASES.md](../USE-CASES.md) when delivered,
    keeping their numbers; settled decisions go to their
    planning/ROADMAP.md sections; user-facing contracts to their `planning/`
    design specs; examples stay synchronized.

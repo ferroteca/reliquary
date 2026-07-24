@@ -10,7 +10,7 @@ rounds and gap queues, moved out of [TASKS.md](TASKS.md)
 (2026-07-22) so the task list stays a task list. Each entry
 records what was decided, by whom and when, what was weighed and
 declined, and where it folded. The specs, planning/ROADMAP.md, and
-planning/INTERFACES.md / planning/USE-CASES.md remain the
+planning/INTERFACES.md / root USE-CASES.md remain the
 normative homes — this file is the adjudication trail, and the
 guard against re-litigating: anything recorded here as killed,
 declined, or superseded is not revisited without new evidence,
@@ -47,6 +47,30 @@ search will act on it. A dated word cannot cause a bug; a
 wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
+
+- D31 — USE-CASES.md MOVES TO THE ROOT — DECIDED (owner,
+  2026-07-23). Supports P8. The use-case list joins PRINCIPLES.md
+  at the repository root. THE ARGUMENT IS THE PARALLEL, already
+  written into both files: PRINCIPLES.md lives at the root
+  BECAUSE IT DESCRIBES CURRENT REALITY — "every principle here is
+  real — the project honors it as the code stands today (it lives
+  at the root for that reason)" — and USE-CASES.md makes the
+  identical claim in the identical shape, implemented-only, with
+  everything undelivered in its proposals doc. The two lists have
+  one lifecycle, one relationship to the code, and one job as the
+  surface every interface change triages against (P8, which D28
+  had just made symmetric across them). Leaving one under
+  `planning/` said the opposite of what both files say about
+  themselves: `planning/` is maintainer-facing plans, and a list
+  of what is TRUE TODAY is not a plan. The proposals docs stay in
+  `planning/` on the same reasoning — being exactly the plans.
+  FOLDED: the move; USE-CASES.md's own links and its
+  root-placement note; PRINCIPLES.md, AGENTS.md,
+  planning/INTERFACES.md, planning/ROADMAP.md,
+  planning/USE-CASE-PROPOSALS.md, planning/design/recorder.md,
+  this file's preamble, and the documentation-rules skill's
+  placement list. Historical DECISIONS entries keep their
+  `planning/USE-CASES.md` spellings under the spellings rule.
 
 - D30 — THE MEDIA LIFECYCLE COMMANDS: THE NOUN IS THE MEDIA, AND
   TWO DEAD VERBS GO — DECIDED (owner, 2026-07-23, milestone 7's

@@ -7,11 +7,11 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the use-case list — the current state of
 > the decision surface of Reliquary's guiding principles,
-> [planning/INTERFACES.md](INTERFACES.md). Every use case here is
+> [planning/INTERFACES.md](planning/INTERFACES.md). Every use case here is
 > in force. Interface decisions are weighed against this list
 > and the accepted proposals under the interface-change rule
 > there; proposed changes are tracked in
-> [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) and
+> [planning/USE-CASE-PROPOSALS.md](planning/USE-CASE-PROPOSALS.md) and
 > land here only when delivered — every use case here is met
 > by the code today, and a settled use case with unimplemented
 > demands lives there instead, with no placeholder here (the
@@ -24,9 +24,9 @@ so a decision, review, or spec section can cite the use case it
 serves — and so a proposed change can be rejected by naming the
 use case it costs. This list is the decision surface: significant
 interface changes arrive as proposed amendments to it (see the
-[interface-change rule](INTERFACES.md#the-interface-change-rule)),
+[interface-change rule](planning/INTERFACES.md#the-interface-change-rule)),
 drafted and tracked in
-[planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md), and
+[planning/USE-CASE-PROPOSALS.md](planning/USE-CASE-PROPOSALS.md), and
 moved here when delivered — scheduling in the roadmap is
 acceptance; delivery makes it current.
 
@@ -34,7 +34,10 @@ This list is an implementation claim: every use case here is
 met by the code as it stands today, in full. A use case with
 any unimplemented demand — however settled — lives in the
 proposals doc instead, and moves here only when its delivery
-lands.
+lands. That claim is why this file sits at the repository root
+beside [PRINCIPLES.md](PRINCIPLES.md) rather than under
+`planning/`: both describe current reality, and neither is a
+plan.
 
 A use case in force is never changed in nature (a proposed
 one may still be reshaped freely in the proposals doc). It
@@ -48,7 +51,7 @@ carry the need forward in a changed shape. Numbers are permanent
 and never reused; proposals share this global namespace and keep
 their numbers when they move here. A retired use case leaves
 this list entirely — no stub, the same as an undelivered one:
-its retirement is recorded in [DECISIONS.md](DECISIONS.md), its
+its retirement is recorded in [planning/DECISIONS.md](planning/DECISIONS.md), its
 full text survives in git history, and successors name the
 number they superseded.
 

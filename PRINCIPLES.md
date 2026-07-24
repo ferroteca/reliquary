@@ -8,7 +8,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** the itemized governing principles — P-numbered so
 > use cases, decisions, designs, and commits can cite them.
 > Principles feed into the use cases
-> ([planning/USE-CASES.md](planning/USE-CASES.md)) and the
+> ([USE-CASES.md](USE-CASES.md)) and the
 > decisions
 > ([planning/DECISIONS.md](planning/DECISIONS.md)); use cases
 > and decisions name the principles they serve — and principles

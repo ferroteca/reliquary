@@ -27,7 +27,7 @@ rebuild.
 [planning/INTERFACES.md](INTERFACES.md) names the interfaces through which
 the world drives Reliquary and the vetting rule every
 interface-changing decision must follow; the use cases
-they serve live in [planning/USE-CASES.md](USE-CASES.md). Every
+they serve live in [USE-CASES.md](../USE-CASES.md). Every
 roadmap item cites what demands it — a use case (its U-number,
 whether in force there or still proposed in
 [planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md)) or a

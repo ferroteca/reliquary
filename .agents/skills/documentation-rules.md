@@ -19,6 +19,7 @@ Documentation in the repository should primarily reflect **current reality** —
 Root-level documents (README.md, CONTRIBUTING.md, CHANGELOG.md, etc.) must describe the current state of the project. They may occasionally mention future plans in small, clearly-marked asides, but the focus is on what users can do today.
 
 - `PRINCIPLES.md` — the standing governing principles (P-numbers): every entry is honored by the code today, which is why it lives at the root; proposed changes live in `planning/PRINCIPLE-PROPOSALS.md`
+- `USE-CASES.md` — the use cases in force (U-numbers): every entry is met by the code today, which is why it lives at the root beside PRINCIPLES.md; proposed and undelivered ones live in `planning/USE-CASE-PROPOSALS.md`
 
 ### docs/ directory
 The `docs/` directory contains user-facing documentation for **implemented features**. Every document here must describe functionality that exists and works in the current codebase. Examples include CLI reference guides, platform-specific automation guides, and blueprint usage guides. Design documents, planned features, and unimplemented interfaces belong elsewhere.
@@ -30,8 +31,7 @@ The `planning/` directory contains maintainer-facing design and planning documen
 - `planning/PRINCIPLE-PROPOSALS.md` — proposed changes to the standing principles in root PRINCIPLES.md (shared P-numbering; same lifecycle and sweep as the use-case proposals; principles drive tasks and roadmap items just as use cases do)
 - `planning/DECISIONS.md` — the adjudicated design-decision record: settled decisions, declined alternatives, and where each folded (the guard against re-litigating). Numbered D1…; each generally supports use cases or principles; D-numbers justify design choices and code commits; overruled or no-longer-relevant entries move to its Retired list
 - `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule
-- `planning/USE-CASES.md` — the implemented use cases that guide interface decisions (every entry is met by the code today; anything unimplemented lives in USE-CASE-PROPOSALS.md, with no placeholder here)
-- `planning/USE-CASE-PROPOSALS.md` — proposed changes to the use-case list, undelivered clarifications included (shared U-numbering; scheduling in the roadmap is acceptance, delivery moves the entry to USE-CASES.md; a dead proposal triggers a planning-doc sweep)
+- `planning/USE-CASE-PROPOSALS.md` — proposed changes to the use-case list, undelivered clarifications included (shared U-numbering; scheduling in the roadmap is acceptance, delivery moves the entry to root USE-CASES.md; a dead proposal triggers a planning-doc sweep)
 - `planning/design/` — design documents for specific interfaces and features (end-goal designs, not current truth)
 - `planning/examples/` — example blueprints and scripts in planned formats
 
