@@ -5,51 +5,53 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # The media spec
 
-> **Status:** the media, source, and archive components are
-> implemented: the four `materialize` modes, `size`, locators
-> (`url`+mirrors / `local` / from-archive / by-name), conditional
-> `sha256` (required on `url`), `read-only`, `extension`, recursive
-> archive trees, unknown-key rejection, namespace resolution with
-> collision detection, hash-verified fetch and extraction with the
-> mismatched-file contract, JSONC acceptance, and the `fetch-media`
-> and `clean-` commands. Details may still change before first
-> release; the component model is worked out in
-> [the composed blueprint model](blueprint-model.md).
+> **Status:** implemented. Media are specs inside a `.rlqb`: the
+> four `materialize` modes, `size`, the one `location` field and its
+> grammar, conditional `sha256`, `read-only`, `extension`,
+> parent/children containment, unknown-key rejection, catalog
+> resolution with identity dedup and collision detection,
+> hash-verified fetch and extraction with the mismatched-file
+> contract, the identity ledger, JSONC acceptance, and the media
+> command family.
+>
+> **This document covers acquisition** — where a payload comes from
+> in practice, how it is verified, and how the cache behaves. The
+> format's normative model — the root shape, spec identity, the
+> location grammar, containment, and the reference closure — is
+> [the composed blueprint model](blueprint-model.md), and is not
+> restated here. One model in two documents is how a spec comes to
+> contradict itself (D32).
 
 Media are the machine-independent payloads a machine mounts:
-installer ISOs, boot floppies, driver disks. In the composed
-blueprint model they are **components inside the one authored
-`.rlqb`** — `media`, and the `source` and `archive` components that
-locate and extract them — not a file kind of their own (`.rlqm`
-retires). A machine's drive names a `media` by name (the
-[`media` drive field](machine-blueprint-reference.md#media--optional--string));
-the media owns everything about the payload: where it comes from,
-how it is verified, and how it materializes.
+installer ISOs, boot floppies, driver disks. They are **specs inside
+the one authored `.rlqb`**, not a file kind of their own (`.rlqm`
+retires). A machine's drive names a media by name — or carries one
+written in place — and the media owns everything about the payload:
+where it comes from, how it is verified, and how it materializes.
 
 Resolution reads the whole source: every `.rlqb` in the active
-source is parsed into one `(name, type)` namespace, and references
+source is parsed into one `(name, type)` catalog, and references
 bind by name. In home mode (the CLI default) that is the whole home,
 seeding from the codex on a miss; under `--assets <dir>` it is the
 whole project root — the sole hermetic source, where neither home
-components nor the codex behind them reach an automated run (the
-artifact-residency split, PRINCIPLES.md P4). Two media of one
-name within a source are a collision error naming both.
+specs nor the codex behind them reach an automated run (the
+artifact-residency split, PRINCIPLES.md P4).
 
 ```text
-<asset root>/…/freedos.rlqb        machine + media + archive components
-<reliquary_home>/cache/
-├── archives/
-│   └── FD14-LiveCD.zip            a cached source archive
-└── media/
-    └── freedos-livecd.iso     a cached payload file
+<asset root>/…/freedos.rlqb        the machine and the media it draws on
+<reliquary_home>/cache/media/
+├── .ledger.json                   what each cached file is
+├── freedos-livecd-zip.zip         the container, cached by its name
+└── freedos-livecd.iso             the payload read out of it
 ```
 
-The cache holds two collision-free, name-keyed namespaces:
-`cache/media/` the payload files machines mount, `cache/archives/`
-the source archives they were extracted from. Both are entirely
-reconstructible — nothing there is authored or hand-fed; a bare file
-dropped into either does nothing, because the caches are Reliquary's,
-not an interface.
+One name-keyed cache holds every payload, keyed by the name of the
+media it *is* — a container is a media like any other, so there is
+no second directory for containers. It is entirely reconstructible
+except where a person supplied a payload nothing can re-fetch
+(`add-media`), which the ledger records so reclamation can tell the
+difference. A bare file dropped into the directory does nothing:
+the cache is Reliquary's, not an interface.
 
 ## The media component
 
@@ -58,10 +60,15 @@ A `media` component owns all content and materialization.
 ### `name`
 
 The string machine drives and script `insert`s reference. Explicit,
-or defaulted from the `source` filename or archive-member path stem
+or derived from content — a location's filename or containment path
+stem, repaired to the name charter with a warning when it must be
 (`144m/FDBOOT.img` → `FDBOOT`). A media with no filename-bearing
-source — a `new` blank — **must** name itself; there is nothing to
-derive from. Media names must be unique within a resolution source.
+content — a blank — **must** name itself, except the one anonymous
+citizen: a content-free blank written in place at a drive, which
+belongs to no namespace and takes its slot's name when materialized.
+Identity is `(name, type)` in one catalog; identical specs coexist
+across files, differing ones collide, and names collide
+case-insensitively.
 
 ### `materialize`
 
@@ -69,14 +76,15 @@ How the drive is realized from the payload; default `use`:
 
 | value | meaning | needs |
 |---|---|---|
-| `new` | a fresh blank image of `size` | `size`; **no** `source` |
-| `difference` | a writable overlay over the payload (payload untouched) | `source` |
-| `copy` | the payload duplicated into a standalone image | `source` |
-| `use` | attach the payload itself (mutable unless `read-only`) | `source` |
+| `new` | a fresh blank image of `size` | `size`; **no** `location` |
+| `difference` | a writable overlay over the payload (payload untouched) | `location` |
+| `copy` | the payload duplicated into a standalone image | `location` |
+| `use` | attach the payload itself (mutable unless `read-only`) | `location` |
 
-`use` / `difference` / `copy` require a `source`; a `use` with no
-source is a validation error. `new` takes `size` and forbids
-`source`. `new` / `difference` / `copy` materialize a per-machine
+`use` / `difference` / `copy` require a `location`; one without is a
+validation error. `new` takes `size` and forbids `location` — and a
+spec carrying `size` and no `location` *is* `new`, which is what
+lets the drive-inline blank be written `{"size": "20M"}`. `new` / `difference` / `copy` materialize a per-machine
 image under `cache/machines/<id>/media/<name>.<ext>` (named for the
 media, not the slot); `use` attaches the shared payload — the
 `cache/media/` file, the `local` file, or the `hostdir` directory —
@@ -89,20 +97,24 @@ change (or point at a different) media.**
 `new` only. A positive integer with a binary unit suffix
 (`K` / `M` / `G` / `T`, powers of 1024): `"20M"`, `"1440K"`.
 
-### `source`
+### `location`
 
-Where the payload comes from — a **locator**
-([below](#sources-and-locators)). Absent only for a `new` media.
+Where the payload comes from. One field, one grammar — specified in
+[the composed blueprint model](blueprint-model.md#the-location-grammar);
+[below](#where-a-payload-comes-from) is what each shape costs at
+fetch time. Absent only for a blank.
 
 ### `sha256`
 
 The payload's hash, verified on every use. **Required when the
-source is a `url`** (remote, untrusted); optional for `local` and
-from-archive sources. Optional is a feature: a `local` media may
+rung is remote** (untrusted); optional for local and derived
+payloads. The check happens at resolution rather than parse, since a
+referenced rung may resolve to a URL. Optional is a feature: a local
+media may
 omit it to attach a drive image you are still *evolving* (a pin
 would fail on every edit); hermetic workflows add the hash when they
-want the pin. The hash is the build pin *independent of the source
-kind* — a trusted `local` source can still verify the media is the
+want the pin. The hash is the build pin *independent of the location
+kind* — a trusted local payload can still verify the media is the
 exact build the scripts target. Hex, accepted in either case;
 Reliquary's canonical writes are lowercase.
 
@@ -117,12 +129,12 @@ protects the host directory.
 ### `extension`
 
 Override the type-declaring extension of the cached payload when the
-source filename misnames it (or omits it) — the extension is what
-declares the image format to machine drives. Otherwise derived from
-the source filename or archive-member `path`.
+location's filename misnames it (or omits it) — the extension is
+what declares the image format to machine drives. Otherwise derived
+from the location's filename or its containment path.
 
-**hostdir is a payload shape, not a mode:** a media whose `source`
-is a host *directory* with `materialize: use` is the live vvfat
+**A host directory is a payload shape, not a mode:** a media whose
+`location` is a host *directory* with `materialize: use` is the live vvfat
 attach — the guest reads and writes it like a disk, the directory
 reflecting its writes by machine stop (live on QEMU's vvfat). While
 the machine is stopped the directory *is* the drive's content, an
@@ -135,159 +147,51 @@ directory resolves against the invocation's asset root, so a
 checked-in blueprint stays portable; a directory that does not exist
 fails closed naming the path.
 
-## Sources and locators
+## Where a payload comes from
 
-A media's `source`, and a standalone `source` component, is a
-**locator**.
+The `location` grammar — the interpreted string forms, their object
+desugarings, mirror lists, and `${media:…}` containment — is
+specified in
+[the composed blueprint model](blueprint-model.md#the-location-grammar),
+along with [parent/children containment](blueprint-model.md#containment-parent-and-children).
+What matters for acquisition is what each shape costs at fetch time:
 
-### Locators
+- A **remote** rung downloads once into `cache/media/<name>.<ext>`
+  and is verified against the media's `sha256`, which is required
+  once any rung is remote. Mirror rungs are tried in order; the
+  hash, not the URL, is the arbiter, so a failing mirror is simply
+  the cue to try the next.
+- A **local** payload is used **in place** and never copied into the
+  cache. Its hash is optional, which is the point: a drive image you
+  are still evolving would fail a pin on every edit.
+- A **contained** payload is extracted from its parent, which is
+  fetched first by the same rules — so one remote rung high in a
+  tree downloads once and every descendant derives from the cached
+  parent. Container reading is roster-gated by format: zip today, an
+  unsupported container failing closed and naming its format.
+- A **property-supplied** location resolves through the property
+  chain at `create` / `apply`, never at `start`.
 
-A locator says where bytes come from. It is one of:
+### Supplying what nothing can locate
 
-- a **string** naming a `source` (or `archive`) component;
-- an inline **`{ "url": … }`** — a single URL, or a list of URLs
-  that are alternates (mirrors) for the identical artifact; the
-  (required) `sha256` is the arbiter, not the URL;
-- an inline **`{ "local": … }`** — a path on disk (relative paths
-  resolve from the referencing file's directory); the user's own
-  file, outside the cache;
-- an inline **from-archive** `{ "archive": "<name>", "path":
-  "<member>" }` — extract a member from a named `archive`.
+A media may pin its `sha256` and name a location nothing supplies —
+the licensed, non-redistributable case, which is how codex media
+ship ([the codex's licensing rule](codex.md#non-redistributable-media)).
+Resolution **fails closed** naming the media until someone provides
+the payload, and there are two ways to do that without editing the
+shipped spec's identity:
 
-A `url` locator's mirrors are tried in order; the first download
-that passes hash verification wins, a failing mirror is simply the
-cue to try the next. Every mirror must serve the identical artifact.
+- **`add-media <name> <file>`** — the guarded door. The file is
+  verified against the pin and copied into the cache under the
+  media's own name, recorded `supplied`. This is the home-CLI path,
+  and the one case where a payload legitimately enters the cache
+  from outside.
+- **A property-valued location** — the project and CI path, and the
+  hermetic one: the committed hash still determines the input, and
+  the path that supplies it is per-run.
 
-### The `source` component
-
-A **`source` component** (the `sources` section) is a named,
-standalone locator — the same locator schema hoisted so it can be
-supplied or replaced independently of the media that pins the
-payload's hash. Its name defaults to the URL / local filename stem.
-Mirror lists live here naturally:
-
-```json
-{ "sources": [
-    { "url": ["https://paul.com/PaulsFreedos.zip",
-              "https://mirror.example/PaulsFreedos.zip"],
-      "sha256": "9f4c…" } ] }
-```
-
-## Archives — the recursive tree
-
-An **archive** is a container: a `source` (where the archive bytes
-are) plus recursive **`members`**. The tree mirrors the physical
-nesting, and its shape *is* the extraction:
-
-> **A node with `members` is an archive** (descend into it); **a
-> leaf — no `members` — is a media** payload.
-
-```json
-{ "archives": [
-    { "source": "PaulsFreedos",
-      "members": [
-        { "path": "FD14-FloppyEdition.zip",
-          "members": [
-            { "path": "144m/FDBOOT.img"  },
-            { "path": "144m/FDSTD01.img" }
-          ] } ] } ] }
-```
-
-- The root `source` names a `sources` component (or is an inline
-  locator). Each internal node becomes an **archive** cached under
-  `cache/archives/`; each leaf becomes a **media** cached under
-  `cache/media/`.
-- **Names default to stems** at every level (`PaulsFreedos`,
-  `FD14-FloppyEdition`, `FDBOOT`, `FDSTD01`, …); any node or leaf
-  takes an explicit `name`, and a leaf may set `materialize` /
-  `read-only` / `sha256` / `extension` like any media (default
-  `use`).
-- **Members are itemized explicitly** — every payload its own line —
-  but the archive chain is declared once. Nesting is unbounded and
-  needs no special chaining syntax: one `url` high in the tree
-  downloads once, and every descendant extracts from the cached
-  parent.
-
-A single payload is just a one-leaf tree, or a media whose `source`
-is a from-archive locator naming an existing `archive`.
-
-The single-archive FreeDOS media, written as a tree:
-
-```json
-{
-  "archives": [
-    {
-      "name": "FD14-LiveCD",
-      "source": {
-        "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
-        "sha256": "cf3f…"
-      },
-      "members": [
-        {
-          "path": "FD14LIVE.iso",
-          "name": "freedos-livecd",
-          "read-only": true,
-          "sha256": "6d3b…"
-        }
-      ]
-    }
-  ]
-}
-```
-
-The leaf becomes the media `freedos-livecd`, extracted from
-`FD14LIVE.iso` inside the cached `FD14-LiveCD` archive and cached as
-`cache/media/freedos-livecd.iso`. *(Hashes truncated for
-readability.)*
-
-## Unlocated media (non-redistributable)
-
-A media may pin its `sha256` and name a `source` that nothing
-supplies yet — the licensed / non-redistributable case (built-in
-codex media ship this way, [the codex's licensing
-rule](codex.md#non-redistributable-media)). Resolution **fails
-closed** naming the media and the missing source until the user
-provides it, **without editing the seeded media**: the media
-references its source by name, and the user drops a matching
-`source` component beside it.
-
-```jsonc
-// shipped (codex / shared): pinned, unlocated
-{ "media": [
-    { "name": "windows-install-cd", "read-only": true,
-      "sha256": "exact-build-hash…", "source": "windows-cd-location" } ] }
-
-// the user supplies it, without touching the media above:
-{ "sources": [
-    { "name": "windows-cd-location", "local": "D:/isos/en_windows.iso" } ] }
-```
-
-The media's `source` string and the `source` component's `name` must
-match; two sources of one name within a source must agree, else it
-is a collision error. Supplying the payload always means adding a
-`source` (or a `url` / `local` on the media), never placing files in
-the cache.
-
-## The format
-
-Authored components accept the JSONC dialect: JSON (RFC 8259) plus
-`//` and `/* */` comments and trailing commas — the dialect editors
-apply to files like `tsconfig.json`, and nothing more. Comments are
-the author's margin notes (provenance, review context, where a hash
-came from) and carry no meaning; anything the contract needs is a
-field. There is no version field and no `$schema` in a document
-([no backward compatibility before 1.0](machine-blueprint.md#format-stability-none-yet)).
-
-The machine-checkable companion is the one published
-[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json)
-— the machine, media, source, and archive components in one schema.
-It captures the per-document structural subset of the format's
-rules, for editor completion while authoring; this prose stays
-normative, and schema validity never implies validity: name
-uniqueness, cross-file agreement, stem-derived defaults, the
-`sha256`-required-on-`url` rule, medium compatibility, and every
-resolution rule live beyond the schema. Editors bind it to `.rlqb`
-by file association.
+Editing your own seeded copy is always the third option; that is
+what seeding is for.
 
 ## Fetching
 
@@ -296,7 +200,8 @@ rlq fetch-media <media_name>
 ```
 
 fetches a media by name: downloads (if missing or failing
-verification), extracts through its archive tree, verifies, reports.
+verification), extracts down through its containment chain,
+verifies, reports.
 Machine operations that resolve a media reference do the same
 implicitly, so `fetch-media` is a convenience for warming the cache
 — an install script's media is fetched before the machine boots
@@ -305,7 +210,7 @@ command sees.
 
 Fetch prefers what is already on disk, cheapest source first: a
 payload that verifies is used as-is; otherwise a cached (or `local`)
-archive that verifies is re-extracted; only then are the mirror URLs
+container that verifies is re-extracted; only then are the mirror rungs
 tried.
 
 The embedding API counterpart is
@@ -389,7 +294,7 @@ the interactive checkpoint.
 
 ### Mismatched files
 
-An existing payload or cached archive that fails its hash is
+An existing cached payload or container that fails its hash is
 never silently discarded — the file may be evidence, or the
 media may simply pin the wrong hash. What happens instead depends on
 how Reliquary is running:
@@ -424,35 +329,56 @@ A *freshly downloaded or extracted* file that fails verification
 is not a checkpoint: the partial result is deleted and the
 failure reported; no pre-existing file is touched.
 
-## Cleaning
+## Reclaiming the cache
 
-Both payloads and archives are caches — anything with a source can
-be rebuilt from its mirrors — and each has its own clean command:
+Everything cached can be fetched or derived again, except a payload
+a person supplied — so reclamation distinguishes the two rather than
+asking the user to.
 
 ```text
-rlq clean-archives
-rlq clean-media
+rlq clean-media [<name>]
+rlq prune-media [--dry-run]
 ```
 
-- `clean-archives` deletes cached source archives (under
-  `cache/archives/`). Always safe: archives exist only to spare a
-  re-download.
-- `clean-media` deletes payload files Reliquary can fetch again —
-  media whose source is a `url` (or a cached, or `local`, verifying
-  archive). It never touches `local` source files or payloads
-  without a download source: nothing irreplaceable is cleanable.
+- **`clean-media`** is blunt: it takes back everything the project
+  can get again. A `supplied` payload is spared, because nothing
+  could put it back, and so is anything a running machine is holding
+  open. Naming a media evicts that one deliberately, whatever its
+  provenance.
+- **`prune-media`** is informed: it keeps the **attachment
+  closure** — what the active scope can still attach — and drops
+  what only existed to produce it. A container goes once its
+  children are cached, and stays while they are not, since it is
+  then still the only way to produce them. After an install that
+  means the extracted ISO stays and the zip husk goes, which is
+  usually the larger file. `--dry-run` reports without removing.
 
-To reclaim everything for a media Reliquary can restore, run both;
-the next reference fetches it fresh. The API counterparts are
-`clean_archives(context=None)` and `clean_media(context=None)`.
+Both are scope-relative: the closure is computed against the media
+the active source declares and the machines that exist, so pruning
+in one project never reasons about another's. The API twins are
+`clean_media(name=None)` and `prune_media(dry_run=)`.
+
+### The identity ledger
+
+Beside the payloads, `cache/media/.ledger.json` records what each
+cached file actually is: the sha256 observed when it was written,
+its provenance (`refetchable`, `derived`, `supplied`), the source it
+came from, and for a derived payload the `(parent-sha, path)` that
+produced it.
+
+That is what makes the preflight identity check a diagnosis rather
+than a comparison. A bare hash mismatch cannot tell a **version
+bump** — same location, changed bytes — from a **cross-project name
+collision** — two different media sharing one name — and those want
+opposite fixes. The ledger names which one you have.
 
 ## Sharing
 
-Media travel inside the blueprint: a `.rlqb` carries its `media`,
-`source`, and `archive` components alongside the machine that uses
-them, so sharing the blueprint shares the verified inputs — small,
-hash-pinned, and machine-independent — without shipping the payloads
-themselves (U4). A component reused across several blueprints is
-written once and referenced by name; the residency split decides
-which source supplies it. What crosses the wire is the pinned
+Media travel inside the blueprint: a `.rlqb` carries its media specs
+alongside the machine that uses them, so sharing the blueprint shares
+the verified inputs — small, hash-pinned, and machine-independent —
+without shipping the payloads themselves (U4). A media reused across
+several blueprints is written once and referenced by name, or
+declared identically in each and deduplicated by identity; the
+residency split decides which source supplies it. What crosses the wire is the pinned
 identity, never the licensed bytes.

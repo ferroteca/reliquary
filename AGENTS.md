@@ -17,12 +17,19 @@ workflow:
   a `--assets <dir>` project root walked recursively by extension as the sole hermetic source), `source_for`, and the
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API names its
   source or fails closed (no home/CWD default), and an `ObjectSource` of JSON-imported objects is the planned third
-  source, `document.py` is the composed `.rlqb` parser — `parse_document` / `load_document` build a `Document` of named
-  `machines` / `media` / `sources` / `archives` (component dataclasses `Machine`, `Media`, `Source`, `Archive`,
-  `Locator`), a bare root reads as one machine, an archive tree expands recursively (a node with `members` is an
-  archive, a leaf a media), names default to source/path stems, and identity is the `(name, type)` pair with
-  medium-compatibility checks; it validates the full field reference (`platform`, `backend`, `memory`, `cpus`,
-  `drives` — a media name, `null`, or `{media, controller, enabled}` — `boot`, `name` (the id-safe identity, not a
+  source, `document.py` is the `.rlqb` parser (normative spec: `planning/design/blueprint-model.md`) —
+  `parse_document` / `load_document` build a `Document` of `machines` / `media` from a root array of specs (a lone
+  spec object is sugar for the array of one; `type` defaults to `media`, so an untyped object is a media and the
+  media branch's unknown-field error carries a did-you-mean when machine vocabulary appears), dataclasses `Machine`,
+  `Media`, `MachineDrive`, `Location`, `Reference`, `Deferred` (a value still carrying `${…}` references, finished at
+  resolution — validation is two-phase, shape here and value at resolve); `children` desugars to
+  child-declares-parent containment, names are explicit or content-derived under the media-name charter (repaired
+  with a `BlueprintWarning`, failing closed when it cannot be), identity is `(name, type)` colliding
+  case-insensitively, and the reference grammar is closed at two productions — the character class screens, the
+  productions decide — refusing references in identity/graph positions and the closed vocabularies; it validates the
+  full field reference (`platform`, `backend`, `memory`, `cpus`,
+  `drives` — a media name, `null`, `{media, controller, enabled}`, or an inline media (the anonymous blank included) —
+  `boot`, `name` (the id-safe identity, not a
   display label), `description`, `scripts`, `control-planes`, `backend-settings`, `parameters`),
   `blueprint.py` is authoring-only — scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
   fails closed while any machine of that blueprint exists), `resolve.py` builds the merged `(name, type)` resolution

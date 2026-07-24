@@ -17,10 +17,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Every Reliquary machine begins with a reusable JSON **blueprint** and is
 realized as separately identified **machines**. One blueprint can create
-many machines. The blueprint is one file holding named **components** —
-a `machine` and the `media`, `source`, and `archive` components it
-draws on; the detailed ownership, state, locking, and recovery model is
-in [Machine blueprints and machines](instance-model.md).
+many machines. The blueprint is one file holding an array of
+**specs** — a `machine` and the `media` it draws on; the detailed
+ownership, state, locking, and recovery model is in
+[Machine blueprints and machines](instance-model.md).
 
 ## The model at a glance
 
@@ -32,7 +32,7 @@ When a result should outlive its machine, `export` carries it out.
 ```mermaid
 flowchart LR
     subgraph yours["yours — durable, worth versioning"]
-        BP["blueprint freedos.rlqb<br/>machine + media + archives"]
+        BP["blueprint freedos.rlqb<br/>machine + media"]
         SCR["scripts<br/>*.rlqs"]
     end
     subgraph reliquarys["reliquary's — disposable, regenerates"]
@@ -183,11 +183,13 @@ through a machine's life. Companion pages:
   every rule.
 - **[Cookbook](machine-blueprint-cookbook.md)** — complete worked
   examples.
-- **[The media spec](media-spec.md)** — the `media`, `source`, and
-  `archive` components: how payloads are located, fetched, verified,
-  and materialized.
 - **[The composed blueprint model](blueprint-model.md)** — the
-  component model the whole `.rlqb` format is built on.
+  format's **normative model**: the root shape, spec identity and
+  the name charter, the location grammar, containment, and the
+  reference closure. This guide teaches the format; that document
+  defines it.
+- **[The media spec](media-spec.md)** — acquisition: how payloads
+  are fetched, verified, cached, and reclaimed.
 - **[Script properties](script-properties.md)** — how scripts
   consume values: the source order, and the user file holding
   reusable personal values and protected secrets.
@@ -209,10 +211,10 @@ portable JSON document you author. The Reliquary-owned machine
 state wraps its resolved form with identity, lifecycle, and
 backend facts. See [the instance model](instance-model.md).
 
-**Machine components have names; machines have ids.** A machine
-component's name is its declared `name`, or — for a lone bare-root
-machine — its file stem (`<name>.rlqb`). `--blueprint <name>` selects
-the machine component of that name; its machine's identity is
+**Machine specs have names; machines have ids.** A machine spec
+declares its `name` — required, since the `.rlqb` file's own stem is
+never an identity. `--blueprint <name>` selects the machine spec of
+that name; its machine's identity is
 `<name>-<n>`, and commands take `--machine <name>-<n>` — the full id,
 exactly — with `--blueprint <name>` alone selecting the machine when
 exactly one exists. Destroy frees the number for reuse on the next
@@ -229,6 +231,8 @@ A minimal blueprint that boots a DOS floppy image:
 
 ```json
 {
+  "type": "machine",
+  "name": "msdos622",
   "platform": "dos",
   "drives": {
     "floppy": "msdos622-boot"
@@ -236,12 +240,13 @@ A minimal blueprint that boots a DOS floppy image:
 }
 ```
 
-This is a **bare root** — a lone machine, its fields at top level,
-no component sections. The `floppy` drive names a `media` component,
-`msdos622-boot`, that Reliquary resolves from the namespace: a
-`media` entry in a sibling `.rlqb`, or a codex media seeded on first
-reference. To ship the machine and its media as one self-contained
-file, add the sections — `{ "machines": [ … ], "media": [ … ] }` (see
+This is a **lone spec object** — sugar for the array of one. It must
+declare `"type": "machine"`, because `type` defaults to `media`
+everywhere. The `floppy` drive names a media, `msdos622-boot`, that
+Reliquary resolves from the catalog: a media spec in a sibling
+`.rlqb`, or a codex media seeded on first reference. To ship the
+machine and its media as one self-contained file, write the array —
+`[ { "type": "machine", … }, { "type": "media", … } ]` (see
 [the media spec](media-spec.md) and
 [cookbook](machine-blueprint-cookbook.md)).
 

@@ -38,6 +38,8 @@ drive:
 
 ```json
 {
+  "type": "machine",
+  "name": "msdos622",
   "platform": "dos",
   "drives": {
     "floppy": "msdos622-boot"
@@ -93,23 +95,28 @@ install. The extra memory avoids the FreeDOS LiveCD's low-RAM
 warning:
 
 ```json
-{
-  "machines": [
-    {
-      "name": "freedos-install",
-      "platform": "dos",
-      "memory": "32M",
-      "drives": {
-        "hdd": "blank-20m",
-        "cdrom": null
-      },
-      "boot": ["hdd", "cdrom"]
-    }
-  ],
-  "media": [
-    {"name": "blank-20m", "materialize": "new", "size": "20M"}
-  ]
-}
+[
+  {
+    "type": "machine",
+    "name": "freedos-install",
+    "platform": "dos",
+    "memory": "32M",
+    "drives": {
+      "hdd": "blank-20m",
+      "cdrom": null
+    },
+    "boot": [
+      "hdd",
+      "cdrom"
+    ]
+  },
+  {
+    "type": "media",
+    "name": "blank-20m",
+    "materialize": "new",
+    "size": "20M"
+  }
+]
 ```
 
 The `hdd` drive names the `blank-20m` media — `materialize: new`,
@@ -144,16 +151,24 @@ a fixed payload the drive's own image is materialized over. A test
 rig booting a writable instance of an installed DOS image:
 
 ```json
-{
-  "machines": [
-    {"name": "dos-rig", "platform": "dos",
-     "drives": {"hdd": "dos622-installed"}}
-  ],
-  "media": [
-    {"name": "dos622-installed", "materialize": "difference",
-     "source": {"local": "D:/images/dos622.qcow2"}}
-  ]
-}
+[
+  {
+    "type": "machine",
+    "name": "dos-rig",
+    "platform": "dos",
+    "drives": {
+      "hdd": "dos622-installed"
+    }
+  },
+  {
+    "type": "media",
+    "name": "dos622-installed",
+    "materialize": "difference",
+    "location": {
+      "local": "D:/images/dos622.qcow2"
+    }
+  }
+]
 ```
 
 At `create` (or first `start`), the `dos622-installed` media
@@ -182,16 +197,24 @@ capability check rather than silently copying. A media's
 format when needed:
 
 ```json
-{
-  "machines": [
-    {"name": "nt4-rig", "platform": "winnt",
-     "drives": {"hdd": "nt4-installed"}}
-  ],
-  "media": [
-    {"name": "nt4-installed", "materialize": "copy",
-     "source": {"local": "D:/images/nt4.vhdx"}}
-  ]
-}
+[
+  {
+    "type": "machine",
+    "name": "nt4-rig",
+    "platform": "winnt",
+    "drives": {
+      "hdd": "nt4-installed"
+    }
+  },
+  {
+    "type": "media",
+    "name": "nt4-installed",
+    "materialize": "copy",
+    "location": {
+      "local": "D:/images/nt4.vhdx"
+    }
+  }
+]
 ```
 
 A copied drive has no runtime dependency on its source payload —
@@ -207,22 +230,32 @@ type — settings no other backend understands, so they live under
 `backend-settings.qemu`:
 
 ```json
-{
-  "machines": [
-    {
-      "name": "dos-486",
-      "platform": "dos",
-      "backend": "qemu",
-      "drives": {"hdd": "blank-100m"},
-      "backend-settings": {
-        "qemu": {"machine": "pc", "args": ["-cpu", "486"]}
+[
+  {
+    "type": "machine",
+    "name": "dos-486",
+    "platform": "dos",
+    "backend": "qemu",
+    "drives": {
+      "hdd": "blank-100m"
+    },
+    "backend-settings": {
+      "qemu": {
+        "machine": "pc",
+        "args": [
+          "-cpu",
+          "486"
+        ]
       }
     }
-  ],
-  "media": [
-    {"name": "blank-100m", "materialize": "new", "size": "100M"}
-  ]
-}
+  },
+  {
+    "type": "media",
+    "name": "blank-100m",
+    "materialize": "new",
+    "size": "100M"
+  }
+]
 ```
 
 With `backend` declared, `create` fails if QEMU is unavailable
@@ -240,25 +273,33 @@ defaults do the right thing (64 MiB memory), and the explicit
 `memory` bump shows overriding one:
 
 ```json
-{
-  "machines": [
-    {
-      "name": "win98",
-      "platform": "win9x",
-      "memory": "128M",
-      "drives": {"hdd": "blank-2g", "cdrom": "win98se"},
-      "boot": ["cdrom", "hdd"]
-    }
-  ],
-  "media": [
-    {"name": "blank-2g", "materialize": "new", "size": "2G"}
-  ]
-}
+[
+  {
+    "type": "machine",
+    "name": "win98",
+    "platform": "win9x",
+    "memory": "128M",
+    "drives": {
+      "hdd": "blank-2g",
+      "cdrom": "win98se"
+    },
+    "boot": [
+      "cdrom",
+      "hdd"
+    ]
+  },
+  {
+    "type": "media",
+    "name": "blank-2g",
+    "materialize": "new",
+    "size": "2G"
+  }
+]
 ```
 
 `win98se` names a `use` media the machine carries at rest (a
 non-redistributable ISO — a component with a pinned hash and a
-`source` the user supplies).
+`location` the user supplies).
 
 > The win9x platform workflow is not implemented yet; the machine
 > can be created and operated at the machine level, but platform
@@ -274,6 +315,8 @@ floppy, a driver floppy, and two mounted ISOs:
 
 ```json
 {
+  "type": "machine",
+  "name": "many-slots",
   "platform": "dos",
   "drives": {
     "floppy0": "boot-floppy",
@@ -298,22 +341,30 @@ matching driver — so it's declared per drive. A Windows NT machine
 with its system disk on SCSI and the installer CD on IDE:
 
 ```json
-{
-  "machines": [
-    {
-      "name": "nt4",
-      "platform": "winnt",
-      "drives": {
-        "hdd": {"media": "nt4-blank-4g", "controller": "scsi"},
-        "cdrom": "nt4-install"
+[
+  {
+    "type": "machine",
+    "name": "nt4",
+    "platform": "winnt",
+    "drives": {
+      "hdd": {
+        "media": "nt4-blank-4g",
+        "controller": "scsi"
       },
-      "boot": ["cdrom", "hdd"]
-    }
-  ],
-  "media": [
-    {"name": "nt4-blank-4g", "materialize": "new", "size": "4G"}
-  ]
-}
+      "cdrom": "nt4-install"
+    },
+    "boot": [
+      "cdrom",
+      "hdd"
+    ]
+  },
+  {
+    "type": "media",
+    "name": "nt4-blank-4g",
+    "materialize": "new",
+    "size": "4G"
+  }
+]
 ```
 
 The object drive form carries the media name plus the
@@ -339,27 +390,37 @@ the install script declares the `identity.full-name` and
 `os.install-key` properties, and the blueprint binds them.
 
 ```json
-{
-  "machines": [
-    {
-      "name": "win98",
-      "platform": "win9x",
-      "drives": {"hdd": "blank-2g", "cdrom": null},
-      "boot": ["hdd", "cdrom"],
-      "scripts": {
-        "install": "win98-install",
-        "verify": "win98-verify"
-      },
-      "parameters": {
-        "identity.full-name": "testuser",
-        "os.install-key": {"property": "products.windows-98.install-key"}
+[
+  {
+    "type": "machine",
+    "name": "win98",
+    "platform": "win9x",
+    "drives": {
+      "hdd": "blank-2g",
+      "cdrom": null
+    },
+    "boot": [
+      "hdd",
+      "cdrom"
+    ],
+    "scripts": {
+      "install": "win98-install",
+      "verify": "win98-verify"
+    },
+    "parameters": {
+      "identity.full-name": "testuser",
+      "os.install-key": {
+        "property": "products.windows-98.install-key"
       }
     }
-  ],
-  "media": [
-    {"name": "blank-2g", "materialize": "new", "size": "2G"}
-  ]
-}
+  },
+  {
+    "type": "media",
+    "name": "blank-2g",
+    "materialize": "new",
+    "size": "2G"
+  }
+]
 ```
 
 `identity.full-name` is specified directly — every machine installs

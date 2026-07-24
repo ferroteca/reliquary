@@ -21,7 +21,7 @@ Exhaustive reference for every field in the machine blueprint format —
 shared by the **blueprint** (`<name>.rlqb`, yours) and each
 machine's **state** (`cache/machines/<id>/machine.json`,
 Reliquary's). A drive names a **media** component; the media's own
-fields (`materialize`, `size`, `source`, `read-only`, …) live in
+fields (`materialize`, `size`, `location`, `read-only`, …) live in
 [the media spec](media-spec.md). For the blueprint/state model, read
 [the guide](machine-blueprint.md) first; for complete examples, see
 the [cookbook](machine-blueprint-cookbook.md).
@@ -127,7 +127,7 @@ backend machine and resolves the blueprint afresh (see
 
 The machine component's **identity** — its selection key. Declared,
 it overrides the filename stem: `--blueprint <name>` selects it and a
-machine's identity is `<name>-<n>`. A lone bare-root machine may omit
+machine's identity is `<name>-<n>`. A machine spec may not omit
 it — identity falls back to the file stem (the common case, a
 `freedos.rlqb` needs no `name`); a machine written inside a
 `machines` section must name itself, since a section can hold several
@@ -431,7 +431,7 @@ payload (a file, or a host directory served as a virtual FAT drive).
 / `hostdir`) is gone**; a blank disk is a media with
 `materialize: new`, a differencing drive is a media with
 `materialize: difference`, a `hostdir` drive is a media whose
-`source` is a directory with `materialize: use`. To change how a
+`location` is a directory with `materialize: use`. To change how a
 drive materializes, change (or point at a different) media.
 
 A removable drive (`cdrom`, `floppy`) may instead be declared
@@ -585,7 +585,7 @@ arrives on whatever backend is assigned, and `recreate` onto a
 different backend regenerates the images in the new backend's
 format.
 
-A `use` media attaches the payload file itself — or its `source`
+A `use` media attaches the payload file itself — or its `location`
 directory, served as vvfat — with no per-machine image. Its format
 is declared by its
 [cached file name's extension](media-spec.md). A media payload in a

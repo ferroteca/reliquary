@@ -118,9 +118,17 @@ can honestly be.
   milestone's one piece of new capability. **Gate:**
   `prune-media` after the install leaves exactly the attachment
   closure.
-- **S5 — the remaining spec realignment** (deliverable 7). These
-  documents legitimately follow the code, INTERFACES.md and the
-  AGENTS module paragraph included.
+- **S5 — the remaining spec realignment — DONE** (deliverable 7).
+  These documents legitimately follow the code, INTERFACES.md and
+  the AGENTS module paragraph included. Realigned by **dividing the
+  job**, not by updating four descriptions of one format:
+  blueprint-model.md is the normative model, machine-blueprint.md
+  the guide, its reference the per-field detail, media-spec.md
+  acquisition and the cache, the cookbook recipes. Restated model
+  prose was deleted rather than corrected — D32 is what the
+  alternative costs. `test_documented_examples.py` now runs every
+  documented example through the parser and the schema, so the
+  prose cannot drift from the format silently again.
 
 Deliverable 5 needs no stage: it landed with milestone 6.
 

@@ -283,15 +283,11 @@ once the state format settles.
 ├── user.properties      personal user properties (line-based
 │                        key = value; ordinary values and @secret
 │                        markers for host-stored secrets)
-├── media/               shared media definitions (mirror URLs, archive
-│                        and payload SHA-256; one definition per
-│                        source archive can itemize several named
-│                        files) — see planning/design/media-spec.md
 └── cache/               reliquary's regenerable files
-    ├── downloads/       cached source archives (redownloadable;
-    │                    reclaimed by `clean downloads`)
-    ├── media/           the named payload files machines mount,
-    │                    fetched/extracted/verified on demand
+    ├── media/           every cached payload, keyed by the name of the
+    │                    media it is (a container is a media too),
+    │                    fetched/extracted/verified on demand, with
+    │                    .ledger.json recording what each file is
     └── machines/<id>/   cached materializations (above —
                          disposable: drives regenerate from
                          blueprint and media; run records are
@@ -676,7 +672,9 @@ rlq get-property <key>
 rlq set-property <key> <value>
 rlq set-property <key> --secret
 rlq unset-property <key>
-rlq clean-archives
+rlq clean-media [<name>]
+rlq prune-media [--dry-run]
+rlq add-media <name> <file>
 rlq clean-media
 ```
 
@@ -722,9 +720,9 @@ Lifecycle semantics:
   media
   item (see planning/design/media-spec.md). It is a convenience: machine
   operations resolving a `media` reference to a fetchable
-  definition fetch implicitly. Source archives are cached under
-  `cache/downloads/`, separate from the payloads in
-  `cache/media/`.
+  media fetch implicitly. Everything caches in the one
+  `cache/media/`, keyed by media name — a container is a media like
+  any other.
 - the property family (`get-property`, `set-property`,
   `unset-property`, `list-properties`) maintains the home-wide
   user properties file described in
@@ -739,10 +737,11 @@ Lifecycle semantics:
   complete binding for programs. Every property command accepts
   `--properties <path>`, maintaining a selected file in place of
   the home's `user.properties`.
-- `clean-archives` / `clean-media` reclaim the two caches:
-  cached source archives, and payload files Reliquary can fetch
-  again. Nothing irreplaceable (definitions, `local-path` files,
-  payloads without a download source) is cleanable.
+- `clean-media` reclaims payloads Reliquary can fetch or derive
+  again, sparing what a person supplied and what a running machine
+  holds; naming one evicts it deliberately. `prune-media` keeps the
+  attachment closure and drops what only existed to produce it.
+  `add-media` supplies a payload nothing can locate.
 - `recreate-machine` is exactly destroy + create under the same
   machine id: drives regenerate as declared (`size`
   blank, `base` differenced or copied afresh). Since resolution
@@ -2117,8 +2116,12 @@ Deliverables:
    down. The schema half, by contrast, cannot lag the parser at
    all: the corpus test runs every fixture against both, so the
    schema lands in deliverable 2's commit.
-7. The remaining specs realigned as normative (blueprint-model.md
-   having led at deliverable 1):
+7. The remaining specs realigned as normative — **delivered**, by
+   dividing the job rather than restating one format in four
+   documents: blueprint-model.md (deliverable 1) is the model,
+   machine-blueprint.md the guide, its reference the per-field
+   detail, media-spec.md acquisition and the cache, the cookbook
+   recipes. The documents realigned:
    machine-blueprint.md + field reference + cookbook,
    media-spec.md (the location grammar, the readings, and
    parent/children containment replacing the source/archive

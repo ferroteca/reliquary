@@ -24,9 +24,9 @@ Reliquary meets the world through its primary interfaces:
 2. **The embedding API** — native language bindings (Python is
    the first).
 3. **The scripting language** — `.rlqs` scripts.
-4. **The machine blueprint** — the authored `.rlqb` document: the
-   machine and the `media`, `source`, and `archive` components it
-   draws on.
+4. **The machine blueprint** — the authored `.rlqb` document: an
+   array of specs of two types, the machine and the `media` it draws
+   on.
 
 They are deliberately not independent designs. The CLI and
 the API are two presentations of one semantic surface: every
@@ -40,9 +40,9 @@ is deliberately non-computational, so that anything computational
 belongs to the API (language goal G2). The authored blueprint
 format is written directly in an editor and consumed through every
 other surface: the CLI and API resolve and materialize blueprints
-(their media, source, and archive components included), scripts
-reference media by name, and landmark declarations are authored
-files of their own — a script carries no JSON. A capability that
+(their media specs included), scripts reference media by name, and
+landmark declarations are authored files of their own — a script
+carries no JSON. A capability that
 appears
 on one surface appears on the others wherever it is meaningful;
 where it does not, the omission is a named decision, not drift.
@@ -102,10 +102,13 @@ reference material.
 
 ### The machine blueprint
 
-A blueprint is a reusable, user-owned JSON description of a kind
-of machine, composed of named `machine`, `media`, `source`, and
-`archive` components: authored directly in an editor, seeded out of
-the codex, or synthesized from a native VM by `import-vm` —
+A blueprint is a reusable, user-owned JSON description of a kind of
+machine: an array of specs of two types, `machine` and `media`
+(`type` defaulting to media). A source is a media's `location`, and
+an archive is a media that other media name as their parent — the
+distinction was never a property of the artifact, only of the use.
+Authored directly in an editor, seeded out of the codex, or
+synthesized from a native VM by `import-vm` —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
 customization (U5). Its `media` components name installation media
@@ -114,9 +117,12 @@ verify the exact build the scripts target — what lets a repository
 refer precisely to media it cannot distribute (U4). Specification:
 [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its
 [reference](design/machine-blueprint-reference.md),
-[cookbook](design/machine-blueprint-cookbook.md), and the
-[media spec](design/media-spec.md) for the media, source, and
-archive components.
+[cookbook](design/machine-blueprint-cookbook.md). The format's
+normative model — structure, identity, the location grammar, and the
+reference closure — is
+[the composed blueprint model](design/blueprint-model.md); the
+[media spec](design/media-spec.md) covers acquisition, verification,
+and the cache.
 
 ## Supporting world-facing contracts
 
@@ -248,8 +254,9 @@ Every approved change then lands the same way:
 | CLI | planning/ROADMAP.md "The CLI"; working notes in [planning/design/cli.md](design/cli.md) |
 | Embedding API | [planning/design/api.md](design/api.md); the implemented binding in [docs/api-reference.md](../docs/api-reference.md) |
 | Scripting language | [planning/design/script-spec.md](design/script-spec.md) |
-| Blueprints | [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its [reference](design/machine-blueprint-reference.md) and [cookbook](design/machine-blueprint-cookbook.md) |
-| Media / source / archive components | [planning/design/media-spec.md](design/media-spec.md) |
+| Blueprints — the model | [planning/design/blueprint-model.md](design/blueprint-model.md) |
+| Blueprints — guide, fields, recipes | [planning/design/machine-blueprint.md](design/machine-blueprint.md) with its [reference](design/machine-blueprint-reference.md) and [cookbook](design/machine-blueprint-cookbook.md) |
+| Media acquisition and the cache | [planning/design/media-spec.md](design/media-spec.md) |
 | Script properties | [planning/design/script-properties.md](design/script-properties.md) |
 | The codex | [planning/design/codex.md](design/codex.md) |
 | Home / machines | [planning/design/instance-model.md](design/instance-model.md) |
