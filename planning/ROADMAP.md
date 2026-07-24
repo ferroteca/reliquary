@@ -1919,10 +1919,12 @@ per the instance model; blueprint edits round-trip through
 Realign the authored surface to the composed blueprint model as
 revised by the second 2026-07-23 design round (DECISIONS.md, "THE
 BLUEPRINT REVISION ROUND" — it supersedes the first round's
-four-component shape before any of it was implemented, and is
-normative for the model until blueprint-model.md is rewritten,
-which deliverable 1 now does before anything is built against
-it). Milestone 6 completed on the pre-composition
+four-component shape before any of it was implemented — with
+D24, D26 and D27 now folded into
+[blueprint-model.md](design/blueprint-model.md), which
+deliverable 1 rewrote and which is the normative home for the
+model in their place). Milestone 6 completed on the
+pre-composition
 formats; this milestone folds the machine blueprint and the media
 definition into one `.rlqb` format of two spec types — machine
 and media — and lands the consequent cache and materialization
@@ -2132,12 +2134,12 @@ Deliverables:
 8. The codex and `planning/examples/` re-authored to the revised
    format — explicit `type` on every spec (the good-code
    doctrine: the format doesn't enforce it, the shipped corpus
-   models it) — and renamed to the launching-point doctrine
-   (DECISIONS.md, 2026-07-23): `freedos.rlqb` →
-   `freedos.rlqb`, `freedos-install.rlqs` →
-   `freedos-install.rlqs`, the mentions across script-spec,
-   machine-blueprint.md, cli.md, docs, and tests following; the
-   FreeDOS install kept green end to end. (U1 — the codex is
+   models it). **The rename half is delivered** (D21, the
+   launching-point doctrine): the codex entries are now generic
+   `freedos` / `openbsd`, their media and scripts follow, and the
+   version lives inside each file as the location and hash. Only
+   the re-authoring half remains, and it rides the format core;
+   the FreeDOS install stays green end to end. (U1 — the codex is
    the one-command install's supply; U5 — the seeded copy is
    where customization starts, so what it models is what users
    start from; D21 for the naming.)

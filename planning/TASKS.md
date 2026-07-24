@@ -66,14 +66,18 @@ changes, every one of them fails together. So the format core is
 **one landing**, and stages 0–2 exist to make it as small as it
 can honestly be.
 
-- **S0 — the launching-point renames** (deliverable 8's rename
-  half, D21). `freedos.rlqb` → `freedos.rlqb`,
-  `freedos-install.rlqs` → `freedos-install.rlqs`, and
-  the mentions across script-spec, machine-blueprint.md, cli.md,
-  docs and tests. Purely mechanical, independent of the format,
-  green throughout — and doing it first means S3 re-authors those
-  files without also renaming them.
-- **S1 — blueprint-model.md rewritten** (deliverable 1). Docs
+- **S0 — the launching-point renames — DONE** (deliverable 8's rename
+  half, D21). The codex entries went generic — blueprints
+  `freedos` and `openbsd`, media `freedos-livecd` and
+  `openbsd-installer`, scripts named for the flow they drive —
+  with the mentions across script-spec, machine-blueprint.md,
+  cli.md, docs and tests following. Purely mechanical,
+  independent of the format, green throughout — and doing it
+  first meant S3 re-authors those files without also renaming
+  them. (The exact before/after is in D21 and the CHANGELOG;
+  this bullet deliberately does not restate the old names,
+  having been caught by its own sweep once.)
+- **S1 — blueprint-model.md rewritten — DONE** (deliverable 1). Docs
   only. Folds D22, D24, D26, D27 into one normative document,
   replacing the superseded first-round shape its banner
   disclaims.
@@ -224,9 +228,9 @@ dependency order:
   array, one schemed `location` field, no source component, no
   composition (identity-dedup instead), and the single name-keyed
   `cache/media/` with the identity ledger (content addressing
-  declined in both rounds). blueprint-model.md describes the
-  superseded first-round shape until its milestone-7 rewrite —
-  the revision-round DECISIONS entry is normative meanwhile.
+  declined in both rounds). blueprint-model.md is now the
+  worked design of the revised model, rewritten at milestone 7's
+  S1 and normative in the decision entries' place.
 - Media lifecycle commands — RESOLVED (owner, 2026-07-23,
   DECISIONS.md D30, run as milestone 7's decide-first round):
   the noun in every media verb is the media, never the owning
