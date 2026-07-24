@@ -1,5 +1,7 @@
 # Reliquary
 
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+
 Reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
 produce bootable disk images without manual interaction. It can help execute one-off commands and capture the results.
 It is built on its own agentless QEMU guest automation layer, which owns QEMU lifecycle, media, QMP identity checks,
