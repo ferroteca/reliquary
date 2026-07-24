@@ -112,7 +112,9 @@ SPDX-License-Identifier: BSD-3-Clause
   unexpected fault — is precisely an error outside the taxonomy.
   Other bindings spell the same classes natively.
 - **Async starters — sync is async plus attach** (owner,
-  2026-07-21): a long operation is one start+attach model with
+  2026-07-21; backlogged 2026-07-24, D35 — no use case, drafted
+  as U19; the blocking twins and record-management verbs stay in
+  milestone 9): a long operation is one start+attach model with
   two projections (planning/ROADMAP.md "Asynchronous runs"). The
   CLI composes them: every foreground command is
   start-plus-attach, and `--detach` is start without attach. The
@@ -155,12 +157,12 @@ carries the exceptions and each family's contract home.
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |
 | `seed-blueprint` / `seed-script` | `seed_blueprint(name, only=)` / `seed_script()` | [codex](codex.md) |
-| `run-script <label>` | `run_script()` blocking; `start_script()` → run handle (`--detach`) | [script spec](script-spec.md) |
+| `run-script <label>` | `run_script()` blocking; `start_script()` → run handle (`--detach`, backlog — D35) | [script spec](script-spec.md) |
 | `check-script` | `check_script()` | script spec |
-| `run status` / `tail` / `wait` / `cancel` | run-handle `status()` / `events()` / `wait()` / `cancel()`, the handle reopened by `attach_run()` — the handle-method exception | script spec |
+| `run status`; `tail` / `wait` / `cancel` (backlog) | `run status` reads the record; the live followers are run-handle `events()` / `wait()` / `cancel()`, the handle reopened by `attach_run()` — the handle-method exception, backlogged with async (D35) | script spec |
 | `run delete` | `delete_run()` | script spec |
 | `begin-run` / `end-run` | `begin_run()` (returns the run number) / `end_run()` — the interaction-run bracket: an ordinary run record whose driver is the caller | script spec |
-| `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle | [media spec](media-spec.md#fetch-progress) |
+| `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle (backlog — D35) | [media spec](media-spec.md#fetch-progress) |
 | `clean-media` / `prune-media` / `add-media` | `clean_media(name=None)` / `prune_media(dry_run=)` / `add_media(name, path)` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the door to out-of-band file exchange (in-band file operations are deferred: planning/ROADMAP.md "Horizon") | [instance model](instance-model.md) |
@@ -176,6 +178,13 @@ exporter vocabulary deliberately decoupled from the backend
 list.
 
 ## Handles
+
+> Both handles below are **backlog work** (D35): the
+> asynchronous-run pillar left the numbered arc for lack of a use
+> case (drafted as U19). Milestone 9 delivers the blocking twins
+> (`run_script()`, `fetch_media()`) and the record-management
+> verbs; the pull-only handles and `attach_run()` return when U19
+> is accepted. The design stands as written.
 
 **The run handle** (`start_script()`; reopened by
 `attach_run()`): a pull-only follower of the run's live

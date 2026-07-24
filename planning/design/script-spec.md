@@ -1686,10 +1686,12 @@ the user deletes it explicitly with `run delete` (API twin
 `delete_run()`, under parity). `run delete` takes its run
 numbers explicitly — the one `run` operation that never defaults
 to the machine's latest run, because deleting evidence warrants
-naming it — accepts several at once, refuses a live run's record
-(fail closed, naming the writer; `run cancel` ends the run
-first), and frees no number: numbering stays monotonic over
-deletions.
+naming it — accepts several at once, refuses the record of a run
+still open (fail closed; an interaction run closes with `end-run`
+first, and a live detached run refuses naming its writer once the
+asynchronous followers land — ROADMAP "Asynchronous runs
+(backlog)", D35), and frees no number: numbering stays monotonic
+over deletions.
 
 The record directory is self-contained and self-identifying:
 plain files, no links into machine internals, carrying the
@@ -1716,12 +1718,15 @@ The stream is written live: appended event by event, flushed at
 each event boundary, from the first preflight event to a
 terminal event stating the outcome (success, a failure class,
 cancelled — or `ended`, an interaction run's neutral close).
-Every follower — the live display, `run tail`, the
-embedding API's event iterator — reads the same growing file. A
-script run's record is owned by its runner (writer pid and start
-time); one whose writer terminated without a terminal event is
-detectably a *crashed* run. An interaction run has no resident
-writer and closes only by `end-run` (below).
+Every follower — the live display, the transcript, and (with
+the asynchronous followers, backlog) `run tail` and the API
+event iterator — reads the same growing file. A foreground run's
+record lacking a terminal event is an *incomplete* run; the
+writer identity (pid and start time) and cross-process liveness
+that make a missing terminal event a detectable *crashed* run
+arrive with the asynchronous followers (ROADMAP "Asynchronous
+runs (backlog)", D35). An interaction run has no resident writer
+and closes only by `end-run` (below).
 
 `transcript.txt` is a pure rendering of the stream (owner,
 2026-07-22), written live beside it so a copied-out record
@@ -1777,12 +1782,13 @@ closes the record with the neutral `ended` terminal event:
 Reliquary attaches no outcome to an interaction run —
 interpreting what the loop did is the caller's computation
 (G2). An open interaction run is visible, never inferred:
-`run status` shows it open with its last-event time,
-`run cancel` refuses it naming `end-run`, and `run delete`
-refuses it while open, exactly as it refuses a live script run.
-Followers never cared who writes: `run tail` and `attach_run()`
-observe an interaction run exactly as a script run, and
-`list runs` shows each record's driver.
+`run status` shows it open with its last-event time, and
+`run delete` refuses it while open — it is closed only by
+`end-run`. Who writes never mattered to a reader: `list runs`
+and `run status` show each record's driver (the asynchronous
+followers `run tail` and `attach_run()` observe an interaction
+run exactly as a script run, when they land — ROADMAP
+"Asynchronous runs (backlog)").
 
 U3's unit-test loop is served by these mechanics, never by
 semantics: per-run test selection travels as ordinary script

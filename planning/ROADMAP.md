@@ -560,9 +560,9 @@ stdout, diagnostics on stderr, exit codes unchanged — so the
 twin's return contract is the command's `--json` contract and
 the two presentations cannot drift. A twin that returns nothing
 prints `{}` on success, letting a program pass `--json`
-unconditionally; stream-bearing commands (`run-script`,
-`run tail`, `fetch-media`) reject `--json` naming
-`--progress jsonl` — a run is
+unconditionally; stream-bearing commands (`run-script` and
+`fetch-media`, the backlogged `run tail` with them) reject
+`--json` naming `--progress jsonl` — a run is
 an event stream, not a document; one flag, one meaning each.
 Secret property values serialize as their marker, never their
 value, and `--verbose` remains pretty-rendering only. Field
@@ -583,7 +583,8 @@ render everything — live progress, the outcome, the failure
 report — to stderr and leave stdout empty: the machine paths are
 `--progress jsonl` (whose stdout events are the result — the
 settled exception) and the run record, and the outcome is the
-exit code; `--detach`'s printed run id remains a result.
+exit code; `--detach`'s printed run id remains a result
+(backlog, D35).
 `--progress auto` resolves by whether *stderr* is a tty — the
 stream progress renders on — so piping stdout never degrades the
 live display and redirecting stderr to a log gets `plain`
@@ -640,15 +641,16 @@ rlq import-vm <source> --name <name> --platform <platform>
     [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
 rlq run-script <label> (--blueprint <name> | --machine <id>)
     [--property <key>=<value>]... [--properties <path>]
-    [--display] [--detach] [--progress <mode>]
+    [--display] [--progress <mode>]
 rlq run status [<n>] (--blueprint <name> | --machine <id>)
-rlq run tail [<n>] (--blueprint <name> | --machine <id>)
-    [--progress <mode>]
-rlq run wait [<n>] (--blueprint <name> | --machine <id>)
-rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
 rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
 rlq begin-run (--blueprint <name> | --machine <id>)
 rlq end-run (--blueprint <name> | --machine <id>)
+# backlog — asynchronous runs (D35), scheduled when U19 is accepted:
+rlq run-script <label> ... --detach
+rlq run tail [<n>] (--blueprint <name> | --machine <id>) [--progress <mode>]
+rlq run wait [<n>] (--blueprint <name> | --machine <id>)
+rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
 rlq type <text> (--blueprint <name> | --machine <id>)
 rlq enter <line> (--blueprint <name> | --machine <id>)
 rlq press <key>... (--blueprint <name> | --machine <id>)
@@ -1171,53 +1173,45 @@ regenerating or text-merging what the author wrote — is designed
 in [planning/design/recorder.md](design/recorder.md). Delivery
 sits in "Horizon" below; work items in planning/TASKS.md.
 
-## Asynchronous runs
+## Run records
 
-A script run can be started without blocking and observed while
-it goes — the consumer story for the feedback split
-(PRINCIPLES.md P5):
-a person leaves an hour-long install and checks back (U1), an
-automating program follows machine-readable events as they
-happen (U3). Settled design (owner, 2026-07-21):
+A script run produces a run record — a live event stream and the
+renderings of it — the consumer story for the feedback split
+(PRINCIPLES.md P5): a person watches an install and sees where
+it is (U12), an automating program follows machine-readable
+events as they happen (U14). Settled design (owner, 2026-07-21);
+asynchronous runs — detaching a run and following it from a
+process that did not start it — were deferred to the backlog
+2026-07-24 (D35; "Asynchronous runs (backlog)" below), leaving
+the run's own driver watching it live here:
 
 **The stream is written live.** `run-events.jsonl` is appended
 event by event, flushed at each event boundary, from the first
 preflight event to a terminal event stating the outcome. The
-file is the update channel: every async affordance below is a
-follower of the stream the run already produces, which keeps the
+file is the update channel: every rendering is a follower of the
+stream the run already produces — the live display, the
+transcript, the record-management verbs — which keeps the
 contract binding-clean (any language that can read lines can
 follow a run — the C/Java constraint) and keeps daemons and
-services permanently out of the picture. A record whose writer
-died without a terminal event is detectably a *crashed* run.
+services permanently out of the picture. A record lacking a
+terminal event is an *incomplete* run, and because a foreground
+run never outlives its process, telling incomplete from finished
+needs no liveness check — the terminal event is present or the
+run is over. (Writer identity and the cross-process liveness the
+*crashed*-run rule needs arrive with "Asynchronous runs
+(backlog)", where a run can outlive the terminal that started
+it.)
 
-**Sync is async plus attach.** A foreground `run-script` run is
-defined as: start the run, immediately attach the live renderer.
-One semantic, one code path — and a run started in one terminal
-can be observed from another. Ctrl-C on a foreground run cancels
-the run; Ctrl-C on a later reattach merely stops tailing.
-
-**Detach hands off at the machine boundary.** `run-script
---detach`
-completes parsing, binding, and static and capability preflight
-in the foreground (G3 — those failures belong to the invoker's
-exit code, never buried in a record), then spawns the runner and
-prints the run id. The detached runner is an owned child exactly
-as QEMU is: the run record carries writer identity (pid plus
-start time), liveness checks verify identity before any command
-targets the run, and stale records fail closed — the vm.json
-doctrine applied to the runner.
-
-**Cancel ends the run, not the machine.** `run cancel` requests
-a stop; the runner ends at the next event boundary (input
-deliveries are atomic, host transfers abort — the execution
-model's severability), writes a `cancelled` terminal event, and
-leaves the machine as-is per the no-implicit-teardown rule;
-`--stop-machine` opts into the visible hard power-off
-(the flag mirrors `cancel(stop_machine=)` — flags mirror
-parameters even in the run family; owner, 2026-07-21). Cancelled
-exits
-with its own code (`5`): deliberately neither success nor RUN
-FAILURE.
+**Cancel ends the run, not the machine.** Ctrl-C on a foreground
+run requests a stop; the runner ends at the next event boundary
+(input deliveries are atomic, host transfers abort — the
+execution model's severability), writes a `cancelled` terminal
+event, and leaves the machine as-is per the no-implicit-teardown
+rule. Cancelled exits with its own code (`5`): deliberately
+neither success nor RUN FAILURE. Cancelling a run from a
+terminal that did not start it — the `run cancel
+[--stop-machine]` command — arrives with the asynchronous
+followers (backlog).
 
 **Run identity is machine-scoped.** Runs number monotonically
 per machine, never reused; the record lives at
@@ -1265,14 +1259,14 @@ never spams records. One run may be open per machine —
 `begin-run` and `run-script` both fail closed naming an open
 run (mixed-driver records are U6's recorder machinery, grown
 from this shape through the reserved handover kinds). An
-interaction run has no resident writer: each command appends
-under the machine's exclusive lock, the crashed-run rule stays
-script-run-scoped, and openness is visible, never inferred —
-`run status` shows the open run and its last-event time,
-`run cancel` refuses it naming `end-run`, `run delete` refuses
-it while open. Followers are indifferent to the driver:
-`run tail`, `attach_run()`, and `list runs` treat interaction
-runs as ordinary records that self-identify their driver.
+interaction run has no resident writer at all: each command
+appends under the machine's exclusive lock, and openness is
+visible, never inferred — `run status` shows the open run and
+its last-event time, `run delete` refuses it while open, and it
+is closed only by `end-run`. `list runs` and `run status` treat
+interaction runs as ordinary records that self-identify their
+driver (the async followers `run tail` / `attach_run()` too,
+when they land).
 U3's per-test loop rides these mechanics: selection in as
 script properties, results out as caller-authored artifacts
 the caller reads out-of-band from the stopped machine's drives
@@ -1281,31 +1275,18 @@ test-result vocabulary in Reliquary (G2) — one iteration is
 one run record. Contract home: script-spec.md "Failure, runs,
 and transcripts".
 
-**Two presentations, under parity.** The CLI carries
-`run-script --detach`, the `run` noun family — `run status`,
-`run tail` (rendering per the decided progress vocabulary:
-pretty on a tty, plain and jsonl for programs), `run wait`
-(its exit code mirrors the run's outcome, so unbound languages
-get results by waiting), `run cancel [--stop-machine]`, and
-`run delete <n> [<n> ...]` — and
-`list runs`. The embedding API's twins: `run_script()` stays the
-blocking form; `start_script()` returns a run handle —
-`status()`, `events(follow=)` as a blocking iterator,
-`wait(timeout=)`, `cancel(stop_machine=)` — plus `delete_run()`;
-`attach_run(machine=, blueprint=, run=None)` reopens a handle
-from a fresh process, the run number defaulting to the machine's
-latest exactly as the CLI `run` operations do. The handle is
-pull-only: no callbacks, nothing a common binding language
-cannot express directly. `wait(timeout=)` completes exactly as
-the blocking form — same result, same raises — and expiry
-raises outside the error taxonomy (Python: the builtin
-`TimeoutError`): nothing failed, the handle stays valid, the
-call repeats (owner, 2026-07-21). A handle is a follower, never
-the owner: dropping one never affects its operation — GC timing
-carries no semantics in any binding, and `cancel()` is the only
-cancellation. A caller wanting concurrency without
-any of this still runs the blocking form on its own thread —
-computation stays on the caller's side of the seam.
+**Two presentations, under parity.** The CLI carries the
+record-management `run` verbs — `run status` (the record's
+state, its driver, its last-event time), `run delete <n> [<n>
+...]`, and `list runs` — alongside the foreground rendering of a
+live run (`--progress`, below). The embedding API's twins:
+`run_script()` stays the blocking form, `begin_run` / `end_run`
+open and close an interaction run, and `delete_run()` removes a
+record; each takes the CLI's selectors (`resolve_machine()` the
+shared seam) and returns what the CLI prints. The asynchronous
+half — `run-script --detach`, the followers `run tail` /
+`run wait` / `run cancel`, and the API handle `start_script()` /
+`attach_run()` — is "Asynchronous runs (backlog)" below.
 
 **Synchronous programmatic runs — the blessed divergence.** The
 sync forms are twins in capability but divergent in presentation
@@ -1315,8 +1296,9 @@ result and raises by error class, while the foreground
 Rendering is
 selected explicitly with `--progress (auto | pretty | plain |
 jsonl)` (default `auto`, tty detection — the decided BuildKit
-vocabulary) on the stream-bearing commands — `run-script`,
-`run tail`, and `fetch-media`. Under `jsonl`, stdout carries the event stream as
+vocabulary) on the stream-bearing commands — `run-script` and
+`fetch-media` (and `run tail`, when the async followers land).
+Under `jsonl`, stdout carries the event stream as
 JSON lines and nothing else, ever — diagnostics go to stderr —
 and because the stream ends with the terminal event, the last
 line is the machine-readable result: no separate result mode
@@ -1348,24 +1330,104 @@ in "The CLI" above. Honesty
 rules carry over: byte totals only where the source names them,
 hashing and extraction elapsed-only, each mirror attempt its own
 event. On the API, `fetch_media()` stays the blocking form
-(typed result, errors by class); `start_fetch()` (same
-parameters) returns a pull-only fetch handle — `status()`,
+(typed result, errors by class); the asynchronous `start_fetch()`
+handle defers with "Asynchronous runs (backlog)". Contract home:
+media-spec "Fetch progress".
+
+## Asynchronous runs (backlog)
+
+> **Deferred to the backlog** (owner, 2026-07-24, D35): the
+> asynchronous-run pillar leaves the numbered arc — milestone 9
+> delivers run records without it. No in-force or accepted use
+> case demands it: the feedback split (P5) is satisfied by the
+> run's own driver watching it live, and detaching a run or
+> following it from a process that did not start it is a
+> separable capability no case writes down. Its demand is the
+> U19 draft
+> ([planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md),
+> "start a long run and follow it from elsewhere"); accepting
+> U19 is scheduling this work back onto the arc, the citing item
+> the record. The design is settled and stands as written.
+
+**Sync is async plus attach.** A foreground `run-script` run is
+defined as: start the run, immediately attach the live renderer.
+One semantic, one code path — and a run started in one terminal
+can be observed from another. Ctrl-C on a foreground run cancels
+the run; Ctrl-C on a later reattach merely stops tailing. (Until
+this lands, milestone 9's foreground run is the simpler shape:
+the runner lives in the invoking process and the renderer reads
+the stream that process writes, with no cross-process attach.)
+
+**Detach hands off at the machine boundary.** `run-script
+--detach` completes parsing, binding, and static and capability
+preflight in the foreground (G3 — those failures belong to the
+invoker's exit code, never buried in a record), then spawns the
+runner and prints the run id. The detached runner is an owned
+child exactly as QEMU is: the run record carries writer identity
+(pid plus start time), liveness checks verify identity before
+any command targets the run, and stale records fail closed — the
+vm.json doctrine applied to the runner. This is what makes a
+record's missing terminal event a detectable *crashed* run
+rather than merely an incomplete one.
+
+**Cancel from another terminal.** `run cancel` requests a stop;
+the runner ends at the next event boundary (input deliveries are
+atomic, host transfers abort — the execution model's
+severability), writes a `cancelled` terminal event, and leaves
+the machine as-is per the no-implicit-teardown rule;
+`--stop-machine` opts into the visible hard power-off (the flag
+mirrors `cancel(stop_machine=)` — flags mirror parameters even
+in the run family; owner, 2026-07-21). The `cancelled` outcome
+and its exit code (`5`) already exist in milestone 9 for
+foreground Ctrl-C; what defers is cancelling a run the current
+process did not start.
+
+**The run family's followers.** `run tail` renders a live run's
+stream per the progress vocabulary (pretty on a tty, plain and
+jsonl for programs); `run wait`'s exit code mirrors the run's
+outcome, so unbound languages get results by waiting. Both take
+the run number as an ordinary positional argument, defaulting to
+the machine's latest run, with the machine chosen by the
+ordinary `--machine` / `--blueprint` selectors.
+
+**Two presentations — the async handle.** The embedding API's
+twin of `--detach` is `start_script()`, returning a run handle —
+`status()`, `events(follow=)` as a blocking iterator,
+`wait(timeout=)`, `cancel(stop_machine=)`;
+`attach_run(machine=, blueprint=, run=None)` reopens a handle
+from a fresh process, the run number defaulting to the machine's
+latest exactly as the CLI `run` operations do. The handle is
+pull-only: no callbacks, nothing a common binding language
+cannot express directly. `wait(timeout=)` completes exactly as
+the blocking form — same result, same raises — and expiry raises
+outside the error taxonomy (Python: the builtin `TimeoutError`):
+nothing failed, the handle stays valid, the call repeats (owner,
+2026-07-21). A handle is a follower, never the owner: dropping
+one never affects its operation — GC timing carries no semantics
+in any binding, and `cancel()` is the only cancellation. A
+caller wanting concurrency without any of this still runs the
+blocking form on its own thread — computation stays on the
+caller's side of the seam.
+
+**Fetch handle.** `start_fetch()` (the same parameters as
+`fetch_media()`) returns a pull-only fetch handle — `status()`,
 `events(follow=)`, `wait(timeout=)`, `cancel()` (aborts at an
 event boundary; the partial download is deleted, no pre-existing
 file touched). There is no attach-by-id and no CLI command —
 `start_fetch` is the one async starter without one (owner,
 2026-07-21): an ephemeral stream is process-local, reattachment
 is what run records provide, and a CLI driver backgrounds
-`fetch-media` itself, the process being the handle. The
-handle form is noninteractive by construction and rejects
+`fetch-media` itself, the process being the handle. The handle
+form is noninteractive by construction and rejects
 `on_mismatch="prompt"` — a background fetch can never hang on a
-hidden prompt. Contract home: media-spec "Fetch progress".
+hidden prompt.
 
 ## Milestones
 
 Milestones run in order — the numbering is the priority. The
 numbered arc runs from text-mode DOS on QEMU through the
-complete documented design for that one vertical, and **ends
+documented design for that one vertical — asynchronous runs
+excepted, backlogged for lack of a use case (D35) — and **ends
 there: milestone 9 is the last numbered milestone**.
 Milestones 1–3 are history: the north-star vertical
 slice, the media library, and the scripting language on its
@@ -1378,10 +1440,13 @@ folded the blueprint and media formats into one composable
 blueprint (the 2026-07-23 composition round); milestone 8
 (complete) added the script properties — the user properties file,
 secret storage, the binding pipeline, the declared derivation, and
-`${key}` location references. Milestone 9 then completes the
-documented design — run records with asynchronous runs — still for
-the DOS platform on the QEMU backend alone. **Milestone 9 is the
-current one.**
+`${key}` location references. Milestone 9 then delivers run
+records — the live event stream, its foreground renderings, the
+error taxonomy, and interaction runs — for the DOS platform on
+the QEMU backend alone; asynchronous runs (detach and
+cross-process followers) leave the arc for the backlog for lack
+of a use case (D35), joining the pillars D33 demoted.
+**Milestone 9 is the current one.**
 
 Generalizing beyond that vertical is **backlog work, not yet
 scheduled** (owner, 2026-07-23, for lack of use-case backing —
@@ -2282,11 +2347,15 @@ candidate as the supplying source, and a media whose `location`
 is a `${key}` reference materializes through the same order
 with its resolved location recorded in the state.
 
-### Milestone 9 — Run records and asynchronous runs
+### Milestone 9 — Run records
 
-The implementation of "Asynchronous runs" above — the run-events
-stream and everything that renders it — completing the feedback
-split (PRINCIPLES.md P5) for the DOS-on-QEMU vertical.
+The run-events stream and everything that renders it —
+completing the feedback split (PRINCIPLES.md P5) for the
+DOS-on-QEMU vertical. Asynchronous runs — detach, cross-process
+followers, and the API async handles — are backlog work
+("Asynchronous runs (backlog)" above; D35), scheduled back onto
+the arc only when U19 is accepted; this milestone builds the
+foreground records they will later follow.
 
 Deliverables:
 
@@ -2295,33 +2364,39 @@ Deliverables:
    and the `runs/<n>/` record layout with machine-scoped
    monotonic run numbers (the superseded `<timestamp>-<run_id>/`
    layout dies); `transcript.txt` as a pure renderer of the
-   stream; the crashed-run rule.
+   stream; a record left without a terminal event is an
+   incomplete run (the cross-process *crashed*-run rule waits on
+   async).
 2. The `--progress (auto | pretty | plain | jsonl)` renderers on
-   the stream-bearing commands (`run-script`, `run tail`,
+   the foreground stream-bearing commands (`run-script`,
    `fetch-media`), the output discipline and stability contract
    ("The CLI" above) implemented across every command, and the
    beautiful, timely, informative human rendering the feedback
    split demands.
-3. `run-script --detach` (foreground preflight, owned-child
-   runner, writer identity), and the `run` family — `run status`
-   / `run tail` / `run wait` / `run cancel [--stop-machine]` /
-   `run delete` — with `list-runs`.
+3. The error taxonomy — `ReliquaryError` the root every
+   deliberate error subclasses, with `StaticError` (2) /
+   `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5)
+   and their exit codes — folding the milestone-8 error classes
+   (`PropertiesError`, `PropertyBindingError`, `CredentialError`,
+   `ScriptParseError`, `ScriptRuntimeError`) under the root and
+   remapping the CLI's exit codes onto it; foreground Ctrl-C
+   writes the `cancelled` terminal event and exits `5`.
 4. Interaction runs: `begin-run` / `end-run`, every
    machine-targeting command appending while a run is open, one
    open run per machine.
-5. API twins under parity: `start_script()` and the pull-only
-   run handle, `attach_run()`, `delete_run()`, `begin_run` /
-   `end_run`, `start_fetch()` and the fetch handle; the error
-   taxonomy (`ReliquaryError`; `StaticError` 2 / `PreflightError`
-   3 / `RunFailure` 4 / `RunCancelled` 5).
+5. The record-management surface under parity: the `run` verbs
+   `run status` / `run delete` and `list-runs`, with API twins
+   `begin_run` / `end_run`, `delete_run()`, and the blocking
+   `run_script()` returning what the CLI prints.
 
-Done when: a detached FreeDOS install is followed from a second
-terminal in pretty and jsonl renderings of the same stream; a
-cancel ends the run at an event boundary and leaves the machine
-as-is; an interaction-run bracket records a primitive-driven
-session; and a failure report names the route and revisits, the
-expired clock and its source scope, the nearest miss, the
-screenshot, and the suggested next command.
+Done when: a foreground FreeDOS install renders live in pretty
+and, run again under `--progress jsonl`, emits the same stream as
+JSON lines with the terminal event last; Ctrl-C ends a run at an
+event boundary with exit `5`, leaving the machine as-is; an
+interaction-run bracket records a primitive-driven session; and
+a failure report names the route and revisits, the expired clock
+and its source scope, the nearest miss, the screenshot, and the
+suggested next command.
 
 ### The backend adapter seam (backlog)
 

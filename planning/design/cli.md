@@ -851,9 +851,11 @@ event. Reliquary attaches no outcome to an interaction run —
 interpreting the loop is the caller's computation. One run may
 be open per machine: a second `begin-run` or a `run-script`
 fails closed naming it. `run status` shows an open run with its
-last-event time; `run cancel` refuses it naming `end-run`;
-`run tail`, `attach_run()`, and `list-runs` treat it as any
-other record (records self-identify their driver). The record
+last-event time, `run delete` refuses it while open, and it is
+closed only by `end-run`; `list-runs` and `run status` treat it
+as any other record (records self-identify their driver; the
+async followers `run tail` / `attach_run()` too, when they
+land — backlog, D35). The record
 contract is the script spec's ("Failure, runs, and
 transcripts").
 
@@ -985,49 +987,59 @@ rlq check-script freedos-install
 rlq check-script install --blueprint freedos
 ```
 
-### Detached runs
+### Runs and run records
 
 ```
-rlq run-script <label> --detach (--blueprint <name> | --machine <id>)
 rlq run status [<n>] (--blueprint <name> | --machine <id>)
-rlq run tail [<n>] (--blueprint <name> | --machine <id>)
-rlq run wait [<n>] (--blueprint <name> | --machine <id>)
-rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
 rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
 rlq list-runs [--blueprint <name> | --machine <id>]
 ```
 
 The `run` family is the identity rule's second named exception:
-its operations map to the API run handle's methods (`status()`,
-`events()`, `wait()`, `cancel()`, plus `delete_run`), not to flat
+its operations map to the API run handle's methods, not to flat
 functions; the exception covers the command names only — flags
-mirror the method parameters as everywhere
-(`run cancel --stop-machine` ↔ `cancel(stop_machine=)`) — and a
-fresh process reopens the handle with `attach_run()`. A foreground `run-script` run is start-plus-attach: it
-streams its own progress until the run ends, and Ctrl-C cancels
-the run.
-`--detach` completes parsing, binding, and preflight in the
-foreground — those failures land on the invoking command's exit
-code — then hands off at the machine boundary and prints the
-run id.
+mirror the method parameters as everywhere. A foreground
+`run-script` run streams its own progress until the run ends,
+and Ctrl-C cancels the run (writing a `cancelled` terminal event
+and exiting `5`).
 
 Runs number monotonically per machine (`<machine-id>/<n>`); the
 `run` operations take the number positionally and default to the
-machine's latest run. `run tail` renders live progress
-(`--progress` as on `run-script`: pretty on a tty, `plain` or
-`jsonl` for programs) and Ctrl-C stops
-tailing without touching the run; `run wait` blocks until the
-terminal event and exits with the run's own outcome code, so a
-shell script or unbound language gets the result by waiting;
-`run cancel` ends the run at the next event boundary and leaves
-the machine as-is — `--stop-machine` also hard powers it off.
-`run delete` removes a run's record — the one `run` operation
-that never defaults to the latest run, because deleting evidence
-warrants naming it: the numbers are explicit, several may be
-given, a live run's record is refused (`run cancel` first), and
+machine's latest run. `run status` reports a record's state,
+driver, and last-event time; `list-runs` lists a machine's
+records with their drivers. `run delete` removes a run's
+record — the one `run` operation that never defaults to the
+latest run, because deleting evidence warrants naming it: the
+numbers are explicit, several may be given, an open run's record
+is refused (an interaction run closes with `end-run` first), and
 deletion frees no number. Records are otherwise kept for the
 machine's life; copy a record's directory out to keep it beyond
 `destroy` (the record contract is in the script spec).
+
+**Asynchronous runs — backlog (D35).** Detaching a run and
+following it from a process that did not start it left the
+numbered arc for lack of a use case (drafted as U19; ROADMAP
+"Asynchronous runs (backlog)"). When U19 is accepted these
+return, unchanged in design:
+
+```
+# scheduled when U19 is accepted:
+rlq run-script <label> --detach (--blueprint <name> | --machine <id>)
+rlq run tail [<n>] (--blueprint <name> | --machine <id>)
+rlq run wait [<n>] (--blueprint <name> | --machine <id>)
+rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
+```
+
+`--detach` completes parsing, binding, and preflight in the
+foreground — those failures land on the invoking command's exit
+code — then hands off at the machine boundary and prints the run
+id; a fresh process reopens the handle with `attach_run()`.
+`run tail` renders live progress (`--progress` as on
+`run-script`) and Ctrl-C stops tailing without touching the run;
+`run wait` blocks until the terminal event and exits with the
+run's own outcome code; `run cancel` ends the run at the next
+event boundary and leaves the machine as-is — `--stop-machine`
+also hard powers it off.
 
 ```powershell
 rlq run-script install --blueprint freedos --detach
@@ -1269,10 +1281,10 @@ Rules:
 - A command whose twin returns nothing prints `{}` on success, so
   a program may pass `--json` unconditionally on any
   result-bearing command.
-- Stream-bearing commands (`run-script`, `run tail`,
-  `fetch-media`) reject `--json`, naming `--progress jsonl`: a
-  live run is an event stream, not a document — one flag, one
-  meaning each.
+- Stream-bearing commands (`run-script` and `fetch-media`, the
+  backlogged `run tail` with them) reject `--json`, naming
+  `--progress jsonl`: a live run is an event stream, not a
+  document — one flag, one meaning each.
 - Secret property values never serialize; the JSON marker
   (`{"secret": true}`) stands in — the marker's `--json`
   spelling; the properties file spells it `@secret`.

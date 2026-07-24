@@ -217,7 +217,12 @@ The embedding API counterpart is
 `fetch_media(name, context=None, on_mismatch="fail")` — the CLI and
 the API move together (planning/INTERFACES.md). `fetch_media` is the
 blocking form: a typed result, errors raised by class. Its
-asynchronous twin `start_fetch(...)` (same parameters) returns a
+asynchronous twin `start_fetch(...)` is **backlog work** (D35 —
+the async pillar left the numbered arc for lack of a use case,
+drafted as U19; ROADMAP "Asynchronous runs (backlog)"); the
+blocking `fetch_media` and its foreground `--progress` rendering
+stay in milestone 9. Design as settled, for when it returns:
+`start_fetch(...)` (same parameters) returns a
 pull-only fetch handle — `status()`, `events(follow=)` as a blocking
 iterator over the same event kinds
 ([fetch progress](#fetch-progress)), `wait(timeout=)` completing

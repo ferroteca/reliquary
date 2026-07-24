@@ -513,6 +513,37 @@ case is general.
 >   fidelity — a real OS, not an emulated API surface — and the
 >   loop being tight enough to use while actually working.
 
+**U19 — Start a long run and follow it from elsewhere** —
+drafted (add, 2026-07-24; the async-deferral round, D35). The
+gap: the asynchronous-run pillar — `run-script --detach`, the
+cross-process followers (`run tail` / `run wait` / `run cancel`),
+and the API async handles (`start_script` / `attach_run` /
+`start_fetch`) — shapes real design but hangs from a gloss on U1
+("leaves an hour-long install and checks back") that U1's own
+text never makes, and from U14's "observes results," which a
+synchronous jsonl stream already satisfies. Milestone 9's
+records core delivers the live stream and its renderings to the
+run's own driver (P5); following a run from a process that did
+not start it is the separable capability U19 names. The pillar
+left the numbered arc for the backlog the day this was drafted
+(D35), on the same ground D33 used for the backend pillars — a
+settled design with no in-force or accepted use case. Accepting
+U19 is scheduling the async work back onto the arc, the citing
+item the acceptance record; on acceptance the ROADMAP
+"Asynchronous runs (backlog)" section and the returning
+milestone cite U19.
+
+> - **U19 — Start a long run and follow it from elsewhere.** A
+>   run takes an hour, and the person or program that started it
+>   does not wait at the terminal that launched it: they detach
+>   it, or start it in one place and follow it from another — a
+>   second terminal, a later session, a different process —
+>   watching the same live stream and reading the same outcome
+>   the driver would have seen. The run is not its terminal's
+>   captive: the machine, not the invoking process, owns it, and
+>   a follower attaches to its record while it runs and detaches
+>   without disturbing it.
+
 ### Pending clarifications
 
 Parked in-place edits — no argument needed, delivered when

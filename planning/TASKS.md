@@ -152,11 +152,88 @@ implemented yet"* — comes off as its sections land. A banner
 that outlives the code it disclaims is the wrong-instruction
 failure DECISIONS.md's preamble names.
 
-## Future implementation hints
+## Milestone 9 — run records
 
-- The error taxonomy under parity (ROADMAP milestone 9):
-  `ReliquaryError` the root; `StaticError(2)` / `PreflightError(3)`
-  / `RunFailure(4)` / `RunCancelled(5)`.
+The sprint tasklist, translated from ROADMAP milestone 9 (the
+run-records milestone as narrowed by D35 — asynchronous runs
+deferred to the backlog for lack of a use case, drafted as U19).
+Normative detail lives in script-spec.md "Failure, runs, and
+transcripts" / "The run event stream" and api.md (the error
+taxonomy); this holds the **landing order**.
+
+**What shapes this one:** the stream is the source of truth and
+everything else renders it, so it lands first; the rest are
+followers. Two things bind the order beyond that. The **record
+layout is a world-facing contract** (`runs/<n>/`, the stream's
+shape), and the old `<timestamp>-<id>/` layout dies with it — a
+break to make once (P9, no compatibility). And the **error
+taxonomy folds milestone 8's debt**: five orphan classes
+(`PropertiesError`, `PropertyBindingError`, `CredentialError`,
+`ScriptParseError`, `ScriptRuntimeError`) with no common root and
+a CLI that collapses everything but a parse error to exit 1; the
+taxonomy re-homes them and remaps the exit arms, and the stream's
+terminal events *are* its outcome classes, so it lands early
+rather than last.
+
+- **T1 — the live stream and record layout.** Deliverable 1.
+  `run-events.jsonl` written live (append + flush per event,
+  first preflight event to terminal event), the `runs/<n>/`
+  record layout with machine-scoped monotonic numbering (the
+  `<timestamp>-<run_id>/` layout and the `output/` subdir die),
+  and `transcript.txt` rewritten as a pure renderer of the
+  stream. A record without a terminal event is an incomplete run
+  (the cross-process crashed-run rule waits on async).
+  **Gate:** a run writes a growing `run-events.jsonl` under
+  `runs/<n>/`, the transcript derives from it line for line, and
+  a second run numbers `<n+1>`.
+- **T2 — the error taxonomy and exit codes.** Deliverable 3.
+  `ReliquaryError` the root every deliberate error subclasses,
+  `StaticError` (2) / `PreflightError` (3) / `RunFailure` (4) /
+  `RunCancelled` (5) and their exit-code mapping, the milestone-8
+  classes folded under the root, and the CLI's except-arms
+  remapped from the current everything-is-1 collapse. Foreground
+  Ctrl-C writes the `cancelled` terminal event and exits 5.
+  Early, because the terminal events are these outcomes and the
+  exit codes must settle before renderers assert on them.
+  **Gate:** a static failure exits 2, a noninteractive property
+  miss exits 3 (not 1 as today), a run failure exits 4, Ctrl-C
+  exits 5, and `except ReliquaryError` catches all four.
+- **T3 — the `--progress` renderers.** Deliverable 2.
+  `--progress (auto | pretty | plain | jsonl)` over the live
+  stream on `run-script` and `fetch-media`, jsonl stdout purity
+  (the terminal event last, diagnostics to stderr), the output
+  discipline across every command, and the noninteractive
+  no-prompt rule (a missing input under `plain`/`jsonl` is a
+  PREFLIGHT ERROR before the machine starts). The feedback split
+  (P5) delivered: pretty for a person, jsonl for a program,
+  neither scraped from the other. **Gate:** one install rendered
+  live in pretty and, rerun under jsonl, emitting the same stream
+  as JSON lines with the terminal event last.
+- **T4 — the record-management run verbs.** Deliverable 5.
+  `list-runs`, `run status`, `run delete` and the API twins
+  (`delete_run()`, and `run_script()` realigned to return what
+  the CLI prints), the run number an ordinary positional
+  defaulting to the latest (except `run delete`, which never
+  defaults), the machine chosen by the ordinary selectors.
+  **Gate:** `list-runs` shows a machine's records with their
+  drivers, `run status <n>` reports one, and `run delete <n>`
+  removes it while refusing an open one.
+- **T5 — interaction runs.** Deliverable 4. `begin-run` /
+  `end-run` (twins `begin_run` / `end_run`), every
+  machine-targeting command appending the execution model's event
+  kinds while a run is open, one open run per machine (a second
+  `begin-run` or a `run-script` fails closed naming it),
+  `end-run` closing with the neutral `ended` terminal event.
+  Last, because it appends through the full record + event
+  machinery the earlier stages build. **Gate:** a `begin-run` /
+  primitives / `end-run` bracket records a primitive-driven
+  session as one run record naming its driver, and a `run-script`
+  against an open run fails closed.
+
+Cross-cutting, every stage: CLI–API parity lands in the same
+change (P6), and docs (README, `docs/api-reference.md`,
+`docs/cli-reference.md`) and CHANGELOG land with the code
+(AGENTS "Documentation maintenance").
 
 ## Language
 

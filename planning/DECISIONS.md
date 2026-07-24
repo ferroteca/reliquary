@@ -48,6 +48,70 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D35 — ASYNCHRONOUS RUNS LEAVE THE ARC; MILESTONE 9 IS RUN
+  RECORDS — DECIDED (owner, 2026-07-24). Supports P8; applies
+  D23's acceptance-is-scheduling and follows D33's ground.
+  Milestone 9 narrows from "run records and asynchronous runs"
+  to run records: the live `run-events.jsonl` stream and the
+  `runs/<n>/` layout, the `--progress` renderings on foreground
+  stream-bearing commands, the error taxonomy and its exit
+  codes, interaction runs (`begin-run`/`end-run`), and the
+  record-management run verbs (`list-runs`, `run status`,
+  `run delete`). The asynchronous pillar — `run-script --detach`
+  and the detached owned-child runner, writer identity and the
+  crashed-run rule, the cross-process followers `run tail` /
+  `run wait` / `run cancel [--stop-machine]`, and the API async
+  handles `start_script` / `attach_run` / `start_fetch` with
+  their pull-only handles — leaves the numbered arc for the
+  backlog.
+  THE REASON IS DEMAND, NOT DOUBT, exactly as D33: the async
+  pillar has no use case. The feedback split (P5) demands two
+  timely renderings of a run TO ITS DRIVER — a foreground
+  concern the records core meets in full; it says nothing of
+  detach or reattach. U12 shows a long run's progress "while it
+  goes" (watch, not leave-and-return); U14 "observes results"
+  through a stream a synchronous run already emits. The "leaves
+  an hour-long install and checks back" story the async section
+  led with is a gloss on U1 that U1's own text never makes. The
+  demand is the U19 draft — start a long run and follow it from
+  elsewhere — and a draft schedules nothing; accepting U19 is
+  what returns the pillar to the arc, the citing item the record.
+  P5 IS UNAFFECTED and promotes with milestone 9 as planned
+  (D34; PRINCIPLE-PROPOSALS.md): its two-rendering demand is
+  foreground, delivered by the stream and the `--progress`
+  renderers, with nothing riding on async.
+  FOREGROUND CANCELLATION STAYS: Ctrl-C on a foreground run
+  writes the `cancelled` terminal event and exits 5
+  (`RunCancelled`), so the exit-code taxonomy lands whole; only
+  the out-of-band `run cancel` command and `--stop-machine`
+  defer with the pillar.
+  THE FORM IS D33'S: the async design keeps its own home — the
+  "Asynchronous runs" section's async-specific prose intact,
+  retitled and headed by a drop note citing U19 — while the
+  records foundation it shared (the live stream, machine-scoped
+  identity, retention and `run delete`, interaction runs, the
+  foreground renderings) moves to a "Run records" section
+  milestone 9 delivers. "Sync is async plus attach" becomes, for
+  now, sync built stream-first, with async an additive follower
+  layer the file already supports (the stream is the update
+  channel) — so the deferral costs no rework when the pillar
+  returns.
+  THE ARC STILL ENDS AT NINE (D33): the async pillar joins the
+  backend seam, the second backend, guest agents, and the GUI
+  era in the backlog, and nothing is promoted to fill it.
+  Milestone 9 completes the run-records design for the
+  DOS-on-QEMU vertical; the documented design beyond it — async
+  included — is backlog work awaiting its use case.
+  FOLDED: this entry; ROADMAP (the Milestones preamble's
+  milestone-9 sentence, the "Asynchronous runs" section split
+  into "Run records" retained and "Asynchronous runs (backlog)"
+  bannered, milestone 9's deliverables and done-when);
+  USE-CASE-PROPOSALS.md (U19 drafted); PRINCIPLE-PROPOSALS.md
+  (P5's note that async's deferral leaves it whole);
+  script-spec.md ("Failure, runs, and transcripts" and "The run
+  event stream" realigned to foreground records, async followers
+  pointed to the backlog); TASKS.md (the milestone 9 breakdown).
+
 - D34 — PROMOTION ON DELIVERY IS AUTOMATIC — DECIDED (owner,
   2026-07-24). Supports P8; sharpens D23. THE RULE: when a
   milestone or a task FULLY delivers a use case or a principle,

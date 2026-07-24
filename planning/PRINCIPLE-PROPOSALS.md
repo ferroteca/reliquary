@@ -41,8 +41,13 @@ exist yet — no run-events stream, no `--progress` renderers
 (the flag appears only in an error message today). The query
 half (`--json`) is real, but the run half is milestone 9's
 work, whose scheduling — it cites the split — is this
-proposal's acceptance. P5 returns to the standing list when
-milestone 9 lands. Statement and prose verbatim:
+proposal's acceptance. The 2026-07-24 async deferral (D35)
+leaves P5 whole within milestone 9: its two-rendering demand is
+on the run's *own driver* — pretty and machine-readable, both
+live — which the foreground stream and `--progress` renderers
+deliver; detach and cross-process following (backlogged) are not
+P5's concern. P5 returns to the standing list when milestone 9
+lands. Statement and prose verbatim:
 
 > - **P5 — The feedback split.** One run, two renderings: pretty
 >   and legible for a person, machine-readable and just as
