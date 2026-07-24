@@ -221,9 +221,9 @@ rlq (seed-blueprint | seed-script) <name> [--only]
 
 Extracts artifacts from the codex into your home — API twins
 `seed_blueprint(name, only=)`, `seed_script`. Existing files are
-never overwritten. (`seed-media` is retained as a deprecated no-op —
-media are components inside a `.rlqb` now, with no separate file to
-seed.)
+never overwritten. There is no `seed-media`: media are components
+inside a `.rlqb` and are seeded with the blueprint that declares
+them (D30 deleted the verb rather than keep it as a no-op).
 
 - `rlq seed-blueprint <name>` — seeds a blueprint (its media, source,
   and archive components ride inside it) and all scripts named in its
@@ -1055,7 +1055,15 @@ rlq search-media <term>...
 ```
 
 `list-media` shows the media names resolvable from the active
-source (the `media` components across its `.rlqb` files).
+source (the `media` components across its `.rlqb` files) — a
+plain name list, because the names are what drives and scripts
+reference and what a program greps. `--verbose` adds each
+media's owning file, its containment parent where it has one,
+and its cache state; a media declared identically in several
+files is one media and takes one row naming all of them
+(identity-dedup shown, not contradicted). The anonymous inline
+blank is never listed: it belongs to no namespace and nothing
+can reference it (D30).
 `search-media` queries the codex index and user media, matching
 terms against the media `name`s (the identifiers machine drives
 reference — semantic, not display metadata) and `description`.
@@ -1112,7 +1120,10 @@ rlq fetch-media freedos-1.4-livecd
 under `cache/media/` that Reliquary can re-fetch. Nothing
 irreplaceable — `local` source files, sourceless payloads — is
 cleanable. (There is no `delete-media`: media are components inside
-a `.rlqb`, so removing one means editing the blueprint.)
+a `.rlqb`, so removing one means editing the blueprint. The
+command existed as a pure failure until D30 deleted it — the
+noun in every media verb is the media, never its owning file,
+and file lifecycle is the blueprint verbs' job.)
 
 ```powershell
 rlq clean-archives

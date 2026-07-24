@@ -80,8 +80,9 @@ Extraction happens two ways:
   from "just use the codex's" to "I want to tweak it"
   (`--only` restricts it to the blueprint file itself);
   `seed-script <name>` extracts a single script (API twins
-  `seed_blueprint(name, only=)` / `seed_script`; `seed_media` is a
-  deprecated no-op — media are components inside a `.rlqb` now).
+  `seed_blueprint(name, only=)` / `seed_script`; there is no
+  `seed_media` — media are components inside a `.rlqb` and are
+  seeded with it, D30).
 
 Both paths obey the never-overwrite rule.
 

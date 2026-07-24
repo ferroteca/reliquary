@@ -485,7 +485,7 @@ flat verb-noun functions completing the `fetch_media` /
 `run_script` family — `create_machine`, `start_machine`,
 `stop_machine`, `apply_blueprint`, `destroy_machine`,
 `recreate_machine`, `clone_machine`, `delete_blueprint`,
-`import_vm`, `seed_blueprint` / `seed_media` / `seed_script`,
+`import_vm`, `seed_blueprint` / `seed_script`,
 `new_blueprint`, and the property family `get_property` /
 `set_property` / `unset_property` / `list_properties` — taking
 the CLI's selectors (`resolve_machine()` the shared seam) and the
@@ -626,7 +626,7 @@ rlq list-runs [--blueprint <name> | --machine <id>]
 rlq (search-blueprints | search-scripts | search-media) <term>...
     [--verbose]
 rlq new-blueprint <name> [flags]
-rlq (seed-blueprint | seed-media | seed-script) <name> [--only]
+rlq (seed-blueprint | seed-script) <name> [--only]
 rlq create-machine --blueprint <name>
 rlq start-machine (--blueprint <name> | --machine <id>) [--display]
 rlq stop-machine (--blueprint <name> | --machine <id>)
@@ -1927,11 +1927,33 @@ formats; this milestone folds the machine blueprint and the media
 definition into one `.rlqb` format of two spec types — machine
 and media — and lands the consequent cache and materialization
 reorganizations. Still DOS-on-QEMU only — a format and
-materialization reshape, no new capability. No backward
-compatibility: the pre-composition formats are replaced, not
-bridged.
+materialization reshape; beyond deliverable 4's media command
+family, no new capability. No backward compatibility: the
+pre-composition formats are replaced, not bridged (P9).
 
-Decide first: nothing — the one gating item, the `${…}` reference
+Demanded by **U4** above all — the committed, hash-pinned
+definitions a second developer builds from in place, and the
+disk they reclaim when the work cycle ends — with **U1** (the
+codex-seeded one-command install the format has to keep
+serving), **U5** (the author's parameter seams, which the
+property-valued location and the inline media are), and **P4**,
+**P7**, **P12**. D22's supports line traces each; the
+deliverables below name the ones they answer to. That trace
+sat only in retired D17 until 2026-07-23 — a milestone this
+size standing on an entry that binds nothing is the shape the
+demand-citation sweep exists to catch.
+
+Decide first: the media lifecycle commands — DECIDED (D30), the
+round TASKS.md had queued and this milestone had overlooked: the
+noun in every media verb is the media, never the owning file;
+`delete-media` and `seed-media` are deleted rather than kept as
+a failing command and a no-op (P9), the first of them having
+contradicted its own design doc since the composition round;
+and `list-media` keeps its plain name list with provenance
+behind `--verbose`. Deliverable 4 extends a family this round
+cleaned first.
+
+The other gating item, the `${…}` reference
 / media-locator grammar, went through its
 scenario battery and is recorded in DECISIONS.md (D24, the
 reference grammar battery): the shape D22 settled holds, with the
@@ -1964,7 +1986,10 @@ Deliverables:
    implementation gets checked against, and the check is not
    available until the spec exists. The rest of the spec
    realignment stays where it was, at deliverable 7: those
-   documents legitimately follow the code.
+   documents legitimately follow the code. Demand: none of its
+   own — it serves every demand below and adds none, being the
+   gate they are checked against (P8's argue-then-build
+   discipline made concrete).
 2. The revised `.rlqb` parser/validator: the root an array of
    specs (a lone spec object accepted as sugar for the array of
    one, same rules — an untyped lone object is a media);
@@ -2022,7 +2047,10 @@ Deliverables:
    which is where the `sha256`-required-once-remote check and
    non-string coercion now land; `${key}` binding is deferred to
    milestone 8 (failing closed naming properties until then).
-   `.rlqm` retired. All fail-closed, naming the problem.
+   `.rlqm` retired. All fail-closed, naming the problem. (P14,
+   as stated above; U4 and U5 for the closure's local price —
+   the checked-in source a schema validates and an editor
+   completes.)
 3. Media and materialization realigned (media.py / machines.py):
    the `materialize` modes (`new`/`difference`/`copy`/`use`),
    `read-only` (default true on cdrom), conditional `sha256`,
@@ -2031,7 +2059,9 @@ Deliverables:
    virtual paths are the recorded follow-on), and per-machine
    materializations under `cache/machines/<id>/media/` keyed by
    media name — slot name for the anonymous blank — so
-   removable-slot swaps never clobber.
+   removable-slot swaps never clobber. (U4 — the rig built from
+   committed definitions alone; U1 for the seeded install that
+   rides the same path.)
 4. The cache rework: the single name-keyed `cache/media/`
    (`cache/archives/` retired), the identity ledger (recorded
    sha256, derivation keys, provenance
@@ -2043,12 +2073,20 @@ Deliverables:
    <name>` (targeted eviction), `prune-media`
    (attachment-closure prune; scope-relative; `--dry-run`), and
    `add-media <name> <file>` (the guarded door — a pinned
-   unlocated media resolves by cache hit).
+   unlocated media resolves by cache hit). U4 writes this
+   deliverable twice over — *"the developer disposes of the
+   large VM and reclaims the disk space"* is `prune-media` and
+   `clean-media`, and *"supplying just the two things the
+   repository cannot provide"* is `add-media`, which is why the
+   milestone's one piece of new capability needs no new use
+   case; P12 for the cache staying under its own root, P6 for
+   the twins.
 5. The machine directory reorganization: `drives/` → `media/`,
    backend files into a backend-named subdir,
    `reliquary-machine.json` → `machine.json` with `vm.json` folded
    in as a while-running state section written atomically with
-   `phase`.
+   `phase`. (P12 — the layout is the home contract; P9 for
+   renaming rather than bridging.)
 6. One published blueprint JSON Schema — the two-variant root,
    machine requiring its declared `type`, media accepting its
    absence — replacing the two milestone-6 schemas; the
@@ -2062,9 +2100,15 @@ Deliverables:
    media-spec.md (the location grammar, the readings, and
    parent/children containment replacing the source/archive
    sections),
-   instance-model.md, INTERFACES.md (its blueprint entry still
-   describes the retired four-component shape), and the AGENTS /
-   ROADMAP home-layout descriptions.
+   instance-model.md, INTERFACES.md (its blueprint entry, its
+   supporting-contracts list, and its specification-homes table
+   all still name the retired four-component shape), and the
+   AGENTS / ROADMAP home-layout descriptions — AGENTS' module
+   paragraph too, which documents `document.py`'s
+   `machines`/`media`/`sources`/`archives` as current. (P8 and
+   P9 — a governing document left describing a retired shape is
+   what the next change gets checked against; INTERFACES.md is
+   an output here, never the premise D22 was triaged on.)
 8. The codex and `planning/examples/` re-authored to the revised
    format — explicit `type` on every spec (the good-code
    doctrine: the format doesn't enforce it, the shipped corpus
@@ -2073,7 +2117,10 @@ Deliverables:
    `freedos.rlqb`, `freedos-1.4-plain-install.rlqs` →
    `freedos-install.rlqs`, the mentions across script-spec,
    machine-blueprint.md, cli.md, docs, and tests following; the
-   FreeDOS install kept green end to end.
+   FreeDOS install kept green end to end. (U1 — the codex is
+   the one-command install's supply; U5 — the seeded copy is
+   where customization starts, so what it models is what users
+   start from; D21 for the naming.)
 
 Done when: the FreeDOS install script runs from a clean home
 against a machine created from a revised-format `.rlqb` (inline

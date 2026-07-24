@@ -48,6 +48,76 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D30 — THE MEDIA LIFECYCLE COMMANDS: THE NOUN IS THE MEDIA, AND
+  TWO DEAD VERBS GO — DECIDED (owner, 2026-07-23, milestone 7's
+  decide-first round, opened by the governing-input audit that
+  found the milestone claiming nothing to decide). Supports U4,
+  U5; P6, P9. TASKS.md had queued this round with four
+  questions, all of them gated on the `children` form: one
+  `.rlqb` can now declare a tree of media, so what does a media
+  verb name? THREE OF THE FOUR WERE ALREADY ANSWERED — by D22's
+  command family, and by surfaces that converged while the round
+  sat unrun. Running it found what nobody had checked.
+
+  THE NOUN IS THE MEDIA, NEVER THE FILE. Every verb in the
+  family takes a media NAME — `fetch-media <name>`,
+  `clean-media <name>`, `add-media <name> <file>`,
+  `prune-media` — and file lifecycle belongs to the blueprint
+  verbs (`delete-blueprint`, `seed-blueprint`, and editing).
+  One rule, no exceptions, so the family reads uniformly; D22
+  had already built the family this way without stating it.
+
+  `delete-media` IS DELETED — the command, the API function, the
+  export, the docs. Not "errors informatively": deleted. It
+  follows from the noun rule (removing a media IS editing a
+  `.rlqb`, which is not this family's job) and from P9. THE
+  STATE THE ROUND FOUND: cli.py registers the subparser,
+  docs/cli-reference.md documents it, README mentions it, and
+  the only thing it can do is raise `NotImplementedError` —
+  while planning/design/cli.md already states "There is no
+  `delete-media`". THE SHIPPED SURFACE AND ITS DESIGN DOC WERE
+  IN CONTRADICTION, and the doc was right. A live world-facing
+  command whose entire behavior is a failure is the
+  deprecated-name shim P9 names, wearing a different hat.
+
+  `seed-media` IS DELETED on the same ground, and named its own
+  offense: a no-op returning `False`, documented as "retained so
+  the `seed-media` surface still resolves". That is the P9
+  sentence almost verbatim — no deprecated-name shims, the old
+  shape deleted rather than bridged — and it survived only
+  because its fate was said to "ride the media-lifecycle design
+  round", which is this one.
+
+  `list-media` KEEPS THE PLAIN NAME LIST, provenance behind
+  `--verbose` / `--json`: names are what drives and scripts
+  reference and what a program greps, so the bare list stays
+  greppable; the verbose form adds owning file(s), the
+  containment parent where there is one, and cache state. A
+  DEDUP'D MEDIA IS ONE MEDIA — identical `(name, media)` specs
+  across files are one row listing every declaring file, which
+  is identity-dedup shown rather than contradicted (D22).
+  ANONYMOUS INLINE BLANKS ARE NEVER LISTED: D22 puts them in no
+  namespace and nothing can reference them, so a list of
+  referenceable names is exactly what excludes them.
+
+  WEIGHED AND DECLINED: keeping `delete-media` as a teaching
+  signpost (the message is genuinely instructive, but a command
+  that can only fail buys it with a subparser, an export, a doc
+  entry and a standing contradiction — and the teaching belongs
+  where the user actually is, which is cli.md, where it already
+  is); the file-grouped tree listing (more legible for a
+  hand-authored home, but it makes the FILE the organizing noun
+  against this round's own rule); an always-on provenance column
+  (honest, but it costs the plain-list property the whole
+  command family shares). PARKED: editing-a-component-out
+  tooling, which arrives as its own named thing under the
+  interface-change rule if a real case appears — never as a
+  resurrected verb.
+  FOLDED: this entry; ROADMAP milestone 7 (the decide-first
+  block) and its CLI section's seed listing; cli.md; api.md;
+  codex.md; the TASKS.md design item retired here. The code and
+  the user-facing docs land in the removal commit.
+
 - D29 — PARTLY-OVERRULED ENTRIES ARE ANNOTATED, NEVER REWRITTEN
   — DECIDED (owner, 2026-07-23). A convention for this record
   itself, settled on its first instance rather than after the
@@ -794,7 +864,34 @@ record, and often the most useful part of it (D29).
   second same-day round; supersedes the four-component shape of
   the media/composition round below, before any of it was
   implemented — ROADMAP milestone 7 is the retargeted
-  implementation). The composed model collapses further. TWO SPEC
+  implementation). Supports U1, U4, U5; P4, P7, P9, P12 —
+  retrofitted 2026-07-23, pulled out of the queued D1–D22
+  supports sweep (TASKS.md) ahead of its turn because milestone
+  7 is gated on this entry alone. TRIAGE UNDER THE
+  INTERFACE-CHANGE RULE, CARRIED FORWARD FROM D17: a MAJOR
+  interface change to the blueprint format, use-case-aligned,
+  no use-case amendment needed. THIS ROUND CHANGED THE SHAPE,
+  NOT THE DEMAND — so D17's triage still holds, but D17
+  retired with the shape it triaged, and a retired decision
+  binds nothing: until this line, milestone 7's only recorded
+  justification sat in an entry that binds nothing. Where the
+  demand bites: the format a repository commits and a second
+  developer builds from, pinned by hash and used in place (U4 —
+  whose disposal clause is `prune-media`'s and `clean-media`'s
+  demand, and whose supply-what-the-repo-cannot clause is
+  `add-media`'s); the codex-seeded one-command install the
+  format has to keep serving (U1); the author's parameter seams,
+  which the property-valued location and inline media are (U5);
+  the supply seam staying edit-your-seeded-copy or a
+  property-valued location rather than a second personal-values
+  mechanism (P4, the composition decline's real ground);
+  strings-interpreted / objects-explicit, every accepted string
+  with exactly one object desugaring, so a program EMITS the
+  canonical form rather than the shorthand (P7); the
+  pre-composition formats replaced and not bridged (P9); and
+  both reorganizations — the single name-keyed cache and the
+  machine directory — staying under the home and cache roots
+  (P12). The composed model collapses further. TWO SPEC
   TYPES: `machine` and `media` — the archive/media distinction was
   never a property of the artifact, only of the use, so ARCHIVE IS
   ABSORBED INTO MEDIA, and the containment vocabulary is

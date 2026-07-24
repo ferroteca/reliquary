@@ -39,10 +39,13 @@ were pruned 2026-07-23).
   USE-CASE-PROPOSALS.md / PRINCIPLES.md, owner 2026-07-23).
   Many sections already cite U-numbers; the sweep fills the
   gaps.
-- retrofit supports onto DECISIONS.md entries D1–D22: each
+- retrofit supports onto DECISIONS.md entries D1–D21: each
   names the use cases (U), principles (P), or goals (G) it
   supports (the numbering round, D23, owner 2026-07-23). New
-  entries carry supports from the start.
+  entries carry supports from the start. D22 is done —
+  pulled forward 2026-07-23 by the milestone-7 governing-input
+  audit, which found the milestone's whole justification
+  sitting in retired D17.
 
 ## Future implementation hints
 
@@ -151,21 +154,18 @@ dependency order:
   declined in both rounds). blueprint-model.md describes the
   superseded first-round shape until its milestone-7 rewrite —
   the revision-round DECISIONS entry is normative meanwhile.
-- Media lifecycle commands (`list-media`, `delete-media`, and any
-  further definition-level verbs) need careful planning before
-  the surface hardens: one `.rlqb` can define several media (the
-  `children` form). Open questions to adjudicate and
-  record in DECISIONS.md / media-spec / cli.md — what does the
-  command noun name (media vs owning file)? does
-  `delete-media` remove the whole file, edit specs out, or refuse
-  when siblings remain? how should `list-media` present file vs
-  media identity (and multi-media provenance)? `seed-media`
-  already
-  seeds by media name and copies the whole file — keep or
-  revisit that invariant together with delete/list. The current
-  provisional twins (media-name delete of the owning file; list
-  of media names) are placeholders pending this round, not
-  settled design.
+- Media lifecycle commands — RESOLVED (owner, 2026-07-23,
+  DECISIONS.md D30, run as milestone 7's decide-first round):
+  the noun in every media verb is the media, never the owning
+  file; `delete-media` and `seed-media` are deleted outright
+  (P9 — a command that can only fail and a no-op that "still
+  resolves" are the shim the rule names); `list-media` keeps
+  its plain name list with owning file, containment parent and
+  cache state behind `--verbose`, a dedup'd media showing every
+  declaring file on its one row, anonymous inline blanks never
+  listed. Component-removal tooling is parked, arriving as its
+  own named thing under the interface-change rule if a real
+  case appears.
 
 ## Backlog
 
