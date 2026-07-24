@@ -267,7 +267,8 @@ def _drive_common(key, drive):
     return entry
 
 
-def _materialize_drive(key, drive, media_root, namespace, context):
+def _materialize_drive(key, drive, media_root, namespace, context,
+                       properties=None):
     """Materialize one enabled drive, returning its resolved state entry.
 
     The drive names a media (or is an empty removable slot); the media
@@ -299,9 +300,11 @@ def _materialize_drive(key, drive, media_root, namespace, context):
         create_hdd_image(path, media.size)
         entry.update(size=media.size, path=path)
     elif mode == "use":
-        entry["path"] = _acquire_fetch(media, namespace, context)
+        entry["path"] = _acquire_fetch(
+            media, namespace, context, properties=properties)
     elif mode in ("difference", "copy"):
-        base_payload = _acquire_fetch(media, namespace, context)
+        base_payload = _acquire_fetch(
+            media, namespace, context, properties=properties)
         dest = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
         if mode == "copy":
             create_duplicate_image(dest, base_payload)
@@ -314,7 +317,7 @@ def _materialize_drive(key, drive, media_root, namespace, context):
 
 
 def create(machine, namespace, *, context=None, blueprint_name="",
-           source=None, number=None):
+           source=None, number=None, properties=None):
     """Materialize one machine from a parsed composed machine component.
 
     Creates the machine cache directory under
@@ -358,7 +361,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
         try:
             return _materialize_machine(
                 machine, namespace, machine_id, blueprint_name, created,
-                media_root, source, context)
+                media_root, source, context, properties)
         except BaseException:
             # Roll back a failed create: the machine never reached a
             # usable phase, so its partial materialization is discarded.
@@ -368,7 +371,8 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 
 
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
-                         created, media_root, source, context):
+                         created, media_root, source, context,
+                         properties=None):
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
@@ -376,7 +380,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             # entirely (machine-blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
-            key, drive, media_root, namespace, context)
+            key, drive, media_root, namespace, context, properties)
 
     memory = machine.memory
     if memory is None:
@@ -415,7 +419,35 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
     return machine_id
 
 
-def create_machine(name, *, context=None, number=None):
+def _bind_location_properties(machine, namespace, *, parameters=None,
+                              explicit=None, properties_file=None,
+                              context=None):
+    """Bind every ``${key}`` a machine's media locations reference.
+
+    Collected across the drives' containment closure and bound through
+    the property source order at create/apply time, so a media located
+    by ``${license-iso}`` materializes from the value a parameter, the
+    environment, the file, or an interactive ask supplies. Returns
+    ``{key: value}`` (empty when no location references any property).
+    """
+    from . import binding, resolve
+    keys = set()
+    for drive in machine.drives.values():
+        if not drive.enabled or drive.media is None:
+            continue
+        media = namespace.media.get(drive.media)
+        if media is not None:
+            keys.update(resolve.location_property_keys(media, namespace))
+    if not keys:
+        return {}
+    return binding.bind_keys(
+        keys, parameters=dict(machine.parameters), explicit=explicit,
+        properties_file=properties_file, context=context,
+        asker=binding.console_asker())
+
+
+def create_machine(name, *, context=None, number=None, properties=None,
+                   properties_file=None):
     """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
@@ -423,6 +455,8 @@ def create_machine(name, *, context=None, number=None):
     definitions and scripts it references (never overwriting user
     files). ``number`` pins the machine number (``recreate`` reuses
     the old id); omitted, the lowest free number is allocated.
+    ``properties`` / ``properties_file`` bind any ``${key}`` a media
+    location references, before materialization.
     """
     from .assets import source_for
     # Home mode seeds the blueprint (and the media/scripts it carries)
@@ -436,17 +470,23 @@ def create_machine(name, *, context=None, number=None):
             f"no machine blueprint named {name!r} in the resolution source")
     machine = namespace.machines[name]
     source = namespace.origin.get(("machine", name))
+    bound = _bind_location_properties(
+        machine, namespace, explicit=properties,
+        properties_file=properties_file, context=context)
     return create(machine, namespace, context=context, blueprint_name=name,
-                  source=source, number=number)
+                  source=source, number=number, properties=bound)
 
 
-def recreate_machine(*, machine=None, blueprint=None, context=None):
+def recreate_machine(*, machine=None, blueprint=None, context=None,
+                     properties=None, properties_file=None):
     """Destroy the selected machine and recreate it under the same id.
 
     Exactly ``destroy`` + ``create`` (instance model): the current
     blueprint is re-resolved and backend assignment re-runs, so drives
     regenerate as declared and the machine may land differently than
-    before. Returns the reused machine id.
+    before. ``properties`` / ``properties_file`` bind any ``${key}`` a
+    media location references, as for ``create``. Returns the reused
+    machine id.
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
@@ -455,7 +495,9 @@ def recreate_machine(*, machine=None, blueprint=None, context=None):
         raise ValueError(f"cannot parse machine id {machine_id!r}")
     blueprint_name, number = parsed
     destroy_machine(machine_id, context)
-    return create_machine(blueprint_name, context=context, number=number)
+    return create_machine(
+        blueprint_name, context=context, number=number,
+        properties=properties, properties_file=properties_file)
 
 
 def get_machine_dir(*, machine=None, blueprint=None, context=None):
@@ -472,7 +514,8 @@ def get_machine_dir(*, machine=None, blueprint=None, context=None):
 _OWNED_MODES = ("new", "difference", "copy")
 
 
-def _reconcile_drives(machine, namespace, old_drives, media_root, context):
+def _reconcile_drives(machine, namespace, old_drives, media_root, context,
+                      properties=None):
     """Reconcile a machine's drives to a re-resolved machine component.
 
     Absorbable changes are applied: added, removed, enabled/disabled
@@ -494,7 +537,7 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context):
             # No reliquary-owned image here: (re)materialize/re-point
             # freely (media re-fetch, empty slot, or a new image).
             new_drives[key] = _materialize_drive(
-                key, drive, media_root, namespace, context)
+                key, drive, media_root, namespace, context, properties)
             continue
         # An existing materialized image may only be kept unchanged.
         media = _drive_media(drive, namespace)
@@ -528,7 +571,8 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context):
     return new_drives
 
 
-def apply_blueprint(*, machine=None, blueprint=None, context=None):
+def apply_blueprint(*, machine=None, blueprint=None, context=None,
+                    properties=None, properties_file=None):
     """Adopt the current blueprint into a stopped machine.
 
     Re-resolves the blueprint the machine was created from (never at
@@ -537,8 +581,9 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
     drive changes are applied; a changed ``size`` or ``base`` on an
     already-materialized image fails closed (``recreate`` is the
     alternative). The new resolved snapshot becomes the baseline
-    (``blueprint-digest`` / ``blueprint-source`` re-recorded). Returns
-    the machine id.
+    (``blueprint-digest`` / ``blueprint-source`` re-recorded).
+    ``properties`` / ``properties_file`` bind any ``${key}`` a
+    re-materialized media location references. Returns the machine id.
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
@@ -557,9 +602,13 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
         parsed = namespace.machines[blueprint_name]
         path = namespace.origin.get(("machine", blueprint_name))
 
+        bound = _bind_location_properties(
+            parsed, namespace, explicit=properties,
+            properties_file=properties_file, context=context)
         media_root = _machine_media_dir(machine_id, context)
         new_drives = _reconcile_drives(
-            parsed, namespace, state.get("drives", {}), media_root, context)
+            parsed, namespace, state.get("drives", {}), media_root, context,
+            bound)
 
         memory = parsed.memory
         if memory is None:

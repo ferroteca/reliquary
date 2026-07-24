@@ -58,10 +58,12 @@ which lives under the (independently resolvable) cache root.
 
 ## Cached machines (the blueprint lifecycle)
 
-- `create_machine(name, *, context=None)` - Materialize a new machine
+- `create_machine(name, *, context=None, properties=None,
+  properties_file=None)` - Materialize a new machine
   from a blueprint name; returns the machine id
   (`<blueprint>-<n>`, lowest free number). Seeds codex content on
-  first reference. CLI twin: `create-machine`.
+  first reference. `properties` / `properties_file` bind any
+  `${key}` a media location references. CLI twin: `create-machine`.
 - `create(machine, namespace, *, context=None, blueprint_name="")` -
   The same, from an already-parsed machine component and the
   resolution namespace (`load_namespace`).
@@ -82,11 +84,13 @@ which lives under the (independently resolvable) cache root.
 - `destroy_machine(machine_id, context=None)` - Delete the machine
   entirely; frees its number for reuse. CLI twin:
   `destroy-machine`.
-- `recreate_machine(*, machine=None, blueprint=None, context=None)` -
+- `recreate_machine(*, machine=None, blueprint=None, context=None,
+  properties=None, properties_file=None)` -
   Destroy the selected machine and recreate it under the same id,
   re-resolving the current blueprint. Returns the reused id. CLI
   twin: `recreate-machine`.
-- `apply_blueprint(*, machine=None, blueprint=None, context=None)` -
+- `apply_blueprint(*, machine=None, blueprint=None, context=None,
+  properties=None, properties_file=None)` -
   Adopt the current blueprint into a stopped machine: absorbable
   changes are applied and the baseline digest re-recorded; a changed
   `size` or `materialize` on an already-materialized media image
@@ -246,6 +250,14 @@ an ordinary `set_property` on that key refuses to overwrite.
   `PropertyBindingError`. `describe_sources(...)` is its dry twin,
   naming each key's source without binding it (what `check_script`
   reports).
+
+`create_machine`, `recreate_machine`, and `apply_blueprint` accept
+`properties=` and `properties_file=`: any `${key}` a media
+`location` (or `sha256`) references binds through the same source
+order before materialization, and the resolved location is recorded
+in the machine state (`start` never re-resolves it). A bound value
+that is itself a reference is refused. See the blueprint guide for
+the `location` grammar.
 
 ## Guest interaction
 

@@ -522,6 +522,15 @@ def _flag(value, where):
 
 # --- locations -------------------------------------------------------
 
+def location_from_string(value, where):
+    """Public: interpret a location string into a :class:`Location`.
+
+    The seam T5 uses to re-interpret a property-bound location value
+    (a path, a URL, or — refused as chaining — another reference).
+    """
+    return _location_string(value, where)
+
+
 def _location_string(value, where):
     """Interpret one location string by scheme.
 

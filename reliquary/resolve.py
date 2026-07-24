@@ -133,13 +133,51 @@ class Alternatives:
     options: Tuple[object, ...]
 
 
-def _deferred_failure(where, deferred):
-    names = ", ".join(sorted(
-        {reference.text for reference in deferred.references}))
+def _unbound_failure(where, keys):
+    names = ", ".join("${" + key + "}" for key in sorted(keys))
     return RuntimeError(
-        f"{where} needs {names}, and property binding is not implemented "
-        "yet — properties are the channel these resolve through, and "
-        "nothing supplies them today")
+        f"{where} needs {names}, and no property supplies it; bind it with "
+        "--property, a blueprint parameter, the environment, the properties "
+        "file, or (on a terminal) interactively")
+
+
+def _render_deferred(deferred, properties, where):
+    """Substitute a deferred string's references with bound values.
+
+    A reference resolving to a value that is itself a reference fails
+    closed — a location binds once, it does not chain.
+    """
+    text = deferred.text
+    for reference in deferred.references:
+        key = reference.target
+        value = properties.get(key)
+        if value is None:
+            raise _unbound_failure(where, [key])
+        if "${" in value:
+            raise _chaining_failure(where, key, value)
+        text = text.replace(reference.text, value)
+    return text
+
+
+def _chaining_failure(where, key, value):
+    return RuntimeError(
+        f"{where}: the property ${{{key}}} resolved to {value!r}, which is "
+        "itself a reference; a location binds once and does not chain")
+
+
+def _location_from_value(value, where):
+    """Interpret a bound location string as a concrete url/local rung.
+
+    A resolved value naming another media or property is chaining and
+    is refused; a location must bind to bytes, not to another edge.
+    """
+    location = document.location_from_string(value, where)
+    if location.kind not in ("url", "local"):
+        raise RuntimeError(
+            f"{where}: the bound location {value!r} is a "
+            f"{location.kind} reference; a location must resolve to a "
+            "path or URL, not to another media or property")
+    return location
 
 
 def _container_format(plan, parent):
@@ -164,25 +202,31 @@ def _container_format(plan, parent):
     return extension
 
 
-def _rung_plan(rung, media, namespace, seen):
+def _rung_plan(rung, media, namespace, seen, properties):
     if rung.kind == "url":
-        return Download(url=rung.url, sha256=_hash_of(media))
+        return Download(url=rung.url, sha256=_hash_of(media, properties))
     if rung.kind == "local":
-        return LocalFile(path=rung.local, sha256=_hash_of(media))
+        return LocalFile(path=rung.local, sha256=_hash_of(media, properties))
     if rung.kind == "property":
-        raise RuntimeError(
-            f"media {media.name!r} is located by ${{{rung.property_key}}}, "
-            "and property binding is not implemented yet — properties are "
-            "the channel these resolve through, and nothing supplies them "
-            "today")
+        where = f"media {media.name!r}"
+        value = properties.get(rung.property_key)
+        if value is None:
+            raise _unbound_failure(where, [rung.property_key])
+        if "${" in value:
+            raise _chaining_failure(where, rung.property_key, value)
+        return _rung_plan(_location_from_value(value, where),
+                          media, namespace, seen, properties)
     if rung.kind == "deferred":
-        raise _deferred_failure(f"media {media.name!r}", rung.deferred)
+        where = f"media {media.name!r}"
+        value = _render_deferred(rung.deferred, properties, where)
+        return _rung_plan(_location_from_value(value, where),
+                          media, namespace, seen, properties)
     if rung.kind == "parent":
-        return _parent_plan(rung, media, namespace, seen)
+        return _parent_plan(rung, media, namespace, seen, properties)
     raise ValueError(f"unresolvable location kind {rung.kind!r}")
 
 
-def _parent_plan(rung, media, namespace, seen):
+def _parent_plan(rung, media, namespace, seen, properties):
     name = rung.parent
     if name in seen:
         cycle = " -> ".join(seen + (name,))
@@ -191,7 +235,7 @@ def _parent_plan(rung, media, namespace, seen):
     if parent is None:
         raise KeyError(
             f"no media named {name!r} for {media.name!r} to come from")
-    inner = _media_plan(parent, namespace, seen + (name,))
+    inner = _media_plan(parent, namespace, seen + (name,), properties)
     if inner is None:
         raise ValueError(
             f"media {name!r} is a blank and has no bytes for {media.name!r} "
@@ -205,23 +249,26 @@ def _parent_plan(rung, media, namespace, seen):
     # one yields the child, and the parent's own hash rode down with
     # ``inner``.
     return Extract(parent=name, member=rung.path, inner=inner,
-                   sha256=_hash_of(media))
+                   sha256=_hash_of(media, properties))
 
 
-def _hash_of(media):
+def _hash_of(media, properties):
     if isinstance(media.sha256, document.Deferred):
-        raise _deferred_failure(f"the sha256 of media {media.name!r}",
-                                media.sha256)
+        value = _render_deferred(
+            media.sha256, properties, f"the sha256 of media {media.name!r}")
+        return value
     return media.sha256
 
 
-def _media_plan(media, namespace, seen=()):
+def _media_plan(media, namespace, seen=(), properties=None):
+    if properties is None:
+        properties = {}
     if not media.location:
         return None
-    plans = tuple(_rung_plan(rung, media, namespace, seen)
+    plans = tuple(_rung_plan(rung, media, namespace, seen, properties)
                   for rung in media.location)
     if any(isinstance(plan, Download) for plan in plans) \
-            and _hash_of(media) is None:
+            and _hash_of(media, properties) is None:
         raise ValueError(
             f"media {media.name!r} has a remote location and must carry a "
             "sha256: the hash is what verifies the payload is the exact "
@@ -229,6 +276,37 @@ def _media_plan(media, namespace, seen=()):
     return plans[0] if len(plans) == 1 else Alternatives(options=plans)
 
 
-def resolve_media_plan(media, namespace):
-    """The fetch plan for a media's payload, or ``None`` for a blank."""
-    return _media_plan(media, namespace)
+def resolve_media_plan(media, namespace, properties=None):
+    """The fetch plan for a media's payload, or ``None`` for a blank.
+
+    ``properties`` binds any ``${key}`` location or ``sha256``
+    reference (milestone 8, T5); without it, a referenced rung fails
+    closed naming the media and the key.
+    """
+    return _media_plan(media, namespace, properties=properties)
+
+
+def location_property_keys(media, namespace, _seen=()):
+    """Every property key a media's location/sha256 closure references.
+
+    Walks the containment closure so a create knows which keys to bind
+    before materializing. Qualified ``${media:…}`` edges are structure,
+    not property references, and contribute nothing here.
+    """
+    keys = set()
+    if media.name in _seen:
+        return keys
+    seen = _seen + (media.name,)
+    if isinstance(media.sha256, document.Deferred):
+        keys.update(ref.target for ref in media.sha256.references)
+    for rung in media.location or ():
+        if rung.kind == "property":
+            keys.add(rung.property_key)
+        elif rung.kind == "deferred":
+            keys.update(ref.target for ref in rung.deferred.references)
+        elif rung.kind == "parent":
+            parent = namespace.media.get(rung.parent)
+            if parent is not None:
+                keys.update(
+                    location_property_keys(parent, namespace, seen))
+    return keys

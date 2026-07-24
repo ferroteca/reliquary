@@ -5,28 +5,23 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Script properties
 
-> **Status:** normative for the script-properties mechanism — its
-> sources and the user properties file — and landing across
-> milestone 8 (planning/TASKS.md holds the stage order). Implemented
-> so far: the **user properties file** itself — the line format,
-> the key rules, the `@` value kinds, the surgical
-> comment-preserving edits, and the four maintenance verbs with
-> their API twins ("Property names and values", "Maintaining
-> properties"); **secret storage** — the credential-store
-> capability behind a provider seam, the entry channels, the
-> fail-safe update order and orphan handling ("Secret storage");
-> and **file selection** — `--properties` / `RELIQUARY_PROPERTIES`
-> / `properties_file=`, with credentials scoped by the selected
-> file's absolute path; and **binding into a run** — the layered
-> sources (flag, blueprint parameter with its redirect, environment
-> with collision preflight, file), the **declared derivation** —
-> `default=` candidates resolved over literal text, other declared
-> keys, and the `rlq.*` host facts, first-answerable-wins with
-> static cycle and dead-candidate checks — the interactive ask, the
-> kind rules, and the runtime secret rules (transcript and
-> diagnostic redaction; `check-script` naming each key's source,
-> never its value). Not yet: `${key}` location references at
-> create/apply (T5). Windows is the
+> **Status:** normative and **implemented** (milestone 8, complete).
+> The **user properties file** — the line format, the key rules, the
+> `@` value kinds, the surgical comment-preserving edits, and the
+> four maintenance verbs with their API twins; **secret storage** —
+> the credential-store capability behind a provider seam, the entry
+> channels, the fail-safe update order and orphan handling; **file
+> selection** — `--properties` / `RELIQUARY_PROPERTIES` /
+> `properties_file=`, credentials scoped by the selected file's
+> absolute path; **binding into a run** — the layered sources (flag,
+> blueprint parameter with its redirect, environment with collision
+> preflight, file, the **declared derivation** with its `rlq.*` host
+> facts, the interactive ask), the kind rules, and the runtime
+> secret rules (transcript and diagnostic redaction; `check-script`
+> naming each key's source, never its value); and **`${key}`
+> location references** binding at `create` / `apply` through the
+> same order, the resolved location recorded in state and never
+> re-resolved at `start`, chaining refused. Windows is the
 > only host whose credential backend is exercised (ROADMAP
 > "Horizon", host portability). Details may still change before
 > first release.

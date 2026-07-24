@@ -118,8 +118,14 @@ workflow:
   derivation's referents resolve first. `facts.py` owns the `rlq.*`
   run facts a derivation may reference (`rlq.host.username`
   login-normalized, `rlq.host.full-name`, `rlq.env.<NAME>` verbatim),
-  each an unanswerable-when-empty host value. `${key}` location
-  references land with the last milestone-8 stage.
+  each an unanswerable-when-empty host value. `bind_keys` binds the
+  bare keys a media `location`/`sha256` references (no `property`
+  node behind them) through the same order minus the derivation;
+  `resolve.py` substitutes them (`location_property_keys` collects
+  the closure, `resolve_media_plan(..., properties)` binds them),
+  and `machines.create` / `apply_blueprint` bind at materialization
+  so the state records the resolved location, never a `${key}` — a
+  bound value that is itself a reference is refused (no chaining).
   `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,

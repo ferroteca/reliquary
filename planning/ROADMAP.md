@@ -1375,10 +1375,12 @@ Packer's local HTTP server for installer answer files, and
 Milestone 6 (complete) delivered the instance model and machine
 blueprints with authored-asset residency. Milestone 7 (complete)
 folded the blueprint and media formats into one composable
-blueprint (the 2026-07-23 composition round); milestones 8–9
-then complete the documented design — the script properties,
-and run records with asynchronous runs — still for the DOS
-platform on the QEMU backend alone. **Milestone 8 is the
+blueprint (the 2026-07-23 composition round); milestone 8
+(complete) added the script properties — the user properties file,
+secret storage, the binding pipeline, the declared derivation, and
+`${key}` location references. Milestone 9 then completes the
+documented design — run records with asynchronous runs — still for
+the DOS platform on the QEMU backend alone. **Milestone 9 is the
 current one.**
 
 Generalizing beyond that vertical is **backlog work, not yet
@@ -2188,7 +2190,22 @@ the attachment closure (the extracted ISO stays, the zip husk
 goes); and the one blueprint schema validates the reworked
 conformance corpus.
 
-### Milestone 8 — Script properties
+### Milestone 8 — Script properties (complete)
+
+> **Complete** (2026-07-24), landed in five stages (planning/TASKS.md
+> holds the record): T1 the line-based user properties file, T2 the
+> host credential store and the command family with `--properties`,
+> T3 the binding pipeline (flag → parameter → env → file → ask, kind
+> rules, runtime secret redaction), T4 the declared derivation and
+> its `rlq.*` facts, T5 the `${key}` location references binding at
+> create/apply. Windows is the only host whose credential backend is
+> exercised (Horizon, host portability). This is the acceptance of
+> U5 and P13 (D23 — the citing item is the acceptance record). P13's
+> property-source model is now honored by the code and is ready to
+> move to the standing principles; U5's value-seam half is delivered
+> but its canonical customized-Windows scenario still waits on the
+> GUI era, so U5 stays accepted-awaiting-delivery. Both list-moves
+> are the owner's to make.
 
 All of [planning/design/script-properties.md](design/script-properties.md)
 — the sources script-declared properties bind through. Small and

@@ -13,6 +13,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A media `location` (or `sha256`) may reference a property with
+  `${key}`, bound at `create-machine` / `recreate-machine` /
+  `apply-blueprint` through the property source order — so a
+  blueprint can name a non-redistributable ISO by `${windows.iso}`
+  and each host supplies its own path or URL via `--property`, a
+  blueprint parameter, `RELIQUARY_PROPERTY_*`, the properties file,
+  or an interactive ask. Those commands gained `--property` and
+  `--properties`. The resolved location is recorded in the machine
+  state, so `start` never re-resolves it; an unbound key fails the
+  create before any drive is materialized, and a bound value that is
+  itself a reference is refused (a location binds once, it does not
+  chain). This completes milestone 8.
+
 - A script property can declare its own derivation with repeatable
   `default=` candidates, tried in order — the first whose references
   all resolve supplies the key, sitting between the properties file

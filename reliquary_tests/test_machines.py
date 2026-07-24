@@ -236,6 +236,53 @@ class MaterializationTests(_HomeCase):
         self.assertIn("format=raw,", cdrom_arg[0])
         self.assertIn("if=ide,index=1", cdrom_arg[0])
 
+    def test_location_property_binds_at_create_and_records_the_path(self):
+        # A media located by ${live.iso}, supplied by a blueprint
+        # parameter, materializes -- and the resolved path lands in
+        # state, so start never re-resolves the reference.
+        self._write(
+            "param", {"platform": "dos",
+                      "drives": {"cdrom0": "livecd"},
+                      "parameters": {"live.iso": self.iso_path}},
+            media=[{"name": "livecd", "materialize": "use",
+                    "read-only": True, "location": "${live.iso}"}])
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine("param", context=self.home)
+        entry = self._state(machine_id)["drives"]["cdrom0"]
+        self.assertEqual(entry["path"], self.iso_path)
+        # The recorded location is concrete: no ${...} survives.
+        self.assertNotIn("${", json.dumps(entry))
+
+    def test_location_property_from_an_explicit_value(self):
+        self._write(
+            "explicit", {"platform": "dos",
+                         "drives": {"cdrom0": "livecd"}},
+            media=[{"name": "livecd", "materialize": "use",
+                    "read-only": True, "location": "${live.iso}"}])
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            machine_id = create_machine(
+                "explicit", context=self.home,
+                properties={"live.iso": self.iso_path})
+        entry = self._state(machine_id)["drives"]["cdrom0"]
+        self.assertEqual(entry["path"], self.iso_path)
+
+    def test_an_unbound_location_property_fails_the_create(self):
+        from reliquary.binding import PropertyBindingError
+        self._write(
+            "needy", {"platform": "dos", "drives": {"cdrom0": "livecd"}},
+            media=[{"name": "livecd", "materialize": "use",
+                    "read-only": True, "location": "${live.iso}"}])
+        with mock.patch("reliquary.machines.create_hdd_image"):
+            with self.assertRaises(PropertyBindingError):
+                create_machine("needy", context=self.home)
+        # The failed create left no machine behind.
+        machines_root = os.path.join(
+            self.home, "cache", "machines")
+        leftover = (os.path.isdir(machines_root)
+                    and [n for n in os.listdir(machines_root)
+                         if not n.startswith(".")])
+        self.assertFalse(leftover)
+
     def test_drive_args_floppy_before_hdd(self):
         def _fake_hdd(path, size):
             os.makedirs(os.path.dirname(path), exist_ok=True)

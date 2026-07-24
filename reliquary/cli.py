@@ -279,6 +279,7 @@ def main(argv=None):
         "create-machine",
         help="materialize a machine from a blueprint")
     _add_home(command)
+    _add_property_inputs(command)
     command.add_argument(
         "--blueprint", required=True,
         help="blueprint to materialize")
@@ -304,12 +305,14 @@ def main(argv=None):
         "recreate-machine",
         help="destroy and recreate a machine under the same id")
     _add_selectors(command)
+    _add_property_inputs(command)
 
     # apply-blueprint
     command = subcommands.add_parser(
         "apply-blueprint",
         help="adopt blueprint edits into a stopped machine")
     _add_selectors(command)
+    _add_property_inputs(command)
 
     # get-machine-dir
     command = subcommands.add_parser(
@@ -567,7 +570,10 @@ def _create(arguments):
         raise ValueError(
             "create-machine allocates the machine number; "
             "do not pass --machine")
-    machine_id = create_machine(arguments.blueprint)
+    machine_id = create_machine(
+        arguments.blueprint,
+        properties=_explicit_properties(arguments),
+        properties_file=_properties_file(arguments))
     return _emit(arguments, machine_id,
                  lambda: print(f"created machine {machine_id}"))
 
@@ -575,7 +581,9 @@ def _create(arguments):
 def _recreate_machine(arguments):
     machine_id = recreate_machine(
         machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
+        blueprint=getattr(arguments, "blueprint", None),
+        properties=_explicit_properties(arguments),
+        properties_file=_properties_file(arguments))
     return _emit(arguments, machine_id,
                  lambda: print(f"recreated machine {machine_id}"))
 
@@ -589,7 +597,9 @@ def _get_machine_dir(arguments):
 def _apply_blueprint(arguments):
     machine_id = apply_blueprint(
         machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
+        blueprint=getattr(arguments, "blueprint", None),
+        properties=_explicit_properties(arguments),
+        properties_file=_properties_file(arguments))
     return _emit(arguments, machine_id,
                  lambda: print(f"applied blueprint to machine {machine_id}"))
 

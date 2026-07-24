@@ -25,7 +25,10 @@ than after a long machine start, and a program never hangs on a
 hidden prompt.
 """
 
+import collections
+import getpass
 import os
+import sys
 
 from . import credentials, facts, properties
 
@@ -315,6 +318,57 @@ def bind_properties(script, *, parameters=None, explicit=None,
     for declaration in _binding_order(declarations):
         binder.bind(declaration)
     return binder.result()
+
+def console_asker():
+    """An interactive asker, or None when there is no terminal.
+
+    Asking requires both stdin and stderr to be ttys: the prompt
+    writes to stderr and the answer reads from stdin (the CLI output
+    discipline). Without a terminal the binder gets no asker and an
+    unresolved property fails before the machine starts, so a program
+    never hangs on a hidden prompt.
+    """
+    if not (sys.stdin.isatty() and sys.stderr.isatty()):
+        return None
+
+    def ask(key, prompt, secret):
+        text = prompt or key
+        if secret:
+            return getpass.getpass(f"{text}: ", stream=sys.stderr) or None
+        print(f"{text}: ", end="", file=sys.stderr, flush=True)
+        line = sys.stdin.readline()
+        if not line:
+            return None
+        return line.rstrip("\n").rstrip("\r") or None
+
+    return ask
+
+# A bare key referenced by a media location has no `property` node to
+# declare it — the reference site is the declaration. It binds as
+# ordinary text through the same order minus the derivation (which
+# needs a `default=` a location cannot carry).
+_LocationKey = collections.namedtuple(
+    "_LocationKey", ("key", "kind", "prompt", "defaults"))
+
+def bind_keys(keys, *, parameters=None, explicit=None, properties_file=None,
+              context=None, asker=None):
+    """Bind a set of bare keys through the source order, as text.
+
+    The location-reference counterpart of :func:`bind_properties`:
+    keys named by a media `location` (or `sha256`) with no `property`
+    declaration behind them. Returns ``{key: value}``; an unbound key
+    raises :class:`PropertyBindingError`.
+    """
+    declarations = [
+        _LocationKey(key=key, kind="text", prompt=None, defaults=())
+        for key in sorted(keys)]
+    _preflight_environment(declarations)
+    binder = _Binder(
+        parameters=parameters, explicit=explicit,
+        properties_file=properties_file, context=context, asker=asker)
+    for declaration in declarations:
+        binder.bind(declaration)
+    return binder.result().values
 
 def describe_sources(script, *, parameters=None, explicit=None,
                      properties_file=None, context=None):

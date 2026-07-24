@@ -49,7 +49,18 @@ Flags may appear before or after the command word.
 
 ### `rlq create-machine --blueprint NAME`
 
-Create a new machine from a blueprint.
+Create a new machine from a blueprint. If any media the machine
+attaches is located by a `${key}` property reference, that key is
+bound before materialization — from `--property KEY=VALUE`, a
+blueprint parameter, `RELIQUARY_PROPERTY_<KEY>`, the properties file
+(`--properties PATH`), or an interactive ask — so a blueprint can
+name a non-redistributable ISO by `${windows.iso}` and each host
+supplies its own path or URL. The **resolved** location is recorded
+in the machine state; `start` never re-resolves it. A key that no
+source answers fails the create before any drive is materialized. A
+bound value that is itself a reference is refused — a location binds
+once, it does not chain. `recreate-machine` and `apply-blueprint`
+take the same `--property` / `--properties`.
 
 ### `rlq start-machine (--blueprint NAME | --machine ID) [--display]`
 

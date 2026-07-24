@@ -162,5 +162,79 @@ class FetchPlanTests(unittest.TestCase):
         self.assertNotIn("milestone", message)
 
 
+class LocationBindingTests(unittest.TestCase):
+    """`${key}` in a location binds through a supplied properties map (T5)."""
+
+    def _ns(self, value):
+        return resolve.namespace_of(parse_document(value))
+
+    def test_a_property_location_binds_to_a_url(self):
+        ns = self._ns([{"name": "win", "location": "${windows.iso}",
+                        "sha256": SHA}])
+        plan = resolve.resolve_media_plan(
+            ns.media["win"], ns,
+            {"windows.iso": "https://vendor.test/win.iso"})
+        self.assertIsInstance(plan, Download)
+        self.assertEqual(plan.url, "https://vendor.test/win.iso")
+        self.assertEqual(plan.sha256, SHA)
+
+    def test_a_property_location_binds_to_a_local_path(self):
+        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
+        plan = resolve.resolve_media_plan(
+            ns.media["win"], ns, {"windows.iso": "C:/isos/win.iso"})
+        self.assertIsInstance(plan, LocalFile)
+        self.assertEqual(plan.path, "C:/isos/win.iso")
+
+    def test_a_deferred_string_interpolates_bound_values(self):
+        ns = self._ns([{
+            "name": "win",
+            "location": "https://vendor.test/${edition}/win.iso",
+            "sha256": SHA}])
+        plan = resolve.resolve_media_plan(
+            ns.media["win"], ns, {"edition": "pro"})
+        self.assertIsInstance(plan, Download)
+        self.assertEqual(plan.url, "https://vendor.test/pro/win.iso")
+
+    def test_an_unbound_key_names_the_media_and_the_key(self):
+        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
+        with self.assertRaises(RuntimeError) as caught:
+            resolve.resolve_media_plan(ns.media["win"], ns, {})
+        message = str(caught.exception)
+        self.assertIn("win", message)
+        self.assertIn("windows.iso", message)
+
+    def test_a_value_that_is_itself_a_reference_fails_closed(self):
+        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
+        with self.assertRaises(RuntimeError) as caught:
+            resolve.resolve_media_plan(
+                ns.media["win"], ns, {"windows.iso": "${other}"})
+        self.assertIn("chain", str(caught.exception))
+
+    def test_a_value_naming_another_media_is_refused(self):
+        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
+        with self.assertRaises(RuntimeError) as caught:
+            resolve.resolve_media_plan(
+                ns.media["win"], ns, {"windows.iso": "${media:other}"})
+        self.assertIn("chain", str(caught.exception))
+
+    def test_a_deferred_sha256_binds(self):
+        ns = self._ns([{"name": "win",
+                        "location": "https://vendor.test/win.iso",
+                        "sha256": "${win.hash}"}])
+        plan = resolve.resolve_media_plan(
+            ns.media["win"], ns, {"win.hash": SHA})
+        self.assertEqual(plan.sha256, SHA)
+
+    def test_location_property_keys_walks_the_closure(self):
+        # A child inherits its parent's location keys: to extract inner,
+        # the outer download's ${outer.zip} must bind first.
+        ns = self._ns([{
+            "name": "outer", "location": "${outer.zip}", "sha256": SHA,
+            "children": ["inner.img"]}])
+        inner = next(m for name, m in ns.media.items() if name != "outer")
+        keys = resolve.location_property_keys(inner, ns)
+        self.assertEqual(keys, {"outer.zip"})
+
+
 if __name__ == "__main__":
     unittest.main()

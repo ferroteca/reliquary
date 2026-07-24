@@ -17,7 +17,6 @@ up and can name the scope that supplied it when a clock expires.
 
 import contextlib
 import dataclasses
-import getpass
 import mimetypes
 import os
 import re
@@ -31,7 +30,7 @@ from urllib.parse import urlsplit
 
 from qemu.qmp import ConnectError
 
-from .binding import bind_properties, describe_sources
+from .binding import bind_properties, console_asker, describe_sources
 from .library import locate_script, seed_blueprint, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
@@ -1218,31 +1217,6 @@ def _blueprint_parameters(state, context):
     return dict(component.parameters) if component is not None else {}
 
 
-def _console_asker():
-    """An interactive asker, or None when there is no terminal.
-
-    Asking requires both stdin and stderr to be ttys: the prompt
-    writes to stderr and the answer reads from stdin (the CLI output
-    discipline). Without a terminal the binder gets no asker and an
-    unresolved property fails before the machine starts, so a program
-    never hangs on a hidden prompt.
-    """
-    if not (sys.stdin.isatty() and sys.stderr.isatty()):
-        return None
-
-    def ask(key, prompt, secret):
-        text = prompt or key
-        if secret:
-            return getpass.getpass(f"{text}: ", stream=sys.stderr) or None
-        print(f"{text}: ", end="", file=sys.stderr, flush=True)
-        line = sys.stdin.readline()
-        if not line:
-            return None
-        return line.rstrip("\n").rstrip("\r") or None
-
-    return ask
-
-
 def run_script(label, *, blueprint=None, machine=None, context=None,
                display=False, properties=None, properties_file=None):
     """Resolve ``label``, ensure a machine, and execute under ``runs/``.
@@ -1275,12 +1249,14 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     bindings = bind_properties(
         script, parameters=parameters, explicit=properties,
         properties_file=properties_file, context=context,
-        asker=_console_asker())
+        asker=console_asker())
 
     # Binding passed: now create the machine if the blueprint had none.
     created = machine_id is None
     if created:
-        machine_id = _machines.create_machine(blueprint, context=context)
+        machine_id = _machines.create_machine(
+            blueprint, context=context, properties=properties,
+            properties_file=properties_file)
     run_dir = _create_run_dir(machine_id, context=context)
     final_phase, machine_phase = execute_script(
         script, machine_id=machine_id, context=context, display=display,

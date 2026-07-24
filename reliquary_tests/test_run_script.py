@@ -110,7 +110,7 @@ class BindingBeforeCreationTests(unittest.TestCase):
     def test_unbound_property_fails_without_creating_a_machine(self):
         from reliquary.binding import PropertyBindingError
         with mock.patch(
-                "reliquary.script_runner._console_asker",
+                "reliquary.script_runner.console_asker",
                 return_value=None), \
                 mock.patch(
                     "reliquary.machines.create_machine") as create:

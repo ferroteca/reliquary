@@ -201,19 +201,21 @@ def _payload_ext(media, plan):
     return media.extension or _plan_ext(plan)
 
 
-def fetch_media(media, namespace, context=None, on_mismatch="fail"):
+def fetch_media(media, namespace, context=None, on_mismatch="fail",
+                properties=None):
     """Return a media's verified payload path, fetching on demand.
 
     ``media`` is a :class:`reliquary.document.Media`; ``namespace`` a
     :class:`reliquary.resolve.Namespace`. A blank has no payload and
     returns ``None``. A local payload is used in place; everything else
-    caches at ``cache/media/<media-name>.<ext>``.
+    caches at ``cache/media/<media-name>.<ext>``. ``properties`` binds
+    any ``${key}`` in the media's location (milestone 8, T5).
     """
     if on_mismatch not in _MISMATCH_POLICIES:
         raise ValueError(
             f"on_mismatch must be one of {_MISMATCH_POLICIES}, "
             f"got: {on_mismatch!r}")
-    plan = resolve.resolve_media_plan(media, namespace)
+    plan = resolve.resolve_media_plan(media, namespace, properties)
     if plan is None:
         return None
     return _run(plan, media.name, _payload_ext(media, plan), context,

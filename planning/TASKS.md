@@ -47,7 +47,11 @@ pruned 2026-07-23).
   audit, which found the milestone's whole justification
   sitting in retired D17.
 
-## Milestone 8 — script properties
+## Milestone 8 — script properties (complete)
+
+All five stages landed (T1–T5). This breakdown is kept until the
+milestone-8 record is folded into the ROADMAP note and pruned like
+milestones 4/6/7; the stage markers below are the landing record.
 
 The sprint tasklist, translated from ROADMAP milestone 8. The
 roadmap holds the *what* and
@@ -130,7 +134,7 @@ resolves differently than it did last release.
   at fixed ranks) getting its first real test. **Gate:** a
   derivation-backed key binds with no ask, naming its winning
   candidate as the supplying source.
-- **T5 — `${key}` location references.** Deliverable 6. The
+- **T5 — `${key}` location references — DONE.** Deliverable 6. The
   grammar landed at milestone 7 parsing-only, failing closed
   naming properties; now it binds through T3's order at `create`
   / `apply`, with the resolved location recorded in the state
