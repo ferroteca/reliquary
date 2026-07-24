@@ -12,11 +12,11 @@
 #     media freedos-livecd {            <- label: names the file
 #       "url": "...FD14-LiveCD.zip",       installed as
 #       "items": [                         freedos-livecd.rlqm
-#         { "name": "freedos-1.4-livecd",  <- item: what @ takes
+#         { "name": "freedos-livecd",  <- item: what @ takes
 #           "file": "FD14LIVE.iso" } ]
 #     }
 #
-#     insert cdrom0 @freedos-1.4-livecd   # the ITEM — correct
+#     insert cdrom0 @freedos-livecd   # the ITEM — correct
 #     insert cdrom0 @freedos-livecd       # the LABEL — WRONG
 #
 # THE RESOLUTION: embedded media blocks are deleted outright, so
@@ -33,7 +33,7 @@ timeout     2m
 
 property media supplemental-disk prompt="Supplemental disk"
 
-insert cdrom0 @freedos-1.4-livecd   # an item in the shared catalog,
+insert cdrom0 @freedos-livecd   # an item in the shared catalog,
                                     # defined by a .rlqm file beside
                                     # this script or in the home
 start
@@ -42,7 +42,7 @@ wait "Welcome to FreeDOS 1.4 (LiveCD)"
 # THE SURVIVING MUSH: the same argument slot accepts two sigils
 # with different definiteness —
 #
-#     insert cdrom0  @freedos-1.4-livecd    exactly this catalog item
+#     insert cdrom0  @freedos-livecd    exactly this catalog item
 #     insert floppy1 $supplemental-disk     whichever item the run
 #                                           supplies (an explicit
 #                                           value, parameter,

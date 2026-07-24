@@ -244,7 +244,7 @@ Discovery and scripting fields: an optional `description`
 (indexed by `search`; the file stem is the blueprint's one name —
 a display-name field was weighed and dropped, owner 2026-07-21), the `scripts` map — short labels naming
 `.rlqs` files, the verbs used with `run-script`
-(`rlq run-script install --blueprint freedos-1.4-plain`) — and the
+(`rlq run-script install --blueprint freedos`) — and the
 `parameters` map: blueprint-supplied script-input bindings, each
 a direct value or a `{"property": ...}` reference, the blueprint
 half of U5's customization seams. Like the `scripts` map it is
@@ -332,7 +332,7 @@ hash verifying it is the exact build the scripts target. For
 open source systems the lazy path is:
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 ```
 
 ## Authored-asset resolution
@@ -464,7 +464,7 @@ named exceptions, each an identity with a different home surface:
 the guest-console family spells as the script language's verbs
 (below), and the `run` family maps to the API run handle's
 methods. The identity paid four characters on the north-star
-command (`rlq run-script install --blueprint freedos-1.4-plain`)
+command (`rlq run-script install --blueprint freedos`)
 — a knowing trade of succinctness for cohesion.
 
 The lifecycle vocabulary is two-layered. Blueprints are plain files
@@ -875,7 +875,7 @@ Scripts are stored in `<reliquary_home>/scripts` and invoked as
 **The July 2026 surface redesign is decided and
 [planning/design/script-spec.md](design/script-spec.md) is its source of
 truth** (including the complete typed EBNF), with
-`reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
+`reliquary/codex/scripts/freedos-install.rlqs` as the
 reference script. Realigning the implementation — parser, runtime, shipped
 scripts — with it was **milestone 4** (complete);
 see the milestones below. Pre-1.0, the superseded surface is
@@ -1400,7 +1400,7 @@ comes.
 ### Milestone 1 — The north-star command (complete, on the superseded surface)
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 ```
 
 From a clean home, that one command must end with a fully
@@ -1436,7 +1436,7 @@ Deliverables:
 4. **The codex** (planning/design/codex.md): the
    `codex/` tree (zip-bundled when packaged), copy-out on
    first reference, the never-overwrite rule, and
-   `freedos-1.4-plain` — blueprint, media definitions, and
+   `freedos` — blueprint, media definitions, and
    install/verify scripts — as its first entries.
 5. The built-in blueprint flow replaces the old root-home
    `drives/`/`machine.json`/`vm.json` layout (pre-release: no
@@ -1461,7 +1461,7 @@ semantics reach into `start` reconciliation).
    layout (spikes 5–6 and 12).
 2. **Media definition (item form only; complete)** — parse/validate one
    FreeDOS-shaped definition; resolve by name from `media/`.
-   Exit: load a `freedos-1.4-livecd`-like JSON; reject bad
+   Exit: load a `freedos-livecd`-like JSON; reject bad
    hashes/fields. Out: archive multi-item, `search`/`list`/
    `clean`, eager whole-library scan extras.
 3. **Fetch → two caches (complete)** — download → `cache/downloads/`,
@@ -1485,7 +1485,7 @@ semantics reach into `start` reconciliation).
    interaction subcommands, multi-backend.
 7. **Codex seed (complete)** — `codex/` tree + copy-out on first
    reference + never-overwrite (+ packaging zip path). Exit:
-   `--blueprint freedos-1.4-plain` seeds home files once;
+   `--blueprint freedos` seeds home files once;
    second call leaves them alone. Out: `pull`, provenance
    columns, full index/`search`.
 8. **`.rlqs` parse (FreeDOS shape; complete)** — header + state-machine +
@@ -1502,7 +1502,7 @@ semantics reach into `start` reconciliation).
     `runs/`. Exit: `rlq --blueprint … script install` invokes
     runtime end to end (may still fail mid-install). Out:
     embedded media blocks, property-bound inputs.
-11. **Author `freedos-1.4-plain` (complete)** — blueprint + media
+11. **Author `freedos` (complete)** — blueprint + media
     definition (URL + license assertion) + install/verify
     scripts in `codex/`. Exit: artifacts resolve and the
     install script matches the LiveCD flow. Out: other OS
@@ -1534,9 +1534,9 @@ semantics reach into `start` reconciliation).
     what the install needs. Runs before spike 12, which
     consumes it.
 
-Done when: `rlq --blueprint freedos-1.4-plain script
+Done when: `rlq --blueprint freedos script
 install` runs unattended from a clean home to an installed
-machine; `rlq --blueprint freedos-1.4-plain script verify`
+machine; `rlq --blueprint freedos script verify`
 confirms the installed disk boots to a DOS prompt; and `start` /
 `stop` control the machine from the CLI.
 
@@ -1646,7 +1646,7 @@ documents is implemented for DOS on QEMU.
 
 The July 2026 script-language redesign
 ([planning/design/script-spec.md](design/script-spec.md), with
-`reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` as the
+`reliquary/codex/scripts/freedos-install.rlqs` as the
 reference script)
 supersedes the surface milestones 1 and 3 implemented.
 This milestone gated everything after it: later milestones
@@ -1696,7 +1696,7 @@ Deliverables:
 6. The built-in and example scripts converted, and every document
    that quotes script syntax updated (README, planning/examples/README);
    the reference script now IS the converted builtin
-   (`reliquary/codex/scripts/freedos-1.4-plain-install.rlqs`).
+   (`reliquary/codex/scripts/freedos-install.rlqs`).
 7. The CLI/API surface renames the July 2026 queues decided
    (planning/DECISIONS.md): the twin-name identity sweep —
    `run-script`, `fetch-media`, the `seed-` family,
@@ -2133,8 +2133,8 @@ Deliverables:
    format — explicit `type` on every spec (the good-code
    doctrine: the format doesn't enforce it, the shipped corpus
    models it) — and renamed to the launching-point doctrine
-   (DECISIONS.md, 2026-07-23): `freedos-1.4-plain.rlqb` →
-   `freedos.rlqb`, `freedos-1.4-plain-install.rlqs` →
+   (DECISIONS.md, 2026-07-23): `freedos.rlqb` →
+   `freedos.rlqb`, `freedos-install.rlqs` →
    `freedos-install.rlqs`, the mentions across script-spec,
    machine-blueprint.md, cli.md, docs, and tests following; the
    FreeDOS install kept green end to end. (U1 — the codex is

@@ -146,7 +146,7 @@ class DirSourceResolutionTests(unittest.TestCase):
     def test_dir_mode_is_hermetic_no_codex(self):
         """A codex name never resolves in dir mode; search shows no codex."""
         with self.assertRaises(FileNotFoundError):
-            locate_blueprint("freedos-1.4-plain", context=self.ctx())
+            locate_blueprint("freedos", context=self.ctx())
         self.assertEqual(search_blueprints("", context=self.ctx()), [])
 
     def test_media_resolves_from_the_project_root(self):
@@ -158,7 +158,7 @@ class DirSourceResolutionTests(unittest.TestCase):
 
     def test_media_missing_in_dir_mode_does_not_seed(self):
         with self.assertRaises(KeyError):
-            resolve_media("freedos-1.4-livecd", load_namespace(self.ctx()))
+            resolve_media("freedos-livecd", load_namespace(self.ctx()))
 
 
 class SelectionScopingTests(unittest.TestCase):
@@ -194,8 +194,8 @@ class BlueprintNameIdentityTests(unittest.TestCase):
 
     def test_id_safe_name_is_accepted(self):
         doc = parse_document(
-            {"platform": "dos", "name": "freedos-1.4-plain"}, stem="h")
-        self.assertIn("freedos-1.4-plain", doc.machines)
+            {"platform": "dos", "name": "freedos"}, stem="h")
+        self.assertIn("freedos", doc.machines)
 
     def test_name_with_spaces_is_rejected(self):
         with self.assertRaises(ValueError):

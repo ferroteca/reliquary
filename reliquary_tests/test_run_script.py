@@ -23,8 +23,8 @@ class ResolveScriptStemTests(unittest.TestCase):
         self.assertEqual(
             _resolve_script_stem(
                 "install",
-                {"install": "freedos-1.4-plain-install"}),
-            "freedos-1.4-plain-install")
+                {"install": "freedos-install"}),
+            "freedos-install")
 
     def test_unknown_label_is_bare_stem(self):
         self.assertEqual(

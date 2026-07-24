@@ -67,8 +67,8 @@ changes, every one of them fails together. So the format core is
 can honestly be.
 
 - **S0 — the launching-point renames** (deliverable 8's rename
-  half, D21). `freedos-1.4-plain.rlqb` → `freedos.rlqb`,
-  `freedos-1.4-plain-install.rlqs` → `freedos-install.rlqs`, and
+  half, D21). `freedos.rlqb` → `freedos.rlqb`,
+  `freedos-install.rlqs` → `freedos-install.rlqs`, and
   the mentions across script-spec, machine-blueprint.md, cli.md,
   docs and tests. Purely mechanical, independent of the format,
   green throughout — and doing it first means S3 re-authors those

@@ -129,6 +129,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Codex names are generic, never version-bound.** The codex is a
+  launching point for real blueprints, so its entries are named for
+  the system and the version lives inside the file as the source
+  URL and hash: `freedos-1.4-plain` → `freedos`,
+  `openbsd-7.9-amd64` → `openbsd`, with the media following
+  (`freedos-1.4-livecd` → `freedos-livecd`,
+  `openbsd-7.9-amd64-install` → `openbsd-installer`). Scripts are
+  named for the flow they drive, never a release:
+  `freedos-1.4-plain-install` → `freedos-install`,
+  `freedos-1.4-verify` → `freedos-verify`,
+  `openbsd-7.9-install` → `openbsd-install`. The `-plain` variant
+  marker goes with them — the launching point *is* the plain
+  install, and variants are the user's. A codex version bump is now
+  a content update under an unchanged name, and machine ids shorten
+  with their blueprints (`freedos-0`). Descriptions still name the
+  release each entry is tested against.
 - **Composed blueprint model.** Reliquary's two authored JSON formats
   fold into one composable blueprint `.rlqb` of named components —
   `machine` / `media` / `source` / `archive` — mixed and matched

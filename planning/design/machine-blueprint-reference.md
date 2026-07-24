@@ -129,7 +129,7 @@ The machine component's **identity** — its selection key. Declared,
 it overrides the filename stem: `--blueprint <name>` selects it and a
 machine's identity is `<name>-<n>`. A lone bare-root machine may omit
 it — identity falls back to the file stem (the common case, a
-`freedos-1.4-plain.rlqb` needs no `name`); a machine written inside a
+`freedos.rlqb` needs no `name`); a machine written inside a
 `machines` section must name itself, since a section can hold several
 and the file stem cannot pick one. Because it becomes a machine-id
 segment and a
@@ -141,7 +141,7 @@ blueprints (which have no stem) a stable identity; human prose
 belongs in [`description`](#description).
 
 ```json
-{"name": "freedos-1.4-plain"}
+{"name": "freedos"}
 ```
 
 ---
@@ -173,15 +173,15 @@ the field from the file (see [the codex](codex.md)).
 A map of short labels to script file names (the stem of
 `scripts/<name>.rlqs`). Labels are the verbs used with the
 `run-script` command:
-`rlq run-script install --blueprint freedos-1.4-plain`
+`rlq run-script install --blueprint freedos`
 looks up `scripts.install` and runs the script it names. Labels
 take priority over bare script filenames.
 
 ```json
 {
   "scripts": {
-    "install": "freedos-1.4-plain-install",
-    "verify": "freedos-1.4-plain-verify"
+    "install": "freedos-install",
+    "verify": "freedos-verify"
   }
 }
 ```
@@ -220,7 +220,7 @@ use case names:
   "parameters": {
     "identity.full-name": "testuser",
     "os.install-key": {"property": "products.windows-98.install-key"},
-    "supplemental-disk": "freedos-1.4-bonus"
+    "supplemental-disk": "freedos-bonus"
   }
 }
 ```
@@ -413,7 +413,7 @@ dropped.
 A value is a **media-name string** (shorthand):
 
 ```json
-{"drives": {"cdrom": "freedos-1.4-livecd"}}
+{"drives": {"cdrom": "freedos-livecd"}}
 ```
 
 or an **object** carrying the media name plus hardware attributes:
@@ -467,7 +467,7 @@ or reference these files; the media name is the handle.
 The name of a [media component](media-spec.md):
 
 ```json
-{"media": "freedos-1.4-livecd"}
+{"media": "freedos-livecd"}
 ```
 
 The name resolves against the blueprint namespace — the `media`

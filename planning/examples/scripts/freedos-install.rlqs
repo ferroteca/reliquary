@@ -9,7 +9,7 @@ timeout  30s
 deadline 45m        # required: the cd-boot <-> partitioning cycle
 
 phase insert-cd {
-    insert cdrom0 @freedos-1.4-livecd
+    insert cdrom0 @freedos-livecd
     start
     goto cd-boot
 }

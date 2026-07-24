@@ -15,7 +15,7 @@ from reliquary.script_timing import format_plan, resolve
 
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.abspath(reliquary.__file__)),
-    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
+    "codex", "scripts", "freedos-install.rlqs")
 
 _HEAD = "platform dos\n"
 
@@ -49,7 +49,7 @@ class CheckScriptTests(unittest.TestCase):
     def test_a_bare_name_reads_a_builtin_without_writing(self):
         with tempfile.TemporaryDirectory() as home:
             result = check_script(
-                "freedos-1.4-plain-install", context=home)
+                "freedos-install", context=home)
             self.assertEqual(result.plan.run_deadline.spelling, "45m")
             self.assertFalse(os.path.isdir(
                 os.path.join(home, "scripts")))
@@ -70,8 +70,8 @@ class CheckScriptTests(unittest.TestCase):
     def test_a_blueprint_label_resolves_without_creating_a_machine(self):
         with tempfile.TemporaryDirectory() as home:
             result = check_script(
-                "install", blueprint="freedos-1.4-plain", context=home)
-            self.assertIn("freedos-1.4-plain-install", result.script_path)
+                "install", blueprint="freedos", context=home)
+            self.assertIn("freedos-install", result.script_path)
             self.assertFalse(os.path.isdir(
                 os.path.join(home, "cache")))
             self.assertEqual(result.plan.run_deadline.spelling, "45m")
@@ -94,7 +94,7 @@ class CheckScriptTests(unittest.TestCase):
             with open(os.path.join(scripts, "use-cd.rlqs"),
                       "w", encoding="utf-8") as handle:
                 handle.write(
-                    _HEAD + 'insert cdrom0 @freedos-1.4-livecd\n'
+                    _HEAD + 'insert cdrom0 @freedos-livecd\n'
                     'wait "x"\n')
             with mock.patch(
                     "reliquary.script_runner._machines") as machines:

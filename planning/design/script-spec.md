@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > planned. The parser, the static rules, the timing plan, and the
 > runtime speak this surface, and so do the shipped built-in and
 > example scripts:
-> `reliquary/codex/scripts/freedos-1.4-plain-install.rlqs` is
+> `reliquary/codex/scripts/freedos-install.rlqs` is
 > the reference script, and the files under
 > `planning/design/script-examples/` catalog known residual rough
 > edges in this surface. Properties and their binding and the full
@@ -34,7 +34,7 @@ One `<name>.rlqs` file per script; a run selects its machine with
 blueprint has exactly one machine, `--blueprint <name>`:
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 ```
 
 After preflight, `run-script` resolves its machine
@@ -206,7 +206,7 @@ Every token class has one spelling:
 | bare word | keyword or script-internal name | `phase`, `goto formatting`, `cdrom0`, `press enter`, the `stopped` in `machine=stopped` |
 | `"..."` | literal text crossing the guest boundary | `wait "C:\>"`, `enter "fdapm poweroff"` |
 | `/.../` | regex match | `wait /[0-9]+ files copied/` |
-| `@name` | external reference, resolved from the media namespace | `insert cdrom0 @freedos-1.4-livecd` |
+| `@name` | external reference, resolved from the media namespace | `insert cdrom0 @freedos-livecd` |
 | `$key` | a declared property's bound value | `insert floppy1 $supplemental-disk` |
 | `name=value` | modifier of the node it follows | `timeout=5m`, `machine=stopped`, `exclude="with sources"` |
 | `5m`, `500ms` | duration | `wait machine=stopped timeout=2m` |
@@ -1468,7 +1468,7 @@ Failing observations capture a screenshot automatically.
 ### `insert` and `eject`
 
 ```rlqs
-insert cdrom0 @freedos-1.4-livecd
+insert cdrom0 @freedos-livecd
 insert floppy1 $supplemental-disk
 eject cdrom0
 ```
@@ -1847,7 +1847,7 @@ timeout     30s
 deadline    45m
 
 phase startup {
-    insert cdrom0 @freedos-1.4-livecd
+    insert cdrom0 @freedos-livecd
     start
     goto cd-boot
 }

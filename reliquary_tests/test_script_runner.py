@@ -26,7 +26,7 @@ from reliquary.script_validation import PORTABLE_KEY_NAMES
 import reliquary
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.abspath(reliquary.__file__)),
-    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
+    "codex", "scripts", "freedos-install.rlqs")
 
 _HEAD = "platform dos\n"
 
@@ -525,12 +525,12 @@ class InputVerbTests(_RuntimeCase):
 
 class MachineOperationTests(_RuntimeCase):
     def test_insert_resolves_a_media_reference(self):
-        engine = self.engine("insert cdrom0 @freedos-1.4-livecd\n")
+        engine = self.engine("insert cdrom0 @freedos-livecd\n")
         with mock.patch(
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
             machines.insert_media.assert_called_once_with(
-                "plain-0", "cdrom0", "freedos-1.4-livecd",
+                "plain-0", "cdrom0", "freedos-livecd",
                 context="/tmp/home")
 
     def test_insert_from_a_property_is_not_bound_yet(self):
@@ -559,7 +559,7 @@ class MachineOperationTests(_RuntimeCase):
                 "plain-0", ("hdd0", "cdrom0"), context="/tmp/home")
 
     def test_a_machine_change_failure_reports_its_line(self):
-        engine = self.engine("insert cdrom0 @freedos-1.4-livecd\n")
+        engine = self.engine("insert cdrom0 @freedos-livecd\n")
         with mock.patch(
                 "reliquary.script_runner._machines") as machines:
             machines.insert_media.side_effect = ValueError(
@@ -854,7 +854,7 @@ class ExecutePreflightTests(unittest.TestCase):
         self._write_state()
         script = parse_script(
             _HEAD + "machine stopped\n"
-            "insert cdrom0 @freedos-1.4-livecd\nstart\n")
+            "insert cdrom0 @freedos-livecd\nstart\n")
         with self.assertRaises(ScriptRuntimeError) as caught:
             execute_script(script, machine_id=self.machine_id,
                            context=self.home)
@@ -907,7 +907,7 @@ class ExecutePreflightTests(unittest.TestCase):
                        "path": None},
         })
         script = parse_script(
-            _HEAD + "machine stopped\ninsert cdrom0 @freedos-1.4-livecd\n")
+            _HEAD + "machine stopped\ninsert cdrom0 @freedos-livecd\n")
         with mock.patch(
                 "reliquary.script_runner._machines") as machines, \
                 contextlib.redirect_stdout(io.StringIO()):

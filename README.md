@@ -105,10 +105,10 @@ Installing registers two equivalent commands: `rlq` (the short form used through
 
 ```powershell
 rlq --help
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 ```
 
-From a clean home, that one command materializes a machine from the codex's `freedos-1.4-plain` blueprint (seeding the
+From a clean home, that one command materializes a machine from the codex's `freedos` blueprint (seeding the
 blueprint — its LiveCD media rides inside it — and its scripts into your home as ordinary user-owned files), inserts the
 fetched, hash-verified LiveCD to the blueprint's empty CD drive, boots it, and drives the FreeDOS installer end to end —
 language, partitioning, the reboot, the "Plain DOS system" package set — until the guest powers itself off and the
@@ -116,9 +116,9 @@ script ejects the CD. The machine is left with FreeDOS installed on its hard dis
 it freely:
 
 ```powershell
-rlq run-script verify --blueprint freedos-1.4-plain
-rlq start-machine --blueprint freedos-1.4-plain
-rlq stop-machine --blueprint freedos-1.4-plain
+rlq run-script verify --blueprint freedos
+rlq start-machine --blueprint freedos
+rlq stop-machine --blueprint freedos
 ```
 
 To inspect a script without running it, `rlq check-script` prints
@@ -126,8 +126,8 @@ the resolved timing plan (each observation's timeout and where it
 came from):
 
 ```powershell
-rlq check-script freedos-1.4-plain-install
-rlq check-script install --blueprint freedos-1.4-plain
+rlq check-script freedos-install
+rlq check-script install --blueprint freedos
 ```
 
 Vendor media is cached and verified against pinned SHA-256 hashes on every use: source archives under `cache/archives/`,
@@ -298,8 +298,8 @@ Seed a codex blueprint (or scaffold your own with
 `rlq new-blueprint <name>`), then create a machine from it:
 
 ```powershell
-rlq seed-blueprint freedos-1.4-plain
-rlq create-machine --blueprint freedos-1.4-plain
+rlq seed-blueprint freedos
+rlq create-machine --blueprint freedos
 ```
 
 `create-machine` materializes the machine's per-machine images under
@@ -310,7 +310,7 @@ machine of this blueprint already exists — e.g. one installed by
 ### 2. Start it
 
 ```powershell
-rlq start-machine --blueprint freedos-1.4-plain
+rlq start-machine --blueprint freedos
 ```
 
 Reliquary chooses an available local QMP port, starts QEMU headless,
@@ -328,14 +328,14 @@ QMP port (an occupied port is refused).
 prompt before running commands:
 
 ```powershell
-rlq wait "C:\\\\>" --blueprint freedos-1.4-plain
+rlq wait "C:\\\\>" --blueprint freedos
 ```
 
 ### 4. Run DOS commands
 
 ```powershell
-rlq exec "dir" --blueprint freedos-1.4-plain
-rlq exec "myprog.exe > result.log" --blueprint freedos-1.4-plain
+rlq exec "dir" --blueprint freedos
+rlq exec "myprog.exe > result.log" --blueprint freedos
 ```
 
 `exec` types the command and waits for the DOS prompt to return. To
@@ -347,8 +347,8 @@ ordinary host state (`rlq get-machine-dir` prints the path).
 ### 5. Inspect the guest
 
 ```powershell
-rlq screen --blueprint freedos-1.4-plain
-rlq screenshot after-test --blueprint freedos-1.4-plain
+rlq screen --blueprint freedos
+rlq screenshot after-test --blueprint freedos
 ```
 
 `screen` prints the current 80-by-25 text screen; `screenshot` saves a
@@ -358,7 +358,7 @@ stems, not paths.
 ### 6. Stop it
 
 ```powershell
-rlq stop-machine --blueprint freedos-1.4-plain
+rlq stop-machine --blueprint freedos
 ```
 
 Stopping verifies the VM's recorded identity before closing it and
@@ -480,7 +480,7 @@ Run `reliquary --help` or `reliquary COMMAND --help` for the complete current sy
 
 The CLI is a thin veneer over the embedding API: every command maps
 one-to-one onto a Python call with the same semantics. To run a whole
-script, `reliquary.run_script("install", blueprint="freedos-1.4-plain")`
+script, `reliquary.run_script("install", blueprint="freedos")`
 is the one call. To drive a machine directly, create and start it, then
 attach the interaction adapter to the returned port and the machine's
 directory (so ownership is verified against its recorded identity):
@@ -488,7 +488,7 @@ directory (so ownership is verified against its recorded identity):
 ```python
 import reliquary
 
-machine_id = reliquary.create_machine("freedos-1.4-plain")
+machine_id = reliquary.create_machine("freedos")
 port = reliquary.start_machine(machine_id)
 home = reliquary.machine_dir_path(machine_id)
 machine = reliquary.Machine(port, home=home)

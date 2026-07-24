@@ -256,7 +256,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         result, out = self._json_out(["search-blueprints", "freedos"])
         self.assertEqual(result, 0)
         rows = json.loads(out)
-        self.assertTrue(any(r["name"] == "freedos-1.4-plain" for r in rows))
+        self.assertTrue(any(r["name"] == "freedos" for r in rows))
 
     def test_json_rejected_on_stream_command(self):
         stderr = io.StringIO()
@@ -316,16 +316,16 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         output = stdout.getvalue()
         self.assertIn("PROVENANCE", output)
-        self.assertIn("freedos-1.4-plain", output)
+        self.assertIn("freedos", output)
 
     def test_seed_blueprint_only_flag(self):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home", self.home, "seed-blueprint",
-                               "freedos-1.4-plain", "--only"])
+                               "freedos", "--only"])
         self.assertEqual(result, 0)
         self.assertTrue(os.path.isfile(os.path.join(
-            self.home, "blueprints", "freedos-1.4-plain.rlqb")))
+            self.home, "blueprints", "freedos.rlqb")))
         self.assertFalse(os.path.isdir(os.path.join(self.home, "media")))
 
     def test_list_blueprints_builtin(self):
@@ -493,7 +493,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--home", self.home, "list-media", "--builtin",
             ])
         self.assertEqual(result, 0)
-        self.assertIn("freedos-1.4-livecd", stdout.getvalue())
+        self.assertIn("freedos-livecd", stdout.getvalue())
 
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.

@@ -41,7 +41,7 @@ name within a source are a collision error naming both.
 ├── archives/
 │   └── FD14-LiveCD.zip            a cached source archive
 └── media/
-    └── freedos-1.4-livecd.iso     a cached payload file
+    └── freedos-livecd.iso     a cached payload file
 ```
 
 The cache holds two collision-free, name-keyed namespaces:
@@ -225,7 +225,7 @@ The single-archive FreeDOS media, written as a tree:
       "members": [
         {
           "path": "FD14LIVE.iso",
-          "name": "freedos-1.4-livecd",
+          "name": "freedos-livecd",
           "read-only": true,
           "sha256": "6d3b…"
         }
@@ -235,9 +235,9 @@ The single-archive FreeDOS media, written as a tree:
 }
 ```
 
-The leaf becomes the media `freedos-1.4-livecd`, extracted from
+The leaf becomes the media `freedos-livecd`, extracted from
 `FD14LIVE.iso` inside the cached `FD14-LiveCD` archive and cached as
-`cache/media/freedos-1.4-livecd.iso`. *(Hashes truncated for
+`cache/media/freedos-livecd.iso`. *(Hashes truncated for
 readability.)*
 
 ## Unlocated media (non-redistributable)

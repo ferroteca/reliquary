@@ -18,7 +18,7 @@ http {
     """
 }
 
-insert cdrom0 @openbsd-7.9-amd64-install
+insert cdrom0 @openbsd-installer
 start
 wait "boot>"
 enter "a"

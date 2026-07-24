@@ -123,7 +123,7 @@ export schedules. Text verbatim as adopted:
 >   requirement: the command-line syntax stays terse and succinct,
 >   and the blueprint and install recipe are easy to find, point
 >   to, and use. From a clean home this is one short command
->   (`rlq run-script install --blueprint freedos-1.4-plain`): the
+>   (`rlq run-script install --blueprint freedos`): the
 >   codex seeds the blueprint (its media included) and scripts;
 >   media is fetched and hash-verified; the script drives
 >   the installer end to end — menus, partitioning, reboots, media

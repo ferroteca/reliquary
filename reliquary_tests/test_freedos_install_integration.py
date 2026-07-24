@@ -42,7 +42,7 @@ def _qemu_tools_available():
     _qemu_tools_available(),
     "qemu-system-i386 and qemu-img required for FreeDOS integration")
 class FreeDOSInstallIntegrationTests(unittest.TestCase):
-    """Milestone-gate path: install then verify on freedos-1.4-plain."""
+    """Milestone-gate path: install then verify on freedos."""
 
     def test_freedos_plain_install_and_verify(self):
         reuse = os.environ.get("RELIQUARY_INTEGRATION_HOME", "").strip()
@@ -59,13 +59,13 @@ class FreeDOSInstallIntegrationTests(unittest.TestCase):
             with live_external_effects():
                 installed = run_script(
                     "install",
-                    blueprint="freedos-1.4-plain",
+                    blueprint="freedos",
                     home=home)
                 self.assertEqual(installed.machine_phase, "ready")
 
                 verified = run_script(
                     "verify",
-                    blueprint="freedos-1.4-plain",
+                    blueprint="freedos",
                     home=home)
                 self.assertEqual(verified.machine_phase, "ready")
                 self.assertEqual(

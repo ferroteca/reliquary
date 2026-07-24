@@ -13,7 +13,7 @@ from reliquary.script_parser import parse_script
 # data so these tests run against an installed artifact too.
 _REFERENCE = os.path.join(
     os.path.dirname(os.path.abspath(reliquary.__file__)),
-    "codex", "scripts", "freedos-1.4-plain-install.rlqs")
+    "codex", "scripts", "freedos-install.rlqs")
 
 _HEAD = "platform dos\n"
 _FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -80,7 +80,7 @@ class ReferenceScriptTests(unittest.TestCase):
     def test_insert_and_select_carry_their_typed_arguments(self):
         insert = self._phase("startup").statements[0]
         self.assertEqual(insert.arguments,
-                         ("cdrom0", ("media", "freedos-1.4-livecd")))
+                         ("cdrom0", ("media", "freedos-livecd")))
         select = next(s for s in self._phase("formatting").statements
                       if s.verb == "select" and s.exclude)
         self.assertEqual(select.arguments[0].text, "Plain DOS system")

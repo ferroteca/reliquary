@@ -77,7 +77,7 @@ same way.
 
 This means the lazy path is often one command with zero files in
 your home beforehand: `rlq run-script install --blueprint
-freedos-1.4` extracts the blueprint (its media inside it) and its
+freedos` extracts the blueprint (its media inside it) and its
 scripts, creates a machine, and runs the install — everything
 materialized on first use.
 
@@ -93,8 +93,8 @@ blueprint's one name):
   "description": "Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set.",
   "platform": "dos",
   "scripts": {
-    "install": "freedos-1.4-plain-install",
-    "verify": "freedos-1.4-plain-verify"
+    "install": "freedos-install",
+    "verify": "freedos-verify"
   },
   "drives": {
     "hdd": "blank-20m",
@@ -108,9 +108,9 @@ blueprint's one name):
 `size: "20M"` — carried in a `media` section of the same `.rlqb`.)
 
 The labels are the verbs you use with `run-script`:
-`rlq run-script install --blueprint freedos-1.4-plain` looks up
-`scripts.install`, finds `freedos-1.4-plain-install`, and runs
-`scripts/freedos-1.4-plain-install.rlqs`.
+`rlq run-script install --blueprint freedos` looks up
+`scripts.install`, finds `freedos-install`, and runs
+`scripts/freedos-install.rlqs`.
 
 `description` is optional in both user and codex
 blueprints. The codex carries an index mapping every
@@ -234,11 +234,11 @@ them (D30 deleted the verb rather than keep it as a no-op).
 
 ```powershell
 # Seed everything for a codex blueprint
-rlq seed-blueprint freedos-1.4
+rlq seed-blueprint freedos
 
 # Seed individual artifacts
-rlq seed-blueprint freedos-1.4-plain --only
-rlq seed-script freedos-1.4-plain-install
+rlq seed-blueprint freedos --only
+rlq seed-script freedos-install
 ```
 
 After seeding, the files are ordinary user-owned documents — edit
@@ -253,8 +253,8 @@ blueprint and script:
 
 | artifact | pattern | example |
 |---|---|---|
-| blueprint | `<name>.rlqb` | `freedos-1.4-plain.rlqb` |
-| script | `<blueprint>-<script-id>.rlqs` | `freedos-1.4-plain-install.rlqs` |
+| blueprint | `<name>.rlqb` | `freedos.rlqb` |
+| script | `<blueprint>-<script-id>.rlqs` | `freedos-install.rlqs` |
 
 Media are components inside the blueprint, not files of their own, so
 they carry component *names* rather than filenames: conventionally
@@ -280,13 +280,13 @@ display-name field). Multiple terms are ANDed:
 ```powershell
 $ rlq search-blueprints dos
 BLUEPRINT              DESCRIPTION                              MACHINES  CODEX
-freedos-1.4-plain      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
+freedos      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
 test-rig                                                        0
 msdos-622              Installs MS-DOS 6.22 from three flop...  —         yes
 
 $ rlq search-blueprints freedos install
 BLUEPRINT              DESCRIPTION                              MACHINES  CODEX
-freedos-1.4-plain      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
+freedos      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
 ```
 
 The CODEX column tracks provenance by name: `yes` marks a
@@ -298,11 +298,11 @@ the name); blank marks a purely user-authored file.
 
 ```powershell
 $ rlq search-blueprints freedos --verbose
-BLUEPRINT              freedos-1.4-plain
+BLUEPRINT              freedos
 DESCRIPTION            Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set.
 PLATFORM               dos
-SCRIPTS                install → freedos-1.4-plain-install
-                       verify → freedos-1.4-plain-verify
+SCRIPTS                install → freedos-install
+                       verify → freedos-verify
 MACHINES               2
 ```
 
@@ -316,9 +316,9 @@ Removes the blueprint's `.rlqb` file. Refuses while any machine of it
 exists, listing their ids:
 
 ```
-$ rlq delete-blueprint freedos-1.4
-rlq: blueprint 'freedos-1.4-plain' still has 2 machine(s):
-  freedos-1.4-plain-0, freedos-1.4-plain-1
+$ rlq delete-blueprint freedos
+rlq: blueprint 'freedos' still has 2 machine(s):
+  freedos-0, freedos-1
 destroy them first, then delete the blueprint
 ```
 
@@ -441,14 +441,14 @@ rlq stop-machine (--blueprint <name> | --machine <id>)
 ```
 
 ```powershell
-rlq start-machine --blueprint freedos-1.4-plain
-rlq stop-machine --blueprint freedos-1.4-plain
+rlq start-machine --blueprint freedos
+rlq stop-machine --blueprint freedos
 ```
 
 ```powershell
-rlq start-machine --blueprint freedos-1.4-plain --display
+rlq start-machine --blueprint freedos --display
 # QEMU window opens — interact manually
-rlq stop-machine --blueprint freedos-1.4-plain
+rlq stop-machine --blueprint freedos
 ```
 
 ```powershell
@@ -588,7 +588,7 @@ export's native location, so the exported VM stands alone
 location.
 
 ```powershell
-rlq export-machine --to virtualbox -b freedos-1.4-plain
+rlq export-machine --to virtualbox -b freedos
 ```
 
 ### Listing machines
@@ -783,7 +783,7 @@ until a later change restores it or `apply-blueprint` reconciles
 it to its blueprint.
 
 ```powershell
-rlq insert-media cdrom0 freedos-1.4-livecd -b freedos
+rlq insert-media cdrom0 freedos-livecd -b freedos
 rlq stop-machine -b freedos
 rlq set-boot-order cdrom0 hdd0 -b freedos
 rlq start-machine -b freedos
@@ -884,8 +884,8 @@ name field; the filename is the name):
 ```powershell
 $ rlq search-scripts freedos
 SCRIPT                        DESCRIPTION                              CODEX
-freedos-1.4-plain-install     Unattended FreeDOS 1.4 plain install     seeded
-freedos-1.4-plain-verify      Boot the installed disk and verify       yes
+freedos-install     Unattended FreeDOS 1.4 plain install     seeded
+freedos-verify      Boot the installed disk and verify       yes
 ```
 
 ### Running scripts
@@ -913,15 +913,15 @@ definitions before execution. Existing files are never overwritten.
 **One-shot install — the common case:**
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 ```
 
 Behind the scenes this:
-1. Extracts `blueprints/freedos-1.4-plain.rlqb`, its companion media
+1. Extracts `blueprints/freedos.rlqb`, its companion media
    definitions, and its scripts from the codex (skipping
    any that already exist).
 2. Creates a machine from the blueprint.
-3. Runs `scripts/freedos-1.4-plain-install.rlqs`, which inserts
+3. Runs `scripts/freedos-install.rlqs`, which inserts
    the LiveCD, starts the machine, drives the install, and
    ejects the CD again as its final step.
 
@@ -930,8 +930,8 @@ step left it (the FreeDOS install script powers it off); run
 another script against it or control it directly:
 
 ```powershell
-rlq run-script verify --blueprint freedos-1.4-plain
-rlq stop-machine --blueprint freedos-1.4-plain
+rlq run-script verify --blueprint freedos
+rlq stop-machine --blueprint freedos
 ```
 
 `run-script` resolves the machine (creating one when `--blueprint`
@@ -977,12 +977,12 @@ consult, so the argument is a bare script name. Read-only, no
 guest steps.
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain --display
-rlq run-script install --blueprint freedos-1.4-plain --property identity.full-name="Paul Galbraith"
-rlq run-script install --blueprint freedos-1.4-plain --progress jsonl
+rlq run-script install --blueprint freedos --display
+rlq run-script install --blueprint freedos --property identity.full-name="Paul Galbraith"
+rlq run-script install --blueprint freedos --progress jsonl
 
-rlq check-script freedos-1.4-plain-install
-rlq check-script install --blueprint freedos-1.4-plain
+rlq check-script freedos-install
+rlq check-script install --blueprint freedos
 ```
 
 ### Detached runs
@@ -1030,11 +1030,11 @@ machine's life; copy a record's directory out to keep it beyond
 `destroy` (the record contract is in the script spec).
 
 ```powershell
-rlq run-script install --blueprint freedos-1.4-plain --detach
-# → freedos-1.4-plain-1/4
-rlq run tail --blueprint freedos-1.4-plain
-rlq run wait --blueprint freedos-1.4-plain; echo $LASTEXITCODE
-rlq run cancel 4 --stop-machine --machine freedos-1.4-plain-1
+rlq run-script install --blueprint freedos --detach
+# → freedos-1/4
+rlq run tail --blueprint freedos
+rlq run wait --blueprint freedos; echo $LASTEXITCODE
+rlq run cancel 4 --stop-machine --machine freedos-1
 ```
 
 ---
@@ -1072,8 +1072,8 @@ Multiple terms are ANDed:
 ```powershell
 $ rlq search-media freedos
 MEDIA                   DESCRIPTION                              CODEX
-freedos-1.4-livecd      The FreeDOS 1.4 LiveCD installer ISO     seeded
-freedos-1.4-bonus       The FreeDOS 1.4 BonusCD package ISO      yes
+freedos-livecd      The FreeDOS 1.4 LiveCD installer ISO     seeded
+freedos-bonus       The FreeDOS 1.4 BonusCD package ISO      yes
 
 $ rlq search-media win98
 MEDIA                   DESCRIPTION                              CODEX
@@ -1112,7 +1112,7 @@ The media name is always required — exactly the twin
 would be its own named growth if real use demands one).
 
 ```powershell
-rlq fetch-media freedos-1.4-livecd
+rlq fetch-media freedos-livecd
 ```
 
 `clean-archives` reclaims cached source archives under
@@ -1189,8 +1189,8 @@ rlq <command> [args...] [--home <path>] [--blueprint <name>]
 Flags are the command's parameters, mirroring its API twin's
 under the identity rule, and **position carries no meaning**: a
 flag may appear before or after the command word —
-`rlq run-script install --blueprint freedos-1.4-plain` and
-`rlq --blueprint freedos-1.4-plain run-script install` are
+`rlq run-script install --blueprint freedos` and
+`rlq --blueprint freedos run-script install` are
 identical. Synopses canonically show flags after the command.
 
 Three flags are accepted by every command, mirroring the API's

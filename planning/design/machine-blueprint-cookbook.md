@@ -127,8 +127,8 @@ stopped.
 
 > **Media note:** the installer medium never appears on a drive
 > here — the empty `cdrom` slot is the convention. The install
-> script inserts it (`insert cdrom0 @freedos-1.4-livecd`) and
-> ejects it as its last act. `freedos-1.4-livecd` names a
+> script inserts it (`insert cdrom0 @freedos-livecd`) and
+> ejects it as its last act. `freedos-livecd` names a
 > [media component](media-spec.md) — a `read-only` `use` media,
 > extracted from an `archive` (the LiveCD's download URL and
 > hashes), carried inside this same `.rlqb` or a sibling in the

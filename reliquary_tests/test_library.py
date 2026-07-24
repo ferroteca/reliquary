@@ -23,12 +23,12 @@ from reliquary.library import (list_builtin_blueprints, search_blueprints,
 from reliquary.machines import create_machine, load_machine_state
 from reliquary.resolve import load_namespace, resolve_media
 
-BLUEPRINT = "freedos-1.4-plain"
-MEDIA = "freedos-1.4-livecd"
-SCRIPTS = ("freedos-1.4-plain-install", "freedos-1.4-verify")
-OPENBSD_BLUEPRINT = "openbsd-7.9-amd64"
-OPENBSD_MEDIA = "openbsd-7.9-amd64-install"
-OPENBSD_SCRIPT = "openbsd-7.9-install"
+BLUEPRINT = "freedos"
+MEDIA = "freedos-livecd"
+SCRIPTS = ("freedos-install", "freedos-verify")
+OPENBSD_BLUEPRINT = "openbsd"
+OPENBSD_MEDIA = "openbsd-installer"
+OPENBSD_SCRIPT = "openbsd-install"
 EXT = ".rlqb"
 
 

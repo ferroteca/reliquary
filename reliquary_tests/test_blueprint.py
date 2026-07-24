@@ -85,7 +85,7 @@ class DeleteBlueprintTests(BlueprintFileTestCase):
 
     def test_does_not_delete_codex(self):
         with self.assertRaises(FileNotFoundError):
-            delete_blueprint("freedos-1.4-plain", context=self.home)
+            delete_blueprint("freedos", context=self.home)
 
 
 if __name__ == "__main__":

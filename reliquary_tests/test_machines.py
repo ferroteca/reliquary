@@ -36,7 +36,7 @@ class _HomeCase(unittest.TestCase):
             handle.write(b"ISO-CONTENT")
 
     def _livecd(self):
-        return {"name": "freedos-1.4-livecd", "materialize": "use",
+        return {"name": "freedos-livecd", "materialize": "use",
                 "read-only": True, "source": {"local": self.iso_path}}
 
     def _write(self, name, machine, media=None, archives=None):
@@ -134,11 +134,11 @@ class MaterializationTests(_HomeCase):
     def test_use_media_attaches_the_payload_path(self):
         machine_id = self._create(
             "with-media", {"platform": "dos",
-                           "drives": {"hdd0": "blank", "cdrom0": "freedos-1.4-livecd"},
+                           "drives": {"hdd0": "blank", "cdrom0": "freedos-livecd"},
                            "boot": ["cdrom0", "hdd0"]},
             media=[_BLANK, self._livecd()])
         cdrom = self._state(machine_id)["drives"]["cdrom0"]
-        self.assertEqual(cdrom["media"], "freedos-1.4-livecd")
+        self.assertEqual(cdrom["media"], "freedos-livecd")
         self.assertEqual(cdrom["materialize"], "use")
         self.assertEqual(os.path.normpath(cdrom["path"]),
                          os.path.normpath(self.iso_path))
@@ -227,7 +227,7 @@ class MaterializationTests(_HomeCase):
             return path
         self._write("bootable", {"platform": "dos",
                                "drives": {"hdd0": "blank",
-                                          "cdrom0": "freedos-1.4-livecd"},
+                                          "cdrom0": "freedos-livecd"},
                                "boot": ["cdrom0", "hdd0"]},
                    media=[_BLANK, self._livecd()])
         with mock.patch("reliquary.machines.create_hdd_image",
@@ -346,7 +346,7 @@ class LifecycleTests(_HomeCase):
     def test_start_launches_qemu_and_sets_running(self):
         machine_id = self._create(
             "bootable", {"platform": "dos",
-                         "drives": {"hdd0": "blank", "cdrom0": "freedos-1.4-livecd"},
+                         "drives": {"hdd0": "blank", "cdrom0": "freedos-livecd"},
                          "boot": ["cdrom0", "hdd0"]},
             media=[_BLANK, self._livecd()])
         with mock.patch("reliquary.machines.find_qemu",
@@ -541,7 +541,7 @@ class LifecycleTests(_HomeCase):
                    "drives": {"hdd0": "blank", "cdrom0": None},
                    "boot": ["hdd0", "cdrom0"]},
             media=[_BLANK, self._livecd()])
-        insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+        insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=self.home)
         self.assertIsNotNone(
             self._state(machine_id)["drives"]["cdrom0"]["media"])
@@ -598,16 +598,16 @@ class MediaInsertionTests(_HomeCase):
 
     def test_insert_persists_media(self):
         machine_id = self._installer()
-        insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+        insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=self.home)
         cdrom = self._state(machine_id)["drives"]["cdrom0"]
-        self.assertEqual(cdrom["media"], "freedos-1.4-livecd")
+        self.assertEqual(cdrom["media"], "freedos-livecd")
         self.assertEqual(os.path.normpath(cdrom["path"]),
                          os.path.normpath(self.iso_path))
 
     def test_eject_returns_slot_to_empty(self):
         machine_id = self._installer()
-        insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+        insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=self.home)
         eject_media(machine_id, "cdrom0", context=self.home)
         cdrom = self._state(machine_id)["drives"]["cdrom0"]
@@ -641,7 +641,7 @@ class MediaInsertionTests(_HomeCase):
 
     def test_inserted_media_survives_start(self):
         machine_id = self._installer()
-        insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+        insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=self.home)
         with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
                 mock.patch("reliquary.machines.launch_owned_qemu",
@@ -653,13 +653,13 @@ class MediaInsertionTests(_HomeCase):
 
     def test_insert_rejects_undeclared_slot(self):
         with self.assertRaises(ValueError) as caught:
-            insert_media(self._installer(), "floppy0", "freedos-1.4-livecd",
+            insert_media(self._installer(), "floppy0", "freedos-livecd",
                          context=self.home)
         self.assertIn("declares no drive floppy0", str(caught.exception))
 
     def test_insert_rejects_non_removable(self):
         with self.assertRaises(ValueError) as caught:
-            insert_media(self._installer(), "hdd0", "freedos-1.4-livecd",
+            insert_media(self._installer(), "hdd0", "freedos-livecd",
                          context=self.home)
         self.assertIn("not a removable drive slot", str(caught.exception))
 
@@ -667,16 +667,16 @@ class MediaInsertionTests(_HomeCase):
         machine_id = self._installer()
         self._force(machine_id, "running", vm=True)
         with mock.patch("reliquary.machines._change_media_live") as live:
-            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+            insert_media(machine_id, "cdrom0", "freedos-livecd",
                          context=self.home)
         live.assert_called_once()
         self.assertEqual(live.call_args.args[1], "cdrom0")
         self.assertEqual(self._state(machine_id)["drives"]["cdrom0"]["media"],
-                         "freedos-1.4-livecd")
+                         "freedos-livecd")
 
     def test_eject_on_running_ejects_live(self):
         machine_id = self._installer()
-        insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+        insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=self.home)
         self._force(machine_id, "running", vm=True)
         with mock.patch("reliquary.machines._change_media_live") as live:
@@ -705,11 +705,11 @@ class MediaInsertionTests(_HomeCase):
     def test_insert_on_stopped_is_state_only(self):
         machine_id = self._installer()
         with mock.patch("reliquary.machines._change_media_live") as live:
-            insert_media(machine_id, "cdrom0", "freedos-1.4-livecd",
+            insert_media(machine_id, "cdrom0", "freedos-livecd",
                          context=self.home)
         live.assert_not_called()
         self.assertEqual(self._state(machine_id)["drives"]["cdrom0"]["media"],
-                         "freedos-1.4-livecd")
+                         "freedos-livecd")
 
     def test_mark_stopped_reconciles(self):
         machine_id = self._installer()

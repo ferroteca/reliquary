@@ -61,7 +61,7 @@ A machine with a blank hard disk and an empty CD slot, plus the
 {
   "machines": [
     {
-      "name": "freedos-1.4-plain",
+      "name": "freedos",
       "description": "FreeDOS 1.4 plain installation",
       "platform": "dos",
       "memory": "32M",
@@ -71,8 +71,8 @@ A machine with a blank hard disk and an empty CD slot, plus the
       },
       "boot": ["hdd0", "cdrom0"],
       "scripts": {
-        "install": "freedos-1.4-plain-install",
-        "verify": "freedos-1.4-verify"
+        "install": "freedos-install",
+        "verify": "freedos-verify"
       }
     }
   ],
@@ -86,19 +86,19 @@ A machine with a blank hard disk and an empty CD slot, plus the
 
 ```powershell
 # Create a machine from a blueprint
-rlq create-machine --blueprint freedos-1.4-plain
+rlq create-machine --blueprint freedos
 
 # Start it
-rlq start-machine --blueprint freedos-1.4-plain
+rlq start-machine --blueprint freedos
 
 # Run a script
-rlq run-script install --blueprint freedos-1.4-plain
+rlq run-script install --blueprint freedos
 
 # Stop it
-rlq stop-machine --blueprint freedos-1.4-plain
+rlq stop-machine --blueprint freedos
 
 # Destroy it
-rlq destroy-machine --machine freedos-1.4-plain-1
+rlq destroy-machine --machine freedos-1
 ```
 
 ## Machine lifecycle

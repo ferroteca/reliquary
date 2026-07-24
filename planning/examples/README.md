@@ -19,17 +19,17 @@ asset root, or copy the files into your home:
 
 ```text
 blueprints/freedos.rlqb              the machine and its media/archive
-scripts/freedos-plain-install.rlqs   install script
-scripts/freedos-plain-verify.rlqs    boot the result, confirm C:\>
+scripts/freedos-install.rlqs   install script
+scripts/freedos-verify.rlqs    boot the result, confirm C:\>
 ```
 
 One file, named components. The blueprint declares a `machines` entry
 (`freedos`), a `media` entry (`blank-20m`), and an `archives` entry
-(`FD14-LiveCD`). A machine drive names a media and nothing more; the
+(`freedos-livecd-zip`). A machine drive names a media and nothing more; the
 media owns how it materializes. So `hdd0` names `blank-20m` — a `new`
 20M blank — and `cdrom0` is an **empty** removable slot
-(`"cdrom0": null`). The installer medium is the `freedos-1.4-livecd`
-media: a `read-only` member (`FD14LIVE.iso`) of the `FD14-LiveCD`
+(`"cdrom0": null`). The installer medium is the `freedos-livecd`
+media: a `read-only` member (`FD14LIVE.iso`) of the `freedos-livecd-zip`
 archive, itself a `url` download with a pinned hash. A script
 references that media by name and never carries a definition; Reliquary
 resolves the name against the components of whichever asset source
@@ -38,7 +38,7 @@ supplies the blueprint.
 Then:
 
 ```powershell
-rlq run-script freedos-plain-install --blueprint freedos
+rlq run-script freedos-install --blueprint freedos
 ```
 
 With no machine of the blueprint yet, `run-script` creates one; the
@@ -61,7 +61,7 @@ is needed before verification: the same `["hdd0", "cdrom0"]` boot order
 now boots the installed hard disk.
 
 ```powershell
-rlq run-script freedos-plain-verify --blueprint freedos
+rlq run-script freedos-verify --blueprint freedos
 ```
 
 The verify script also declares `machine stopped`, issues a plain
