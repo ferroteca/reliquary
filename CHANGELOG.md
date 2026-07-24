@@ -203,6 +203,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   module twin) — a leftover pointer at the retired `cache/downloads/`.
   Its live counterpart `archives_cache_dir` (`cache/archives/`) is now
   exported from the package root in its place.
+- `delete-media` / `delete_media()` and `seed-media` / `seed_media()`
+  are removed outright. Media are components inside a `.rlqb`, so the
+  first could only ever fail and the second could only ever do
+  nothing; neither is kept as a shim. Removing a media means editing
+  the blueprint that declares it, and seeding a blueprint brings its
+  media along inside the same file. The noun in every media command
+  is the media itself, never its owning file.
 
 ## 0.1.0.dev1 - 2026-07-22
 

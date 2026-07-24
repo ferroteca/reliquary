@@ -23,7 +23,7 @@ from .home import HOME_ASSETS, set_assets, set_cache, set_home
 from .library import (list_blueprints, list_builtin_blueprints,
                       list_builtin_media, list_scripts, locate_blueprint,
                       locate_script, search_blueprints, seed_blueprint,
-                      seed_media, seed_script)
+                      seed_script)
 from . import blueprint as blueprint_mod
 from .machines import (apply_blueprint, create_machine, destroy_machine,
                        eject_media, get_machine_dir, insert_media,
@@ -32,7 +32,7 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
 from .media import (fetch_media, clean_archives, clean_media,
-                    delete_media, list_media)
+                    list_media)
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
 from .script_runner import (ScriptRuntimeError, check_script,
@@ -49,12 +49,12 @@ _COMMANDS = frozenset({
     "destroy-machine", "recreate-machine", "apply-blueprint",
     "get-machine-dir",
     "run-script", "check-script", "fetch-media",
-    "seed-blueprint", "seed-media", "seed-script", "new-blueprint",
+    "seed-blueprint", "seed-script", "new-blueprint",
     "delete-blueprint", "search-blueprints",
     "get-property", "set-property", "unset-property",
     "list-properties", "import-vm", "list-blueprints",
     "list-machines", "list-scripts", "list-media",
-    "delete-media", "clean-archives",
+    "clean-archives",
     "clean-media", "insert-media", "eject-media", "set-boot-order",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
@@ -296,7 +296,7 @@ def main(argv=None):
     command.add_argument("name", help="media name")
 
     # seed-*
-    for kind in ("blueprint", "media", "script"):
+    for kind in ("blueprint", "script"):
         command = subcommands.add_parser(
             f"seed-{kind}",
             help=f"copy built-in {kind} to home")
@@ -378,11 +378,6 @@ def main(argv=None):
         "list-media", help="list media item names")
     _add_home(command)
     command.add_argument("--builtin", action="store_true")
-
-    command = subcommands.add_parser(
-        "delete-media", help="delete a home media definition")
-    _add_home(command)
-    command.add_argument("name", help="media item name")
 
     # clean-*
     command = subcommands.add_parser(
@@ -610,12 +605,6 @@ def _list_media(arguments):
                  lambda: _print_names(names, "(no media)"))
 
 
-def _delete_media(arguments):
-    path = delete_media(arguments.name)
-    return _emit(arguments, path,
-                 lambda: print(f"deleted media {arguments.name} ({path})"))
-
-
 def _list_machines(arguments):
     filter_blueprint = getattr(arguments, "blueprint", None)
     machines = list_machines(blueprint=filter_blueprint)
@@ -727,10 +716,6 @@ def _seed(arguments, seeder, kind):
 
 def _seed_blueprint(arguments):
     return _seed(arguments, seed_blueprint, "blueprint")
-
-
-def _seed_media(arguments):
-    return _seed(arguments, seed_media, "media")
 
 
 def _seed_script(arguments):
@@ -856,8 +841,6 @@ def _dispatch(arguments):
         return _fetch_media(arguments)
     if arguments.command == "seed-blueprint":
         return _seed_blueprint(arguments)
-    if arguments.command == "seed-media":
-        return _seed_media(arguments)
     if arguments.command == "seed-script":
         return _seed_script(arguments)
     if arguments.command == "search-blueprints":
@@ -884,8 +867,6 @@ def _dispatch(arguments):
         return _list_scripts(arguments)
     if arguments.command == "list-media":
         return _list_media(arguments)
-    if arguments.command == "delete-media":
-        return _delete_media(arguments)
     if arguments.command == "clean-archives":
         return _clean_archives(arguments)
     if arguments.command == "clean-media":

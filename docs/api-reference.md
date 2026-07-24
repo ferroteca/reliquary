@@ -150,10 +150,6 @@ survive stop/start:
 - `list_media(context=None, *, builtin=False)` - Sorted media names
   from the namespace, or the package codex when ``builtin=True``.
   CLI twin: `list-media`.
-- `delete_media(name, *, context=None)` - Media now lives inside a
-  `.rlqb`; deleting a shared component is not a file operation, so
-  this raises `NotImplementedError` pointing at editing the
-  blueprint. CLI twin: `delete-media`.
 - `clean_archives(context=None)` / `clean_media(context=None)` -
   Reclaim the cached source archives (`cache/archives/`) and cached
   payloads (`cache/media/`). CLI twins: `clean-archives`,

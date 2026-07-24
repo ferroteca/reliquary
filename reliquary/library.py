@@ -314,18 +314,6 @@ def seed_blueprint(name, context=None, *, only=False):
     return True
 
 
-def seed_media(name, context=None, *, only=False):
-    """Deprecated no-op in the composed model.
-
-    Media are components inside a blueprint ``.rlqb`` and are seeded
-    with it (``seed_blueprint``), so there is no standalone media
-    definition to copy out. Retained so the ``seed-media`` surface
-    still resolves; it seeds nothing and returns ``False``. The
-    command's fate rides the media-lifecycle design round.
-    """
-    return False
-
-
 def seed_script(stem, context=None, *, only=False):
     """Seed ``scripts/<stem>.rlqs`` from the built-in library.
 

@@ -474,7 +474,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("still has 1 machine(s)", stderr.getvalue())
         self.assertIn("plain-0", stderr.getvalue())
 
-    def test_list_media_and_delete_media(self):
+    def test_list_media(self):
         blueprints = os.path.join(self.home, "blueprints")
         with open(os.path.join(blueprints, "media-lib.rlqb"), "w",
                   encoding="utf-8") as handle:
@@ -494,10 +494,6 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         self.assertIn("freedos-1.4-livecd", stdout.getvalue())
-
-        # delete-media is not yet implemented for a media inside a .rlqb.
-        result = cli.main(["--home", self.home, "delete-media", "livecd"])
-        self.assertNotEqual(result, 0)
 
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.

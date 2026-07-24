@@ -406,7 +406,8 @@ a media by name and warms its cached payload. `clean-archives` and
 `clean-media` reclaim the cached source archives (`cache/archives/`)
 and payloads (`cache/media/`); both are safe — anything with a source
 refetches. (Media are components inside a `.rlqb` now, so there is no
-`delete-media` file operation — edit the blueprint instead.)
+`delete-media` command — removing one means editing the blueprint that
+declares it.)
 
 ### Keyboard and command input
 

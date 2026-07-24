@@ -49,10 +49,6 @@ class MediaModuleTests(unittest.TestCase):
                 {"name": "win", "source": {"local": "/x.iso"}}])
             self.assertEqual(media.list_media(context=ctx), ["blank", "win"])
 
-    def test_delete_media_is_not_yet_implemented(self):
-        with self.assertRaises(NotImplementedError):
-            media.delete_media("x", context=Context(home="."))
-
     def test_clean_media_and_archives(self):
         with tempfile.TemporaryDirectory() as home:
             ctx = Context(home=home, cache=os.path.join(home, "cache"),

@@ -41,20 +41,6 @@ def list_media(context=None, *, builtin=False):
     return sorted(load_namespace(context).media)
 
 
-def delete_media(name, *, context=None):
-    """Removing a media is editing the ``.rlqb`` that declares it.
-
-    In the composed model a media is a component inside a blueprint
-    document, so there is no standalone file to delete. The precise
-    lifecycle verb (edit the component out vs. remove the file when it
-    holds only that media) is an open design item.
-    """
-    raise NotImplementedError(
-        f"media {name!r} is a component inside a .rlqb blueprint; edit "
-        "that file to remove it (delete-media semantics are pending "
-        "the media-lifecycle design round)")
-
-
 def _clean(cache):
     if not os.path.isdir(cache):
         return

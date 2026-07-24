@@ -31,8 +31,8 @@ workflow:
   (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,
   on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the `cache/archives/` and
   `cache/media/` caches, attaching a `local` source in place, `media.py` is acquisition-only — `fetch_media(name,
-  context, on_mismatch)` and `list_media` over the namespace, `clean_archives` / `clean_media`, and `delete_media`
-  (a `NotImplementedError` pointing at editing the blueprint, since media are components inside a `.rlqb` now),
+  context, on_mismatch)` and `list_media` over the namespace, plus `clean_archives` / `clean_media` (there is no
+  `delete_media`: removing a media is editing the `.rlqb` that declares it — D30),
   `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
@@ -193,7 +193,7 @@ All persistent state belongs under the Reliquary home (`Documents/reliquary` by 
 when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--home`, or `set_home()`). The
 regenerable cache root defaults to `<home>/cache` but resolves independently — overridden by `RELIQUARY_CACHE_DIR`,
 `--cache`, or `set_cache()` — so it can live outside the home entirely (e.g. off OneDrive-synced storage). Seeding
-(`seed-blueprint` / `seed-script`; `seed-media` is a deprecated no-op) always targets `<home>/blueprints` /
+(`seed-blueprint` / `seed-script`; there is no `seed-media`) always targets `<home>/blueprints` /
 `<home>/scripts`, never the cache root. Every function that resolves a path under the home or cache accepts a
 `context=` parameter (`home.py`'s `Context`, exported from the package root): omit it (the common case) to use the
 process-global default; pass a bare string as shorthand for `Context(home=that_string)`; pass a `Context(home=...,

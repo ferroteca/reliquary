@@ -14,7 +14,7 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import (Qmp, create_hdd_image, find_qemu, find_qemu_img,
                         stop)
 from .library import (list_blueprints, list_scripts, search_blueprints,
-                     seed_blueprint, seed_media, seed_script)
+                     seed_blueprint, seed_script)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .machines import (apply_blueprint, create, create_machine,
@@ -25,7 +25,7 @@ from .machines import (apply_blueprint, create, create_machine,
                        start_machine,
                        stop_machine)
 from .media import (fetch_media, clean_archives, clean_media,
-                    delete_media, list_media)
+                    list_media)
 from .resolve import load_namespace
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
@@ -59,7 +59,6 @@ __all__ = [
     "create_machine",
     "cursor_menu_select",
     "delete_blueprint",
-    "delete_media",
     "destroy_machine",
     "eject_media",
     "get_machine_dir",
@@ -100,7 +99,6 @@ __all__ = [
     "scripts_dir",
     "search_blueprints",
     "seed_blueprint",
-    "seed_media",
     "seed_script",
     "send_keys",
     "send_text",

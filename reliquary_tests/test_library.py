@@ -4,8 +4,8 @@
 
 Media are components inside the blueprint ``.rlqb`` now, so seeding a
 blueprint brings its media along inside the same file — there is no
-separate media definition to copy out (``seed_media`` is a deprecated
-no-op).
+separate media definition to copy out, and no ``seed_media`` verb
+(DECISIONS.md D30).
 """
 
 import importlib
@@ -19,7 +19,7 @@ from unittest import mock
 import reliquary
 from reliquary import document, jsonc
 from reliquary.library import (list_builtin_blueprints, search_blueprints,
-                               seed_blueprint, seed_media, seed_script)
+                               seed_blueprint, seed_script)
 from reliquary.machines import create_machine, load_machine_state
 from reliquary.resolve import load_namespace, resolve_media
 
@@ -90,12 +90,8 @@ class SeedingTest(_HomeTest):
                     self.assertEqual(handle.read(), "mine")
                 self.assertFalse(os.path.exists(self._path("scripts")))
 
-    def test_seed_media_is_a_no_op(self):
-        self.assertFalse(seed_media(MEDIA, context=self.home))
-
     def test_unknown_names_seed_nothing(self):
         self.assertFalse(seed_blueprint("no-such", context=self.home))
-        self.assertFalse(seed_media("no-such", context=self.home))
         self.assertFalse(seed_script("no-such", context=self.home))
         self.assertFalse(os.path.exists(self._path("blueprints")))
         self.assertFalse(os.path.exists(self._path("scripts")))

@@ -107,9 +107,8 @@ platform; omitted, everything is listed.
 Copy a built-in artifact into the home. By default a blueprint or
 script also brings its closure (referenced scripts; media travel
 inside the blueprint itself); `--only` copies just the named file.
-`seed-media` is retained as a deprecated no-op — media are
-components inside a `.rlqb` now, so there is no separate media file
-to seed.
+There is no `seed-media`: media are components inside a `.rlqb` and
+are seeded with the blueprint that declares them.
 
 ### `rlq delete-blueprint <name>`
 
@@ -145,13 +144,6 @@ runs as well. Static errors exit 2.
 List media names resolvable from the active source (the `media`
 components across its `.rlqb` files). With ``--builtin``, list
 package codex media instead.
-
-### `rlq delete-media <name>`
-
-Media are components inside a `.rlqb` now, not standalone files, so
-there is nothing to delete: this errors, pointing at editing the
-blueprint that defines the media. (To reclaim a cached payload, use
-``clean-media``.)
 
 ### `rlq fetch-media <name>`
 
