@@ -58,12 +58,12 @@ class CliEmptyListingTests(unittest.TestCase):
         os.makedirs(os.path.join(self.home, "blueprints"))
         with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
                   "w", encoding="utf-8") as handle:
-            json.dump({
-                "machines": [{"name": "plain", "platform": "dos",
-                              "drives": {"hdd0": "blank-20m"}}],
-                "media": [{"name": "blank-20m", "materialize": "new",
-                           "size": "20M"}],
-            }, handle)
+            json.dump([
+                {"type": "machine", "name": "plain", "platform": "dos",
+                 "drives": {"hdd0": "blank-20m"}},
+                {"type": "media", "name": "blank-20m",
+                 "materialize": "new", "size": "20M"},
+            ], handle)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
@@ -168,12 +168,12 @@ class CliMachineLifecycleTests(unittest.TestCase):
         os.makedirs(os.path.join(self.home, "blueprints"))
         with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
                   "w", encoding="utf-8") as handle:
-            json.dump({
-                "machines": [{"name": "plain", "platform": "dos",
-                              "drives": {"hdd0": "blank-20m"}}],
-                "media": [{"name": "blank-20m", "materialize": "new",
-                           "size": "20M"}],
-            }, handle)
+            json.dump([
+                {"type": "machine", "name": "plain", "platform": "dos",
+                 "drives": {"hdd0": "blank-20m"}},
+                {"type": "media", "name": "blank-20m",
+                 "materialize": "new", "size": "20M"},
+            ], handle)
 
     def test_create_machine(self):
         stdout = io.StringIO()
@@ -478,8 +478,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
         blueprints = os.path.join(self.home, "blueprints")
         with open(os.path.join(blueprints, "media-lib.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({"media": [
-                {"name": "livecd", "source": {"local": "/x.iso"}}]}, handle)
+            json.dump([
+                {"type": "media", "name": "livecd",
+                 "location": {"local": "/x.iso"}}], handle)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home", self.home, "list-media"])
@@ -621,14 +622,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
         os.makedirs(scripts)
         with open(os.path.join(blueprints, "cust.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({
-                "machines": [{"name": "cust", "platform": "dos",
-                              "drives": {"hdd0": "blank"},
-                              "scripts": {"setup": "cust-setup",
-                                          "teardown": "cust-teardown"}}],
-                "media": [{"name": "blank", "materialize": "new",
-                           "size": "20M"}],
-            }, handle)
+            json.dump([
+                {"type": "machine", "name": "cust", "platform": "dos",
+                 "drives": {"hdd0": "blank"},
+                 "scripts": {"setup": "cust-setup",
+                             "teardown": "cust-teardown"}},
+                {"type": "media", "name": "blank", "materialize": "new",
+                 "size": "20M"},
+            ], handle)
         with open(os.path.join(scripts, "cust-setup.rlqs"), "w",
                   encoding="utf-8") as handle:
             handle.write(

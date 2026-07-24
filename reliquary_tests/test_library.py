@@ -121,9 +121,10 @@ class SearchBlueprintsTest(_HomeTest):
         os.makedirs(bp_dir)
         with open(os.path.join(bp_dir, "mine.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({"machines": [{"name": "custom-rig", "platform": "dos",
-                                     "description": "bespoke widget rig",
-                                     "drives": {"cdrom0": None}}]}, handle)
+            json.dump([{"type": "machine", "name": "custom-rig",
+                        "platform": "dos",
+                        "description": "bespoke widget rig",
+                        "drives": {"cdrom0": None}}], handle)
         rows = search_blueprints("bespoke", context=self.home)
         self.assertEqual([r["name"] for r in rows], ["custom-rig"])
         self.assertEqual(rows[0]["provenance"], "user")
@@ -155,7 +156,9 @@ class FirstReferenceTest(_HomeTest):
             self.assertTrue(os.path.isfile(blueprint_path))
             with open(blueprint_path, encoding="utf-8") as handle:
                 data = jsonc.load(handle)
-            data["machines"][0]["memory"] = 64
+            machine = next(spec for spec in data
+                           if spec.get("type") == "machine")
+            machine["memory"] = 64
             with open(blueprint_path, "w", encoding="utf-8") as handle:
                 json.dump(data, handle)
             second_id = create_machine(BLUEPRINT, context=self.home)
@@ -187,9 +190,9 @@ class CodexMediaTests(unittest.TestCase):
 
     def test_openbsd_install_media_pins_the_iso(self):
         media = self._codex_doc(OPENBSD_BLUEPRINT).media[OPENBSD_MEDIA]
-        self.assertEqual(media.source.kind, "url")
+        self.assertEqual(media.location[0].kind, "url")
         self.assertEqual(
-            media.source.sha256,
+            media.sha256,
             "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102"
             "cf8a5130449f")
 

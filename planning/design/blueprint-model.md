@@ -310,7 +310,7 @@ The same graph, written from the child side:
     "location": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
     "sha256": "2020ff…" },
   { "type": "media", "name": "freedos-livecd", "read-only": true,
-    "location": "${media:freedos-livecd-zip}/FD14LIVE.iso",
+    "location": "${media:freedos-livecd-zip/FD14LIVE.iso}",
     "sha256": "c48a9d…" }
 ]
 ```
@@ -365,7 +365,7 @@ And a location string is interpreted **by scheme**:
 | `FD14LIVE.iso` | path, relative to the referencing file | `{ "local": … }` |
 | `https:…` / `http:…` | a download | `{ "url": … }` |
 | `${media:<name>}` | the parent's own bytes | `{ "parent": "<name>" }` |
-| `${media:<name>}/<path>` | a member of the parent | `{ "parent": "<name>", "path": "<path>" }` |
+| `${media:<name>/<path>}` | a member of the parent | `{ "parent": "<name>", "path": "<path>" }` |
 | `${<key>}` | a property-supplied location | `{ "property": "<key>" }` |
 
 The object forms are `url`, `local`, `parent` + `path`, and
@@ -399,9 +399,10 @@ mixed schemes allowed — the hash, not the URL, is the arbiter. A
   `${media:X}` is a legal whole location meaning the parent's
   own bytes — which is how `materialize: difference` puts an
   overlay over another media. With a suffix,
-  `${media:<name>}/<path>` is the containment location; the path
-  is the **second component of one location**, never string
-  interpolation.
+  `${media:<name>/<path>}` is the containment location; the path
+  is the **second component of one reference**, never string
+  interpolation — which is why it lives *inside* the braces, where
+  the closure can see it (D32).
 
 Property binding itself lands at **milestone 8**. Until then a
 `${key}` reference parses and then **fails closed naming
@@ -453,18 +454,26 @@ may be revisited on a named case — unlike the grammar below.
 
 **Interpolate, then scheme-dispatch the result. Resolved text is
 never re-scanned.** A property whose value happens to read
-`${media:X}/p` stays literal text and fails the scheme check —
+`${media:X/p}` stays literal text and fails the scheme check —
 this is the no-chaining rule made precise.
 
 ### The path suffix
 
-Exactly **one `/`** separates reference from path. Member paths
-are `/`-separated always, following the container formats' own
-convention. The path normalizes, and `..`, absolute paths, and
-empty segments are **refused as containment escapes**. A
-backslash after `}` is an error naming the `/` rule — the
-Windows author's first guess — and trailing or doubled slashes
-are errors.
+The path lives **inside the braces**, after the media name:
+`${media:<name>/<path>}`. Exactly **one `/`** separates name from
+path — the first one; every later `/` belongs to the path. Member
+paths are `/`-separated always, following the container formats'
+own convention. The path normalizes, and `..`, absolute paths,
+and empty segments are **refused as containment escapes**. A
+backslash anywhere in the body is an error naming the `/` rule —
+the Windows author's first guess — and trailing or doubled
+slashes are errors.
+
+Inside, not after, so that **the closure test sees the whole
+location** (D32): a qualified reference is whole-value, and with
+the path inside, "whole-value" means the string is *exactly* one
+reference with no trailing text to disambiguate. It is also what
+the character class earns its `/` for.
 
 ### The closure: operations closed, namespaces open
 

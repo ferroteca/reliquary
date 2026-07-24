@@ -1,0 +1,4 @@
+// invalid: the plural root sections are retired
+// spec: The file
+// schema: rejects
+{ "machines": [ { "name": "m", "platform": "dos" } ] }

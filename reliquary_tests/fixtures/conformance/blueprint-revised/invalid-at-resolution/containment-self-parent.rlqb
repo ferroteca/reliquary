@@ -1,5 +1,0 @@
-// invalid: a self-parent is a cycle, named
-// spec: Resolution
-[
-  { "type": "media", "name": "loop", "location": "${media:loop}/p.img" }
-]

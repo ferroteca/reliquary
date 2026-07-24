@@ -1,6 +1,0 @@
-// invalid: nested mirror lists are illegal
-// spec: Mirror lists
-[
-  { "type": "media", "name": "x", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "location": [ "https://a.test/p.iso", [ "https://b.test/p.iso" ] ] }
-]

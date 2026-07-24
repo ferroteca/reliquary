@@ -37,22 +37,19 @@ class _HomeCase(unittest.TestCase):
 
     def _livecd(self):
         return {"name": "freedos-livecd", "materialize": "use",
-                "read-only": True, "source": {"local": self.iso_path}}
+                "read-only": True, "location": {"local": self.iso_path}}
 
-    def _write(self, name, machine, media=None, archives=None):
-        obj = {"machines": [dict(machine, name=name)]}
-        if media is not None:
-            obj["media"] = media
-        if archives is not None:
-            obj["archives"] = archives
+    def _write(self, name, machine, media=None):
+        specs = [dict(machine, type="machine", name=name)]
+        specs.extend(dict(spec, type="media") for spec in (media or ()))
         bpdir = os.path.join(self.home, "blueprints")
         os.makedirs(bpdir, exist_ok=True)
         with open(os.path.join(bpdir, f"{name}.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump(obj, handle)
+            json.dump(specs, handle)
 
-    def _create(self, name, machine, media=None, archives=None):
-        self._write(name, machine, media, archives)
+    def _create(self, name, machine, media=None):
+        self._write(name, machine, media)
         with mock.patch("reliquary.machines.create_hdd_image"):
             return create_machine(name, context=self.home)
 
@@ -146,7 +143,7 @@ class MaterializationTests(_HomeCase):
     def test_difference_media_materializes_an_overlay(self):
         self._write("based", {"platform": "dos", "drives": {"hdd0": "base"}},
                    media=[{"name": "base", "materialize": "difference",
-                           "source": {"local": self.iso_path}}])
+                           "location": {"local": self.iso_path}}])
         with mock.patch(
                 "reliquary.machines.create_difference_image") as diff:
             machine_id = create_machine("based", context=self.home)
@@ -159,7 +156,7 @@ class MaterializationTests(_HomeCase):
     def test_copy_media_materializes_a_duplicate(self):
         self._write("dup", {"platform": "dos", "drives": {"hdd0": "base"}},
                    media=[{"name": "base", "materialize": "copy",
-                           "source": {"local": self.iso_path}}])
+                           "location": {"local": self.iso_path}}])
         with mock.patch(
                 "reliquary.machines.create_duplicate_image") as dupe:
             machine_id = create_machine("dup", context=self.home)
@@ -173,7 +170,7 @@ class MaterializationTests(_HomeCase):
         machine_id = self._create(
             "hd", {"platform": "dos", "drives": {"hdd0": "shared"}},
             media=[{"name": "shared", "materialize": "use",
-                    "source": {"local": work}}])
+                    "location": {"local": work}}])
         drive = self._state(machine_id)["drives"]["hdd0"]
         self.assertEqual(os.path.normpath(drive["path"]),
                          os.path.normpath(work))

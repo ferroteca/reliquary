@@ -1,6 +1,0 @@
-// invalid: a nested type echo that disagrees is an error
-// spec: Spec types
-[
-  { "type": "media", "name": "bundle", "location": "bundle.zip",
-    "children": [ { "type": "machine", "path": "inner.img" } ] }
-]

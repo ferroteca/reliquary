@@ -1,6 +1,0 @@
-// invalid: a malformed hash is refused
-// spec: media
-[
-  { "type": "media", "name": "x", "location": "https://x.test/p.iso",
-    "sha256": "zz" }
-]

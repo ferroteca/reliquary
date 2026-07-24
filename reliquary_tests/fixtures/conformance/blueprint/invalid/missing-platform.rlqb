@@ -1,1 +1,6 @@
-{"drives": {}}
+// invalid: platform is required and never inferred
+// spec: machine
+// schema: rejects
+[
+  { "type": "machine", "name": "rig", "drives": { "cdrom0": null } }
+]

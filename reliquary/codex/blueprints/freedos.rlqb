@@ -1,43 +1,46 @@
-{
-  "machines": [
-    {
-      "name": "freedos",
-      "platform": "dos",
-      "memory": "32M",
-      "description": "Plain FreeDOS 1.4 system installed from the LiveCD",
-      "drives": {
-        "hdd0": "blank-20m",
-        "cdrom0": null
-      },
-      "boot": ["hdd0", "cdrom0"],
-      "scripts": {
-        "install": "freedos-install",
-        "verify": "freedos-verify"
+// A plain FreeDOS system, installed from the LiveCD.
+//
+// The codex is a launching point, not a version library: this entry is
+// named for the system, and the version lives below as the location and
+// its hash — the two knobs a version bump turns.
+[
+  {
+    "type": "machine",
+    "name": "freedos",
+    "platform": "dos",
+    "memory": "32M",
+    "description": "Plain FreeDOS 1.4 system installed from the LiveCD",
+    "drives": {
+      // The blank the installer partitions and formats. Written in
+      // place and unnamed: nothing else refers to it, and it is
+      // materialized fresh into every machine.
+      "hdd0": { "type": "media", "size": "20M" },
+      // Declared but empty — the install script inserts the LiveCD.
+      "cdrom0": null
+    },
+    "boot": ["hdd0", "cdrom0"],
+    "scripts": {
+      "install": "freedos-install",
+      "verify": "freedos-verify"
+    }
+  },
+
+  {
+    // The download, and the ISO read out of it. One remote rung, one
+    // hash; the child names its path inside the container.
+    "type": "media",
+    "name": "freedos-livecd-zip",
+    "location": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
+    "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
+    "children": [
+      {
+        "type": "media",
+        "path": "FD14LIVE.iso",
+        "name": "freedos-livecd",
+        "description": "The FreeDOS 1.4 LiveCD installer ISO",
+        "read-only": true,
+        "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
       }
-    }
-  ],
-  "media": [
-    {
-      "name": "blank-20m",
-      "materialize": "new",
-      "size": "20M"
-    }
-  ],
-  "archives": [
-    {
-      "name": "freedos-livecd-zip",
-      "source": {
-        "url": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
-        "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339"
-      },
-      "members": [
-        {
-          "path": "FD14LIVE.iso",
-          "name": "freedos-livecd",
-          "read-only": true,
-          "sha256": "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e6ef2deb0477f81fb"
-        }
-      ]
-    }
-  ]
-}
+    ]
+  }
+]

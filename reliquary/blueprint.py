@@ -23,19 +23,21 @@ def new_blueprint(name, *, platform="dos", context=None):
     if os.path.exists(path):
         raise FileExistsError(f"blueprint already exists: {path}")
 
-    data = {
-        "machines": [
-            {
-                "name": name,
-                "platform": platform,
-                "memory": 16 if platform == "dos" else 64,
-                "drives": {"hdd0": "blank-256m"},
-            }
-        ],
-        "media": [
-            {"name": "blank-256m", "materialize": "new", "size": "256M"}
-        ],
-    }
+    data = [
+        {
+            "type": "machine",
+            "name": name,
+            "platform": platform,
+            "memory": 16 if platform == "dos" else 64,
+            "drives": {"hdd0": "blank-256m"},
+        },
+        {
+            "type": "media",
+            "name": "blank-256m",
+            "materialize": "new",
+            "size": "256M",
+        },
+    ]
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         handle.write("// Machine blueprint for " + name + "\n")

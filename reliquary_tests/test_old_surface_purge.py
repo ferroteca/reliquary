@@ -158,6 +158,45 @@ class RetiredMediaDefinitionTests(unittest.TestCase):
             "the .rlqm media-definition file kind is retired; "
             "these files must be removed:\n" + "\n".join(survivors))
 
+    def test_no_authored_document_uses_the_retired_shape(self):
+        """The first-round four-component model leaves no authored file.
+
+        The plural root sections and the `source` / `archive` spec
+        types were superseded by D22 before any of them shipped in an
+        authored document. Every `.rlqb` the repository carries — the
+        codex, the examples, the conformance corpus — speaks the
+        revised model, and the parser is what proves it: a survivor
+        would fail to parse rather than quietly mean something else.
+        """
+        import warnings
+
+        from reliquary import document, jsonc
+
+        skip_dirs = {".venv", ".git", "__pycache__", "build", "dist"}
+        stale = []
+        for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
+            dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+            if os.path.basename(dirpath) == "invalid":
+                continue  # fixtures that must fail, by design
+            for name in filenames:
+                if not name.endswith(".rlqb"):
+                    continue
+                path = os.path.join(dirpath, name)
+                with open(path, encoding="utf-8") as handle:
+                    raw = jsonc.load(handle)
+                if isinstance(raw, dict) and (
+                        {"machines", "sources", "archives"} & set(raw)):
+                    stale.append(os.path.relpath(path, _REPO_ROOT))
+                    continue
+                with warnings.catch_warnings():
+                    warnings.simplefilter(
+                        "ignore", document.BlueprintWarning)
+                    document.parse_document(raw)
+        self.assertEqual(
+            stale, [],
+            "these authored blueprints still use the retired "
+            "four-component shape:\n" + "\n".join(stale))
+
 
 class OldApiNamesAbsentTests(unittest.TestCase):
     """Superseded package exports are gone, not aliased."""

@@ -1,5 +1,0 @@
-// invalid: an empty mirror list is an error
-// spec: Mirror lists
-[
-  { "type": "media", "name": "x", "location": [] }
-]

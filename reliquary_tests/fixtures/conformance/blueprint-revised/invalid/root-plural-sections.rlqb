@@ -1,3 +1,0 @@
-// invalid: the plural root sections are retired
-// spec: The file
-{ "machines": [ { "name": "m", "platform": "dos" } ] }

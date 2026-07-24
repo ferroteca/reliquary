@@ -1,6 +1,0 @@
-// invalid: a new blank takes no location
-// spec: media
-[
-  { "type": "media", "name": "blank", "materialize": "new", "size": "20M",
-    "location": "p.img" }
-]

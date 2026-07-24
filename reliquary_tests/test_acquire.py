@@ -38,13 +38,14 @@ class AcquireTests(unittest.TestCase):
                 bundle.writestr("inner.zip", _read(inner_zip))
             outer_sha = _sha(_read(outer_zip))
 
-            doc = parse_document({"archives": [{
+            doc = parse_document([{
                 "name": "outer",
-                "source": {"local": outer_zip, "sha256": outer_sha},
-                "members": [{
+                "location": {"local": outer_zip}, "sha256": outer_sha,
+                "children": [{
                     "path": "inner.zip", "sha256": inner_sha,
-                    "members": [{"path": "144m/payload.img", "name": "payload",
-                                 "sha256": payload_sha}]}]}]})
+                    "children": [{"path": "144m/payload.img",
+                                  "name": "payload",
+                                  "sha256": payload_sha}]}]}])
             ns = resolve.namespace_of(doc)
             cache = os.path.join(root, "cache")
             ctx = Context(cache=cache)
@@ -54,16 +55,18 @@ class AcquireTests(unittest.TestCase):
             self.assertEqual(os.path.basename(path), "payload.img")
             self.assertTrue(os.path.exists(
                 os.path.join(cache, "media", "payload.img")))
+            # The container is a media like any other now: one cache,
+            # keyed by name, with no second directory for archives.
             self.assertTrue(os.path.exists(
-                os.path.join(cache, "archives", "inner.zip")))
+                os.path.join(cache, "media", "inner.zip")))
 
             # idempotent: a second fetch verifies the cache and reuses it
             self.assertEqual(
                 acquire.fetch_media(ns.media["payload"], ns, context=ctx), path)
 
     def test_new_media_returns_none(self):
-        doc = parse_document({"media": [
-            {"name": "blank", "materialize": "new", "size": "1M"}]})
+        doc = parse_document([
+            {"name": "blank", "materialize": "new", "size": "1M"}])
         ns = resolve.namespace_of(doc)
         self.assertIsNone(
             acquire.fetch_media(ns.media["blank"], ns, context=Context(cache=".")))
@@ -73,21 +76,22 @@ class AcquireTests(unittest.TestCase):
             iso = os.path.join(root, "win98se.iso")
             with open(iso, "wb") as handle:
                 handle.write(b"ISO-CONTENT")
-            doc = parse_document({"media": [
-                {"name": "win", "source": {"local": iso}}]})
+            doc = parse_document([
+                {"name": "win", "location": {"local": iso}}])
             ns = resolve.namespace_of(doc)
             path = acquire.fetch_media(
                 ns.media["win"], ns, context=Context(cache=os.path.join(root, "c")))
             self.assertEqual(path, iso)  # used in place, not copied to cache
 
-    def test_url_source_without_hash_fails_before_network(self):
-        # A url with no sha256 parses (the schema/parser defer the
-        # required-on-url rule), but acquisition refuses it up front —
-        # so this never touches the network.
-        doc = parse_document({"media": [
-            {"name": "x", "source": {"url": "https://example/a.iso"}}]})
+    def test_remote_without_hash_fails_before_network(self):
+        # A remote location with no sha256 parses — the required-once-
+        # remote rule is a resolution check, since a referenced rung may
+        # resolve to a URL — and resolution refuses it up front, so this
+        # never touches the network.
+        doc = parse_document([
+            {"name": "x", "location": {"url": "https://example/a.iso"}}])
         ns = resolve.namespace_of(doc)
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             acquire.fetch_media(ns.media["x"], ns, context=Context(cache="."))
 
 

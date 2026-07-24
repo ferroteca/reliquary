@@ -1,6 +1,0 @@
-// invalid: closed vocabulary: control-planes items
-// spec: Reach
-[
-  { "type": "machine", "name": "rig", "platform": "dos",
-    "control-planes": ["${plane}"], "drives": { "cdrom0": null } }
-]

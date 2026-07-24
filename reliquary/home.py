@@ -195,9 +195,6 @@ class Context:
     def blueprints_dir(self):
         return os.path.join(self.home_dir(), "blueprints")
 
-    def media_dir(self):
-        return os.path.join(self.home_dir(), "media")
-
     def scripts_dir(self):
         return os.path.join(self.home_dir(), "scripts")
 
@@ -228,11 +225,6 @@ def _ctx(context):
 def blueprints_dir(context=None):
     """Return the machine-blueprint directory under the effective home."""
     return _ctx(context).blueprints_dir()
-
-
-def media_dir(context=None):
-    """Return the shared media-definition directory under the home."""
-    return _ctx(context).media_dir()
 
 
 def scripts_dir(context=None):

@@ -1,7 +1,0 @@
-// invalid: a stem that repairs to nothing fails closed demanding an explicit
-//         name
-// spec: Derivation, repair, and failure
-[
-  { "type": "media", "location": "https://x.test/%20%20.zip",
-    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
-]

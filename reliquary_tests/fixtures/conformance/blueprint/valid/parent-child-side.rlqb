@@ -1,0 +1,8 @@
+// valid: the same graph written from the child side
+// spec: Containment
+[
+  { "type": "media", "name": "outer", "location": "https://x.test/outer.zip",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+  { "type": "media", "name": "cd", "read-only": true,
+    "location": "${media:outer/cd.iso}" }
+]

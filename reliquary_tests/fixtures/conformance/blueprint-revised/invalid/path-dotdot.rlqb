@@ -1,6 +1,0 @@
-// invalid: a .. segment is refused as a containment escape
-// spec: The path suffix
-[
-  { "type": "media", "name": "outer", "location": "outer.zip" },
-  { "type": "media", "name": "esc", "location": "${media:outer}/../p.img" }
-]

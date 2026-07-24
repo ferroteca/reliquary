@@ -39,24 +39,24 @@ def live_external_effects():
 
     Unit tests keep the blocked bindings. Opt-in integration tests
     enter this context so media fetch and QEMU launch can run.
-    ``reliquary.media`` binds ``urlopen`` at import, so that name is
+    ``reliquary.acquire`` binds ``urlopen`` at import, so that name is
     restored alongside ``urllib.request.urlopen``.
     """
-    import reliquary.media as media
+    import reliquary.acquire as acquire
 
     previous_urlopen = urllib.request.urlopen
-    previous_media_urlopen = media.urlopen
+    previous_acquire_urlopen = acquire.urlopen
     previous_popen = subprocess.Popen
     previous_run = subprocess.run
     urllib.request.urlopen = _ORIGINAL_URLOPEN
-    media.urlopen = _ORIGINAL_URLOPEN
+    acquire.urlopen = _ORIGINAL_URLOPEN
     subprocess.Popen = _ORIGINAL_POPEN
     subprocess.run = _ORIGINAL_RUN
     try:
         yield
     finally:
         urllib.request.urlopen = previous_urlopen
-        media.urlopen = previous_media_urlopen
+        acquire.urlopen = previous_acquire_urlopen
         subprocess.Popen = previous_popen
         subprocess.run = previous_run
 

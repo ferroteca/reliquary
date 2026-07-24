@@ -1,6 +1,0 @@
-// invalid: closed vocabulary: materialize
-// spec: Reach
-[
-  { "type": "media", "name": "x", "materialize": "${how}",
-    "location": "p.img" }
-]

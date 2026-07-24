@@ -20,7 +20,7 @@ def _home_with_media(home, media_entries):
     bpdir = os.path.join(home, "blueprints")
     os.makedirs(bpdir, exist_ok=True)
     with open(os.path.join(bpdir, "lib.rlqb"), "w", encoding="utf-8") as h:
-        json.dump({"media": media_entries}, h)
+        json.dump(list(media_entries), h)
     return Context(home=home, cache=os.path.join(home, "cache"),
                    assets=HOME_ASSETS)
 
@@ -32,7 +32,7 @@ class MediaModuleTests(unittest.TestCase):
             with open(iso, "wb") as handle:
                 handle.write(b"ISO")
             ctx = _home_with_media(
-                home, [{"name": "win", "source": {"local": iso}}])
+                home, [{"name": "win", "location": {"local": iso}}])
             self.assertEqual(media.fetch_media("win", context=ctx), iso)
 
     def test_new_media_fetch_returns_none(self):
@@ -46,7 +46,7 @@ class MediaModuleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as home:
             ctx = _home_with_media(home, [
                 {"name": "blank", "materialize": "new", "size": "1M"},
-                {"name": "win", "source": {"local": "/x.iso"}}])
+                {"name": "win", "location": {"local": "/x.iso"}}])
             self.assertEqual(media.list_media(context=ctx), ["blank", "win"])
 
     def test_clean_media_and_archives(self):

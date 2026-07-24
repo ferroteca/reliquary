@@ -1,5 +1,0 @@
-// invalid: an explicit name outside the charter is refused
-// spec: The name charter
-[
-  { "type": "media", "name": "my iso", "location": "p.iso" }
-]

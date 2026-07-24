@@ -2,20 +2,31 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """The shared static-conformance corpus (composed blueprint model).
 
-Every fixture under ``fixtures/conformance/blueprint/{valid,invalid}/``
-is run against two validators that must agree: reliquary's own parser
-(``document.parse_document`` — the normative validator) and the published
-JSON Schema (``reliquary/schemas/blueprint-schema-v1.json``). A valid
-document parses and validates; an invalid document is rejected by both.
-The parser side always runs; the schema side runs when ``jsonschema`` is
-available (the schema ships in the package, so it validates even on an
-installed artifact).
+Every fixture under ``fixtures/conformance/blueprint/`` is run against
+the validators that can judge it. Reliquary's own parser
+(``document.parse_document``) is the normative one and judges every
+fixture; the published JSON Schema
+(``reliquary/schemas/blueprint-schema-v1.json``) must accept everything
+valid, and catches the structural half of what is invalid.
+
+Three buckets, because two-phase validation is real:
+
+- ``valid/`` — parses, and validates against the schema.
+- ``invalid/`` — rejected at parse. Those a schema can also judge carry
+  a ``// schema: rejects`` header and must fail it too; the rest are
+  semantic rules no schema can express (the reference grammar, name
+  derivation, identity across specs, containment paths).
+- ``invalid-at-resolution/`` — parses clean and is rejected only when
+  resolved, so neither the parse assertion nor the schema applies.
+
+The corpus README documents what single-document fixtures cannot reach.
 """
 
 import glob
 import json
 import os
 import unittest
+import warnings
 from importlib import resources
 
 from reliquary import document, jsonc
@@ -33,8 +44,8 @@ _STATE_SCHEMA_DIR = os.path.join(
 _HAVE_STATE_SCHEMA = os.path.isdir(_STATE_SCHEMA_DIR)
 
 
-def _fixtures(verdict):
-    return sorted(glob.glob(os.path.join(_CORPUS, verdict, "*.rlqb")))
+def _fixtures(bucket):
+    return sorted(glob.glob(os.path.join(_CORPUS, bucket, "*.rlqb")))
 
 
 def _load(path):
@@ -42,8 +53,21 @@ def _load(path):
         return jsonc.load(handle)
 
 
-def _stem(path):
-    return os.path.splitext(os.path.basename(path))[0]
+def _header(path):
+    with open(path, encoding="utf-8") as handle:
+        return [line for line in handle.read().split("\n")
+                if line.startswith("//")]
+
+
+def _declares(path, marker):
+    return any(line.startswith(marker) for line in _header(path))
+
+
+def _parse(path):
+    """Parse a fixture, ignoring the warnings some of them declare."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", document.BlueprintWarning)
+        return document.parse_document(_load(path))
 
 
 def _blueprint_schema():
@@ -58,7 +82,7 @@ class BlueprintCorpusTests(unittest.TestCase):
         self.assertTrue(paths, "no valid blueprint fixtures found")
         for path in paths:
             with self.subTest(fixture=os.path.basename(path)):
-                document.parse_document(_load(path), stem=_stem(path))
+                _parse(path)
 
     def test_invalid_fixtures_are_rejected(self):
         paths = _fixtures("invalid")
@@ -66,7 +90,42 @@ class BlueprintCorpusTests(unittest.TestCase):
         for path in paths:
             with self.subTest(fixture=os.path.basename(path)):
                 with self.assertRaises((ValueError, KeyError, TypeError)):
-                    document.parse_document(_load(path), stem=_stem(path))
+                    _parse(path)
+
+    def test_resolution_fixtures_parse_clean(self):
+        """These are rejected at resolution, so parse must accept them.
+
+        A fixture failing here would be failing for the wrong reason,
+        which costs as much as one passing for the wrong reason.
+        """
+        paths = _fixtures("invalid-at-resolution")
+        self.assertTrue(paths, "no resolution-time fixtures found")
+        for path in paths:
+            with self.subTest(fixture=os.path.basename(path)):
+                _parse(path)
+
+    def test_declared_warnings_are_emitted(self):
+        """A fixture declaring `// warns:` must actually warn."""
+        for path in _fixtures("valid"):
+            if not _declares(path, "// warns:"):
+                continue
+            with self.subTest(fixture=os.path.basename(path)):
+                with self.assertWarns(document.BlueprintWarning):
+                    document.parse_document(_load(path))
+
+    def test_fixtures_that_only_warn_do_not_warn_otherwise(self):
+        """Every other valid fixture parses silently."""
+        for path in _fixtures("valid"):
+            if _declares(path, "// warns:"):
+                continue
+            with self.subTest(fixture=os.path.basename(path)):
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    document.parse_document(_load(path))
+                self.assertEqual(
+                    [str(w.message) for w in caught
+                     if issubclass(w.category, document.BlueprintWarning)],
+                    [])
 
     @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_valid_fixtures_match_the_schema(self):
@@ -76,59 +135,47 @@ class BlueprintCorpusTests(unittest.TestCase):
                 jsonschema.validate(_load(path), schema)
 
     @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
-    def test_invalid_fixtures_fail_the_schema(self):
+    def test_schema_rejects_what_it_declares_it_rejects(self):
         schema = _blueprint_schema()
         for path in _fixtures("invalid"):
+            if not _declares(path, "// schema: rejects"):
+                continue
             with self.subTest(fixture=os.path.basename(path)):
                 with self.assertRaises(jsonschema.ValidationError):
                     jsonschema.validate(_load(path), schema)
 
+    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
+    def test_unmarked_fixtures_really_are_beyond_the_schema(self):
+        """The marker records the overlap; it must not go stale.
 
-class StagedRevisedCorpusTests(unittest.TestCase):
-    """The revised-format corpus, staged ahead of its parser (S2).
+        An unmarked fixture the schema now catches means the schema grew
+        a rule and the corpus did not notice — which is how the two
+        validators drift apart.
+        """
+        schema = _blueprint_schema()
+        for path in _fixtures("invalid"):
+            if _declares(path, "// schema: rejects"):
+                continue
+            with self.subTest(fixture=os.path.basename(path)):
+                jsonschema.validate(_load(path), schema)
 
-    ``fixtures/conformance/blueprint-revised/`` describes the composed
-    blueprint model (planning/design/blueprint-model.md) and is written
-    before the parser that will validate it, so S3 has an acceptance
-    test from its first line. Nothing here asserts parser behaviour —
-    that arrives when S3 moves this corpus into place. What is checked
-    is the little that can be: the fixtures are well-formed JSONC and
-    each declares what it exercises, so a typo cannot survive the wait.
-    See the corpus README for the wiring step.
-    """
+    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
+    def test_closed_vocabularies_are_schema_enforced(self):
+        """What the reach trim buys, asserted rather than assumed.
 
-    STAGED = os.path.join(
-        _HERE, "fixtures", "conformance", "blueprint-revised")
-    BUCKETS = ("valid", "invalid", "invalid-at-resolution")
-
-    def _staged(self, bucket):
-        return sorted(glob.glob(os.path.join(self.STAGED, bucket, "*.rlqb")))
-
-    def test_every_bucket_is_populated(self):
-        for bucket in self.BUCKETS:
-            with self.subTest(bucket=bucket):
-                self.assertTrue(self._staged(bucket),
-                                f"no staged fixtures in {bucket}/")
-
-    def test_fixtures_are_well_formed_jsonc(self):
-        for bucket in self.BUCKETS:
-            for path in self._staged(bucket):
-                with self.subTest(fixture=os.path.basename(path)):
-                    # Invalid fixtures are invalid *blueprints*; every
-                    # one of them is still a well-formed document.
-                    _load(path)
-
-    def test_fixtures_declare_what_they_exercise(self):
-        for bucket in self.BUCKETS:
-            verdict = "valid" if bucket == "valid" else "invalid"
-            for path in self._staged(bucket):
-                with self.subTest(fixture=os.path.basename(path)):
-                    with open(path, encoding="utf-8") as handle:
-                        head = handle.readline()
-                    self.assertTrue(
-                        head.startswith(f"// {verdict}: "),
-                        f"{os.path.basename(path)} must open with a "
-                        f"'// {verdict}: ' header naming what it exercises")
+        A reference in a closed vocabulary must fail the schema, not
+        merely the parser: the enums stay plain so an editor can
+        complete them, and that is the whole argument for refusing a
+        reference there (D26).
+        """
+        for name in ("platform", "backend", "materialize", "controller",
+                     "control-planes"):
+            path = os.path.join(_CORPUS, "invalid", f"ref-in-{name}.rlqb")
+            with self.subTest(vocabulary=name):
+                self.assertTrue(os.path.exists(path), f"missing {path}")
+                self.assertTrue(
+                    _declares(path, "// schema: rejects"),
+                    f"the {name} vocabulary must be schema-enforced")
 
 
 class MachineStateSchemaTests(unittest.TestCase):
@@ -150,9 +197,9 @@ class MachineStateSchemaTests(unittest.TestCase):
             os.makedirs(root)
             with open(os.path.join(root, "state-bp.rlqb"), "w",
                       encoding="utf-8") as handle:
-                handle.write('{"machines": [{"name": "state-bp", '
+                handle.write('[{"type": "machine", "name": "state-bp", '
                              '"platform": "dos", '
-                             '"drives": {"cdrom0": null}}]}')
+                             '"drives": {"cdrom0": null}}]')
             context = Context(home=os.path.join(tmp, "home"), assets=root)
             machine_id = create_machine("state-bp", context=context)
             state = load_machine_state(machine_id, context)

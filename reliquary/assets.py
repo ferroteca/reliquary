@@ -2,26 +2,26 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Authored-asset residency: the resolution source seam.
 
-Authored assets — machine blueprints (``.rlqb``), media definitions
-(``.rlqm``), scripts (``.rlqs``), and landmark declarations (``.rlql``)
-— resolve through one of two file-backed sources, selected per
-invocation (``home.assets_mode``):
+Authored assets — machine blueprints (``.rlqb``, media included),
+scripts (``.rlqs``), and landmark declarations (``.rlql``) — resolve
+through one of two file-backed sources, selected per invocation
+(``home.assets_mode``):
 
 - **home mode** (``HomeSource``) — the CLI default. Resolves from the
-  home's canonical ``blueprints/`` / ``media/`` / ``scripts/`` folders
-  and seeds missing names from the built-in codex. A convenience for
-  human CLI interaction.
+  home's canonical ``blueprints/`` and ``scripts/`` folders and seeds
+  missing names from the built-in codex. A convenience for human CLI
+  interaction.
 - **dir mode** (``DirSource``) — ``--assets <dir>`` / API ``assets=``.
   A project's own asset root, walked recursively by extension, as the
   **sole** source: no home, no codex. Hermetic, for automation.
 
 An asset's identity is its ``name`` field when the authored file
 declares one, else its filename stem; two files of one kind claiming
-the same effective name within a source is an error. Media is the
-exception — a definition identifies its items by their own ``name``s
-regardless of filename — so media resolution scans items rather than
-indexing by this rule; scripts and landmarks carry no ``name`` field
-and stay stem-identified.
+the same effective name within a source is an error. Media are not a
+file kind at all — they are specs inside a blueprint, identified by
+their own names — so they resolve through the catalog rather than by
+this rule; scripts and landmarks carry no ``name`` field and stay
+stem-identified.
 
 An ``ObjectSource`` (JSON-imported objects supplied by an embedding
 caller, no files at all) is the planned third source and slots onto
@@ -30,16 +30,16 @@ this same seam.
 
 import os
 
-from .home import (HOME_ASSETS, assets_mode, blueprints_dir, media_dir,
+from .home import (HOME_ASSETS, assets_mode, blueprints_dir,
                    scripts_dir)
 
 
 # Authored-asset file extensions by kind. ``.json`` is the accepted
-# legacy spelling for blueprints and media definitions; scripts and
-# landmarks have no legacy form.
+# legacy spelling for blueprints; scripts and landmarks have no legacy
+# form. There is no media kind: ``.rlqm`` retired with the composed
+# model, and a media is a spec inside a ``.rlqb``.
 KIND_EXTENSIONS = {
     "blueprint": (".rlqb", ".json"),
-    "media": (".rlqm", ".json"),
     "script": (".rlqs",),
     "landmark": (".rlql",),
 }
@@ -100,7 +100,6 @@ class HomeSource(AssetSource):
 
     _DIRS = {
         "blueprint": blueprints_dir,
-        "media": media_dir,
         "script": scripts_dir,
     }
 
@@ -119,10 +118,7 @@ class HomeSource(AssetSource):
         return self._cache[kind]
 
     def document_files(self):
-        files = []
-        for kind in ("blueprint", "media"):
-            files.extend(_walk_files(self._dir(kind), (".rlqb",)))
-        return files
+        return _walk_files(self._dir("blueprint"), (".rlqb",))
 
     def describe(self, kind):
         return self._dir(kind) or "the home"

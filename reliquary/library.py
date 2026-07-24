@@ -41,12 +41,23 @@ def _copy_out(source, destination):
 
 
 def _machine_objects(blueprint_data):
-    """Yield the machine component objects in a raw composed document."""
-    machines = blueprint_data.get("machines")
-    entries = machines if isinstance(machines, list) else [blueprint_data]
-    for machine in entries:
-        if isinstance(machine, collections.abc.Mapping):
-            yield machine
+    """Yield the machine specs in a raw composed document.
+
+    Raw because this runs before parsing — search and seeding read
+    files that may not be valid. The root is an array of specs, or a
+    lone spec object as sugar for the array of one; a machine is the
+    spec that declares ``"type": "machine"``.
+    """
+    if isinstance(blueprint_data, collections.abc.Mapping):
+        entries = [blueprint_data]
+    elif isinstance(blueprint_data, list):
+        entries = blueprint_data
+    else:
+        return
+    for spec in entries:
+        if (isinstance(spec, collections.abc.Mapping)
+                and spec.get("type") == "machine"):
+            yield spec
 
 
 def _referenced_scripts(blueprint_data):
@@ -96,8 +107,7 @@ def list_builtin_media():
             continue
         try:
             doc = document.parse_document(
-                jsonc.loads(entry.read_text(encoding="utf-8")),
-                stem=entry.name[:-5])
+                jsonc.loads(entry.read_text(encoding="utf-8")))
         except (ValueError, KeyError, UnicodeDecodeError):
             continue
         names.update(doc.media)
@@ -119,15 +129,7 @@ def _blueprint_meta(path):
             raw = jsonc.loads(handle.read())
     except (OSError, ValueError, UnicodeDecodeError):
         raw = None
-    mapping = raw if isinstance(raw, collections.abc.Mapping) else None
-    machine = None
-    if mapping is not None:
-        machines = mapping.get("machines")
-        if (isinstance(machines, list) and machines
-                and isinstance(machines[0], collections.abc.Mapping)):
-            machine = machines[0]
-        elif "machines" not in mapping and "platform" in mapping:
-            machine = mapping
+    machine = next(_machine_objects(raw), None)
     if not path.endswith(".rlqb") and machine is None:
         return None
     name = machine.get("name") if machine else None
@@ -300,13 +302,13 @@ def seed_blueprint(name, context=None, *, only=False):
     except (ValueError, UnicodeDecodeError):
         # A malformed builtin still copies out; loading it reports
         # the real parse error against the user's file.
-        data = {}
+        data = []
 
     os.makedirs(blueprints_dir(context), exist_ok=True)
     if not _copy_out(source, destination):
         return False
 
-    if not only and isinstance(data, collections.abc.Mapping):
+    if not only:
         # Media travel inside the composed blueprint; only the scripts
         # its machines reference are separate files to seed.
         for stem in _referenced_scripts(data):

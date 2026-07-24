@@ -1,5 +1,0 @@
-// invalid: the type never takes a reference
-// spec: Reach
-[
-  { "type": "${what.type}", "name": "x", "location": "p.img" }
-]

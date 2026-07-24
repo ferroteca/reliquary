@@ -60,13 +60,13 @@ class FreeDOSInstallIntegrationTests(unittest.TestCase):
                 installed = run_script(
                     "install",
                     blueprint="freedos",
-                    home=home)
+                    context=home)
                 self.assertEqual(installed.machine_phase, "ready")
 
                 verified = run_script(
                     "verify",
                     blueprint="freedos",
-                    home=home)
+                    context=home)
                 self.assertEqual(verified.machine_phase, "ready")
                 self.assertEqual(
                     verified.machine_id, installed.machine_id)

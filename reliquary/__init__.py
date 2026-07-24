@@ -7,7 +7,7 @@ from .cli import main
 from .document import Document, load_document, parse_document
 from .home import (HOME_ASSETS, Context, archives_cache_dir,
                    blueprints_dir, cache_dir, documents_dir, home,
-                   machines_cache_dir, media_cache_dir, media_dir,
+                   machines_cache_dir, media_cache_dir,
                    scripts_dir, set_assets, set_cache, set_home)
 from .interaction import GuestExec
 from .interaction_agentless import AgentlessGuestExec
@@ -88,7 +88,6 @@ __all__ = [
     "main",
     "mark_stopped",
     "media_cache_dir",
-    "media_dir",
     "new_blueprint",
     "parse_document",
     "parse_script",

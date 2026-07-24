@@ -1,168 +1,293 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Tests for the composed blueprint document parser (document.py)."""
+"""Tests for the composed blueprint document parser (document.py).
+
+The conformance corpus
+(``fixtures/conformance/blueprint/``, ``test_conformance_corpus.py``)
+covers accept-versus-reject across the whole rule surface. These tests
+cover what a fixture cannot assert: the *shape* parsing produces — that
+sugar desugars to the thing it claims to, that identity lands where the
+model says, and that a repair says what it repaired.
+"""
 
 import unittest
+import warnings
 
 from reliquary import document
 from reliquary.document import parse_document
 
+SHA = "a" * 64
 
-class BareMachineTests(unittest.TestCase):
-    def test_bare_root_machine_takes_stem_name(self):
-        doc = parse_document(
-            {"platform": "dos", "memory": "16M",
-             "drives": {"hdd0": "blank-20m", "cdrom0": None}},
-            stem="freedos-1.4")
-        self.assertEqual(set(doc.machines), {"freedos-1.4"})
-        machine = doc.machines["freedos-1.4"]
-        self.assertEqual(machine.platform, "dos")
-        self.assertEqual(machine.memory, 16)
-        self.assertEqual(machine.drives["hdd0"].media, "blank-20m")
+
+def _parse(value):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", document.BlueprintWarning)
+        return parse_document(value)
+
+
+class RootShapeTests(unittest.TestCase):
+    def test_root_array_of_specs(self):
+        doc = _parse([
+            {"type": "machine", "name": "rig", "platform": "dos",
+             "drives": {"hdd0": "blank", "cdrom0": None}},
+            {"type": "media", "name": "blank", "materialize": "new",
+             "size": "20M"}])
+        self.assertEqual(set(doc.machines), {"rig"})
+        self.assertEqual(set(doc.media), {"blank"})
+        machine = doc.machines["rig"]
+        self.assertEqual(machine.drives["hdd0"].media, "blank")
         self.assertIsNone(machine.drives["cdrom0"].media)
-        self.assertEqual(machine.boot, ("hdd0",))  # default best-guess: slot-0 hdd
+        # The default boot best-guess: the slot-0 hard disk.
+        self.assertEqual(machine.boot, ("hdd0",))
 
-    def test_bare_machine_without_stem_or_name_fails(self):
+    def test_lone_object_is_the_array_of_one(self):
+        doc = _parse({"type": "machine", "name": "solo", "platform": "dos"})
+        self.assertEqual(set(doc.machines), {"solo"})
+
+    def test_untyped_lone_object_is_a_media_not_a_machine(self):
+        """The bare-root-machine reading retired with the sections."""
+        doc = _parse({"name": "iso", "location": "payload.iso"})
+        self.assertEqual(set(doc.media), {"iso"})
+        self.assertEqual(doc.machines, {})
+
+    def test_machine_vocabulary_without_a_type_says_did_you_mean(self):
+        with self.assertRaises(ValueError) as caught:
+            parse_document({"name": "rig", "platform": "dos"})
+        self.assertIn("did you mean", str(caught.exception).lower())
+        self.assertIn("machine", str(caught.exception))
+
+    def test_bare_string_desugars_to_a_location(self):
+        doc = _parse(["payload.iso"])
+        media = doc.media["payload"]
+        self.assertEqual(len(media.location), 1)
+        self.assertEqual(media.location[0].kind, "local")
+        self.assertEqual(media.location[0].local, "payload.iso")
+
+    def test_retired_section_names_itself(self):
+        with self.assertRaises(ValueError) as caught:
+            parse_document({"machines": [{"name": "m", "platform": "dos"}]})
+        self.assertIn("retired", str(caught.exception))
+
+    def test_retired_spec_type_names_itself(self):
+        for retired in ("source", "archive"):
+            with self.subTest(type=retired):
+                with self.assertRaises(ValueError) as caught:
+                    parse_document([{"type": retired, "name": "x"}])
+                self.assertIn("retired", str(caught.exception))
+
+
+class IdentityTests(unittest.TestCase):
+    def test_machine_and_media_may_share_a_name(self):
+        doc = _parse([
+            {"type": "machine", "name": "dos622", "platform": "dos"},
+            {"type": "media", "name": "dos622", "materialize": "new",
+             "size": "1M"}])
+        self.assertIn("dos622", doc.machines)
+        self.assertIn("dos622", doc.media)
+
+    def test_name_derives_from_the_content_stem(self):
+        doc = _parse([{"location": "D:/isos/win98se.iso"}])
+        self.assertEqual(set(doc.media), {"win98se"})
+
+    def test_leading_digit_derives_cleanly(self):
+        """The charter splits from the property key by exactly this."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            doc = parse_document([{"location": "https://x.test/86Box.zip",
+                                   "sha256": SHA}])
+        self.assertEqual(set(doc.media), {"86Box"})
+        self.assertEqual([w for w in caught
+                          if issubclass(w.category, document.BlueprintWarning)],
+                         [])
+
+    def test_repair_names_both_the_derived_name_and_its_source(self):
+        with self.assertWarns(document.BlueprintWarning) as caught:
+            doc = parse_document(
+                [{"location": "https://x.test/FD 1.4 (final).zip",
+                  "sha256": SHA}])
+        self.assertEqual(set(doc.media), {"FD-1.4-final"})
+        message = str(caught.warning)
+        self.assertIn("FD-1.4-final", message)
+        self.assertIn("FD 1.4 (final).zip", message)
+
+    def test_in_file_duplicates_are_refused_even_when_identical(self):
         with self.assertRaises(ValueError):
-            parse_document({"platform": "dos"})
+            parse_document([{"name": "x", "location": "p.iso"},
+                            {"name": "x", "location": "p.iso"}])
 
-    def test_explicit_name_overrides_stem(self):
-        doc = parse_document({"name": "custom", "platform": "dos"},
-                             stem="from-file")
-        self.assertEqual(set(doc.machines), {"custom"})
+    def test_names_collide_case_insensitively(self):
+        with self.assertRaises(ValueError) as caught:
+            parse_document([{"name": "FDBOOT", "location": "a.img"},
+                            {"name": "fdboot", "location": "b.img"}])
+        self.assertIn("case", str(caught.exception))
 
-    def test_drive_with_old_size_source_rejected(self):
+
+class AnonymousBlankTests(unittest.TestCase):
+    def test_the_blank_is_in_no_namespace(self):
+        doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                       "drives": {"hdd0": {"size": "20M"}}}])
+        self.assertEqual(doc.media, {})
+        drive = doc.machines["rig"].drives["hdd0"]
+        self.assertIsNone(drive.media)
+        self.assertIsNotNone(drive.inline)
+        self.assertTrue(drive.inline.anonymous)
+        self.assertEqual(drive.inline.materialize, "new")
+        self.assertEqual(drive.inline.size, "20M")
+
+    def test_a_named_inline_media_joins_the_catalog(self):
+        doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                       "drives": {"cdrom0": {"type": "media", "name": "cd",
+                                             "location": "cd.iso"}}}])
+        self.assertIn("cd", doc.media)
+        self.assertEqual(doc.machines["rig"].drives["cdrom0"].media, "cd")
+
+
+class ContainmentTests(unittest.TestCase):
+    def test_children_desugar_to_child_declares_parent(self):
+        doc = _parse([{
+            "name": "outer", "location": "https://x.test/outer.zip",
+            "sha256": SHA,
+            "children": [{"path": "cd.iso", "name": "cd"},
+                         "floppy.img"]}])
+        self.assertEqual(set(doc.media), {"outer", "cd", "floppy"})
+        for name, path in (("cd", "cd.iso"), ("floppy", "floppy.img")):
+            rung = doc.media[name].location[0]
+            self.assertEqual(rung.kind, "parent")
+            self.assertEqual(rung.parent, "outer")
+            self.assertEqual(rung.path, path)
+
+    def test_the_two_spellings_produce_the_same_spec(self):
+        """children is pure sugar: one semantic, two spellings."""
+        batch = _parse([{"name": "outer", "location": "outer.zip",
+                         "children": [{"path": "cd.iso", "name": "cd"}]}])
+        child_side = _parse([
+            {"name": "outer", "location": "outer.zip"},
+            {"name": "cd", "location": "${media:outer/cd.iso}"}])
+        self.assertEqual(batch.media["cd"], child_side.media["cd"])
+
+    def test_nested_children_recurse(self):
+        doc = _parse([{
+            "name": "outer", "location": "outer.zip",
+            "children": [{"path": "inner.zip", "name": "inner",
+                          "children": ["deep.img"]}]}])
+        self.assertEqual(set(doc.media), {"outer", "inner", "deep"})
+        self.assertEqual(doc.media["deep"].location[0].parent, "inner")
+
+
+class LocationTests(unittest.TestCase):
+    def test_every_string_form_has_one_object_desugaring(self):
+        doc = _parse([
+            {"name": "a", "location": "https://x.test/a.iso", "sha256": SHA},
+            {"name": "b", "location": "b.iso"},
+            {"name": "c", "location": "C:/isos/c.iso"},
+            {"name": "d", "location": "${media:a}"},
+            {"name": "e", "location": "${iso.path}"}])
+        self.assertEqual(doc.media["a"].location[0].kind, "url")
+        self.assertEqual(doc.media["b"].location[0].kind, "local")
+        self.assertEqual(doc.media["c"].location[0].local, "C:/isos/c.iso")
+        parent = doc.media["d"].location[0]
+        self.assertEqual((parent.kind, parent.parent, parent.path),
+                         ("parent", "a", None))
+        self.assertEqual(doc.media["e"].location[0].property_key, "iso.path")
+
+    def test_mirror_singleton_is_the_scalar(self):
+        doc = _parse([{"name": "x", "sha256": SHA,
+                       "location": ["https://a.test/p.iso"]}])
+        self.assertEqual(len(doc.media["x"].location), 1)
+
+    def test_mirror_list_may_mix_schemes(self):
+        doc = _parse([{"name": "x", "sha256": SHA,
+                       "location": ["https://a.test/p.iso", "vendor/p.iso"]}])
+        kinds = [rung.kind for rung in doc.media["x"].location]
+        self.assertEqual(kinds, ["url", "local"])
+
+    def test_inline_parent_registers_as_its_own_media(self):
+        doc = _parse([{
+            "name": "cd",
+            "location": {"parent": {"name": "outer", "location": "outer.zip"},
+                         "path": "cd.iso"}}])
+        self.assertEqual(set(doc.media), {"outer", "cd"})
+        self.assertEqual(doc.media["cd"].location[0].parent, "outer")
+
+
+class ReferenceTests(unittest.TestCase):
+    def test_interpolation_defers_the_value(self):
+        doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                       "memory": "${rig.memory}"}])
+        memory = doc.machines["rig"].memory
+        self.assertIsInstance(memory, document.Deferred)
+        self.assertEqual(memory.references[0].target, "rig.memory")
+        self.assertIsNone(memory.references[0].qualifier)
+
+    def test_escape_yields_the_literal_text(self):
+        """`\\${` means a literal `${`, so the parsed value carries it.
+
+        The escape is consumed at parse: what reaches a guest config
+        file is `${HOME}`, which is the whole point of having one.
+        """
+        doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                       "parameters": {"p": "\\${HOME} is the guest's"}}])
+        self.assertEqual(doc.machines["rig"].parameters["p"],
+                         "${HOME} is the guest's")
+
+    def test_qualified_reference_carries_its_path(self):
+        doc = _parse([{"name": "cd", "location": "${media:outer/a/b.iso}"}])
+        rung = doc.media["cd"].location[0]
+        self.assertEqual((rung.parent, rung.path), ("outer", "a/b.iso"))
+
+    def test_the_closure_refuses_an_operator_that_passes_the_class(self):
+        """P14's acceptance test, asserted on the message too.
+
+        `${mem:-512M}` is built entirely from legal characters, so only
+        the production can refuse it — and it must say why.
+        """
+        with self.assertRaises(ValueError) as caught:
+            parse_document([{"type": "machine", "name": "rig",
+                             "platform": "dos", "memory": "${mem:-512M}"}])
+        self.assertIn("qualifier", str(caught.exception))
+
+    def test_closed_vocabularies_refuse_references(self):
+        for field, value in (("platform", "${p}"), ("backend", "${b}")):
+            with self.subTest(field=field):
+                spec = {"type": "machine", "name": "rig", "platform": "dos"}
+                spec[field] = value
+                with self.assertRaises(ValueError) as caught:
+                    parse_document([spec])
+                self.assertIn("closed vocabulary", str(caught.exception))
+
+    def test_identity_refuses_references(self):
         with self.assertRaises(ValueError):
-            parse_document({"platform": "dos", "drives": {"hdd0": {"size": "20M"}}})
+            parse_document([{"name": "${what}", "location": "p.iso"}])
 
-    def test_hdd_null_rejected(self):
+
+class MediaFieldTests(unittest.TestCase):
+    def test_size_without_a_location_is_a_blank(self):
+        doc = _parse([{"name": "blank", "size": "20M"}])
+        self.assertEqual(doc.media["blank"].materialize, "new")
+
+    def test_default_materialize_is_use(self):
+        doc = _parse([{"name": "iso", "location": "https://x.test/a.iso",
+                       "sha256": SHA}])
+        self.assertEqual(doc.media["iso"].materialize, "use")
+
+    def test_a_blank_takes_no_location(self):
         with self.assertRaises(ValueError):
-            parse_document({"platform": "dos", "drives": {"hdd0": None}})
+            parse_document([{"name": "x", "materialize": "new",
+                             "size": "20M", "location": "p.img"}])
+
+    def test_a_payload_mode_needs_a_location(self):
+        with self.assertRaises(ValueError):
+            parse_document([{"name": "x", "materialize": "use"}])
 
     def test_state_only_field_rejected(self):
         with self.assertRaises(ValueError):
-            parse_document({"platform": "dos", "id": "x"})
+            parse_document([{"type": "machine", "name": "rig",
+                             "platform": "dos", "id": "rig-0"}])
 
-
-class MediaTests(unittest.TestCase):
-    def test_new_media_needs_size_no_source(self):
-        doc = parse_document({"media": [
-            {"name": "blank-20m", "materialize": "new", "size": "20M"}]})
-        media = doc.media["blank-20m"]
-        self.assertEqual(media.materialize, "new")
-        self.assertEqual(media.size, "20M")
-        self.assertIsNone(media.source)
-
-    def test_new_media_with_source_rejected(self):
+    def test_hdd_null_rejected(self):
         with self.assertRaises(ValueError):
-            parse_document({"media": [
-                {"name": "x", "materialize": "new", "size": "20M",
-                 "source": {"local": "d:/x.img"}}]})
-
-    def test_use_media_needs_source(self):
-        with self.assertRaises(ValueError):
-            parse_document({"media": [{"name": "x", "materialize": "use"}]})
-
-    def test_media_default_materialize_is_use(self):
-        doc = parse_document({"media": [
-            {"name": "iso", "source": {"url": "https://x/a.iso",
-                                       "sha256": "a" * 64}}]})
-        self.assertEqual(doc.media["iso"].materialize, "use")
-
-    def test_media_name_defaults_from_local_source_stem(self):
-        doc = parse_document({"media": [
-            {"source": {"local": "D:/isos/win98se.iso"}}]})
-        self.assertEqual(set(doc.media), {"win98se"})
-
-    def test_unlocated_media_references_source_by_name(self):
-        doc = parse_document({
-            "media": [{"name": "windows-install-cd", "read-only": True,
-                       "sha256": "c" * 64, "source": "windows-cd-location"}],
-            "sources": [{"name": "windows-cd-location",
-                         "local": "D:/isos/win.iso"}]})
-        media = doc.media["windows-install-cd"]
-        self.assertEqual(media.source.kind, "ref")
-        self.assertEqual(media.source.ref, "windows-cd-location")
-        self.assertTrue(media.read_only)
-        self.assertEqual(doc.sources["windows-cd-location"].locator.kind, "local")
-
-    def test_bad_sha256_rejected(self):
-        with self.assertRaises(ValueError):
-            parse_document({"media": [
-                {"name": "x", "source": {"url": "u", "sha256": "zz"}}]})
-
-    def test_duplicate_media_name_rejected(self):
-        with self.assertRaises(ValueError):
-            parse_document({"media": [
-                {"name": "x", "materialize": "new", "size": "1M"},
-                {"name": "x", "materialize": "new", "size": "2M"}]})
-
-
-class ArchiveTreeTests(unittest.TestCase):
-    def _freedos_tree(self):
-        return parse_document({
-            "sources": [{"url": ["https://paul.com/PaulsFreedos.zip",
-                                 "https://m/PaulsFreedos.zip"],
-                         "sha256": "a" * 64}],
-            "archives": [{"source": "PaulsFreedos", "members": [
-                {"path": "FD14-FloppyEdition.zip", "members": [
-                    {"path": "144m/FDBOOT.img"},
-                    {"path": "144m/FDSTD01.img"}]}]}]})
-
-    def test_source_name_from_url_filename_stem(self):
-        doc = self._freedos_tree()
-        self.assertEqual(set(doc.sources), {"PaulsFreedos"})
-        self.assertEqual(doc.sources["PaulsFreedos"].locator.urls,
-                         ("https://paul.com/PaulsFreedos.zip",
-                          "https://m/PaulsFreedos.zip"))
-
-    def test_tree_expands_to_archives_and_leaf_media(self):
-        doc = self._freedos_tree()
-        self.assertEqual(set(doc.archives),
-                         {"PaulsFreedos", "FD14-FloppyEdition"})
-        self.assertEqual(set(doc.media), {"FDBOOT", "FDSTD01"})
-        # top archive sources from the named download
-        self.assertEqual(doc.archives["PaulsFreedos"].source.kind, "ref")
-        self.assertEqual(doc.archives["PaulsFreedos"].source.ref, "PaulsFreedos")
-        # nested archive extracts from its parent
-        inner = doc.archives["FD14-FloppyEdition"].source
-        self.assertEqual(inner.kind, "archive")
-        self.assertEqual(inner.archive, "PaulsFreedos")
-        self.assertEqual(inner.path, "FD14-FloppyEdition.zip")
-        # leaf media extract from the inner archive, default use
-        fdboot = doc.media["FDBOOT"]
-        self.assertEqual(fdboot.materialize, "use")
-        self.assertEqual(fdboot.source.kind, "archive")
-        self.assertEqual(fdboot.source.archive, "FD14-FloppyEdition")
-        self.assertEqual(fdboot.source.path, "144m/FDBOOT.img")
-
-    def test_member_with_members_rejects_leaf_fields(self):
-        with self.assertRaises(ValueError):
-            parse_document({"archives": [
-                {"name": "a", "source": {"url": "u", "sha256": "a" * 64},
-                 "members": [{"path": "inner.zip", "materialize": "use",
-                              "members": [{"path": "x.img"}]}]}]})
-
-    def test_archive_requires_source(self):
-        with self.assertRaises(ValueError):
-            parse_document({"archives": [{"name": "a"}]})
-
-
-class DocumentShapeTests(unittest.TestCase):
-    def test_unknown_section_rejected(self):
-        with self.assertRaises(ValueError):
-            parse_document({"widgets": []})
-
-    def test_empty_object_is_a_nameless_machine_and_fails(self):
-        with self.assertRaises((ValueError, KeyError)):
-            parse_document({})
-
-    def test_machine_and_media_share_a_name_across_types(self):
-        doc = parse_document({
-            "machines": [{"name": "dos622", "platform": "dos"}],
-            "media": [{"name": "dos622", "materialize": "new", "size": "1M"}]})
-        self.assertIn("dos622", doc.machines)
-        self.assertIn("dos622", doc.media)
+            parse_document([{"type": "machine", "name": "rig",
+                             "platform": "dos", "drives": {"hdd0": None}}])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,7 @@
+// invalid: closed vocabulary: materialize
+// spec: Reach
+// schema: rejects
+[
+  { "type": "media", "name": "x", "materialize": "${how}",
+    "location": "p.img" }
+]

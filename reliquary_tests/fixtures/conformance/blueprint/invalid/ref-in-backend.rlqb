@@ -1,0 +1,7 @@
+// invalid: closed vocabulary: backend
+// spec: Reach
+// schema: rejects
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "backend": "${host.backend}", "drives": { "cdrom0": null } }
+]

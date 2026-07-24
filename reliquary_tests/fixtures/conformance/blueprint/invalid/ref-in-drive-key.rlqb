@@ -1,0 +1,7 @@
+// invalid: an object key never takes a reference
+// spec: Reach
+// schema: rejects
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "${slot}": null } }
+]

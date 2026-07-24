@@ -1,6 +1,0 @@
-// invalid: the archive type is retired
-// spec: Spec types
-[
-  { "type": "archive", "name": "a", "location": "a.zip",
-    "members": [ { "path": "p.img" } ] }
-]

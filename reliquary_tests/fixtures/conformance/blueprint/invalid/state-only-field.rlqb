@@ -1,1 +1,7 @@
-{"platform": "dos", "id": "x"}
+// invalid: a state-only field is not authorable
+// spec: Spec types
+// schema: rejects
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "cdrom0": null }, "id": "rig-0" }
+]

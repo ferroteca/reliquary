@@ -45,8 +45,6 @@ class HomeTests(unittest.TestCase):
         cache = os.path.join(root, "cache")
         self.assertEqual(reliquary.blueprints_dir(),
                          os.path.join(root, "blueprints"))
-        self.assertEqual(reliquary.media_dir(),
-                         os.path.join(root, "media"))
         self.assertEqual(reliquary.scripts_dir(),
                          os.path.join(root, "scripts"))
         self.assertEqual(reliquary.cache_dir(), cache)
@@ -64,8 +62,6 @@ class HomeTests(unittest.TestCase):
         cache = os.path.join(root, "cache")
         self.assertEqual(reliquary.blueprints_dir(context=root),
                          os.path.join(root, "blueprints"))
-        self.assertEqual(reliquary.media_dir(context=root),
-                         os.path.join(root, "media"))
         self.assertEqual(reliquary.scripts_dir(context=root),
                          os.path.join(root, "scripts"))
         self.assertEqual(reliquary.cache_dir(context=root), cache)

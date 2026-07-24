@@ -48,6 +48,52 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D32 — THE CONTAINMENT PATH LIVES INSIDE THE BRACES — DECIDED
+  (owner, 2026-07-23, milestone 7's S3). Supports P14; RESOLVES a
+  contradiction between D22/D24 and D26/D27. Found by running the
+  S2 corpus against the first parser written to the spec — which
+  is what writing the corpus first was for.
+  THE CONTRADICTION: D22 settled the spelling as
+  `${media:<name>}/<path>`, path OUTSIDE the closing brace, and
+  D24 built on it — "a backslash after `}` is an error naming the
+  `/` rule" presupposes the path follows the brace. But D26's
+  character class justifies `/` as "separates the containment
+  path (exactly one)", which it need not do if the path is
+  outside the body at all, and D27's corrected production spells
+  the body `qualifier:media-name[/path]`, path INSIDE. Both
+  readings were live, and blueprint-model.md inherited both in
+  one document — its location table said outside, its closure
+  section said inside — WITHOUT THE REWRITE NOTICING. A spec
+  contradicting itself about a character position is one an
+  implementer resolves by guessing.
+  DECIDED: INSIDE. `${media:outer/cd.iso}`. THE GOVERNING
+  ARGUMENT IS THE CLOSURE: a qualified reference is whole-value
+  only, and with the path inside, whole-value means the string is
+  EXACTLY ONE REFERENCE — the closure test sees the entire
+  location and nothing trails it. With the path outside, the
+  parser must special-case trailing text after a qualified
+  reference, distinguishing a path suffix from interpolation the
+  reach rules forbid there; that is a second rule, and it lives
+  exactly where P14 says a second rule must not accrete. It also
+  gives D26's `/` its stated job back.
+  WHAT THE OUTSIDE FORM HAD: D22's priority, and familiarity —
+  it reads like a path join. Both real, neither structural.
+  THE BACKSLASH DIAGNOSTIC SURVIVES, which was the strongest
+  objection: `${media:outer\cd.iso}` is the same Windows author
+  making the same guess, and the parser names the same `/` rule —
+  it is now caught inside the body rather than after it, and the
+  message is unchanged in substance.
+  RECORDED AS METHOD: the S2-before-S3 ordering (the milestone
+  reassessment) is what surfaced this. A corpus written from the
+  spec, run against a parser written from the same spec, is a
+  differential test of the SPEC — and it failed on the one
+  sentence where the spec disagreed with itself.
+  FOLDED: this entry; blueprint-model.md (the location table, the
+  path-suffix section, the containment example, the resolution
+  order example); the S2 corpus fixtures; reliquary/document.py.
+  D22, D24, D26 and D27 keep their text; this entry is the
+  amendment of record.
+
 - D31 — USE-CASES.md MOVES TO THE ROOT — DECIDED (owner,
   2026-07-23). Supports P8. The use-case list joins PRINCIPLES.md
   at the repository root. THE ARGUMENT IS THE PARALLEL, already

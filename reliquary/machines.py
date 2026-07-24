@@ -18,6 +18,31 @@ from .lifecycle import (create_difference_image, create_duplicate_image,
 from .resolve import load_namespace, resolve_media
 
 
+def _drive_media(drive, namespace):
+    """The media a drive carries: from the catalog, or written in place.
+
+    An inline media declared at the drive is used directly — the
+    anonymous blank has no catalog name to look up, being in no
+    namespace at all.
+    """
+    if drive.inline is not None:
+        return drive.inline
+    if drive.media is None:
+        return None
+    return resolve_media(drive.media, namespace)
+
+
+def _image_stem(media, key):
+    """The per-machine image name: the media, or the slot for the blank.
+
+    Images are keyed by media so that media moving through a shared
+    removable slot never clobber one another. The anonymous blank is the
+    one exception and the one place a slot names anything: it has no
+    catalog identity to be keyed by.
+    """
+    return media.name or key
+
+
 def _fetch(media_name, context, *, namespace=None, on_mismatch="fail"):
     """Resolve a media by name against the source namespace and fetch
     its verified payload path (or ``None`` for a ``new`` blank)."""
@@ -256,12 +281,12 @@ def _materialize_drive(key, drive, media_root, namespace, context):
     and mode.
     """
     entry = _drive_common(key, drive)
-    if drive.media is None:
+    media = _drive_media(drive, namespace)
+    if media is None:
         # An empty removable slot: guest-visible hardware with no medium
         # until a script inserts one.
         entry.update(media=None, materialize=None, path=None)
         return entry
-    media = resolve_media(drive.media, namespace)
     mode = media.materialize
     if drive.medium == "cdrom" and mode != "use":
         raise ValueError(
@@ -270,14 +295,14 @@ def _materialize_drive(key, drive, media_root, namespace, context):
     entry["media"] = media.name
     entry["materialize"] = mode
     if mode == "new":
-        path = os.path.join(media_root, f"{media.name}.qcow2")
+        path = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
         create_hdd_image(path, media.size)
         entry.update(size=media.size, path=path)
     elif mode == "use":
         entry["path"] = _acquire_fetch(media, namespace, context)
     elif mode in ("difference", "copy"):
         base_payload = _acquire_fetch(media, namespace, context)
-        dest = os.path.join(media_root, f"{media.name}.qcow2")
+        dest = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
         if mode == "copy":
             create_duplicate_image(dest, base_payload)
         else:
@@ -410,7 +435,7 @@ def create_machine(name, *, context=None, number=None):
         raise FileNotFoundError(
             f"no machine blueprint named {name!r} in the resolution source")
     machine = namespace.machines[name]
-    source = namespace.origin.get(("machines", name))
+    source = namespace.origin.get(("machine", name))
     return create(machine, namespace, context=context, blueprint_name=name,
                   source=source, number=number)
 
@@ -472,7 +497,7 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context):
                 key, drive, media_root, namespace, context)
             continue
         # An existing materialized image may only be kept unchanged.
-        media = resolve_media(drive.media, namespace) if drive.media else None
+        media = _drive_media(drive, namespace)
         unchanged = (
             media is not None
             and media.name == old.get("media")
@@ -530,7 +555,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None):
             raise FileNotFoundError(
                 f"no machine blueprint named {blueprint_name!r} to apply")
         parsed = namespace.machines[blueprint_name]
-        path = namespace.origin.get(("machines", blueprint_name))
+        path = namespace.origin.get(("machine", blueprint_name))
 
         media_root = _machine_media_dir(machine_id, context)
         new_drives = _reconcile_drives(

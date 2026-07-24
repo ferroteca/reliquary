@@ -1,7 +1,0 @@
-// invalid: a children entry is path-form only - its location is parent plus
-//         path
-// spec: Containment
-[
-  { "type": "media", "name": "outer", "location": "outer.zip",
-    "children": [ { "path": "p.img", "location": "elsewhere.img" } ] }
-]

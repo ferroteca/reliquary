@@ -1,13 +1,18 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Execute a resolved fetch plan into the payload and archive caches.
+"""Execute a resolved fetch plan into the media cache.
 
 A media's :func:`reliquary.resolve.resolve_media_plan` yields a nested
-plan of :class:`~reliquary.resolve.Download` / ``LocalFile`` / ``Extract``
-steps; this module runs it, caching each archive under ``cache/archives/``
-by its component name and the final payload under ``cache/media/`` by the
-media's name, SHA-256-verifying every file. ``local`` sources attach in
-place (never cached). Design: planning/design/blueprint-model.md.
+plan of :class:`~reliquary.resolve.Download` / ``LocalFile`` /
+``Extract`` / ``Alternatives`` steps; this module runs it,
+SHA-256-verifying every file.
+
+Every cached file is keyed by the **name of the media it is**, in the
+one ``cache/media/`` directory — a container is a media like any other
+now, so there is no second cache for it. ``local`` payloads attach in
+place and are never copied in.
+
+Design: planning/design/blueprint-model.md ("The cache").
 """
 
 import hashlib
@@ -18,7 +23,7 @@ import zipfile
 from urllib.request import urlopen
 
 from . import resolve
-from .home import archives_cache_dir, media_cache_dir
+from .home import media_cache_dir
 
 _CHUNK = 1024 * 1024
 _MISMATCH_POLICIES = ("fail", "prompt", "refetch")
@@ -61,31 +66,23 @@ def _approve_refetch(path, actual, expected, on_mismatch):
         "delete it, or pre-approve with on_mismatch='refetch'")
 
 
-def _download(urls, destination):
-    """Stream the first working mirror into destination atomically."""
+def _download(url, destination):
+    """Stream a URL into destination atomically."""
     os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
     partial = destination + ".part"
-    errors = []
-    for url in urls:
-        try:
-            print(f"downloading {url}", file=sys.stderr)
-            with urlopen(url) as response, open(partial, "wb") as handle:
-                shutil.copyfileobj(response, handle, _CHUNK)
-            os.replace(partial, destination)
-            return
-        except OSError as error:  # try the next mirror
-            errors.append(f"{url}: {error}")
-    raise RuntimeError(
-        "all mirrors failed:\n  " + "\n  ".join(errors))
+    print(f"downloading {url}", file=sys.stderr)
+    with urlopen(url) as response, open(partial, "wb") as handle:
+        shutil.copyfileobj(response, handle, _CHUNK)
+    os.replace(partial, destination)
 
 
-def _extract(archive_path, member, destination):
+def _extract(container_path, member, destination):
     """Extract one zip member to destination atomically."""
-    print(f"extracting {member} from {os.path.basename(archive_path)}",
+    print(f"extracting {member} from {os.path.basename(container_path)}",
           file=sys.stderr)
     os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
     partial = destination + ".part"
-    with zipfile.ZipFile(archive_path) as bundle:
+    with zipfile.ZipFile(container_path) as bundle:
         with bundle.open(member) as source, open(partial, "wb") as handle:
             shutil.copyfileobj(source, handle, _CHUNK)
     os.replace(partial, destination)
@@ -100,78 +97,86 @@ def _verify(path, expected, describe):
             f"{describe} at {path} has SHA-256 {actual}, expected {expected}")
 
 
-def _run(plan, name, extension, expected_sha, cache_dir, context, on_mismatch):
+def _run(plan, name, extension, context, on_mismatch):
     """Produce the file ``plan`` yields, verified, returning its path."""
+    if isinstance(plan, resolve.Alternatives):
+        errors = []
+        for option in plan.options:
+            try:
+                return _run(option, name, extension, context, on_mismatch)
+            except (OSError, RuntimeError) as error:
+                errors.append(f"{_describe(option)}: {error}")
+        raise RuntimeError(
+            f"every location for {name!r} failed:\n  " + "\n  ".join(errors))
+
     if isinstance(plan, resolve.LocalFile):
-        sha = expected_sha or plan.sha256
-        _verify(plan.path, sha, f"local file for {name!r}")
+        _verify(plan.path, plan.sha256, f"local file for {name!r}")
         return plan.path
 
-    destination = os.path.join(cache_dir, _cached_name(name, extension))
+    destination = os.path.join(media_cache_dir(context),
+                               _cached_name(name, extension))
 
     if isinstance(plan, resolve.Download):
-        sha = expected_sha or plan.sha256
-        if sha is None:
-            raise RuntimeError(
-                f"a url source ({name!r}) must carry a sha256")
         if os.path.exists(destination):
             actual = _sha256(destination)
-            if actual == sha:
+            if plan.sha256 is None or actual == plan.sha256:
                 return destination
-            _approve_refetch(destination, actual, sha, on_mismatch)
+            _approve_refetch(destination, actual, plan.sha256, on_mismatch)
             os.remove(destination)
-        _download(plan.urls, destination)
-        _verify(destination, sha, f"downloaded {name!r}")
+        _download(plan.url, destination)
+        _verify(destination, plan.sha256, f"downloaded {name!r}")
         return destination
 
     if isinstance(plan, resolve.Extract):
-        sha = expected_sha
         if os.path.exists(destination):
             actual = _sha256(destination)
-            if sha is None or actual == sha:
+            if plan.sha256 is None or actual == plan.sha256:
                 return destination
-            _approve_refetch(destination, actual, sha, on_mismatch)
+            _approve_refetch(destination, actual, plan.sha256, on_mismatch)
             os.remove(destination)
-        archive_path = _run(
-            plan.inner, plan.archive, _archive_ext(plan.inner), plan.sha256,
-            archives_cache_dir(context), context, on_mismatch)
-        _extract(archive_path, plan.member, destination)
-        _verify(destination, sha, f"extracted {name!r}")
+        container = _run(plan.inner, plan.parent, _plan_ext(plan.inner),
+                         context, on_mismatch)
+        _extract(container, plan.member, destination)
+        _verify(destination, plan.sha256, f"extracted {name!r}")
         return destination
 
     raise TypeError(f"unknown plan step: {plan!r}")
 
 
-def _archive_ext(plan):
-    """The extension of the archive file ``plan`` produces."""
+def _describe(plan):
     if isinstance(plan, resolve.Download):
-        return _ext(plan.urls[0])
+        return plan.url
+    if isinstance(plan, resolve.LocalFile):
+        return plan.path
+    if isinstance(plan, resolve.Extract):
+        return f"{plan.parent}/{plan.member}"
+    return type(plan).__name__
+
+
+def _plan_ext(plan):
+    """The extension of the file ``plan`` produces."""
+    if isinstance(plan, resolve.Download):
+        return _ext(plan.url.split("#", 1)[0].split("?", 1)[0])
     if isinstance(plan, resolve.LocalFile):
         return _ext(plan.path)
     if isinstance(plan, resolve.Extract):
         return _ext(plan.member)
+    if isinstance(plan, resolve.Alternatives):
+        return _plan_ext(plan.options[0])
     return ""
 
 
 def _payload_ext(media, plan):
-    if media.extension:
-        return media.extension
-    if isinstance(plan, resolve.Extract):
-        return _ext(plan.member)
-    if isinstance(plan, resolve.Download):
-        return _ext(plan.urls[0])
-    if isinstance(plan, resolve.LocalFile):
-        return _ext(plan.path)
-    return ""
+    return media.extension or _plan_ext(plan)
 
 
 def fetch_media(media, namespace, context=None, on_mismatch="fail"):
     """Return a media's verified payload path, fetching on demand.
 
     ``media`` is a :class:`reliquary.document.Media`; ``namespace`` a
-    :class:`reliquary.resolve.Namespace`. A ``new`` media has no payload
-    and returns ``None``. A ``local`` source is used in place; otherwise
-    the payload is cached at ``cache/media/<media-name>.<ext>``.
+    :class:`reliquary.resolve.Namespace`. A blank has no payload and
+    returns ``None``. A local payload is used in place; everything else
+    caches at ``cache/media/<media-name>.<ext>``.
     """
     if on_mismatch not in _MISMATCH_POLICIES:
         raise ValueError(
@@ -180,5 +185,5 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail"):
     plan = resolve.resolve_media_plan(media, namespace)
     if plan is None:
         return None
-    return _run(plan, media.name, _payload_ext(media, plan), media.sha256,
-                media_cache_dir(context), context, on_mismatch)
+    return _run(plan, media.name, _payload_ext(media, plan), context,
+                on_mismatch)

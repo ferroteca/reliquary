@@ -1,262 +1,232 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "reliquary blueprint",
-  "description": "Synchronized companion to the composed blueprint model (planning/design/blueprint-model.md), which remains normative. One authored JSON kind, .rlqb, holding named components (machine/media/source/archive) in plural sections, or a bare-root lone machine. Schema validity never implies document validity: names default to the source/path stem, the materialize/source/size coupling, sha256-required-on-url, medium compatibility, (name,type) uniqueness, and every reference resolution and backend capability check live in the specification and the parser only. It validates the parsed document; the JSONC dialect (comments, trailing commas) is invisible at this level. Documents carry no $schema field pre-1.0; editors bind this schema to *.rlqb by file association. The machine state (machine.json) is a separate document type with its own schema (machine-state.schema.json).",
+  "description": "Synchronized companion to the composed blueprint model (planning/design/blueprint-model.md), which remains normative. One authored JSON kind, .rlqb: an array of specs of two types, machine and media, with a lone spec object accepted as sugar for the array of one and a bare string as a media located by it. type defaults to media. Schema validity never implies document validity: the name charter's derivation and repair, identity dedup and case collision, the reference grammar and its closure, containment paths and cycles, sha256-required-once-remote, medium compatibility, and every backend capability check live in the specification and the parser only. Note what this schema deliberately does NOT do: the closed vocabularies below stay plain enums and are never widened to admit a reference pattern, which is exactly what makes editor completion work on them. It validates the parsed document; the JSONC dialect (comments, trailing commas) is invisible at this level. Documents carry no $schema field pre-1.0; editors bind this schema to *.rlqb by file association. The machine state (machine.json) is a separate document type with its own schema (machine-state.schema.json).",
   "oneOf": [
-    {"$ref": "#/$defs/machine"},
-    {"$ref": "#/$defs/document"}
+    {"$ref": "#/$defs/spec"},
+    {
+      "description": "The general form: an array of specs.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/spec"}
+    }
   ],
+
   "$defs": {
-    "document": {
-      "description": "The sectioned form: any combination of the plural component sections, each a list. A bare-root machine (no section keys) is the other form.",
-      "type": "object",
-      "properties": {
-        "machines": {"type": "array", "items": {"$ref": "#/$defs/machine"}},
-        "media": {"type": "array", "items": {"$ref": "#/$defs/media"}},
-        "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
-        "archives": {"type": "array", "items": {"$ref": "#/$defs/archive"}}
-      },
-      "additionalProperties": false,
-      "minProperties": 1
+    "spec": {
+      "description": "One spec: a machine, a media, or a bare string desugaring to a media located by it.",
+      "oneOf": [
+        {"$ref": "#/$defs/machine"},
+        {"$ref": "#/$defs/media"},
+        {"type": "string"}
+      ]
+    },
+
+    "mediaName": {
+      "description": "The media-name charter: a letter or digit, then letters, digits, '.', '_' or '-'. Whitespace, braces, '#', '/' (the containment separator) and control characters are out by grammar; parens and brackets by argv, every media name being a command-line argument.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
 
     "machine": {
-      "description": "Machine topology only. A drive names a media or is empty; content and materialization live on the media. name is optional here (a bare-root machine takes the file stem; a machine in a machines[] list must name itself — a rule beyond this schema).",
+      "description": "Machine topology only. A drive names a media, is empty, or carries one written in place; content and materialization live on the media. A machine must declare its type, since type defaults to media everywhere.",
       "type": "object",
+      "required": ["type", "name", "platform"],
       "properties": {
-        "name": {"$ref": "#/$defs/componentName"},
+        "type": {"const": "machine"},
+        "name": {"$ref": "#/$defs/mediaName"},
         "platform": {
-          "description": "The guest platform. Required; never inferred.",
+          "description": "The guest platform. Required, never inferred, and never supplied by a reference.",
           "enum": ["dos", "openbsd", "win9x", "winnt"]
         },
         "backend": {
-          "description": "The virtualization backend. Omitted, assigned at materialization; declared, it pins the choice.",
+          "description": "The materializing backend. Never supplied by a reference.",
           "enum": ["qemu", "virtualbox", "vmware", "hyperv"]
         },
-        "description": {"type": "string"},
         "memory": {
-          "description": "Guest memory: a positive integer (MiB) or a size string.",
-          "oneOf": [{"type": "integer", "minimum": 1}, {"$ref": "#/$defs/sizeString"}]
+          "description": "A size string, a whole-MiB integer, or a reference supplying one.",
+          "type": ["string", "integer"]
         },
-        "cpus": {"type": "integer", "minimum": 1},
+        "cpus": {"type": ["string", "integer"]},
         "drives": {
-          "description": "The drive inventory. Keys declare medium and slot; each value names a media (string), is null for an empty removable slot, or is an object naming a media plus hardware attributes. size/base/hostdir are gone from the drive — they are the media's business.",
           "type": "object",
-          "patternProperties": {
-            "^floppy[01]?$": {"$ref": "#/$defs/removableDrive"},
-            "^hdd[0-3]?$": {"$ref": "#/$defs/fixedDrive"},
-            "^cdrom[0-3]?$": {"$ref": "#/$defs/removableDrive"}
+          "propertyNames": {
+            "description": "Slot keys are fixed and never take a reference: an object key is authored graph.",
+            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
           },
-          "additionalProperties": false,
-          "allOf": [
-            {"not": {"required": ["floppy", "floppy0"]}},
-            {"not": {"required": ["hdd", "hdd0"]}},
-            {"not": {"required": ["cdrom", "cdrom0"]}}
-          ]
+          "additionalProperties": {"$ref": "#/$defs/drive"}
         },
         "boot": {
-          "description": "Boot order: declared drive keys tried in order, unique by slot.",
           "type": "array",
-          "items": {"$ref": "#/$defs/driveKey"},
-          "uniqueItems": true
-        },
-        "scripts": {
-          "description": "Short labels naming .rlqs script stems; the verbs used with run-script.",
-          "type": "object",
-          "propertyNames": {"minLength": 1},
-          "additionalProperties": {"type": "string", "minLength": 1}
-        },
-        "parameters": {
-          "description": "Blueprint-supplied answers for script-declared properties: a direct string value or a {\"property\": \"<key>\"} redirect.",
-          "type": "object",
-          "propertyNames": {"minLength": 1},
-          "additionalProperties": {
-            "oneOf": [
-              {"type": "string"},
-              {
-                "type": "object",
-                "properties": {"property": {"type": "string", "minLength": 1}},
-                "required": ["property"],
-                "additionalProperties": false
-              }
-            ]
+          "items": {
+            "type": "string",
+            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
           }
+        },
+        "description": {"type": "string"},
+        "scripts": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
         },
         "control-planes": {
           "type": "array",
-          "items": {"enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]},
-          "uniqueItems": true
+          "items": {
+            "description": "A closed vocabulary: never widened to admit a reference pattern.",
+            "enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]
+          }
         },
         "backend-settings": {
           "type": "object",
+          "propertyNames": {"enum": ["qemu", "virtualbox", "vmware", "hyperv"]},
+          "additionalProperties": {"type": "object"}
+        },
+        "parameters": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+
+    "drive": {
+      "description": "A media name, null for a declared-but-empty removable slot, a hardware-attribute object, or a media written in place.",
+      "oneOf": [
+        {"$ref": "#/$defs/mediaName"},
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["media"],
           "properties": {
-            "qemu": {"type": "object"},
-            "virtualbox": {"type": "object"},
-            "vmware": {"type": "object"},
-            "hyperv": {"type": "object"}
+            "media": {"$ref": "#/$defs/mediaName"},
+            "controller": {
+              "description": "A closed vocabulary: never widened to admit a reference pattern.",
+              "enum": ["ide", "sata", "scsi", "nvme", "virtio"]
+            },
+            "enabled": {"type": "boolean"}
           },
           "additionalProperties": false
-        }
-      },
-      "required": ["platform"],
-      "additionalProperties": false
+        },
+        {"$ref": "#/$defs/media"}
+      ]
     },
 
     "media": {
-      "description": "A media component: owns content and materialization. materialize is new (a size, no source), difference/copy (a source materialized into the drive's own image), or use (the source attached directly; default). sha256 verifies the payload and is required when the resolved source is a url (a rule beyond this schema). read-only defaults true on a cdrom. hostdir is a directory source with materialize use. The materialize/source/size coupling is enforced by the parser.",
+      "description": "A media spec. name is optional here: it may be derived from content, or absent entirely for the anonymous blank at a drive - both rules beyond this schema.",
       "type": "object",
       "properties": {
-        "name": {"$ref": "#/$defs/componentName"},
-        "materialize": {"enum": ["new", "difference", "copy", "use"]},
-        "size": {"$ref": "#/$defs/sizeString"},
-        "source": {"$ref": "#/$defs/locator"},
+        "type": {"const": "media"},
+        "name": {"$ref": "#/$defs/mediaName"},
+        "materialize": {
+          "description": "A closed vocabulary: never widened to admit a reference pattern.",
+          "enum": ["new", "difference", "copy", "use"]
+        },
+        "size": {"type": "string"},
+        "location": {"$ref": "#/$defs/location"},
         "sha256": {"$ref": "#/$defs/sha256"},
         "read-only": {"type": "boolean"},
-        "extension": {
-          "description": "Override the type-declaring extension of the cached payload when the source filename misnames it.",
-          "type": "string",
-          "minLength": 1
+        "extension": {"type": "string"},
+        "description": {"type": "string"},
+        "notes": {"type": "string"},
+        "children": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/child"}
         }
-      },
-      "additionalProperties": false
-    },
-
-    "source": {
-      "description": "A named standalone locator (the sources section): the same locator schema given its own name, so it can be supplied or replaced independently of the media that pins the payload hash. Exactly one of url, local, or a from-archive reference.",
-      "type": "object",
-      "properties": {
-        "name": {"$ref": "#/$defs/componentName"},
-        "url": {"$ref": "#/$defs/url"},
-        "local": {"type": "string", "minLength": 1},
-        "archive": {"$ref": "#/$defs/componentName"},
-        "path": {"type": "string", "minLength": 1},
-        "sha256": {"$ref": "#/$defs/sha256"}
       },
       "additionalProperties": false,
+      "not": {
+        "description": "A blank takes a size, not a location.",
+        "type": "object",
+        "required": ["materialize", "location"],
+        "properties": {"materialize": {"const": "new"}}
+      }
+    },
+
+    "child": {
+      "description": "A children entry: a media declared in place, in path form only - its location is its parent plus that path. A bare string is the path.",
       "oneOf": [
-        {"required": ["url"]},
-        {"required": ["local"]},
-        {"required": ["archive"]}
-      ]
-    },
-
-    "archive": {
-      "description": "A named container: a source (where the archive bytes are) plus recursive members. A member with its own members is an archive to descend into; a leaf member is a media payload. sha256 verifies the archive, required when its source is a url (a rule beyond this schema).",
-      "type": "object",
-      "properties": {
-        "name": {"$ref": "#/$defs/componentName"},
-        "source": {"$ref": "#/$defs/locator"},
-        "sha256": {"$ref": "#/$defs/sha256"},
-        "members": {"type": "array", "items": {"$ref": "#/$defs/member"}}
-      },
-      "required": ["source"],
-      "additionalProperties": false
-    },
-
-    "member": {
-      "description": "One node in an archive tree. path is the member's location inside the parent archive. With members it is a nested archive; without, it is a leaf media (and may carry any media field but source, which the tree supplies).",
-      "type": "object",
-      "properties": {
-        "path": {"type": "string", "minLength": 1},
-        "name": {"$ref": "#/$defs/componentName"},
-        "members": {"type": "array", "items": {"$ref": "#/$defs/member"}},
-        "materialize": {"enum": ["new", "difference", "copy", "use"]},
-        "read-only": {"type": "boolean"},
-        "extension": {"type": "string", "minLength": 1},
-        "sha256": {"$ref": "#/$defs/sha256"}
-      },
-      "required": ["path"],
-      "additionalProperties": false
-    },
-
-    "locator": {
-      "description": "Where bytes come from: a string naming a source or archive component, or an inline object (url / local / from-archive).",
-      "oneOf": [
-        {"$ref": "#/$defs/componentName"},
+        {"type": "string"},
         {
           "type": "object",
+          "required": ["path"],
           "properties": {
-            "url": {"$ref": "#/$defs/url"},
-            "local": {"type": "string", "minLength": 1},
-            "archive": {"$ref": "#/$defs/componentName"},
-            "path": {"type": "string", "minLength": 1},
-            "sha256": {"$ref": "#/$defs/sha256"}
+            "type": {"const": "media"},
+            "path": {
+              "description": "Static: a containment path never takes a reference, because the catalog can never depend on a download.",
+              "type": "string",
+              "pattern": "^[^$]*$"
+            },
+            "name": {"$ref": "#/$defs/mediaName"},
+            "materialize": {"enum": ["new", "difference", "copy", "use"]},
+            "size": {"type": "string"},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "read-only": {"type": "boolean"},
+            "extension": {"type": "string"},
+            "description": {"type": "string"},
+            "notes": {"type": "string"},
+            "children": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/child"}
+            }
           },
-          "additionalProperties": false,
-          "oneOf": [
-            {"required": ["url"]},
-            {"required": ["local"]},
-            {"required": ["archive"]}
-          ]
+          "additionalProperties": false
         }
-      ]
-    },
-
-    "removableDrive": {
-      "description": "A floppy or cdrom slot: a media name (string), null (empty slot), or an object naming a media plus hardware attributes.",
-      "oneOf": [
-        {"$ref": "#/$defs/componentName"},
-        {"type": "null"},
-        {"$ref": "#/$defs/driveObject"}
-      ]
-    },
-
-    "fixedDrive": {
-      "description": "A hard-disk slot: a media name (string) or an object. Fixed drives cannot be empty (no null).",
-      "oneOf": [
-        {"$ref": "#/$defs/componentName"},
-        {"$ref": "#/$defs/driveObject"}
-      ]
-    },
-
-    "driveObject": {
-      "type": "object",
-      "properties": {
-        "media": {"$ref": "#/$defs/componentName"},
-        "controller": {"$ref": "#/$defs/controller"},
-        "enabled": {
-          "description": "false removes the drive from the machine entirely while keeping the entry in the document.",
-          "type": "boolean"
-        }
-      },
-      "required": ["media"],
-      "additionalProperties": false
-    },
-
-    "componentName": {
-      "description": "A component's name, or a by-name reference to one. Grammar deliberately open pre-asset-spec; the stem-default and (name,type) uniqueness rules live in the parser.",
-      "type": "string",
-      "minLength": 1
-    },
-
-    "url": {
-      "description": "A single URL, or a list of mirror alternates for the identical artifact (the sha256 is the arbiter).",
-      "oneOf": [
-        {"type": "string", "minLength": 1},
-        {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
       ]
     },
 
     "sha256": {
-      "description": "Hex SHA-256, either case.",
+      "description": "A hex SHA-256, or a reference supplying one - a hash is not a closed vocabulary, so it stays interpolable.",
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{64}$"
+      "pattern": "^([0-9a-fA-F]{64}|.*\\$\\{.+\\}.*)$"
     },
 
-    "sizeString": {
-      "description": "A positive integer immediately followed by a binary unit suffix K, M, G, or T (powers of 1024), case-insensitive.",
-      "type": "string",
-      "pattern": "^[1-9][0-9]*[KkMmGgTt]$"
+    "location": {
+      "description": "One rung, or a flat mirror list of them tried in order. Strings are interpreted by scheme; objects are the canonical form and the option point.",
+      "oneOf": [
+        {"$ref": "#/$defs/locationRung"},
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/locationRung"}
+        }
+      ]
     },
 
-    "driveKey": {
-      "type": "string",
-      "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
-    },
-
-    "controller": {
-      "description": "The kind of storage controller the drive attaches to. Default ide.",
-      "enum": ["ide", "sata", "scsi", "nvme", "virtio"]
+    "locationRung": {
+      "oneOf": [
+        {"type": "string"},
+        {
+          "description": "The url form.",
+          "type": "object",
+          "required": ["url"],
+          "properties": {"url": {"type": "string"}},
+          "additionalProperties": false
+        },
+        {
+          "description": "The local form: a host path, relative to the referencing file.",
+          "type": "object",
+          "required": ["local"],
+          "properties": {"local": {"type": "string"}},
+          "additionalProperties": false
+        },
+        {
+          "description": "The containment form: a media name or an inline media spec, with an optional path. No path means the parent's own bytes.",
+          "type": "object",
+          "required": ["parent"],
+          "properties": {
+            "parent": {
+              "oneOf": [
+                {"$ref": "#/$defs/mediaName"},
+                {"$ref": "#/$defs/media"}
+              ]
+            },
+            "path": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The property form: supplied through the property chain.",
+          "type": "object",
+          "required": ["property"],
+          "properties": {"property": {"type": "string"}},
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

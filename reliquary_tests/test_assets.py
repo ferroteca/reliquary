@@ -114,15 +114,18 @@ class DirSourceResolutionTests(unittest.TestCase):
         return Context(home=self.home, assets=self.root)
 
     def test_walks_recursively_skipping_dotdirs(self):
-        _write(os.path.join(self.root, "a.rlqb"), {"platform": "dos"})
-        _write(os.path.join(self.root, "sub", "b.rlqb"), {"platform": "dos"})
-        _write(os.path.join(self.root, ".git", "c.rlqb"), {"platform": "dos"})
+        _write(os.path.join(self.root, "a.rlqb"),
+               {"type": "machine", "name": "a", "platform": "dos"})
+        _write(os.path.join(self.root, "sub", "b.rlqb"),
+               {"type": "machine", "name": "b", "platform": "dos"})
+        _write(os.path.join(self.root, ".git", "c.rlqb"),
+               {"type": "machine", "name": "c", "platform": "dos"})
         names = {row["name"] for row in list_blueprints(self.ctx())}
         self.assertEqual(names, {"a", "b"})
 
     def test_name_field_overrides_stem(self):
         _write(os.path.join(self.root, "file.rlqb"),
-               {"platform": "dos", "name": "identity"})
+               {"type": "machine", "platform": "dos", "name": "identity"})
         self.assertTrue(
             locate_blueprint("identity", context=self.ctx()).endswith(
                 "file.rlqb"))
@@ -131,15 +134,16 @@ class DirSourceResolutionTests(unittest.TestCase):
 
     def test_duplicate_effective_name_is_error(self):
         _write(os.path.join(self.root, "one.rlqb"),
-               {"platform": "dos", "name": "dup"})
+               {"type": "machine", "platform": "dos", "name": "dup"})
         _write(os.path.join(self.root, "two.rlqb"),
-               {"platform": "dos", "name": "dup"})
+               {"type": "machine", "platform": "dos", "name": "dup"})
         with self.assertRaises(ValueError):
             list_blueprints(self.ctx())
 
     def test_rlqb_by_extension_but_json_needs_platform(self):
         _write(os.path.join(self.root, "notes.json"), {"items": {}})
-        _write(os.path.join(self.root, "real.rlqb"), {"platform": "dos"})
+        _write(os.path.join(self.root, "real.rlqb"),
+                   {"type": "machine", "name": "real", "platform": "dos"})
         names = {row["name"] for row in list_blueprints(self.ctx())}
         self.assertEqual(names, {"real"})
 
@@ -151,8 +155,8 @@ class DirSourceResolutionTests(unittest.TestCase):
 
     def test_media_resolves_from_the_project_root(self):
         _write(os.path.join(self.root, "lib.rlqb"),
-               {"media": [{"name": "proj-media",
-                           "source": {"local": "/X.iso"}}]})
+               [{"type": "media", "name": "proj-media",
+                 "location": {"local": "/X.iso"}}])
         resolved = resolve_media("proj-media", load_namespace(self.ctx()))
         self.assertEqual(resolved.name, "proj-media")
 
@@ -172,7 +176,8 @@ class SelectionScopingTests(unittest.TestCase):
         self.b = os.path.join(self._tmp.name, "b")
         for root in (self.a, self.b):
             _write(os.path.join(root, "shared.rlqb"),
-                   {"platform": "dos", "drives": {"cdrom0": None}})
+                   {"type": "machine", "name": "shared", "platform": "dos",
+                    "drives": {"cdrom0": None}})
 
     def _ctx(self, root):
         return Context(home=self.home, assets=root)
@@ -194,16 +199,16 @@ class BlueprintNameIdentityTests(unittest.TestCase):
 
     def test_id_safe_name_is_accepted(self):
         doc = parse_document(
-            {"platform": "dos", "name": "freedos"}, stem="h")
+            {"type": "machine", "platform": "dos", "name": "freedos"}, stem="h")
         self.assertIn("freedos", doc.machines)
 
     def test_name_with_spaces_is_rejected(self):
         with self.assertRaises(ValueError):
-            parse_document({"platform": "dos", "name": "Not An Id"}, stem="h")
+            parse_document({"type": "machine", "platform": "dos", "name": "Not An Id"}, stem="h")
 
     def test_all_digit_name_is_rejected(self):
         with self.assertRaises(ValueError):
-            parse_document({"platform": "dos", "name": "12"}, stem="h")
+            parse_document({"type": "machine", "platform": "dos", "name": "12"}, stem="h")
 
 
 if __name__ == "__main__":

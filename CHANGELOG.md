@@ -146,20 +146,59 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with their blueprints (`freedos-0`). Descriptions still name the
   release each entry is tested against.
 - **Composed blueprint model.** Reliquary's two authored JSON formats
-  fold into one composable blueprint `.rlqb` of named components —
-  `machine` / `media` / `source` / `archive` — mixed and matched
-  across files, or a lone machine as a bare root. A machine's drive
-  now names a **media** by name (or `null`, or `{media, controller,
-  enabled}`); the old four-way drive content selector (`size` /
-  `base` / `media` / `hostdir`) is gone. The named media owns
-  materialization: `materialize` ∈ `new` / `difference` / `copy` /
-  `use` (default `use`), with `size`, a `source` locator
-  (`url`+mirrors / `local` / from-archive / by-name), conditional
-  `sha256` (required on `url`), `read-only`, and `extension`.
-  Archives are recursive trees (a node with `members` is an archive,
-  a leaf a media); a `hostdir` drive is now a media whose `source` is
-  a directory with `materialize: use`. Resolution reads the whole
-  source into one `(name, type)` namespace.
+  fold into one blueprint `.rlqb`, whose root is an **array of specs**
+  of two types — `machine` and `media` — with a lone spec object
+  accepted as sugar for the array of one and a bare string as a media
+  located by it. `type` defaults to `media`, so an untyped lone object
+  is a media and the bare-root-machine reading is gone; a machine that
+  forgets `"type": "machine"` gets a did-you-mean naming the machine
+  vocabulary it used. There is no `source` or `archive` type: a source
+  is a media's `location`, and an archive is just a media that other
+  media name as their **parent** — the distinction was never a
+  property of the artifact, only of the use.
+  A machine's drive names a media, is `null` for a declared-but-empty
+  removable slot, carries `{media, controller, enabled}`, or holds a
+  media **written in place** — including the content-free blank
+  `{"size": "20M"}`, the format's one anonymous citizen, which belongs
+  to no namespace and is named for its slot when materialized. The old
+  four-way drive content selector (`size` / `base` / `media` /
+  `hostdir`) is gone.
+  The media owns materialization: `materialize` ∈ `new` /
+  `difference` / `copy` / `use` (default `use`), with `size`, one
+  `location` field, conditional `sha256`, `read-only`, `extension`,
+  and `children`. **Containment is parent/children**: any media may
+  declare `children` (recursive batch sugar, a bare string being the
+  path) or its `parent` from the child side, and every edge resolves
+  to child-declares-parent.
+  **Locations follow one law — strings are interpreted, objects are
+  explicit**: every accepted string has exactly one object desugaring,
+  which is the canonical form. Strings dispatch by scheme (a bare
+  path, an http(s) URL, `${media:<name>/<path>}`, `${<key>}`), objects
+  are `url` / `local` / `parent`+`path` / `property`, and a list of
+  them is a mirror list tried in order. A scheme-shaped string that is
+  not recognized is a parse error rather than a silently relative
+  path, with a drive-letter exemption for `C:/...`.
+  **`${...}` is the one reference syntax.** An unqualified reference
+  interpolates anywhere a string is accepted (`\${` is the literal
+  escape); a qualified `${media:...}` is whole-value. References are
+  refused in identity and graph positions (`name`, `type`, `children`
+  paths, drive keys) and in the closed vocabularies (`platform`,
+  `backend`, `materialize`, `controller`, `control-planes`), whose
+  published-schema enums stay plain so editors can complete them. The
+  reference body is closed at two productions and carries no
+  operators. Property binding itself arrives with script properties;
+  until then a `${key}` parses and then fails closed naming
+  properties.
+  Validation is **two-phase**: shape at parse, value at resolution —
+  which is where the `sha256`-required-once-remote rule now lands,
+  since a referenced rung may resolve to a URL.
+  Identity is `(name, type)` in one catalog. A name is explicit or
+  derived from content (never from the slot or the `.rlqb` filename),
+  repaired to the name charter with a warning that names both the
+  derived name and its source, and failing closed when it cannot be.
+  Names match case-sensitively and collide case-insensitively.
+  Canonically identical specs of one identity coexist across files;
+  differing ones collide naming both.
 - **Machine directory reorganized.** `cache/machines/<id>/` now holds
   `machine.json` (was `reliquary-machine.json`) with the live-VM
   identity folded in as a `vm` section written atomically with
@@ -168,15 +207,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   never clobber); and backend artifacts (QEMU's captured stderr) move
   into a `<backend>/` subdir. `lifecycle.py` no longer owns a state
   file — `launch_owned_qemu` returns the identity and `machines.py`
-  persists it. Cached source archives move from `cache/downloads/` to
-  `cache/archives/`.
+  persists it. Every cached payload now lives in the one
+  `cache/media/`, keyed by the name of the media it is: a container is
+  a media like any other, so there is no separate archive cache.
 - The cache-reclaim command `clean-downloads` and its API twin
   `clean_downloads()` are renamed `clean-archives` / `clean_archives`,
   matching the `cache/archives/` cache they reclaim and the composed
   model's `archive` components. No backward-compatible alias (pre-beta).
 - **One published schema.** The blueprint and media-definition JSON
   Schemas collapse into a single `reliquary/schemas/blueprint-schema-v1.json`
-  (packaged, versioned v1 so editors can bind it); `.rlqm` retires.
+  (packaged, versioned v1 so editors can bind it), with a two-variant
+  root — a machine requiring its declared `type`, a media accepting its
+  absence. `.rlqm` retires, and with it the `media` asset kind and the
+  `<home>/media` folder; media are specs inside a blueprint.
 - `list-blueprints` (local listing) resolves through the active
   asset source: home mode lists the home's canonical `blueprints/`
   folder (recursively within it), and `--assets <dir>` lists the

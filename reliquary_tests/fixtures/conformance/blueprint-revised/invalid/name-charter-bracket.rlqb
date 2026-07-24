@@ -1,6 +1,0 @@
-// invalid: brackets are excluded by argv, not grammar - every name is a
-//         command-line argument
-// spec: The name charter
-[
-  { "type": "media", "name": "FD[SE]", "location": "p.iso" }
-]

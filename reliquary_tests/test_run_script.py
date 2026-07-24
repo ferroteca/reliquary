@@ -51,13 +51,13 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
         os.makedirs(blueprints)
         with open(os.path.join(blueprints, "plain.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({
-                "machines": [{"name": "plain", "platform": "dos",
-                              "drives": {"hdd0": "blank-20m"},
-                              "scripts": {"install": "install-script"}}],
-                "media": [{"name": "blank-20m", "materialize": "new",
-                           "size": "20M"}],
-            }, handle)
+            json.dump([
+                {"type": "machine", "name": "plain", "platform": "dos",
+                 "drives": {"hdd0": "blank-20m"},
+                 "scripts": {"install": "install-script"}},
+                {"type": "media", "name": "blank-20m",
+                 "materialize": "new", "size": "20M"},
+            ], handle)
 
     def test_creates_when_blueprint_has_no_machine(self):
         with mock.patch("reliquary.machines.create_hdd_image"):
@@ -181,13 +181,13 @@ class RunScriptWiringTests(unittest.TestCase):
         os.makedirs(scripts)
         with open(os.path.join(blueprints, "plain.rlqb"), "w",
                   encoding="utf-8") as handle:
-            json.dump({
-                "machines": [{"name": "plain", "platform": "dos",
-                              "drives": {"hdd0": "blank-20m"},
-                              "scripts": {"install": "install-script"}}],
-                "media": [{"name": "blank-20m", "materialize": "new",
-                           "size": "20M"}],
-            }, handle)
+            json.dump([
+                {"type": "machine", "name": "plain", "platform": "dos",
+                 "drives": {"hdd0": "blank-20m"},
+                 "scripts": {"install": "install-script"}},
+                {"type": "media", "name": "blank-20m",
+                 "materialize": "new", "size": "20M"},
+            ], handle)
         with open(os.path.join(scripts, "install-script.rlqs"), "w",
                   encoding="utf-8", newline="\n") as handle:
             handle.write("platform dos\n")

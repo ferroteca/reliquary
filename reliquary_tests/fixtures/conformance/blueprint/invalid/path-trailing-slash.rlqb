@@ -1,0 +1,6 @@
+// invalid: a trailing slash is an error
+// spec: The path suffix
+[
+  { "type": "media", "name": "outer", "location": "outer.zip" },
+  { "type": "media", "name": "esc", "location": "${media:outer/a/}" }
+]
