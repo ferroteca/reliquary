@@ -47,6 +47,79 @@ were pruned 2026-07-23).
   audit, which found the milestone's whole justification
   sitting in retired D17.
 
+## Milestone 7 — the composed blueprint model
+
+The sprint tasklist, translated from ROADMAP milestone 7 (owner,
+2026-07-23). The roadmap holds the *what*; this holds the
+**landing order**, which is not the deliverable numbering — the
+deliverables are a list of work, and three of them cannot land
+apart from each other. Read the roadmap's deliverable text for
+each item's substance; only the sequencing argument lives here.
+
+**The constraint that shapes everything:** `resolve.py` is built
+on the four kind buckets, `acquire.py` on `Source`/`Archive`, and
+the codex blueprints, the example blueprint, and the conformance
+fixtures are all authored in the retired shape — `bare-machine`
+does not merely need editing, it becomes *invalid* (an untyped
+lone object is a media now, D22). The moment `document.py`'s root
+changes, every one of them fails together. So the format core is
+**one landing**, and stages 0–2 exist to make it as small as it
+can honestly be.
+
+- **S0 — the launching-point renames** (deliverable 8's rename
+  half, D21). `freedos-1.4-plain.rlqb` → `freedos.rlqb`,
+  `freedos-1.4-plain-install.rlqs` → `freedos-install.rlqs`, and
+  the mentions across script-spec, machine-blueprint.md, cli.md,
+  docs and tests. Purely mechanical, independent of the format,
+  green throughout — and doing it first means S3 re-authors those
+  files without also renaming them.
+- **S1 — blueprint-model.md rewritten** (deliverable 1). Docs
+  only. Folds D22, D24, D26, D27 into one normative document,
+  replacing the superseded first-round shape its banner
+  disclaims.
+- **S2 — the conformance corpus re-authored** (deliverable 6's
+  corpus half) against S1's spec, staged in a directory the
+  corpus test does not yet walk so the suite stays green. This
+  is the parser's acceptance test, written before the parser.
+  Cover at least: the typed root array and the lone-object
+  sugar; an untyped lone object reading as media; `children`
+  batch and child-side `parent`; inline and anonymous media at
+  drives; stem-derived names, the repair warning, and the
+  unrepairable failure; identity-dedup versus collision; every
+  `location` string form and its object desugaring; and the
+  reference-grammar refusals — the closed vocabularies, and an
+  operator-bearing `${…}` body, which is P14's acceptance test.
+- **S3 — the format core, one landing** (deliverables 2 and 3,
+  the corpus wired, the schema, and deliverable 8's re-authoring
+  half). `document.py` rewritten; `resolve.py` collapsed from
+  four kind buckets to the one catalog with containment
+  resolution and two-phase validation; `acquire.py` on
+  parent/children with the roster gate; `machines.py` giving the
+  anonymous blank its slot name; both codex blueprints and the
+  example blueprint re-authored with explicit `type`; the corpus
+  moved into place and the old fixtures deleted; the one
+  two-variant schema replacing the two (it cannot lag — the
+  corpus checks both); `.rlqm` retired and `test_old_surface_purge`
+  extended to it and to `sources`/`archives`; and
+  test_document / test_resolve / test_acquire / test_assets /
+  test_library brought over. **Gate:** the full suite plus the
+  FreeDOS install integration run, which is the milestone's own
+  "done when" for this half.
+- **S4 — the cache rework and its command family** (deliverable
+  4). The single name-keyed `cache/media/` with `cache/archives/`
+  retired, the identity ledger, the deterministic preflight
+  identity check feeding the on-mismatch contract, and
+  `clean-media` / `clean-media <name>` / `prune-media` /
+  `add-media` with their API twins. Separable from S3 and the
+  milestone's one piece of new capability. **Gate:**
+  `prune-media` after the install leaves exactly the attachment
+  closure.
+- **S5 — the remaining spec realignment** (deliverable 7). These
+  documents legitimately follow the code, INTERFACES.md and the
+  AGENTS module paragraph included.
+
+Deliverable 5 needs no stage: it landed with milestone 6.
+
 ## Future implementation hints
 
 - The error taxonomy under parity (ROADMAP milestone 9):

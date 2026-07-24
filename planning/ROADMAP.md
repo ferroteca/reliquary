@@ -2051,17 +2051,24 @@ Deliverables:
    as stated above; U4 and U5 for the closure's local price —
    the checked-in source a schema validates and an editor
    completes.)
-3. Media and materialization realigned (media.py / machines.py):
-   the `materialize` modes (`new`/`difference`/`copy`/`use`),
-   `read-only` (default true on cdrom), conditional `sha256`,
-   recursive child extraction under the container-format
-   roster (zip only this milestone — ISO9660 and its `[BOOT]`
-   virtual paths are the recorded follow-on), and per-machine
+3. Media and materialization **re-anchored** on the revised
+   model (media.py / machines.py). Most of this deliverable is
+   already standing and survives the reshape: the four
+   `materialize` modes, conditional `sha256`, the cdrom
+   read-only rule, recursive zip extraction, and per-machine
    materializations under `cache/machines/<id>/media/` keyed by
-   media name — slot name for the anonymous blank — so
-   removable-slot swaps never clobber. (U4 — the rig built from
-   committed definitions alone; U1 for the seeded install that
-   rides the same path.)
+   media name rather than slot — so removable-slot swaps never
+   clobber — all landed on the first-round model. What remains
+   is what the revised model actually changes: extraction
+   re-expressed over parent/children containment rather than
+   archive/members, the anonymous blank slot-named at
+   materialization (it has no catalog name to be keyed by), and
+   the container-format roster stated and enforced — zip only
+   this milestone, an unsupported container failing closed and
+   naming its format (ISO9660 and its `[BOOT]` virtual paths are
+   the recorded follow-on). (U4 — the rig built from committed
+   definitions alone; U1 for the seeded install that rides the
+   same path.)
 4. The cache rework: the single name-keyed `cache/media/`
    (`cache/archives/` retired), the identity ledger (recorded
    sha256, derivation keys, provenance
@@ -2081,12 +2088,16 @@ Deliverables:
    milestone's one piece of new capability needs no new use
    case; P12 for the cache staying under its own root, P6 for
    the twins.
-5. The machine directory reorganization: `drives/` → `media/`,
-   backend files into a backend-named subdir,
-   `reliquary-machine.json` → `machine.json` with `vm.json` folded
-   in as a while-running state section written atomically with
-   `phase`. (P12 — the layout is the home contract; P9 for
-   renaming rather than bridging.)
+5. The machine directory reorganization — **delivered ahead of
+   this milestone**, with milestone 6's absorption of the
+   root-home machine model: `drives/` → `media/`
+   (`_machine_media_dir`), backend files into a backend-named
+   subdir (`_backend_dir`), and `reliquary-machine.json` →
+   `machine.json` with `vm.json` folded in as a while-running
+   state section written atomically with `phase`. Kept in the
+   list as the record of where it belonged; no work remains.
+   (P12 — the layout is the home contract; P9 for renaming
+   rather than bridging.)
 6. One published blueprint JSON Schema — the two-variant root,
    machine requiring its declared `type`, media accepting its
    absence — replacing the two milestone-6 schemas; the
@@ -2094,6 +2105,15 @@ Deliverables:
    vocabularies stay plain `enum`s, never widened to admit a
    reference pattern — which is what D26's reach trim buys, and
    the completion it protects is the point (U4, U5).
+   ORDERING, against the numbering: the corpus half **leads**
+   the parser rather than trailing it — authored against
+   deliverable 1's rewritten spec so deliverable 2 has an
+   executable acceptance test from its first line, staged
+   beside the current fixtures and moved into place when the
+   parser lands. That is deliverable 1's own argument one level
+   down. The schema half, by contrast, cannot lag the parser at
+   all: the corpus test runs every fixture against both, so the
+   schema lands in deliverable 2's commit.
 7. The remaining specs realigned as normative (blueprint-model.md
    having led at deliverable 1):
    machine-blueprint.md + field reference + cookbook,
