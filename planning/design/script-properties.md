@@ -17,11 +17,17 @@ SPDX-License-Identifier: BSD-3-Clause
 > fail-safe update order and orphan handling ("Secret storage");
 > and **file selection** — `--properties` / `RELIQUARY_PROPERTIES`
 > / `properties_file=`, with credentials scoped by the selected
-> file's absolute path. Not yet: the layered sources and their
-> binding into a run, the declared derivation and its `rlq.*`
-> facts, and the runtime secret rules. Windows is the only host
-> whose credential backend is exercised (ROADMAP "Horizon", host
-> portability). Details may still change before first release.
+> file's absolute path; and **binding into a run** — the layered
+> sources (flag, blueprint parameter with its redirect, environment
+> with collision preflight, file), the interactive ask, the
+> kind rules, and the runtime secret rules (transcript and
+> diagnostic redaction; `check-script` naming each key's source,
+> never its value). Not yet: the declared derivation and its
+> `rlq.*` facts (T4), which slot between the file and the ask, and
+> `${key}` location references at create/apply (T5). Windows is the
+> only host whose credential backend is exercised (ROADMAP
+> "Horizon", host portability). Details may still change before
+> first release.
 
 Script properties carry the values scripts consume without
 embedding them:

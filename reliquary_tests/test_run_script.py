@@ -14,7 +14,7 @@ from reliquary import cli
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (
     ScriptRun, _ScriptEngine, _create_run_dir,
-    _resolve_or_create_machine, _resolve_script_stem, run_script,
+    _existing_machine, _resolve_script_stem, run_script,
 )
 
 
@@ -59,43 +59,69 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
                  "materialize": "new", "size": "20M"},
             ], handle)
 
-    def test_creates_when_blueprint_has_no_machine(self):
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id, created = _resolve_or_create_machine(
-                blueprint="plain", context=self.home)
-        self.assertTrue(created)
-        self.assertEqual(machine_id, "plain-0")
+    def test_no_machine_yet_is_reported_as_none(self):
+        # _existing_machine never creates; None means "would create".
+        self.assertIsNone(
+            _existing_machine(blueprint="plain", context=self.home))
 
     def test_reuses_sole_machine(self):
+        from reliquary.machines import create_machine
         with mock.patch("reliquary.machines.create_hdd_image"):
-            first, created = _resolve_or_create_machine(
-                blueprint="plain", context=self.home)
-            self.assertTrue(created)
-            second, created = _resolve_or_create_machine(
-                blueprint="plain", context=self.home)
-        self.assertFalse(created)
+            first = create_machine("plain", context=self.home)
+        second = _existing_machine(blueprint="plain", context=self.home)
         self.assertEqual(first, second)
 
-    def test_machine_id_resolves(self):
+    def test_machine_id_resolves_to_itself(self):
+        from reliquary.machines import create_machine
         with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id, _ = _resolve_or_create_machine(
-                blueprint="plain", context=self.home)
-        resolved, created = _resolve_or_create_machine(
-            machine=machine_id, context=self.home)
-        self.assertFalse(created)
+            machine_id = create_machine("plain", context=self.home)
+        resolved = _existing_machine(machine=machine_id, context=self.home)
         self.assertEqual(resolved, machine_id)
 
-    def test_machine_id_resolves(self):
+    def test_a_specific_machine_id_selects_among_several(self):
         from reliquary.machines import create_machine
         with mock.patch("reliquary.machines.create_hdd_image"):
             first = create_machine("plain", context=self.home)
             second = create_machine("plain", context=self.home)
-        resolved, created = _resolve_or_create_machine(
-            machine="plain-1", context=self.home)
-        self.assertFalse(created)
+        resolved = _existing_machine(machine="plain-1", context=self.home)
         self.assertEqual(first, "plain-0")
         self.assertEqual(resolved, second)
         self.assertEqual(resolved, "plain-1")
+
+
+class BindingBeforeCreationTests(unittest.TestCase):
+    """A noninteractive unbound property fails before any machine."""
+
+    def setUp(self):
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+        os.makedirs(os.path.join(self.home, "blueprints"))
+        os.makedirs(os.path.join(self.home, "scripts"))
+        with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
+                  "w", encoding="utf-8") as handle:
+            json.dump(
+                {"type": "machine", "name": "plain", "platform": "dos"},
+                handle)
+        with open(os.path.join(self.home, "scripts", "needs.rlqs"),
+                  "w", encoding="utf-8") as handle:
+            handle.write('property owner\nenter "${owner}"\n')
+
+    def test_unbound_property_fails_without_creating_a_machine(self):
+        from reliquary.binding import PropertyBindingError
+        with mock.patch(
+                "reliquary.script_runner._console_asker",
+                return_value=None), \
+                mock.patch(
+                    "reliquary.machines.create_machine") as create:
+            with self.assertRaises(PropertyBindingError):
+                run_script("needs", blueprint="plain", context=self.home)
+        create.assert_not_called()
+        machines_root = os.path.join(self.home, "cache", "machines")
+        created = (os.path.isdir(machines_root)
+                   and [name for name in os.listdir(machines_root)
+                        if not name.startswith(".")])
+        self.assertFalse(created)
 
 
 class CreateRunDirTests(unittest.TestCase):
@@ -301,6 +327,8 @@ class RunScriptWiringTests(unittest.TestCase):
             blueprint="plain",
             machine=None,
             display=False,
+            properties=None,
+            properties_file=None,
         )
         output = stdout.getvalue()
         self.assertIn("created machine", output)

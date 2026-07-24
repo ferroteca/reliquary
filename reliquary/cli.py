@@ -81,6 +81,8 @@ _FLAG_ARITY = {
     "--only": 0,
     "--name": 1,
     "--exclude": 1,
+    "--property": 1,
+    "--properties": 1,
 }
 
 
@@ -180,6 +182,34 @@ def _add_properties_file(parser):
         help="properties file to use instead of the home's "
              "(secrets scope to this path)")
     return parser
+
+
+def _add_property_inputs(parser):
+    """Property binding inputs for a run: --property and --properties."""
+    parser.add_argument(
+        "--property", action="append", default=None, metavar="KEY=VALUE",
+        dest="property", help="bind a declared property (repeatable); "
+        "never a secret -- argv is not a credential store")
+    _add_properties_file(parser)
+    return parser
+
+
+def _explicit_properties(arguments):
+    """Parse repeated --property KEY=VALUE into a mapping, or None."""
+    pairs = getattr(arguments, "property", None)
+    if not pairs:
+        return None
+    explicit = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep:
+            raise ValueError(
+                f"--property expects KEY=VALUE, got: {pair!r}")
+        key = key.strip()
+        if key in explicit:
+            raise ValueError(f"--property {key} given more than once")
+        explicit[key] = value
+    return explicit
 
 
 def _emit(arguments, value, render):
@@ -291,6 +321,7 @@ def main(argv=None):
     command = subcommands.add_parser(
         "run-script", help="run a labeled .rlqs script")
     _add_selectors(command)
+    _add_property_inputs(command)
     command.add_argument("label", help="script label or stem")
     command.add_argument("--display", action="store_true")
 
@@ -298,6 +329,7 @@ def main(argv=None):
     command = subcommands.add_parser(
         "check-script", help="check a script")
     _add_selectors(command)
+    _add_property_inputs(command)
     command.add_argument("name", help="script name")
 
     # fetch-media
@@ -575,6 +607,8 @@ def _script(arguments):
             blueprint=blueprint_name,
             machine=machine_selector,
             display=arguments.display,
+            properties=_explicit_properties(arguments),
+            properties_file=_properties_file(arguments),
         )
     except KeyboardInterrupt:
         print("reliquary: interrupted", file=sys.stderr)
@@ -594,9 +628,14 @@ def _check_script(arguments):
         arguments.name,
         blueprint=getattr(arguments, "blueprint", None),
         machine=getattr(arguments, "machine", None),
+        properties=_explicit_properties(arguments),
+        properties_file=_properties_file(arguments),
     )
-    return _emit(arguments, {"report": result.report},
-                 lambda: print(result.report, end=""))
+    return _emit(
+        arguments,
+        {"report": result.report,
+         "property_sources": result.property_sources},
+        lambda: print(result.report, end=""))
 
 
 def _list_blueprints(arguments):

@@ -218,18 +218,34 @@ an ordinary `set_property` on that key refuses to overwrite.
   Parse a redesigned-surface `.rlqs` script into an immutable
   `Script`; errors raise `ScriptParseError` with source locations.
 - `run_script(label, *, blueprint=None, machine=None, context=None,
-  display=False)` - Resolve the label through the blueprint's
-  `scripts` map, create a machine when the blueprint has none,
-  honor the script's `machine` header, statically preflight
-  insert/eject/set-boot targets, and execute with a run record under
-  the machine's `runs/` directory. Returns `ScriptRun`; failures
-  raise `ScriptRuntimeError`. CLI twin: `run-script`.
-- `check_script(name, *, blueprint=None, machine=None, context=None)` -
-  Parse and statically check a script; return a printable timing
-  plan without running it. CLI twin: `check-script`.
+  display=False, properties=None, properties_file=None)` - Resolve the
+  label through the blueprint's `scripts` map, create a machine when
+  the blueprint has none, honor the script's `machine` header,
+  statically preflight insert/eject/set-boot targets, bind every
+  declared property before the machine starts, and execute with a run
+  record under the machine's `runs/` directory. `properties` is the
+  explicit `{key: value}` mapping (the CLI's repeated `--property`);
+  `properties_file` selects the binding file. Returns `ScriptRun`;
+  failures raise `ScriptRuntimeError`, and an unbound property raises
+  `PropertyBindingError` before any machine work. CLI twin:
+  `run-script`.
+- `check_script(name, *, blueprint=None, machine=None, context=None,
+  properties=None, properties_file=None)` - Parse and statically
+  check a script; return a printable timing plan and, on
+  `ScriptCheck.property_sources`, each declared property's supplying
+  source — without prompting, running, or reading a secret's value.
+  CLI twin: `check-script`.
 - `execute_script(script, *, machine_id, context=None,
-  display=False, run_dir=None, script_path=None)` - Execute an
-  already-parsed script against a specific machine.
+  display=False, run_dir=None, script_path=None, bindings=None)` -
+  Execute an already-parsed script against a specific machine.
+  `bindings` is a `BoundProperties` (from `bind_properties`); without
+  it, a `${key}` reference fails at runtime.
+- `bind_properties(script, *, parameters=None, explicit=None,
+  properties_file=None, context=None, asker=None)` - Resolve every
+  declared property through the source order, or raise
+  `PropertyBindingError`. `describe_sources(...)` is its dry twin,
+  naming each key's source without binding it (what `check_script`
+  reports).
 
 ## Guest interaction
 

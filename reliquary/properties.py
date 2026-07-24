@@ -240,6 +240,17 @@ def has_credential(key, context=None, properties_file=None):
     path = _properties_path(context, properties_file)
     return credentials.has_secret(credentials.scope_for(path), key)
 
+def get_secret(key, context=None, properties_file=None):
+    """Return a secret's plaintext value, or None if it has none.
+
+    The one door to a stored secret's value, for binding it into a
+    run. It is deliberately not exported to the CLI: `get-property`
+    and `list-properties` reveal only the marker.
+    """
+    check_key(key)
+    path = _properties_path(context, properties_file)
+    return credentials.read_secret(credentials.scope_for(path), key)
+
 def _refuse_orphan(path, key):
     """Fail closed on a credential left behind with no marker.
 

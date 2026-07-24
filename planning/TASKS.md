@@ -103,7 +103,7 @@ resolves differently than it did last release.
   secret material in the file, and an interrupted update can
   leave neither a plaintext value nor a marker whose credential
   was reported bound but is absent.
-- **T3 — the binding pipeline.** Deliverable 4: the flattened
+- **T3 — the binding pipeline — DONE.** Deliverable 4: the flattened
   order minus derivation — flag > parameter > env > file > ask.
   It lands where `script_runner.py` today raises "property
   binding arrives with the property family", and reaches

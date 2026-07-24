@@ -17,6 +17,7 @@ up and can name the scope that supplied it when a clock expires.
 
 import contextlib
 import dataclasses
+import getpass
 import mimetypes
 import os
 import re
@@ -30,7 +31,8 @@ from urllib.parse import urlsplit
 
 from qemu.qmp import ConnectError
 
-from .library import locate_script, seed_script
+from .binding import bind_properties, describe_sources
+from .library import locate_script, seed_blueprint, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
 from .resolve import load_namespace
@@ -346,6 +348,7 @@ class ScriptCheck:
     plan: object
     report: str
     machine_id: str = None
+    property_sources: dict = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -405,7 +408,7 @@ class _ScriptEngine:
     def __init__(self, script, machine_id, context, machine_home,
                  run_dir=None, script_path=None, plan=None,
                  clock=time.monotonic, sleep=time.sleep,
-                 http_service_factory=_HttpService):
+                 http_service_factory=_HttpService, bindings=None):
         self._script = script
         self._plan = plan if plan is not None else resolve_timing(script)
         self._phases = {phase.name: phase for phase in script.phases}
@@ -423,7 +426,11 @@ class _ScriptEngine:
         self._status = _Progress()
         self._http_service_factory = http_service_factory
         self._http = None
-        self._bindings = {}
+        self._property_bindings = bindings
+        self._bindings = dict(bindings.values) if bindings else {}
+        self._secret_values = (
+            set(bindings.secret_values()) if bindings else set())
+        self._secret_entered = False
         self._phase = None
         self._run_started = None
         self._phase_started = None
@@ -443,7 +450,20 @@ class _ScriptEngine:
             f"{clock} of {bound.spelling} expired{detail} (from the "
             f"{bound.source})", statement)
 
+    def _redact(self, message):
+        """Blank any bound secret value out of a record line.
+
+        Protects Reliquary's own records — transcript and diagnostics.
+        It cannot reach what a guest installer prints, logs, or shows
+        in an explicitly requested screenshot.
+        """
+        for value in self._secret_values:
+            if value and value in message:
+                message = message.replace(value, "«secret»")
+        return message
+
     def _log(self, message):
+        message = self._redact(message)
         self._status.clear()
         print(message)
         if self._transcript is not None:
@@ -488,6 +508,7 @@ class _ScriptEngine:
         self._display = display
         self._establish_machine(display)
         self._start_transcript()
+        self._log_bindings()
         self._run_started = self._now()
         try:
             if self._script.phases:
@@ -519,6 +540,18 @@ class _ScriptEngine:
             if self._transcript is not None:
                 self._transcript.close()
                 self._transcript = None
+
+    def _log_bindings(self):
+        """Record each bound property's key and source — never a value.
+
+        The transcript is evidence of provenance, so a run is
+        auditable without exposing what any source supplied.
+        """
+        bindings = self._property_bindings
+        if not bindings or not bindings.sources:
+            return
+        for key in sorted(bindings.sources):
+            self._log(f"property {key}: {bindings.sources[key]}")
 
     def _establish_machine(self, display):
         """Meet the `machine` header's precondition, then bind a port."""
@@ -807,6 +840,7 @@ class _ScriptEngine:
 
     def _enter(self, statement):
         text = _render_literal(statement.arguments[0], self._bindings)
+        self._note_secret(statement.arguments[0])
         self._log(f"line {statement.line}: enter {text!r}")
         self._requires_running(statement)
         with self._console() as console:
@@ -814,10 +848,30 @@ class _ScriptEngine:
 
     def _type(self, statement):
         text = _render_literal(statement.arguments[0], self._bindings)
+        self._note_secret(statement.arguments[0])
         self._log(f"line {statement.line}: type {text!r}")
         self._requires_running(statement)
         with self._console() as console:
             console.send_text(text, False)
+
+    def _note_secret(self, literal):
+        """Record that a secret was entered, for later suppression.
+
+        Once a secret reaches the guest, automatic failure screenshots
+        are suppressed for the rest of the run (those land with the
+        failure report, milestone 9); an explicitly requested
+        screenshot is the author's own call and is never suppressed.
+        """
+        if self._secret_entered or not self._secret_values:
+            return
+        if not hasattr(literal, "parts"):
+            return
+        for part in literal.parts:
+            key = getattr(part, "key", None)
+            if key and self._property_bindings and \
+                    key in self._property_bindings.secret_keys:
+                self._secret_entered = True
+                return
 
     def _press(self, statement):
         keys = statement.arguments
@@ -866,7 +920,10 @@ class _ScriptEngine:
     def _insert(self, statement):
         slot, (kind, name) = statement.arguments
         if kind == "property":
-            raise _PropertyUnbound(name)
+            try:
+                name = self._bindings[name]
+            except KeyError:
+                raise _PropertyUnbound(name) from None
         self._log(f"line {statement.line}: insert {slot} @{name}")
         self._machine_change(
             statement, _machines.insert_media, slot, name)
@@ -1023,7 +1080,7 @@ def _preflight_media_slots(script, machine_state, script_path):
 
 
 def execute_script(script, *, machine_id, context=None, display=False,
-                   run_dir=None, script_path=None):
+                   run_dir=None, script_path=None, bindings=None):
     """Execute a parsed Script against a cached machine.
 
     The machine state the script's ``machine`` header expects is
@@ -1052,30 +1109,44 @@ def execute_script(script, *, machine_id, context=None, display=False,
     engine = _ScriptEngine(
         script, machine_id, context,
         _machines.machine_dir_path(machine_id, context),
-        run_dir=run_dir, script_path=script_path)
+        run_dir=run_dir, script_path=script_path, bindings=bindings)
     engine.run(display=display)
     return engine.final_phase, engine.machine_phase
 
 
-def _resolve_or_create_machine(*, machine=None, blueprint=None,
-                               context=None):
-    """Resolve a selector, creating a machine when blueprint has none."""
+def _existing_machine(*, machine=None, blueprint=None, context=None):
+    """Resolve a selector to an existing machine, or None to be created.
+
+    Never creates: the create-if-none decision is deferred so property
+    binding can run before it (G3 — binding precedes machine creation).
+    The blueprint lookup is scoped to this invocation's source, so a
+    same-named machine from another project is never adopted.
+    """
     if machine is None and blueprint is None:
         raise ValueError(
             "select a machine with --blueprint or --machine")
     if machine is not None:
         return _machines.resolve_machine(
-            machine=machine, blueprint=blueprint, context=context), False
-    # Scope the create-if-none decision to this invocation's source, so
-    # a same-named machine from another project is never adopted — a new
-    # project-scoped machine is created instead.
-    matches = _machines.machines_for_blueprint(blueprint, context)
-    if not matches:
-        machine_id = _machines.create_machine(
-            blueprint, context=context)
-        return machine_id, True
-    return _machines.resolve_machine(
-        blueprint=blueprint, context=context), False
+            machine=machine, blueprint=blueprint, context=context)
+    if _machines.machines_for_blueprint(blueprint, context):
+        return _machines.resolve_machine(
+            blueprint=blueprint, context=context)
+    return None
+
+
+def _blueprint_component(blueprint, context):
+    """The blueprint's machine component, seeding in home mode.
+
+    Mirrors ``create_machine``'s own resolution so the parameters and
+    scripts map read here are exactly the ones a subsequent create
+    would use. Returns None when the name resolves to no component;
+    the eventual create then raises the missing-blueprint error.
+    """
+    from .assets import source_for
+    if source_for(context).seeds:
+        seed_blueprint(blueprint, context=context)
+    namespace = load_namespace(context)
+    return namespace.machines.get(blueprint)
 
 
 def _resolve_script_stem(label, scripts_map):
@@ -1122,25 +1193,98 @@ def _create_run_dir(machine_id, context=None):
     return run_dir
 
 
+def _blueprint_parameters(state, context):
+    """The blueprint's `parameters` map, read live at invocation.
+
+    Parameters configure script binding, not machine shape: they carry
+    no state, `apply`, or baseline-digest involvement (ROADMAP "The
+    machine model"), so they are read from the blueprint file each run
+    rather than from the machine snapshot. A machine whose blueprint
+    file has since moved simply contributes no parameters — its own
+    state remains authoritative for shape.
+    """
+    source = state.get("blueprint-source")
+    if not source or not os.path.exists(source):
+        return {}
+    from .document import load_document
+    try:
+        document = load_document(source)
+    except (OSError, ValueError):
+        return {}
+    name = state.get("blueprint")
+    component = document.machines.get(name)
+    if component is None and len(document.machines) == 1:
+        component = next(iter(document.machines.values()))
+    return dict(component.parameters) if component is not None else {}
+
+
+def _console_asker():
+    """An interactive asker, or None when there is no terminal.
+
+    Asking requires both stdin and stderr to be ttys: the prompt
+    writes to stderr and the answer reads from stdin (the CLI output
+    discipline). Without a terminal the binder gets no asker and an
+    unresolved property fails before the machine starts, so a program
+    never hangs on a hidden prompt.
+    """
+    if not (sys.stdin.isatty() and sys.stderr.isatty()):
+        return None
+
+    def ask(key, prompt, secret):
+        text = prompt or key
+        if secret:
+            return getpass.getpass(f"{text}: ", stream=sys.stderr) or None
+        print(f"{text}: ", end="", file=sys.stderr, flush=True)
+        line = sys.stdin.readline()
+        if not line:
+            return None
+        return line.rstrip("\n").rstrip("\r") or None
+
+    return ask
+
+
 def run_script(label, *, blueprint=None, machine=None, context=None,
-               display=False):
+               display=False, properties=None, properties_file=None):
     """Resolve ``label``, ensure a machine, and execute under ``runs/``.
 
     Looks up ``label`` in the machine's blueprint ``scripts`` map
     first; when absent, treats ``label`` as a bare script stem under
     ``scripts/``.  With ``--blueprint`` and no machine yet, creates
-    one.  Returns a :class:`ScriptRun` naming the run directory.
+    one.  Declared properties bind before the machine starts, from
+    ``properties`` (explicit ``--property`` values), the blueprint
+    parameters, the environment, the properties file, or — on a
+    terminal — an interactive ask.  Returns a :class:`ScriptRun`
+    naming the run directory.
     """
-    machine_id, created = _resolve_or_create_machine(
+    # Resolve to an existing machine (or None) without creating, so
+    # declared properties bind before any machine or media is made.
+    machine_id = _existing_machine(
         machine=machine, blueprint=blueprint, context=context)
-    state = _machines.load_machine_state(machine_id, context)
-    stem = _resolve_script_stem(label, state.get("scripts") or {})
+    if machine_id is not None:
+        state = _machines.load_machine_state(machine_id, context)
+        scripts_map = state.get("scripts") or {}
+        parameters = _blueprint_parameters(state, context)
+    else:
+        component = _blueprint_component(blueprint, context)
+        scripts_map = dict(component.scripts) if component is not None else {}
+        parameters = (dict(component.parameters)
+                      if component is not None else {})
+    stem = _resolve_script_stem(label, scripts_map)
     script_path = _ensure_script_path(stem, context=context)
     script = load_script(script_path)
+    bindings = bind_properties(
+        script, parameters=parameters, explicit=properties,
+        properties_file=properties_file, context=context,
+        asker=_console_asker())
+
+    # Binding passed: now create the machine if the blueprint had none.
+    created = machine_id is None
+    if created:
+        machine_id = _machines.create_machine(blueprint, context=context)
     run_dir = _create_run_dir(machine_id, context=context)
     final_phase, machine_phase = execute_script(
         script, machine_id=machine_id, context=context, display=display,
-        run_dir=run_dir, script_path=script_path)
+        run_dir=run_dir, script_path=script_path, bindings=bindings)
     return ScriptRun(
         machine_id=machine_id,
         run_dir=run_dir,
@@ -1151,22 +1295,27 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     )
 
 
-def check_script(name, *, blueprint=None, machine=None, context=None):
+def check_script(name, *, blueprint=None, machine=None, context=None,
+                 properties=None, properties_file=None):
     """Parse and statically check a script; return its timing plan.
 
     Read-only: does not seed the home, create a machine, write a run
-    record, or execute guest steps. Without a selector, ``name`` is a
-    bare script stem. With ``--blueprint`` or ``--machine``, ``name``
-    resolves through that blueprint's ``scripts`` map first. When a
-    machine is selected, media-slot preflight runs as well.
+    record, execute guest steps, prompt, or read a secret's value.
+    Without a selector, ``name`` is a bare script stem. With
+    ``--blueprint`` or ``--machine``, ``name`` resolves through that
+    blueprint's ``scripts`` map first. When a machine is selected,
+    media-slot preflight runs as well. The result names each declared
+    property's supplying source without binding it.
     """
     machine_id = None
     scripts_map = {}
+    parameters = {}
     if machine is not None:
         machine_id = _machines.resolve_machine(
             machine=machine, blueprint=blueprint, context=context)
         state = _machines.load_machine_state(machine_id, context)
         scripts_map = state.get("scripts") or {}
+        parameters = _blueprint_parameters(state, context)
     elif blueprint is not None:
         from .library import locate_blueprint
         from .document import load_document
@@ -1178,6 +1327,8 @@ def check_script(name, *, blueprint=None, machine=None, context=None):
             machine_component = next(iter(doc.machines.values()))
         scripts_map = (dict(machine_component.scripts)
                        if machine_component is not None else {})
+        parameters = (dict(machine_component.parameters)
+                      if machine_component is not None else {})
     stem = _resolve_script_stem(name, scripts_map)
     script_path = locate_script(stem, context=context)
     script = load_script(script_path)
@@ -1185,8 +1336,15 @@ def check_script(name, *, blueprint=None, machine=None, context=None):
         _preflight_media_slots(
             script, _machines.load_machine_state(machine_id, context),
             script_path)
+    property_sources = describe_sources(
+        script, parameters=parameters, explicit=properties,
+        properties_file=properties_file, context=context)
     plan = resolve_timing(script)
     report = format_plan(plan, name=os.path.basename(script_path))
+    if property_sources:
+        report += "\n\nproperties:\n" + "\n".join(
+            f"  {key}: {property_sources[key]}"
+            for key in sorted(property_sources))
     return ScriptCheck(
         script_path=script_path, plan=plan, report=report,
-        machine_id=machine_id)
+        machine_id=machine_id, property_sources=property_sources)

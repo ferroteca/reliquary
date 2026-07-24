@@ -13,6 +13,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Scripts bind the properties they declare. Before the machine
+  starts, each declared property resolves from the first source that
+  answers: a repeatable `--property KEY=VALUE` (never a secret —
+  argv is not a credential store), a blueprint `parameter` (a direct
+  value or a `{"property": "<key>"}` redirect), a
+  `RELIQUARY_PROPERTY_*` environment variable (with fail-closed
+  collision preflight when two consulted keys mangle alike), the
+  properties file (a secret read from the credential store), or — on
+  a terminal — an interactive ask. Without a terminal, an unresolved
+  property fails before the machine starts, so a program never hangs
+  on a hidden prompt. `run-script` and `check-script` gained
+  `--property` and `--properties`; `check-script` now names each
+  declared property's supplying source, never its value. A `secret`
+  property expands only in `enter`/`type`, and its value is redacted
+  from the transcript and diagnostics (shown as `«secret»`). The
+  declared derivation and `${key}` location references arrive with
+  later milestone-8 stages.
+
 - Secret properties are real: `set-property <key> --secret` stores
   the value in the host credential store (via `keyring`, a new
   runtime dependency) and writes only the `@secret` marker to

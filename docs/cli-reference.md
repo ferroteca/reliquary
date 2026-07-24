@@ -127,12 +127,37 @@ List scripts, optionally filtered by blueprint.
 Run a script against a blueprint's machine. Resolves the blueprint,
 creates a machine if none exists, runs the script, and records the run.
 
+A script declares the properties it consumes; each is bound before
+the machine starts, from the first source that answers:
+
+1. `--property KEY=VALUE` — the caller's answer for this run
+   (repeatable; never a secret — argv is not a credential store).
+2. a **blueprint parameter** — a value the blueprint fixes for its
+   machines, or a `{"property": "<key>"}` redirect to another key.
+3. `RELIQUARY_PROPERTY_<KEY>` — an environment value (the CI
+   injection path); the key uppercases with `.`, `-`, `_` all
+   mapped to `_`.
+4. the **properties file** — `user.properties`, or the file named by
+   `--properties PATH`; a secret is read from the credential store.
+5. an **interactive ask** — only on a terminal, once per unresolved
+   key. Without a terminal, an unresolved property fails before the
+   machine starts, so a program never hangs on a hidden prompt.
+
+A `secret` property expands only in `enter` and `type`; its value is
+kept out of the transcript and diagnostics (shown as `«secret»`).
+`--properties PATH` selects the file for binding, exactly as for the
+property commands above.
+
 ### `rlq check-script <name> [--blueprint NAME | --machine ID]`
 
 Parse and statically check a script; print its resolved timing plan
-(each observation's effective timeout and source scope). Read-only:
-does not seed the home, create a machine, or run guest steps. Without
-a selector, `<name>` is a bare script stem (home `scripts/` or a
+(each observation's effective timeout and source scope) and, for each
+declared property, the source that would supply it — flag, blueprint
+parameter, environment, properties file, or the ask — never its
+value. Accepts the same `--property` and `--properties` as
+`run-script`. Read-only: does not seed the home, create a machine,
+run guest steps, prompt, or read a secret's value. Without a
+selector, `<name>` is a bare script stem (home `scripts/` or a
 builtin). With `--blueprint` or `--machine`, `<name>` may be a
 blueprint scripts-map label. With a machine, media-slot preflight
 runs as well. Static errors exit 2.

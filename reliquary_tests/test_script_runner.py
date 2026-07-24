@@ -14,6 +14,7 @@ from unittest import mock
 
 from qemu.qmp import ConnectError
 
+from reliquary.binding import BoundProperties
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (ScriptRuntimeError, _normalize_row,
                                      _resolve_key, _HttpResponse,
@@ -108,7 +109,7 @@ class _RuntimeCase(unittest.TestCase):
     """Builds engines over a fake console and a controlled clock."""
 
     def engine(self, source, screens=(), port=5555, fail=False,
-               run_dir=None):
+               run_dir=None, bindings=None):
         _FakeHttpService.instances = []
         script = parse_script(_HEAD + source)
         clock = _Clock()
@@ -116,7 +117,7 @@ class _RuntimeCase(unittest.TestCase):
             script, "plain-0", "/tmp/home",
             "/tmp/home/cache/machines/plain-0", run_dir=run_dir,
             script_path="demo.rlqs", clock=clock, sleep=clock.sleep,
-            http_service_factory=_FakeHttpService)
+            http_service_factory=_FakeHttpService, bindings=bindings)
         engine._port = port
         self.console = _FakeConsole(screens, fail)
         self.clock = clock
@@ -521,6 +522,41 @@ class InputVerbTests(_RuntimeCase):
                 self.run_linear(engine)
             self.assertIn("${owner} has no bound value",
                           str(caught.exception), msg=source)
+
+    def test_a_bound_property_expands_into_enter(self):
+        engine = self.engine(
+            'property owner\nenter "setup /owner=${owner}"\n',
+            bindings=BoundProperties({"owner": "Paul"}, {"owner": "flag"}))
+        self.run_linear(engine)
+        self.assertEqual(
+            self.console.commands,
+            [("send_text", "setup /owner=Paul", True)])
+
+    def test_a_bound_media_property_selects_the_insert_target(self):
+        with mock.patch("reliquary.script_runner._machines") as machines:
+            engine = self.engine(
+                "property media disk\ninsert cdrom0 $disk\n",
+                bindings=BoundProperties(
+                    {"disk": "supplemental"}, {"disk": "flag"}))
+            self.run_linear(engine)
+        machines.insert_media.assert_called_once_with(
+            "plain-0", "cdrom0", "supplemental", context="/tmp/home")
+
+    def test_a_secret_value_is_redacted_from_the_transcript(self):
+        bound = BoundProperties(
+            {"pw": "swordfish"}, {"pw": "properties file"},
+            frozenset({"pw"}))
+        engine = self.engine(
+            'property secret pw\ntype "${pw}"\n', bindings=bound)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            engine._execute(engine._script.statements)
+        # The guest still receives the real value...
+        self.assertEqual(
+            self.console.commands, [("send_text", "swordfish", False)])
+        # ...but the record shows the marker, never the secret.
+        self.assertNotIn("swordfish", stdout.getvalue())
+        self.assertIn("«secret»", stdout.getvalue())
 
 
 class MachineOperationTests(_RuntimeCase):

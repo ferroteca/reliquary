@@ -27,6 +27,8 @@ from .machines import (apply_blueprint, create, create_machine,
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
 from .resolve import load_namespace
+from .binding import (BoundProperties, PropertyBindingError,
+                      bind_properties, describe_sources)
 from .credentials import CredentialError
 from .properties import (PropertiesError, check_key, get_property,
                          has_credential, is_secret, list_properties,
@@ -48,8 +50,10 @@ __all__ = [
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
+    "BoundProperties",
     "CredentialError",
     "PropertiesError",
+    "PropertyBindingError",
     "Phase",
     "Property",
     "Statement",
@@ -69,7 +73,9 @@ __all__ = [
     "insert_media",
     "blueprints_dir",
     "cache_dir",
+    "bind_properties",
     "check_key",
+    "describe_sources",
     "has_credential",
     "is_secret",
     "secret_marker",

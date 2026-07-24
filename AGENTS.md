@@ -106,10 +106,21 @@ workflow:
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
   effective timeout and the scope that supplied it; `format_plan` /
   `check_script` / `rlq check-script` report it without running).
-  `script_runner.py` executes that tree against
+  `binding.py` resolves declared script properties before a run —
+  the flattened source order (explicit `--property`, blueprint
+  parameter with its `{"property": ...}` redirect, `RELIQUARY_PROPERTY_*`
+  environment with collision preflight, the properties file, then an
+  interactive ask), the text/media/secret kind rules, secret values
+  pulled from the credential store, and `describe_sources` the dry
+  twin that names each key's source for `check-script` without
+  binding or prompting; the declared derivation (between file and
+  ask) and `${key}` location references land with later milestone-8
+  stages. `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
-  create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys, run
+  create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys,
+  property binding before the machine starts, secret redaction in the
+  transcript, run
   records under `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and
   `__main__.py` preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
