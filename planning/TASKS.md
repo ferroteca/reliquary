@@ -67,7 +67,7 @@ get right the first time and silently corrupting to change
 later — an orphaned credential nobody can name, or a bundle that
 resolves differently than it did last release.
 
-- **T1 — the properties file.** Deliverable 1. Replace the JSON
+- **T1 — the properties file — DONE.** Deliverable 1. Replace the JSON
   stub with the line-based format: `key = value`, `#` full-line
   comments, blank lines, the `@secret` marker and `@@` literal
   escape, dot-separated letter-initial segments with the `rlq` /
@@ -78,7 +78,7 @@ resolves differently than it did last release.
   file with comments, blank lines, and a deliberate ordering
   survives a set and an unset with everything but the named line
   untouched.
-- **T2 — the credential store and the command family.**
+- **T2 — the credential store and the command family — DONE.**
   Deliverables 2 and 3, **plus `--properties <path>` pulled
   forward from deliverable 4**. Use the `keyring` package rather
   than hand-rolling Credential Manager / Keychain / Secret

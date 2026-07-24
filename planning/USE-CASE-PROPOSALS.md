@@ -469,6 +469,44 @@ delivered, U4 retires to a stub naming them.
 >   Reliquary's own ground: caches, machines, the personal
 >   properties file.
 
+**U18 — Test on the platform the host isn't** — drafted (add,
+2026-07-23; owner's, from the observation that Reliquary's own
+credential-store code has a Linux path its Windows developer
+cannot execute). The gap: every case in the list treats the
+guest as the subject or the product; none treats it as **the
+missing platform** a developer needs in order to test their own
+work. It is distinct from U3 (something is tested *in* a VM,
+platform incidental) and from U16 (a rig shared between
+developers): here the guest's *identity as a different OS* is
+the entire point, and the "somebody else's machine" it replaces
+is a CI matrix nobody has locally.
+
+SEQUENCING, and the owner's own caveat — this needs a maturity
+the project does not have: a modern-guest platform workflow
+(Linux), a way in for the code and out for the results, and
+realistically a native guest agent for a tight loop. So it is
+not a near-term schedule request. What makes it worth numbering
+now is what it would *demand* if accepted: it is the first case
+that would put in-force weight behind the backlogged guest-agent
+work (D33 demoted it for lack of exactly this), behind the
+deferred in-band file operations, and behind **P16** and
+**P17** — a developer driving a Linux guest from Windows cannot
+reach around Reliquary to a `hostdir`, and would name that
+guest's files in the guest's own terms. Reliquary self-hosting
+its own cross-platform tests is the motivating instance; the
+case is general.
+
+> - **U18 — Test on the platform the host isn't.** A developer's
+>   code has paths that only run on an operating system they are
+>   not sitting in front of. They describe that system as a
+>   blueprint, put the code and its test runner inside, run it,
+>   and read the results back — on their own machine, with no CI
+>   round trip and no second computer. The guest is not the
+>   product and not the subject: it is the platform the work
+>   needs and the host cannot provide. What makes it useful is
+>   fidelity — a real OS, not an emulated API surface — and the
+>   loop being tight enough to use while actually working.
+
 ### Pending clarifications
 
 Parked in-place edits — no argument needed, delivered when

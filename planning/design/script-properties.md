@@ -12,11 +12,16 @@ SPDX-License-Identifier: BSD-3-Clause
 > the key rules, the `@` value kinds, the surgical
 > comment-preserving edits, and the four maintenance verbs with
 > their API twins ("Property names and values", "Maintaining
-> properties"). Not yet: secret storage (the host credential
-> store — a secret set fails closed, never falling back to
-> plaintext), the layered sources and their binding into a run,
-> the declared derivation and its `rlq.*` facts, and the runtime
-> secret rules. Details may still change before first release.
+> properties"); **secret storage** — the credential-store
+> capability behind a provider seam, the entry channels, the
+> fail-safe update order and orphan handling ("Secret storage");
+> and **file selection** — `--properties` / `RELIQUARY_PROPERTIES`
+> / `properties_file=`, with credentials scoped by the selected
+> file's absolute path. Not yet: the layered sources and their
+> binding into a run, the declared derivation and its `rlq.*`
+> facts, and the runtime secret rules. Windows is the only host
+> whose credential backend is exercised (ROADMAP "Horizon", host
+> portability). Details may still change before first release.
 
 Script properties carry the values scripts consume without
 embedding them:

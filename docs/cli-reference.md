@@ -219,13 +219,21 @@ identity.preferred-username = paul
 accounts.default-password = @secret
 ```
 
+Every command below accepts `--properties PATH`, which **replaces**
+the home's file for that invocation rather than layering over it.
+Pointing it at a project-committed file makes a run hermetic —
+nothing from your personal file can reach it. The environment
+variable `RELIQUARY_PROPERTIES` selects the same way.
+
 ### `rlq list-properties [PREFIX]`
 
 List keys with their values, sorted. A secret shows as `@secret`,
 never its value. `PREFIX` selects that key and its dotted
 descendants — a namespace, not a raw string match, so
 `products.windows-98` matches `products.windows-98.install-key`
-but not `products.windows-98-extra`.
+but not `products.windows-98-extra`. A secret whose credential is
+missing on this host is reported as a warning on stderr; the
+listing itself is unchanged.
 
 ### `rlq get-property <key>`
 
@@ -238,19 +246,48 @@ only that key's line. Changing a property between ordinary and
 secret requires `unset-property` first, so a secret can never be
 downgraded to a plaintext value by one command.
 
+### `rlq set-property <key> --secret`
+
+Store a secret. The value never appears on the command line —
+process listings and shell history are not credential stores — so
+there is deliberately no value argument. On a terminal you are
+prompted without echo; otherwise the value is read from stdin to
+EOF with one trailing newline stripped, which keeps the CLI a
+complete binding for programs:
+
+```powershell
+"swordfish" | rlq set-property accounts.default-password --secret
+```
+
+The value goes to the host credential store and only the `@secret`
+marker is written to the file. Secrets are scoped by the absolute
+path of the properties file holding the marker, so a `--properties`
+file and your home file never share one, and copying a properties
+file elsewhere copies names and markers but not credentials.
+
 ### `rlq unset-property <key>`
 
-Remove a property, leaving the rest of the file as it was.
+Remove a property, leaving the rest of the file as it was. For a
+secret this removes both the marker and its credential — and it is
+also the cleanup door for an orphaned credential (below).
 
 A malformed properties file is reported with its path and line
 number and is never partly rewritten.
 
-> **Not yet:** secret *values* need the host credential store,
-> which has not landed. `set-property --secret` fails closed
-> rather than writing a value the file must never hold — there is
-> no plaintext fallback. Secret markers already read correctly, and
-> binding properties into a script run arrives with the rest of
-> milestone 8 (`planning/design/script-properties.md`).
+**No plaintext fallback.** If this host has no usable credential
+store, storing or reading a secret fails closed rather than
+falling back to the file. Updates are ordered so an interruption
+can never strand a marker whose credential Reliquary reported as
+stored: the credential is written first and the marker second, and
+on removal the marker goes first. The recoverable leftover is an
+*orphaned credential* — stored, with no marker — which a later
+ordinary `set-property` on that key refuses to write over, naming
+`unset-property` as the way to clear it.
+
+> **Not yet:** binding these properties into a script run — the
+> layered sources, the declared derivation, and the runtime secret
+> rules — arrives with the rest of milestone 8
+> (`planning/design/script-properties.md`).
 
 ## Keyboard and command input
 

@@ -170,24 +170,47 @@ blank lines, and ordering outside the named key are preserved.
 Malformed files raise `PropertiesError` (a `ValueError`) naming the
 path and line, and are never partly rewritten.
 
-- `get_property(key, context=None)` - The value, or `None`. A secret
-  returns its marker `{"secret": True}`, never its value — exactly
-  what `--json` serializes. CLI twin: `get-property`.
-- `set_property(key, value, secret=False, context=None)` - Create or
-  replace a property, rewriting or appending only that key's line.
-  Changing a property between ordinary and secret raises; unset it
-  first. CLI twin: `set-property`.
-- `unset_property(key, context=None)` - Remove a property. CLI twin:
-  `unset-property`.
-- `list_properties(prefix=None, context=None)` - The properties
-  projection, key to value-or-marker, sorted. `prefix` selects that
-  key and its dotted descendants. CLI twin: `list-properties`.
+Every function takes `properties_file=` (CLI `--properties`), which
+replaces the home's file rather than layering over it;
+`RELIQUARY_PROPERTIES` selects the same way.
+
+- `get_property(key, context=None, properties_file=None)` - The
+  value, or `None`. A secret returns its marker `{"secret": True}`,
+  never its value — exactly what `--json` serializes. CLI twin:
+  `get-property`.
+- `set_property(key, value, secret=False, context=None,
+  properties_file=None)` - Create or replace a property, rewriting
+  or appending only that key's line. With `secret=True` the value
+  goes to the host credential store and only the marker to the
+  file. Changing a property between ordinary and secret raises;
+  unset it first. CLI twin: `set-property`.
+  **One named divergence from the CLI:** this takes a secret's
+  value as its ordinary `value` parameter. The CLI's prompt and
+  stdin channels exist because argv reaches process listings and
+  shell history, which an in-process value never touches — and a
+  library function never prompts.
+- `unset_property(key, context=None, properties_file=None)` - Remove
+  a property; for a secret, its credential too. Also clears an
+  orphaned credential. CLI twin: `unset-property`.
+- `list_properties(prefix=None, context=None, properties_file=None)` -
+  The properties projection, key to value-or-marker, sorted.
+  `prefix` selects that key and its dotted descendants. CLI twin:
+  `list-properties`.
+- `has_credential(key, context=None, properties_file=None)` - Whether
+  a secret's credential is actually present on this host. Kept
+  separate from `get_property` so reading a property never depends
+  on reaching the store; the CLI renders it as a stderr warning
+  rather than folding it into the result.
 - `is_secret(value)` / `secret_marker()` - Recognize and build the
   secret marker. `check_key(key)` validates a property key.
 
-Secret *values* need the host credential store, which has not
-landed: `set_property(..., secret=True)` raises
-`NotImplementedError` rather than writing plaintext.
+Secrets are stored in the host's credential service, scoped by the
+absolute path of the properties file holding the marker and the
+property name. There is no plaintext fallback: a host with no
+usable store raises `CredentialError`. Updates are ordered
+fail-safely (credential before marker, marker before credential),
+so the only recoverable leftover is an orphaned credential, which
+an ordinary `set_property` on that key refuses to overwrite.
 
 ## Scripts and runs
 

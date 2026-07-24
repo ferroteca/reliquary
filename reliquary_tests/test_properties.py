@@ -9,8 +9,21 @@ import os
 import shutil
 import tempfile
 import unittest
-from reliquary import properties
+from reliquary import credentials, properties
 from reliquary.properties import PropertiesError
+from reliquary_tests.test_credentials import FakeStore
+
+_provider = None
+
+
+def setUpModule():
+    """Never let the unit suite reach the host's real credential store."""
+    global _provider
+    _provider = credentials._set_provider(FakeStore())
+
+
+def tearDownModule():
+    credentials._set_provider(_provider)
 
 
 class PropertiesFileTests(unittest.TestCase):
@@ -193,13 +206,6 @@ class ValueKindTests(unittest.TestCase):
         self.assertFalse(
             properties.is_secret(
                 properties.get_property("decoy", context=self.home)))
-
-    def test_secret_set_fails_closed_with_no_plaintext_written(self):
-        with self.assertRaises(NotImplementedError):
-            properties.set_property(
-                "accounts.default-password", "hunter2", secret=True,
-                context=self.home)
-        self.assertEqual(properties.list_properties(context=self.home), {})
 
     def test_ordinary_over_a_secret_needs_an_unset_first(self):
         self.write("accounts.default-password = @secret\n")

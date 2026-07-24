@@ -13,6 +13,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Secret properties are real: `set-property <key> --secret` stores
+  the value in the host credential store (via `keyring`, a new
+  runtime dependency) and writes only the `@secret` marker to
+  `user.properties`. The value never appears on the command line —
+  on a terminal the command prompts without echo, otherwise it
+  reads stdin to EOF — because process listings and shell history
+  are not credential stores. Secrets are scoped by the absolute
+  path of the properties file holding the marker, so a
+  `--properties` file and the home's never share one. There is no
+  plaintext fallback: a host with no usable store fails closed.
+  Updates are fail-safe ordered (credential before marker, marker
+  before credential), so the only recoverable leftover is an
+  orphaned credential, which an ordinary `set-property` refuses to
+  overwrite and `unset-property` clears. `get-property` and
+  `list-properties` warn on stderr about a marker whose credential
+  is missing, leaving the result itself unchanged.
+- `--properties <path>` on every property command (API
+  `properties_file=`, environment `RELIQUARY_PROPERTIES`) selects a
+  properties file that **replaces** the home's for that
+  invocation, so a project-committed file makes a run hermetic.
+
 - `user.properties` is now the line-based, user-owned format its
   spec describes: `key = value` lines, `#` comments, blank lines,
   dotted keys validated (segments of letters, digits, `_` and `-`,
@@ -143,6 +164,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Windows is declared as the supported host.** The packaging
+  classifier moves from `Operating System :: OS Independent` to
+  `Operating System :: Microsoft :: Windows`, and the README says
+  so. Nothing about the code changed: host paths for macOS and
+  Linux exist and are written portably, but they are untested, and
+  an untested platform is an unclaimed capability rather than a
+  quiet promise. What widening support would take is itemized in
+  the roadmap's Horizon.
 - **One media cache, with an identity ledger.** Every cached payload
   now lives in `cache/media/`, keyed by the name of the media it is —
   a container is a media like any other, so `cache/archives/` retires
@@ -276,9 +305,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - `set-property --secret` no longer writes the secret's value into
-  `user.properties` in plaintext. Secret values belong to the host
-  credential store, which has not landed yet, so the command now
-  fails closed — there is no plaintext fallback. (The previous
+  `user.properties` in plaintext; it stores the value in the host
+  credential store and records only the marker. (The previous
   behavior accepted `--secret` and ignored it.)
 - Usage/help text now names whichever entry point was actually
   invoked (`reliquary -h` says `usage: reliquary ...`, `rlq -h`

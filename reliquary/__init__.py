@@ -27,9 +27,10 @@ from .machines import (apply_blueprint, create, create_machine,
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
 from .resolve import load_namespace
+from .credentials import CredentialError
 from .properties import (PropertiesError, check_key, get_property,
-                         is_secret, list_properties, secret_marker,
-                         set_property, unset_property)
+                         has_credential, is_secret, list_properties,
+                         secret_marker, set_property, unset_property)
 from .script_nodes import ScriptParseError
 from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
@@ -47,6 +48,7 @@ __all__ = [
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
+    "CredentialError",
     "PropertiesError",
     "Phase",
     "Property",
@@ -68,6 +70,7 @@ __all__ = [
     "blueprints_dir",
     "cache_dir",
     "check_key",
+    "has_credential",
     "is_secret",
     "secret_marker",
     "add_media",

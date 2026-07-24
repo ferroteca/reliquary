@@ -19,13 +19,13 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Testing",
     "Topic :: System :: Emulators",
     "Topic :: System :: Installation/Setup",
 ]
-dependencies = ["lark", "pillow", "qemu.qmp"]
+dependencies = ["keyring", "lark", "pillow", "qemu.qmp"]
 
 [project.urls]
 Homepage = "https://github.com/ferroteca/reliquary"

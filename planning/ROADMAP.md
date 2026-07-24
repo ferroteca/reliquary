@@ -2549,6 +2549,31 @@ VNC and on Hyper-V through its decided screen strategy.
   returns. The durable-artifact exits become meaningful once
   two backends exist — sequence at or after the second
   backend.
+- **Host portability: Linux and macOS** (added 2026-07-23, owner).
+  Windows is the delivered host — the only one developed on,
+  tested on, and claimed in the packaging classifiers (AGENTS.md
+  "Dependencies and style"). Host code is written portably and
+  the other paths exist, but unexercised is unclaimed under P11.
+  Widening is gated on three jobs, each substantial and none of
+  them a by-product of ordinary work:
+  1. **Secret storage per host** — the credential-store capability
+     against a Secret Service provider on Linux and Keychain on
+     macOS. The `keyring` seam
+     (planning/design/script-properties.md, "Secret storage") is
+     built for exactly this, so the code is likely already right;
+     what is missing is *evidence*, and the no-plaintext-fallback
+     rule means a wrong guess fails a user's run outright.
+  2. **Backend verification per host** — QEMU discovery, process
+     ownership, paths, and the agentless display plane proven on
+     each host, not assumed from the Windows implementation.
+  3. **A place to run them** — CI or real hardware. Every claim
+     above rests on a suite actually executing there; U18 (drafted)
+     is the case for reaching such a host from this one, which
+     would make Reliquary its own answer.
+  Demand is uncited today: no use case asks to *run Reliquary on*
+  another host — U18 asks to reach another OS as a guest, which is
+  a different axis. Sequencing it is the acceptance of whatever
+  case does.
 - `fork-blueprint` (a fire-and-forget authoring convenience;
   `new-blueprint` scaffolding lands in milestone 6) —
   currently unjustified: no use case demands it, and

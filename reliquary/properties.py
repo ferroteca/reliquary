@@ -24,6 +24,8 @@ import os
 import re
 import tempfile
 
+from . import credentials
+
 _SEGMENT = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 _RESERVED = ("rlq", "reliquary")
 _SECRET_TOKEN = "@secret"
@@ -39,8 +41,19 @@ def is_secret(value):
     """Return True if a returned value is the secret marker."""
     return isinstance(value, dict) and value.get("secret") is True
 
-def _properties_path(context=None):
-    """Return the path to the user properties file."""
+def _properties_path(context=None, properties_file=None):
+    """Return the path of the selected properties file.
+
+    An explicit `properties_file` (CLI `--properties`) *replaces*
+    the home's file rather than layering over it, so pointing it at
+    a project-controlled file makes a run hermetic. The
+    `RELIQUARY_PROPERTIES` environment variable selects the same
+    way when no argument does.
+    """
+    if properties_file is None:
+        properties_file = os.environ.get("RELIQUARY_PROPERTIES") or None
+    if properties_file is not None:
+        return os.path.abspath(properties_file)
     from .home import _ctx
     return os.path.join(_ctx(context).home_dir(), "user.properties")
 
@@ -207,50 +220,121 @@ def _read(path):
         entries[key] = (index, _decode(written.strip(), path, number))
     return _File(path, lines, entries, ending)
 
-def get_property(key, context=None):
+def get_property(key, context=None, properties_file=None):
     """Return the named property's value, or None if it has none.
 
     A secret returns its marker, never its value — exactly what
-    the `--json` rendering serializes.
+    the `--json` rendering serializes. Whether its credential is
+    actually present is `has_credential`'s question, kept separate
+    so reading a property never depends on reaching the store.
     """
     check_key(key)
-    return _read(_properties_path(context)).value(key)
+    return _read(_properties_path(context, properties_file)).value(key)
 
-def set_property(key, value, secret=False, context=None):
+def has_credential(key, context=None, properties_file=None):
+    """Return True when this key's secret credential is present.
+
+    Read-only: it never stores or removes anything.
+    """
+    check_key(key)
+    path = _properties_path(context, properties_file)
+    return credentials.has_secret(credentials.scope_for(path), key)
+
+def _refuse_orphan(path, key):
+    """Fail closed on a credential left behind with no marker.
+
+    The fail-safe order stores a credential before publishing its
+    marker, so a credential without one is an interrupted secret
+    set. Writing over it would discard a secret the user believes
+    is stored, so the cleanup is theirs to ask for.
+    """
+    try:
+        present = credentials.has_secret(credentials.scope_for(path), key)
+    except credentials.CredentialError:
+        # A host that cannot answer cannot be checked; ordinary
+        # values must not become unreachable because of it.
+        return
+    if present:
+        raise PropertiesError(
+            f"an orphaned credential exists for {key!r} (stored, but "
+            f"no marker in {path} — an interrupted secret set); run "
+            f"'rlq unset-property {key}' to clear it first")
+
+def set_property(key, value, secret=False, context=None,
+                 properties_file=None):
     """Create or replace a property, preserving the rest of the file.
 
     Changing a property between ordinary and secret requires
     `unset_property` first, so a secret can never be downgraded to
     a plaintext value by a single command.
+
+    A secret's value is stored in the host credential store and only
+    its marker is written to the file, in that order: the credential
+    lands first, so an interruption can leave an orphaned credential
+    (recoverable, and reported) but never a marker whose credential
+    was reported bound and is absent.
     """
     check_key(key)
-    if secret:
-        raise NotImplementedError(
-            "secret properties need the host credential store, which "
-            "has not landed yet; there is no plaintext fallback")
-    properties = _read(_properties_path(context))
+    path = _properties_path(context, properties_file)
+    properties = _read(path)
     current = properties.value(key)
+    if secret:
+        if not isinstance(value, str) or not value:
+            raise PropertiesError(
+                "a secret needs a non-empty value")
+        if current is not None and not is_secret(current):
+            raise PropertiesError(
+                f"{key!r} is an ordinary property; unset it first to "
+                "store a secret under that key")
+        credentials.store_secret(credentials.scope_for(path), key, value)
+        properties.set(key, secret_marker())
+        properties.save()
+        return
     if is_secret(current):
         raise PropertiesError(
             f"{key!r} is a secret property; unset it first to store "
             "an ordinary value under that key")
+    if current is None:
+        _refuse_orphan(path, key)
     properties.set(key, value)
     properties.save()
 
-def unset_property(key, context=None):
-    """Remove a property, preserving the rest of the file."""
+def unset_property(key, context=None, properties_file=None):
+    """Remove a property, marker and credential alike.
+
+    The marker goes first, then the credential: an interruption
+    leaves an orphaned credential rather than a marker pointing at
+    nothing. Unsetting a key with no marker still clears an
+    orphaned credential — this is the cleanup door.
+    """
     check_key(key)
-    properties = _read(_properties_path(context))
+    path = _properties_path(context, properties_file)
+    properties = _read(path)
+    current = properties.value(key)
+    was_secret = is_secret(current)
     if properties.unset(key):
         properties.save()
+    if current is not None and not was_secret:
+        # An ordinary value and an orphaned credential cannot
+        # coexist — a set refuses the orphan first — so there is
+        # nothing here worth waking the host store for.
+        return
+    try:
+        credentials.delete_secret(credentials.scope_for(path), key)
+    except credentials.CredentialError:
+        # Clearing an ordinary property must not depend on a store
+        # this host may not even have; a secret's must.
+        if was_secret:
+            raise
 
-def list_properties(prefix=None, context=None):
+def list_properties(prefix=None, context=None, properties_file=None):
     """Return the properties projection: key to value or marker.
 
     A prefix selects that key and its dotted descendants — it is a
     namespace, not a raw string match.
     """
-    properties = _read(_properties_path(context)).projection()
+    path = _properties_path(context, properties_file)
+    properties = _read(path).projection()
     if prefix is None:
         return dict(sorted(properties.items()))
     check_key(prefix)

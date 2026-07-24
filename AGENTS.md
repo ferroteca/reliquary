@@ -55,10 +55,21 @@ workflow:
   blanks, and ordering preserved — and written atomically;
   `get_property` / `set_property` / `unset_property` /
   `list_properties(prefix)` are the verbs, a secret reading as the
-  marker `{"secret": True}` and never a value. Secret *storage* (the
-  host credential store) and property *binding* into a run are the
-  rest of milestone 8; a secret set raises rather than falling back to
-  plaintext,
+  marker `{"secret": True}` and never a value; every verb takes
+  `properties_file=` (CLI `--properties`, env `RELIQUARY_PROPERTIES`),
+  which *replaces* the home's file rather than layering over it.
+  `credentials.py` owns the host credential store — a three-method
+  provider seam (`keyring`'s own shape, so the default provider is
+  `keyring` and a test double is three functions; `_set_provider`
+  installs one, which is how the suite never touches the real store),
+  secrets scoped by the selected properties file's absolute path, and
+  no plaintext fallback anywhere: an absent or unusable store raises
+  `CredentialError`. Updates are fail-safe ordered — credential before
+  marker, marker before credential — so the only recoverable leftover
+  is an orphaned credential, which an ordinary set refuses to
+  overwrite and `unset_property` clears. Property *binding* into a run
+  (the layered sources, the derivation, the runtime secret rules) is
+  the rest of milestone 8,
   `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
@@ -387,6 +398,17 @@ Doctrine to preserve:
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.
 - Support Python 3.9 and newer.
+- **Windows is the delivered host platform.** It is the only one
+  developed on, tested on, and claimed in the packaging classifiers.
+  Write host code portably — the paths for other hosts exist and
+  should stay correct (the Documents lookup, the credential-store
+  backends) — but they are *unexercised*, so never state or imply
+  support the project has not tested. Under P11 an untested platform
+  is an unclaimed capability, not a quiet promise. Claiming another
+  host means running the suite there, in CI or on real hardware —
+  the three gating jobs are itemized in ROADMAP "Horizon" under
+  host portability (U18 is the drafted case for reaching one from
+  here).
 - Keep lines near 79 columns and match existing formatting.
 - Prefer small public interfaces with lifecycle complexity kept behind them.
 - Preserve useful exception context and actionable diagnostics.

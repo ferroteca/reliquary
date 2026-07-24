@@ -3,6 +3,7 @@
 """Command-line parsing and dispatch."""
 
 import argparse
+import getpass
 import importlib.metadata
 import json
 import os
@@ -33,8 +34,9 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
                        start_machine, stop_machine)
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
-from .properties import (get_property, set_property, unset_property,
-                         list_properties, is_secret)
+from .credentials import CredentialError
+from .properties import (get_property, has_credential, set_property,
+                         unset_property, list_properties, is_secret)
 from .script_runner import (ScriptRuntimeError, check_script,
                             run_script, _resolve_key)
 from .script_nodes import ScriptParseError
@@ -168,6 +170,15 @@ def _add_home(parser):
     parser.add_argument(
         "--json", action="store_true",
         help="print the command's result as one JSON document")
+    return parser
+
+
+def _add_properties_file(parser):
+    """The properties file a command maintains, replacing the home's."""
+    parser.add_argument(
+        "--properties", default=None, metavar="PATH",
+        help="properties file to use instead of the home's "
+             "(secrets scope to this path)")
     return parser
 
 
@@ -332,23 +343,33 @@ def main(argv=None):
     command = subcommands.add_parser(
         "get-property", help="get a property")
     _add_home(command)
+    _add_properties_file(command)
     command.add_argument("key")
 
     command = subcommands.add_parser(
         "set-property", help="set a property")
     _add_home(command)
+    _add_properties_file(command)
     command.add_argument("key")
-    command.add_argument("value")
-    command.add_argument("--secret", action="store_true")
+    command.add_argument(
+        "value", nargs="?",
+        help="the value (omitted with --secret, which never takes "
+             "one on the command line)")
+    command.add_argument(
+        "--secret", action="store_true",
+        help="store a secret: prompted without echo on a terminal, "
+             "otherwise read from stdin")
 
     command = subcommands.add_parser(
         "unset-property", help="unset a property")
     _add_home(command)
+    _add_properties_file(command)
     command.add_argument("key")
 
     command = subcommands.add_parser(
         "list-properties", help="list properties")
     _add_home(command)
+    _add_properties_file(command)
     command.add_argument(
         "prefix", nargs="?",
         help="limit to this key and its dotted descendants")
@@ -777,8 +798,58 @@ def _property_text(value):
     return "@secret" if is_secret(value) else value
 
 
+def _properties_file(arguments):
+    return getattr(arguments, "properties", None)
+
+
+def _warn_missing_credentials(arguments, keys):
+    """Warn on stderr for secrets whose credential is absent.
+
+    The *result* is the properties projection — a secret is its
+    marker, on stdout, identical under ``--json``. Whether the host
+    store actually holds the value is a diagnostic about the host,
+    so it goes to stderr as a warning and never changes the result.
+    """
+    try:
+        missing = [key for key in keys
+                   if not has_credential(
+                       key, properties_file=_properties_file(arguments))]
+    except CredentialError as error:
+        print(f"reliquary: warning: {error}", file=sys.stderr)
+        return
+    for key in missing:
+        print(f"reliquary: warning: {key} is marked secret but has no "
+              f"credential on this host; set it with "
+              f"'rlq set-property {key} --secret'", file=sys.stderr)
+
+
+def _read_secret_value(key):
+    """Read a secret from the entry channel the context provides.
+
+    On a terminal, a no-echo prompt; otherwise stdin to EOF with one
+    trailing newline stripped, so a program can pipe the value in and
+    the CLI stays a complete binding. There is deliberately no
+    command-line argument: argv reaches process listings and shell
+    history, which are not credential stores.
+    """
+    if sys.stdin.isatty() and sys.stderr.isatty():
+        value = getpass.getpass(f"value for {key}: ", stream=sys.stderr)
+    else:
+        value = sys.stdin.read()
+        if value.endswith("\n"):
+            value = value[:-1]
+        if value.endswith("\r"):
+            value = value[:-1]
+    if not value:
+        raise ValueError(f"no value supplied for the secret {key!r}")
+    return value
+
+
 def _get_property(arguments):
-    value = get_property(arguments.key)
+    value = get_property(
+        arguments.key, properties_file=_properties_file(arguments))
+    if is_secret(value):
+        _warn_missing_credentials(arguments, [arguments.key])
 
     def render():
         if value is not None:
@@ -787,17 +858,37 @@ def _get_property(arguments):
 
 
 def _set_property(arguments):
-    set_property(arguments.key, arguments.value, secret=arguments.secret)
+    if arguments.secret:
+        if arguments.value is not None:
+            raise ValueError(
+                "set-property --secret takes no value argument: "
+                "process listings and shell history are not "
+                "credential stores; it prompts on a terminal and "
+                "reads stdin otherwise")
+        value = _read_secret_value(arguments.key)
+    else:
+        if arguments.value is None:
+            raise ValueError(
+                "set-property needs a value (or --secret)")
+        value = arguments.value
+    set_property(arguments.key, value, secret=arguments.secret,
+                 properties_file=_properties_file(arguments))
     return _emit(arguments, {}, lambda: None)
 
 
 def _unset_property(arguments):
-    unset_property(arguments.key)
+    unset_property(
+        arguments.key, properties_file=_properties_file(arguments))
     return _emit(arguments, {}, lambda: None)
 
 
 def _list_properties(arguments):
-    properties = list_properties(getattr(arguments, "prefix", None))
+    properties = list_properties(
+        getattr(arguments, "prefix", None),
+        properties_file=_properties_file(arguments))
+    secrets = [key for key, value in properties.items() if is_secret(value)]
+    if secrets:
+        _warn_missing_credentials(arguments, secrets)
 
     def render():
         if not properties:

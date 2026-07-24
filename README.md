@@ -85,13 +85,21 @@ starting with "The model at a glance" and its diagrams — and
 
 ## Installation
 
+**Windows is the supported host.** It is the platform Reliquary is
+developed and tested on. The host code is written portably and the
+paths for macOS and Linux hosts are there, but they are not
+exercised yet — so they are not claimed. (The *guest* side is a
+separate question: what a machine runs inside is up to its
+blueprint.)
+
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .
 ```
 
-On macOS or Linux, activate the environment with:
+On an untested host (macOS or Linux), activate the environment
+with:
 
 ```sh
 python3 -m venv .venv
