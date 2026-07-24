@@ -118,7 +118,7 @@ resolves differently than it did last release.
   both). **Gate:** one script bound from each tier in turn, each
   naming its source, and a noninteractive miss failing in
   preflight before the machine is created.
-- **T4 — the declared derivation rank.** Deliverable 5 (D20).
+- **T4 — the declared derivation rank — DONE.** Deliverable 5 (D20).
   `default=` candidates in declaration order, first-answerable
   wins, with static cycle detection, dead literal candidates and
   any secret involvement as static errors, and the `rlq.*` facts

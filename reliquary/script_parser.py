@@ -174,6 +174,7 @@ class Property:
     key: str
     kind: str = "text"
     prompt: Optional[StringLiteral] = None
+    defaults: Tuple[StringLiteral, ...] = ()
     line: int = 0
     column: int = 1
 
@@ -455,8 +456,20 @@ class _Builder(Transformer):
     def property_def(self, children):
         words = [child for child in children
                  if isinstance(child, LarkToken) and child.type == "NAME"]
+        items = [c for c in children if isinstance(c, tuple)]
+        # `default=` is the one repeatable modifier -- an ordered list of
+        # derivation candidates -- so it is split out before the generic
+        # single-value modifier check.
+        defaults = []
+        for name, value, line, column in items:
+            if name != "default":
+                continue
+            if value.type != "STRING":
+                raise ScriptParseError(
+                    line, "default must be a string", column)
+            defaults.append(value.reliquary.value)
         modifiers = _modifiers(
-            "property_def", [c for c in children if isinstance(c, tuple)])
+            "property_def", [item for item in items if item[0] != "default"])
         line = _line(words[0])
         if len(words) == 2:
             kind, key = str(words[0]), str(words[1])
@@ -471,8 +484,8 @@ class _Builder(Transformer):
             raise ScriptParseError(line, "prompt must be a string",
                                    words[0].column)
         return Property(key, kind,
-                        prompt.reliquary.value if prompt else None, line,
-                        words[0].column)
+                        prompt.reliquary.value if prompt else None,
+                        tuple(defaults), line, words[0].column)
 
     def http_def(self, children):
         modifiers = _modifiers(

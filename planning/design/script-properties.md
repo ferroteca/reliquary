@@ -19,12 +19,14 @@ SPDX-License-Identifier: BSD-3-Clause
 > / `properties_file=`, with credentials scoped by the selected
 > file's absolute path; and **binding into a run** — the layered
 > sources (flag, blueprint parameter with its redirect, environment
-> with collision preflight, file), the interactive ask, the
+> with collision preflight, file), the **declared derivation** —
+> `default=` candidates resolved over literal text, other declared
+> keys, and the `rlq.*` host facts, first-answerable-wins with
+> static cycle and dead-candidate checks — the interactive ask, the
 > kind rules, and the runtime secret rules (transcript and
 > diagnostic redaction; `check-script` naming each key's source,
-> never its value). Not yet: the declared derivation and its
-> `rlq.*` facts (T4), which slot between the file and the ask, and
-> `${key}` location references at create/apply (T5). Windows is the
+> never its value). Not yet: `${key}` location references at
+> create/apply (T5). Windows is the
 > only host whose credential backend is exercised (ROADMAP
 > "Horizon", host portability). Details may still change before
 > first release.

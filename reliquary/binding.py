@@ -27,7 +27,7 @@ hidden prompt.
 
 import os
 
-from . import credentials, properties
+from . import credentials, facts, properties
 
 class PropertyBindingError(ValueError):
     """A declared property could not be bound before the run."""
@@ -37,6 +37,7 @@ FLAG = "--property"
 PARAMETER = "blueprint parameter"
 ENVIRONMENT = "environment"
 FILE = "properties file"
+DERIVATION = "declared derivation"
 ASK = "interactive ask"
 
 def _env_name(key):
@@ -84,6 +85,8 @@ class _Binder:
         answer = self._explicit_answer(key, kind)
         if answer is None:
             answer = self._parameter_answer(key, kind)
+        if answer is None:
+            answer = self._derivation_answer(declaration)
         if answer is None:
             answer = self._ask(declaration)
         if answer is None:
@@ -162,6 +165,46 @@ class _Binder:
                 "an ordinary value under that key; store it as a secret")
         return (stored, FILE)
 
+    def _derivation_answer(self, declaration):
+        """The script's own answer: the first candidate that resolves.
+
+        Candidates are tried in declaration order; the first whose
+        references all resolve to non-empty values answers. A literal
+        candidate (no references) always answers, so it stops
+        resolution here. A candidate touching an empty or unavailable
+        fact — or a declared key that itself did not bind — does not
+        answer, and resolution falls through to the ask.
+        """
+        for candidate in declaration.defaults:
+            resolved = self._resolve_candidate(candidate)
+            if resolved is not None:
+                return (resolved, DERIVATION)
+        return None
+
+    def _resolve_candidate(self, candidate):
+        rendered = []
+        for part in candidate.parts:
+            if isinstance(part, str):
+                rendered.append(part)
+                continue
+            value = self._reference_value(part.key)
+            if not value:
+                return None
+            rendered.append(value)
+        return "".join(rendered)
+
+    def _reference_value(self, key):
+        """A derivation reference: a bound declared key, or an rlq fact.
+
+        Static validation (S6) guaranteed the key is one or the other,
+        so a fact lookup here never raises. A declared key not yet in
+        the bound set resolves to None — it did not answer — which the
+        dependency ordering makes deterministic.
+        """
+        if facts.is_fact(key):
+            return facts.resolve(key)
+        return self._values.get(key)
+
     def _explicit_answer(self, key, kind):
         if key not in self._explicit:
             return None
@@ -227,6 +270,33 @@ def _validate_explicit(declarations, explicit):
             raise PropertyBindingError(
                 f"--property {key}=... is not declared by this script")
 
+def _binding_order(declarations):
+    """Order declarations so a derivation's referents bind first.
+
+    A `default=` may reference another declared key's bound value, so
+    that key must resolve first. The order is a stable topological
+    sort over those edges — declaration order otherwise — and the
+    static acyclic guarantee (S6) means it always exists.
+    """
+    by_key = {d.key: d for d in declarations}
+    ordered = []
+    placed = set()
+
+    def place(declaration):
+        if declaration.key in placed:
+            return
+        placed.add(declaration.key)
+        for candidate in declaration.defaults:
+            for key in candidate.keys:
+                referent = by_key.get(key)
+                if referent is not None:
+                    place(referent)
+        ordered.append(declaration)
+
+    for declaration in declarations:
+        place(declaration)
+    return ordered
+
 def bind_properties(script, *, parameters=None, explicit=None,
                     properties_file=None, context=None, asker=None):
     """Bind every declared property, or fail closed naming the key.
@@ -242,7 +312,7 @@ def bind_properties(script, *, parameters=None, explicit=None,
     binder = _Binder(
         parameters=parameters, explicit=explicit,
         properties_file=properties_file, context=context, asker=asker)
-    for declaration in declarations:
+    for declaration in _binding_order(declarations):
         binder.bind(declaration)
     return binder.result()
 
@@ -263,6 +333,6 @@ def describe_sources(script, *, parameters=None, explicit=None,
         parameters=parameters, explicit=explicit,
         properties_file=properties_file, context=context, asker=None,
         dry_run=True)
-    for declaration in declarations:
+    for declaration in _binding_order(declarations):
         binder.bind(declaration)
     return binder.result().sources

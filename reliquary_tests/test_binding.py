@@ -261,6 +261,144 @@ class ExplicitValidationTests(unittest.TestCase):
         self.assertIn("stranger", str(caught.exception))
 
 
+class DerivationTests(unittest.TestCase):
+    """The declared derivation tier, between the file and the ask."""
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp()
+        self.previous = credentials._set_provider(FakeStore())
+        self.facts = {}
+        # Route rlq.* facts through a controlled table, so tests never
+        # depend on the host account.
+        import reliquary.facts as facts_module
+        self._real_resolve = facts_module.resolve
+        self._real_is_fact = facts_module.is_fact
+        facts_module.resolve = lambda key: self.facts.get(key)
+        facts_module.is_fact = lambda key: (
+            key in self.facts or key.startswith("rlq."))
+        self.facts_module = facts_module
+
+    def tearDown(self):
+        self.facts_module.resolve = self._real_resolve
+        self.facts_module.is_fact = self._real_is_fact
+        credentials._set_provider(self.previous)
+        shutil.rmtree(self.home)
+
+    def bind(self, text, **kwargs):
+        kwargs.setdefault("context", self.home)
+        return bind_properties(script(text), **kwargs)
+
+    def test_a_literal_default_answers(self):
+        bound = self.bind('property owner default="guest"\n')
+        self.assertEqual(bound.values["owner"], "guest")
+        self.assertEqual(bound.sources["owner"], binding.DERIVATION)
+
+    def test_a_fact_default_answers_when_available(self):
+        self.facts["rlq.host.username"] = "ada"
+        bound = self.bind(
+            'property owner default="${rlq.host.username}"\n')
+        self.assertEqual(bound.values["owner"], "ada")
+        self.assertEqual(bound.sources["owner"], binding.DERIVATION)
+
+    def test_an_unavailable_fact_falls_through_to_the_next_candidate(self):
+        self.facts["rlq.host.full-name"] = None  # empty, unanswerable
+        bound = self.bind(
+            'property owner default="${rlq.host.full-name}" '
+            'default="fallback"\n')
+        self.assertEqual(bound.values["owner"], "fallback")
+
+    def test_a_curated_fact_prefers_itself_over_a_raw_fallback(self):
+        self.facts["rlq.host.full-name"] = "Ada Lovelace"
+        self.facts["rlq.env.FULLNAME"] = "ada-env"
+        bound = self.bind(
+            'property owner default="${rlq.host.full-name}" '
+            'default="${rlq.env.FULLNAME}"\n')
+        self.assertEqual(bound.values["owner"], "Ada Lovelace")
+
+    def test_a_derivation_falls_to_the_ask_when_no_candidate_answers(self):
+        self.facts["rlq.host.full-name"] = None
+        bound = self.bind(
+            'property owner default="${rlq.host.full-name}"\n',
+            asker=lambda key, prompt, secret: "asked")
+        self.assertEqual(bound.values["owner"], "asked")
+        self.assertEqual(bound.sources["owner"], binding.ASK)
+
+    def test_an_outer_source_still_beats_the_derivation(self):
+        bound = self.bind(
+            'property owner default="guest"\n',
+            explicit={"owner": "explicit"})
+        self.assertEqual(bound.values["owner"], "explicit")
+        self.assertEqual(bound.sources["owner"], binding.FLAG)
+
+    def test_a_derivation_references_another_bound_property(self):
+        properties.set_property("company", "Acme", context=self.home)
+        bound = self.bind(
+            'property company\n'
+            'property banner default="Welcome to ${company}"\n')
+        self.assertEqual(bound.values["banner"], "Welcome to Acme")
+
+    def test_referents_bind_first_regardless_of_declaration_order(self):
+        # `banner` is declared before the `company` it references.
+        properties.set_property("company", "Acme", context=self.home)
+        bound = self.bind(
+            'property banner default="Welcome to ${company}"\n'
+            'property company\n')
+        self.assertEqual(bound.values["banner"], "Welcome to Acme")
+
+    def test_a_composed_default_needs_every_reference(self):
+        self.facts["rlq.host.username"] = "ada"
+        # The second reference is empty, so the whole candidate is
+        # unanswerable and the literal fallback wins.
+        self.facts["rlq.env.TEAM"] = None
+        bound = self.bind(
+            'property tag default="${rlq.host.username}-${rlq.env.TEAM}" '
+            'default="anon"\n')
+        self.assertEqual(bound.values["tag"], "anon")
+
+
+class DerivationValidationTests(unittest.TestCase):
+    """The static derivation rules (S5, S6)."""
+
+    def check(self, text):
+        from reliquary.script_validation import validate
+        validate(script(text))
+
+    def test_secret_with_default_is_rejected(self):
+        with self.assertRaises(Exception) as caught:
+            self.check('property secret pw default="x"\n')
+        self.assertIn("secret", str(caught.exception))
+
+    def test_a_literal_before_another_candidate_is_dead(self):
+        with self.assertRaises(Exception) as caught:
+            self.check(
+                'property owner default="here" '
+                'default="${rlq.host.username}"\n')
+        self.assertIn("dead", str(caught.exception))
+
+    def test_a_reference_to_an_undeclared_key_is_rejected(self):
+        with self.assertRaises(Exception) as caught:
+            self.check('property owner default="${nobody}"\n')
+        self.assertIn("nobody", str(caught.exception))
+
+    def test_a_reference_to_a_secret_is_rejected(self):
+        with self.assertRaises(Exception) as caught:
+            self.check(
+                'property secret pw\n'
+                'property owner default="${pw}"\n')
+        self.assertIn("secret", str(caught.exception))
+
+    def test_a_cycle_among_derivations_is_rejected(self):
+        with self.assertRaises(Exception) as caught:
+            self.check(
+                'property a default="${b}"\n'
+                'property b default="${a}"\n')
+        self.assertIn("cycle", str(caught.exception))
+
+    def test_an_rlq_fact_reference_is_accepted(self):
+        self.check('property owner default="${rlq.host.username}"\n')
+        self.check('property owner default="${rlq.env.USER}"\n')
+
+
 class DescribeSourcesTests(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.mkdtemp()

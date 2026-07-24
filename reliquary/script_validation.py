@@ -62,6 +62,7 @@ def validate(script):
     knows the document's path.
     """
     _properties(script)
+    _derivations(script)
     _http(script)
     _durations(script)
     _keys(script)
@@ -83,6 +84,85 @@ def _properties(script):
                 prop.line, f"duplicate property: {prop.key} (S5)",
                 prop.column)
         seen[prop.key] = prop
+
+
+def _derivations(script):
+    """The `default=` derivation rules (S5, S6).
+
+    Static because a derivation is not an expression: its answer is
+    knowable — or knowably unanswerable — before the run, so every
+    error it can carry is caught here rather than at binding time.
+    """
+    from . import facts
+    declared = {prop.key: prop for prop in script.properties}
+    for prop in script.properties:
+        if not prop.defaults:
+            continue
+        if prop.kind == "secret":
+            raise ScriptParseError(
+                prop.line,
+                f"a secret property may not carry default=: {prop.key} "
+                "(S5)", prop.column)
+        # A literal candidate (no references) always answers, so any
+        # candidate after it is dead code.
+        for candidate in prop.defaults[:-1]:
+            if not candidate.interpolated:
+                raise ScriptParseError(
+                    prop.line,
+                    f"a literal default= must be the last candidate; "
+                    f"those after it are dead: {prop.key} (S5)",
+                    prop.column)
+        for candidate in prop.defaults:
+            for key in candidate.keys:
+                _check_reference(prop, key, declared, facts)
+    _forbid_derivation_cycles(script, declared)
+
+
+def _check_reference(prop, key, declared, facts):
+    if facts.is_fact(key):
+        return
+    target = declared.get(key)
+    if target is None:
+        raise ScriptParseError(
+            prop.line,
+            f"default= for {prop.key} references {key!r}, which is "
+            "neither a declared property nor an rlq.* fact (S6)",
+            prop.column)
+    if target.kind == "secret":
+        raise ScriptParseError(
+            prop.line,
+            f"default= for {prop.key} references the secret {key!r}; "
+            "no derivation may reference a secret (S6)", prop.column)
+
+
+def _forbid_derivation_cycles(script, declared):
+    """A `${key}` chain among derivations must be acyclic (S6)."""
+    edges = {}
+    for prop in script.properties:
+        targets = set()
+        for candidate in prop.defaults:
+            targets.update(
+                key for key in candidate.keys if key in declared)
+        edges[prop.key] = targets
+    state = {}  # unvisited / "open" / "closed"
+
+    def visit(key, trail):
+        if state.get(key) == "closed":
+            return
+        if state.get(key) == "open":
+            cycle = " -> ".join(trail + [key])
+            prop = declared[key]
+            raise ScriptParseError(
+                prop.line,
+                f"default= derivations form a cycle: {cycle} (S6)",
+                prop.column)
+        state[key] = "open"
+        for target in edges.get(key, ()):
+            visit(target, trail + [key])
+        state[key] = "closed"
+
+    for key in edges:
+        visit(key, [])
 
 
 def _property_key(key, line, column):

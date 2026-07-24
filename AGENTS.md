@@ -109,13 +109,18 @@ workflow:
   `binding.py` resolves declared script properties before a run —
   the flattened source order (explicit `--property`, blueprint
   parameter with its `{"property": ...}` redirect, `RELIQUARY_PROPERTY_*`
-  environment with collision preflight, the properties file, then an
+  environment with collision preflight, the properties file, the
+  declared `default=` derivation, then an
   interactive ask), the text/media/secret kind rules, secret values
   pulled from the credential store, and `describe_sources` the dry
   twin that names each key's source for `check-script` without
-  binding or prompting; the declared derivation (between file and
-  ask) and `${key}` location references land with later milestone-8
-  stages. `script_runner.py` executes that tree against
+  binding or prompting; declarations bind in topological order so a
+  derivation's referents resolve first. `facts.py` owns the `rlq.*`
+  run facts a derivation may reference (`rlq.host.username`
+  login-normalized, `rlq.host.full-name`, `rlq.env.<NAME>` verbatim),
+  each an unanswerable-when-empty host value. `${key}` location
+  references land with the last milestone-8 stage.
+  `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys,

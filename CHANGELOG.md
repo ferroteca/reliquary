@@ -13,6 +13,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A script property can declare its own derivation with repeatable
+  `default=` candidates, tried in order — the first whose references
+  all resolve supplies the key, sitting between the properties file
+  and the interactive ask. A candidate may reference literal text,
+  another declared property (`${key}`), or an `rlq.*` host fact:
+  `rlq.host.username` (login-normalized), `rlq.host.full-name`, and
+  `rlq.env.<NAME>` (verbatim). An empty or unavailable fact is
+  unanswerable, so resolution falls through to the next candidate.
+  Static checks reject a `secret` with `default=`, a reference to a
+  secret or undeclared key, a candidate after a literal one (dead),
+  and a cycle among derivations. `check-script` names the derivation
+  as a key's source without running it.
+
 - Scripts bind the properties they declare. Before the machine
   starts, each declared property resolves from the first source that
   answers: a repeatable `--property KEY=VALUE` (never a secret —
