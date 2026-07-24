@@ -1,6 +1,7 @@
 # Reliquary
 
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue.svg)](https://www.python.org/downloads/)
 
 Reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
 produce bootable disk images without manual interaction. It can help execute one-off commands and capture the results.
