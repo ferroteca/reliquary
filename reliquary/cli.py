@@ -34,7 +34,7 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
 from .properties import (get_property, set_property, unset_property,
-                         list_properties)
+                         list_properties, is_secret)
 from .script_runner import (ScriptRuntimeError, check_script,
                             run_script, _resolve_key)
 from .script_nodes import ScriptParseError
@@ -349,6 +349,9 @@ def main(argv=None):
     command = subcommands.add_parser(
         "list-properties", help="list properties")
     _add_home(command)
+    command.add_argument(
+        "prefix", nargs="?",
+        help="limit to this key and its dotted descendants")
 
     # import-vm
     command = subcommands.add_parser(
@@ -769,12 +772,17 @@ def _delete_blueprint(arguments):
         lambda: print(f"deleted blueprint {arguments.name} ({path})"))
 
 
+def _property_text(value):
+    """Render one property value for a human. Secrets show their kind."""
+    return "@secret" if is_secret(value) else value
+
+
 def _get_property(arguments):
     value = get_property(arguments.key)
 
     def render():
         if value is not None:
-            print(value)
+            print(_property_text(value))
     return _emit(arguments, value, render)
 
 
@@ -789,14 +797,14 @@ def _unset_property(arguments):
 
 
 def _list_properties(arguments):
-    properties = list_properties()
+    properties = list_properties(getattr(arguments, "prefix", None))
 
     def render():
         if not properties:
             return
         key_width = max(len(key) for key in properties)
-        for key, value in sorted(properties.items()):
-            print(f"{key:<{key_width}}  {value}")
+        for key, value in properties.items():
+            print(f"{key:<{key_width}}  {_property_text(value)}")
     return _emit(arguments, properties, render)
 
 

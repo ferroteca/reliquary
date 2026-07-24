@@ -193,6 +193,65 @@ Set the boot order on a **stopped** machine (a launch-time firmware
 order). Persists in the machine state until the next `set-boot-order`
 or `apply-blueprint`.
 
+## User properties
+
+Values scripts consume without embedding them — a registered owner,
+a login name, a product key — live in `<home>/user.properties`, a
+flat file of `key = value` lines that belongs to you, not to any
+machine or script. Reliquary edits it *surgically*: your comments,
+blank lines, and ordering survive every command below untouched.
+
+Keys are dot-separated segments of ASCII letters, digits, `_` and
+`-`, each starting with a letter. The `rlq` and `reliquary`
+namespaces are reserved for Reliquary's own facts. Values are the
+trimmed remainder of the line, verbatim — no quoting, no escapes,
+no line continuations (despite the extension, this is not the Java
+properties format). A value starting with `@` names a value *kind*:
+`@secret` is a secret marker, and a literal leading `@` is written
+`@@`.
+
+```properties
+# reliquary user properties
+identity.full-name = Paul Galbraith
+identity.preferred-username = paul
+
+# the value lives in the host credential store, not here
+accounts.default-password = @secret
+```
+
+### `rlq list-properties [PREFIX]`
+
+List keys with their values, sorted. A secret shows as `@secret`,
+never its value. `PREFIX` selects that key and its dotted
+descendants — a namespace, not a raw string match, so
+`products.windows-98` matches `products.windows-98.install-key`
+but not `products.windows-98-extra`.
+
+### `rlq get-property <key>`
+
+Print one value. A secret prints only its kind.
+
+### `rlq set-property <key> <value>`
+
+Create or replace an ordinary property, rewriting or appending
+only that key's line. Changing a property between ordinary and
+secret requires `unset-property` first, so a secret can never be
+downgraded to a plaintext value by one command.
+
+### `rlq unset-property <key>`
+
+Remove a property, leaving the rest of the file as it was.
+
+A malformed properties file is reported with its path and line
+number and is never partly rewritten.
+
+> **Not yet:** secret *values* need the host credential store,
+> which has not landed. `set-property --secret` fails closed
+> rather than writing a value the file must never hold — there is
+> no plaintext fallback. Secret markers already read correctly, and
+> binding properties into a script run arrives with the rest of
+> milestone 8 (`planning/design/script-properties.md`).
+
 ## Keyboard and command input
 
 Guest-console verbs match the script language. Select a machine with

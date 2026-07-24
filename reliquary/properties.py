@@ -1,60 +1,260 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-import json
-import os
-from collections.abc import Mapping
+"""The user properties file.
 
-from . import jsonc
+`<reliquary_home>/user.properties` is a flat, user-owned file of
+`key = value` lines. A person edits it directly; Reliquary edits
+it *surgically* — every comment, blank line, and ordering choice
+outside the one line a command names survives untouched, which is
+why the format is line-based rather than JSON. The normative spec
+is planning/design/script-properties.md.
+
+Despite the familiar extension this is deliberately not the Java
+properties format: no unicode escapes, no line continuations, no
+quoting. A value is the trimmed remainder of its line, verbatim.
+
+Secret values never live in this file. A secret property's line
+carries the `@secret` marker and its value belongs to the host
+credential store, which lands with the store itself (milestone 8,
+T2 in planning/TASKS.md); until then a secret set fails closed
+rather than writing a value the file must never hold.
+"""
+
+import os
+import re
+import tempfile
+
+_SEGMENT = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
+_RESERVED = ("rlq", "reliquary")
+_SECRET_TOKEN = "@secret"
+
+class PropertiesError(ValueError):
+    """A malformed properties file, key, or value."""
+
+def secret_marker():
+    """Return the value a secret property presents as."""
+    return {"secret": True}
+
+def is_secret(value):
+    """Return True if a returned value is the secret marker."""
+    return isinstance(value, dict) and value.get("secret") is True
 
 def _properties_path(context=None):
     """Return the path to the user properties file."""
     from .home import _ctx
     return os.path.join(_ctx(context).home_dir(), "user.properties")
 
-def _load_properties(context=None):
-    """Load the user properties from disk."""
-    path = _properties_path(context)
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            value = jsonc.load(handle)
-    except (ValueError, UnicodeDecodeError):
-        return {}
-    if not isinstance(value, Mapping):
-        return {}
-    return dict(value)
+def check_key(key):
+    """Validate a property key, returning it.
 
-def _save_properties(properties, context=None):
-    """Save the user properties to disk."""
-    path = _properties_path(context)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(properties, handle, indent=4)
-        handle.write("\n")
+    Keys are dot-separated segments of ASCII letters, digits, `_`
+    and `-`, each starting with a letter, and the `rlq` and
+    `reliquary` namespaces are reserved for Reliquary's own facts.
+    """
+    if not isinstance(key, str) or not key:
+        raise PropertiesError("a property key is required")
+    segments = key.split(".")
+    for segment in segments:
+        if not _SEGMENT.match(segment):
+            raise PropertiesError(
+                f"invalid property key {key!r}: each segment starts "
+                "with a letter and continues with letters, digits, "
+                "'_' or '-'")
+    if segments[0] in _RESERVED:
+        raise PropertiesError(
+            f"invalid property key {key!r}: the {segments[0]!r} "
+            "namespace is reserved for Reliquary's own facts")
+    return key
+
+def _decode(text, path, number):
+    """Decode a value as written, or raise naming file and line."""
+    if text == _SECRET_TOKEN:
+        return secret_marker()
+    if text.startswith("@@"):
+        return text[1:]
+    if text.startswith("@"):
+        raise PropertiesError(
+            f"{path}:{number}: {text!r} is not a known value kind; "
+            "a leading '@' is reserved (write '@@' for a literal "
+            "'@')")
+    return text
+
+def _encode(value):
+    """Render a value as the file writes it."""
+    if is_secret(value):
+        return _SECRET_TOKEN
+    if not isinstance(value, str):
+        raise PropertiesError(
+            "a property value must be text; every ordinary value "
+            "is a string and the declaration provides the type")
+    if value != value.strip():
+        raise PropertiesError(
+            f"a property value may not lead or trail with "
+            f"whitespace: {value!r} would not read back as written "
+            "(the format has no quoting)")
+    if "\n" in value or "\r" in value:
+        raise PropertiesError(
+            "a property value is one line; it may not contain a "
+            "line break")
+    if value.startswith("@"):
+        return "@" + value
+    return value
+
+class _File:
+    """A parsed properties file that remembers how it was written."""
+
+    def __init__(self, path, lines, entries, ending="\n"):
+        self.path = path
+        self.lines = lines
+        self.entries = entries
+        self.ending = ending
+
+    def value(self, key):
+        entry = self.entries.get(key)
+        return None if entry is None else entry[1]
+
+    def projection(self):
+        return {key: value for key, (_, value) in self.entries.items()}
+
+    def set(self, key, value):
+        """Rewrite or append the one line this key owns."""
+        line = f"{key} = {_encode(value)}"
+        entry = self.entries.get(key)
+        if entry is None:
+            self.lines.append(line)
+            index = len(self.lines) - 1
+        else:
+            index = entry[0]
+            self.lines[index] = line
+        self.entries[key] = (index, value)
+
+    def unset(self, key):
+        """Delete the one line this key owns, if it has one."""
+        entry = self.entries.pop(key, None)
+        if entry is None:
+            return False
+        index = entry[0]
+        del self.lines[index]
+        self.entries = {
+            other: ((position - 1) if position > index else position, value)
+            for other, (position, value) in self.entries.items()}
+        return True
+
+    def save(self):
+        """Write the file atomically, creating its directory."""
+        directory = os.path.dirname(self.path)
+        os.makedirs(directory, exist_ok=True)
+        handle = tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="", dir=directory,
+            prefix=".user.properties.", delete=False)
+        try:
+            with handle:
+                for line in self.lines:
+                    handle.write(line + self.ending)
+            os.replace(handle.name, self.path)
+        except BaseException:
+            try:
+                os.unlink(handle.name)
+            except OSError:
+                pass
+            raise
+
+def _read(path):
+    """Parse the properties file, or raise naming path and line.
+
+    A file that does not parse is never partly rewritten: every
+    caller reads the whole file before it edits a line of it.
+    """
+    lines = []
+    entries = {}
+    ending = os.linesep if os.linesep in ("\n", "\r\n") else "\n"
+    if os.path.exists(path):
+        try:
+            # newline="" keeps the file's own line endings visible, so a
+            # hand-edited CRLF file is not silently rewritten as LF.
+            with open(path, "r", encoding="utf-8", newline="") as handle:
+                text = handle.read()
+        except UnicodeDecodeError as error:
+            raise PropertiesError(
+                f"{path}: the properties file is not UTF-8") from error
+        if text:
+            ending = "\r\n" if "\r\n" in text else "\n"
+        lines = [line.rstrip("\r") for line in text.split("\n")]
+        # A file's final newline terminates its last line rather than
+        # starting an empty one; save() writes one back.
+        if lines and lines[-1] == "":
+            lines.pop()
+    for index, line in enumerate(lines):
+        number = index + 1
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        key, separator, written = line.partition("=")
+        if not separator:
+            raise PropertiesError(
+                f"{path}:{number}: expected 'key = value', a comment, "
+                "or a blank line")
+        key = key.strip()
+        try:
+            check_key(key)
+        except PropertiesError as error:
+            raise PropertiesError(f"{path}:{number}: {error}") from error
+        if key in entries:
+            first = entries[key][0] + 1
+            raise PropertiesError(
+                f"{path}:{number}: duplicate property {key!r}, first "
+                f"defined on line {first}")
+        entries[key] = (index, _decode(written.strip(), path, number))
+    return _File(path, lines, entries, ending)
 
 def get_property(key, context=None):
-    """Return the value of the named property, or None."""
-    return _load_properties(context).get(key)
+    """Return the named property's value, or None if it has none.
+
+    A secret returns its marker, never its value — exactly what
+    the `--json` rendering serializes.
+    """
+    check_key(key)
+    return _read(_properties_path(context)).value(key)
 
 def set_property(key, value, secret=False, context=None):
-    """Set the value of the named property.
+    """Create or replace a property, preserving the rest of the file.
 
-    If secret is True, the value should be stored in the host's
-    protected credential store (milestone 6). For now, it's just
-    in the JSON file.
+    Changing a property between ordinary and secret requires
+    `unset_property` first, so a secret can never be downgraded to
+    a plaintext value by a single command.
     """
-    properties = _load_properties(context)
-    properties[key] = value
-    _save_properties(properties, context)
+    check_key(key)
+    if secret:
+        raise NotImplementedError(
+            "secret properties need the host credential store, which "
+            "has not landed yet; there is no plaintext fallback")
+    properties = _read(_properties_path(context))
+    current = properties.value(key)
+    if is_secret(current):
+        raise PropertiesError(
+            f"{key!r} is a secret property; unset it first to store "
+            "an ordinary value under that key")
+    properties.set(key, value)
+    properties.save()
 
 def unset_property(key, context=None):
-    """Remove the named property."""
-    properties = _load_properties(context)
-    if key in properties:
-        del properties[key]
-        _save_properties(properties, context)
+    """Remove a property, preserving the rest of the file."""
+    check_key(key)
+    properties = _read(_properties_path(context))
+    if properties.unset(key):
+        properties.save()
 
-def list_properties(context=None):
-    """Return a dictionary of all defined properties."""
-    return _load_properties(context)
+def list_properties(prefix=None, context=None):
+    """Return the properties projection: key to value or marker.
+
+    A prefix selects that key and its dotted descendants — it is a
+    namespace, not a raw string match.
+    """
+    properties = _read(_properties_path(context)).projection()
+    if prefix is None:
+        return dict(sorted(properties.items()))
+    check_key(prefix)
+    selected = {
+        key: value for key, value in properties.items()
+        if key == prefix or key.startswith(prefix + ".")}
+    return dict(sorted(selected.items()))

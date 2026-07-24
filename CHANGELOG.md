@@ -13,6 +13,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `user.properties` is now the line-based, user-owned format its
+  spec describes: `key = value` lines, `#` comments, blank lines,
+  dotted keys validated (segments of letters, digits, `_` and `-`,
+  each letter-initial; the `rlq` and `reliquary` namespaces
+  reserved), and values taken verbatim as the trimmed remainder of
+  the line — no quoting, escapes, or continuations. A leading `@`
+  marks a value *kind*: `@secret` is the secret marker, `@@` a
+  literal `@`. Property commands edit the file surgically — every
+  comment, blank line, and ordering choice outside the named key
+  survives — and write atomically. A malformed file is reported
+  with its path and line and is never partly rewritten.
+  `list-properties` gained its `[PREFIX]` argument, selecting a key
+  and its dotted descendants.
+
 - Published the machine-state JSON Schema
   (`planning/design/machine-state.schema.json`) for
   `reliquary-machine.json`, alongside the blueprint and
@@ -261,6 +275,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `set-property --secret` no longer writes the secret's value into
+  `user.properties` in plaintext. Secret values belong to the host
+  credential store, which has not landed yet, so the command now
+  fails closed — there is no plaintext fallback. (The previous
+  behavior accepted `--secret` and ignored it.)
 - Usage/help text now names whichever entry point was actually
   invoked (`reliquary -h` says `usage: reliquary ...`, `rlq -h`
   says `usage: rlq ...`) instead of always hardcoding `rlq`.

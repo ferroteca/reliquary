@@ -5,10 +5,18 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Script properties
 
-> **Status:** this documents the planned script-properties
-> mechanism — its sources and the user properties file. None of it
-> is implemented yet; details may still
-> change before first release.
+> **Status:** normative for the script-properties mechanism — its
+> sources and the user properties file — and landing across
+> milestone 8 (planning/TASKS.md holds the stage order). Implemented
+> so far: the **user properties file** itself — the line format,
+> the key rules, the `@` value kinds, the surgical
+> comment-preserving edits, and the four maintenance verbs with
+> their API twins ("Property names and values", "Maintaining
+> properties"). Not yet: secret storage (the host credential
+> store — a secret set fails closed, never falling back to
+> plaintext), the layered sources and their binding into a run,
+> the declared derivation and its `rlq.*` facts, and the runtime
+> secret rules. Details may still change before first release.
 
 Script properties carry the values scripts consume without
 embedding them:

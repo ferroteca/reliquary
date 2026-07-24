@@ -163,6 +163,32 @@ survive stop/start:
   can locate, verified against the media's pin and recorded as
   `supplied`. Returns the cached path. CLI twin: `add-media`.
 
+## User properties
+
+The `<home>/user.properties` file, edited surgically — comments,
+blank lines, and ordering outside the named key are preserved.
+Malformed files raise `PropertiesError` (a `ValueError`) naming the
+path and line, and are never partly rewritten.
+
+- `get_property(key, context=None)` - The value, or `None`. A secret
+  returns its marker `{"secret": True}`, never its value — exactly
+  what `--json` serializes. CLI twin: `get-property`.
+- `set_property(key, value, secret=False, context=None)` - Create or
+  replace a property, rewriting or appending only that key's line.
+  Changing a property between ordinary and secret raises; unset it
+  first. CLI twin: `set-property`.
+- `unset_property(key, context=None)` - Remove a property. CLI twin:
+  `unset-property`.
+- `list_properties(prefix=None, context=None)` - The properties
+  projection, key to value-or-marker, sorted. `prefix` selects that
+  key and its dotted descendants. CLI twin: `list-properties`.
+- `is_secret(value)` / `secret_marker()` - Recognize and build the
+  secret marker. `check_key(key)` validates a property key.
+
+Secret *values* need the host credential store, which has not
+landed: `set_property(..., secret=True)` raises
+`NotImplementedError` rather than writing plaintext.
+
 ## Scripts and runs
 
 - `parse_script(source, path="<script>")` / `load_script(path)` -

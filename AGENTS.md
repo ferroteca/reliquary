@@ -45,6 +45,20 @@ workflow:
   attachment closure: a container goes once its children are cached), and `add_media(name, file)` (the guarded
   door for payloads nothing can locate) — with no `delete_media`: removing a media is editing the `.rlqb` that
   declares it (D30),
+  `properties.py` owns the user properties file — the line-based
+  `<home>/user.properties` (`key = value`, `#` comments, dotted
+  letter-initial keys with the `rlq`/`reliquary` namespaces reserved,
+  values verbatim to end of line, a leading `@` naming a value kind:
+  `@secret` the marker, `@@` a literal `@`), parsed whole before any
+  edit so a malformed file is never partly rewritten (`PropertiesError`
+  naming path and line), edited surgically line by line — comments,
+  blanks, and ordering preserved — and written atomically;
+  `get_property` / `set_property` / `unset_property` /
+  `list_properties(prefix)` are the verbs, a secret reading as the
+  marker `{"secret": True}` and never a value. Secret *storage* (the
+  host credential store) and property *binding* into a run are the
+  rest of milestone 8; a secret set raises rather than falling back to
+  plaintext,
   `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`

@@ -27,8 +27,9 @@ from .machines import (apply_blueprint, create, create_machine,
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
 from .resolve import load_namespace
-from .properties import (get_property, set_property, unset_property,
-                         list_properties)
+from .properties import (PropertiesError, check_key, get_property,
+                         is_secret, list_properties, secret_marker,
+                         set_property, unset_property)
 from .script_nodes import ScriptParseError
 from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
@@ -46,6 +47,7 @@ __all__ = [
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
+    "PropertiesError",
     "Phase",
     "Property",
     "Statement",
@@ -65,6 +67,9 @@ __all__ = [
     "insert_media",
     "blueprints_dir",
     "cache_dir",
+    "check_key",
+    "is_secret",
+    "secret_marker",
     "add_media",
     "clean_media",
     "documents_dir",
