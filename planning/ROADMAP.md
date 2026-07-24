@@ -1373,12 +1373,13 @@ first, now-superseded surface. Milestone 4 is complete: the
 tree speaks the July 2026 redesign. Milestone 5 (complete) added
 Packer's local HTTP server for installer answer files, and
 Milestone 6 (complete) delivered the instance model and machine
-blueprints with authored-asset residency. Milestone 7 folds the
-blueprint and media formats into one composable blueprint (the
-2026-07-23 composition round); milestones 8–9 then complete the
-documented design — the script properties, and run records with
-asynchronous runs — still for the DOS platform on the QEMU
-backend alone.
+blueprints with authored-asset residency. Milestone 7 (complete)
+folded the blueprint and media formats into one composable
+blueprint (the 2026-07-23 composition round); milestones 8–9
+then complete the documented design — the script properties,
+and run records with asynchronous runs — still for the DOS
+platform on the QEMU backend alone. **Milestone 8 is the
+current one.**
 
 Generalizing beyond that vertical is **backlog work, not yet
 scheduled** (owner, 2026-07-23, for lack of use-case backing —
@@ -1922,7 +1923,28 @@ alone; a process killed mid-operation is detected and recovered
 per the instance model; blueprint edits round-trip through
 `apply-blueprint` with drive-regenerating changes failing closed.
 
-### Milestone 7 — The composed blueprint model
+### Milestone 7 — The composed blueprint model (complete)
+
+> **Complete** (2026-07-23), landed in six stages: S0 the
+> launching-point renames (D21), S1 blueprint-model.md as the
+> normative model, S2 the conformance corpus written against it
+> before the parser, S3 the format core as one landing —
+> `document.py`, `resolve.py`, `acquire.py`, the codex and
+> example blueprints, the one schema — S4 the cache rework and
+> its media command family (D30), S5 the remaining spec
+> realignment by dividing the job. The sprint breakdown was
+> pruned from planning/TASKS.md on landing per its own rule;
+> git history and D21/D22/D30/D32 carry the detail. D32 came
+> out of S2 running against S3 — a corpus and a parser written
+> from one spec, differentially testing that spec.
+>
+> Done-when verified 2026-07-23: the FreeDOS install script ran
+> end to end against a machine freshly materialized from a
+> composed-format `.rlqb` (inline anonymous blank hdd, empty
+> cdrom, the LiveCD through its zip), the verify script booted
+> the installed system to `C:\>` and powered it off, and
+> `prune-media` afterward left exactly the attachment closure —
+> the extracted ISO cached, the zip husk gone.
 
 Realign the authored surface to the composed blueprint model as
 revised by the second 2026-07-23 design round (DECISIONS.md, "THE
@@ -2171,6 +2193,24 @@ conformance corpus.
 All of [planning/design/script-properties.md](design/script-properties.md)
 — the sources script-declared properties bind through. Small and
 independently useful.
+
+Demanded by **U5** — customization is what properties are for,
+and this milestone is where the author's run-specific data
+(owner names, login names, product keys) stops being embedded in
+scripts; scheduling here is U5's acceptance, and delivery is
+what returns it to the current list. It is likewise **P13**'s
+acceptance (property sources — the layered chain, custody and
+provenance over a frozen order), P13 joining the standing list
+when this lands. Also serving **U4** twice — the
+project-committed properties file a `--properties` run reads,
+which is "the repository defines everything except what it must
+not contain", and the `RELIQUARY_PROPERTY_*` injection path a CI
+harness uses without provisioning a home — with **P4** (that
+same hermetic file is the artifact-residency split applied to
+values), **P6** and **P7** (the twins, and the stdin secret path
+that exists precisely so the CLI stays a complete binding), and
+**P12** (the file lives in the home; credentials scope by its
+absolute path).
 
 Deliverables:
 

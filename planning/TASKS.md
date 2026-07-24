@@ -28,8 +28,8 @@ records live in
 [DECISIONS.md](DECISIONS.md). Completed milestone
 task-breakdowns are pruned once the milestone lands — the
 record survives in git history, DECISIONS.md, and the ROADMAP
-milestone notes (the milestone-4 and milestone-6 breakdowns
-were pruned 2026-07-23).
+milestone notes (the milestone-4, -6, and -7 breakdowns were
+pruned 2026-07-23).
 
 ## Planning docs
 
@@ -47,103 +47,112 @@ were pruned 2026-07-23).
   audit, which found the milestone's whole justification
   sitting in retired D17.
 
-## Milestone 7 — the composed blueprint model
+## Milestone 8 — script properties
 
-The sprint tasklist, translated from ROADMAP milestone 7 (owner,
-2026-07-23). The roadmap holds the *what*; this holds the
-**landing order**, which is not the deliverable numbering — the
-deliverables are a list of work, and three of them cannot land
-apart from each other. Read the roadmap's deliverable text for
-each item's substance; only the sequencing argument lives here.
+The sprint tasklist, translated from ROADMAP milestone 8. The
+roadmap holds the *what* and
+[script-properties.md](design/script-properties.md) the
+normative detail; this holds the **landing order**, which is not
+the deliverable numbering. Only the sequencing argument lives
+here.
 
-**The constraint that shapes everything:** `resolve.py` is built
-on the four kind buckets, `acquire.py` on `Source`/`Archive`, and
-the codex blueprints, the example blueprint, and the conformance
-fixtures are all authored in the retired shape — `bare-machine`
-does not merely need editing, it becomes *invalid* (an untyped
-lone object is a media now, D22). The moment `document.py`'s root
-changes, every one of them fails together. So the format core is
-**one landing**, and stages 0–2 exist to make it as small as it
-can honestly be.
+**What shapes this one:** nothing must land as one piece — the
+milestone is new capability over a stub (`properties.py` today
+is a JSON file with a `set_property(secret=)` parameter that
+does nothing with it), so each stage is independently green.
+What does bind the order is that two decisions are expensive to
+retrofit: the **credential scope key** (the properties file's
+absolute path) and the **rank of a source**. Both are cheap to
+get right the first time and silently corrupting to change
+later — an orphaned credential nobody can name, or a bundle that
+resolves differently than it did last release.
 
-- **S0 — the launching-point renames — DONE** (deliverable 8's rename
-  half, D21). The codex entries went generic — blueprints
-  `freedos` and `openbsd`, media `freedos-livecd` and
-  `openbsd-installer`, scripts named for the flow they drive —
-  with the mentions across script-spec, machine-blueprint.md,
-  cli.md, docs and tests following. Purely mechanical,
-  independent of the format, green throughout — and doing it
-  first meant S3 re-authors those files without also renaming
-  them. (The exact before/after is in D21 and the CHANGELOG;
-  this bullet deliberately does not restate the old names,
-  having been caught by its own sweep once.)
-- **S1 — blueprint-model.md rewritten — DONE** (deliverable 1). Docs
-  only. Folds D22, D24, D26, D27 into one normative document,
-  replacing the superseded first-round shape its banner
-  disclaims.
-- **S2 — the conformance corpus re-authored — DONE** (deliverable 6's
-  corpus half) against S1's spec, staged in a directory the
-  corpus test does not yet walk so the suite stays green. This
-  is the parser's acceptance test, written before the parser.
-  Cover at least: the typed root array and the lone-object
-  sugar; an untyped lone object reading as media; `children`
-  batch and child-side `parent`; inline and anonymous media at
-  drives; stem-derived names, the repair warning, and the
-  unrepairable failure; identity-dedup versus collision; every
-  `location` string form and its object desugaring; and the
-  reference-grammar refusals — the closed vocabularies, and an
-  operator-bearing `${…}` body, which is P14's acceptance test.
-- **S3 — the format core, one landing — DONE** (deliverables 2 and 3,
-  the corpus wired, the schema, and deliverable 8's re-authoring
-  half). `document.py` rewritten; `resolve.py` collapsed from
-  four kind buckets to the one catalog with containment
-  resolution and two-phase validation; `acquire.py` on
-  parent/children with the roster gate; `machines.py` giving the
-  anonymous blank its slot name; both codex blueprints and the
-  example blueprint re-authored with explicit `type`; the corpus
-  moved into place and the old fixtures deleted; the one
-  two-variant schema replacing the two (it cannot lag — the
-  corpus checks both); `.rlqm` retired and `test_old_surface_purge`
-  extended to it and to `sources`/`archives`; and
-  test_document / test_resolve / test_acquire / test_assets /
-  test_library brought over. **Gate:** the full suite plus the
-  FreeDOS install integration run, which is the milestone's own
-  "done when" for this half.
-- **S4 — the cache rework and its command family — DONE** (deliverable
-  4). The single name-keyed `cache/media/` with `cache/archives/`
-  retired, the identity ledger, the deterministic preflight
-  identity check feeding the on-mismatch contract, and
-  `clean-media` / `clean-media <name>` / `prune-media` /
-  `add-media` with their API twins. Separable from S3 and the
-  milestone's one piece of new capability. **Gate:**
-  `prune-media` after the install leaves exactly the attachment
-  closure.
-- **S5 — the remaining spec realignment — DONE** (deliverable 7).
-  These documents legitimately follow the code, INTERFACES.md and
-  the AGENTS module paragraph included. Realigned by **dividing the
-  job**, not by updating four descriptions of one format:
-  blueprint-model.md is the normative model, machine-blueprint.md
-  the guide, its reference the per-field detail, media-spec.md
-  acquisition and the cache, the cookbook recipes. Restated model
-  prose was deleted rather than corrected — D32 is what the
-  alternative costs. `test_documented_examples.py` now runs every
-  documented example through the parser and the schema, so the
-  prose cannot drift from the format silently again.
+- **T1 — the properties file.** Deliverable 1. Replace the JSON
+  stub with the line-based format: `key = value`, `#` full-line
+  comments, blank lines, the `@secret` marker and `@@` literal
+  escape, dot-separated letter-initial segments with the `rlq` /
+  `reliquary` namespaces refused, comment- and order-preserving
+  surgical edits, atomic writes. Invalid files report path and
+  line and are never partly rewritten. Pure host-side and fully
+  unit-testable — no credential store, no binding. **Gate:** a
+  file with comments, blank lines, and a deliberate ordering
+  survives a set and an unset with everything but the named line
+  untouched.
+- **T2 — the credential store and the command family.**
+  Deliverables 2 and 3, **plus `--properties <path>` pulled
+  forward from deliverable 4**. Use the `keyring` package rather
+  than hand-rolling Credential Manager / Keychain / Secret
+  Service; its `(service, username)` model takes the spec's
+  scoping directly — properties-file path as service, property
+  name as username — behind a thin Reliquary-owned seam, so an
+  absent or unusable store fails closed and there is never a
+  plaintext fallback. The four commands with their secret rules
+  (no-echo prompt on a tty, stdin to EOF otherwise, empty
+  rejected; get and list never revealing; prefix filtering by
+  dotted descendants, not string prefix; a kind change requiring
+  `unset-property` first), the fail-safe update order
+  (credential before marker, marker before credential) and
+  orphan reporting. API twins in the same commit (P6), including
+  the named divergence — `set_property` takes a secret's value
+  in-process, because argv is what the CLI's entry channels
+  exist to avoid. **Why `--properties` lands here and not in
+  T4:** credentials scope by the selected file's absolute path,
+  so the scoping rule is untestable without it, and changing a
+  scope key after credentials exist orphans every one of them.
+  **Gate:** the milestone's own — secrets round-trip with no
+  secret material in the file, and an interrupted update can
+  leave neither a plaintext value nor a marker whose credential
+  was reported bound but is absent.
+- **T3 — the binding pipeline.** Deliverable 4: the flattened
+  order minus derivation — flag > parameter > env > file > ask.
+  It lands where `script_runner.py` today raises "property
+  binding arrives with the property family", and reaches
+  preflight (every failure before a media materializes or a
+  machine starts), `check-script` (each key's supplying source
+  named, never its value), and the runtime secret rules
+  (transcripts record key and source only; diagnostics redact;
+  failure screenshots suppressed for the rest of a run after
+  secret entry). Env mangling with the fail-closed collision
+  preflight over the keys a run actually consults; blueprint
+  `parameters` direct and redirect (`document.py` already parses
+  both). **Gate:** one script bound from each tier in turn, each
+  naming its source, and a noninteractive miss failing in
+  preflight before the machine is created.
+- **T4 — the declared derivation rank.** Deliverable 5 (D20).
+  `default=` candidates in declaration order, first-answerable
+  wins, with static cycle detection, dead literal candidates and
+  any secret involvement as static errors, and the `rlq.*` facts
+  (`host.username` login-normalized, `host.full-name`,
+  `rlq.env.<NAME>`; an empty fact is unanswerable by design).
+  The grammar already parses the modifier — this is semantics.
+  Deliberately after T3: it is a one-rank insertion between file
+  and ask, which is the model's own claim (D19 — new tiers land
+  at fixed ranks) getting its first real test. **Gate:** a
+  derivation-backed key binds with no ask, naming its winning
+  candidate as the supplying source.
+- **T5 — `${key}` location references.** Deliverable 6. The
+  grammar landed at milestone 7 parsing-only, failing closed
+  naming properties; now it binds through T3's order at `create`
+  / `apply`, with the resolved location recorded in the state
+  and never re-adopted at `start`, no chaining (a resolved value
+  that is itself a reference fails closed), and noninteractive
+  misses naming both the media and the key. Last because it is
+  the only consumer outside scripts and wants the order settled
+  under it. **Gate:** a media whose `location` is `${key}`
+  materializes, with the resolved location in the machine state.
 
-Deliverable 5 needs no stage: it landed with milestone 6.
+Cross-cutting, every stage: docs and CHANGELOG land with the
+code (AGENTS "Documentation maintenance"), and
+script-properties.md's status banner — *"None of it is
+implemented yet"* — comes off as its sections land. A banner
+that outlives the code it disclaims is the wrong-instruction
+failure DECISIONS.md's preamble names.
 
 ## Future implementation hints
 
 - The error taxonomy under parity (ROADMAP milestone 9):
   `ReliquaryError` the root; `StaticError(2)` / `PreflightError(3)`
   / `RunFailure(4)` / `RunCancelled(5)`.
-- `user.properties` and the property command family (ROADMAP
-  milestone 8): use the `keyring` package for the protected host
-  credential store rather than hand-rolling Windows Credential
-  Manager / macOS Keychain / Secret Service backends; its
-  `(service, username)` model takes the spec's scoping directly —
-  the properties-file path as the service, the property name as
-  the username.
 
 ## Language
 
