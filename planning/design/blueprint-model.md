@@ -17,8 +17,10 @@ SPDX-License-Identifier: BSD-3-Clause
 > `location` field (the source type retired), no composition
 > (identity-dedup), and the single-directory identity-ledger
 > cache. The DECISIONS entry is normative for the revised model
-> until this document is rewritten (ROADMAP milestone 7,
-> deliverable 6); the sections below describe the superseded
+> until this document is rewritten — **ROADMAP milestone 7,
+> deliverable 1**, which now leads the milestone so the rest is
+> built against a spec rather than against four chained decision
+> entries (D22, D24, D26, D27); the sections below describe the superseded
 > first-round shape, and the existing specs
 > ([machine-blueprint.md](machine-blueprint.md), its
 > [field reference](machine-blueprint-reference.md),

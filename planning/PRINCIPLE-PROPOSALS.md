@@ -161,7 +161,7 @@ landed code — the language is the constrained one it was
 designed to be, growing under G7 — and the property channel in
 normative design, its refusal written before this round found
 it. ONLY THE SPEC CHANNEL WAITS, and on one deliverable:
-milestone 7's first, honored when the parser refuses an
+milestone 7's parser, honored when it refuses an
 operator-bearing reference. The milestone's citation of P14 is
 this acceptance, and P14 joins the standing list when the
 milestone lands. What is deliberately NOT in it: how far a

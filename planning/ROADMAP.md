@@ -1921,7 +1921,8 @@ revised by the second 2026-07-23 design round (DECISIONS.md, "THE
 BLUEPRINT REVISION ROUND" — it supersedes the first round's
 four-component shape before any of it was implemented, and is
 normative for the model until blueprint-model.md is rewritten,
-deliverable 6). Milestone 6 completed on the pre-composition
+which deliverable 1 now does before anything is built against
+it). Milestone 6 completed on the pre-composition
 formats; this milestone folds the machine blueprint and the media
 definition into one `.rlqb` format of two spec types — machine
 and media — and lands the consequent cache and materialization
@@ -1951,7 +1952,20 @@ of one; the source type and composition declined).
 
 Deliverables:
 
-1. The revised `.rlqb` parser/validator: the root an array of
+1. **blueprint-model.md rewritten as the revised model's worked
+   design** — folding D22, D24, D26 and D27 into one normative
+   document, replacing the superseded first-round shape its
+   banner currently disclaims. This leads the milestone rather
+   than trailing it (it was deliverable 6's first half) because
+   everything below is built against it, and building against
+   four chained decision entries instead is how `document.py`
+   came to hold 730 lines of the first-round model that D22
+   superseded the same afternoon — a spec is what an
+   implementation gets checked against, and the check is not
+   available until the spec exists. The rest of the spec
+   realignment stays where it was, at deliverable 7: those
+   documents legitimately follow the code.
+2. The revised `.rlqb` parser/validator: the root an array of
    specs (a lone spec object accepted as sugar for the array of
    one, same rules — an untyped lone object is a media);
    `type` optional defaulting to `media`, a machine
@@ -2009,7 +2023,7 @@ Deliverables:
    non-string coercion now land; `${key}` binding is deferred to
    milestone 8 (failing closed naming properties until then).
    `.rlqm` retired. All fail-closed, naming the problem.
-2. Media and materialization realigned (media.py / machines.py):
+3. Media and materialization realigned (media.py / machines.py):
    the `materialize` modes (`new`/`difference`/`copy`/`use`),
    `read-only` (default true on cdrom), conditional `sha256`,
    recursive child extraction under the container-format
@@ -2018,7 +2032,7 @@ Deliverables:
    materializations under `cache/machines/<id>/media/` keyed by
    media name — slot name for the anonymous blank — so
    removable-slot swaps never clobber.
-3. The cache rework: the single name-keyed `cache/media/`
+4. The cache rework: the single name-keyed `cache/media/`
    (`cache/archives/` retired), the identity ledger (recorded
    sha256, derivation keys, provenance
    refetchable/derived/supplied, source lineage), the
@@ -2030,20 +2044,20 @@ Deliverables:
    (attachment-closure prune; scope-relative; `--dry-run`), and
    `add-media <name> <file>` (the guarded door — a pinned
    unlocated media resolves by cache hit).
-4. The machine directory reorganization: `drives/` → `media/`,
+5. The machine directory reorganization: `drives/` → `media/`,
    backend files into a backend-named subdir,
    `reliquary-machine.json` → `machine.json` with `vm.json` folded
    in as a while-running state section written atomically with
    `phase`.
-5. One published blueprint JSON Schema — the two-variant root,
+6. One published blueprint JSON Schema — the two-variant root,
    machine requiring its declared `type`, media accepting its
    absence — replacing the two milestone-6 schemas; the
    conformance corpus reworked to the revised format. The closed
    vocabularies stay plain `enum`s, never widened to admit a
    reference pattern — which is what D26's reach trim buys, and
    the completion it protects is the point (U4, U5).
-6. The specs realigned as normative: blueprint-model.md rewritten
-   first as the revision's worked design, then
+7. The remaining specs realigned as normative (blueprint-model.md
+   having led at deliverable 1):
    machine-blueprint.md + field reference + cookbook,
    media-spec.md (the location grammar, the readings, and
    parent/children containment replacing the source/archive
@@ -2051,7 +2065,7 @@ Deliverables:
    instance-model.md, INTERFACES.md (its blueprint entry still
    describes the retired four-component shape), and the AGENTS /
    ROADMAP home-layout descriptions.
-7. The codex and `planning/examples/` re-authored to the revised
+8. The codex and `planning/examples/` re-authored to the revised
    format — explicit `type` on every spec (the good-code
    doctrine: the format doesn't enforce it, the shipped corpus
    models it) — and renamed to the launching-point doctrine
