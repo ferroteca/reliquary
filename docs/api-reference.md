@@ -38,9 +38,8 @@ results belongs to the caller.
   call within one process. The CLI only ever drives the
   process-global default via `--home`/`--cache`/`--assets` — scoped
   `Context` objects are an embedding-API-only capability.
-- `assets=` selects where authored assets (blueprints and their
-  media/source/archive components, plus scripts) resolve from: a
-  directory path is a
+- `assets=` selects where authored assets (blueprints, media
+  included, plus scripts) resolve from: a directory path is a
   hermetic project root walked recursively by extension (the sole
   source — no home, no codex, no seeding), and `HOME_ASSETS` is
   home mode (the home's canonical folders plus codex seeding). The
@@ -51,8 +50,8 @@ results belongs to the caller.
   `set_assets(dir)` set the process-global; the CLI sets it from
   `--assets` (home mode when absent).
 - Path helpers, each accepting `context=None`: `blueprints_dir`,
-  `media_dir`, `scripts_dir`, `cache_dir`, `archives_cache_dir`,
-  `media_cache_dir`, and `machines_cache_dir`.
+  `scripts_dir`, `cache_dir`, `media_cache_dir`, and
+  `machines_cache_dir`.
 
 All state lives under the home, except the regenerable cache,
 which lives under the (independently resolvable) cache root.
@@ -117,32 +116,34 @@ survive stop/start:
 
 ## Blueprints (composed documents)
 
-- `parse_document(value, *, stem=None)` /
-  `load_document(path)` - Parse and validate a composed `.rlqb`
-  document (a bare-root machine, or the `machines` / `media` /
-  `sources` / `archives` sections); return `Document`, whose
-  `machines` / `media` / `sources` / `archives` are dicts by name.
+- `parse_document(value)` / `load_document(path)` - Parse and
+  validate a `.rlqb` document: an array of specs, or a lone spec
+  object as sugar for the array of one. Returns `Document`, whose
+  `machines` and `media` are dicts by name. `type` defaults to
+  `media`, so a machine declares `"type": "machine"`.
 - `load_namespace(context=None)` - Build the merged `(name, type)`
-  resolution namespace from every `.rlqb` in the active source;
-  `resolve_machine`/`create` and media resolution read it. (The
-  namespace-level `resolve_media(name, namespace)` lives in
-  `reliquary.resolve`.)
+  catalog from every `.rlqb` in the active source;
+  `resolve_machine`/`create` and media resolution read it.
+  Canonically identical specs of one identity coexist across files;
+  differing ones collide. (The catalog-level
+  `resolve_media(name, namespace)` lives in `reliquary.resolve`.)
 - `new_blueprint(name, *, platform="dos", context=None)` - Scaffold a
-  home ``blueprints/<name>.rlqb`` (a bare-root machine). CLI twin:
-  `new-blueprint`.
+  home ``blueprints/<name>.rlqb``. CLI twin: `new-blueprint`.
 - `delete_blueprint(name, *, context=None)` - Remove the home blueprint
   file; fails closed while any machine of it exists. Never touches
   package builtins. CLI twin: `delete-blueprint`.
-- Component types live in `reliquary.document`: `Media`, `Source`,
-  `Archive`, `Locator`, `Machine`.
+- Spec types live in `reliquary.document`: `Machine`, `Media`,
+  `MachineDrive`, `Location`, `Reference`, and `Deferred` — the last
+  carrying a value that still holds `${...}` references, finished at
+  resolution rather than at parse.
 
 ## Media
 
 - `fetch_media(name, context=None, on_mismatch="fail")` - Resolve a
-  media by name against the namespace and return its verified
-  payload path, fetching on demand — cheapest source first: a
-  verifying payload as-is, a verifying cached archive re-extracted,
-  then the mirror URLs. Every file is SHA-256-verified before use.
+  media by name against the catalog and return its verified payload
+  path, fetching on demand — a verifying cached payload as-is, a
+  verifying cached container re-extracted, then the mirror rungs in
+  order. Every file is SHA-256-verified before use.
   `on_mismatch` is `"fail"` (default), `"prompt"` (interactive
   delete-and-refetch checkpoint), or `"refetch"` (pre-approved
   deletion); a mismatched file whose media names no source is
@@ -150,10 +151,17 @@ survive stop/start:
 - `list_media(context=None, *, builtin=False)` - Sorted media names
   from the namespace, or the package codex when ``builtin=True``.
   CLI twin: `list-media`.
-- `clean_archives(context=None)` / `clean_media(context=None)` -
-  Reclaim the cached source archives (`cache/archives/`) and cached
-  payloads (`cache/media/`). CLI twins: `clean-archives`,
-  `clean-media`.
+- `clean_media(name=None, *, context=None)` - Reclaim cached
+  payloads, returning the names reclaimed. Blunt with no name,
+  sparing `supplied` payloads and anything a running machine holds;
+  targeted with one. CLI twin: `clean-media`.
+- `prune_media(*, context=None, dry_run=False)` - Drop cached
+  payloads outside the attachment closure, returning the names
+  pruned (or, under `dry_run`, the names that would be). CLI twin:
+  `prune-media`.
+- `add_media(name, path, *, context=None)` - Supply a payload nothing
+  can locate, verified against the media's pin and recorded as
+  `supplied`. Returns the cached path. CLI twin: `add-media`.
 
 ## Scripts and runs
 

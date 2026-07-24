@@ -15,8 +15,8 @@ appear before or after the command word.
 - `--home <path>` - Override the Reliquary home directory
 - `--cache <path>` - Override the cache directory (default:
   `<home>/cache`)
-- `--assets <dir>` - Resolve authored assets (blueprints, with
-  their media/source/archive components, and scripts) solely from
+- `--assets <dir>` - Resolve authored assets (blueprints, media
+  included, and scripts) solely from
   this project root, walked recursively by extension — no home, no
   codex, no seeding. Its absence is home mode: the home's canonical
   `blueprints/` / `scripts/` folders, seeding missing names from the
@@ -141,19 +141,41 @@ runs as well. Static errors exit 2.
 
 ### `rlq list-media [--builtin]`
 
-List media names resolvable from the active source (the `media`
-components across its `.rlqb` files). With ``--builtin``, list
-package codex media instead.
+List media names resolvable from the active source (the media specs
+across its `.rlqb` files). With ``--builtin``, list package codex
+media instead.
 
 ### `rlq fetch-media <name>`
 
 Resolve a media by name and fetch and verify its payload into the
 cache.
 
-### `rlq clean-archives` / `rlq clean-media`
+### `rlq clean-media [<name>]`
 
-Reclaim the cached source archives (`cache/archives/`) or the
-cached media payloads (`cache/media/`).
+Reclaim cached payloads from `cache/media/`. With no argument it is
+blunt: everything the project can fetch or derive again goes. A
+**supplied** payload — one you put there with `add-media`, which
+nothing can reproduce — is spared, and so is anything a running
+machine is holding open. Naming a media evicts just that one,
+whatever its provenance.
+
+### `rlq prune-media [--dry-run]`
+
+Drop cached payloads outside the **attachment closure**: what the
+active scope can still attach stays, and what only existed to produce
+it goes. After an install, that means the extracted ISO stays and the
+zip it came out of does not — re-deriving the husk is one download
+away, and it is usually the larger file. `--dry-run` reports what
+would go without touching anything.
+
+### `rlq add-media <name> <file>`
+
+Supply a payload nothing can locate. A blueprint may pin a `sha256`
+for media it cannot legally distribute; resolution fails closed until
+someone provides the file. This copies it into the cache under the
+media's own name, verified against the pin, so the blueprint never has
+to be edited. The payload is recorded as **supplied** and is not
+reclaimed unless you name it.
 
 ### `rlq insert-media <slot> <media> (--blueprint NAME | --machine ID)`
 

@@ -29,10 +29,15 @@ workflow:
   namespace from every `.rlqb` in the active source (`load_namespace` / `build_namespace`, cross-file collision
   detection), resolves a media by name (`resolve_media`), and lowers it to a nested fetch plan
   (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,
-  on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the `cache/archives/` and
-  `cache/media/` caches, attaching a `local` source in place, `media.py` is acquisition-only — `fetch_media(name,
-  context, on_mismatch)` and `list_media` over the namespace, plus `clean_archives` / `clean_media` (there is no
-  `delete_media`: removing a media is editing the `.rlqb` that declares it — D30),
+  on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the one `cache/media/`
+  cache, keyed by the name of the media each file is, recording provenance in `ledger.py`'s identity ledger
+  (`refetchable` / `derived` / `supplied`, with a derived payload's `(parent-sha, path)` derivation key) and
+  attaching a `local` payload in place, `media.py` is acquisition-only — `fetch_media(name,
+  context, on_mismatch)` and `list_media` over the namespace, plus the cache family — `clean_media(name=None)`
+  (blunt, sparing `supplied` and running attachments; targeted when named), `prune_media(dry_run=)` (the
+  attachment closure: a container goes once its children are cached), and `add_media(name, file)` (the guarded
+  door for payloads nothing can locate) — with no `delete_media`: removing a media is editing the `.rlqb` that
+  declares it (D30),
   `library.py` owns the codex — the built-in seed library
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
@@ -226,8 +231,8 @@ unrelated cache state file):
 
 - `blueprints/` — composed blueprints, media components included (`blueprints_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
-- `cache/archives/` — cached source archives (`archives_cache_dir`), under the cache root
-- `cache/media/` — cached media payloads (`media_cache_dir`), under the cache root
+- `cache/media/` — every cached payload (`media_cache_dir`), keyed by media name, under the cache root, with
+  the identity ledger (`.ledger.json`) recording what each file is
 - `cache/machines/<name>-<n>/` — machine materializations (`machines_cache_dir`;
   parent via `cache_dir`), under the cache root, each with `machine.json` (the
   resolved state; while running its `vm` section carries the live VM identity,

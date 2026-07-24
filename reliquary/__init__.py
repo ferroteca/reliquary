@@ -5,7 +5,7 @@
 from .blueprint import delete_blueprint, new_blueprint
 from .cli import main
 from .document import Document, load_document, parse_document
-from .home import (HOME_ASSETS, Context, archives_cache_dir,
+from .home import (HOME_ASSETS, Context,
                    blueprints_dir, cache_dir, documents_dir, home,
                    machines_cache_dir, media_cache_dir,
                    scripts_dir, set_assets, set_cache, set_home)
@@ -24,8 +24,8 @@ from .machines import (apply_blueprint, create, create_machine,
                        recreate_machine, resolve_machine, set_boot_order,
                        start_machine,
                        stop_machine)
-from .media import (fetch_media, clean_archives, clean_media,
-                    list_media)
+from .media import (add_media, fetch_media, clean_media, list_media,
+                    prune_media)
 from .resolve import load_namespace
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
@@ -63,10 +63,9 @@ __all__ = [
     "eject_media",
     "get_machine_dir",
     "insert_media",
-    "archives_cache_dir",
     "blueprints_dir",
     "cache_dir",
-    "clean_archives",
+    "add_media",
     "clean_media",
     "documents_dir",
     "find_qemu",
@@ -90,6 +89,7 @@ __all__ = [
     "media_cache_dir",
     "new_blueprint",
     "parse_document",
+    "prune_media",
     "parse_script",
     "recreate_machine",
     "resolve_machine",

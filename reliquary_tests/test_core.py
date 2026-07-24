@@ -48,8 +48,6 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(reliquary.scripts_dir(),
                          os.path.join(root, "scripts"))
         self.assertEqual(reliquary.cache_dir(), cache)
-        self.assertEqual(reliquary.archives_cache_dir(),
-                         os.path.join(cache, "archives"))
         self.assertEqual(reliquary.media_cache_dir(),
                          os.path.join(cache, "media"))
         self.assertEqual(reliquary.machines_cache_dir(),
@@ -65,8 +63,6 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(reliquary.scripts_dir(context=root),
                          os.path.join(root, "scripts"))
         self.assertEqual(reliquary.cache_dir(context=root), cache)
-        self.assertEqual(reliquary.archives_cache_dir(context=root),
-                         os.path.join(cache, "archives"))
         self.assertEqual(reliquary.media_cache_dir(context=root),
                          os.path.join(cache, "media"))
         self.assertEqual(reliquary.machines_cache_dir(context=root),

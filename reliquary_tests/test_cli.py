@@ -688,12 +688,39 @@ class CliMachineLifecycleTests(unittest.TestCase):
         send.assert_called_once_with(
             [["ret"], ["ctrl", "c"]], 1234)
 
-    def test_clean_archives(self):
-        with mock.patch("reliquary.cli.clean_archives") as clean, \
+    def test_clean_media_passes_an_optional_name(self):
+        with mock.patch("reliquary.cli.clean_media",
+                        return_value=[]) as clean, \
                 contextlib.redirect_stdout(io.StringIO()):
-            result = cli.main(["clean-archives", "--home", self.home])
-        self.assertEqual(result, 0)
-        clean.assert_called_once_with()
+            self.assertEqual(
+                cli.main(["clean-media", "--home", self.home]), 0)
+            clean.assert_called_once_with(None)
+            clean.reset_mock()
+            self.assertEqual(
+                cli.main(["clean-media", "livecd", "--home", self.home]), 0)
+            clean.assert_called_once_with("livecd")
+
+    def test_prune_media_dry_run_reports_without_pruning(self):
+        with mock.patch("reliquary.cli.prune_media",
+                        return_value=["husk"]) as prune, \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(
+                cli.main(["prune-media", "--dry-run", "--home", self.home]),
+                0)
+        prune.assert_called_once_with(dry_run=True)
+        self.assertIn("husk", out.getvalue())
+
+    def test_add_media_supplies_a_payload(self):
+        payload = os.path.join(self.home, "supplied.iso")
+        with open(payload, "wb") as handle:
+            handle.write(b"ISO")
+        with mock.patch("reliquary.cli.add_media",
+                        return_value=payload) as add, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(
+                cli.main(["add-media", "win", payload,
+                          "--home", self.home]), 0)
+        add.assert_called_once_with("win", payload)
 
 
 if __name__ == "__main__":

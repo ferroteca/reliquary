@@ -94,6 +94,41 @@ class AcquireTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             acquire.fetch_media(ns.media["x"], ns, context=Context(cache="."))
 
+    def test_extraction_records_its_derivation_in_the_ledger(self):
+        """A derived payload records what produced it, not just its hash.
+
+        The derivation key is what lets the cache answer "is this the
+        file this blueprint means?" without re-deriving it.
+        """
+        from reliquary import ledger
+
+        with tempfile.TemporaryDirectory() as root:
+            payload = b"PAYLOAD"
+            container = os.path.join(root, "outer.zip")
+            with zipfile.ZipFile(container, "w") as bundle:
+                bundle.writestr("inner/p.img", payload)
+            container_sha = _sha(_read(container))
+
+            doc = parse_document([{
+                "name": "outer", "location": {"local": container},
+                "sha256": container_sha,
+                "children": [{"path": "inner/p.img", "name": "p",
+                              "sha256": _sha(payload)}]}])
+            ns = resolve.namespace_of(doc)
+            ctx = Context(cache=os.path.join(root, "cache"))
+            acquire.fetch_media(ns.media["p"], ns, context=ctx)
+
+            entry = ledger.entry("p", ctx)
+            self.assertEqual(entry["provenance"], ledger.DERIVED)
+            self.assertEqual(entry["sha256"], _sha(payload))
+            self.assertEqual(entry["derivation"]["parent"], "outer")
+            self.assertEqual(entry["derivation"]["path"], "inner/p.img")
+            self.assertEqual(entry["derivation"]["parent-sha"], container_sha)
+            # The container here is local: used in place, never copied
+            # into the cache, so there is nothing for the ledger to
+            # describe. Only cached files get entries.
+            self.assertIsNone(ledger.entry("outer", ctx))
+
 
 if __name__ == "__main__":
     unittest.main()

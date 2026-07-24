@@ -2071,7 +2071,8 @@ Deliverables:
    the recorded follow-on). (U4 — the rig built from committed
    definitions alone; U1 for the seeded install that rides the
    same path.)
-4. The cache rework: the single name-keyed `cache/media/`
+4. The cache rework — **delivered**: the single name-keyed
+   `cache/media/`
    (`cache/archives/` retired), the identity ledger (recorded
    sha256, derivation keys, provenance
    refetchable/derived/supplied, source lineage), the

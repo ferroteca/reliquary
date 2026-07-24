@@ -129,6 +129,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **One media cache, with an identity ledger.** Every cached payload
+  now lives in `cache/media/`, keyed by the name of the media it is —
+  a container is a media like any other, so `cache/archives/` retires
+  along with `clean-archives` / `clean_archives()` and
+  `archives_cache_dir()`. Beside the payloads, a ledger records what
+  each cached file actually is: the sha256 observed when it was
+  written, its provenance (`refetchable`, `derived`, `supplied`), the
+  source it came from, and for a derived payload the
+  `(parent-sha, path)` that produced it. That turns the pre-fetch
+  identity check from a bare hash comparison into a diagnosis: a
+  version bump and two projects sharing one media name now read
+  differently, and a `supplied` payload is never deleted on a policy,
+  because nothing could put it back.
+- **The media cache commands.** `clean-media` reclaims what can be
+  fetched or derived again, sparing `supplied` payloads and anything
+  a running machine holds open; `clean-media <name>` evicts one
+  deliberately. `prune-media [--dry-run]` keeps the **attachment
+  closure** — what the active scope can still attach — and drops what
+  only existed to produce it, so after an install the extracted ISO
+  stays and the zip husk goes. `add-media <name> <file>` supplies a
+  payload nothing can locate, verified against the blueprint's pin
+  and recorded `supplied`. API twins throughout:
+  `clean_media(name=None)`, `prune_media(dry_run=)`,
+  `add_media(name, path)`.
 - **Codex names are generic, never version-bound.** The codex is a
   launching point for real blueprints, so its entries are named for
   the system and the version lives inside the file as the source

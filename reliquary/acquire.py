@@ -22,7 +22,7 @@ import sys
 import zipfile
 from urllib.request import urlopen
 
-from . import resolve
+from . import ledger, resolve
 from .home import media_cache_dir
 
 _CHUNK = 1024 * 1024
@@ -45,25 +45,32 @@ def _cached_name(name, extension):
     return name + ("." + extension if extension else "")
 
 
-def _approve_refetch(path, actual, expected, on_mismatch):
-    """Gate deleting an existing cached file that fails verification."""
+def _approve_refetch(name, actual, expected, on_mismatch, source, context):
+    """Gate deleting an existing cached file that fails verification.
+
+    The ledger supplies the diagnosis: a bare hash comparison cannot
+    tell a version bump from two projects sharing one media name, and
+    those want different fixes. A ``supplied`` payload is never
+    deleted on a policy — nothing could put it back.
+    """
+    explanation = ledger.explain(name, expected, actual, source=source,
+                                 context=context)
+    if ledger.provenance(name, context) == ledger.SUPPLIED:
+        raise RuntimeError(explanation)
     if on_mismatch == "refetch":
-        print(f"existing file {path} does not match its defined hash; "
-              "deleting for refetch", file=sys.stderr)
+        print(explanation + "\ndeleting for refetch", file=sys.stderr)
         return
     if on_mismatch == "prompt":
         try:
             answer = input(
-                f"Existing file {path} does not match its defined hash "
-                f"(SHA-256 {actual}, expected {expected}). Delete it and "
-                f"fetch again? [y/N] ")
+                explanation + "\nDelete it and fetch again? [y/N] ")
         except EOFError:
             answer = ""
         if answer.strip().lower() in ("y", "yes"):
             return
     raise RuntimeError(
-        f"existing file {path} has SHA-256 {actual}, expected {expected}; "
-        "delete it, or pre-approve with on_mismatch='refetch'")
+        explanation
+        + "\ndelete it, or pre-approve with on_mismatch='refetch'")
 
 
 def _download(url, destination):
@@ -117,30 +124,54 @@ def _run(plan, name, extension, context, on_mismatch):
                                _cached_name(name, extension))
 
     if isinstance(plan, resolve.Download):
-        if os.path.exists(destination):
-            actual = _sha256(destination)
-            if plan.sha256 is None or actual == plan.sha256:
-                return destination
-            _approve_refetch(destination, actual, plan.sha256, on_mismatch)
-            os.remove(destination)
+        if _cache_hit(destination, name, plan.sha256, on_mismatch,
+                      plan.url, context):
+            return destination
         _download(plan.url, destination)
         _verify(destination, plan.sha256, f"downloaded {name!r}")
+        ledger.record(name, filename=os.path.basename(destination),
+                      sha256=plan.sha256 or _sha256(destination),
+                      provenance=ledger.REFETCHABLE, source=plan.url,
+                      context=context)
         return destination
 
     if isinstance(plan, resolve.Extract):
-        if os.path.exists(destination):
-            actual = _sha256(destination)
-            if plan.sha256 is None or actual == plan.sha256:
-                return destination
-            _approve_refetch(destination, actual, plan.sha256, on_mismatch)
-            os.remove(destination)
+        if _cache_hit(destination, name, plan.sha256, on_mismatch,
+                      f"{plan.parent}/{plan.member}", context):
+            return destination
         container = _run(plan.inner, plan.parent, _plan_ext(plan.inner),
                          context, on_mismatch)
         _extract(container, plan.member, destination)
         _verify(destination, plan.sha256, f"extracted {name!r}")
+        ledger.record(
+            name, filename=os.path.basename(destination),
+            sha256=plan.sha256 or _sha256(destination),
+            provenance=ledger.DERIVED,
+            source=f"{plan.parent}/{plan.member}",
+            derivation={"parent": plan.parent, "path": plan.member,
+                        "parent-sha": _sha256(container)},
+            context=context)
         return destination
 
     raise TypeError(f"unknown plan step: {plan!r}")
+
+
+def _cache_hit(destination, name, expected, on_mismatch, source, context):
+    """Whether the cached file is already the one wanted.
+
+    This is the deterministic preflight identity check: it runs before
+    any network or extraction work, and a mismatch is explained from the
+    ledger rather than merely reported.
+    """
+    if not os.path.exists(destination):
+        return False
+    actual = _sha256(destination)
+    if expected is None or actual == expected:
+        return True
+    _approve_refetch(name, actual, expected, on_mismatch, source, context)
+    os.remove(destination)
+    ledger.forget(name, context)
+    return False
 
 
 def _describe(plan):

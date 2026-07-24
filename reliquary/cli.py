@@ -31,8 +31,8 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
                        recreate_machine, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
-from .media import (fetch_media, clean_archives, clean_media,
-                    list_media)
+from .media import (add_media, fetch_media, clean_media, list_media,
+                    prune_media)
 from .properties import (get_property, set_property, unset_property,
                          list_properties)
 from .script_runner import (ScriptRuntimeError, check_script,
@@ -54,8 +54,8 @@ _COMMANDS = frozenset({
     "get-property", "set-property", "unset-property",
     "list-properties", "import-vm", "list-blueprints",
     "list-machines", "list-scripts", "list-media",
-    "clean-archives",
-    "clean-media", "insert-media", "eject-media", "set-boot-order",
+    "clean-media", "prune-media", "add-media",
+    "insert-media", "eject-media", "set-boot-order",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
 })
@@ -379,14 +379,26 @@ def main(argv=None):
     _add_home(command)
     command.add_argument("--builtin", action="store_true")
 
-    # clean-*
-    command = subcommands.add_parser(
-        "clean-archives", help="reclaim cached source archives")
-    _add_home(command)
-
+    # cache reclamation
     command = subcommands.add_parser(
         "clean-media", help="reclaim cached media payloads")
     _add_home(command)
+    command.add_argument(
+        "name", nargs="?",
+        help="evict just this media (default: everything reclaimable)")
+
+    command = subcommands.add_parser(
+        "prune-media", help="drop cached payloads outside the closure")
+    _add_home(command)
+    command.add_argument(
+        "--dry-run", action="store_true",
+        help="report what would be pruned, without pruning it")
+
+    command = subcommands.add_parser(
+        "add-media", help="supply a payload nothing can locate")
+    _add_home(command)
+    command.add_argument("name", help="the media the file supplies")
+    command.add_argument("file", help="the payload file")
 
     # state ops
     command = subcommands.add_parser(
@@ -792,14 +804,26 @@ def _import_vm(arguments):
     raise NotImplementedError("import-vm is not yet implemented")
 
 
-def _clean_archives(arguments):
-    clean_archives()
-    return _emit(arguments, {}, lambda: print("cleaned archives cache"))
-
-
 def _clean_media(arguments):
-    clean_media()
-    return _emit(arguments, {}, lambda: print("cleaned media cache"))
+    reclaimed = clean_media(getattr(arguments, "name", None))
+    return _emit(
+        arguments, reclaimed,
+        lambda: _print_names(reclaimed, "(nothing to reclaim)"))
+
+
+def _prune_media(arguments):
+    pruned = prune_media(dry_run=arguments.dry_run)
+    verb = "would prune" if arguments.dry_run else "pruned"
+    return _emit(
+        arguments, pruned,
+        lambda: _print_names(pruned, f"({verb} nothing)"))
+
+
+def _add_media(arguments):
+    path = add_media(arguments.name, arguments.file)
+    return _emit(
+        arguments, path,
+        lambda: print(f"supplied {arguments.name} ({path})"))
 
 
 def _insert_media(arguments):
@@ -867,10 +891,12 @@ def _dispatch(arguments):
         return _list_scripts(arguments)
     if arguments.command == "list-media":
         return _list_media(arguments)
-    if arguments.command == "clean-archives":
-        return _clean_archives(arguments)
     if arguments.command == "clean-media":
         return _clean_media(arguments)
+    if arguments.command == "prune-media":
+        return _prune_media(arguments)
+    if arguments.command == "add-media":
+        return _add_media(arguments)
     if arguments.command == "insert-media":
         return _insert_media(arguments)
     if arguments.command == "eject-media":

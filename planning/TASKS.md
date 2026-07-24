@@ -81,7 +81,7 @@ can honestly be.
   only. Folds D22, D24, D26, D27 into one normative document,
   replacing the superseded first-round shape its banner
   disclaims.
-- **S2 — the conformance corpus re-authored** (deliverable 6's
+- **S2 — the conformance corpus re-authored — DONE** (deliverable 6's
   corpus half) against S1's spec, staged in a directory the
   corpus test does not yet walk so the suite stays green. This
   is the parser's acceptance test, written before the parser.
@@ -93,7 +93,7 @@ can honestly be.
   `location` string form and its object desugaring; and the
   reference-grammar refusals — the closed vocabularies, and an
   operator-bearing `${…}` body, which is P14's acceptance test.
-- **S3 — the format core, one landing** (deliverables 2 and 3,
+- **S3 — the format core, one landing — DONE** (deliverables 2 and 3,
   the corpus wired, the schema, and deliverable 8's re-authoring
   half). `document.py` rewritten; `resolve.py` collapsed from
   four kind buckets to the one catalog with containment
@@ -109,7 +109,7 @@ can honestly be.
   test_library brought over. **Gate:** the full suite plus the
   FreeDOS install integration run, which is the milestone's own
   "done when" for this half.
-- **S4 — the cache rework and its command family** (deliverable
+- **S4 — the cache rework and its command family — DONE** (deliverable
   4). The single name-keyed `cache/media/` with `cache/archives/`
   retired, the identity ledger, the deterministic preflight
   identity check feeding the on-mismatch contract, and

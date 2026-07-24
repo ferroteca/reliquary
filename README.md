@@ -399,18 +399,27 @@ rlq list-machines --home $scratch
 ```text
 rlq list-media [--builtin]
 rlq fetch-media NAME
-rlq clean-archives
-rlq clean-media
+rlq clean-media [NAME]
+rlq prune-media [--dry-run]
+rlq add-media NAME FILE
 ```
 
-`list-media` names the `media` components resolvable from the active
-source (or the package codex with `--builtin`). `fetch-media` resolves
-a media by name and warms its cached payload. `clean-archives` and
-`clean-media` reclaim the cached source archives (`cache/archives/`)
-and payloads (`cache/media/`); both are safe — anything with a source
-refetches. (Media are components inside a `.rlqb` now, so there is no
-`delete-media` command — removing one means editing the blueprint that
-declares it.)
+`list-media` names the media resolvable from the active source (or the
+package codex with `--builtin`). `fetch-media` resolves one by name and
+warms its cached payload.
+
+Everything cached lives in one place, `cache/media/`, keyed by the name
+of the media it is — a container is a media like any other, so there is
+no separate archive cache. `clean-media` reclaims what can be fetched
+or derived again; `prune-media` is the informed version, keeping what
+the scope can still attach and dropping what only existed to produce
+it, so after an install the extracted ISO stays and the zip husk goes.
+`add-media` is the door for payloads nothing can locate — a licensed
+ISO you cannot redistribute — verified against the blueprint's pin and
+then never reclaimed behind your back.
+
+(Media are specs inside a `.rlqb` now, so there is no `delete-media`
+command — removing one means editing the blueprint that declares it.)
 
 ### Keyboard and command input
 
