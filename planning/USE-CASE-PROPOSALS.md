@@ -165,8 +165,11 @@ moved from the current list 2026-07-23 (owner:
 implemented-only). The programmatic loop itself runs
 agentlessly on QEMU/DOS today, but the first-class demands —
 granular results, selective re-run — ride milestone 8's
-properties and milestone 9's run records and interaction runs,
-and the preferred guest-agent plane is milestone 12. The split
+properties and milestone 9's run records and interaction runs.
+The preferred guest-agent plane left the numbered arc for the
+backlog 2026-07-23 (D33) — a preference this case states, not
+a demand it makes: the loop runs agentlessly today, and the
+demands that gate delivery are 8's and 9's. The split
 superseding it (U14 + U15) is drafted below. Text verbatim as
 adopted:
 
@@ -285,12 +288,17 @@ form, ready to move verbatim on delivery.
 
 **U7 — Materialize on the hypervisor the host provides** —
 drafted (add, 2026-07-23). The gap: the backend-adapter
-pillar — roadmap milestones 10 and 11 and the GUI era's
-remaining backends — has no use-case demand; VirtualBox,
+pillar — the adapter seam, the second backend, and the GUI
+era's remaining backends — has no use-case demand; VirtualBox,
 VMware, and Hyper-V appear in the current list only as export
 targets (U1), import sources (U2), and guest-agent vendors
-(U3), never as run substrates. On acceptance, the ROADMAP
-backend-adapter section and milestones 10–11 cite U7.
+(U3), never as run substrates. The seam and the second backend
+left the numbered arc for the backlog on this very lack, the
+same day this draft was written (formerly milestones 10–11;
+D33). Accepting U7 is scheduling that pair back onto the arc,
+the citing item the acceptance record; on acceptance the
+ROADMAP backend-adapter section and both returning milestones
+cite U7.
 
 > - **U7 — Materialize on the hypervisor the host provides.** A
 >   blueprint and its scripts are written once; the hosts that

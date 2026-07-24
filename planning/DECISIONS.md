@@ -48,6 +48,57 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D33 — THE NUMBERED ARC ENDS AT MILESTONE 9 — DECIDED (owner,
+  2026-07-23). Supports P8; applies D23's acceptance-is-scheduling
+  rule and follows the ground D23 itself set when machine
+  mobility left the arc. Milestones 10, 11, and 12 — the backend
+  adapter seam, the second backend (VirtualBox), and guest agent
+  communication — leave the numbered arc for the backlog. Nine
+  is now the last numbered milestone, and everything past the
+  DOS-on-QEMU vertical is unscheduled.
+  THE REASON IS DEMAND, NOT DOUBT: the multi-backend pillar has
+  no in-force use case. Its demand is the U7 draft — materialize
+  on the hypervisor the host provides — and a draft schedules
+  nothing; U7's own note already said the citing milestones
+  would be 10–11, which under D23 makes the scheduling and the
+  acceptance one act. Guest agents go on the narrower finding
+  that U3 does not demand them: its first-class demands
+  (granular results, selective re-run) are met by milestones 8
+  and 9, its loop runs agentlessly on QEMU/DOS today, and the
+  guest-agent plane is that case's stated PREFERENCE. P3 governs
+  how a native agent is consumed if one ever lands; it does not
+  demand that one land.
+  THE FORM IS THE GUI-ERA PRECEDENT, NOT THE MOBILITY ONE
+  (owner's choice among three): each keeps its own section in
+  place — decide-first, deliverables, done-when intact —
+  retitled without its number and headed by a drop note, exactly
+  as the GUI era was handled. Machine mobility's Horizon bullet
+  was the alternative and was declined: the settled design is
+  worth more in full than condensed, and these three are large
+  enough to translate straight into sprint tasklists the day
+  they return. The three sections keep their order and sit ahead
+  of the GUI era, so the backlog reads in the sequence the work
+  would take.
+  THE ARC IS NOT REFILLED (owner): nothing is promoted to
+  number 10. Milestones 1–9 complete the documented design for
+  one vertical, and an honest roadmap says so rather than
+  keeping a numbered item in view for the sake of one. The door
+  back is D23's: accept the case, and the citing item schedules
+  the work.
+  NO RENUMBER THIS TIME: nothing numbered follows, so D14's rule
+  has nothing to move. Note the collision it leaves — machine
+  mobility and guest agents are both "the former milestone 12",
+  from either side of the same-day renumber; both mentions now
+  say which.
+  FOLDED: this entry; ROADMAP (the Milestones preamble, the
+  three retitled sections and their drop notes, the
+  backend-adapter doctrine pointer, milestone 6's forward
+  pointer, the GUI-era deliverable citing VirtualBox, the
+  Horizon in-band-files and machine-mobility bullets, the
+  guest-communication section), backend-adapter.md (status
+  block, extraction map), guest-communication.md (status
+  block), USE-CASE-PROPOSALS.md (U3's and U7's notes).
+
 - D32 — THE CONTAINMENT PATH LIVES INSIDE THE BRACES — DECIDED
   (owner, 2026-07-23, milestone 7's S3). Supports P14; RESOLVES a
   contradiction between D22/D24 and D26/D27. Found by running the

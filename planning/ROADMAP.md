@@ -142,8 +142,9 @@ planning/TASKS.md); adapters own drive-image materialization in
 their native formats; adapters provide carriers and control planes
 compose them (one shared fixed-font recognizer serves text
 readback where no native text carrier exists). The doctrine is
-settled ahead; signatures land with the milestone-10 extraction,
-defined by the working code.
+settled ahead; signatures land with the seam extraction —
+backlog work since 2026-07-23 ("The backend adapter seam"
+below) — defined by the working code.
 
 ## The machine model
 
@@ -1363,8 +1364,10 @@ hidden prompt. Contract home: media-spec "Fetch progress".
 ## Milestones
 
 Milestones run in order — the numbering is the priority. The
-whole arc runs from text-mode DOS on QEMU to the GUI era ending
-on Hyper-V. Milestones 1–3 are history: the north-star vertical
+numbered arc runs from text-mode DOS on QEMU through the
+complete documented design for that one vertical, and **ends
+there: milestone 9 is the last numbered milestone**.
+Milestones 1–3 are history: the north-star vertical
 slice, the media library, and the scripting language on its
 first, now-superseded surface. Milestone 4 is complete: the
 tree speaks the July 2026 redesign. Milestone 5 (complete) added
@@ -1375,15 +1378,20 @@ blueprint and media formats into one composable blueprint (the
 2026-07-23 composition round); milestones 8–9 then complete the
 documented design — the script properties, and run records with
 asynchronous runs — still for the DOS platform on the QEMU
-backend alone. Only then does the design generalize: the adapter
-seam is extracted from working code (10), proven by a second
-backend (11), and extended with native guest agents (12);
-machine mobility — clone, export, import — moved to Horizon
-(2026-07-23, for lack of use-case backing); the arc's
-endpoint — the GUI era: the VNC
+backend alone.
+
+Generalizing beyond that vertical is **backlog work, not yet
+scheduled** (owner, 2026-07-23, for lack of use-case backing —
+planning/DECISIONS.md D33): the adapter seam extracted from
+working code, the second backend that proves it, native guest
+agents, and the arc's former endpoint — the GUI era: the VNC
 control plane, GUI installer scripting, and the last backends,
-Hyper-V deliberately last — now sits in the backlog, not yet
-scheduled.
+Hyper-V deliberately last. Each keeps its own section below,
+design settled and intact; machine mobility — clone, export,
+import — sits in Horizon on the same ground. Scheduling is
+acceptance (D23): the citing roadmap item is the acceptance
+record, so a backlog section returns to the numbered arc when
+the case it serves is accepted.
 
 A milestone that needs decisions opens with them: its "Decide
 first" block is the design round to run before its deliverables
@@ -1807,7 +1815,8 @@ plus the [machine blueprint](design/machine-blueprint.md) with its
 [cookbook](design/machine-blueprint-cookbook.md) — still scoped to
 one backend. The `backend` field is parsed and validated in full,
 but with QEMU the only implementation, assignment is trivial; the
-adapter seam that makes it real is milestone 10. Capability checks
+adapter seam that makes it real is backlog work ("The backend
+adapter seam" below). Capability checks
 are real from the start, derived from what the QEMU
 implementation can actually do.
 
@@ -2254,7 +2263,16 @@ session; and a failure report names the route and revisits, the
 expired clock and its source scope, the nearest miss, the
 screenshot, and the suggested next command.
 
-### Milestone 10 — The backend adapter seam
+### The backend adapter seam (backlog)
+
+> **Dropped from the numbered arc to the backlog** (owner,
+> 2026-07-23): the former Milestone 10, not yet scheduled — the
+> multi-backend pillar has no in-force use case demanding it.
+> Its demand is the U7 draft
+> ([planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md),
+> "materialize on the hypervisor the host provides"); accepting
+> U7 is what schedules this work back onto the arc, the citing
+> item the record. The design is settled and stands as written.
 
 Extract the adapter API from the now-complete QEMU implementation
 — the only adapter with a full control plane set — so the seam is
@@ -2292,7 +2310,12 @@ Deliverables:
 Done when: all QEMU interaction flows through the adapter API and
 the FreeDOS install script passes unchanged.
 
-### Milestone 11 — Second backend: VirtualBox
+### Second backend: VirtualBox (backlog)
+
+> **Dropped from the numbered arc to the backlog** (owner,
+> 2026-07-23): the former Milestone 11, not yet scheduled on the
+> same ground as the seam extraction above — U7 is its demand
+> too, and it follows that extraction whenever the pair returns.
 
 The first non-QEMU adapter end to end, proving the adapter API
 against a genuinely different hypervisor. VirtualBox is the
@@ -2317,7 +2340,17 @@ Deliverables:
 Done when: the FreeDOS install script runs unmodified on both
 backends from the same blueprint (minus a pinned backend field).
 
-### Milestone 12 — Guest agent communication
+### Guest agent communication (backlog)
+
+> **Dropped from the numbered arc to the backlog** (owner,
+> 2026-07-23): the former Milestone 12 — numbered 13 until the
+> same-day renumber that followed machine mobility's demotion —
+> not yet scheduled. No use case demands it: U3's first-class
+> demands (granular results, selective re-run) are met by
+> milestones 8–9, and the guest-agent plane is that case's
+> stated *preference*, not its requirement — its loop runs
+> agentlessly on QEMU/DOS today. P3 governs how a native agent
+> is consumed if this lands; it does not demand that it land.
 
 Native guest agents as control planes, per
 [planning/design/guest-communication.md](design/guest-communication.md):
@@ -2426,7 +2459,8 @@ Deliverables:
    framebuffer capture, key events, pointer events — behind the
    same input and screen capabilities as agentless display,
    reusing the pixel-level text recognition built for the
-   VirtualBox display plane in milestone 11.
+   VirtualBox display plane ("Second backend: VirtualBox"
+   above).
    `control-planes: ["vnc"]` honored end to end, with a
    capability error naming Hyper-V where it cannot exist.
 2. The three portable input primitives exposed at the
@@ -2459,7 +2493,9 @@ VNC and on Hyper-V through its decided screen strategy.
   round-trip fragments, and the `record` command family (work
   items in planning/TASKS.md).
 - Machine mobility: clone, export, import — the former
-  milestone 12, moved here 2026-07-23 for lack of use-case
+  milestone 12 (the number guest agents inherited in the
+  same-day renumber), moved here 2026-07-23 for lack of
+  use-case
   backing: clone has no use case at all, export's stands only
   as the U8 draft, and import's U2 loses its scheduled
   delivery with this move. Scheduling it back onto the
@@ -2494,7 +2530,7 @@ VNC and on Hyper-V through its decided screen strategy.
   `get-files`' destination default are that round's to settle).
   Value concentrates where out-of-band access thins — non-QEMU
   backends (no `hostdir`) and non-FAT guest filesystems — so
-  sequence at or soon after milestone 11's second backend.
+  sequence at or soon after the second backend (backlog).
 - Media commands beyond `fetch-media` (verify, remove) —
   currently unjustified: no use case demands them; `verify`
   would stand on the U13 draft if accepted.
@@ -2543,9 +2579,10 @@ capability seam, and the readiness-waterfall configuration and
 lifecycle rules — is consolidated in
 [planning/design/guest-communication.md](design/guest-communication.md).
 The `GuestExec` protocol, the isolated agentless adapter, and
-its use by the DOS workflow are implemented; native-agent
-control planes land at milestone 12 and the VNC plane in the
-backlog GUI era. Agentless DOS operation remains the permanent base
+its use by the DOS workflow are implemented; the native-agent
+control planes and the VNC plane are both backlog work ("Guest
+agent communication" and the GUI era above), unscheduled since
+2026-07-23. Agentless DOS operation remains the permanent base
 no milestone may weaken.
 
 ## Roadmap constraints

@@ -16,8 +16,10 @@ SPDX-License-Identifier: BSD-3-Clause
 > backend-neutral: `GuestExec` and the control-plane vocabulary
 > apply to every backend adapter
 > ([backend-adapter.md](backend-adapter.md)). Native-agent
-> control planes land at planning/ROADMAP.md milestone 12, the
-> VNC plane in the backlog GUI era. This document does not by itself
+> control planes and the VNC plane are both **backlog work**
+> (planning/ROADMAP.md "Guest agent communication" and the GUI
+> era), unscheduled since 2026-07-23 (DECISIONS.md D33). This
+> document does not by itself
 > authorize further implementation.
 
 ## Purpose
