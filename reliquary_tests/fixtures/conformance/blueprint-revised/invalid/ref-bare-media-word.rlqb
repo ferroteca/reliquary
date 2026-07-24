@@ -1,0 +1,6 @@
+// invalid: an unqualified media reference is rejected with a did-you-mean, not
+//         read as a property of that name
+// spec: Dispatch and degenerates
+[
+  { "type": "media", "name": "x", "location": "${media}" }
+]

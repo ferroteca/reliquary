@@ -1,0 +1,8 @@
+// valid: JSONC is accepted: line and block comments, trailing commas
+// spec: The file
+[
+  // a machine, with comments and a trailing comma
+  { "type": "machine", "name": "rig", "platform": "dos",
+    /* the empty removable slot a script fills */
+    "drives": { "cdrom0": null, }, },
+]

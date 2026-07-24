@@ -1,0 +1,7 @@
+// valid: the backslash form is the literal escape, as in the script language
+// spec: Reach
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "cdrom0": null },
+    "parameters": { "prompt": "\\${HOME} is expanded by the guest" } }
+]

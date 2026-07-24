@@ -1,0 +1,7 @@
+// valid: a bare ${media:X} is the parent's own bytes - the difference overlay
+// spec: The universal reference
+[
+  { "type": "media", "name": "golden", "location": "golden.qcow2" },
+  { "type": "media", "name": "scratch", "materialize": "difference",
+    "location": "${media:golden}" }
+]

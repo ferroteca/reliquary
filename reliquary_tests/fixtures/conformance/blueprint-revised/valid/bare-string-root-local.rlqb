@@ -1,0 +1,3 @@
+// valid: a bare-string root element is a media desugaring to {location}
+// spec: The file
+[ "payload.iso" ]

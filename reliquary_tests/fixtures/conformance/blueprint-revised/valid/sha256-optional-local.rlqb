@@ -1,0 +1,5 @@
+// valid: a local payload may omit the pin - the evolving-image case
+// spec: media
+[
+  { "type": "media", "name": "wip", "location": "work-in-progress.img" }
+]

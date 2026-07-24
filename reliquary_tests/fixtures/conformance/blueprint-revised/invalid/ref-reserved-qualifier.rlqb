@@ -1,0 +1,5 @@
+// invalid: a reserved qualifier fails closed naming itself
+// spec: Dispatch and degenerates
+[
+  { "type": "media", "name": "x", "location": "${env:ISO_PATH}" }
+]

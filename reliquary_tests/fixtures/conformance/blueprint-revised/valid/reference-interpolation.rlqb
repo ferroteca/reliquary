@@ -1,0 +1,9 @@
+// valid: an unqualified reference interpolates anywhere a string is accepted
+// spec: Reach
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "memory": "${rig.memory}",
+    "description": "a rig for ${project.name}",
+    "drives": { "cdrom0": null },
+    "parameters": { "user": "${install.user}" } }
+]

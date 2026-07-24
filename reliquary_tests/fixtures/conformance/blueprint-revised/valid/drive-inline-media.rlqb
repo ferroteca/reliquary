@@ -1,0 +1,7 @@
+// valid: a drive may carry a full media spec written in place
+// spec: machine
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "cdrom0": { "type": "media", "name": "cd",
+                            "location": "cd.iso" } } }
+]

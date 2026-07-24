@@ -1,0 +1,5 @@
+// invalid: a leading colon is a parse error
+// spec: Dispatch and degenerates
+[
+  { "type": "media", "name": "x", "location": "${:x}" }
+]

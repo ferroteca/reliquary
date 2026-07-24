@@ -1,0 +1,7 @@
+// valid: an out-of-charter stem is repaired and warned, naming both names
+// spec: Derivation, repair, and failure
+// warns: FD 1.4 (final) is repaired to FD-1.4-final
+[
+  { "type": "media", "location": "https://x.test/FD 1.4 (final).zip",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+]

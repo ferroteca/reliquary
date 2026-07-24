@@ -1,0 +1,7 @@
+// invalid: P14's acceptance test: this passes the character class and is
+//         refused by the production - mem is not a qualifier
+// spec: The closure
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "memory": "${mem:-512M}", "drives": { "cdrom0": null } }
+]

@@ -1,0 +1,10 @@
+// valid: the four object forms are the canonical spellings
+// spec: The location grammar
+[
+  { "type": "media", "name": "a", "location": { "url": "https://x.test/a.iso" },
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+  { "type": "media", "name": "b", "location": { "local": "b.iso" } },
+  { "type": "media", "name": "c",
+    "location": { "parent": "a", "path": "c.img" } },
+  { "type": "media", "name": "d", "location": { "property": "iso.path" } }
+]

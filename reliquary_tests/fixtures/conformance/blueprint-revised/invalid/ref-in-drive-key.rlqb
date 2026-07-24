@@ -1,0 +1,6 @@
+// invalid: an object key never takes a reference
+// spec: Reach
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "${slot}": null } }
+]

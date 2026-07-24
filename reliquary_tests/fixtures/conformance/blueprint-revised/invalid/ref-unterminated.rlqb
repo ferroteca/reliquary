@@ -1,0 +1,5 @@
+// invalid: an unterminated reference is a parse error
+// spec: Dispatch and degenerates
+[
+  { "type": "media", "name": "x", "location": "${media:outer" }
+]

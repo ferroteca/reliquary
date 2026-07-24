@@ -1,0 +1,5 @@
+// invalid: identity never takes a reference
+// spec: Reach
+[
+  { "type": "media", "name": "${what.name}", "location": "p.img" }
+]

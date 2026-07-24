@@ -1,0 +1,7 @@
+// invalid: closed vocabulary: a referenced platform is a runtime-decided
+//         platform
+// spec: Reach
+[
+  { "type": "machine", "name": "rig", "platform": "${target.platform}",
+    "drives": { "cdrom0": null } }
+]

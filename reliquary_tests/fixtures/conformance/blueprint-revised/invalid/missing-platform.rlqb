@@ -1,0 +1,5 @@
+// invalid: platform is required and never inferred
+// spec: machine
+[
+  { "type": "machine", "name": "rig", "drives": { "cdrom0": null } }
+]

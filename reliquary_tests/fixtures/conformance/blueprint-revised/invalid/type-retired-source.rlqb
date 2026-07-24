@@ -1,0 +1,5 @@
+// invalid: the source type is retired
+// spec: Spec types
+[
+  { "type": "source", "name": "s", "url": "https://x.test/p.iso" }
+]

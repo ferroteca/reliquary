@@ -1,0 +1,8 @@
+// invalid: a writable cdrom is rejected
+// spec: media
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "cdrom0": "cd" } },
+  { "type": "media", "name": "cd", "location": "cd.iso",
+    "read-only": false }
+]

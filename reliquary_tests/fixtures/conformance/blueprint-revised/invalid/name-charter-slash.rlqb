@@ -1,0 +1,5 @@
+// invalid: the slash is the containment separator, never in a name
+// spec: The name charter
+[
+  { "type": "media", "name": "isos/p", "location": "p.iso" }
+]

@@ -1,0 +1,3 @@
+// valid: type defaults to media, so an untyped lone object is a media
+// spec: Spec types
+{ "name": "iso", "location": "payload.iso" }

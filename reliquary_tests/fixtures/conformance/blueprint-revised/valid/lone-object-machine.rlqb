@@ -1,0 +1,4 @@
+// valid: a lone spec object is sugar for the array of one
+// spec: The file
+{ "type": "machine", "name": "solo", "platform": "dos",
+  "drives": { "cdrom0": null } }

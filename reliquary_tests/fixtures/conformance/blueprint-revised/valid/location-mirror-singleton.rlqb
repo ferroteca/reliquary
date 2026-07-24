@@ -1,0 +1,6 @@
+// valid: a one-element mirror list is simply the scalar
+// spec: Mirror lists
+[
+  { "type": "media", "name": "iso", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "location": [ "https://a.test/p.iso" ] }
+]

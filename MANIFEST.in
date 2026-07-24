@@ -3,5 +3,4 @@
 
 include reliquary/codex/codex.json
 include reliquary/codex/blueprints/*.rlqb
-include reliquary/codex/media/*.rlqm
 include reliquary/codex/scripts/*.rlqs

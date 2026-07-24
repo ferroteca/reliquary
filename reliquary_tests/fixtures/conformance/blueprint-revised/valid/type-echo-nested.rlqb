@@ -1,0 +1,6 @@
+// valid: an optional type at a nested position is a checked echo
+// spec: Spec types
+[
+  { "type": "media", "name": "bundle", "location": "bundle.zip",
+    "children": [ { "type": "media", "path": "inner.img" } ] }
+]

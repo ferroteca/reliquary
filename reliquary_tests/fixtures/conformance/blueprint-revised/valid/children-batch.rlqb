@@ -1,0 +1,11 @@
+// valid: children is recursive batch sugar; a bare string entry is the path
+// spec: Containment
+[
+  { "type": "media", "name": "outer", "location": "https://x.test/outer.zip",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "children": [
+      { "path": "floppies.zip",
+        "children": [ "144m/FDBOOT.img", "144m/FDSTD01.img" ] },
+      { "path": "cd.iso", "name": "cd", "read-only": true }
+    ] }
+]

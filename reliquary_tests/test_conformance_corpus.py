@@ -84,6 +84,53 @@ class BlueprintCorpusTests(unittest.TestCase):
                     jsonschema.validate(_load(path), schema)
 
 
+class StagedRevisedCorpusTests(unittest.TestCase):
+    """The revised-format corpus, staged ahead of its parser (S2).
+
+    ``fixtures/conformance/blueprint-revised/`` describes the composed
+    blueprint model (planning/design/blueprint-model.md) and is written
+    before the parser that will validate it, so S3 has an acceptance
+    test from its first line. Nothing here asserts parser behaviour —
+    that arrives when S3 moves this corpus into place. What is checked
+    is the little that can be: the fixtures are well-formed JSONC and
+    each declares what it exercises, so a typo cannot survive the wait.
+    See the corpus README for the wiring step.
+    """
+
+    STAGED = os.path.join(
+        _HERE, "fixtures", "conformance", "blueprint-revised")
+    BUCKETS = ("valid", "invalid", "invalid-at-resolution")
+
+    def _staged(self, bucket):
+        return sorted(glob.glob(os.path.join(self.STAGED, bucket, "*.rlqb")))
+
+    def test_every_bucket_is_populated(self):
+        for bucket in self.BUCKETS:
+            with self.subTest(bucket=bucket):
+                self.assertTrue(self._staged(bucket),
+                                f"no staged fixtures in {bucket}/")
+
+    def test_fixtures_are_well_formed_jsonc(self):
+        for bucket in self.BUCKETS:
+            for path in self._staged(bucket):
+                with self.subTest(fixture=os.path.basename(path)):
+                    # Invalid fixtures are invalid *blueprints*; every
+                    # one of them is still a well-formed document.
+                    _load(path)
+
+    def test_fixtures_declare_what_they_exercise(self):
+        for bucket in self.BUCKETS:
+            verdict = "valid" if bucket == "valid" else "invalid"
+            for path in self._staged(bucket):
+                with self.subTest(fixture=os.path.basename(path)):
+                    with open(path, encoding="utf-8") as handle:
+                        head = handle.readline()
+                    self.assertTrue(
+                        head.startswith(f"// {verdict}: "),
+                        f"{os.path.basename(path)} must open with a "
+                        f"'// {verdict}: ' header naming what it exercises")
+
+
 class MachineStateSchemaTests(unittest.TestCase):
     """A real materialized state validates against the state schema."""
 

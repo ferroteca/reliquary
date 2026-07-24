@@ -1,0 +1,8 @@
+// valid: the parent object form takes an inline media spec
+// spec: The location grammar
+[
+  { "type": "media", "name": "cd",
+    "location": { "parent": { "type": "media", "name": "outer",
+                              "location": "outer.zip" },
+                  "path": "cd.iso" } }
+]

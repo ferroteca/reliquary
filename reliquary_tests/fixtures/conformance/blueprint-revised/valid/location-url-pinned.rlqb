@@ -1,0 +1,6 @@
+// valid: a remote location carries its sha256
+// spec: media
+[
+  { "type": "media", "name": "iso", "location": "https://x.test/p.iso",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+]

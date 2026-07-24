@@ -1,0 +1,7 @@
+// valid: the content-free blank is the sole anonymous citizen; size implies
+//       new
+// spec: Identity and the catalog
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "hdd0": { "size": "20M" } }, "boot": ["hdd0"] }
+]

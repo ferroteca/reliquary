@@ -1,0 +1,5 @@
+// valid: the single-character drive-letter exemption keeps C:/ a path
+// spec: The location grammar
+[
+  { "type": "media", "name": "iso", "location": "C:/isos/p.iso" }
+]

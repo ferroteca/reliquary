@@ -1,0 +1,4 @@
+// invalid: machine vocabulary without a machine type fails in the media
+//         branch, with a did-you-mean hint
+// spec: Spec types
+{ "name": "rig", "platform": "dos", "drives": { "cdrom0": null } }

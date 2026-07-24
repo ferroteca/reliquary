@@ -1,0 +1,7 @@
+// valid: read-only defaults true on a cdrom, so it need not be written
+// spec: media
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "drives": { "cdrom0": "cd" } },
+  { "type": "media", "name": "cd", "location": "cd.iso" }
+]

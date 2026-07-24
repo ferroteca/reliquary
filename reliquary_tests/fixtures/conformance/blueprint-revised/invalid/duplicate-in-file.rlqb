@@ -1,0 +1,6 @@
+// invalid: in-file duplicates always error, identical or not
+// spec: Duplicates
+[
+  { "type": "media", "name": "iso", "location": "p.iso" },
+  { "type": "media", "name": "iso", "location": "p.iso" }
+]

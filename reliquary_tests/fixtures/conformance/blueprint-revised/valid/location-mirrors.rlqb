@@ -1,0 +1,7 @@
+// valid: a mirror list is tried in order and may mix schemes
+// spec: Mirror lists
+[
+  { "type": "media", "name": "iso", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "location": [ "https://a.test/p.iso", "https://b.test/p.iso",
+                  "vendor/p.iso" ] }
+]

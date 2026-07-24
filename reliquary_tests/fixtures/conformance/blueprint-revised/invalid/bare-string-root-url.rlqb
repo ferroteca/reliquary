@@ -1,0 +1,3 @@
+// invalid: a bare URL string has nowhere to put its required pin
+// spec: The file
+[ "https://x.test/p.iso" ]

@@ -1,0 +1,6 @@
+// invalid: a scheme-shaped string that is not recognized is a parse error,
+//         never a silently relative path
+// spec: The location grammar
+[
+  { "type": "media", "name": "x", "location": "ftp://x.test/p.iso" }
+]

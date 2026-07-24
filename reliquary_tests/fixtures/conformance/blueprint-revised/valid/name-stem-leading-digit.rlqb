@@ -1,0 +1,5 @@
+// valid: the media-name charter allows a leading digit, so 86Box derives clean
+// spec: The name charter
+[
+  { "type": "media", "location": "https://x.test/86Box.zip", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+]

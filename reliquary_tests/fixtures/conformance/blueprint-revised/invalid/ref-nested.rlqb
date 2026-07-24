@@ -1,0 +1,6 @@
+// invalid: nesting is closed out
+// spec: The closure
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "memory": "${${which}}", "drives": { "cdrom0": null } }
+]
