@@ -353,6 +353,92 @@ dependency order:
 
 ## Design
 
+- Built-in input pacing before guest input — OPEN (owner,
+  2026-07-24, raised by milestone 9's FreeDOS install failure).
+  Shape settled in that day's question round; unscheduled.
+  Demand: G1, G5; serves U12, U14, U20 — a script that cannot
+  reliably land a keystroke serves none of them.
+  THE PROBLEM, with evidence: `freedos-install.rlqs` waited for
+  the installer's welcome screen and then `press enter`, and the
+  keystroke was swallowed — the installer paints the screen
+  *before* it starts reading the keyboard. The wait timed out 30s
+  later at the next step. Pressing Enter by hand, seconds after,
+  advanced it immediately. Reproduced on the pre-milestone tree,
+  so this is structural, not a regression. It was worked around by
+  switching that one line to `select "Yes"`, which is
+  feedback-driven and re-reads the screen between keys — which is
+  also *why* every other confirmation in that script already
+  worked.
+  THE OWNER'S POSITION: this will be very common — "wait for
+  <this>, then do <that>" needs a gap between the two — and
+  authors should not have to code that gap every time. A standard
+  delay belongs in the system; only *changing* it should require
+  writing anything.
+  THE FRAMING THAT MAKES IT LEGAL: this is **not** a `delay` verb,
+  and the language's prohibition on one stands. script-spec.md's
+  Timing section already ends "Screen polling and input-event
+  pacing remain control-plane-owned; the script does not tune
+  them" — a gap between observing a screen and delivering the next
+  input *is* input-event pacing. G1 supplies the argument:
+  agentlessly, the guest's *input* readiness is unobservable (only
+  its output is), so a control plane that types the instant a
+  screen paints asserts something it cannot know. The mechanism is
+  half-present already — `send_keys` paces at 0.06s *between* key
+  events; what is missing is the pause before the *first* one.
+  `stable=` is the wrong tool: it strengthens the observation
+  (does the condition keep holding?) where the need is to pace the
+  actor, it costs a poll interval plus its duration, it changes
+  what the author is asserting, and it must be written on every
+  wait — the burden being objected to.
+  SETTLED IN THE 2026-07-24 QUESTION ROUND (owner):
+  * **Scope: header > phase > statement**, the same lexical ladder
+    `timeout` uses — innermost-wins, resolved at parse time,
+    reported by `check-script`. A column in the placement matrix,
+    not a second model.
+  * **Applies to every guest-input verb** — `enter`, `type`,
+    `press`, `select`. One invariant needing no context: before
+    typing at an agentless guest, let it settle. Host-side verbs
+    (`insert`, `eject`, `set-boot`, `screenshot`, `start`, `stop`,
+    `set`, `http`) are not guest input and do not pay it.
+  * **Default 0.1s for now, expected to be revisited.** The owner's
+    note is the important part: this number will swing wildly — a
+    plain text screen renders quickly, while the colourful
+    exploding TUI menus render very slowly. So the default cannot
+    serve every screen by construction, which is itself the
+    argument for the per-phase and per-statement override carrying
+    real weight rather than being speculative generality.
+  * **The term is *pacing*** (owner, 2026-07-24, settling the one
+    question the round left open). It is the spec's own word for
+    this — Timing already says "input-event pacing remain[s]
+    control-plane-owned" — so the language adopts a term the design
+    already used rather than coining one, and the name says plainly
+    which half of the model it belongs to: it paces the actor, it
+    does not strengthen an observation. It collides with nothing.
+    The rejected candidates are worth keeping: `settle` read best
+    on meaning but sat a near-homophone away from `stable` in one
+    small vocabulary, on the opposite half of the model — a real G6
+    cost; `ready` reads naturally but collides with the resting
+    machine phase.
+    Residual nit for the implementing round, not a reopening:
+    whether the token spells `pacing` or `pace` in both positions
+    (`pacing 300ms` in a header, `press enter pacing=300ms` on a
+    statement). Lean `pacing` for both — one spelling everywhere
+    (G6), and a *pace* is naturally a rate while what is being set
+    is an interval.
+  ALSO UNMEASURED: no evidence yet fixes the number against the
+  case that motivated it. What is known is that "immediately" is
+  too little and "several seconds later" is enough; the interval
+  that reliably lands a keystroke on that installer screen was
+  never bisected. Worth doing when this is picked up — the rig is
+  cheap to stand up now.
+  When it lands: script-spec.md's Timing section is the normative
+  home (the placement matrix, and the "there is no `delay`"
+  paragraph amended to distinguish the absent *verb* from
+  control-plane pacing), plus a D-number recording the
+  interface-change triage. Triage as it stands: no use case is
+  cost, several are served — an easy approval under the
+  interface-change rule.
+
 - Media residency vs the download cache AND composable authored
   specs — RESOLVED together (owner, 2026-07-23, the media/composition
   design round), then REVISED same day by the blueprint revision
