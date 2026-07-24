@@ -130,9 +130,10 @@ workflow:
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys,
-  property binding before the machine starts, secret redaction in the
-  transcript, run
-  records under `cache/machines/<blueprint>-<n>/runs/`), `cli.py` owns command parsing, and
+  property binding before the machine starts, secret redaction, and
+  the run **returning its output** to the caller — no run-record
+  persistence, milestone 9's return model; the `runs/` archive is
+  async-backlog work, D36), `cli.py` owns command parsing, and
   `__main__.py` preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.
@@ -205,8 +206,9 @@ proper are defined no earlier than 1.0.
 
 The CLI, the embedding API, the scripting language, and the machine blueprint (media, source, and archive
 components included) are
-Reliquary's primary interfaces to the world; the script properties, recorded outputs (run records,
-transcripts), and the home layout are world-facing contracts alongside them. Any decision that
+Reliquary's primary interfaces to the world; the script properties, the run's returned output (the live
+event stream, `--json` documents, exit codes — persistence dropped with D36), and the home layout are
+world-facing contracts alongside them. Any decision that
 changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
 numbered use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
@@ -290,9 +292,12 @@ unrelated cache state file):
 - `cache/machines/<name>-<n>/` — machine materializations (`machines_cache_dir`;
   parent via `cache_dir`), under the cache root, each with `machine.json` (the
   resolved state; while running its `vm` section carries the live VM identity,
-  port, PID), `media/` (the machine's per-machine images and vvfat directories,
-  named by media), `runs/` (run records), and a `<backend>/` subdir
-  (e.g. `qemu/qemu-stderr.log`)
+  port, PID; and machine variables a script `set`s, cleared on start — D36),
+  `media/` (the machine's per-machine images and vvfat directories,
+  named by media), and a `<backend>/` subdir
+  (e.g. `qemu/qemu-stderr.log`). A run stores nothing here — it
+  returns its output to the caller (D36); the `runs/` archive is
+  async-backlog work.
 
 ### VM ownership
 

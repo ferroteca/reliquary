@@ -1010,13 +1010,17 @@ run.
 
 ### The run event stream
 
-Every run appends one normative event stream,
-`run-events.jsonl`, to its run directory: append-only JSON
-Lines, each event carrying a sequence number, timestamp, elapsed
-time, and kind. Every other presentation of a run — the live
-display, CI output, `transcript.txt`, the embedding API's
-progress reporting, raw JSON — is a *renderer* of this stream;
-no surface records anything the stream does not carry.
+Every run emits one normative event stream — JSON Lines, each
+event carrying a sequence number, timestamp, elapsed time, and
+kind — as **live output** to the run's driver, never a stored
+file (owner, 2026-07-24; D36: the run returns its output and
+stores nothing; the persisted `run-events.jsonl` and the run
+directory are async-backlog work, ROADMAP "Asynchronous runs
+(backlog)"). Under `--progress jsonl` / `run_script`'s event
+iterator the stream *is* the machine-readable output; the pretty
+and plain displays and the transcript a caller keeps are
+*renderers* of it — no surface reports anything the stream does
+not carry.
 
 Spans in the stream mirror the activation tree the clocks above
 define — a run span (the run deadline's scope), a span per phase
@@ -1040,11 +1044,12 @@ activation (the phase deadline's scope), a span per observation
   and its source scope, the route taken with phase revisit
   counts, the nearest-miss screen row, the automatic screenshot
   reference, and the suggested next command;
-- for [interaction runs](#interaction-runs): `screen`'s CLI-only
-  read kind, and the neutral `ended` terminal event;
-- reserved for the authoring recorder (U6): handover kinds —
-  control passing from script to human and back — so a capture
-  session is one run record with mixed drivers.
+- `screen`'s CLI-only read kind (emitted by the `screen` command);
+- reserved with the backlogged record model (D36): interaction
+  runs' neutral `ended` terminal event, and the authoring
+  recorder's (U6) handover kinds — control passing from script to
+  human and back, a capture session as one record with mixed
+  drivers.
 
 Events carry their originating statement's source line and
 number wherever one exists (owner, 2026-07-22) — action,
@@ -1062,8 +1067,9 @@ change — and consumers must ignore unknown event kinds and
 unknown fields. Pre-1.0 the shapes track this spec with no
 stability promise. The human renderings (`pretty`/`plain`) are
 deliberately uncontracted; the machine surfaces are this
-stream, `--json` documents, exit codes, and the run record's
-files (planning/ROADMAP.md "The CLI").
+stream (as live output), `--json` documents, and exit codes
+(planning/ROADMAP.md "The CLI"; run-record files dropped with
+persistence, D36).
 
 ## Observations
 
@@ -1460,10 +1466,12 @@ screenshot
 screenshot after-package-selection
 ```
 
-Captures the screen in the current run directory. The default name
-contains the step number. Repeated explicit names receive an
-occurrence suffix rather than overwriting an earlier capture.
-Failing observations capture a screenshot automatically.
+Captures the screen and returns it to the caller — the CLI writes
+it to a caller-named path (or a default under the machine
+directory), the API returns the image (D36: a run stores nothing,
+so there is no run-directory screenshots folder). Failing
+observations capture a screenshot automatically, carried in the
+run's returned output.
 
 ### `insert` and `eject`
 
@@ -1665,87 +1673,51 @@ carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
 across the classes, and the full id index is deferred to beta.
 
-## Failure, runs, and transcripts
+## The run's output and failure
 
-Every invocation creates a unique run directory under:
+A run drives the machine and **returns its output** to whoever
+started it; it stores nothing (owner, 2026-07-24; D36). The
+output is the [event stream](#the-run-event-stream) — rendered
+live to the run's driver (pretty for a person, jsonl for a
+program) and gone when the run ends. There is no run directory,
+no persisted `run-events.jsonl` or `transcript.txt`, no
+retention, and no `run` management family: persistence is the
+substrate a cross-process follower would read, and following a
+run from a process that did not start it is asynchronous work in
+the backlog (ROADMAP "Asynchronous runs (backlog)", D35/D36) —
+which is where the whole record model now lives (the `runs/<n>/`
+archive, monotonic numbering, retention, `list-runs` / `run
+status` / `run delete`, and interaction runs). Milestone 9
+stores nothing; each run returns to its own caller, which is what
+keeps the multithreaded case free of a shared store.
 
-```text
-cache/machines/<machine_id>/runs/<n>/
-├── run-events.jsonl
-├── transcript.txt
-└── screenshots/
-```
+The stream ends with a **terminal event** stating the outcome:
+success, a failure class, or cancelled — Ctrl-C on a foreground
+run emits a `cancelled` terminal event, exits `5`, and leaves
+the machine as-is. Under `jsonl` the last line is the
+machine-readable result; there is no separate result mode. On
+the API, `run_script` / `exec` return a typed result and raise
+by error class ([error classes and exit
+codes](#error-classes-and-exit-codes)).
 
-Runs number monotonically per machine and a number is never
-reused; `<machine_id>/<n>` is a run's full identity.
+On failure the returned output carries the pending condition or
+action, the clock that expired and the scope that supplied it
+(statement timeout, phase deadline, or run deadline), final
+observed screen text, machine state, and an automatic screenshot
+when available.
 
-A run record is **evidence, with machine-bounded retention**:
-append-only, never rewritten, and never implicitly pruned. It
-lives until its machine is destroyed (or recreated), or until
-the user deletes it explicitly with `run delete` (API twin
-`delete_run()`, under parity). `run delete` takes its run
-numbers explicitly — the one `run` operation that never defaults
-to the machine's latest run, because deleting evidence warrants
-naming it — accepts several at once, refuses the record of a run
-still open (fail closed; an interaction run closes with `end-run`
-first, and a live detached run refuses naming its writer once the
-asynchronous followers land — ROADMAP "Asynchronous runs
-(backlog)", D35), and frees no number: numbering stays monotonic
-over deletions.
-
-The record directory is self-contained and self-identifying:
-plain files, no links into machine internals, carrying the
-machine id, run number, timestamps, and the run's driver — a
-script run records the script's source and digest, an
-[interaction run](#interaction-runs) that its driver was the
-caller — so a record copied out of the cache stands alone, and
-records from different machine generations (machine ids are
-reused after `destroy`) remain distinguishable. Copying
-`runs/<n>/` out with ordinary tools is the sanctioned way to
-keep a record beyond its machine's life; there is deliberately
-no export verb for it — the record is already host-side plain
-files at a path `run status` and `list runs` report, and the
-shape contract here is what makes the copy readable. The run
-record is often the product of the whole exercise (U3):
-Reliquary retains it with the machine and delivers its contents
-live through the event stream; durability beyond the machine is
-the consumer's claim.
-
-`run-events.jsonl` is the run's normative record — the
-[event stream](#the-run-event-stream) the execution model
-defines.
-The stream is written live: appended event by event, flushed at
-each event boundary, from the first preflight event to a
-terminal event stating the outcome (success, a failure class,
-cancelled — or `ended`, an interaction run's neutral close).
-Every follower — the live display, the transcript, and (with
-the asynchronous followers, backlog) `run tail` and the API
-event iterator — reads the same growing file. A foreground run's
-record lacking a terminal event is an *incomplete* run; the
-writer identity (pid and start time) and cross-process liveness
-that make a missing terminal event a detectable *crashed* run
-arrive with the asynchronous followers (ROADMAP "Asynchronous
-runs (backlog)", D35). An interaction run has no resident writer
-and closes only by `end-run` (below).
-
-`transcript.txt` is a pure rendering of the stream (owner,
-2026-07-22), written live beside it so a copied-out record
-stands alone for a human with no Reliquary installed: every
-line derives from an event, it adds no information the stream
-does not carry, and deriving is one-way — stream to transcript,
-never scraped back. Its format is a human surface, deliberately
-uncontracted (planning/ROADMAP.md "The CLI"); the stream is
-what programs read. On-demand rendering was declined — the
-standalone record is the custody story. What a transcript shows
-is therefore exactly what the stream carries; the stream's
-content requirements are listed with [its
-vocabulary](#the-run-event-stream).
-
-On failure the record carries the pending condition or action,
-the clock that
-expired and the scope that supplied it (statement timeout, phase
-deadline, or run deadline), final observed screen text, machine
-state, and an automatic screenshot when available.
+A run's **product is the consumer's**, never a record Reliquary
+keeps: the value returned, a file the caller retrieves in-band
+(guest-terms addressing), a small value read from a machine
+variable, or a whole disk image swapped out. Reliquary attaches
+no meaning to any of it and has no test-result vocabulary — no
+pass/fail schema, no result parsing (G2). A primitive-driven
+loop needs no bracket to be recorded: the caller's own driving
+code, collecting each call's returned output, is its record.
+Per-run selection travels as ordinary script properties;
+granular results come out as the caller's own files and values.
+The consumer keeps, organizes, and discards on its own side of
+the seam (P4, P18).
 
 There is no automatic retry. Re-running an installation against a
 partially modified disk is not generally safe and is not described
@@ -1753,55 +1725,28 @@ as a retry. The caller deliberately resumes, recreates the machine,
 or runs again according to that workflow's documented recovery
 semantics.
 
-### Interaction runs
+### Interaction runs — the recording bracket
 
-A run record is not only a script's product: a primitive-driven
-loop — a program driving the guest-console and state commands,
-or their API twins — earns the same evidence by opting in
-(owner, 2026-07-22). `begin-run` (twin
-`begin_run(machine=|blueprint=)`, returning the new run number)
-opens an **interaction run**: an ordinary run record — same
-directory shape, same monotonic numbering, same retention and
-custody — whose driver is the caller, not a script. While it is
-open, every machine-targeting command on that machine appends
-the event kinds the execution model defines for the same
-actions — the interaction family (`screen` emitting its
-CLI-only read kind), the state operations, and lifecycle
-commands alike: a mid-session `apply-blueprint` or
-`stop-machine` is exactly the evidence a record exists to keep.
-With no open run, primitives record nothing — interactive
-fiddling never spams records; the automator opts in when the
-record is the product (U3).
+A primitive-driven loop needs no recording bracket in milestone 9:
+each command returns its output, and the caller's own driving code
+collecting those outputs is its record (D36). The `begin-run` /
+`end-run` bracket that records such a loop into one persisted run
+record is part of the record model, which moved to the
+asynchronous-runs backlog with the rest of persistence (ROADMAP
+"Asynchronous runs (backlog)", D35/D36); it returns if that work
+schedules.
 
-One run may be open per machine: a second `begin-run`, or a
-`run-script`, fails closed naming the open run (the
-mixed-driver composition — script playback and human takeover
-in one record — is U6's recorder machinery, which grows out of
-this shape through the reserved handover kinds). `end-run`
-closes the record with the neutral `ended` terminal event:
-Reliquary attaches no outcome to an interaction run —
-interpreting what the loop did is the caller's computation
-(G2). An open interaction run is visible, never inferred:
-`run status` shows it open with its last-event time, and
-`run delete` refuses it while open — it is closed only by
-`end-run`. Who writes never mattered to a reader: `list runs`
-and `run status` show each record's driver (the asynchronous
-followers `run tail` and `attach_run()` observe an interaction
-run exactly as a script run, when they land — ROADMAP
-"Asynchronous runs (backlog)").
-
-U3's unit-test loop is served by these mechanics, never by
-semantics: per-run test selection travels as ordinary script
-properties (`--property` / the `properties=` mapping,
-interpolated by property references); granular results are a
-caller-authored artifact (JUnit XML, TAP) that the caller takes
-directly — read out-of-band from the stopped machine's drives
-at rest (a `hostdir` results drive makes this a plain directory
-read), or captured as text through `exec` — and keeps on its
-own side of the seam; and Reliquary has
-deliberately no test-result vocabulary — no pass/fail schema,
-no result parsing (G2). Granularity comes from run structure:
-one iteration is one run record.
+U3's unit-test loop is served without it: per-run test selection
+travels as ordinary script properties (`--property` / the
+`properties=` mapping, interpolated by property references);
+granular results are a caller-authored artifact (JUnit XML, TAP)
+the caller takes directly — retrieved in-band by guest-terms
+address (U14), swapped out as a disk image (U20), read from a
+`hostdir` results drive at rest, or captured as text through
+`exec` — and keeps on its own side of the seam. Reliquary has
+deliberately no test-result vocabulary — no pass/fail schema, no
+result parsing (G2). Granularity comes from run structure: one
+iteration is one returned output.
 
 ## How the vocabulary grows
 

@@ -382,9 +382,9 @@ the media component is yours.
 Machines are disposable realizations of a blueprint, each identified
 by `<blueprint>-<n>` and stored entirely under
 `cache/machines/<blueprint>-<n>/`. Everything under `cache/` is
-Reliquary's and disposable — and, run records excepted, regenerates
-from blueprints (media components and all) and scripts (records are
-evidence: copy out any worth keeping).
+Reliquary's and disposable, regenerating from blueprints (media
+components and all) and scripts. A run stores nothing here — it
+returns its output to the caller (D36).
 
 Every machine verb *is* its embedding-API twin's name under the
 identity rule: `create-machine` ↔ `create_machine`,
@@ -659,9 +659,10 @@ Every interaction command requires `--blueprint <name>` or
 machine" shortcut. The family's API twins land with the
 control-plane design — a named omission ([api.md](api.md)); the
 capability is meanwhile reachable through today's `Machine`
-functions. By default these commands leave no record; with a
-[recorded interaction run](#recorded-interaction-runs) open
-they append to it.
+functions. Each command returns its output; recording a loop of
+them into one persisted record (`begin-run` / `end-run`) is
+async-backlog work (D36; "Recorded interaction runs — backlog"
+below).
 
 ### Typing and pressing keys
 
@@ -809,7 +810,7 @@ plane, its drives are plain host state — a `hostdir` drive *is*
 its directory, and image drives are readable and writable with
 the user's own tools. Reliquary neither mediates nor records
 out-of-band access. The contract, including what stays
-untouchable (`cache/media/` payloads, `runs/` records), lives
+untouchable (`cache/media/` payloads), lives
 in the [instance model](instance-model.md).
 
 ```powershell
@@ -833,39 +834,16 @@ rlq hmp "info status" -b freedos
 rlq hmp "info block" -m freedos-0
 ```
 
-### Recorded interaction runs
+### Recorded interaction runs — backlog (D36)
 
-```
-rlq begin-run (--blueprint <name> | --machine <id>)
-rlq end-run (--blueprint <name> | --machine <id>)
-```
-
-By default the interaction commands leave no record. `begin-run`
-(twin `begin_run`, printing the new run number) opens an
-**interaction run** — an ordinary run record whose driver is the
-caller — and while it is open, every machine-targeting command
-on that machine (this family, the state operations, lifecycle)
-appends the same event kinds a script action emits; `end-run`
-(twin `end_run`) closes it with the neutral `ended` terminal
-event. Reliquary attaches no outcome to an interaction run —
-interpreting the loop is the caller's computation. One run may
-be open per machine: a second `begin-run` or a `run-script`
-fails closed naming it. `run status` shows an open run with its
-last-event time, `run delete` refuses it while open, and it is
-closed only by `end-run`; `list-runs` and `run status` treat it
-as any other record (records self-identify their driver; the
-async followers `run tail` / `attach_run()` too, when they
-land — backlog, D35). The record
-contract is the script spec's ("Failure, runs, and
-transcripts").
-
-```powershell
-rlq begin-run -b freedos
-# → freedos-0/5
-rlq enter "run-tests.bat" -b freedos
-rlq wait "Tests complete" -b freedos --timeout 300
-rlq end-run -b freedos
-```
+The `begin-run` / `end-run` bracket that records a primitive-driven
+loop into one persisted run record is part of the record model,
+which moved to the asynchronous-runs backlog with the rest of
+persistence (D36; ROADMAP "Asynchronous runs (backlog)").
+Milestone 9 stores nothing: the interaction commands each *return*
+their output, and a caller wanting a record collects those returned
+outputs in its own code (the driving program is the record). The
+bracket returns if the async work schedules.
 
 ---
 
@@ -962,7 +940,8 @@ forces the live tty
 rendering elsewhere — CI logs that render ANSI, a pager). The
 human modes render everything — live progress, the outcome, the
 failure report — to stderr and leave stdout empty: the outcome
-travels by exit code, run record, and `jsonl`. `jsonl`
+travels by exit code and, under `jsonl`, the returned event
+stream on stdout. `jsonl`
 is the programmatic
 synchronous form: stdout carries the run's event stream as JSON
 lines and nothing else — the last line is the terminal event, the
@@ -987,67 +966,25 @@ rlq check-script freedos-install
 rlq check-script install --blueprint freedos
 ```
 
-### Runs and run records
+### The run returns its output
 
-```
-rlq run status [<n>] (--blueprint <name> | --machine <id>)
-rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
-rlq list-runs [--blueprint <name> | --machine <id>]
-```
+A foreground `run-script` run streams its progress live and
+**returns its output** to the caller — a value the program takes,
+a rendering a person watches (D36). It stores nothing: there is
+no run directory, no persisted record, and no `run` management
+family (that whole record model — persisted runs, `run status` /
+`run delete` / `list-runs`, the async followers and handle, and
+interaction runs — is asynchronous-runs backlog work, ROADMAP
+"Asynchronous runs (backlog)", D35/D36). Ctrl-C cancels the run
+at the next event boundary (a `cancelled` terminal event, exit
+`5`) and leaves the machine as-is.
 
-The `run` family is the identity rule's second named exception:
-its operations map to the API run handle's methods, not to flat
-functions; the exception covers the command names only — flags
-mirror the method parameters as everywhere. A foreground
-`run-script` run streams its own progress until the run ends,
-and Ctrl-C cancels the run (writing a `cancelled` terminal event
-and exiting `5`).
-
-Runs number monotonically per machine (`<machine-id>/<n>`); the
-`run` operations take the number positionally and default to the
-machine's latest run. `run status` reports a record's state,
-driver, and last-event time; `list-runs` lists a machine's
-records with their drivers. `run delete` removes a run's
-record — the one `run` operation that never defaults to the
-latest run, because deleting evidence warrants naming it: the
-numbers are explicit, several may be given, an open run's record
-is refused (an interaction run closes with `end-run` first), and
-deletion frees no number. Records are otherwise kept for the
-machine's life; copy a record's directory out to keep it beyond
-`destroy` (the record contract is in the script spec).
-
-**Asynchronous runs — backlog (D35).** Detaching a run and
-following it from a process that did not start it left the
-numbered arc for lack of a use case (drafted as U19; ROADMAP
-"Asynchronous runs (backlog)"). When U19 is accepted these
-return, unchanged in design:
-
-```
-# scheduled when U19 is accepted:
-rlq run-script <label> --detach (--blueprint <name> | --machine <id>)
-rlq run tail [<n>] (--blueprint <name> | --machine <id>)
-rlq run wait [<n>] (--blueprint <name> | --machine <id>)
-rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
-```
-
-`--detach` completes parsing, binding, and preflight in the
-foreground — those failures land on the invoking command's exit
-code — then hands off at the machine boundary and prints the run
-id; a fresh process reopens the handle with `attach_run()`.
-`run tail` renders live progress (`--progress` as on
-`run-script`) and Ctrl-C stops tailing without touching the run;
-`run wait` blocks until the terminal event and exits with the
-run's own outcome code; `run cancel` ends the run at the next
-event boundary and leaves the machine as-is — `--stop-machine`
-also hard powers it off.
-
-```powershell
-rlq run-script install --blueprint freedos --detach
-# → freedos-1/4
-rlq run tail --blueprint freedos
-rlq run wait --blueprint freedos; echo $LASTEXITCODE
-rlq run cancel 4 --stop-machine --machine freedos-1
-```
+The run's product is the caller's — the returned value, a file
+retrieved in-band, a machine variable read with `get-machine-var`,
+a disk image swapped out — kept and organized on the caller's own
+side of the seam (P4, P18). The whole `run` family and the
+detach/follow surface return only if the async work schedules
+(drafted as U19).
 
 ---
 

@@ -112,9 +112,11 @@ SPDX-License-Identifier: BSD-3-Clause
   unexpected fault — is precisely an error outside the taxonomy.
   Other bindings spell the same classes natively.
 - **Async starters — sync is async plus attach** (owner,
-  2026-07-21; backlogged 2026-07-24, D35 — no use case, drafted
-  as U19; the blocking twins and record-management verbs stay in
-  milestone 9): a long operation is one start+attach model with
+  2026-07-21; backlogged 2026-07-24, D35/D36 — no use case,
+  drafted as U19; milestone 9 keeps only the blocking twins,
+  which *return* their output and store nothing — D36, so the
+  record-management verbs go to the backlog too): a long
+  operation is one start+attach model with
   two projections (planning/ROADMAP.md "Asynchronous runs"). The
   CLI composes them: every foreground command is
   start-plus-attach, and `--detach` is start without attach. The
@@ -157,16 +159,16 @@ carries the exceptions and each family's contract home.
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |
 | `seed-blueprint` / `seed-script` | `seed_blueprint(name, only=)` / `seed_script()` | [codex](codex.md) |
-| `run-script <label>` | `run_script()` blocking; `start_script()` → run handle (`--detach`, backlog — D35) | [script spec](script-spec.md) |
+| `run-script <label>` | `run_script()` returns the run's output, raises by error class (D36 — no stored record; the `exec` twin lands with it) | [script spec](script-spec.md) |
 | `check-script` | `check_script()` | script spec |
-| `run status`; `tail` / `wait` / `cancel` (backlog) | `run status` reads the record; the live followers are run-handle `events()` / `wait()` / `cancel()`, the handle reopened by `attach_run()` — the handle-method exception, backlogged with async (D35) | script spec |
-| `run delete` | `delete_run()` | script spec |
-| `begin-run` / `end-run` | `begin_run()` (returns the run number) / `end_run()` — the interaction-run bracket: an ordinary run record whose driver is the caller | script spec |
+| the `run` family; `begin-run` / `end-run`; `list-runs` — all backlog (D35/D36) | the record model — persisted runs, `run status` / `run delete`, the async followers `run tail` / `run wait` / `run cancel` with the run handle (`start_script()` / `attach_run()` / `delete_run()`), and interaction runs (`begin_run` / `end_run`) — is async-backlog work; milestone 9 stores nothing | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle (backlog — D35) | [media spec](media-spec.md#fetch-progress) |
 | `clean-media` / `prune-media` / `add-media` | `clean_media(name=None)` / `prune_media(dry_run=)` / `add_media(name, path)` | media spec |
-| `insert-media` / `eject-media` / `set-boot-order` | `insert_media()` / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
-| `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the door to out-of-band file exchange (in-band file operations are deferred: planning/ROADMAP.md "Horizon") | [instance model](instance-model.md) |
-| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` / `list-runs`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [ROADMAP "The CLI"](../ROADMAP.md); each noun's returns: that noun's spec, as they land |
+| `insert-media` / `eject-media` / `set-boot-order` | `insert_media(slot, media=None, file=None)` (`--file` mounts an anonymous `local`+`use` image, U20) / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
+| `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the out-of-band door | [instance model](instance-model.md) |
+| `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
+| in-band file put/get | guest-terms addressed (P17), over a vvfat drive, stopped-only, non-vvfat fails closed (P11) — milestone 9 (U14); names settle with the work | script spec |
+| `list-machines` / `list-blueprints` / `list-scripts` / `list-media`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [ROADMAP "The CLI"](../ROADMAP.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
 | guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
 

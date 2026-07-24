@@ -52,11 +52,10 @@ directory, run directories, and backend identity all use the
 machine id, and there is no separate machine name. A machine
 **is** its cache directory — nothing about a machine lives
 outside `cache/`, because a machine lives and dies as one thing.
-Deleting the cache deletes the machines, by design — run records
-included, and unlike everything else there, records are evidence
-rather than regenerable output: copy a record out while the
-machine exists when it should outlive it (see the script spec's
-run-record contract).
+Deleting the cache deletes the machines, by design. A run stores
+nothing in the cache — it returns its output to the caller (D36),
+which keeps whatever is worth keeping on its own side of the seam
+(P4, P18; the return model — script spec).
 
 Commands select their targets with explicit flags, never
 positionally:
@@ -230,15 +229,14 @@ honest ceiling is host resources (memory, free ports), surfaced
 as an ordinary `start` failure. Reliquary invents no cap of its
 own.
 
-There is no `installed` boolean. Script outcomes belong to the
-append-only run records under the instance cache, where they can name
-the script, its source digest, result, transcript, and produced
-artifacts without making a vague claim about the guest's contents.
-Records have machine-bounded retention: never rewritten or
-implicitly pruned, deleted only with their machine
-(`destroy`/`recreate`) or explicitly by `run delete`; each record
-directory is self-contained plain files, copied out to survive
-the machine.
+There is no `installed` boolean. A script's outcome is the output
+the run returns to the caller (D36) — naming the script, its
+source digest, result, and produced artifacts — never a stored
+claim about the guest's contents. The run stores nothing in the
+cache; persisting a run into a record archive is
+asynchronous-runs backlog work (ROADMAP "Asynchronous runs
+(backlog)"), and the consumer keeps whatever output is worth
+keeping.
 
 ## Naming and identity
 

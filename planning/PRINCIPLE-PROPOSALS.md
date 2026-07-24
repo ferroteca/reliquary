@@ -42,10 +42,12 @@ exist yet — no run-events stream, no `--progress` renderers
 half (`--json`) is real, but the run half is milestone 9's
 work, whose scheduling — it cites the split — is this
 proposal's acceptance. The 2026-07-24 async deferral (D35)
-leaves P5 whole within milestone 9: its two-rendering demand is
-on the run's *own driver* — pretty and machine-readable, both
-live — which the foreground stream and `--progress` renderers
-deliver; detach and cross-process following (backlogged) are not
+and the return-not-store revision (D36) leave P5 whole within
+milestone 9: its two-rendering demand is on the run's *own
+driver* — pretty and machine-readable, both live — which the
+`--progress` renderers deliver as **live output**, never a
+stored file (persistence was async's substrate and went with it,
+D36). Detach and cross-process following (backlogged) are not
 P5's concern. P5 returns to the standing list when milestone 9
 lands. Statement and prose verbatim:
 
@@ -398,7 +400,47 @@ Statement (candidate; question 1 may add a clause):
 >   closed naming the ambiguity (P11). (Normative home: TBD on
 >   acceptance.)
 
+**P18 — Mechanism, not content** — drafted (add, 2026-07-24, the
+exec-run round; D36). Reliquary ships no standardized authored
+content — no blessed scripts of any kind (readiness, test,
+install), no reusable script library. The codex holds *examples*
+to copy a first draft from (P4), nothing more; a library of
+reusable authored automation is a different project's job. This
+sharpens P4 (residency — the codex never feeds automation) and
+G2 (no test-result vocabulary) into one boundary about
+*authorship*: Reliquary supplies the machine, the drive
+mechanics, and the value channels, and attaches no meaning to
+what runs through them. Already the shape of the project's own
+stack — a guest driver and a test-framework parser each live
+outside the machine layer, consuming its interfaces — which is
+what a real principle looks like on the way in. It is the same
+"computation lives outside Reliquary" the authored-input ceiling
+(P14) draws, turned toward *output* and *reusable content*: the
+consuming project owns both.
+
+> - **P18 — Mechanism, not content.** Reliquary provides
+>   mechanism — machines, drive and file transports, the value
+>   channels in and out — and never standardized content. No
+>   blessed scripts of any kind, no reusable authored library:
+>   the codex carries examples to copy a first draft from (P4),
+>   and anything reusable is the consuming project's or another
+>   project's to build. Reliquary attaches no meaning to what
+>   runs through its mechanisms; computation and interpretation
+>   live on the caller's side of the seam (G2). (Normative home:
+>   TBD on acceptance.)
+
 ### Tracked
+
+- **Sharpen P3 from "guest agents" to "transport agents"** —
+  tracked (recorded 2026-07-24, the exec-run round; D36). P3
+  today says Reliquary consumes native guest agents and never
+  builds its own; the fast file-transport thread found the same
+  logic binds the *host* side of a transport agent — Reliquary
+  builds neither side, sourcing the transport externally (an
+  existing tool, then a dedicated project) and providing only the
+  control-plane seam. Fold into P3's wording if the fast-transport
+  work schedules.
+
 
 - **Itemize ROADMAP's remaining design principles** — tracked
   (recorded 2026-07-23; previously a candidates note inside

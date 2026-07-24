@@ -145,6 +145,22 @@ structured command results or file transfer. A custom listener
 could add those operations, but that would be a separate protocol
 carried over serial.
 
+**Fast file transport is wholly external (backlog; owner,
+2026-07-24, D36).** Agentless vvfat exchange reboots the machine
+per file swap; live media swap (`insert-media`/`eject-media`, U20)
+avoids the reboot but still pays a swap per round. A transport
+faster than that needs guest cooperation and is **outside
+Reliquary's scope entirely, host and guest sides alike**:
+Reliquary provides only the file-transfer control-plane seam (P17
+guest-terms addressing, P11 capability selection), and the
+transport itself is sourced externally — an existing tool
+(Kermit-style serial file transfer is the candidate) → another
+alternative → worst-case a dedicated project — never built here.
+vvfat stays the built-in agentless fallback (P2). Demand is the
+swap/reboot cost; scheduling it may sharpen P3 from "guest agents"
+to "transport agents, host or guest"
+([PRINCIPLE-PROPOSALS.md](PRINCIPLE-PROPOSALS.md)).
+
 ### Guest agents
 
 Structured guest protocols with command execution and file

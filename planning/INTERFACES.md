@@ -141,16 +141,17 @@ covers them equally:
   delete-to-refresh, provenance, and the licensing rule
   for shipped media URLs:
   [planning/design/codex.md](design/codex.md).
-- **Recorded outputs** — run records under a machine's `runs/`
-  directory: the event stream, transcripts (with the
-  secret-redaction contract), and screenshots. The world reads these;
-  their shape and retention are a contract: append-only, never
-  rewritten, never implicitly pruned — a record lives until its
-  machine is destroyed or the user explicitly deletes it. A
-  record is evidence, not reconstructible; durability beyond the
-  machine is the consumer's claim — the record directory is
-  self-contained, and copying it out is the sanctioned way to
-  keep one ([planning/design/script-spec.md](design/script-spec.md)).
+- **The run's returned output** — a run drives the machine and
+  returns its output to whoever started it, storing nothing (D36):
+  the live event stream (rendered pretty or as `jsonl`, with the
+  secret-redaction contract), `--json` documents, and exit codes
+  are the world-facing machine surfaces. Their shape is a
+  contract; the run stores no record — persisting a run so another
+  process can follow it is asynchronous-runs backlog work, and the
+  whole record model lives there (ROADMAP "Asynchronous runs
+  (backlog)"). A run's product is the consumer's, kept on its own
+  side of the seam
+  ([planning/design/script-spec.md](design/script-spec.md)).
 - **The home layout** — where users place payload files, find
   caches, and locate everything above:
   [planning/design/instance-model.md](design/instance-model.md).

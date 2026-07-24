@@ -48,6 +48,92 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D36 — THE RUN RETURNS ITS OUTPUT; MILESTONE 9 IS THE
+  PROGRAMMATIC LOOP — DECIDED (owner, 2026-07-24, the exec-run
+  design round). Supports P4, P6, P8, P18; **amends D35**. The
+  round itemized the U14/U20 journeys end to end (a consumer
+  driving a DOS machine, running work, reading results, iterating)
+  and found the elaborate run-record design demand-less. Five
+  moves:
+  U14 RESHAPED (product corrected). U3/U14 said "the run record
+  is the product," conflating Reliquary's *evidence* record with
+  the caller's *work-product* — the value a run yields and the
+  file the caller asks Reliquary to hand back. The result is the
+  product; the record is evidence (P4). U14 now supersedes U3
+  alone.
+  U15 CLOSED. The itemization showed U15's "rerun tests tightly"
+  (granular results, selective re-run) is U14's own loop with a
+  property — steps 4–6 of the journey — so it carries nothing U14
+  does not. Withdrawn, its number retired; this is its death
+  record (the lifecycle's requirement).
+  U20 ADDED. Live media swap — `insert-media`/`eject-media` on a
+  running machine — is the faster *agentless* file exchange: no
+  reboot per round, no guest agent. It drives a different consumer
+  model (image-granular, consumer-built and -managed) than U14's
+  file-granular vvfat put/get, so it earns its own case beside
+  U14. The image it mounts is an anonymous `local`+`use` media
+  (mutable, unverified, in place — all already in the spec);
+  `insert-media` grows an explicit `--file <path>` mode beside the
+  declared-media name.
+  P18 DRAFTED. Mechanism, not content: Reliquary ships no
+  standardized scripts (readiness, test, install) of any kind —
+  the codex holds *examples* (P4), never a blessed library — and
+  reusable authored content is a different project's job. Already
+  the shape of the project's own stack (a test-framework parser
+  and a guest driver each live outside the machine layer).
+  THE RUN RETURNS ITS OUTPUT — ZERO PERSISTENCE. `run_script` /
+  `exec` return their output directly; nothing is stored. Deleted:
+  the `runs/<n>/` archive (the `<timestamp>-<id>/` layout with
+  it), the persisted `run-events.jsonl` / `transcript.txt`,
+  retention, `list-runs` / `run status` / `run delete`, and
+  interaction runs (`begin-run` / `end-run` — a bracket with no
+  record to write to). THE REASON IS THAT PERSISTENCE WAS ASYNC'S
+  SUBSTRATE: the persisted stream existed to be "the update
+  channel" every async follower reads (`run tail`, `attach_run`,
+  cross-process). D35 deferred every follower, so the file has had
+  no reader since — vestigial for an hour. And no use case demands
+  a stored record: U14/U20 are consumer-managed, U12 wants live
+  progress, U10's "verdict" is the returned result. The event
+  *stream* survives as **live output** (jsonl to a program, pretty
+  to a person — P5), never a file; the multithreaded case is
+  cleaner for it, each run returning to its own caller with no
+  shared store to number or lock. Proven precedent: the absorbed
+  DOS/QEMU harness `run_guest_program` returned the log text and
+  stored nothing.
+  MILESTONE 9 REFRAMED as the programmatic loop it is *for* —
+  U14/U20 (drive, test, iterate) plus live feedback for a watched
+  install (U12) — not "run records" as an isolated feature. Its
+  deliverables: the return-not-store run model, the error taxonomy,
+  live `--progress` feedback, and the exec-run mechanics (in-band
+  vvfat file put/get, machine variables, the `exec` twin,
+  `insert-media --file`, consumer-authored readiness). Scheduling
+  this work is U14's and U20's acceptance (D23), so both promote
+  drafted → accepted. Async (U19) stays deferred.
+  SERIAL / FAST TRANSPORT — WHOLLY EXTERNAL. A transport faster
+  than live swap needs guest cooperation and is outside
+  Reliquary's scope entirely, host and guest sides alike:
+  Reliquary provides only the file-transfer control-plane seam
+  (P17 addressing, P11 selection), and the transport is an
+  existing tool (Kermit-ish) → another alternative → worst-case a
+  dedicated project. vvfat stays the built-in agentless fallback
+  (P2). Backlog; demand is the swap/reboot cost. May sharpen P3
+  ("guest agents" → "transport agents, host or guest").
+  AMENDS D35: the "Run records" section D35 split from the async
+  section is superseded by the return model, and the persistence
+  design it carried moves into the Asynchronous-runs backlog as
+  the substrate async would need if it ever returns.
+  FOLDED: this entry; USE-CASE-PROPOSALS.md (U14 reshaped + moved
+  to accepted, U20 added + accepted, U15 removed);
+  PRINCIPLE-PROPOSALS.md (P18 drafted, P3 sharpening tracked, P5
+  note); ROADMAP (the Run-records section rewritten to the return
+  model, persistence moved to the async backlog, milestone 9
+  reframed, the CLI run family trimmed); script-spec.md ("Failure,
+  runs, and transcripts" and "The run event stream" rewritten to
+  return-not-store, "Interaction runs" removed); AGENTS.md
+  (machine layout, the embedding surface); guest-communication.md
+  (the external-transport backlog note); TASKS.md (the milestone 9
+  breakdown replacing the run-records one).
+
 - D35 — ASYNCHRONOUS RUNS LEAVE THE ARC; MILESTONE 9 IS RUN
   RECORDS — DECIDED (owner, 2026-07-24). Supports P8; applies
   D23's acceptance-is-scheduling and follows D33's ground.

@@ -166,16 +166,15 @@ machine is durable: a machine **is** its cache directory (see
 │                            `vm` section)
 ├── media/                   per-machine materialized images, by
 │                            media name
-├── runs/                    append-only run records (transcripts,
-│                            screenshots, outputs)
 └── <backend>/               the backend's own files (e.g. qemu/)
 ```
 
 Everything under `cache/machines/<id>/` is Reliquary's and
 disposable: drives and backend files regenerate from the blueprint
-(plus media definitions and scripts); run records are evidence —
-retained for the machine's life, never regenerable, copied out to
-survive it.
+(plus media definitions and scripts). A run stores nothing here —
+it returns its output to the caller (D36); there is no `runs/`
+archive (that persistence is async-backlog work — "Asynchronous
+runs (backlog)").
 Nothing is ever hand-placed there. Pre-existing content enters a
 machine through the blueprint: `media` references, and starting-point
 images (`base`) that machine drives are differenced from, or
@@ -227,9 +226,9 @@ changes fail closed, pointing at `recreate`). Reconfiguration
 persists there — a machine legitimately diverges from its
 blueprint, as an install script does while its installer CD is
 attached, until the script restores it or `apply` reconciles the
-machine back to the blueprint. Script
-outcomes live in the append-only run records under the machine's
-cache; there is no `installed` flag.
+machine back to the blueprint. A script's
+outcome is the output it returns to the caller (D36); there is no
+`installed` flag and no stored record.
 
 Core fields: `platform` (required, never inferred), `backend`
 (assigned from the availability-filtered priority list when not
@@ -291,9 +290,8 @@ once the state format settles.
     │                    .ledger.json recording what each file is
     └── machines/<id>/   cached materializations (above —
                          disposable: drives regenerate from
-                         blueprint and media; run records are
-                         evidence, copied out to outlive the
-                         machine)
+                         blueprint and media; a run stores nothing,
+                         returning its output to the caller — D36)
 ```
 
 The current `install-media/` cache folds into `cache/`. The
@@ -529,7 +527,9 @@ deliberately lacks: `screen` prints the current text screen
 (scripts observe; humans and programs read), and `exec <command>`
 is the composite convenience — `enter` plus the platform
 workflow's completion detection — that scripts spell as explicit
-observation. `run` therefore names run records exclusively.
+observation. The `run` family (record management, follow, cancel)
+is async-backlog work (D35/D36), so no `run` command is in the
+milestone-9 surface.
 `hmp` remains the QEMU-only escape hatch until the control-plane
 design homes it; the interaction family's API twins land with
 that same design as a named omission (planning/design/api.md),
@@ -580,11 +580,11 @@ screen text, and printed ids pipe clean with no flags, and
 announcement lines (a resolved directory header, narration)
 never pollute a pipe. Stream-bearing commands' human modes
 render everything — live progress, the outcome, the failure
-report — to stderr and leave stdout empty: the machine paths are
+report — to stderr and leave stdout empty: the machine path is
 `--progress jsonl` (whose stdout events are the result — the
-settled exception) and the run record, and the outcome is the
-exit code; `--detach`'s printed run id remains a result
-(backlog, D35).
+settled exception), and the outcome is the exit code.
+(`--detach`'s printed run id, and the persisted record it names,
+are backlog — D35/D36.)
 `--progress auto` resolves by whether *stderr* is a tty — the
 stream progress renders on — so piping stdout never degrades the
 live display and redirecting stderr to a log gets `plain`
@@ -599,10 +599,11 @@ when that stream is a tty; `NO_COLOR` is honored; there is no
 `--color` flag (`--progress pretty` remains the way to force
 live rendering at a non-tty).
 
-The stability contract (owner, 2026-07-22): the machine
-surfaces are exactly four — exit codes (the error classes),
-`--json` documents, the `jsonl` event stream, and run-record
-files. Pretty and plain output are explicitly uncontracted —
+The stability contract (owner, 2026-07-22; run-record files
+dropped 2026-07-24, D36): the machine surfaces are exactly
+three — exit codes (the error classes), `--json` documents, and
+the `jsonl` event stream (live output, not a stored file).
+Pretty and plain output are explicitly uncontracted —
 free to change any release: machine consumers get machine
 surfaces, and nobody freezes the human rendering by depending
 on it. From 1.0 the machine surfaces grow additively only (the
@@ -620,7 +621,6 @@ rlq list-blueprints
 rlq list-machines [--blueprint <name>]
 rlq list-scripts
 rlq list-media
-rlq list-runs [--blueprint <name> | --machine <id>]
 rlq (search-blueprints | search-scripts | search-media) <term>...
     [--verbose]
 rlq new-blueprint <name> [flags]
@@ -642,15 +642,18 @@ rlq import-vm <source> --name <name> --platform <platform>
 rlq run-script <label> (--blueprint <name> | --machine <id>)
     [--property <key>=<value>]... [--properties <path>]
     [--display] [--progress <mode>]
+# backlog — the run family, interaction runs, and list-runs need
+# record persistence, which is async work (D35/D36), scheduled
+# when U19 is accepted:
+rlq list-runs [--blueprint <name> | --machine <id>]
 rlq run status [<n>] (--blueprint <name> | --machine <id>)
 rlq run delete <n> [<n> ...] (--blueprint <name> | --machine <id>)
-rlq begin-run (--blueprint <name> | --machine <id>)
-rlq end-run (--blueprint <name> | --machine <id>)
-# backlog — asynchronous runs (D35), scheduled when U19 is accepted:
-rlq run-script <label> ... --detach
 rlq run tail [<n>] (--blueprint <name> | --machine <id>) [--progress <mode>]
 rlq run wait [<n>] (--blueprint <name> | --machine <id>)
 rlq run cancel [<n>] [--stop-machine] (--blueprint <name> | --machine <id>)
+rlq begin-run (--blueprint <name> | --machine <id>)
+rlq end-run (--blueprint <name> | --machine <id>)
+rlq run-script <label> ... --detach
 rlq type <text> (--blueprint <name> | --machine <id>)
 rlq enter <line> (--blueprint <name> | --machine <id>)
 rlq press <key>... (--blueprint <name> | --machine <id>)
@@ -662,10 +665,12 @@ rlq wait <condition> (--blueprint <name> | --machine <id>)
     [--timeout <duration>]
 rlq screen (--blueprint <name> | --machine <id>)
 rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
-rlq insert-media <slot> <media> (--blueprint <name> | --machine <id>)
+rlq insert-media <slot> (<media> | --file <path>)
+    (--blueprint <name> | --machine <id>)
 rlq eject-media <slot> (--blueprint <name> | --machine <id>)
 rlq set-boot-order <key>... (--blueprint <name> | --machine <id>)
 rlq get-machine-dir (--blueprint <name> | --machine <id>)
+rlq get-machine-var <key> (--blueprint <name> | --machine <id>)
 rlq hmp <line> (--blueprint <name> | --machine <id>)
 rlq check-script <label-or-name> [--blueprint <name> | --machine <id>]
     [--property <key>=<value>]... [--properties <path>]
@@ -702,7 +707,7 @@ Lifecycle semantics:
   sides; `recreate-machine` is the honest alternative.
 - `destroy-machine` deletes the machine entirely — its directory
   (state,
-  drive images, run records) and the backend's machine. The
+  drive images) and the backend's machine. The
   blueprint is never touched; `create-machine` makes a fresh
   machine whenever one is wanted again.
 - `delete-blueprint <name>` removes the blueprint file itself and
@@ -1173,34 +1178,31 @@ regenerating or text-merging what the author wrote — is designed
 in [planning/design/recorder.md](design/recorder.md). Delivery
 sits in "Horizon" below; work items in planning/TASKS.md.
 
-## Run records
+## The run and its output
 
-A script run produces a run record — a live event stream and the
-renderings of it — the consumer story for the feedback split
-(PRINCIPLES.md P5): a person watches an install and sees where
-it is (U12), an automating program follows machine-readable
-events as they happen (U14). Settled design (owner, 2026-07-21);
-asynchronous runs — detaching a run and following it from a
-process that did not start it — were deferred to the backlog
-2026-07-24 (D35; "Asynchronous runs (backlog)" below), leaving
-the run's own driver watching it live here:
+A run drives the machine and **returns its output** to whoever
+started it — a value for a program, live progress for a person —
+and stores nothing (owner, 2026-07-24; D36). This is the
+consumer story for the feedback split (PRINCIPLES.md P5): a
+person watches an install and sees where it is (U12), an
+automating program reads machine-readable events as they happen
+and takes the result (U9, U14). Reliquary keeps no record
+archive; the consumer keeps whatever it wants (P4, P18).
 
-**The stream is written live.** `run-events.jsonl` is appended
-event by event, flushed at each event boundary, from the first
-preflight event to a terminal event stating the outcome. The
-file is the update channel: every rendering is a follower of the
-stream the run already produces — the live display, the
-transcript, the record-management verbs — which keeps the
-contract binding-clean (any language that can read lines can
-follow a run — the C/Java constraint) and keeps daemons and
-services permanently out of the picture. A record lacking a
-terminal event is an *incomplete* run, and because a foreground
-run never outlives its process, telling incomplete from finished
-needs no liveness check — the terminal event is present or the
-run is over. (Writer identity and the cross-process liveness the
-*crashed*-run rule needs arrive with "Asynchronous runs
-(backlog)", where a run can outlive the terminal that started
-it.)
+**The event stream is live output, never a file.** A run emits
+an event stream — preflight, phase and observation spans,
+transfer progress, the terminal event stating the outcome —
+rendered live to the run's driver and gone when the run ends.
+There is no `runs/` directory, no persisted `run-events.jsonl`
+or `transcript.txt`, no retention: persistence was the substrate
+async needed — a stored stream is what a cross-process follower
+reads — and async is backlog (D35), so the file would have no
+reader. `run_script` / `exec` **return** their output directly;
+the consumer redirects or captures it to keep it. The
+multithreaded case is cleaner for it — each run returns to its
+own caller with no shared store to number or lock. Proven
+precedent: the absorbed DOS/QEMU harness returned the log text
+and stored nothing.
 
 **Cancel ends the run, not the machine.** Ctrl-C on a foreground
 run requests a stop; the runner ends at the next event boundary
@@ -1213,141 +1215,84 @@ terminal that did not start it — the `run cancel
 [--stop-machine]` command — arrives with the asynchronous
 followers (backlog).
 
-**Run identity is machine-scoped.** Runs number monotonically
-per machine, never reused; the record lives at
-`cache/machines/<machine-id>/runs/<n>/` and `<machine-id>/<n>`
-is a run's full identity. The `run` operations take the number
-as an ordinary positional argument (the property-family
-precedent), defaulting to the machine's latest run, with the
-machine chosen by the ordinary `--machine` / `--blueprint`
-selectors.
+**Results are the consumer's.** A run's *product* is the value
+it returns and the artifacts the consumer pulls from the machine
+— a file retrieved in-band (U14, guest-terms addressing), a
+small value read from a machine variable, a whole disk image
+swapped out (U20). Reliquary attaches no meaning to any of it
+(G2), retains none of it, and has no test-result vocabulary; the
+consumer keeps, organizes, and discards on its own side of the
+seam (P4, P18). One iteration is one returned output. A
+primitive-driven loop needs no bracket to be recorded — the
+consumer's own driving code, collecting each call's returned
+output, *is* its record. Per-test selection travels in as script
+properties; granular results come out as the caller's own files
+and values (U14, U15's closed demand). Contract home:
+script-spec.md "Failure, runs, and transcripts".
 
-**Retention is machine-bounded and explicit (owner,
-2026-07-21).** A run record is append-only, never rewritten, and
-never implicitly pruned: the only deleters are machine
-`destroy`/`recreate` and the explicit `run delete` — a `run`
-family member, never a `clean` one, because `clean`'s own
-invariant is that nothing irreplaceable is cleanable, and
-records are evidence, not regenerable output. `run delete` alone
-never defaults to the latest run (deleting evidence warrants
-naming it): numbers are explicit, several may be given, a live
-run's record is refused (fail closed, naming the writer), and
-deletion frees no number. The record directory is self-contained
-and self-identifying (machine id, run number, timestamps, script
-digest — distinguishable across `recreate` generations that
-reuse a machine id); copying it out with ordinary tools is the
-sanctioned way to keep a record beyond its machine, and there is
-deliberately no export verb for it — the record is already
-host-side plain files at a reported path. Contract home:
-script-spec.md "Failure, runs, and transcripts"; custody model
-in PRINCIPLES.md (P4, the artifact-residency split) and INTERFACES
-(recorded outputs).
+**Two renderings, under parity.** Rendering is selected with
+`--progress (auto | pretty | plain | jsonl)` (default `auto`,
+tty detection — the decided BuildKit vocabulary) on the
+stream-bearing commands, `run-script` and `fetch-media`. Under
+`jsonl`, stdout carries the event stream as JSON lines and
+nothing else — diagnostics to stderr — and because the stream
+ends with the terminal event, the last line is the
+machine-readable result: no separate result mode exists.
+`run_script()` returns a typed result and raises by error class,
+while the foreground `run-script` command speaks the stream live
+and exits by code — twins in capability, divergent in
+presentation (a named decision, not drift). Prompting is
+confined to a tty under `auto`/`pretty`; `plain`/`jsonl` runs
+are noninteractive, so a missing input is a PREFLIGHT ERROR
+before the machine starts and a program can never hang on a
+hidden prompt. The general stdout/stderr discipline and the
+stability contract across every command are settled in "The
+CLI" above (owner, 2026-07-22).
 
-**Interaction runs — the opt-in bracket (owner, 2026-07-22).**
-A primitive-driven loop earns the same evidence a script gets:
-`begin-run` (twin `begin_run`, returning the new run number)
-opens an ordinary run record whose driver is the caller; while
-it is open, every machine-targeting command on that machine —
-the guest-console family, the state operations, lifecycle —
-appends the event kinds the execution model defines for the
-same actions, and `end-run` closes the record with the neutral
-`ended` terminal event (Reliquary attaches no outcome to an
-interaction run — G2). With no open run, primitives record
-nothing: recording is opt-in, so the automator opts in exactly
-when the record is the product (U3) and interactive fiddling
-never spams records. One run may be open per machine —
-`begin-run` and `run-script` both fail closed naming an open
-run (mixed-driver records are U6's recorder machinery, grown
-from this shape through the reserved handover kinds). An
-interaction run has no resident writer at all: each command
-appends under the machine's exclusive lock, and openness is
-visible, never inferred — `run status` shows the open run and
-its last-event time, `run delete` refuses it while open, and it
-is closed only by `end-run`. `list runs` and `run status` treat
-interaction runs as ordinary records that self-identify their
-driver (the async followers `run tail` / `attach_run()` too,
-when they land).
-U3's per-test loop rides these mechanics: selection in as
-script properties, results out as caller-authored artifacts
-the caller reads out-of-band from the stopped machine's drives
-at rest, and deliberately no
-test-result vocabulary in Reliquary (G2) — one iteration is
-one run record. Contract home: script-spec.md "Failure, runs,
-and transcripts".
-
-**Two presentations, under parity.** The CLI carries the
-record-management `run` verbs — `run status` (the record's
-state, its driver, its last-event time), `run delete <n> [<n>
-...]`, and `list runs` — alongside the foreground rendering of a
-live run (`--progress`, below). The embedding API's twins:
-`run_script()` stays the blocking form, `begin_run` / `end_run`
-open and close an interaction run, and `delete_run()` removes a
-record; each takes the CLI's selectors (`resolve_machine()` the
-shared seam) and returns what the CLI prints. The asynchronous
-half — `run-script --detach`, the followers `run tail` /
-`run wait` / `run cancel`, and the API handle `start_script()` /
-`attach_run()` — is "Asynchronous runs (backlog)" below.
-
-**Synchronous programmatic runs — the blessed divergence.** The
-sync forms are twins in capability but divergent in presentation
-— a named decision, not drift: `run_script()` returns a typed
-result and raises by error class, while the foreground
-`run-script` command speaks the stream and its exit code.
-Rendering is
-selected explicitly with `--progress (auto | pretty | plain |
-jsonl)` (default `auto`, tty detection — the decided BuildKit
-vocabulary) on the stream-bearing commands — `run-script` and
-`fetch-media` (and `run tail`, when the async followers land).
-Under `jsonl`, stdout carries the event stream as
-JSON lines and nothing else, ever — diagnostics go to stderr —
-and because the stream ends with the terminal event, the last
-line is the machine-readable result: no separate result mode
-exists. Prompting is confined to interactive contexts (a tty
-under `auto`/`pretty`); `plain`/`jsonl` runs are noninteractive,
-so a missing input value is a PREFLIGHT ERROR before the machine
-starts and a program can never hang on a hidden prompt. This
-settles renderer selection and jsonl stdout purity for the
-stream-bearing commands; the general stdout/stderr discipline
-and the stability contract across every command are settled in
-"The CLI" above (owner, 2026-07-22).
-
-**Fetch progress — the same model (owner, 2026-07-21).** Media
-movement emits the same transfer and verification event kinds
-wherever it happens; only where they land differs. Inside a
-script run they ride the run's stream (the transfer events
-above). Standalone `fetch-media` renders them itself under the same
-`--progress` vocabulary — jsonl stdout purity and the
-no-prompt rule included, so the mismatched-file checkpoint
-prompts only under `auto`/`pretty` and fails fast under
-`plain`/`jsonl`. The stream is ephemeral: media has no state
-document and there is no fetch record — nothing persists,
-nothing reattaches; run records remain the only recorded
-outputs. Machine operations that fetch implicitly outside a run
-(`create-machine` / `start-machine` / `apply-blueprint` /
-`recreate-machine` reconciliation) render the
-same events under the same defaults, under the output discipline
-in "The CLI" above. Honesty
-rules carry over: byte totals only where the source names them,
-hashing and extraction elapsed-only, each mirror attempt its own
-event. On the API, `fetch_media()` stays the blocking form
-(typed result, errors by class); the asynchronous `start_fetch()`
-handle defers with "Asynchronous runs (backlog)". Contract home:
-media-spec "Fetch progress".
+**Fetch progress — the same model.** Media movement emits the
+same transfer and verification event kinds wherever it happens,
+rendered live under the same `--progress` vocabulary — inside a
+run they ride the run's stream; standalone `fetch-media` and the
+implicit fetches of `create-machine` / `start-machine` /
+`apply-blueprint` / `recreate-machine` reconciliation render
+them the same way. jsonl stdout purity and the no-prompt rule
+carry over (the mismatched-file checkpoint prompts only under
+`auto`/`pretty`, fails fast under `plain`/`jsonl`). The stream
+is ephemeral — media has no state document and nothing persists,
+here as everywhere (D36). Honesty rules: byte totals only where
+the source names them, hashing and extraction elapsed-only, each
+mirror attempt its own event. On the API, `fetch_media()`
+returns a typed result, errors by class; the asynchronous
+`start_fetch()` handle defers with "Asynchronous runs
+(backlog)". Contract home: media-spec "Fetch progress".
 
 ## Asynchronous runs (backlog)
 
-> **Deferred to the backlog** (owner, 2026-07-24, D35): the
-> asynchronous-run pillar leaves the numbered arc — milestone 9
-> delivers run records without it. No in-force or accepted use
-> case demands it: the feedback split (P5) is satisfied by the
-> run's own driver watching it live, and detaching a run or
-> following it from a process that did not start it is a
-> separable capability no case writes down. Its demand is the
-> U19 draft
+> **Deferred to the backlog** (owner, 2026-07-24, D35; scope
+> extended D36): the asynchronous-run pillar leaves the numbered
+> arc — milestone 9 delivers the run, and its output, without it.
+> No in-force or accepted use case demands it: the feedback split
+> (P5) is satisfied by the run's own driver watching it live, and
+> detaching a run or following it from a process that did not
+> start it is a separable capability no case writes down. Its
+> demand is the U19 draft
 > ([planning/USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md),
 > "start a long run and follow it from elsewhere"); accepting
 > U19 is scheduling this work back onto the arc, the citing item
-> the record. The design is settled and stands as written.
+> the record.
+>
+> **Persistence lives here (D36).** A run another process can
+> follow must be written down, so the whole record substrate
+> belongs to this pillar and returns with it: the
+> `cache/machines/<id>/runs/<n>/` archive with machine-scoped
+> monotonic numbering, the persisted `run-events.jsonl` and
+> `transcript.txt`, retention and the `list-runs` / `run status`
+> / `run delete` verbs, the crashed-run rule (writer identity +
+> cross-process liveness), and interaction runs (`begin-run` /
+> `end-run`, the primitive-loop bracket and U6's recorder seam).
+> Milestone 9 stores nothing; this is where storage comes back.
+> The design below and that record model are settled and stand as
+> written.
 
 **Sync is async plus attach.** A foreground `run-script` run is
 defined as: start the run, immediately attach the live renderer.
@@ -1440,11 +1385,13 @@ folded the blueprint and media formats into one composable
 blueprint (the 2026-07-23 composition round); milestone 8
 (complete) added the script properties — the user properties file,
 secret storage, the binding pipeline, the declared derivation, and
-`${key}` location references. Milestone 9 then delivers run
-records — the live event stream, its foreground renderings, the
-error taxonomy, and interaction runs — for the DOS platform on
-the QEMU backend alone; asynchronous runs (detach and
-cross-process followers) leave the arc for the backlog for lack
+`${key}` location references. Milestone 9 then delivers the
+programmatic testing loop — the run returning its output, live
+feedback, the error taxonomy, and the exec-run mechanics (file
+put/get, machine variables, readiness, `insert-media --file`) —
+for the DOS platform on the QEMU backend alone; asynchronous runs
+and the record persistence they need leave the arc for the
+backlog for lack
 of a use case (D35), joining the pillars D33 demoted.
 **Milestone 9 is the current one.**
 
@@ -2347,56 +2294,60 @@ candidate as the supplying source, and a media whose `location`
 is a `${key}` reference materializes through the same order
 with its resolved location recorded in the state.
 
-### Milestone 9 — Run records
+### Milestone 9 — The programmatic testing loop
 
-The run-events stream and everything that renders it —
-completing the feedback split (PRINCIPLES.md P5) for the
-DOS-on-QEMU vertical. Asynchronous runs — detach, cross-process
-followers, and the API async handles — are backlog work
-("Asynchronous runs (backlog)" above; D35), scheduled back onto
-the arc only when U19 is accepted; this milestone builds the
-foreground records they will later follow.
+The DOS-on-QEMU vertical's culmination: an agent drives a machine
+from its own code, runs work, reads results, and iterates (U14,
+U20), with live feedback for a watched install (U12, P5). The run
+**returns its output** and stores nothing (D36); async — detach,
+cross-process followers, and the persistence they need — is
+backlog ("Asynchronous runs (backlog)" above; D35/D36). This
+milestone accepts U14 and U20 (D23).
 
 Deliverables:
 
-1. The normative `run-events.jsonl` stream, written live (append
-   and flush per event, first preflight event to terminal event),
-   and the `runs/<n>/` record layout with machine-scoped
-   monotonic run numbers (the superseded `<timestamp>-<run_id>/`
-   layout dies); `transcript.txt` as a pure renderer of the
-   stream; a record left without a terminal event is an
-   incomplete run (the cross-process *crashed*-run rule waits on
-   async).
-2. The `--progress (auto | pretty | plain | jsonl)` renderers on
-   the foreground stream-bearing commands (`run-script`,
-   `fetch-media`), the output discipline and stability contract
-   ("The CLI" above) implemented across every command, and the
-   beautiful, timely, informative human rendering the feedback
-   split demands.
-3. The error taxonomy — `ReliquaryError` the root every
+1. The return-not-store run model: `run_script` / `exec` return
+   their output directly, the event stream rendered live and
+   never written to disk — the `runs/<n>/` archive, persisted
+   stream/transcript, retention, `list-runs` / `run status` /
+   `run delete`, and interaction runs are removed (D36); the
+   `exec` API twin completes the run family's parity.
+2. The error taxonomy — `ReliquaryError` the root every
    deliberate error subclasses, with `StaticError` (2) /
    `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5)
    and their exit codes — folding the milestone-8 error classes
    (`PropertiesError`, `PropertyBindingError`, `CredentialError`,
    `ScriptParseError`, `ScriptRuntimeError`) under the root and
    remapping the CLI's exit codes onto it; foreground Ctrl-C
-   writes the `cancelled` terminal event and exits `5`.
-4. Interaction runs: `begin-run` / `end-run`, every
-   machine-targeting command appending while a run is open, one
-   open run per machine.
-5. The record-management surface under parity: the `run` verbs
-   `run status` / `run delete` and `list-runs`, with API twins
-   `begin_run` / `end_run`, `delete_run()`, and the blocking
-   `run_script()` returning what the CLI prints.
+   emits the `cancelled` terminal event and exits `5`.
+3. Live feedback: the `--progress (auto | pretty | plain |
+   jsonl)` renderers on the stream-bearing commands (`run-script`,
+   `fetch-media`), jsonl stdout purity, the output discipline and
+   stability contract ("The CLI" above), and the beautiful,
+   timely rendering P5 demands — all live, nothing stored.
+4. The exec-run mechanics: machine variables (a `set` script
+   verb + `get-machine-var`, in `machine.json`, cleared on
+   `start`); consumer-authored readiness (the ready script sets a
+   var, `get-machine-var` polls; no Reliquary default script —
+   P18); in-band file put/get over a vvfat drive (guest-terms
+   addressing — P17, stopped-only, non-vvfat fails closed — P11);
+   and `insert-media --file` mounting an anonymous `local`+`use`
+   media, live (U20).
+5. Prove the U20 transports on QEMU/DOS: a live `insert-media` /
+   `eject-media` floppy swap is seen by DOS (media-change), and
+   `eject` flushes guest writes to the local image — a gating
+   spike, taken before anything rests on it.
 
-Done when: a foreground FreeDOS install renders live in pretty
-and, run again under `--progress jsonl`, emits the same stream as
-JSON lines with the terminal event last; Ctrl-C ends a run at an
-event boundary with exit `5`, leaving the machine as-is; an
-interaction-run bracket records a primitive-driven session; and
-a failure report names the route and revisits, the expired clock
-and its source scope, the nearest miss, the screenshot, and the
-suggested next command.
+Done when: an agent, against a live DOS machine, injects a test
+binary, runs it, reads its result back — a value via
+`get-machine-var` and a file retrieved in-band (U14) or a floppy
+image swapped live (U20) — and iterates with the next binary; a
+watched install renders live in pretty and, rerun under
+`--progress jsonl`, emits the event stream to stdout with the
+terminal event last and nothing written to disk; Ctrl-C ends a
+run at an event boundary with exit `5`; and a failure names the
+route and revisits, the expired clock and its scope, the nearest
+miss, and the suggested next command.
 
 ### The backend adapter seam (backlog)
 
