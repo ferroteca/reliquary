@@ -48,6 +48,44 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D39 — THE TWO RAW INPUT QUEUES; NOTHING ENTERS ELSEWHERE —
+  DECIDED (owner, 2026-07-24). Supports P8; completes D38 by
+  naming what it is an exception *to*.
+  THE RULE: an idea enters the project through exactly two
+  queues — **GitHub issues** (the raw, unfiltered intake, often
+  from outside: a bug hit, a question asked, a wish stated) and
+  **the proposed/ directory** (the same idea argued in the
+  project's own vocabulary, as a drafted use case, principle or
+  task). Nothing flows without starting in one of them. The single
+  exception is a small raw commit approved under housekeeping
+  (D38).
+  WHY IT IS WORTH STATING, given the docs already gesture at it:
+  what was missing is the **closure**. TASKS.md has long said work
+  "flows from the roadmap and from issues", which describes the
+  common path without forbidding any other. A negative rule is
+  what constrains — and its value is the property it produces
+  when composed with D38: housekeeping refuses anything touching
+  an interface, so **nothing can reach an interface without having
+  passed through a queue**. That is checkable, and it is the
+  guarantee the whole vetting apparatus rests on.
+  THE TWO QUEUES ARE NOT PEERS; issues are upstream. Raw intake is
+  triaged into one of three outcomes: drafted as a proposal (a use
+  case, a principle, a task), fixed directly as housekeeping, or
+  rejected with its reason recorded here. The proposed/ directory
+  is where an idea acquires the project's vocabulary — a
+  U-number, a P-number, an argued statement — and nothing is
+  worked from there until it is accepted.
+  OPEN EDGE, deliberately not decided here: a defect discovered
+  mid-work, against a standing principle. Its demand exists (the
+  principle is its own demand — the gap-is-a-bug rule), but it
+  started in neither queue. Milestone 9 produced one of each kind:
+  the control-planes gap was *filed* against P11 and waits in the
+  backlog, while the floppy-geometry guard was *fixed inline*
+  because T1's own gate covered it. Both look right, so the rule
+  wants a clause distinguishing them — probably that an in-scope
+  discovery may be fixed within the work that found it, and
+  anything else is filed. Left for the round that settles it.
+
 - D37 — MILESTONE 9 DELIVERS U14 AND U20; BOTH PROMOTE —
   DECIDED (2026-07-24, landing milestone 9). Supports P8, P11,
   P17, P18; applies D34's promotion-on-delivery rule and D36's
