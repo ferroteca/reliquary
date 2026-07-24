@@ -152,7 +152,11 @@ implemented yet"* — comes off as its sections land. A banner
 that outlives the code it disclaims is the wrong-instruction
 failure DECISIONS.md's preamble names.
 
-## Milestone 9 — the programmatic testing loop
+## Milestone 9 — the programmatic testing loop (complete)
+
+All seven stages landed (T1–T7). This breakdown is kept until the
+milestone-9 record is folded into the ROADMAP note and pruned like
+milestones 4/6/7; the stage markers below are the landing record.
 
 The sprint tasklist, translated from ROADMAP milestone 9 as
 reframed by D36 — the vertical's culmination: the programmatic
@@ -173,7 +177,7 @@ orphan classes (`PropertiesError`, `PropertyBindingError`,
 no common root and a CLI that collapses everything but a parse
 error to exit 1.
 
-- **T1 — Spike: prove the transports.** Before any code rests on
+- **T1 — Spike: prove the transports — DONE.** Before any code rests on
   them, confirm on QEMU/DOS: a live `insert-media`/`eject-media`
   floppy swap is *seen* by DOS (media-change detection), `eject`
   flushes guest writes to the local `.img`, and vvfat's
@@ -181,7 +185,23 @@ error to exit 1.
   where DOS reads the new floppy's contents, and a guest-written
   file reads back host-side after eject. If either fails, U20 is
   reshaped here, not later.
-- **T2 — The run model: return, don't store.** Delete `runs/<n>/`
+
+  **Result: both hold, with one condition.** Run against an
+  installed FreeDOS 1.4 on QEMU: a live `insert-media --file` swap
+  is seen by DOS (a `DIR A:` after the swap lists the *new* image's
+  files, never the previous disk's), and a guest write reaches the
+  host `.img` — verified byte-wise after `eject-media`, and again
+  after swapping back, each image carrying only its own rounds.
+  U20 needs no reshaping. THE CONDITION: **a floppy drive's
+  geometry is fixed when the backend attaches it at launch, and a
+  live change does not revise it.** A slot launched empty gets
+  QEMU's own default (2.88M), so inserting a 1.44M image into it
+  live reaches the guest as "general failure" on every read and
+  write. Reliquary did not choose that geometry, so it now records
+  the launched medium's size and refuses a mismatched live insert
+  naming both sizes and the fix (P11) — the spike's finding turned
+  into a guard rather than a footnote.
+- **T2 — The run model: return, don't store — DONE.** Delete `runs/<n>/`
   persistence (the `<timestamp>-<id>/` layout and the `output/`
   subdir die), stored `run-events.jsonl`/`transcript.txt`,
   retention, `list-runs`/`run status`/`run delete`, and
@@ -190,7 +210,7 @@ error to exit 1.
   here (parity). **Gate:** a run returns its output with no
   `runs/` dir created; two concurrent runs return independently,
   no shared store.
-- **T3 — Error taxonomy and exit codes.** `ReliquaryError` the
+- **T3 — Error taxonomy and exit codes — DONE.** `ReliquaryError` the
   root every deliberate error subclasses, `StaticError` (2) /
   `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5)
   and their exit-code mapping, the milestone-8 classes folded
@@ -199,7 +219,7 @@ error to exit 1.
   Ctrl-C on a foreground run emits `cancelled`, exit 5.
   **Gate:** the four classes exit 2/3/4/5, and
   `except ReliquaryError` catches all four.
-- **T4 — Live feedback (P5).** `--progress (auto | pretty |
+- **T4 — Live feedback (P5) — DONE.** `--progress (auto | pretty |
   plain | jsonl)` rendered live during a run and **never
   stored**, jsonl stdout purity (terminal event last,
   diagnostics to stderr), the stdout/stderr discipline, and the
@@ -209,7 +229,7 @@ error to exit 1.
   output). **Gate:** an install renders live in pretty; rerun
   under jsonl it emits the event stream to stdout, terminal event
   last, with zero bytes written to disk.
-- **T5 — Machine variables and readiness.** A `set` script verb
+- **T5 — Machine variables and readiness — DONE.** A `set` script verb
   + `get-machine-var` query (a `machine.json` field, cleared on
   `start`, under the op lock) — the script→host scalar/signal
   channel. Readiness rides it: the consumer's ready script `set`s
@@ -217,13 +237,13 @@ error to exit 1.
   script (P18). **Gate:** a `set` var is readable by any process,
   cleared on start; a consumer ready script drives boot-to-ready
   with no Reliquary-side prompt knowledge.
-- **T6 — In-band file put/get over vvfat (U14).** Guest-terms
+- **T6 — In-band file put/get over vvfat (U14) — DONE.** Guest-terms
   addressing (P17) → vvfat hostdir mapping (P10-safe from the
   declared drive assignment), stopped-only, non-vvfat fails
   closed (P11). Put before start, get after stop. **Gate:**
   put/get a guest-addressed file to/from a vvfat drive; a
   non-vvfat target fails closed naming the gap.
-- **T7 — `insert-media --file` (U20).** `insert-media <slot>
+- **T7 — `insert-media --file` (U20) — DONE.** `insert-media <slot>
   --file <path>` (twin `insert_media(slot, file=)`) mounting an
   anonymous `local`+`use` media (mutable, unverified, in place),
   live; the declared-media form stays. **Gate:** a freshly-built
@@ -234,6 +254,22 @@ Cross-cutting, every stage: CLI–API parity lands in the same
 change (P6), and docs (README, `docs/api-reference.md`,
 `docs/cli-reference.md`) and CHANGELOG land with the code
 (AGENTS "Documentation maintenance").
+
+Found while landing it, and fixed in passing:
+
+- the codex `freedos-install.rlqs` pressed `enter` on the
+  installer's first Yes/No menu, which the installer draws before it
+  reads the keyboard — the keystroke was swallowed and the install
+  timed out at the next wait. Reproduced on the pre-milestone tree,
+  so it was not a milestone-9 regression. Now `select "Yes"`, as
+  every other confirmation in that script already was: `select` is
+  feedback-driven and verifies the highlight moved.
+- the guest-console commands (`screen`, `type`, `enter`, `press`,
+  `exec`, `select`, `wait`, `screenshot`, `hmp`) resolved a selected
+  machine's QMP port but not its directory, so the identity check
+  looked for the recorded VM under the home, found none, and refused
+  every one of them as a mismatch. Found by the failure report's own
+  suggested next command (`rlq screen --machine …`) not working.
 
 ## Language
 

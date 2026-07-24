@@ -25,12 +25,18 @@ store fails closed naming what it could not reach.
 
 import os
 
+from .errors import ReliquaryError
+
 _SERVICE_PREFIX = "reliquary"
 
 _provider = None
 
-class CredentialError(RuntimeError):
-    """The credential store could not be reached or used."""
+class CredentialError(ReliquaryError):
+    """The credential store could not be reached or used.
+
+    Deliberate, but outside the run surface's four classes, so it
+    subclasses the root directly (planning/design/api.md).
+    """
 
 def scope_for(path):
     """Return the store scope for a properties file path.

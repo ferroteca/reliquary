@@ -178,8 +178,12 @@ The preferred guest-agent plane left the numbered arc for the
 backlog 2026-07-23 (D33) — a preference this case states, not
 a demand it makes: the loop runs agentlessly today, and the
 demands that gate delivery are 8's and 9's. U14 supersedes it
-**alone** (accepted above; U15 closed 2026-07-24, D36 — its
-demands are U14's own loop). Text verbatim as adopted:
+**alone** (U15 closed 2026-07-24, D36 — its demands are U14's own
+loop). **Both gating milestones have now landed** (milestone 9,
+2026-07-24) and U14 moved to the current list with them (D37), so
+U3's supersession is due: retiring it is an owner adjudication
+under the lifecycle's Retire clause, not a step of that delivery,
+and it waits here until made. Text verbatim as adopted:
 
 > - **U3 — Automated testing of something in a VM.** An agent — a
 >   test harness, a CI driver, an AI coding agent — starts a
@@ -279,66 +283,6 @@ Text verbatim as adopted:
 >   product. (The authoring parallel to U2: import captures a
 >   machine built by hand; recording captures a procedure
 >   performed by hand.)
-
-**U14 — Drive a machine from a program** — accepted; reshaped
-and promoted from drafted 2026-07-24 by the exec-run round (D36),
-which schedules its delivery as milestone 9 — the acceptance
-(D23). Now supersedes U3 **alone**: the itemized journey showed
-U15's demands are U14's own loop with a property, so U15 closed
-(removed 2026-07-24, D36). The reshape corrects the product —
-"the run record is the product" conflated Reliquary's evidence
-record with the caller's work-product (D36). What gates its move
-to the current list: the exec-run mechanics (in-band vvfat file
-put/get — P16/P17; machine variables; the `exec` twin;
-consumer-authored readiness) and the return-not-store run model,
-all milestone 9. Text:
-
-> - **U14 — Drive a machine from a program.** An agent — a test
->   harness, a CI driver, an AI coding agent — drives a machine
->   from its own code, through a native binding or the CLI: it
->   places input into the guest, runs work, reads results back,
->   iterates, and closes the machine down. The **result is the
->   product** — a value the run produced, and the specific file
->   the caller asked Reliquary to hand back — delivered across the
->   seam to the caller; Reliquary's own run output is *evidence*,
->   never the product. The loop is tight: per-run selection goes
->   in as properties, granular results come out as the caller's
->   own files and values, and re-running one step or the whole
->   task is first-class. Reliquary supplies the mechanics and
->   attaches no meaning to any of it — the computation, the result
->   parsing, and any reusable scripting are the caller's or
->   another project's, never Reliquary's. The canonical journey
->   uses Reliquary twice: build the rig (U16), then automate the
->   work inside it; often nothing durable remains but the
->   retrieved result.
-
-**U20 — Iterate against a live machine by swapping media** —
-accepted (add, 2026-07-24, the exec-run round; scheduled as
-milestone 9 — the acceptance, D23). The gap: U14's file exchange
-is vvfat, which reboots the machine per round — too slow for a
-tight loop. Live media swap (`insert-media`/`eject-media`,
-already running-or-stopped) is the faster agentless transport,
-but it drives a different consumer model — image-granular,
-consumer-built and -managed — so it earns its own case beside
-U14. What gates the current list: `insert-media --file` (an
-anonymous `local`+`use` media — already legal in the media spec)
-plus two proven QEMU/DOS behaviors (live floppy media-change
-detection, eject-flush to the local image). Text:
-
-> - **U20 — Iterate against a live machine by swapping media.**
->   The programmatic drive of U14, but the machine stays *up*
->   across rounds: an agent mounts a disk image it built — a test
->   binary on a floppy — runs it, reads the results, unmounts,
->   rebuilds the image with the next binary, and mounts again, all
->   live, no reboot between rounds. Reliquary supplies the live
->   media swap (`insert-media`/`eject-media` over the running
->   machine) and attaches no meaning; the consumer owns the images
->   and the host-side tooling that builds and reads them. This is
->   the fast *agentless* loop — no guest agent, no stop/start per
->   round — and its price is the consumer's: whole-image
->   granularity and the medium's size. The retrieved result is the
->   product, exactly as U14; only the transport differs, chosen
->   when reboot-per-round is the bottleneck.
 
 ### Drafted
 

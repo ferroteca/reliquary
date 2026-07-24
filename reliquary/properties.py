@@ -25,13 +25,18 @@ import re
 import tempfile
 
 from . import credentials
+from .errors import ReliquaryError
 
 _SEGMENT = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 _RESERVED = ("rlq", "reliquary")
 _SECRET_TOKEN = "@secret"
 
-class PropertiesError(ValueError):
-    """A malformed properties file, key, or value."""
+class PropertiesError(ReliquaryError):
+    """A malformed properties file, key, or value.
+
+    Deliberate, but outside the run surface's four classes, so it
+    subclasses the root directly (planning/design/api.md).
+    """
 
 def secret_marker():
     """Return the value a secret property presents as."""

@@ -26,15 +26,21 @@ from .library import (list_blueprints, list_builtin_blueprints,
                       locate_script, search_blueprints, seed_blueprint,
                       seed_script)
 from . import blueprint as blueprint_mod
+from .errors import ReliquaryError, UNEXPECTED, exit_code
 from .machines import (apply_blueprint, create_machine, destroy_machine,
-                       eject_media, get_machine_dir, insert_media,
+                       eject_media, get_file, get_machine_dir,
+                       get_machine_var, insert_media,
                        list_machines, load_machine_state, machine_dir_path,
-                       recreate_machine, resolve_machine,
+                       put_file, recreate_machine, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
+# Aliased on import: the twin is named for its command under the
+# identity rule, and the builtin stays reachable here.
+from .machines import exec as exec_guest
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
 from .credentials import CredentialError
+from .progress import MODES as _PROGRESS_MODES
 from .properties import (get_property, has_credential, set_property,
                          unset_property, list_properties, is_secret)
 from .script_runner import (ScriptRuntimeError, check_script,
@@ -58,6 +64,7 @@ _COMMANDS = frozenset({
     "list-machines", "list-scripts", "list-media",
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
+    "get-machine-var", "put-file", "get-file",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
 })
@@ -83,6 +90,8 @@ _FLAG_ARITY = {
     "--exclude": 1,
     "--property": 1,
     "--properties": 1,
+    "--progress": 1,
+    "--file": 1,
 }
 
 
@@ -138,11 +147,15 @@ def _require_machine_selector(arguments):
     )
 
 
-def _interaction_port(arguments):
-    """Resolve a QMP port from selectors or the legacy ``--port``.
+def _interaction_target(arguments):
+    """Resolve ``(port, machine directory)`` for a guest-console command.
 
     Cached machines are selected with ``--blueprint`` /
     ``--machine``; bare ``--port`` remains for the root-home path.
+    The directory travels with the port because that is where the
+    machine's recorded VM identity lives: without it the session
+    could not be verified against the machine it claims to be, and
+    every such command would fail closed.
     """
     if getattr(arguments, "blueprint", None) or getattr(
             arguments, "machine", None):
@@ -152,13 +165,14 @@ def _interaction_port(arguments):
             raise ValueError(
                 f"machine {machine_id} is not running "
                 f"(phase: {state.get('phase')})")
-        vm = read_vm_state(home=machine_dir_path(machine_id))
+        machine_home = machine_dir_path(machine_id)
+        vm = read_vm_state(home=machine_home)
         if vm is None:
             raise ValueError(
                 f"machine {machine_id} is running but has no recorded "
                 "VM identity")
-        return vm["port"]
-    return getattr(arguments, "port", None)
+        return vm["port"], machine_home
+    return getattr(arguments, "port", None), None
 
 
 def _add_home(parser):
@@ -218,6 +232,12 @@ def _emit(arguments, value, render):
     Under ``--json`` the twin's return ``value`` is printed as one
     JSON document on stdout (a void twin passes ``{}``); otherwise
     ``render()`` prints the human form. Returns exit code 0.
+
+    The output discipline (planning/design/cli.md): a result-bearing
+    command's pretty stdout is exactly the human rendering of what
+    its twin returns — the same value ``--json`` serializes — so it
+    pipes clean with no flags. Narration around it, and every line of
+    a void twin, belongs on stderr.
     """
     if getattr(arguments, "json", False):
         print(json.dumps(value, default=str))
@@ -226,12 +246,26 @@ def _emit(arguments, value, render):
     return 0
 
 
+def _narrate(message):
+    """Print narration — never a result — on stderr."""
+    print(f"rlq: {message}", file=sys.stderr)
+
+
 def _reject_stream_json(arguments, command):
     """Stream-bearing commands reject ``--json`` (they are event streams)."""
     if getattr(arguments, "json", False):
         raise ValueError(
             f"{command} is a stream, not a document; use "
             "--progress jsonl for machine-readable output")
+
+
+def _add_progress(parser):
+    """The rendering selector on a stream-bearing command."""
+    parser.add_argument(
+        "--progress", choices=_PROGRESS_MODES, default="auto",
+        help="live rendering: auto (tty detection), pretty, plain, or "
+             "jsonl (the event stream on stdout, nothing else)")
+    return parser
 
 
 def _add_selectors(parser):
@@ -322,9 +356,12 @@ def main(argv=None):
 
     # run-script
     command = subcommands.add_parser(
-        "run-script", help="run a labeled .rlqs script")
+        "run-script",
+        help="run a labeled .rlqs script against a machine, streaming "
+             "its progress and returning its output")
     _add_selectors(command)
     _add_property_inputs(command)
+    _add_progress(command)
     command.add_argument("label", help="script label or stem")
     command.add_argument("--display", action="store_true")
 
@@ -339,6 +376,7 @@ def main(argv=None):
     command = subcommands.add_parser(
         "fetch-media", help="fetch media")
     _add_home(command)
+    _add_progress(command)
     command.add_argument("name", help="media name")
 
     # seed-*
@@ -464,7 +502,13 @@ def main(argv=None):
         "insert-media", help="insert media into a drive slot")
     _add_selectors(command)
     command.add_argument("slot")
-    command.add_argument("media")
+    command.add_argument(
+        "media", nargs="?",
+        help="a declared media name (omit with --file)")
+    command.add_argument(
+        "--file", default=None, metavar="PATH",
+        help="mount this image in place instead: an anonymous local "
+             "media, mutable and unverified, the caller's own")
 
     command = subcommands.add_parser(
         "eject-media", help="eject media from a drive slot")
@@ -475,6 +519,29 @@ def main(argv=None):
         "set-boot-order", help="set the machine boot order")
     _add_selectors(command)
     command.add_argument("keys", nargs="+")
+
+    command = subcommands.add_parser(
+        "get-machine-var",
+        help="read a machine variable a script set")
+    _add_selectors(command)
+    command.add_argument("key", help="the variable's key")
+
+    command = subcommands.add_parser(
+        "put-file",
+        help="copy a host file into a stopped machine's guest")
+    _add_selectors(command)
+    command.add_argument("source", help="the host file to place")
+    command.add_argument(
+        "destination",
+        help=r"the guest address to place it at (e.g. A:\TEST.EXE)")
+
+    command = subcommands.add_parser(
+        "get-file",
+        help="retrieve a file from a stopped machine's guest")
+    _add_selectors(command)
+    command.add_argument(
+        "source", help=r"the guest address to read (e.g. A:\RESULT.TXT)")
+    command.add_argument("destination", help="the host path to write")
 
     # guest-console family (script-language identity)
     command = subcommands.add_parser(
@@ -546,23 +613,30 @@ def main(argv=None):
     set_assets(getattr(arguments, "assets", None) or HOME_ASSETS)
     try:
         return _dispatch(arguments)
-    except ScriptParseError as error:
-        print(f"reliquary: error: {error}", file=sys.stderr)
-        return 2
+    except ReliquaryError as error:
+        # The taxonomy is the exit codes: STATIC ERROR 2, PREFLIGHT
+        # ERROR 3, RUN FAILURE 4, cancelled 5, everything else 1
+        # (reliquary/errors.py). A run's own failure report already
+        # reached the stream, so only the one-line diagnostic is
+        # repeated here.
+        print(f"rlq: {error}", file=sys.stderr)
+        return exit_code(error)
     except (ConnectError, ConnectionError) as error:
         target = (f"127.0.0.1:{arguments.port}"
                   if getattr(arguments, "port", None)
                   else "the active VM")
-        print(f"reliquary: cannot reach QMP on {target}: {error}\n"
-              "is the VM running? "
+        print(f"rlq: cannot reach QMP on {target}: {error}\n"
+              "  is the VM running? "
               "(rlq start-machine --blueprint NAME)",
               file=sys.stderr)
-        return 1
-    except (ScriptRuntimeError, RuntimeError, TimeoutError,
-            FileNotFoundError, NotImplementedError, ValueError,
-            OSError, KeyError) as error:
-        print(f"reliquary: error: {error}", file=sys.stderr)
-        return 1
+        return UNEXPECTED
+    except KeyboardInterrupt:
+        print("rlq: interrupted", file=sys.stderr)
+        return 5
+    except (RuntimeError, TimeoutError, FileNotFoundError,
+            NotImplementedError, ValueError, OSError, KeyError) as error:
+        print(f"rlq: {error}", file=sys.stderr)
+        return UNEXPECTED
 
 
 def _create(arguments):
@@ -574,8 +648,7 @@ def _create(arguments):
         arguments.blueprint,
         properties=_explicit_properties(arguments),
         properties_file=_properties_file(arguments))
-    return _emit(arguments, machine_id,
-                 lambda: print(f"created machine {machine_id}"))
+    return _emit(arguments, machine_id, lambda: print(machine_id))
 
 
 def _recreate_machine(arguments):
@@ -584,8 +657,7 @@ def _recreate_machine(arguments):
         blueprint=getattr(arguments, "blueprint", None),
         properties=_explicit_properties(arguments),
         properties_file=_properties_file(arguments))
-    return _emit(arguments, machine_id,
-                 lambda: print(f"recreated machine {machine_id}"))
+    return _emit(arguments, machine_id, lambda: print(machine_id))
 
 
 def _get_machine_dir(arguments):
@@ -600,36 +672,33 @@ def _apply_blueprint(arguments):
         blueprint=getattr(arguments, "blueprint", None),
         properties=_explicit_properties(arguments),
         properties_file=_properties_file(arguments))
-    return _emit(arguments, machine_id,
-                 lambda: print(f"applied blueprint to machine {machine_id}"))
+    return _emit(arguments, machine_id, lambda: print(machine_id))
 
 
 def _script(arguments):
+    """Run a script live and exit by outcome.
+
+    Stream-bearing: the run's output is the event stream, which
+    ``--progress`` has already rendered — under ``jsonl`` onto stdout,
+    terminal event last; under the human modes onto stderr, leaving
+    stdout empty. Nothing is written to disk (D36), and nothing more
+    is printed here: the outcome travels by exit code.
+    """
     _reject_stream_json(arguments, "run-script")
     blueprint_name = getattr(arguments, "blueprint", None)
     machine_selector = getattr(arguments, "machine", None)
     if not blueprint_name and not machine_selector:
         raise ValueError(
             "run-script requires --blueprint or --machine")
-    try:
-        result = run_script(
-            arguments.label,
-            blueprint=blueprint_name,
-            machine=machine_selector,
-            display=arguments.display,
-            properties=_explicit_properties(arguments),
-            properties_file=_properties_file(arguments),
-        )
-    except KeyboardInterrupt:
-        print("reliquary: interrupted", file=sys.stderr)
-        return 130
-    if result.created_machine:
-        print(f"created machine {result.machine_id}")
-    print(f"ran {os.path.basename(result.script_path)} "
-          f"on machine {result.machine_id}")
-    print(f"final script phase: {result.final_phase}")
-    print(f"machine phase: {result.machine_phase}")
-    print(f"run: {result.run_dir}")
+    run_script(
+        arguments.label,
+        blueprint=blueprint_name,
+        machine=machine_selector,
+        display=arguments.display,
+        properties=_explicit_properties(arguments),
+        properties_file=_properties_file(arguments),
+        progress=arguments.progress,
+    )
     return 0
 
 
@@ -786,9 +855,9 @@ def _list_scripts(arguments):
 
 
 def _fetch_media(arguments):
+    """Fetch a media live; the transfer events are the output."""
     _reject_stream_json(arguments, "fetch-media")
-    fetch_media(arguments.name)
-    print(f"fetched {arguments.name}")
+    fetch_media(arguments.name, progress=arguments.progress)
     return 0
 
 
@@ -796,7 +865,7 @@ def _seed(arguments, seeder, kind):
     seeded = seeder(arguments.name, only=getattr(arguments, "only", False))
     message = (f"seeded {kind} {arguments.name}" if seeded
                else f"{kind} {arguments.name} already exists or not found")
-    return _emit(arguments, seeded, lambda: print(message))
+    return _emit(arguments, seeded, lambda: _narrate(message))
 
 
 def _seed_blueprint(arguments):
@@ -830,16 +899,12 @@ def _search_blueprints(arguments):
 def _new_blueprint(arguments):
     path = blueprint_mod.new_blueprint(
         arguments.name, platform=arguments.platform or "dos")
-    return _emit(arguments, path,
-                 lambda: print(f"created blueprint {arguments.name} "
-                               f"at {path}"))
+    return _emit(arguments, path, lambda: print(path))
 
 
 def _delete_blueprint(arguments):
     path = blueprint_mod.delete_blueprint(arguments.name)
-    return _emit(
-        arguments, path,
-        lambda: print(f"deleted blueprint {arguments.name} ({path})"))
+    return _emit(arguments, path, lambda: print(path))
 
 
 def _property_text(value):
@@ -969,25 +1034,51 @@ def _prune_media(arguments):
 
 def _add_media(arguments):
     path = add_media(arguments.name, arguments.file)
-    return _emit(
-        arguments, path,
-        lambda: print(f"supplied {arguments.name} ({path})"))
+    return _emit(arguments, path, lambda: print(path))
 
 
 def _insert_media(arguments):
     machine_id = _require_machine_selector(arguments)
-    insert_media(machine_id, arguments.slot, arguments.media)
+    file = getattr(arguments, "file", None)
+    insert_media(machine_id, arguments.slot, arguments.media, file=file)
+    what = file if file else arguments.media
     return _emit(
         arguments, {},
-        lambda: print(f"inserted {arguments.media} into {arguments.slot} "
-                      f"on {machine_id}"))
+        lambda: _narrate(f"inserted {what} into {arguments.slot} "
+                         f"on {machine_id}"))
+
+
+def _get_machine_var(arguments):
+    value = get_machine_var(
+        arguments.key,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, value,
+                 lambda: None if value is None else print(value))
+
+
+def _put_file(arguments):
+    address = put_file(
+        arguments.source, arguments.destination,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, address, lambda: print(address))
+
+
+def _get_file(arguments):
+    path = get_file(
+        arguments.source, arguments.destination,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, path, lambda: print(path))
 
 
 def _eject_media(arguments):
     machine_id = _require_machine_selector(arguments)
     eject_media(machine_id, arguments.slot)
-    return _emit(arguments, {},
-                 lambda: print(f"ejected {arguments.slot} on {machine_id}"))
+    return _emit(
+        arguments, {},
+        lambda: _narrate(f"ejected {arguments.slot} on {machine_id}"))
 
 
 def _set_boot_order(arguments):
@@ -995,8 +1086,8 @@ def _set_boot_order(arguments):
     set_boot_order(machine_id, arguments.keys)
     return _emit(
         arguments, {},
-        lambda: print(f"boot order on {machine_id}: "
-                      f"{' '.join(arguments.keys)}"))
+        lambda: _narrate(f"boot order on {machine_id}: "
+                         f"{' '.join(arguments.keys)}"))
 
 
 def _dispatch(arguments):
@@ -1051,11 +1142,17 @@ def _dispatch(arguments):
         return _eject_media(arguments)
     if arguments.command == "set-boot-order":
         return _set_boot_order(arguments)
+    if arguments.command == "get-machine-var":
+        return _get_machine_var(arguments)
+    if arguments.command == "put-file":
+        return _put_file(arguments)
+    if arguments.command == "get-file":
+        return _get_file(arguments)
     if arguments.command == "start-machine":
         machine_id = _require_machine_selector(arguments)
         started_port = start_machine(
             machine_id, display=getattr(arguments, "display", False))
-        return _emit(arguments, started_port, lambda: None)
+        return _emit(arguments, started_port, lambda: print(started_port))
     if arguments.command == "stop-machine":
         machine_id = _require_machine_selector(arguments)
         stop_machine(machine_id)
@@ -1064,7 +1161,7 @@ def _dispatch(arguments):
         machine_id = _require_machine_selector(arguments)
         destroy_machine(machine_id)
         return _emit(arguments, {},
-                     lambda: print(f"destroyed machine {machine_id}"))
+                     lambda: _narrate(f"destroyed machine {machine_id}"))
     if arguments.command == "recreate-machine":
         return _recreate_machine(arguments)
     if arguments.command == "apply-blueprint":
@@ -1072,40 +1169,50 @@ def _dispatch(arguments):
     if arguments.command == "get-machine-dir":
         return _get_machine_dir(arguments)
 
-    interaction_port = _interaction_port(arguments)
+    port, machine_home = _interaction_target(arguments)
     if arguments.command == "type":
-        send_text(arguments.text, enter=False, port=interaction_port)
+        send_text(arguments.text, enter=False, port=port, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "enter":
-        send_text(arguments.line, enter=True, port=interaction_port)
+        send_text(arguments.line, enter=True, port=port, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "press":
         combos = [_resolve_key(name) for name in arguments.names]
-        send_keys(combos, interaction_port)
+        send_keys(combos, port, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "exec":
-        if platform != "dos":
-            raise NotImplementedError("exec requires platform='dos'")
-        AgentlessGuestExec(Machine(interaction_port)).execute(
-            arguments.dos_command, timeout or 120)
-        return _emit(arguments, {}, lambda: None)
+        if getattr(arguments, "machine", None) or getattr(
+                arguments, "blueprint", None):
+            # The twin resolves the selector, the platform, and the
+            # VM identity itself, and returns the command's output.
+            rows = exec_guest(
+                arguments.dos_command,
+                machine=getattr(arguments, "machine", None),
+                blueprint=getattr(arguments, "blueprint", None),
+                timeout=timeout or 120)
+        else:
+            if platform != "dos":
+                raise NotImplementedError("exec requires platform='dos'")
+            rows = AgentlessGuestExec(Machine(port, machine_home)).execute(
+                arguments.dos_command, timeout or 120)
+        rows = list(rows or ())
+        return _emit(arguments, rows, lambda: print("\n".join(rows)))
     if arguments.command == "select":
         selected = cursor_menu_select(
             arguments.item, timeout or 30,
-            getattr(arguments, "exclude", []), interaction_port)
-        return _emit(arguments, selected,
-                     lambda: print(f"selected: {selected}"))
+            getattr(arguments, "exclude", []), port, home=machine_home)
+        return _emit(arguments, selected, lambda: print(selected))
     if arguments.command == "screen":
-        rows = screen_text(interaction_port)
+        rows = screen_text(port, home=machine_home)
         return _emit(arguments, rows, lambda: print("\n".join(rows)))
     if arguments.command == "wait":
-        wait_text(arguments.pattern, timeout or 60, interaction_port)
-        return _emit(arguments, {}, lambda: print("matched."))
+        wait_text(arguments.pattern, timeout or 60, port, home=machine_home)
+        return _emit(arguments, {}, lambda: _narrate("matched"))
     if arguments.command == "screenshot":
-        screenshot(arguments.name, interaction_port)
+        screenshot(arguments.name, port, machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "hmp":
-        with Machine(interaction_port).qmp() as qmp:
+        with Machine(port, machine_home).qmp() as qmp:
             output = qmp.hmp(arguments.line)
         return _emit(arguments, output, lambda: print(output))
     return 0

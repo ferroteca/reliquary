@@ -38,12 +38,65 @@ appear before or after the command word.
   prints `{}`). Diagnostics stay on stderr and exit codes are
   unchanged. Stream-bearing commands (`run-script`, `fetch-media`)
   reject `--json` — their machine-readable form is `--progress jsonl`.
+- `--progress (auto | pretty | plain | jsonl)` - Live rendering, on
+  the stream-bearing commands (`run-script`, `fetch-media`) only.
+  See [Live progress](#live-progress) below.
 - `--version` - Show version and exit
 
 `--display` is accepted on `start-machine` and `run-script`.
 Flags may appear before or after the command word.
 
 `--blueprint` and `--machine` are mutually exclusive.
+
+## Output, exit codes, and live progress
+
+**The result is stdout; everything else is stderr.** A command that
+returns a value prints exactly that value's plain rendering on stdout
+— the same thing `--json` serializes — so ids, paths, and tables pipe
+clean with no flags. Narration, warnings, prompts, progress, and error
+reports go to stderr. Colour is emitted only to a terminal and never
+under `NO_COLOR`.
+
+### Exit codes
+
+| code | meaning |
+|---|---|
+| `0` | success |
+| `1` | an unexpected fault — an error outside the taxonomy |
+| `2` | STATIC ERROR — a legality rule, from the script text alone |
+| `3` | PREFLIGHT ERROR — a machine rule, before the first input |
+| `4` | RUN FAILURE — the run's dynamic semantics failed |
+| `5` | cancelled — Ctrl-C ended the run at an event boundary |
+
+Cancelled is deliberately neither success nor failure. Ctrl-C on a
+foreground run requests a stop; the run ends at the next event
+boundary (an input already in flight completes), reports a
+`cancelled` terminal event, and leaves the machine exactly as it
+stands — nothing is torn down.
+
+### Live progress
+
+`--progress` selects how a run or a fetch reports itself while it
+happens. Nothing is written to disk: the stream is live output, and
+the run returns it to whoever started it.
+
+- `auto` (default) — `pretty` when stderr is a terminal, else `plain`.
+- `pretty` — an in-place live line with elapsed time against its
+  limit. Forces the terminal rendering where `auto` would not (a CI
+  log that renders ANSI, a pager).
+- `plain` — one line per event plus a periodic heartbeat, for a
+  redirected log.
+- `jsonl` — **stdout carries the run's event stream as JSON Lines and
+  nothing else.** Each line has `seq`, `time`, `elapsed`, `kind`, and
+  the kind's own fields; the last line is the terminal event, which is
+  the machine-readable result. Diagnostics stay on stderr.
+
+`plain` and `jsonl` never prompt: a property no source answers is a
+PREFLIGHT ERROR before the machine starts, so a program can never
+hang on a question it cannot see.
+
+Consumers of the `jsonl` stream should ignore event kinds and fields
+they do not recognize — the stream grows additively.
 
 ## Machine lifecycle commands
 
@@ -133,10 +186,20 @@ List scripts, optionally filtered by blueprint.
 
 ## Script commands
 
-### `rlq run-script <label> (--blueprint NAME | --machine ID) [--display]`
+### `rlq run-script <label> (--blueprint NAME | --machine ID) [--display] [--progress MODE]`
 
 Run a script against a blueprint's machine. Resolves the blueprint,
-creates a machine if none exists, runs the script, and records the run.
+creates a machine if none exists, and runs the script, streaming its
+progress live.
+
+**The run returns its output and stores nothing.** There is no run
+directory, no saved transcript, and no run-management commands: the
+event stream is rendered as `--progress` asks and is gone when the run
+ends. Keep it by redirecting `--progress jsonl`, or take the returned
+stream from the `run_script()` twin. The run's *product* is yours —
+the file you pull back with `get-file`, the value you read with
+`get-machine-var`, the image you swapped out — and Reliquary attaches
+no meaning to any of it.
 
 A script declares the properties it consumes; each is bound before
 the machine starts, from the first source that answers:
@@ -155,9 +218,15 @@ the machine starts, from the first source that answers:
    machine starts, so a program never hangs on a hidden prompt.
 
 A `secret` property expands only in `enter` and `type`; its value is
-kept out of the transcript and diagnostics (shown as `«secret»`).
-`--properties PATH` selects the file for binding, exactly as for the
-property commands above.
+kept out of the event stream and diagnostics (shown as `«secret»`),
+and once one reaches the guest, automatic failure screenshots are
+suppressed for the rest of the run. `--properties PATH` selects the
+file for binding, exactly as for the property commands above.
+
+When a run fails, the report names what was pending, which clock
+expired and the scope that supplied it, the route through the phase
+graph with its revisit counts, the screen row that came nearest to
+matching, an automatic screenshot, and the command to try next.
 
 ### `rlq check-script <name> [--blueprint NAME | --machine ID]`
 
@@ -181,10 +250,13 @@ List media names resolvable from the active source (the media specs
 across its `.rlqb` files). With ``--builtin``, list package codex
 media instead.
 
-### `rlq fetch-media <name>`
+### `rlq fetch-media <name> [--progress MODE]`
 
 Resolve a media by name and fetch and verify its payload into the
-cache.
+cache. Stream-bearing: transfer and verification report live under the
+same `--progress` vocabulary a run uses, with byte totals only where
+the source names one — hashing and extraction report elapsed time
+alone, and each mirror attempt is its own event.
 
 ### `rlq clean-media [<name>]`
 
@@ -213,7 +285,7 @@ media's own name, verified against the pin, so the blueprint never has
 to be edited. The payload is recorded as **supplied** and is not
 reclaimed unless you name it.
 
-### `rlq insert-media <slot> <media> (--blueprint NAME | --machine ID)`
+### `rlq insert-media <slot> (<media> | --file PATH) (--blueprint NAME | --machine ID)`
 
 ### `rlq eject-media <slot> (--blueprint NAME | --machine ID)`
 
@@ -223,11 +295,101 @@ over QMP (a change the guest observes); on a stopped machine it is
 present at the next `start`. Either way it persists in the machine
 state until a later `insert`/`eject` or `apply-blueprint`.
 
+`<media>` names a declared media, fetched and hash-verified like any
+other. `--file PATH` mounts **your own image** instead: an anonymous
+medium, attached in place, mutable and unverified. Nothing is copied
+and no hash is pinned, so you can rebuild the image between rounds
+and mount it again — the fast agentless loop, with no reboot and no
+guest agent (see [Iterating live](#iterating-against-a-live-machine)).
+
 ### `rlq set-boot-order <key>... (--blueprint NAME | --machine ID)`
 
 Set the boot order on a **stopped** machine (a launch-time firmware
 order). Persists in the machine state until the next `set-boot-order`
 or `apply-blueprint`.
+
+## Driving a machine from a program
+
+These are the mechanics for the loop an automating program runs:
+put work in, run it, read the result out, iterate. Reliquary supplies
+the transports and attaches no meaning to what travels through them.
+
+### `rlq get-machine-var <key> (--blueprint NAME | --machine ID)`
+
+Read a machine variable a script set with the `set` verb — the
+script-to-host channel for a small value. Prints the value, or
+nothing at all when it is unset (`null` under `--json`); either way
+the command succeeds, which is what makes polling a plain loop.
+
+Variables are cleared at each `start`, so one always reports what the
+*current* boot produced. Keys are yours, except the reserved `rlq` and
+`reliquary` namespaces.
+
+**Readiness rides this.** Reliquary ships no readiness script: your
+own ready script sets a variable as its last step, and you poll
+`get-machine-var` until it appears. What "ready" means belongs to
+whatever you are building, not to Reliquary.
+
+```powershell
+# in your script:  set ready "yes"
+rlq get-machine-var ready --machine rig-0
+```
+
+### `rlq put-file <host-path> <guest-address> (--blueprint NAME | --machine ID)`
+
+### `rlq get-file <guest-address> <host-path> (--blueprint NAME | --machine ID)`
+
+Move one file across the guest boundary, addressed **the way the
+guest names it** — `A:\TEST.EXE`, not an image file or a staging
+directory. The drive-letter mapping comes from the machine's declared
+platform and Reliquary's own drive assignment; nothing is inferred by
+inspecting the guest.
+
+Both are **stopped-only**, and the addressed drive must be a
+directory-source (`hostdir`) drive: the backend snapshots that
+directory when the drive is attached, so a change made while the
+machine runs would be invisible to the guest, and a guest write is
+not flushed until it stops. An image drive has no in-band route and
+says so rather than pretending.
+
+`put-file` prints the guest address it wrote; `get-file` prints the
+host path.
+
+```powershell
+rlq stop-machine --machine rig-0
+rlq put-file .\build\TEST.EXE "A:\TEST.EXE" --machine rig-0
+rlq run-script test --machine rig-0
+rlq stop-machine --machine rig-0
+rlq get-file "A:\RESULT.TXT" .\out\result.txt --machine rig-0
+```
+
+### Iterating against a live machine
+
+When a reboot per round is the bottleneck, swap the medium instead.
+`insert-media --file` mounts an image you built; the guest sees the
+media change live, and ejecting flushes its writes back to that same
+file. Whole images rather than single files, and the images are
+yours to build and read with your own tools.
+
+```powershell
+# build round-1.img yourself, then:
+rlq stop-machine --machine rig-0
+rlq insert-media floppy0 --file .\round-1.img --machine rig-0
+rlq start-machine --machine rig-0
+# from here every round is live:
+rlq exec "A:\TEST.EXE" --machine rig-0
+rlq eject-media floppy0 --machine rig-0
+# read round-1.img host-side, rebuild it, and mount the next one
+rlq insert-media floppy0 --file .\round-2.img --machine rig-0
+```
+
+**Mount the first image before starting, and keep every round the
+same size.** A floppy drive's geometry is fixed when the backend
+attaches its medium at launch, and a live change does not revise it:
+a slot that was empty at start takes the backend's own default, and
+a differently sized image would reach the guest as read and write
+errors rather than as a new disk. Reliquary records the launched
+size and refuses a mismatch rather than hand you a broken drive.
 
 ## User properties
 
@@ -344,7 +506,17 @@ Send portable key names (and `+` chords) from the script vocabulary.
 
 ### `rlq exec COMMAND [--timeout SECONDS]`
 
-Enter a command and wait for the DOS prompt to return.
+Enter a command in a running guest, wait for the DOS prompt to
+return, and **print the text the command produced** — the run
+family's one-shot member, returning its output exactly as
+`run-script` does and storing nothing. Twin: `exec(command, *,
+machine=, blueprint=, timeout=120)`, which returns those rows.
+
+The capture is agentless, so the output is what the command left on
+the visible 80x25 screen: a command that scrolls more than a
+screenful leaves only its tail. When you need more than that, have
+the guest write a file and take it with `get-file`, or set a machine
+variable. Reliquary reads no meaning into any of it.
 
 ### `rlq select ITEM [--exclude TEXT]`
 

@@ -74,3 +74,37 @@ number they superseded.
   inside it through U3's loop — the same tool that built the rig
   automates the testing in it. When truly finished, the developer
   disposes of the large VM and reclaims the disk space.
+
+- **U14 — Drive a machine from a program.** An agent — a test
+  harness, a CI driver, an AI coding agent — drives a machine
+  from its own code, through a native binding or the CLI: it
+  places input into the guest, runs work, reads results back,
+  iterates, and closes the machine down. The **result is the
+  product** — a value the run produced, and the specific file
+  the caller asked Reliquary to hand back — delivered across the
+  seam to the caller; Reliquary's own run output is *evidence*,
+  never the product. The loop is tight: per-run selection goes
+  in as properties, granular results come out as the caller's
+  own files and values, and re-running one step or the whole
+  task is first-class. Reliquary supplies the mechanics and
+  attaches no meaning to any of it — the computation, the result
+  parsing, and any reusable scripting are the caller's or
+  another project's, never Reliquary's. The canonical journey
+  uses Reliquary twice: build the rig (U16), then automate the
+  work inside it; often nothing durable remains but the
+  retrieved result.
+
+- **U20 — Iterate against a live machine by swapping media.**
+  The programmatic drive of U14, but the machine stays *up*
+  across rounds: an agent mounts a disk image it built — a test
+  binary on a floppy — runs it, reads the results, unmounts,
+  rebuilds the image with the next binary, and mounts again, all
+  live, no reboot between rounds. Reliquary supplies the live
+  media swap (`insert-media`/`eject-media` over the running
+  machine) and attaches no meaning; the consumer owns the images
+  and the host-side tooling that builds and reads them. This is
+  the fast *agentless* loop — no guest agent, no stop/start per
+  round — and its price is the consumer's: whole-image
+  granularity and the medium's size. The retrieved result is the
+  product, exactly as U14; only the transport differs, chosen
+  when reboot-per-round is the bottleneck.

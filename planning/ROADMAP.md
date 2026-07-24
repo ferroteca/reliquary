@@ -1393,7 +1393,7 @@ for the DOS platform on the QEMU backend alone; asynchronous runs
 and the record persistence they need leave the arc for the
 backlog for lack
 of a use case (D35), joining the pillars D33 demoted.
-**Milestone 9 is the current one.**
+**Milestone 9 is complete, and with it the numbered arc.**
 
 Generalizing beyond that vertical is **backlog work, not yet
 scheduled** (owner, 2026-07-23, for lack of use-case backing —
@@ -2294,7 +2294,7 @@ candidate as the supplying source, and a media whose `location`
 is a `${key}` reference materializes through the same order
 with its resolved location recorded in the state.
 
-### Milestone 9 — The programmatic testing loop
+### Milestone 9 — The programmatic testing loop (complete)
 
 The DOS-on-QEMU vertical's culmination: an agent drives a machine
 from its own code, runs work, reads results, and iterates (U14,
@@ -2302,7 +2302,17 @@ U20), with live feedback for a watched install (U12, P5). The run
 **returns its output** and stores nothing (D36); async — detach,
 cross-process followers, and the persistence they need — is
 backlog ("Asynchronous runs (backlog)" above; D35/D36). This
-milestone accepts U14 and U20 (D23).
+milestone accepts U14 and U20 (D23) and, on landing, delivers
+them: both promoted to USE-CASES.md (D34's rule, recorded as
+D37).
+
+The transport spike (T1) proved live media-change and eject-flush
+on QEMU/DOS and found one condition worth carrying: a floppy
+drive's geometry is fixed when the backend attaches it at launch
+and a live change does not revise it, so a live swap must match
+the launched medium's size — a slot launched empty takes the
+backend's own default and refuses a differently sized image
+(recorded in the machine state and enforced fail-closed, P11).
 
 Deliverables:
 

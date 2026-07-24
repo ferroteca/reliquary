@@ -6,10 +6,13 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import shutil
 from datetime import datetime, timezone
 
+from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
+from .errors import PreflightError
 from .home import machines_cache_dir
 from .library import seed_blueprint
 from .lifecycle import (create_difference_image, create_duplicate_image,
@@ -43,12 +46,14 @@ def _image_stem(media, key):
     return media.name or key
 
 
-def _fetch(media_name, context, *, namespace=None, on_mismatch="fail"):
+def _fetch(media_name, context, *, namespace=None, on_mismatch="fail",
+           events=None):
     """Resolve a media by name against the source namespace and fetch
     its verified payload path (or ``None`` for a ``new`` blank)."""
     namespace = namespace if namespace is not None else load_namespace(context)
     media = resolve_media(media_name, namespace)
-    return _acquire_fetch(media, namespace, context, on_mismatch)
+    return _acquire_fetch(media, namespace, context, on_mismatch,
+                          events=events)
 
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
@@ -141,8 +146,8 @@ def _backend_dir(machine_id, backend, context=None):
 
     reliquary quarantines each backend's files in a backend-named
     subdir so the machine root holds only ``machine.json`` and the
-    ``media/`` and ``runs/`` directories. For QEMU it holds just the
-    captured ``qemu-stderr.log``.
+    ``media/`` and ``screenshots/`` directories. For QEMU it holds
+    just the captured ``qemu-stderr.log``.
     """
     return os.path.join(machine_dir_path(machine_id, context),
                         backend or "qemu")
@@ -268,7 +273,7 @@ def _drive_common(key, drive):
 
 
 def _materialize_drive(key, drive, media_root, namespace, context,
-                       properties=None):
+                       properties=None, events=None):
     """Materialize one enabled drive, returning its resolved state entry.
 
     The drive names a media (or is an empty removable slot); the media
@@ -301,10 +306,10 @@ def _materialize_drive(key, drive, media_root, namespace, context,
         entry.update(size=media.size, path=path)
     elif mode == "use":
         entry["path"] = _acquire_fetch(
-            media, namespace, context, properties=properties)
+            media, namespace, context, properties=properties, events=events)
     elif mode in ("difference", "copy"):
         base_payload = _acquire_fetch(
-            media, namespace, context, properties=properties)
+            media, namespace, context, properties=properties, events=events)
         dest = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
         if mode == "copy":
             create_duplicate_image(dest, base_payload)
@@ -317,7 +322,7 @@ def _materialize_drive(key, drive, media_root, namespace, context,
 
 
 def create(machine, namespace, *, context=None, blueprint_name="",
-           source=None, number=None, properties=None):
+           source=None, number=None, properties=None, events=None):
     """Materialize one machine from a parsed composed machine component.
 
     Creates the machine cache directory under
@@ -361,7 +366,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
         try:
             return _materialize_machine(
                 machine, namespace, machine_id, blueprint_name, created,
-                media_root, source, context, properties)
+                media_root, source, context, properties, events)
         except BaseException:
             # Roll back a failed create: the machine never reached a
             # usable phase, so its partial materialization is discarded.
@@ -372,7 +377,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
                          created, media_root, source, context,
-                         properties=None):
+                         properties=None, events=None):
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
@@ -380,7 +385,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             # entirely (machine-blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
-            key, drive, media_root, namespace, context, properties)
+            key, drive, media_root, namespace, context, properties, events)
 
     memory = machine.memory
     if memory is None:
@@ -447,7 +452,7 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
 
 
 def create_machine(name, *, context=None, number=None, properties=None,
-                   properties_file=None):
+                   properties_file=None, events=None):
     """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
@@ -474,11 +479,12 @@ def create_machine(name, *, context=None, number=None, properties=None,
         machine, namespace, explicit=properties,
         properties_file=properties_file, context=context)
     return create(machine, namespace, context=context, blueprint_name=name,
-                  source=source, number=number, properties=bound)
+                  source=source, number=number, properties=bound,
+                  events=events)
 
 
 def recreate_machine(*, machine=None, blueprint=None, context=None,
-                     properties=None, properties_file=None):
+                     properties=None, properties_file=None, events=None):
     """Destroy the selected machine and recreate it under the same id.
 
     Exactly ``destroy`` + ``create`` (instance model): the current
@@ -497,7 +503,8 @@ def recreate_machine(*, machine=None, blueprint=None, context=None,
     destroy_machine(machine_id, context)
     return create_machine(
         blueprint_name, context=context, number=number,
-        properties=properties, properties_file=properties_file)
+        properties=properties, properties_file=properties_file,
+        events=events)
 
 
 def get_machine_dir(*, machine=None, blueprint=None, context=None):
@@ -515,7 +522,7 @@ _OWNED_MODES = ("new", "difference", "copy")
 
 
 def _reconcile_drives(machine, namespace, old_drives, media_root, context,
-                      properties=None):
+                      properties=None, events=None):
     """Reconcile a machine's drives to a re-resolved machine component.
 
     Absorbable changes are applied: added, removed, enabled/disabled
@@ -537,7 +544,8 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context,
             # No reliquary-owned image here: (re)materialize/re-point
             # freely (media re-fetch, empty slot, or a new image).
             new_drives[key] = _materialize_drive(
-                key, drive, media_root, namespace, context, properties)
+                key, drive, media_root, namespace, context, properties,
+                events)
             continue
         # An existing materialized image may only be kept unchanged.
         media = _drive_media(drive, namespace)
@@ -572,7 +580,7 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context,
 
 
 def apply_blueprint(*, machine=None, blueprint=None, context=None,
-                    properties=None, properties_file=None):
+                    properties=None, properties_file=None, events=None):
     """Adopt the current blueprint into a stopped machine.
 
     Re-resolves the blueprint the machine was created from (never at
@@ -608,7 +616,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         media_root = _machine_media_dir(machine_id, context)
         new_drives = _reconcile_drives(
             parsed, namespace, state.get("drives", {}), media_root, context,
-            bound)
+            bound, events)
 
         memory = parsed.memory
         if memory is None:
@@ -869,12 +877,14 @@ def _reconcile_phase(machine_id, context=None):
         f"machine {machine_id} is in an unrecognized phase {phase!r}")
 
 
-def start_machine(machine_id, *, display=False, context=None):
+def start_machine(machine_id, *, display=False, context=None, events=None):
     """Start a ready machine and return its QMP port.
 
     Under the per-machine lock, reconciles any interrupted phase,
     re-verifies every media hash, launches QEMU under the machine's
-    cache directory, and records phase ``running``.
+    cache directory, and records phase ``running``. Machine variables
+    are cleared here: a variable reports what *this* boot produced,
+    never what a previous one left behind.
     """
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
@@ -896,15 +906,29 @@ def start_machine(machine_id, *, display=False, context=None):
             # recorded path.
             if media_name is not None and drive.get("materialize") == "use":
                 drive["path"] = _fetch(
-                    media_name, context, namespace=namespace)
+                    media_name, context, namespace=namespace, events=events)
+        # The backend fixes a floppy drive's geometry from whatever
+        # medium is attached at launch, so record it: a later live
+        # swap must match, and this is the only moment the fact is
+        # knowable.
+        for drive in drives.values():
+            if drive.get("medium") == "floppy":
+                drive["launch-size"] = _medium_size(drive.get("path"))
         state["drives"] = drives
+        # A machine variable belongs to one boot: a script `set` it
+        # while the guest ran, so the next start starts empty.
+        state.pop("variables", None)
         _write_state(machine_id, state, context)
 
         memory = state.get("memory")
         if memory is None:
             memory = _PLATFORM_MEMORY.get(state.get("platform"), 16)
         qemu = find_qemu()
-        print(f"using QEMU: {qemu}")
+        _events.note(events, _events.RUN_PREFLIGHT,
+                     f"using QEMU: {qemu}",
+                     backend=state.get("backend", "qemu"),
+                     executable=qemu,
+                     **{"control-planes": state.get("control-planes") or []})
         vm_name = f"reliquary-{machine_id}"
         args = [qemu, "-name", vm_name, "-m", str(memory)]
         args += machine_drive_args(machine_id, context)
@@ -998,8 +1022,75 @@ def _change_media_live(machine_id, slot, path, context):
             qmp.hmp(f"change {slot} {target}{fmt}")
 
 
-def insert_media(machine_id, slot, media_name, *, context=None):
-    """Insert a defined media item into a floppy or cdrom slot.
+def _medium_size(path):
+    """The byte size of an attached medium, or ``None`` for an empty
+    slot or a directory-source (vvfat) drive, which has no image."""
+    if not path or os.path.isdir(path):
+        return None
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return None
+
+
+def _check_live_geometry(state, slot, drive, path):
+    """Refuse a live floppy swap the drive's geometry cannot serve.
+
+    A floppy drive's geometry is fixed when the backend attaches it at
+    launch, and a live ``change`` does not revise it — so a medium of
+    a different size reaches the guest as read and write errors rather
+    than as a new disk. Reliquary did not choose that geometry, so it
+    says what it cannot do instead of producing a broken drive (P11).
+    Proven on QEMU/DOS, milestone 9's transport spike.
+    """
+    if drive.get("medium") != "floppy":
+        return
+    launch = drive.get("launch-size")
+    size = _medium_size(path)
+    if launch is None:
+        raise PreflightError(
+            f"{slot} was empty when machine {state['id']} started, so "
+            "the backend chose the drive's geometry and a live insert "
+            "cannot change it; stop the machine, insert this medium, "
+            "and start again. After that, live swaps of the same size "
+            "work")
+    if size is not None and size != launch:
+        raise PreflightError(
+            f"{slot} was launched with a {launch}-byte medium and this "
+            f"one is {size} bytes; a live swap keeps the drive's "
+            "geometry, so the guest would see read and write errors. "
+            "Build every round's image at the launched size, or stop "
+            "the machine to change it")
+
+
+def _anonymous_local(file):
+    """The path an ``insert_media(file=)`` mounts, or fail closed.
+
+    ``--file`` mounts an **anonymous** ``local`` + ``use`` media (U20):
+    mutable, unverified, attached in place. It has no catalog name, no
+    ``sha256`` to pin, and reliquary never copies it — the consumer
+    owns the image it just built and is free to rebuild it for the
+    next round.
+    """
+    path = os.path.abspath(os.fspath(file))
+    if os.path.isdir(path):
+        raise ValueError(
+            f"{path} is a directory; --file mounts an image file. A "
+            "directory reaches a guest as a declared hostdir drive, "
+            "which is stopped-only")
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"no such image file: {path}")
+    return path
+
+
+def insert_media(machine_id, slot, media=None, *, file=None, context=None,
+                 events=None):
+    """Insert a medium into a floppy or cdrom slot.
+
+    Exactly one of ``media`` (a defined media item, fetched and
+    hash-verified) or ``file`` (an anonymous ``local`` + ``use``
+    image, mounted in place, mutable and unverified — U20's live
+    iteration transport).
 
     Hard-disk slots are rejected.  The slot must already exist in
     the machine's state — drives are guest-visible hardware the
@@ -1010,15 +1101,21 @@ def insert_media(machine_id, slot, media_name, *, context=None):
     across stop/start — the machine diverges from its blueprint until a
     later ``insert``/``eject`` or ``apply``.
     """
+    if (media is None) == (file is None):
+        raise ValueError(
+            "insert-media takes a media name or --file <path>, "
+            "not both and not neither")
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         _removable_drive(state, slot)
-        path = _fetch(media_name, context)
-        if state.get("phase") == "running":
-            _change_media_live(machine_id, slot, path, context)
+        path = (_anonymous_local(file) if file is not None
+                else _fetch(media, context, events=events))
         drive = state["drives"][slot]
+        if state.get("phase") == "running":
+            _check_live_geometry(state, slot, drive, path)
+            _change_media_live(machine_id, slot, path, context)
         drive["path"] = path
-        drive["media"] = media_name
+        drive["media"] = media
         drive["materialize"] = "use"
         state["generation"] = state.get("generation", 0) + 1
         _write_state(machine_id, state, context)
@@ -1098,6 +1195,219 @@ def mark_stopped(machine_id, context=None):
         state["phase"] = "ready"
         state["generation"] = state.get("generation", 0) + 1
         _write_state(machine_id, state, context)
+
+
+# -- machine variables -------------------------------------------
+#
+# The script -> host scalar channel (U14/U20): a script `set`s a
+# variable, any process reads it with `get-machine-var`. It lives in
+# `machine.json` under the operation lock, and `start` clears it, so a
+# variable always reports what the current boot produced.
+
+_VARIABLE_KEY = re.compile(r"[A-Za-z][A-Za-z0-9._-]*\Z")
+_RESERVED_VARIABLE = ("rlq", "reliquary")
+
+
+def check_variable_key(key):
+    """Validate a machine-variable key, or raise ``ValueError``.
+
+    The property key rules, for the same reason: the ``rlq`` and
+    ``reliquary`` namespaces stay reliquary's, so a consumer's own
+    names can never collide with one the project later introduces.
+    """
+    if not isinstance(key, str) or not key:
+        raise ValueError("a machine-variable key is required")
+    if not _VARIABLE_KEY.match(key):
+        raise ValueError(
+            f"invalid machine-variable key {key!r}: letter-initial, "
+            "then letters, digits, dot, dash, or underscore")
+    if key.split(".", 1)[0].lower() in _RESERVED_VARIABLE:
+        raise ValueError(
+            f"the {key.split('.', 1)[0]!r} namespace is reserved: {key!r}")
+    return key
+
+
+def set_machine_var(machine_id, key, value, *, context=None):
+    """Record a machine variable on a machine, in any phase.
+
+    Its world-facing spelling is the script ``set`` verb — the
+    scripting language is a primary interface, so this capability is
+    reachable without a command of its own. ``value`` is text;
+    reliquary attaches no meaning to it (G2, P18).
+    """
+    check_variable_key(key)
+    if not isinstance(value, str):
+        raise ValueError(
+            f"a machine variable holds text; {key!r} got "
+            f"{type(value).__name__}")
+    with _machine_lock(machine_id, context):
+        state = load_machine_state(machine_id, context)
+        variables = dict(state.get("variables") or {})
+        variables[key] = value
+        state["variables"] = variables
+        _write_state(machine_id, state, context)
+
+
+def get_machine_var(key, *, machine=None, blueprint=None, context=None):
+    """Read one machine variable — ``None`` when it is not set.
+
+    A query: valid in any phase, touching nothing. An unset variable
+    and a machine that never ran read the same, which is what makes
+    polling a consumer-authored readiness script (P18) a plain loop.
+    """
+    check_variable_key(key)
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    state = load_machine_state(machine_id, context)
+    return (state.get("variables") or {}).get(key)
+
+
+def exec(command, *, machine=None, blueprint=None, timeout=120,
+         context=None):
+    """Run one command in a running guest and return its output.
+
+    The run family's one-shot member: like ``run_script`` it drives
+    the machine and **returns its output** to the caller, storing
+    nothing (D36). The output is the text the command left on the
+    guest's screen, as a tuple of rows — reliquary reads no meaning
+    into it (G2), and a caller wanting structure retrieves a file
+    instead (:func:`get_file`) or reads a machine variable.
+
+    The platform workflow owns command syntax and completion
+    detection, so anything but DOS fails closed rather than
+    borrowing DOS assumptions.
+
+    (The name shadows the Python builtin inside this module, which is
+    the price of the twin-name identity rule: the CLI command *is*
+    ``exec``. Nothing here calls the builtin.)
+    """
+    from .interaction_agentless import AgentlessGuestExec
+    from .machine import Machine
+
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    state = load_machine_state(machine_id, context)
+    platform = state.get("platform")
+    if platform != "dos":
+        raise NotImplementedError(
+            f"exec is not implemented for platform {platform!r}; DOS "
+            "is the delivered workflow")
+    phase = state.get("phase")
+    if phase != "running":
+        raise PreflightError(
+            f"machine {machine_id} is not running (phase: {phase}); "
+            f"start it first: rlq start-machine --machine {machine_id}")
+    machine_home = machine_dir_path(machine_id, context)
+    vm = read_vm_state(machine_home)
+    if vm is None:
+        raise PreflightError(
+            f"machine {machine_id} is running but has no recorded VM "
+            "identity")
+    return AgentlessGuestExec(
+        Machine(vm["port"], machine_home)).execute(command, timeout)
+
+
+# -- in-band file exchange ---------------------------------------
+
+def _addressing(platform):
+    """The platform module that maps guest addresses to drives.
+
+    Guest paths are guest knowledge, so each platform workflow owns
+    its own mapping (P17), built from declared facts only — never by
+    inspecting a guest (P10). Anything but DOS fails closed rather
+    than borrowing DOS assumptions.
+    """
+    if platform != "dos":
+        raise NotImplementedError(
+            f"in-band file exchange is not implemented for platform "
+            f"{platform!r}; DOS is the delivered workflow")
+    from . import platform_dos
+    return platform_dos
+
+
+def _host_path(machine_id, address, context):
+    """Resolve a guest-terms address to a host path under a vvfat drive.
+
+    The whole of P17 in one function: the caller writes ``A:\\FOO.TXT``
+    and never learns which host directory backs it. Stopped-only, and
+    a drive that is not a host directory fails closed naming the gap
+    (P11) — an image drive has no in-band route until one is built.
+    """
+    state = load_machine_state(machine_id, context)
+    phase = state.get("phase")
+    if phase != "ready":
+        raise PreflightError(
+            f"machine {machine_id} must be stopped for in-band file "
+            f"exchange (phase: {phase}); the backend snapshots a host "
+            "directory when the drive is attached, so a running "
+            "machine would neither see a put nor have flushed a get")
+    platform = _addressing(state.get("platform"))
+    drives = state.get("drives", {})
+    letters = platform.drive_letters(drives)
+    letter, segments = platform.split_address(address)
+    key = letters.get(letter)
+    if key is None:
+        known = ", ".join(f"{name}: ({letters[name]})"
+                          for name in sorted(letters)) or "none"
+        raise PreflightError(
+            f"{address}: the machine declares no drive at {letter}:; "
+            f"declared letters: {known}")
+    root = drives[key].get("path")
+    if not root or not os.path.isdir(root):
+        raise PreflightError(
+            f"{address}: drive {key} ({letter}:) is an image, not a "
+            "host directory; in-band file exchange needs a "
+            "directory-source (hostdir) drive there")
+    resolved = os.path.abspath(os.path.join(root, *segments))
+    root = os.path.abspath(root)
+    if os.path.commonpath([root, resolved]) != root:
+        raise PreflightError(
+            f"{address} escapes drive {key}; a guest address stays "
+            "inside its own drive")
+    return resolved
+
+
+def put_file(source, destination, *, machine=None, blueprint=None,
+             context=None):
+    """Copy a host file into the guest, addressed in the guest's terms.
+
+    ``destination`` is what the guest's own user would write —
+    ``A:\\RESULTS\\RUN.TXT`` on DOS — never a host path, an image, or
+    a staging directory (P17). Stopped-only. Returns the guest address
+    written, which is the address the guest will read it at.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    origin = os.path.abspath(os.fspath(source))
+    if not os.path.isfile(origin):
+        raise FileNotFoundError(f"no such file: {origin}")
+    with _machine_lock(machine_id, context):
+        target = _host_path(machine_id, destination, context)
+        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+        shutil.copyfile(origin, target)
+    return destination
+
+
+def get_file(source, destination, *, machine=None, blueprint=None,
+             context=None):
+    """Retrieve a guest file to the host, addressed in the guest's terms.
+
+    ``source`` is the guest address; ``destination`` a host path. The
+    counterpart of :func:`put_file`, and the U14 half that makes the
+    retrieved file the caller's product. Stopped-only, so the guest's
+    writes have been flushed. Returns the host path written.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    target = os.path.abspath(os.fspath(destination))
+    with _machine_lock(machine_id, context):
+        origin = _host_path(machine_id, source, context)
+        if not os.path.isfile(origin):
+            raise FileNotFoundError(
+                f"the guest has no file at {source}")
+        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+        shutil.copyfile(origin, target)
+    return target
 
 
 def destroy_machine(machine_id, context=None):

@@ -31,11 +31,17 @@ import os
 import sys
 
 from . import credentials, facts, properties
+from .errors import PreflightError
 
-class PropertyBindingError(ValueError):
-    """A declared property could not be bound before the run."""
+class PropertyBindingError(PreflightError):
+    """A declared property could not be bound before the run.
 
-# The sources named in provenance, for check-script and transcripts.
+    Binding is preflight — it finishes before any media materializes
+    or any machine starts — so this is a PREFLIGHT ERROR, exit ``3``.
+    """
+
+# The sources named in provenance, for check-script and the run's
+# event stream.
 FLAG = "--property"
 PARAMETER = "blueprint parameter"
 ENVIRONMENT = "environment"

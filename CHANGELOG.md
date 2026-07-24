@@ -13,6 +13,74 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `insert-media` grew a `--file <path>` mode (twin
+  `insert_media(slot, media=None, file=None)`) that mounts an image
+  you built as an anonymous medium: attached in place, mutable, never
+  copied, and never hash-verified — it is yours. On a running machine
+  the guest sees the media change live, so a program can mount an
+  image, run it, eject, rebuild, and mount again with no reboot
+  between rounds.
+
+- A live floppy swap is checked against the geometry the drive was
+  launched with. The backend fixes a floppy drive's geometry when it
+  attaches the medium at launch and a live change does not revise
+  it, so a differently sized image reaches the guest as read and
+  write errors rather than as a new disk — and a slot launched empty
+  takes the backend's own default, which Reliquary never chose. Both
+  now fail closed naming the sizes and the fix (stop, insert, start;
+  after that live swaps of the same size work). Found by running the
+  swap cycle against FreeDOS on QEMU rather than by reading the
+  documentation.
+
+- In-band file exchange, addressed the way the guest names it:
+  `put-file <host-path> <guest-address>` and `get-file
+  <guest-address> <host-path>` (twins `put_file` / `get_file`) move
+  one file across the boundary as `A:\TEST.EXE`, never as a host
+  image or staging directory. The drive-letter map is built from the
+  machine's declared platform and Reliquary's own drive assignment —
+  nothing is inferred by inspecting a guest. Both are stopped-only
+  and require a directory-source (`hostdir`) drive; anything else
+  fails closed naming the gap. Non-DOS platforms raise
+  `NotImplementedError` rather than borrowing DOS assumptions.
+
+- Machine variables — the script-to-host channel for a small value. A
+  script's new `set <key> "<value>"` verb records one; `rlq
+  get-machine-var <key>` (twin `get_machine_var`) reads it from any
+  process, printing nothing (JSON `null`) and still succeeding when
+  it is unset, so polling is a plain loop. Variables live in
+  `machine.json` under the operation lock and are cleared at each
+  `start`, so one always reports what the current boot produced. The
+  `rlq` and `reliquary` key namespaces are reserved. Readiness rides
+  this channel: your own ready script sets a variable and you poll
+  for it — Reliquary ships no readiness script of its own.
+
+- Live progress on the stream-bearing commands: `run-script` and
+  `fetch-media` gained `--progress (auto | pretty | plain | jsonl)`
+  (twins take `progress=`). `auto` resolves by whether stderr is a
+  terminal; `pretty` is an in-place live line showing elapsed time
+  against its limit; `plain` is one line per event plus a heartbeat;
+  `jsonl` puts the run's event stream on stdout as JSON Lines and
+  nothing else, the last line being the terminal event that states
+  the outcome. `plain` and `jsonl` never prompt, so an unbound
+  property is a preflight failure rather than a program hanging on a
+  hidden question. A failed run now reports what was pending, the
+  clock that expired and the scope that supplied it, the route
+  through the phase graph with revisit counts, the screen row that
+  came nearest to matching, an automatic screenshot, and the command
+  to try next.
+
+- An error taxonomy with one root: every deliberate Reliquary error
+  subclasses `ReliquaryError`, so `except ReliquaryError` is always
+  the catch-all. The run surface's four classes carry the CLI's exit
+  codes — `StaticError` (2), `PreflightError` (3), `RunFailure` (4),
+  and `RunCancelled` (5, which subclasses the root and never
+  `RunFailure`: a cancellation is neither success nor failure). Exit
+  `1` is now precisely a fault outside the taxonomy rather than the
+  bucket everything fell into. Ctrl-C on a foreground run ends it at
+  the next event boundary — an input already in flight completes —
+  emits a `cancelled` terminal event, exits `5`, and leaves the
+  machine exactly as it stands.
+
 - A media `location` (or `sha256`) may reference a property with
   `${key}`, bound at `create-machine` / `recreate-machine` /
   `apply-blueprint` through the property source order — so a
@@ -208,6 +276,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A run returns its output and stores nothing.** `run_script()` now
+  returns the run's whole event stream on `ScriptRun.events` (plain
+  dicts, in order, the terminal event last) instead of naming a
+  directory it wrote. The event stream is live output — rendered as
+  `--progress` asks and gone when the run ends — so a caller that
+  wants a record keeps the one it was handed. This makes the
+  multithreaded case clean: each run returns to its own caller, with
+  no shared store to number or lock. `ScriptRun.run_dir` is gone;
+  `execute_script` takes `events=` in place of `run_dir=`. A
+  screenshot a script asks for now rests under the machine's own
+  `screenshots/` directory.
+
+- **The result is stdout; everything else is stderr.** A
+  result-bearing command's plain output is now exactly the human
+  rendering of what its twin returns — `create-machine` prints
+  `freedos-0`, `new-blueprint` prints the path it wrote,
+  `start-machine` prints the port — so they pipe clean with no flags.
+  Narration ("destroyed machine …", "inserted … into …"), progress,
+  and QEMU's own launch notes moved to stderr, and the human
+  `--progress` modes leave stdout empty entirely.
+
+- A media-slot preflight failure (`insert`/`eject`/`set-boot` naming
+  a drive the machine does not declare) is now a `PreflightError`
+  exiting `3` rather than a run failure — it is caught before the
+  first guest input, which is what the preflight tier means.
+
 - **Windows is declared as the supported host.** The packaging
   classifier moves from `Operating System :: OS Independent` to
   `Operating System :: Microsoft :: Windows`, and the README says
@@ -348,6 +442,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The built-in FreeDOS install script no longer stalls at the
+  installer's first confirmation. It pressed Enter on a menu the
+  installer draws *before* it starts reading the keyboard, so the
+  keystroke was swallowed and the install timed out at the next
+  step; it now uses `select "Yes"`, like every other confirmation
+  in that script — `select` is feedback-driven and confirms the
+  highlight moved before committing.
+- The guest-console commands (`screen`, `type`, `enter`, `press`,
+  `exec`, `select`, `wait`, `screenshot`, `hmp`) work again against a
+  machine selected with `--machine` / `--blueprint`. They resolved
+  the machine's QMP port but not its directory, so the identity check
+  looked for the recorded VM in the Reliquary home instead of the
+  machine, found nothing, and refused every command as an identity
+  mismatch.
 - `set-property --secret` no longer writes the secret's value into
   `user.properties` in plaintext; it stores the value in the host
   credential store and records only the marker. (The previous
@@ -357,6 +465,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   says `usage: rlq ...`) instead of always hardcoding `rlq`.
 
 ### Removed
+
+- Run persistence and the verbs that managed it. There is no
+  `cache/machines/<id>/runs/` directory, no stored `run-events.jsonl`
+  or `transcript.txt`, no retention, and no `list-runs` / `run
+  status` / `run delete` / `begin-run` / `end-run`. A stored stream
+  existed to be read by a follower in another process, and following
+  a run you did not start is asynchronous work that left the arc for
+  the backlog — so the file had no reader. The whole record model
+  returns only if that work schedules.
 
 - The milestone-1 root-home machine model is gone, absorbed into the
   cached-machine model: `reliquary.Runner`, `MachineConfig`,

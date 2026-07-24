@@ -384,6 +384,40 @@ class LexicalDiagnosticsTests(unittest.TestCase):
         self.assertIn("^", str(caught.exception))
 
 
+class SetVerbTests(unittest.TestCase):
+    """``set <key> "<value>"`` — the script's channel to the host."""
+
+    def test_a_set_carries_its_key_and_value(self):
+        script = parse_script('platform dos\nset result "PASS"\n')
+        statement = script.statements[0]
+        self.assertEqual(statement.verb, "set")
+        self.assertEqual(statement.arguments[0], "result")
+        self.assertEqual(statement.arguments[1].text, "PASS")
+
+    def test_a_value_may_interpolate_a_property(self):
+        script = parse_script(
+            'platform dos\nproperty tag\nset build "${tag}"\n')
+        self.assertTrue(script.statements[0].arguments[1].interpolated)
+
+    def test_set_is_distinct_from_set_boot(self):
+        script = parse_script(
+            'platform dos\nmachine stopped\nset-boot hdd0\n'
+            'set stage "booted"\n')
+        self.assertEqual([s.verb for s in script.statements],
+                         ["set-boot", "set"])
+
+    def test_a_bare_value_is_not_a_set(self):
+        # The value is text, so it is written as a string: a bare
+        # word would be indistinguishable from a second key.
+        with self.assertRaises(ScriptParseError):
+            parse_script("platform dos\nset result PASS\n")
+
+    def test_set_takes_no_modifiers(self):
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script('platform dos\nset result "x" timeout=5s\n')
+        self.assertIn("set does not accept", str(caught.exception))
+
+
 class SupersededSurfaceTests(unittest.TestCase):
     """The milestone-one spellings are gone, not bridged."""
 

@@ -77,7 +77,7 @@ select "English (United States)"
   forms, and reactive `always` handlers.
 - **Actions** deliver intent-level input or perform supporting host
   operations: `enter`, `type`, `press`, `select`, `insert`,
-  `eject`, `set-boot`, `screenshot`, `start`, and `stop`.
+  `eject`, `set-boot`, `set`, `screenshot`, `start`, and `stop`.
 
 Intent-level verbs remain above portable input events. `select`
 means choosing a visible menu entry, not sending a guessed number
@@ -350,6 +350,7 @@ Statements:
 | `insert` | slot, `@media` or `$property` | — | — |
 | `eject` | slot | — | — |
 | `set-boot` | drive keys | — | — |
+| `set` | variable key, string | — | — |
 | `start` | — | — | — |
 | `stop` | — | — | — |
 
@@ -436,6 +437,7 @@ action          = "enter" , string , eol
                   eol
                 | "eject" , slot , eol
                 | "set-boot" , slot , { slot } , eol
+                | "set" , variable-key , string , eol
                 | "start" , eol
                 | "stop" , eol ;
 
@@ -444,6 +446,7 @@ block-close     = "}" , eol ;
 media-ref       = "@" , media-name ;
 property-ref    = "$" , name ;
 property-key    = name ;
+variable-key    = name ;
 key             = key-name , { "+" , key-name } ;
 
 name            = letter , { letter | digit | "." | "_" | "-" } ;
@@ -1540,6 +1543,35 @@ attached installer CD, then boots the installed disk once it is
 populated. The verb exists for scripts that genuinely need a
 different order than the blueprint's default.
 
+### `set`
+
+```rlqs
+set result "PASS"
+set build "${tag}"
+```
+
+`set` records a **machine variable** — the script's channel back to
+the host for one small value (U14/U20). The key is a name outside
+the reserved `rlq` and `reliquary` namespaces; the value is a
+string, which may interpolate a bound property. The variable lands
+in the machine's state document, where any process reads it with
+`get-machine-var` (twin `get_machine_var`) while the run is still
+going or long after it ends.
+
+Variables are **cleared at each `start`**, so one always reports
+what the current boot produced rather than what a previous boot
+left behind. They are the consumer's names for the consumer's
+values: reliquary stores them and reads no meaning into either
+(G2, P18).
+
+**Readiness rides this channel.** reliquary ships no readiness
+script of any kind — what "ready" means belongs to the workflow
+being built, not to reliquary (P18). A consumer's own ready script
+`set`s a variable as its last step, and the driving program polls
+`get-machine-var` until it appears. An unset variable and a machine
+that never ran read alike, which is what keeps the poll a plain
+loop.
+
 ### File exchange — a named omission
 
 The language deliberately has no file-exchange verbs (owner,
@@ -1555,12 +1587,21 @@ out-of-band host work against the machine directory
 [the instance model](instance-model.md)). The omission also
 keeps every quoted string in a script on one side of one
 boundary: string content is guest-facing text, never a host
-path. In-band file operations addressed as `<drive-key>:<path>`
-are a deferred CLI/API capability (planning/ROADMAP.md
-"Horizon"), and future live guest-agent transfer gets its own
-distinct verbs with an explicitly stronger capability; neither
-lands in the language through this omission — reopening it is a
-language decision under the growth goals.
+path.
+
+In-band file operations **landed at milestone 9 as a CLI/API
+capability, not a language one**: `put-file` / `get-file` (twins
+`put_file` / `get_file`) address their target the way the guest
+names it — `A:\TEST.EXE`, per P17's candidate statement, and not
+the `<drive-key>:<path>` form D5 had roughed — over a
+directory-source drive, stopped-only, with a non-vvfat target or an
+unmapped drive letter failing closed naming the gap (P11). The
+letter map is built from the machine's declared platform and
+reliquary's own drive assignment, never by inspecting a guest
+(P10). Future live guest-agent transfer would get its own
+distinct capability with an explicitly stronger guarantee. None of
+this lands in the *language*: the omission above stands, and
+reopening it is a language decision under the growth goals.
 
 ### `start` and `stop`
 

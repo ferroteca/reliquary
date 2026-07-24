@@ -97,6 +97,12 @@
     "vm": {
       "description": "The live VM identity, present only while phase is 'running' and written atomically with phase (the former standalone vm.json, folded in). reliquary verifies a QMP session against name+uuid before touching the VM, so a same-named VM of another home is never mistaken for this one.",
       "$ref": "#/$defs/vmState"
+    },
+    "variables": {
+      "description": "Machine variables a script `set` — the script-to-host scalar channel, read back with get-machine-var. Consumer-owned names and values (reliquary attaches no meaning to either); the rlq and reliquary key namespaces are reserved. Cleared at each start, so a variable always reports what the current boot produced, and absent until a script sets one.",
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9._-]*$"},
+      "additionalProperties": {"type": "string"}
     }
   },
   "required": ["id", "blueprint", "created", "phase", "generation"],
@@ -107,7 +113,7 @@
       "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
     },
     "driveState": {
-      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; media names the resolved media (null in an empty removable slot) and materialize records how it is realized (new/difference/copy/use, null for an empty slot); size is present for a 'new' image; path is the cache location (or null for an empty removable slot).",
+      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; media names the resolved media (null in an empty removable slot, and also null for an anonymous image mounted by insert-media --file, which has no catalog identity) and materialize records how it is realized (new/difference/copy/use, null for an empty slot); size is present for a 'new' image; path is the cache location, the host path of an anonymous mounted image, or null for an empty removable slot.",
       "type": "object",
       "properties": {
         "medium": {"enum": ["floppy", "hdd", "cdrom"]},

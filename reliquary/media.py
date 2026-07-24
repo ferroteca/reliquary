@@ -30,15 +30,27 @@ from .home import media_cache_dir
 from .resolve import load_namespace, resolve_media
 
 
-def fetch_media(name, context=None, on_mismatch="fail"):
+def fetch_media(name, context=None, on_mismatch="fail", progress="auto"):
     """Return the named media's verified payload path, fetching on demand.
 
     Resolves the media by name from the active resolution source and
     runs its fetch plan. A blank has no payload and returns ``None``.
+
+    Stream-bearing: ``progress`` selects the live rendering of the
+    transfer and verification events (``auto | pretty | plain |
+    jsonl``), the same vocabulary and the same event kinds a run's own
+    fetches ride (planning/design/media-spec.md, "Fetch progress").
+    The stream is ephemeral — nothing is written down (D36).
     """
+    from .progress import stream_for
     namespace = load_namespace(context)
     media = resolve_media(name, namespace)
-    return _acquire_fetch(media, namespace, context, on_mismatch)
+    events = stream_for(progress)
+    try:
+        return _acquire_fetch(media, namespace, context, on_mismatch,
+                              events=events)
+    finally:
+        events.close()
 
 
 def list_media(context=None, *, builtin=False):

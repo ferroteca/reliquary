@@ -7,6 +7,7 @@ import dataclasses
 import difflib
 import os
 import re
+import sys
 import time
 
 from PIL import Image
@@ -44,7 +45,7 @@ def screenshot(name="screen", port=None, home=None, directory=None):
             png = os.path.join(screenshots, f"{name}.png")
             qmp.cmd("screendump", filename=png.replace("\\", "/"),
                     format="png")
-            print(f"saved {png}")
+            print(f"rlq: saved {png}", file=sys.stderr)
             return
         except ExecuteError:
             pass
@@ -58,7 +59,7 @@ def screenshot(name="screen", port=None, home=None, directory=None):
         raise ValueError(
             f"unexpected screendump format in {ppm}: {error}") from error
     os.remove(ppm)
-    print(f"saved {png}")
+    print(f"rlq: saved {png}", file=sys.stderr)
 
 
 def vga_screen(qmp):

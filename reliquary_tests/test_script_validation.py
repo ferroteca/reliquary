@@ -369,6 +369,26 @@ class PortableKeyTests(_ValidationCase):
                      "'' is not a portable key name", "S14")
 
 
+class MachineVariableTests(_ValidationCase):
+    """A machine-variable key is the consumer's, but not reliquary's."""
+
+    def test_an_ordinary_key_is_accepted(self):
+        parse_script(_HEAD + 'set suite.result "PASS"\n')
+
+    def test_the_reserved_namespaces_are_refused(self):
+        self.rejects(_HEAD + 'set rlq.ready "yes"\n',
+                     "rlq namespace are reserved", "S5")
+        self.rejects(_HEAD + 'set reliquary "yes"\n',
+                     "reliquary namespace are reserved", "S5")
+
+    def test_a_reserved_key_inside_a_handler_is_found(self):
+        self.rejects(
+            _HEAD + 'wait {\n    on "a" {\n        set rlq.x "1"\n'
+            "        finish\n    }\n"
+            '    on "b" {\n        finish\n    }\n}\n',
+            "rlq namespace are reserved", "S5")
+
+
 class DiagnosticContextTests(_ValidationCase):
     """A static error carries the same context as a parse error."""
 

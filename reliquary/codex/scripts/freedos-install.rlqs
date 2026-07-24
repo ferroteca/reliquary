@@ -20,7 +20,10 @@ phase cd-boot {
     wait   "What is your preferred language"
     select "English"
     wait   "Welcome to the FreeDOS 1.4 installation program"
-    press  enter
+    select "Yes"                    # feedback-driven: a bare `press
+                                    # enter` here is drawn before the
+                                    # installer reads the keyboard and
+                                    # is swallowed
 
     wait {
         on "Drive C: does not appear to be partitioned." {

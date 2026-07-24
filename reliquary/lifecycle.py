@@ -117,7 +117,7 @@ def create_hdd_image(filename, capacity):
         "-o", "compat=1.1,preallocation=off",
         path, size,
     ]
-    print(f"creating qcow2 image: {path} ({size})")
+    print(f"rlq: creating qcow2 image: {path} ({size})", file=sys.stderr)
     completed = subprocess.run(
         command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
@@ -166,7 +166,8 @@ def create_difference_image(filename, base):
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    print(f"creating qcow2 difference: {path} (backing {base})")
+    print(f"rlq: creating qcow2 difference: {path} (backing {base})",
+          file=sys.stderr)
     _run_qemu_img(
         ["create", "-f", "qcow2", "-o", "compat=1.1",
          "-b", base, "-F", base_format, path],
@@ -191,7 +192,8 @@ def create_duplicate_image(filename, base):
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    print(f"creating qcow2 duplicate: {path} (from {base})")
+    print(f"rlq: creating qcow2 duplicate: {path} (from {base})",
+          file=sys.stderr)
     _run_qemu_img(
         ["convert", "-O", "qcow2", base, path],
         "duplicating", path)
@@ -462,8 +464,10 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         except RuntimeError:
             _terminate_started_process(proc)
             raise
-    print(f"QEMU started: {vm_name} (QMP on 127.0.0.1:{port})")
-    print(f"command line: {subprocess.list2cmdline(command)}")
+    print(f"rlq: QEMU started: {vm_name} (QMP on 127.0.0.1:{port})",
+          file=sys.stderr)
+    print(f"rlq: command line: {subprocess.list2cmdline(command)}",
+          file=sys.stderr)
     return {"port": port, "name": vm_name, "uuid": vm_uuid, "pid": proc.pid}
 
 
@@ -505,4 +509,4 @@ def stop(vm):
                 "QEMU is still holding the QMP port 15s after quit; "
                 "a following start() on the same port would collide")
         time.sleep(0.5)
-    print("VM stopped.")
+    print("rlq: VM stopped", file=sys.stderr)

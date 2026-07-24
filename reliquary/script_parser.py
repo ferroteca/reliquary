@@ -35,7 +35,7 @@ KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
     "property", "http", "content", "phase", "wait", "on", "always",
     "goto", "finish", "enter", "type", "press", "select", "screenshot",
-    "insert", "eject", "set-boot", "start", "stop",
+    "insert", "eject", "set-boot", "set", "start", "stop",
 )
 
 # Each node's allowed modifiers. The transformer reports anything
@@ -55,7 +55,8 @@ _SIGNATURES = {
     "http_control": (),
     "select": ("exclude",),
     "enter": (), "type_text": (), "press": (), "screenshot": (),
-    "insert": (), "eject": (), "set_boot": (), "start": (), "stop": (),
+    "insert": (), "eject": (), "set_boot": (), "set_var": (),
+    "start": (), "stop": (),
     "goto": (), "finish": (),
 }
 
@@ -64,7 +65,7 @@ _SIGNATURES = {
 _DISPLAY = {
     "wait_one": "wait", "wait_branching": "wait", "on_handler": "on",
     "always_handler": "always", "type_text": "type",
-    "set_boot": "set-boot", "property_def": "property",
+    "set_boot": "set-boot", "set_var": "set", "property_def": "property",
     "http_def": "http", "content_def": "content",
     "http_control": "http",
 }
@@ -710,6 +711,14 @@ class _Builder(Transformer):
         keys = tuple(str(c) for c in children[1:]
                      if isinstance(c, LarkToken) and c.type == "NAME")
         return self._simple("set-boot", "set_boot", children, keys)
+
+    def set_var(self, children):
+        # The script -> host scalar channel: `set <key> "<value>"`
+        # records a machine variable any process can read back with
+        # `get-machine-var`.
+        return self._simple(
+            "set", "set_var", children,
+            (str(children[1]), children[2].reliquary.value))
 
     def start(self, children):
         return self._simple("start", "start", children, ())

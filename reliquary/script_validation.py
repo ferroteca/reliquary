@@ -66,6 +66,7 @@ def validate(script):
     _http(script)
     _durations(script)
     _keys(script)
+    _variables(script)
     if script.phases:
         _phased(script)
     else:
@@ -381,6 +382,33 @@ def _timed(statements, handlers=()):
 
 # -- portable keys (S14) -----------------------------------------
 
+def _all_statements(script):
+    """Every statement of a script, nested bodies included."""
+    statements = list(_walk(script.statements))
+    for phase in script.phases:
+        statements.extend(_walk(phase.statements, phase.handlers))
+    return statements
+
+
+def _variables(script):
+    """Every ``set`` key is outside reliquary's reserved namespaces.
+
+    A machine variable is the consumer's own name for its own value
+    (P18), so the only rule is that it never collides with a name
+    reliquary may introduce later.
+    """
+    for statement in _all_statements(script):
+        if statement.verb != "set":
+            continue
+        key = statement.arguments[0]
+        head = key.split(".", 1)[0]
+        if head in ("rlq", "reliquary"):
+            raise ScriptParseError(
+                statement.line,
+                f"machine-variable keys in the {head} namespace are "
+                f"reserved: {key} (S5)", statement.column)
+
+
 def _keys(script):
     """Every ``press`` argument belongs to the portable key set.
 
@@ -388,10 +416,7 @@ def _keys(script):
     in ``ctrl+c``. A bare character remains text and must be sent
     with ``type`` or ``enter``.
     """
-    statements = list(_walk(script.statements))
-    for phase in script.phases:
-        statements.extend(_walk(phase.statements, phase.handlers))
-    for statement in statements:
+    for statement in _all_statements(script):
         if statement.verb != "press":
             continue
         for spelling in statement.arguments:

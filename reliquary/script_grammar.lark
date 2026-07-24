@@ -75,6 +75,7 @@ action: KW_ENTER STRING modifier* _NL                   -> enter
       | KW_INSERT NAME media_arg modifier* _NL          -> insert
       | KW_EJECT NAME modifier* _NL                     -> eject
       | KW_SET_BOOT NAME+ modifier* _NL                 -> set_boot
+      | KW_SET NAME STRING modifier* _NL                -> set_var
       | KW_START modifier* _NL                          -> start
       | KW_STOP modifier* _NL                           -> stop
 
@@ -89,6 +90,6 @@ _close: _BLOCK_CLOSE _NL
 %declare KW_DESCRIPTION KW_PLATFORM KW_MACHINE KW_ENTRY KW_TIMEOUT
 %declare KW_DEADLINE KW_PROPERTY KW_HTTP KW_CONTENT KW_PHASE KW_WAIT KW_ON KW_ALWAYS
 %declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT
-%declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_START KW_STOP
+%declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_SET KW_START KW_STOP
 %declare NAME STRING REGEX DURATION MEDIA_REF PROP_REF MOD_NAME TRIPLE CONTENT_TEXT
 %declare _NL _BLOCK_OPEN _BLOCK_CLOSE

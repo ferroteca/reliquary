@@ -112,11 +112,57 @@ slots and work running-or-stopped (a running change is applied live
 over QMP); `set_boot_order` is stopped-only; all three persist and
 survive stop/start:
 
-- `insert_media(machine_id, slot, media_name, *, context=None)`
-  (`insert-media`)
+- `insert_media(machine_id, slot, media=None, *, file=None,
+  context=None)` (`insert-media`) - Exactly one of `media` (a
+  declared media, fetched and hash-verified) or `file` (your own
+  image, mounted in place: anonymous, mutable, unverified, never
+  copied — the live-iteration transport).
 - `eject_media(machine_id, slot, *, context=None)` (`eject-media`)
 - `set_boot_order(machine_id, boot_keys, *, context=None)`
   (`set-boot-order`)
+
+## Driving a machine from a program
+
+The mechanics of the automating loop: put work in, run it, read the
+result out, iterate. Reliquary supplies the transports and attaches
+no meaning to what travels through them.
+
+- `exec(command, *, machine=None, blueprint=None, timeout=120,
+  context=None)` - Run one command in a running guest and return the
+  text it produced, as a tuple of screen rows. The run family's
+  one-shot member: it drives the machine and returns its output,
+  storing nothing. Agentless capture, so the output is the visible
+  screen — a command that scrolls further leaves only its tail;
+  retrieve a file or read a machine variable when you need more.
+  Non-DOS platforms raise `NotImplementedError`. CLI twin: `exec`.
+  (The name shadows the Python builtin where it is imported by name,
+  which is the price of the twin-name identity rule; `builtins.exec`
+  remains reachable.)
+- `get_machine_var(key, *, machine=None, blueprint=None,
+  context=None)` - Read one machine variable, or `None` when it is
+  not set. A query, valid in any phase. CLI twin: `get-machine-var`.
+- `set_machine_var(machine_id, key, value, *, context=None)` - Record
+  one. Its world-facing spelling is the script `set` verb, so the
+  capability reaches the CLI through the scripting language rather
+  than a command of its own. Variables are cleared at each `start`,
+  so one always reports what the current boot produced; the `rlq` and
+  `reliquary` key namespaces are reserved.
+- `put_file(source, destination, *, machine=None, blueprint=None,
+  context=None)` - Copy a host file into the guest, `destination`
+  addressed **as the guest names it** (`"A:\TEST.EXE"`). Returns
+  that address. CLI twin: `put-file`.
+- `get_file(source, destination, *, machine=None, blueprint=None,
+  context=None)` - The reverse: `source` is the guest address,
+  `destination` a host path, and the host path is returned. CLI twin:
+  `get-file`.
+
+The drive-letter mapping is built from the machine's declared
+platform and Reliquary's own drive assignment — never from
+inspecting a guest. Both file calls are **stopped-only**, and the
+addressed drive must be a directory-source (`hostdir`) drive: the
+backend snapshots that directory at attach, so a put made while the
+machine runs would be invisible and a guest write is not flushed
+until it stops. Anything else raises `PreflightError` naming the gap.
 
 ## Blueprints (composed documents)
 
@@ -222,17 +268,24 @@ an ordinary `set_property` on that key refuses to overwrite.
   Parse a redesigned-surface `.rlqs` script into an immutable
   `Script`; errors raise `ScriptParseError` with source locations.
 - `run_script(label, *, blueprint=None, machine=None, context=None,
-  display=False, properties=None, properties_file=None)` - Resolve the
+  display=False, properties=None, properties_file=None,
+  progress="auto")` - Resolve the
   label through the blueprint's `scripts` map, create a machine when
   the blueprint has none, honor the script's `machine` header,
   statically preflight insert/eject/set-boot targets, bind every
-  declared property before the machine starts, and execute with a run
-  record under the machine's `runs/` directory. `properties` is the
+  declared property before the machine starts, and run it.
+  `properties` is the
   explicit `{key: value}` mapping (the CLI's repeated `--property`);
-  `properties_file` selects the binding file. Returns `ScriptRun`;
-  failures raise `ScriptRuntimeError`, and an unbound property raises
-  `PropertyBindingError` before any machine work. CLI twin:
-  `run-script`.
+  `properties_file` selects the binding file; `progress` selects the
+  live rendering (`"auto"` | `"pretty"` | `"plain"` | `"jsonl"`, as
+  the CLI's `--progress`), and `"plain"`/`"jsonl"` never prompt.
+
+  **The run returns its output and stores nothing.** The returned
+  `ScriptRun` carries `machine_id`, `script_path`, `created_machine`,
+  `final_phase`, `machine_phase`, and `events` — the whole event
+  stream as plain dicts, in order, the terminal event last. Keep it
+  if you want a record; Reliquary keeps none. Failures raise by error
+  class (below). CLI twin: `run-script`.
 - `check_script(name, *, blueprint=None, machine=None, context=None,
   properties=None, properties_file=None)` - Parse and statically
   check a script; return a printable timing plan and, on
@@ -240,10 +293,11 @@ an ordinary `set_property` on that key refuses to overwrite.
   source — without prompting, running, or reading a secret's value.
   CLI twin: `check-script`.
 - `execute_script(script, *, machine_id, context=None,
-  display=False, run_dir=None, script_path=None, bindings=None)` -
+  display=False, script_path=None, bindings=None, events=None)` -
   Execute an already-parsed script against a specific machine.
   `bindings` is a `BoundProperties` (from `bind_properties`); without
-  it, a `${key}` reference fails at runtime.
+  it, a `${key}` reference fails at runtime. `events` is the
+  `EventStream` the run emits into.
 - `bind_properties(script, *, parameters=None, explicit=None,
   properties_file=None, context=None, asker=None)` - Resolve every
   declared property through the source order, or raise

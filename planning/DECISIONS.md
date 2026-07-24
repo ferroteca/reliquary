@@ -48,6 +48,63 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D37 — MILESTONE 9 DELIVERS U14 AND U20; BOTH PROMOTE —
+  DECIDED (2026-07-24, landing milestone 9). Supports P8, P11,
+  P17, P18; applies D34's promotion-on-delivery rule and D36's
+  reframing. The milestone landed in full — the return-not-store
+  run model, the error taxonomy, live `--progress` feedback, and
+  the exec-run mechanics — so by D34 the two use cases it accepted
+  move to their standing list as a step of that delivery.
+  U14 PROMOTED. The loop it describes runs end to end against a
+  live FreeDOS machine: a file injected by its guest address
+  (`put-file "A:\JOB.BAT"`), work run from a consumer-authored
+  script, and the result read back both ways — a value through a
+  machine variable (`get-machine-var`) and the guest's own file
+  retrieved in-band (`get-file`). The `exec` twin landed with it,
+  returning the text its command produced, which is the run
+  family's parity D36 named.
+  U20 PROMOTED, ITS TRANSPORT PROVEN. The T1 spike ran the swap
+  cycle on QEMU/DOS: a live `insert-media --file` swap is *seen*
+  by DOS (the directory listing after a swap is the new image's,
+  never the previous disk's), and a guest write reaches the host
+  image — verified byte-wise after `eject-media`, and again after
+  swapping back, each image carrying only its own rounds. No
+  reshaping was needed.
+  THE ONE CONDITION THE SPIKE FOUND, NOW A GUARD. A floppy drive's
+  geometry is fixed when the backend attaches it at launch, and a
+  live change does not revise it: a slot launched empty takes
+  QEMU's own 2.88M default, so inserting a 1.44M image into it
+  live reaches the guest as "general failure" on every read and
+  write. Reliquary did not choose that geometry and will not ship
+  a silently broken drive (P11), so `start` records the launched
+  medium's size and a mismatched live insert fails closed naming
+  both sizes and the fix. This is what the spike was *for* — the
+  finding became a guard rather than a footnote.
+  P16/P17/P18 NOT PROMOTED. The code now honors P17's candidate
+  statement (guest-terms addressing, built from declared facts,
+  failing closed on ambiguity) and P18 (no shipped readiness
+  script, no result vocabulary), but all three principles are
+  **drafted, adjudication pending** — P17 still carries four open
+  questions. Promotion presupposes acceptance, which is the
+  owner's, so they stay in PRINCIPLE-PROPOSALS.md; the
+  implementation is evidence for that adjudication, not a
+  substitute for it.
+  U3's SUPERSESSION IS DUE, NOT TAKEN. D36 settled that U14
+  supersedes U3 alone, and U14 is now delivered — but retiring a
+  use case is the lifecycle's Retire clause, an owner
+  adjudication, not a step of this delivery. U3 waits in the
+  proposals doc with that noted.
+  FOLDED: this entry; USE-CASES.md (U14 and U20 added);
+  USE-CASE-PROPOSALS.md (both removed, no stub — D23; U3's note);
+  ROADMAP (milestone 9 marked complete, the arc with it, the
+  spike condition recorded); TASKS.md (T1–T7 marked landed, the
+  spike result, the two fixes found in passing); script-spec.md
+  (the `set` verb, and the half of the file-exchange omission
+  in-band put/get closes — as a CLI/API capability, never a
+  language one); AGENTS.md; the machine-state schema
+  (`variables`, the anonymous medium); README, CHANGELOG, and
+  both references.
+
 - D36 — THE RUN RETURNS ITS OUTPUT; MILESTONE 9 IS THE
   PROGRAMMATIC LOOP — DECIDED (owner, 2026-07-24, the exec-run
   design round). Supports P4, P6, P8, P18; **amends D35**. The

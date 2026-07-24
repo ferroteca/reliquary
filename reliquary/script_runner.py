@@ -15,30 +15,33 @@ resolved every bound at parse time, so this module looks each one
 up and can name the scope that supplied it when a clock expires.
 """
 
+import collections
 import contextlib
 import dataclasses
+import difflib
 import mimetypes
 import os
 import re
-import sys
+import signal
 import threading
 import time
-import uuid
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 from qemu.qmp import ConnectError
 
 from .binding import bind_properties, console_asker, describe_sources
+from .errors import PreflightError, RunCancelled, RunFailure
 from .library import locate_script, seed_blueprint, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
+from .progress import interactive as _interactive, stream_for
 from .resolve import load_namespace
 from .script_parser import load_script
 from .script_timing import (format_plan, parse_duration,
                             resolve as resolve_timing)
 from .script_validation import PORTABLE_KEY_NAMES
+from . import events as _events
 from . import machines as _machines
 
 
@@ -244,76 +247,8 @@ class _PropertyUnbound(Exception):
         self.key = key
 
 
-_HEARTBEAT_INTERVAL = 5.0
-_SPINNER = "|/-\\"
-_BAR_WIDTH = 20
-
-
-class _Progress:
-    """Live progress for a dispatch loop.
-
-    Two audiences, one clock:
-
-    * An attached terminal gets a colored, in-place spinner + bar
-      that redraws every sample — good for someone watching the
-      session live.
-    * Everyone else — a redirected log a user is ``tail -f``-ing
-      against a headless/backgrounded VM, and the transcript file
-      itself — gets a plain heartbeat line every
-      :data:`_HEARTBEAT_INTERVAL` seconds, so progress is visible
-      without needing a live terminal.
-    """
-
-    def __init__(self):
-        self.isatty = sys.stdout.isatty()
-        self._active = False
-        self._last_heartbeat = None
-        self._tick = 0
-
-    @staticmethod
-    def _bar(fraction):
-        fraction = min(1.0, max(0.0, fraction))
-        filled = round(fraction * _BAR_WIDTH)
-        return "#" * filled + "." * (_BAR_WIDTH - filled)
-
-    def _render(self, phase, step, description, elapsed, remaining,
-                timeout):
-        fraction = elapsed / timeout if timeout > 0 else 1.0
-        return (
-            f"[{phase}] step {step}: {description}  "
-            f"[{self._bar(fraction)}] "
-            f"{elapsed:0.0f}s elapsed, {remaining:0.0f}s to timeout"
-        )
-
-    def tick(self, phase, step, description, expiry, timeout, now):
-        """Advance the animation; return a heartbeat line, or None."""
-        remaining = max(0.0, expiry - now)
-        elapsed = max(0.0, timeout - remaining)
-        line = self._render(
-            phase, step, description, elapsed, remaining, timeout)
-        if self.isatty:
-            spin = _SPINNER[self._tick % len(_SPINNER)]
-            self._tick += 1
-            sys.stdout.write(f"\r\x1b[K\033[36m{spin} {line}\033[0m")
-            sys.stdout.flush()
-            self._active = True
-        if (self._last_heartbeat is None
-                or now - self._last_heartbeat >= _HEARTBEAT_INTERVAL):
-            self._last_heartbeat = now
-            return line
-        return None
-
-    def clear(self):
-        if self._active:
-            sys.stdout.write("\r\x1b[K")
-            sys.stdout.flush()
-            self._active = False
-        self._last_heartbeat = None
-        self._tick = 0
-
-
-class ScriptRuntimeError(RuntimeError):
-    """An error that occurred during script execution."""
+class _Located:
+    """A diagnostic that can cite the statement it came from."""
 
     def __init__(self, message, statement=None, path=None):
         super().__init__(message)
@@ -324,19 +259,48 @@ class ScriptRuntimeError(RuntimeError):
         location = ""
         if self.statement is not None and self.statement.line:
             location = f" at line {self.statement.line}"
-        return f"{self.path or '<script>'}{location}: {super().__str__()}"
+        return (f"{self.path or '<script>'}{location}: "
+                f"{Exception.__str__(self)}")
+
+
+class ScriptRuntimeError(_Located, RunFailure):
+    """An error that occurred during script execution.
+
+    The dynamic tier of the taxonomy — a RUN FAILURE, exit ``4``.
+    ``clock`` and ``scope`` are set when a timing bound expired, so
+    the failure report can name which clock ran out and where it came
+    from.
+    """
+
+    clock = None
+    scope = None
+
+
+class ScriptPreflightError(_Located, PreflightError):
+    """A machine rule broken before the first guest input (exit ``3``).
+
+    Same diagnostic shape as a runtime error — it cites the statement
+    that would have broken the rule — but it is raised before the run
+    touches the guest, so it belongs to the preflight tier.
+    """
 
 
 @dataclasses.dataclass(frozen=True)
 class ScriptRun:
-    """Result of a labeled ``run-script <label>`` invocation."""
+    """The output of a ``run-script <label>`` invocation.
+
+    The run **returns its output** and stores nothing (D36):
+    ``events`` is the run's whole event stream, in order, the
+    terminal event last. A caller that wants a record keeps this;
+    reliquary keeps none.
+    """
 
     machine_id: str
-    run_dir: str
     script_path: str
     created_machine: bool = False
     final_phase: str = "-"
     machine_phase: str = "-"
+    events: tuple = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -378,15 +342,24 @@ class _Observation:
     def channel(self):
         return self.condition.channel
 
+    def matches_row(self, row):
+        """Whether one screen row satisfies this condition.
+
+        The per-row form the whole-sample test is built from, so a
+        match event can name the row that satisfied it rather than
+        merely asserting that one did.
+        """
+        if self.condition.channel == "machine":
+            return False
+        if self.condition.kind == "regex":
+            return re.search(self.condition.value, row) is not None
+        return _normalize_row(_literal(self.condition.value)) in row
+
     def holds(self, sample):
         """Whether the condition holds at this sample."""
         if self.condition.channel == "machine":
             return sample.stopped
-        if self.condition.kind == "regex":
-            return any(re.search(self.condition.value, row)
-                       for row in sample.rows)
-        target = _normalize_row(_literal(self.condition.value))
-        return any(target in row for row in sample.rows)
+        return any(self.matches_row(row) for row in sample.rows)
 
     def update(self, sample, now):
         """Fold one sample in; report whether the condition is met."""
@@ -405,7 +378,7 @@ class _ScriptEngine:
     """One run of one script against one cached machine."""
 
     def __init__(self, script, machine_id, context, machine_home,
-                 run_dir=None, script_path=None, plan=None,
+                 events=None, script_path=None, plan=None,
                  clock=time.monotonic, sleep=time.sleep,
                  http_service_factory=_HttpService, bindings=None):
         self._script = script
@@ -414,15 +387,12 @@ class _ScriptEngine:
         self._machine_id = machine_id
         self._context = context
         self._machine_home = machine_home
-        self._run_dir = run_dir
         self._script_path = script_path
-        self._transcript = None
         self._port = None
         self._display = False
         self._now = clock
         self._sleep = sleep
         self._step = 0
-        self._status = _Progress()
         self._http_service_factory = http_service_factory
         self._http = None
         self._property_bindings = bindings
@@ -434,10 +404,31 @@ class _ScriptEngine:
         self._run_started = None
         self._phase_started = None
         self._phase_budget = None
+        # The failure report's raw material, kept as the run goes:
+        # what is pending, the route taken and how often each phase
+        # was revisited, and the last screen read.
+        self._pending = None
+        self._pending_literal = None
+        self._route = []
+        self._revisits = collections.Counter()
+        self._last_sample = None
+        self._cancelled = threading.Event()
+        self.events = (events if events is not None
+                       else _events.EventStream(redact=self._redact))
         self.final_phase = None
         self.machine_phase = None
 
-    # -- diagnostics and records ---------------------------------
+    # -- diagnostics and the stream ------------------------------
+
+    def cancel(self):
+        """Request a stop; the run ends at the next event boundary.
+
+        Boundaries are statement starts and dispatch samples, so an
+        input delivery in flight completes atomically — the execution
+        model's severability (script-spec "The run's output and
+        failure").
+        """
+        self._cancelled.set()
 
     def _error(self, message, statement=None):
         return ScriptRuntimeError(
@@ -445,40 +436,35 @@ class _ScriptEngine:
 
     def _expired(self, clock, bound, statement=None, detail=""):
         """A timing failure naming the clock and where it came from."""
-        return self._error(
+        failure = self._error(
             f"{clock} of {bound.spelling} expired{detail} (from the "
             f"{bound.source})", statement)
+        failure.clock = f"{clock} of {bound.spelling}"
+        failure.scope = bound.source
+        return failure
 
     def _redact(self, message):
-        """Blank any bound secret value out of a record line.
+        """Blank any bound secret value out of a rendered line.
 
-        Protects Reliquary's own records — transcript and diagnostics.
-        It cannot reach what a guest installer prints, logs, or shows
-        in an explicitly requested screenshot.
+        Protects reliquary's own output — the event stream and its
+        diagnostics. It cannot reach what a guest installer prints,
+        logs, or shows in an explicitly requested screenshot.
         """
         for value in self._secret_values:
             if value and value in message:
                 message = message.replace(value, "«secret»")
         return message
 
-    def _log(self, message):
-        message = self._redact(message)
-        self._status.clear()
-        print(message)
-        if self._transcript is not None:
-            self._transcript.write(message + "\n")
-            self._transcript.flush()
+    def _emit(self, kind, **fields):
+        return self.events.emit(kind, **fields)
 
     def _progress(self, expiry, timeout, description, now):
-        heartbeat = self._status.tick(
-            self._phase.name if self._phase is not None else "-",
-            self._step, description, expiry, timeout, now)
-        if heartbeat is not None:
-            if self._transcript is not None:
-                self._transcript.write(heartbeat + "\n")
-                self._transcript.flush()
-            if not self._status.isatty:
-                print(heartbeat)
+        """Advance the live display — elapsed against its limit."""
+        self.events.tick(
+            phase=self._phase.name if self._phase is not None else "-",
+            step=self._step, description=description,
+            elapsed=max(0.0, timeout - max(0.0, expiry - now)),
+            limit=timeout)
 
     def _read_machine_phase(self):
         try:
@@ -497,16 +483,16 @@ class _ScriptEngine:
         """
         self.machine_phase = self._read_machine_phase()
         self.final_phase = self._phase.name if self._phase else "-"
-        if self._transcript is not None:
-            self._log(f"final script phase: {self.final_phase}")
-            self._log(f"machine phase: {self.machine_phase}")
 
     # -- the run -------------------------------------------------
 
     def run(self, display=False):
         self._display = display
+        self._emit(_events.RUN_START,
+                   script=self._script_path or "<script>",
+                   machine=self._machine_id,
+                   platform=self._script.platform or "dos")
         self._establish_machine(display)
-        self._start_transcript()
         self._log_bindings()
         self._run_started = self._now()
         try:
@@ -517,40 +503,115 @@ class _ScriptEngine:
                 # completes the run.
                 self._execute(self._script.statements)
             self._report_final()
-            if self._transcript is not None:
-                self._log("result: ok")
+            self._terminal(None)
+        except RunCancelled as exc:
+            self._report_final()
+            self._terminal(exc)
+            raise
         except (ScriptRuntimeError, TimeoutError, RuntimeError,
                 ValueError) as exc:
             self._report_final()
-            if self._transcript is not None:
-                self._log("result: failed")
-                self._log(f"error: {exc}")
             if isinstance(exc, ScriptRuntimeError) and exc.path is None:
                 exc.path = self._script_path
+            self._fail(exc)
             raise
         except Exception as exc:
             self._report_final()
-            if self._transcript is not None:
-                self._log("result: failed")
-                self._log(f"error: {exc}")
-            raise self._error(f"unexpected error: {exc}") from exc
+            wrapped = self._error(f"unexpected error: {exc}")
+            self._fail(wrapped)
+            raise wrapped from exc
         finally:
             self._http_stop()
-            if self._transcript is not None:
-                self._transcript.close()
-                self._transcript = None
+            self.events.clear()
+
+    def _terminal(self, error):
+        """Emit the stream's last word: what the run came to."""
+        from .errors import exit_code, outcome
+        self._emit(
+            _events.RUN_END, outcome=outcome(error),
+            **{"exit-code": exit_code(error) if error else 0,
+               "final-phase": self.final_phase or "-",
+               "machine-phase": self.machine_phase or "-",
+               "error": str(error) if error is not None else None})
+
+    def _fail(self, error):
+        """Emit the failure report, then the terminal event.
+
+        Everything the report can name comes from the run itself: the
+        pending condition or action, the clock that expired and the
+        scope that supplied it, the route with its revisit counts, the
+        nearest miss on the last screen read, an automatic screenshot,
+        and the command to try next.
+        """
+        self.events.clear()
+        self._emit(
+            _events.FAILURE, error=str(error), pending=self._pending,
+            clock=getattr(error, "clock", None),
+            scope=getattr(error, "scope", None),
+            route=tuple(self._route) or None,
+            revisits={name: count for name, count
+                      in self._revisits.items() if count > 1} or None,
+            **{"nearest-miss": self._nearest_miss(),
+               "screenshot": self._failure_screenshot(),
+               "next-command": self._next_command()})
+        self._terminal(error)
+
+    def _nearest_miss(self):
+        """The screen row that came closest to the pending literal.
+
+        Only a text condition has a nearest miss: a regex names a
+        shape rather than a string, and there is nothing honest to
+        measure against.
+        """
+        target = self._pending_literal
+        if not target or not self._last_sample:
+            return None
+        rows = [row for row in self._last_sample.rows if row.strip()]
+        if not rows:
+            return None
+        best = max(rows, key=lambda row: difflib.SequenceMatcher(
+            None, target, row).ratio())
+        return self._redact(best)
+
+    def _failure_screenshot(self):
+        """Capture the failing screen, unless a secret has been typed.
+
+        Once a secret reaches the guest, automatic screenshots are
+        suppressed for the rest of the run: an installer may echo what
+        it was given, and an automatic capture is not the author's own
+        deliberate call.
+        """
+        if self._port is None or self._secret_entered:
+            return None
+        name = f"failure-step-{self._step}"
+        try:
+            screenshot(name, self._port, self._machine_home)
+        except Exception:
+            # A failure report must never fail; the machine may
+            # already be gone.
+            return None
+        return os.path.join(self._machine_home, "screenshots",
+                            f"{name}.png")
+
+    def _next_command(self):
+        """The command most likely to move the user forward."""
+        if self._read_machine_phase() == "running":
+            return f"rlq screen --machine {self._machine_id}"
+        return f"rlq list-machines --machine {self._machine_id}"
 
     def _log_bindings(self):
-        """Record each bound property's key and source — never a value.
+        """Report each bound property's key and source — never a value.
 
-        The transcript is evidence of provenance, so a run is
-        auditable without exposing what any source supplied.
+        The stream is evidence of provenance, so a run is auditable
+        without exposing what any source supplied.
         """
         bindings = self._property_bindings
         if not bindings or not bindings.sources:
             return
         for key in sorted(bindings.sources):
-            self._log(f"property {key}: {bindings.sources[key]}")
+            self._emit(_events.PROPERTY_BOUND, key=key,
+                       source=bindings.sources[key],
+                       secret=key in bindings.secret_keys or None)
 
     def _establish_machine(self, display):
         """Meet the `machine` header's precondition, then bind a port."""
@@ -570,7 +631,8 @@ class _ScriptEngine:
                     f"script (phase: {phase})")
         elif phase == "ready":
             self._port = _machines.start_machine(
-                self._machine_id, display=display, context=self._context)
+                self._machine_id, display=display, context=self._context,
+                events=self.events)
         elif phase == "running":
             from .lifecycle import read_vm_state
             vm = read_vm_state(home=_machines.machine_dir_path(
@@ -584,30 +646,26 @@ class _ScriptEngine:
                 f"machine {self._machine_id} cannot execute a script "
                 f"(phase: {phase})")
 
-    def _start_transcript(self):
-        if self._run_dir is None:
-            return
-        self._transcript = open(
-            os.path.join(self._run_dir, "transcript.txt"), "w",
-            encoding="utf-8", newline="\n")
-        self._log(f"script: {self._script_path or '<script>'}")
-        self._log(f"machine: {self._machine_id}")
-        started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        self._log(f"started: {started}")
-
     def _run_phases(self):
         """Walk the phase graph from `entry` until a `finish`."""
         name = self._script.entry
         while True:
             phase = self._phases[name]
             self._phase = phase
-            self._log(f"phase: {name}")
+            self._route.append(name)
+            self._revisits[name] += 1
+            activation = self._revisits[name]
+            self._emit(_events.PHASE_START, phase=name,
+                       activation=activation, line=phase.line)
             # A budget is dynamically scoped to one activation, so
             # each entry to a phase starts a fresh one.
             self._phase_started = self._now()
             self._phase_budget = self._plan.phase_deadlines.get(name)
             result = (self._run_reactive(phase) if phase.handlers
                       else self._execute(phase.statements))
+            self._emit(_events.PHASE_END, phase=name,
+                       activation=activation,
+                       elapsed=round(self._now() - self._phase_started, 3))
             if result is _FINISH or result is None:
                 return
             name = result
@@ -627,10 +685,12 @@ class _ScriptEngine:
     def _statement(self, statement):
         verb = statement.verb
         if verb == "goto":
-            self._log(f"line {statement.line}: goto {statement.arguments[0]}")
+            self._emit(_events.TRANSITION, transition="goto",
+                       target=statement.arguments[0], line=statement.line)
             return statement.arguments[0]
         if verb == "finish":
-            self._log(f"line {statement.line}: finish")
+            self._emit(_events.TRANSITION, transition="finish",
+                       line=statement.line)
             return _FINISH
         try:
             # A `${key}` reaches the runtime unbound from a condition
@@ -660,6 +720,8 @@ class _ScriptEngine:
                 self._start(statement)
             elif verb == "stop":
                 self._stop(statement)
+            elif verb == "set":
+                self._set(statement)
             else:
                 raise self._error(f"unknown statement: {verb}", statement)
         except _PropertyUnbound as unbound:
@@ -668,48 +730,76 @@ class _ScriptEngine:
 
     def _unbound(self, unbound, statement):
         return self._error(
-            f"the property ${{{unbound.key}}} has no bound value: "
-            "property binding arrives with the property family",
+            f"the property ${{{unbound.key}}} has no bound value",
             statement)
 
+    def _set(self, statement):
+        """Record a machine variable — the script's channel to the host."""
+        key = statement.arguments[0]
+        value = _render_literal(statement.arguments[1], self._bindings)
+        self._action(statement, "set", f"{key}={value!r}")
+        try:
+            _machines.set_machine_var(
+                self._machine_id, key, value, context=self._context)
+        except (RuntimeError, ValueError) as exc:
+            raise self._error(str(exc), statement) from exc
+        self._completed(statement, "set")
+
     # -- observation ---------------------------------------------
+
+    def _arm(self, statement, observations, description):
+        """Announce an observation and remember it as pending."""
+        bound = self._bound(statement)
+        self._pending = description
+        literal = None
+        if len(observations) == 1:
+            condition = observations[0].condition
+            if condition.channel == "screen" and condition.kind == "text":
+                literal = _normalize_row(_literal(condition.value))
+        self._pending_literal = literal
+        self._emit(_events.OBSERVATION_ARM, description=description,
+                   timeout=bound.seconds, line=getattr(statement, "line", 0),
+                   **{"timeout-source": bound.source})
+        return bound
 
     def _wait(self, statement):
         if statement.handlers:
             return self._wait_branching(statement)
         condition = statement.condition
         description = _describe(condition)
-        self._log(f"line {statement.line}: wait {description}")
-        self._observe(
-            [_Observation(condition, _seconds(statement.stable))],
-            self._bound(statement), description, statement)
+        observations = [_Observation(condition, _seconds(statement.stable))]
+        bound = self._arm(statement, observations, description)
+        self._observe(observations, bound, description, statement)
         return None
 
     def _wait_branching(self, statement):
-        self._log(f"line {statement.line}: wait (branching)")
         handlers = statement.handlers
         observations = [_Observation(handler.condition,
                                      _seconds(handler.stable))
                         for handler in handlers]
-        index = self._observe(
-            observations, self._bound(statement),
-            " or ".join(_describe(h.condition) for h in handlers),
-            statement)
+        description = " or ".join(
+            _describe(handler.condition) for handler in handlers)
+        bound = self._arm(statement, observations, description)
+        index = self._observe(observations, bound, description, statement)
         handler = handlers[index]
-        self._log(f"line {handler.line}: on "
-                  f"{_describe(handler.condition)}")
+        self._emit(_events.HANDLER_FIRE, keyword="on",
+                   description=_describe(handler.condition),
+                   line=handler.line)
         # The sample loop holds no session, so a handler body is free
         # to open its own: QEMU's QMP server admits one client.
         return self._execute(handler.statements)
 
     def _run_reactive(self, phase):
         """Dispatch a reactive phase's standing handlers."""
-        bound = self._bound(phase)
         observations = [_Observation(handler.condition,
                                      _seconds(handler.stable))
                         for handler in phase.handlers]
+        description = " or ".join(
+            _describe(handler.condition) for handler in phase.handlers)
+        bound = self._arm(phase, observations, description)
         self._require_screen(observations, phase)
-        expiry = self._now() + bound.seconds
+        started = self._now()
+        expiry = started + bound.seconds
         while True:
             self._check_clocks()
             sample = self._read()
@@ -723,7 +813,11 @@ class _ScriptEngine:
                     fired = index
             if fired is None:
                 if now >= expiry:
-                    self._status.clear()
+                    self.events.clear()
+                    self._emit(_events.OBSERVATION_TIMEOUT,
+                               description=description,
+                               timeout=bound.seconds, line=phase.line,
+                               **{"timeout-source": bound.source})
                     raise self._expired(
                         "the reactive interval", bound,
                         detail=" with no handler firing")
@@ -732,37 +826,63 @@ class _ScriptEngine:
                 continue
             observations[fired].consumed = True
             handler = phase.handlers[fired]
-            self._status.clear()
-            self._log(f"line {handler.line}: always "
-                      f"{_describe(handler.condition)}")
+            self.events.clear()
+            self._matched(_describe(handler.condition), sample,
+                          observations[fired], now - started, handler.line)
+            self._emit(_events.HANDLER_FIRE, keyword="always",
+                       description=_describe(handler.condition),
+                       line=handler.line)
             result = self._execute(handler.statements)
             if result is not None:
                 return result
             # Dispatch resumes in the same phase, and the interval
             # clock restarts with it.
-            expiry = self._now() + bound.seconds
+            self._arm(phase, observations, description)
+            started = self._now()
+            expiry = started + bound.seconds
 
     def _observe(self, observations, bound, description, statement):
         """Sample until one observation is met; report which."""
         self._require_screen(observations, statement)
-        expiry = self._now() + bound.seconds
+        started = self._now()
+        expiry = started + bound.seconds
         while True:
             self._check_clocks(statement)
             sample = self._read()
             now = self._now()
             for index, observation in enumerate(observations):
                 if observation.update(sample, now):
-                    self._status.clear()
+                    self.events.clear()
+                    self._matched(
+                        _describe(observation.condition), sample,
+                        observation, now - started,
+                        getattr(statement, "line", 0))
+                    self._pending = None
+                    self._pending_literal = None
                     return index
             # Checked after a sample: a timeout always means samples
             # were taken and none satisfied the condition.
             if now >= expiry:
-                self._status.clear()
+                self.events.clear()
+                self._emit(_events.OBSERVATION_TIMEOUT,
+                           description=description, timeout=bound.seconds,
+                           line=getattr(statement, "line", 0),
+                           **{"timeout-source": bound.source})
                 raise self._expired(
                     "the observation timeout", bound, statement,
                     f" waiting for {description}")
             self._progress(expiry, bound.seconds, description, now)
             self._sleep(_POLL_INTERVAL)
+
+    def _matched(self, description, sample, observation, elapsed, line):
+        """Report a match, naming the row that satisfied it."""
+        row = None
+        for candidate in sample.rows:
+            if observation.matches_row(candidate):
+                row = candidate
+                break
+        self._emit(_events.OBSERVATION_MATCH, description=description,
+                   row=row, elapsed=round(elapsed, 3), line=line)
 
     def _bound(self, node):
         """The effective timeout the timing plan resolved for a node."""
@@ -770,7 +890,11 @@ class _ScriptEngine:
         return entry.timeout if entry is not None else self._plan.default
 
     def _check_clocks(self, statement=None):
-        """Check the budgets at a boundary."""
+        """Check the budgets — and a cancellation — at a boundary."""
+        if self._cancelled.is_set():
+            raise RunCancelled(
+                f"the run was cancelled at step {self._step}; machine "
+                f"{self._machine_id} is left as it stands")
         now = self._now()
         run = self._plan.run_deadline
         if (run is not None and self._run_started is not None
@@ -791,7 +915,7 @@ class _ScriptEngine:
     def _read(self):
         """Take one sample of every channel."""
         if self._port is None:
-            return _Sample((), True)
+            return self._sampled(_Sample((), True))
         try:
             with self._console() as console:
                 rows = console.screen_text()
@@ -800,7 +924,7 @@ class _ScriptEngine:
             # so the machine's phase must return to `ready` for any
             # later insert/eject and `start`.
             self._mark_stopped()
-            return _Sample((), True)
+            return self._sampled(_Sample((), True))
         except RuntimeError as error:
             # lifecycle.qmp_session wraps connect failures as
             # RuntimeError after clearing vm.json; that sample is
@@ -808,8 +932,14 @@ class _ScriptEngine:
             if "no longer reachable" not in str(error):
                 raise
             self._mark_stopped()
-            return _Sample((), True)
-        return _Sample(tuple(_normalize_row(row) for row in rows), False)
+            return self._sampled(_Sample((), True))
+        return self._sampled(
+            _Sample(tuple(_normalize_row(row) for row in rows), False))
+
+    def _sampled(self, sample):
+        """Keep the latest reading, which the failure report needs."""
+        self._last_sample = sample
+        return sample
 
     @contextlib.contextmanager
     def _console(self):
@@ -837,29 +967,44 @@ class _ScriptEngine:
 
     # -- input verbs ---------------------------------------------
 
+    def _action(self, statement, verb, detail=None):
+        """Announce an action and remember it as the pending one."""
+        self.events.clear()
+        self._pending = verb + (f" {detail}" if detail else "")
+        self._pending_literal = None
+        self._emit(_events.ACTION_START, verb=verb, detail=detail,
+                   line=getattr(statement, "line", 0))
+
+    def _completed(self, statement, verb):
+        self._emit(_events.ACTION_END, verb=verb,
+                   line=getattr(statement, "line", 0))
+        self._pending = None
+
     def _enter(self, statement):
         text = _render_literal(statement.arguments[0], self._bindings)
         self._note_secret(statement.arguments[0])
-        self._log(f"line {statement.line}: enter {text!r}")
+        self._action(statement, "enter", repr(text))
         self._requires_running(statement)
         with self._console() as console:
             console.send_text(text, True)
+        self._completed(statement, "enter")
 
     def _type(self, statement):
         text = _render_literal(statement.arguments[0], self._bindings)
         self._note_secret(statement.arguments[0])
-        self._log(f"line {statement.line}: type {text!r}")
+        self._action(statement, "type", repr(text))
         self._requires_running(statement)
         with self._console() as console:
             console.send_text(text, False)
+        self._completed(statement, "type")
 
     def _note_secret(self, literal):
         """Record that a secret was entered, for later suppression.
 
         Once a secret reaches the guest, automatic failure screenshots
-        are suppressed for the rest of the run (those land with the
-        failure report, milestone 9); an explicitly requested
-        screenshot is the author's own call and is never suppressed.
+        are suppressed for the rest of the run; an explicitly
+        requested screenshot is the author's own call and is never
+        suppressed.
         """
         if self._secret_entered or not self._secret_values:
             return
@@ -874,7 +1019,7 @@ class _ScriptEngine:
 
     def _press(self, statement):
         keys = statement.arguments
-        self._log(f"line {statement.line}: press {' '.join(keys)}")
+        self._action(statement, "press", " ".join(keys))
         combos = []
         for spelling in keys:
             try:
@@ -886,20 +1031,22 @@ class _ScriptEngine:
         self._requires_running(statement)
         with self._console() as console:
             console.send_keys(combos)
+        self._completed(statement, "press")
 
     def _select(self, statement):
         item = _render_literal(statement.arguments[0], self._bindings)
         exclude = ((_render_literal(statement.exclude, self._bindings),)
                    if statement.exclude else ())
-        detail = f"select {item!r}"
+        detail = repr(item)
         if exclude:
             detail += f" (exclude: {exclude[0]!r})"
-        self._log(f"line {statement.line}: {detail}")
+        self._action(statement, "select", detail)
         self._requires_running(statement)
         with self._console() as console:
             console.cursor_menu_select(
                 item, timeout=self._bound(statement).seconds,
                 exclude=exclude)
+        self._completed(statement, "select")
 
     # -- supporting operations -----------------------------------
 
@@ -907,14 +1054,12 @@ class _ScriptEngine:
         name = (statement.arguments[0] if statement.arguments
                 else f"step-{self._step}")
         name = validate_screenshot_name(name)
-        self._log(f"line {statement.line}: screenshot {name}")
+        self._action(statement, "screenshot", name)
         self._requires_running(statement)
-        if self._run_dir is not None:
-            screenshot(
-                name, self._port, self._machine_home,
-                directory=os.path.join(self._run_dir, "screenshots"))
-        else:
-            Machine(self._port, self._machine_home).screenshot(name)
+        # No run directory exists any more (D36), so an author's
+        # screenshot rests with the machine it was taken from.
+        Machine(self._port, self._machine_home).screenshot(name)
+        self._completed(statement, "screenshot")
 
     def _insert(self, statement):
         slot, (kind, name) = statement.arguments
@@ -923,19 +1068,22 @@ class _ScriptEngine:
                 name = self._bindings[name]
             except KeyError:
                 raise _PropertyUnbound(name) from None
-        self._log(f"line {statement.line}: insert {slot} @{name}")
+        self._action(statement, "insert", f"{slot} @{name}")
         self._machine_change(
             statement, _machines.insert_media, slot, name)
+        self._completed(statement, "insert")
 
     def _eject(self, statement):
         slot = statement.arguments[0]
-        self._log(f"line {statement.line}: eject {slot}")
+        self._action(statement, "eject", slot)
         self._machine_change(statement, _machines.eject_media, slot)
+        self._completed(statement, "eject")
 
     def _set_boot(self, statement):
         keys = statement.arguments
-        self._log(f"line {statement.line}: set-boot {' '.join(keys)}")
+        self._action(statement, "set-boot", " ".join(keys))
         self._machine_change(statement, _machines.set_boot_order, keys)
+        self._completed(statement, "set-boot")
 
     def _machine_change(self, statement, operation, *arguments):
         """Apply a persistent machine-state change, naming failures."""
@@ -945,26 +1093,30 @@ class _ScriptEngine:
             raise self._error(str(exc), statement) from exc
 
     def _start(self, statement):
-        self._log(f"line {statement.line}: start")
+        self._action(statement, "start")
         self._port = _machines.start_machine(
-            self._machine_id, display=self._display, context=self._context)
+            self._machine_id, display=self._display, context=self._context,
+            events=self.events)
+        self._completed(statement, "start")
 
     def _stop(self, statement):
-        self._log(f"line {statement.line}: stop")
+        self._action(statement, "stop")
         _machines.stop_machine(self._machine_id, context=self._context)
         self._port = None
+        self._completed(statement, "stop")
 
     # -- run-scoped HTTP -----------------------------------------
 
     def _http_control(self, statement):
         command = statement.arguments[0]
-        self._log(f"line {statement.line}: http {command}")
+        self._action(statement, "http", command)
         if command == "start":
             self._http_start(statement)
         elif command == "stop":
             self._http_stop()
         else:
             raise self._error(f"unknown http action: {command}", statement)
+        self._completed(statement, "http")
 
     def _http_start(self, statement):
         self._http_stop()
@@ -1067,19 +1219,19 @@ def _preflight_media_slots(script, machine_state, script_path):
         for slot in slots:
             drive = drives.get(slot)
             if drive is None:
-                raise ScriptRuntimeError(
+                raise ScriptPreflightError(
                     f"the machine declares no drive {slot}",
                     statement=statement, path=script_path)
             if (removable_only
                     and drive.get("medium") not in _REMOVABLE_MEDIA):
-                raise ScriptRuntimeError(
+                raise ScriptPreflightError(
                     f"{slot} is not a removable drive slot "
                     "(insert/eject are floppy and cdrom only)",
                     statement=statement, path=script_path)
 
 
 def execute_script(script, *, machine_id, context=None, display=False,
-                   run_dir=None, script_path=None, bindings=None):
+                   script_path=None, bindings=None, events=None):
     """Execute a parsed Script against a cached machine.
 
     The machine state the script's ``machine`` header expects is
@@ -1088,8 +1240,8 @@ def execute_script(script, *, machine_id, context=None, display=False,
     leaves starting to the script itself.  The machine is left in
     whatever state the last executed step produced.
 
-    When ``run_dir`` is set, a transcript is written there and
-    screenshots land under ``run_dir/screenshots/``.
+    ``events`` is the run's live :class:`~reliquary.events.EventStream`;
+    nothing is written to disk (D36).
 
     Returns a ``(final_phase, machine_phase)`` pair reporting the
     script phase and machine phase the run finished in.
@@ -1108,9 +1260,45 @@ def execute_script(script, *, machine_id, context=None, display=False,
     engine = _ScriptEngine(
         script, machine_id, context,
         _machines.machine_dir_path(machine_id, context),
-        run_dir=run_dir, script_path=script_path, bindings=bindings)
-    engine.run(display=display)
+        events=events, script_path=script_path, bindings=bindings)
+    with _cancel_on_interrupt(engine):
+        engine.run(display=display)
     return engine.final_phase, engine.machine_phase
+
+
+@contextlib.contextmanager
+def _cancel_on_interrupt(engine):
+    """Turn Ctrl-C into a cancellation the runner ends cleanly on.
+
+    A foreground Ctrl-C requests a stop; the run ends at the next
+    event boundary with a ``cancelled`` terminal event and exit ``5``,
+    leaving the machine as-is (no implicit teardown). Installing a
+    handler is what makes the stop land *at a boundary* rather than
+    wherever the interrupt happened to arrive — an input delivery in
+    flight completes.
+
+    Signal handlers belong to the main thread; a run driven from any
+    other thread simply keeps Python's default behavior, and the
+    ``KeyboardInterrupt`` is translated below instead.
+    """
+    installed = False
+    previous = None
+    try:
+        previous = signal.signal(
+            signal.SIGINT, lambda *_: engine.cancel())
+        installed = True
+    except (ValueError, AttributeError, OSError):
+        pass
+    try:
+        yield
+    except KeyboardInterrupt as interrupt:
+        raise RunCancelled(
+            "the run was cancelled; the machine is left as it stands"
+        ) from interrupt
+    finally:
+        if installed:
+            with contextlib.suppress(ValueError, OSError, TypeError):
+                signal.signal(signal.SIGINT, previous)
 
 
 def _existing_machine(*, machine=None, blueprint=None, context=None):
@@ -1178,20 +1366,6 @@ def _ensure_script_path(stem, context=None):
     return locate_script(stem, context=context)
 
 
-def _create_run_dir(machine_id, context=None):
-    """Create ``runs/<timestamp>-<id>/`` under the machine cache."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_id = uuid.uuid4().hex[:8]
-    run_dir = os.path.join(
-        _machines.machine_dir_path(machine_id, context),
-        "runs",
-        f"{timestamp}-{run_id}",
-    )
-    os.makedirs(os.path.join(run_dir, "screenshots"), exist_ok=True)
-    os.makedirs(os.path.join(run_dir, "output"), exist_ok=True)
-    return run_dir
-
-
 def _blueprint_parameters(state, context):
     """The blueprint's `parameters` map, read live at invocation.
 
@@ -1218,8 +1392,9 @@ def _blueprint_parameters(state, context):
 
 
 def run_script(label, *, blueprint=None, machine=None, context=None,
-               display=False, properties=None, properties_file=None):
-    """Resolve ``label``, ensure a machine, and execute under ``runs/``.
+               display=False, properties=None, properties_file=None,
+               progress="auto"):
+    """Resolve ``label``, ensure a machine, run it, and return its output.
 
     Looks up ``label`` in the machine's blueprint ``scripts`` map
     first; when absent, treats ``label`` as a bare script stem under
@@ -1227,8 +1402,15 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     one.  Declared properties bind before the machine starts, from
     ``properties`` (explicit ``--property`` values), the blueprint
     parameters, the environment, the properties file, or — on a
-    terminal — an interactive ask.  Returns a :class:`ScriptRun`
-    naming the run directory.
+    terminal under an interactive ``progress`` mode — an interactive
+    ask.
+
+    The run **returns its output** and stores nothing (D36): the
+    returned :class:`ScriptRun` carries the whole event stream, which
+    ``progress`` also renders live (``auto | pretty | plain |
+    jsonl``). A failure raises by error class; a Ctrl-C ends the run
+    at the next event boundary and raises
+    :class:`~reliquary.errors.RunCancelled`.
     """
     # Resolve to an existing machine (or None) without creating, so
     # declared properties bind before any machine or media is made.
@@ -1246,37 +1428,60 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     stem = _resolve_script_stem(label, scripts_map)
     script_path = _ensure_script_path(stem, context=context)
     script = load_script(script_path)
+    # `plain` and `jsonl` never prompt, so a missing value fails
+    # preflight before the machine starts rather than hanging a
+    # program on a question it cannot see.
     bindings = bind_properties(
         script, parameters=parameters, explicit=properties,
         properties_file=properties_file, context=context,
-        asker=console_asker())
+        asker=console_asker() if _interactive(progress) else None)
 
-    # Binding passed: now create the machine if the blueprint had none.
-    created = machine_id is None
-    if created:
-        machine_id = _machines.create_machine(
-            blueprint, context=context, properties=properties,
-            properties_file=properties_file)
-    run_dir = _create_run_dir(machine_id, context=context)
-    final_phase, machine_phase = execute_script(
-        script, machine_id=machine_id, context=context, display=display,
-        run_dir=run_dir, script_path=script_path, bindings=bindings)
-    return ScriptRun(
-        machine_id=machine_id,
-        run_dir=run_dir,
-        script_path=script_path,
-        created_machine=created,
-        final_phase=final_phase,
-        machine_phase=machine_phase,
-    )
+    events = stream_for(progress, redact=_redactor(bindings))
+    try:
+        # Binding passed: now create the machine if the blueprint had
+        # none.
+        created = machine_id is None
+        if created:
+            machine_id = _machines.create_machine(
+                blueprint, context=context, properties=properties,
+                properties_file=properties_file, events=events)
+        final_phase, machine_phase = execute_script(
+            script, machine_id=machine_id, context=context, display=display,
+            script_path=script_path, bindings=bindings, events=events)
+        return ScriptRun(
+            machine_id=machine_id,
+            script_path=script_path,
+            created_machine=created,
+            final_phase=final_phase,
+            machine_phase=machine_phase,
+            events=events.events,
+        )
+    finally:
+        events.close()
+
+
+def _redactor(bindings):
+    """A redaction function over the bound secrets, or ``None``."""
+    values = [value for value in (bindings.secret_values() if bindings
+                                  else ()) if value]
+    if not values:
+        return None
+
+    def redact(text):
+        for value in values:
+            if value in text:
+                text = text.replace(value, "«secret»")
+        return text
+
+    return redact
 
 
 def check_script(name, *, blueprint=None, machine=None, context=None,
                  properties=None, properties_file=None):
     """Parse and statically check a script; return its timing plan.
 
-    Read-only: does not seed the home, create a machine, write a run
-    record, execute guest steps, prompt, or read a secret's value.
+    Read-only: does not seed the home, create a machine, execute
+    guest steps, prompt, or read a secret's value.
     Without a selector, ``name`` is a bare script stem. With
     ``--blueprint`` or ``--machine``, ``name`` resolves through that
     blueprint's ``scripts`` map first. When a machine is selected,

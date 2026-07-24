@@ -138,11 +138,14 @@ rlq check-script freedos-install
 rlq check-script install --blueprint freedos
 ```
 
-Vendor media is cached and verified against pinned SHA-256 hashes on every use: source archives under `cache/archives/`,
-extracted payloads under `cache/media/` (`Documents\reliquary` by default; override with `--home` or the
-`RELIQUARY_HOME` environment variable). Each script run writes a transcript and screenshots under the machine's
-`cache/machines/<id>/runs/` directory. Pass `--display` to show the QEMU window instead of running headless — helpful
-when debugging a script.
+Vendor media is cached and verified against pinned SHA-256 hashes on every use, under `cache/media/`
+(`Documents\reliquary` by default; override with `--home` or the `RELIQUARY_HOME` environment variable).
+
+A run **returns its output** and stores nothing: it streams its progress live — `--progress pretty` for a person,
+`--progress jsonl` for a program — and the stream is gone when the run ends. Redirect it if you want to keep it. When a
+run fails, the report names what it was waiting for, which clock expired, the route it took, the screen row that came
+nearest, a screenshot, and the command to try next. Pass `--display` to show the QEMU window instead of running
+headless — helpful when debugging a script.
 
 ## The machine layer
 
@@ -210,11 +213,14 @@ guest program's raw output, and interpreting it is left to the caller.
    `rlq run-script <label> --blueprint <name>`, or operate the machine
    interactively — `rlq start-machine`, then `exec` / `wait` / `screen` /
    `press` / `select` against it, then `rlq stop-machine`.
-4. **Collect the results.** Script runs leave a transcript, screenshots,
-   and outputs under the machine's `cache/machines/<id>/runs/` records.
-   For files, `rlq get-machine-dir` prints the machine directory: while
-   the machine is stopped, its directory-source and image drives are
-   ordinary host state to read or prepare.
+4. **Take the results.** A run returns its output to you and keeps
+   nothing of its own. A small value comes back through a machine
+   variable (`rlq get-machine-var`); a file comes back by its guest
+   address (`rlq get-file "A:\RESULT.TXT" .esult.txt`); a whole
+   image comes back by swapping it out. Out of band, `rlq
+   get-machine-dir` prints the machine directory: while the machine is
+   stopped, its directory-source and image drives are ordinary host
+   state to read or prepare.
 5. **Recreate freely.** `destroy-machine` deletes a machine entirely and
    `recreate-machine` rebuilds it under the same id; `apply-blueprint`
    adopts blueprint edits into a stopped machine.
@@ -263,14 +269,15 @@ Documents/reliquary/
 ├── scripts/              automation scripts (<name>.rlqs)
 └── cache/                regenerable; resolves independently (--cache /
     │                     RELIQUARY_CACHE_DIR) and can live elsewhere
-    ├── archives/         cached source archives (redownloadable)
     ├── media/            cached, hash-verified media payloads
     └── machines/<id>/    each materialized machine — its own directory
                           with machine.json (the state; while running its
-                          `vm` section holds the live VM identity), media/
-                          (per-machine images), runs/ (transcripts +
-                          screenshots), and a <backend>/ subdir (e.g.
-                          qemu/qemu-stderr.log)
+                          `vm` section holds the live VM identity, and
+                          any machine variables a script set), media/
+                          (per-machine images), screenshots/, and a
+                          <backend>/ subdir (e.g. qemu/qemu-stderr.log).
+                          A run stores nothing here — it returns its
+                          output to whoever started it
 ```
 
 A machine is wholly its `cache/machines/<id>/` directory — there is no
@@ -360,8 +367,8 @@ rlq screenshot after-test --blueprint freedos
 ```
 
 `screen` prints the current 80-by-25 text screen; `screenshot` saves a
-PNG under the machine's run directory. Screenshot names are filename
-stems, not paths.
+PNG under the machine's own `screenshots/` directory. Screenshot names
+are filename stems, not paths.
 
 ### 6. Stop it
 
@@ -428,6 +435,53 @@ then never reclaimed behind your back.
 
 (Media are specs inside a `.rlqb` now, so there is no `delete-media`
 command — removing one means editing the blueprint that declares it.)
+
+### Driving a machine from a program
+
+```text
+rlq run-script LABEL (--blueprint NAME | --machine ID) [--progress MODE]
+rlq get-machine-var KEY (--blueprint NAME | --machine ID)
+rlq put-file HOST-PATH GUEST-ADDRESS (--blueprint NAME | --machine ID)
+rlq get-file GUEST-ADDRESS HOST-PATH (--blueprint NAME | --machine ID)
+rlq insert-media SLOT --file PATH (--blueprint NAME | --machine ID)
+```
+
+This is the loop an automating program runs: put work into the guest,
+run it, read the result back, iterate. Reliquary supplies the
+transports and attaches no meaning to what travels through them —
+there is no pass/fail vocabulary and no result parsing, because those
+belong to whatever you are building.
+
+Values come back as **machine variables**: a script's `set result
+"PASS"` writes one, and `get-machine-var result` reads it from any
+process. They are cleared at each start, so one always reports what the
+current boot produced. Readiness rides the same channel — your own
+ready script sets a variable and you poll for it; Reliquary ships no
+readiness script of its own.
+
+Files come back **by their guest address** — `A:\RESULT.TXT`, the way
+the guest names it, never a host image path. `put-file` and `get-file`
+work while the machine is stopped, over a directory-source drive; the
+backend snapshots that directory at attach, so a stopped machine is
+what makes a put visible and a guest write flushed.
+
+When a reboot per round costs too much, swap the medium instead:
+`insert-media --file` mounts an image you built, live, and ejecting
+flushes the guest's writes back to that same file.
+
+```powershell
+rlq put-file .\build\TEST.EXE "A:\TEST.EXE" --machine rig-0
+rlq run-script test --machine rig-0 --progress jsonl > run.jsonl
+rlq get-machine-var result --machine rig-0
+rlq stop-machine --machine rig-0
+rlq get-file "A:\RESULT.TXT" .\out\result.txt --machine rig-0
+```
+
+`--progress` selects the live rendering: `pretty` for a person,
+`plain` for a log, `jsonl` for a program (stdout carries the event
+stream and nothing else, the last line being the outcome). Exit codes
+carry the outcome too — `2` a static error, `3` preflight, `4` a run
+failure, `5` cancelled, `1` an unexpected fault.
 
 ### Keyboard and command input
 
@@ -563,10 +617,10 @@ The lifecycle and scripting verbs are all available as Python calls
 with the same names as their CLI twins: `create_machine` /
 `start_machine` / `stop_machine` / `destroy_machine` /
 `recreate_machine` / `apply_blueprint`, and `run_script` /
-`check_script` for the `.rlqs` language. `run_script` returns a result
-describing the run (its record directory, final script phase, and the
-machine's phase) and writes a transcript and screenshots under the
-machine's `runs/` directory. See the [API reference](docs/api-reference.md)
+`check_script` for the `.rlqs` language. `run_script` **returns the
+run's output** — the whole event stream, plus the final script phase
+and the machine's phase — and writes nothing to disk; it raises by
+error class on failure. See the [API reference](docs/api-reference.md)
 for the full surface and [`planning/design/api.md`](planning/design/api.md)
 for the end-goal design.
 

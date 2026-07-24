@@ -15,13 +15,19 @@ import tempfile
 import unittest
 from unittest import mock
 
+from reliquary import platform_dos
+from reliquary.errors import PreflightError
+from reliquary.interaction_agentless import _command_output
+from reliquary.machines import exec as machines_exec
 from reliquary.machines import (apply_blueprint, create_machine,
-                                destroy_machine, eject_media,
-                                get_machine_dir, insert_media, list_machines,
+                                destroy_machine, eject_media, get_file,
+                                get_machine_dir, get_machine_var,
+                                insert_media, list_machines,
                                 load_machine_state, machine_dir_path,
-                                machine_drive_args, mark_stopped,
+                                machine_drive_args, mark_stopped, put_file,
                                 recreate_machine, resolve_machine,
-                                set_boot_order, start_machine, stop_machine)
+                                set_boot_order, set_machine_var,
+                                start_machine, stop_machine)
 
 _BLANK = {"name": "blank", "materialize": "new", "size": "20M"}
 
@@ -767,6 +773,391 @@ class MediaInsertionTests(_HomeCase):
         machine_id = self._installer()
         mark_stopped(machine_id, context=self.home)
         self.assertEqual(self._state(machine_id)["phase"], "ready")
+
+
+class AnonymousImageTests(_HomeCase):
+    """``insert-media --file``: the caller's own image, mounted as-is."""
+
+    def _rig(self):
+        machine_id = self._create(
+            "rig", {"platform": "dos",
+                    "drives": {"hdd0": "blank", "floppy0": None}},
+            media=[_BLANK])
+        image = os.path.join(self.home, "round-1.img")
+        with open(image, "wb") as handle:
+            handle.write(b"BINARY")
+        return machine_id, image
+
+    def test_a_file_mounts_in_place_with_no_catalog_identity(self):
+        machine_id, image = self._rig()
+        insert_media(machine_id, "floppy0", file=image, context=self.home)
+        floppy = self._state(machine_id)["drives"]["floppy0"]
+        # Anonymous: no media name, attached ("use") in place.
+        self.assertIsNone(floppy["media"])
+        self.assertEqual(floppy["materialize"], "use")
+        self.assertEqual(os.path.normpath(floppy["path"]),
+                         os.path.normpath(image))
+
+    def test_the_image_is_never_copied_into_the_cache(self):
+        machine_id, image = self._rig()
+        insert_media(machine_id, "floppy0", file=image, context=self.home)
+        cache = os.path.join(self.home, "cache", "media")
+        self.assertFalse(
+            os.path.isdir(cache) and os.listdir(cache))
+
+    def test_a_rebuilt_image_is_picked_up_at_the_next_start(self):
+        machine_id, image = self._rig()
+        insert_media(machine_id, "floppy0", file=image, context=self.home)
+        with open(image, "wb") as handle:
+            handle.write(b"ROUND-2")
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu"), \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=self._identity(machine_id)) as launch:
+            start_machine(machine_id, context=self.home)
+        # Mutable and unverified: no hash is re-checked, and the
+        # path the consumer just rewrote is what QEMU is handed.
+        floppy = [a for a in launch.call_args.args[0] if "if=floppy" in a]
+        self.assertIn(image.replace("\\", "\\"), floppy[0])
+
+    def test_naming_both_a_media_and_a_file_is_refused(self):
+        machine_id, image = self._rig()
+        with self.assertRaises(ValueError) as caught:
+            insert_media(machine_id, "floppy0", "blank", file=image,
+                         context=self.home)
+        self.assertIn("not both and not neither", str(caught.exception))
+
+    def test_naming_neither_is_refused(self):
+        machine_id, _image = self._rig()
+        with self.assertRaises(ValueError):
+            insert_media(machine_id, "floppy0", context=self.home)
+
+    def test_a_missing_image_fails_closed(self):
+        machine_id, _image = self._rig()
+        with self.assertRaises(FileNotFoundError):
+            insert_media(machine_id, "floppy0",
+                         file=os.path.join(self.home, "absent.img"),
+                         context=self.home)
+
+    def test_a_directory_names_the_gap(self):
+        machine_id, _image = self._rig()
+        with self.assertRaises(ValueError) as caught:
+            insert_media(machine_id, "floppy0", file=self.home,
+                         context=self.home)
+        self.assertIn("hostdir", str(caught.exception))
+
+
+class LiveFloppyGeometryTests(_HomeCase):
+    """A live floppy swap keeps the geometry it launched with.
+
+    The transport spike (milestone 9, T1) proved live media-change and
+    eject-flush on QEMU/DOS, and found this one condition: the drive's
+    geometry is fixed at attach, so a differently sized medium reaches
+    the guest as read and write errors. Reliquary did not choose that
+    geometry, so it fails closed rather than build a broken drive.
+    """
+
+    def _running_rig(self, launched=None):
+        machine_id = self._create(
+            "rig", {"platform": "dos",
+                    "drives": {"hdd0": "blank", "floppy0": None}},
+            media=[_BLANK])
+        if launched is not None:
+            insert_media(machine_id, "floppy0", file=launched,
+                         context=self.home)
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu"), \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=self._identity(machine_id)):
+            start_machine(machine_id, context=self.home)
+        return machine_id
+
+    def _image(self, name, size):
+        path = os.path.join(self.home, name)
+        with open(path, "wb") as handle:
+            handle.write(b"\0" * size)
+        return path
+
+    def test_a_same_sized_swap_is_allowed(self):
+        first = self._image("round-1.img", 1474560)
+        machine_id = self._running_rig(launched=first)
+        second = self._image("round-2.img", 1474560)
+        with mock.patch("reliquary.machines._change_media_live") as change:
+            insert_media(machine_id, "floppy0", file=second,
+                         context=self.home)
+        change.assert_called_once()
+        self.assertEqual(
+            os.path.normpath(
+                self._state(machine_id)["drives"]["floppy0"]["path"]),
+            os.path.normpath(second))
+
+    def test_a_differently_sized_swap_fails_closed(self):
+        first = self._image("round-1.img", 1474560)
+        machine_id = self._running_rig(launched=first)
+        bigger = self._image("round-2.img", 2949120)
+        with self.assertRaises(PreflightError) as caught:
+            insert_media(machine_id, "floppy0", file=bigger,
+                         context=self.home)
+        message = str(caught.exception)
+        self.assertIn("1474560-byte medium", message)
+        self.assertIn("2949120 bytes", message)
+
+    def test_a_slot_launched_empty_names_the_fix(self):
+        machine_id = self._running_rig()
+        image = self._image("round-1.img", 1474560)
+        with self.assertRaises(PreflightError) as caught:
+            insert_media(machine_id, "floppy0", file=image,
+                         context=self.home)
+        self.assertIn("was empty when machine", str(caught.exception))
+        self.assertIn("start again", str(caught.exception))
+
+    def test_a_stopped_insert_is_never_geometry_checked(self):
+        # Stopped, the drive has not been attached yet, so any size is
+        # legitimate — it becomes the geometry at the next start.
+        machine_id = self._running_rig()
+        self._force(machine_id, "ready")
+        image = self._image("round-1.img", 1474560)
+        insert_media(machine_id, "floppy0", file=image, context=self.home)
+        self.assertEqual(
+            os.path.normpath(
+                self._state(machine_id)["drives"]["floppy0"]["path"]),
+            os.path.normpath(image))
+
+    def test_a_cdrom_swap_is_not_constrained(self):
+        machine_id = self._create(
+            "rig", {"platform": "dos",
+                    "drives": {"hdd0": "blank", "cdrom0": None}},
+            media=[_BLANK, self._livecd()])
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu"), \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=self._identity(machine_id)):
+            start_machine(machine_id, context=self.home)
+        with mock.patch("reliquary.machines._change_media_live"):
+            insert_media(machine_id, "cdrom0", "freedos-livecd",
+                         context=self.home)
+        self.assertEqual(
+            self._state(machine_id)["drives"]["cdrom0"]["media"],
+            "freedos-livecd")
+
+
+class MachineVariableTests(_HomeCase):
+    """The script -> host scalar channel."""
+
+    def _rig(self):
+        return self._create(
+            "rig", {"platform": "dos", "drives": {"hdd0": "blank"}},
+            media=[_BLANK])
+
+    def test_a_set_variable_reads_back_from_any_process(self):
+        machine_id = self._rig()
+        set_machine_var(machine_id, "result", "42", context=self.home)
+        self.assertEqual(
+            get_machine_var("result", machine=machine_id,
+                            context=self.home),
+            "42")
+
+    def test_an_unset_variable_reads_as_none(self):
+        machine_id = self._rig()
+        self.assertIsNone(
+            get_machine_var("ready", machine=machine_id,
+                            context=self.home))
+
+    def test_start_clears_the_variables_of_the_previous_boot(self):
+        machine_id = self._rig()
+        set_machine_var(machine_id, "ready", "yes", context=self.home)
+        with mock.patch("reliquary.machines.find_qemu",
+                        return_value="qemu"), \
+                mock.patch("reliquary.machines.launch_owned_qemu",
+                           return_value=self._identity(machine_id)):
+            start_machine(machine_id, context=self.home)
+        self.assertIsNone(
+            get_machine_var("ready", machine=machine_id,
+                            context=self.home))
+
+    def test_the_reserved_namespaces_are_refused(self):
+        machine_id = self._rig()
+        for key in ("rlq.ready", "reliquary", "9lives", ""):
+            with self.subTest(key=key):
+                with self.assertRaises(ValueError):
+                    set_machine_var(machine_id, key, "x",
+                                    context=self.home)
+
+    def test_a_variable_holds_text(self):
+        machine_id = self._rig()
+        with self.assertRaises(ValueError):
+            set_machine_var(machine_id, "count", 3, context=self.home)
+
+
+class ExecTests(_HomeCase):
+    """The run family's one-shot member returns its output."""
+
+    def _rig(self):
+        return self._create(
+            "rig", {"platform": "dos", "drives": {"hdd0": "blank"}},
+            media=[_BLANK])
+
+    def test_a_stopped_machine_is_refused(self):
+        machine_id = self._rig()
+        with self.assertRaises(PreflightError) as caught:
+            machines_exec("DIR", machine=machine_id, context=self.home)
+        self.assertIn("is not running", str(caught.exception))
+
+    def test_the_command_output_is_returned(self):
+        machine_id = self._rig()
+        self._force(machine_id, "running", vm=True)
+        with mock.patch(
+                "reliquary.interaction_agentless.AgentlessGuestExec"
+                ".execute", return_value=("VOL SERIAL", "2 FILES")) as run:
+            rows = machines_exec(
+                "DIR", machine=machine_id, timeout=30, context=self.home)
+        self.assertEqual(rows, ("VOL SERIAL", "2 FILES"))
+        run.assert_called_once_with("DIR", 30)
+
+
+class CommandOutputTests(unittest.TestCase):
+    """Agentless capture: the rows between the echo and the prompt."""
+
+    def test_the_rows_between_echo_and_prompt_are_the_output(self):
+        rows = _command_output(
+            ["C:\\>DIR", "VOL SERIAL IS 1234", "2 FILE(S)", "C:\\>"],
+            "DIR")
+        self.assertEqual(rows, ("VOL SERIAL IS 1234", "2 FILE(S)"))
+
+    def test_a_command_with_no_output_returns_nothing(self):
+        self.assertEqual(
+            _command_output(["C:\\>CLS", "C:\\>"], "CLS"), ())
+
+    def test_a_scrolled_echo_yields_what_is_still_visible(self):
+        # The honest limit of screen scraping: the echo scrolled off,
+        # so what remains on screen is what the caller gets.
+        rows = _command_output(["LINE 1", "LINE 2", "C:\\>"], "TYPE BIG.TXT")
+        self.assertEqual(rows, ("LINE 1", "LINE 2"))
+
+
+class InBandFileTests(_HomeCase):
+    """Guest-terms addressing over a vvfat drive (U14)."""
+
+    def _rig(self):
+        exchange = os.path.join(self.home, "exchange")
+        os.makedirs(exchange)
+        machine_id = self._create(
+            "rig", {"platform": "dos",
+                    "drives": {"hdd0": "blank",
+                               "floppy0": "exchange-dir"}},
+            media=[_BLANK,
+                   {"name": "exchange-dir", "materialize": "use",
+                    "location": {"local": exchange}}])
+        return machine_id, exchange
+
+    def test_a_put_lands_where_the_guest_will_read_it(self):
+        machine_id, exchange = self._rig()
+        source = os.path.join(self.home, "TEST.EXE")
+        with open(source, "wb") as handle:
+            handle.write(b"MZ")
+        address = put_file(source, r"A:\TEST.EXE", machine=machine_id,
+                           context=self.home)
+        self.assertEqual(address, r"A:\TEST.EXE")
+        with open(os.path.join(exchange, "TEST.EXE"), "rb") as handle:
+            self.assertEqual(handle.read(), b"MZ")
+
+    def test_a_get_retrieves_by_guest_address(self):
+        machine_id, exchange = self._rig()
+        os.makedirs(os.path.join(exchange, "OUT"))
+        with open(os.path.join(exchange, "OUT", "RESULT.TXT"), "w",
+                  encoding="ascii") as handle:
+            handle.write("PASS")
+        target = os.path.join(self.home, "result.txt")
+        written = get_file(r"A:\OUT\RESULT.TXT", target,
+                           machine=machine_id, context=self.home)
+        self.assertEqual(written, os.path.abspath(target))
+        with open(target, encoding="ascii") as handle:
+            self.assertEqual(handle.read(), "PASS")
+
+    def test_a_running_machine_is_refused(self):
+        machine_id, _exchange = self._rig()
+        self._force(machine_id, "running", vm=True)
+        with self.assertRaises(PreflightError) as caught:
+            get_file(r"A:\X.TXT", os.path.join(self.home, "x"),
+                     machine=machine_id, context=self.home)
+        self.assertIn("must be stopped", str(caught.exception))
+
+    def test_an_image_drive_fails_closed_naming_the_gap(self):
+        machine_id, _exchange = self._rig()
+        source = os.path.join(self.home, "x.txt")
+        with open(source, "w", encoding="ascii") as handle:
+            handle.write("x")
+        with self.assertRaises(PreflightError) as caught:
+            put_file(source, r"C:\X.TXT", machine=machine_id,
+                     context=self.home)
+        self.assertIn("directory-source (hostdir) drive",
+                      str(caught.exception))
+
+    def test_an_undeclared_letter_names_the_ones_that_exist(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(PreflightError) as caught:
+            get_file(r"Z:\X.TXT", os.path.join(self.home, "x"),
+                     machine=machine_id, context=self.home)
+        self.assertIn("no drive at Z:", str(caught.exception))
+        self.assertIn("A:", str(caught.exception))
+
+    def test_an_address_may_not_escape_its_drive(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(ValueError):
+            get_file(r"A:\..\..\secret.txt",
+                     os.path.join(self.home, "x"),
+                     machine=machine_id, context=self.home)
+
+    def test_a_host_path_is_not_a_guest_address(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(ValueError) as caught:
+            get_file("/etc/passwd", os.path.join(self.home, "x"),
+                     machine=machine_id, context=self.home)
+        self.assertIn("is not a DOS path", str(caught.exception))
+
+    def test_a_missing_guest_file_fails_closed(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(FileNotFoundError) as caught:
+            get_file(r"A:\ABSENT.TXT", os.path.join(self.home, "x"),
+                     machine=machine_id, context=self.home)
+        self.assertIn(r"A:\ABSENT.TXT", str(caught.exception))
+
+
+class DosAddressingTests(unittest.TestCase):
+    """The letter map comes from declared facts alone (P10/P17)."""
+
+    def test_floppies_take_a_and_b_and_disks_take_c_onward(self):
+        letters = platform_dos.drive_letters({
+            "floppy0": {"medium": "floppy", "slot": 0},
+            "floppy1": {"medium": "floppy", "slot": 1},
+            "hdd0": {"medium": "hdd", "slot": 0},
+            "hdd1": {"medium": "hdd", "slot": 1},
+            "cdrom0": {"medium": "cdrom", "slot": 0},
+        })
+        self.assertEqual(letters, {"A": "floppy0", "B": "floppy1",
+                                   "C": "hdd0", "D": "hdd1",
+                                   "E": "cdrom0"})
+
+    def test_a_cdrom_takes_c_when_there_is_no_hard_disk(self):
+        letters = platform_dos.drive_letters(
+            {"cdrom0": {"medium": "cdrom", "slot": 0}})
+        self.assertEqual(letters, {"C": "cdrom0"})
+
+    def test_an_address_splits_into_letter_and_segments(self):
+        self.assertEqual(platform_dos.split_address(r"c:\DOS\FOO.TXT"),
+                         ("C", ["DOS", "FOO.TXT"]))
+        self.assertEqual(platform_dos.split_address("A:BAR.TXT"),
+                         ("A", ["BAR.TXT"]))
+
+    def test_a_drive_with_no_file_is_not_an_address(self):
+        with self.assertRaises(ValueError):
+            platform_dos.split_address("A:\\")
+
+    def test_a_non_dos_platform_fails_closed(self):
+        from reliquary.machines import _addressing
+        with self.assertRaises(NotImplementedError) as caught:
+            _addressing("openbsd")
+        self.assertIn("openbsd", str(caught.exception))
 
 
 def _drive_values(args):

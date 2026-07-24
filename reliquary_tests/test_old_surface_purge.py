@@ -212,7 +212,7 @@ class OldApiNamesAbsentTests(unittest.TestCase):
 class OldCliCommandsAbsentTests(unittest.TestCase):
     """Superseded CLI command words are not registered."""
 
-    def test_old_cli_commands_absent(self):
+    def _commands(self):
         stdout = io.StringIO()
         stderr = io.StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -223,11 +223,43 @@ class OldCliCommandsAbsentTests(unittest.TestCase):
         help_text = stdout.getvalue() + stderr.getvalue()
         match = re.search(r"\{([^}]+)\}", help_text)
         self.assertIsNotNone(match, "cli --help lists no commands")
-        commands = {part.strip() for part in match.group(1).split(",")}
-        survivors = sorted(_OLD_CLI_COMMANDS & commands)
+        return {part.strip() for part in match.group(1).split(",")}
+
+    def test_old_cli_commands_absent(self):
+        survivors = sorted(_OLD_CLI_COMMANDS & self._commands())
         self.assertEqual(
             survivors, [],
             f"superseded CLI commands still registered: {survivors}")
+
+    def test_the_record_management_family_is_absent(self):
+        # D36: persistence went to the asynchronous-runs backlog, and
+        # the verbs that managed it went with it. No shims.
+        backlogged = {"list-runs", "run", "begin-run", "end-run"}
+        survivors = sorted(backlogged & self._commands())
+        self.assertEqual(
+            survivors, [],
+            f"backlogged record commands still registered: {survivors}")
+
+
+class RunPersistenceAbsentTests(unittest.TestCase):
+    """The run returns its output and stores nothing (D36)."""
+
+    def test_the_run_directory_helpers_are_gone(self):
+        from reliquary import script_runner
+        for name in ("_create_run_dir", "_start_transcript"):
+            self.assertFalse(
+                hasattr(script_runner, name),
+                f"script_runner still carries {name!r}")
+
+    def test_the_run_result_carries_no_stored_location(self):
+        self.assertNotIn(
+            "run_dir",
+            {field.name for field
+             in reliquary.ScriptRun.__dataclass_fields__.values()})
+        self.assertIn(
+            "events",
+            {field.name for field
+             in reliquary.ScriptRun.__dataclass_fields__.values()})
 
 
 class OldScriptSurfaceRejectedTests(unittest.TestCase):

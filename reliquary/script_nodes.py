@@ -23,6 +23,8 @@ import types
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple
 
+from .errors import StaticError
+
 _DURATION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:ms|s|m|h)$")
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
 # A media name may lead with a digit where a property key may not:
@@ -35,8 +37,12 @@ _MEDIA_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*$")
 _DELIMITERS = " \t{}#"
 
 
-class ScriptParseError(ValueError):
-    """A script syntax or static-validation error with a source line."""
+class ScriptParseError(StaticError):
+    """A script syntax or static-validation error with a source line.
+
+    The legality tier of the error taxonomy: it is decided from the
+    script text alone, so it is a STATIC ERROR and exits ``2``.
+    """
 
     def __init__(self, line, message, column=1):
         super().__init__(message)

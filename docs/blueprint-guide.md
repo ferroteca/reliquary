@@ -108,11 +108,16 @@ rlq destroy-machine --machine freedos-1
 
 Machines live under `cache/machines/<name>-<n>/`. Each machine has:
 - `machine.json` - The resolved state document; while running, it
-  also carries the live VM identity and port as a `vm` section
+  also carries the live VM identity and port as a `vm` section, plus
+  any machine variables a script set (cleared at each start)
 - `media/` - The machine's per-machine materialized images, named
   by media (`<media-name>.qcow2`)
-- `runs/` - Run records (transcripts, screenshots, outputs)
+- `screenshots/` - Screenshots a script asked for, and the automatic
+  capture a failure report references
 - `<backend>/` - The backend's own files (e.g. `qemu/qemu-stderr.log`)
+
+A run writes nothing here: it returns its output to whoever started
+it, and keeping that output is the caller's choice.
 
 For the complete blueprint specification, see
 [the composed blueprint model](../planning/design/blueprint-model.md);

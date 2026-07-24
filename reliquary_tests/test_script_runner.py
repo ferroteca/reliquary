@@ -15,8 +15,10 @@ from unittest import mock
 from qemu.qmp import ConnectError
 
 from reliquary.binding import BoundProperties
+from reliquary.errors import RunCancelled
 from reliquary.script_parser import parse_script
-from reliquary.script_runner import (ScriptRuntimeError, _normalize_row,
+from reliquary.script_runner import (ScriptPreflightError,
+                                     ScriptRuntimeError, _normalize_row,
                                      _resolve_key, _HttpResponse,
                                      _HttpService, _ScriptEngine,
                                      execute_script)
@@ -109,13 +111,13 @@ class _RuntimeCase(unittest.TestCase):
     """Builds engines over a fake console and a controlled clock."""
 
     def engine(self, source, screens=(), port=5555, fail=False,
-               run_dir=None, bindings=None):
+               bindings=None, events=None):
         _FakeHttpService.instances = []
         script = parse_script(_HEAD + source)
         clock = _Clock()
         engine = _ScriptEngine(
             script, "plain-0", "/tmp/home",
-            "/tmp/home/cache/machines/plain-0", run_dir=run_dir,
+            "/tmp/home/cache/machines/plain-0", events=events,
             script_path="demo.rlqs", clock=clock, sleep=clock.sleep,
             http_service_factory=_FakeHttpService, bindings=bindings)
         engine._port = port
@@ -137,6 +139,16 @@ class _RuntimeCase(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             engine._run_started = self.clock()
             return engine._run_phases()
+
+    @contextlib.contextmanager
+    def whole_run(self):
+        """Drive ``engine.run()`` against an already-running machine."""
+        with mock.patch(
+                "reliquary.script_runner._machines") as machines, \
+                mock.patch("reliquary.lifecycle.read_vm_state",
+                           return_value={"port": 5555}):
+            machines.load_machine_state.return_value = {"phase": "running"}
+            yield machines
 
 
 class HelperTests(unittest.TestCase):
@@ -542,21 +554,20 @@ class InputVerbTests(_RuntimeCase):
         machines.insert_media.assert_called_once_with(
             "plain-0", "cdrom0", "supplemental", context="/tmp/home")
 
-    def test_a_secret_value_is_redacted_from_the_transcript(self):
+    def test_a_secret_value_is_redacted_from_the_event_stream(self):
         bound = BoundProperties(
             {"pw": "swordfish"}, {"pw": "properties file"},
             frozenset({"pw"}))
         engine = self.engine(
             'property secret pw\ntype "${pw}"\n', bindings=bound)
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            engine._execute(engine._script.statements)
+        engine._execute(engine._script.statements)
         # The guest still receives the real value...
         self.assertEqual(
             self.console.commands, [("send_text", "swordfish", False)])
-        # ...but the record shows the marker, never the secret.
-        self.assertNotIn("swordfish", stdout.getvalue())
-        self.assertIn("«secret»", stdout.getvalue())
+        # ...but the stream shows the marker, never the secret.
+        rendered = json.dumps(engine.events.events, ensure_ascii=False)
+        self.assertNotIn("swordfish", rendered)
+        self.assertIn("«secret»", rendered)
 
 
 class MachineOperationTests(_RuntimeCase):
@@ -577,6 +588,24 @@ class MachineOperationTests(_RuntimeCase):
             with self.assertRaises(ScriptRuntimeError) as caught:
                 self.run_linear(engine)
         self.assertIn("has no bound value", str(caught.exception))
+
+    def test_set_records_a_machine_variable(self):
+        engine = self.engine('set result "PASS"\n')
+        with mock.patch(
+                "reliquary.script_runner._machines") as machines:
+            self.run_linear(engine)
+            machines.set_machine_var.assert_called_once_with(
+                "plain-0", "result", "PASS", context="/tmp/home")
+
+    def test_a_set_value_interpolates_a_bound_property(self):
+        bound = BoundProperties({"tag": "v2"}, {"tag": "--property"})
+        engine = self.engine(
+            'property tag\nset build "${tag}"\n', bindings=bound)
+        with mock.patch(
+                "reliquary.script_runner._machines") as machines:
+            self.run_linear(engine)
+            machines.set_machine_var.assert_called_once_with(
+                "plain-0", "build", "v2", context="/tmp/home")
 
     def test_eject_empties_the_slot(self):
         engine = self.engine("eject cdrom0\n")
@@ -615,21 +644,131 @@ class MachineOperationTests(_RuntimeCase):
                 "plain-0", context="/tmp/home")
         self.assertEqual(engine._port, 9999)
 
-    def test_screenshot_lands_in_the_run_directory(self):
-        engine = self.engine("screenshot installed\n",
-                             run_dir="/tmp/home/runs/r1")
-        with mock.patch(
-                "reliquary.script_runner.screenshot") as capture:
+    def test_a_screenshot_rests_with_its_machine(self):
+        # No run directory exists any more (D36): an author's
+        # screenshot lands under the machine it was taken from.
+        engine = self.engine("screenshot installed\n")
+        with mock.patch("reliquary.script_runner.Machine") as machine:
             self.run_linear(engine)
-        capture.assert_called_once_with(
-            "installed", 5555, "/tmp/home/cache/machines/plain-0",
-            directory=os.path.join("/tmp/home/runs/r1", "screenshots"))
+        machine.assert_called_once_with(
+            5555, "/tmp/home/cache/machines/plain-0")
+        machine.return_value.screenshot.assert_called_once_with(
+            "installed")
 
     def test_a_screenshot_defaults_to_its_step_number(self):
         engine = self.engine("screenshot\n")
         with mock.patch("reliquary.script_runner.Machine") as machine:
             self.run_linear(engine)
         machine.return_value.screenshot.assert_called_once_with("step-1")
+
+
+class CancellationTests(_RuntimeCase):
+    """A cancellation ends the run at the next event boundary."""
+
+    def test_a_pending_cancel_stops_at_the_next_boundary(self):
+        engine = self.engine('wait "a"\nwait "b"\n',
+                             screens=[["a"], ["b"]])
+        engine.cancel()
+        with self.assertRaises(RunCancelled):
+            self.run_linear(engine)
+        # Nothing was observed: the very first boundary caught it.
+        self.assertEqual(self.console.reads, 0)
+
+    def test_an_input_in_flight_completes_before_the_stop(self):
+        engine = self.engine('enter "FORMAT C:"\nenter "second"\n')
+        original = engine._enter
+
+        def enter_then_cancel(statement):
+            original(statement)
+            engine.cancel()
+
+        engine._enter = enter_then_cancel
+        with self.assertRaises(RunCancelled):
+            self.run_linear(engine)
+        # The delivery is atomic: the first line reached the guest
+        # whole, and the second never started.
+        self.assertEqual(
+            self.console.commands, [("send_text", "FORMAT C:", True)])
+
+    def test_the_terminal_event_reports_the_cancellation(self):
+        engine = self.engine('wait "a"\n', screens=[["a"]])
+        engine.cancel()
+        with self.whole_run():
+            with self.assertRaises(RunCancelled):
+                engine.run()
+        terminal = engine.events.events[-1]
+        self.assertEqual(terminal["kind"], "run.end")
+        self.assertEqual(terminal["outcome"], "cancelled")
+        self.assertEqual(terminal["exit-code"], 5)
+
+
+class FailureReportTests(_RuntimeCase):
+    """A failure names the route, the clock, and what to try next."""
+
+    def _failed_run(self, source, screens):
+        engine = self.engine(source, screens=screens)
+        with self.whole_run(), \
+                mock.patch("reliquary.script_runner.screenshot"):
+            with self.assertRaises(ScriptRuntimeError):
+                engine.run()
+        by_kind = {event["kind"]: event for event in engine.events.events}
+        return engine, by_kind
+
+    def test_the_report_names_the_clock_and_its_scope(self):
+        _engine, by_kind = self._failed_run(
+            'timeout 10s\nwait "never"\n', [["nothing here"]])
+        failure = by_kind["failure"]
+        self.assertIn("the observation timeout of 10s", failure["clock"])
+        self.assertIn("header", failure["scope"])
+        self.assertEqual(failure["pending"], "'never'")
+
+    def test_the_report_names_the_nearest_miss(self):
+        _engine, by_kind = self._failed_run(
+            'timeout 10s\nwait "Welcome to FreeDOS"\n',
+            [["Welcome to FreeDO"]])
+        self.assertEqual(by_kind["failure"]["nearest-miss"],
+                         "Welcome to FreeDO")
+
+    def test_the_report_suggests_a_next_command(self):
+        _engine, by_kind = self._failed_run(
+            'timeout 10s\nwait "never"\n', [["nothing"]])
+        self.assertIn("rlq screen --machine plain-0",
+                      by_kind["failure"]["next-command"])
+
+    def test_the_route_and_its_revisits_are_reported(self):
+        # Each phase spends one poll interval, so the run deadline
+        # trips only after the graph has been walked twice round.
+        engine = self.engine(
+            'timeout 10s\ndeadline 5s\nentry first\n'
+            'phase first {\n    wait "a" stable=1s\n    goto second\n}\n'
+            'phase second {\n    wait "a" stable=1s\n    goto first\n}\n',
+            screens=[["a"]])
+        with self.whole_run(), \
+                mock.patch("reliquary.script_runner.screenshot"):
+            with self.assertRaises(ScriptRuntimeError):
+                engine.run()
+        failure = [event for event in engine.events.events
+                   if event["kind"] == "failure"][0]
+        self.assertEqual(list(failure["route"][:3]),
+                         ["first", "second", "first"])
+        self.assertGreaterEqual(failure["revisits"]["first"], 2)
+
+    def test_a_screenshot_is_suppressed_after_a_secret_is_typed(self):
+        bound = BoundProperties(
+            {"pw": "swordfish"}, {"pw": "properties file"},
+            frozenset({"pw"}))
+        engine = self.engine(
+            'timeout 10s\nproperty secret pw\ntype "${pw}"\n'
+            'wait "never"\n', screens=[["nothing"]], bindings=bound)
+        with self.whole_run(), \
+                mock.patch(
+                    "reliquary.script_runner.screenshot") as capture:
+            with self.assertRaises(ScriptRuntimeError):
+                engine.run()
+        capture.assert_not_called()
+        failure = [event for event in engine.events.events
+                   if event["kind"] == "failure"][0]
+        self.assertNotIn("screenshot", failure)
 
 
 class HttpLifecycleTests(_RuntimeCase):
@@ -891,7 +1030,7 @@ class ExecutePreflightTests(unittest.TestCase):
         script = parse_script(
             _HEAD + "machine stopped\n"
             "insert cdrom0 @freedos-livecd\nstart\n")
-        with self.assertRaises(ScriptRuntimeError) as caught:
+        with self.assertRaises(ScriptPreflightError) as caught:
             execute_script(script, machine_id=self.machine_id,
                            context=self.home)
         self.assertIn("declares no drive cdrom0", str(caught.exception))
@@ -905,7 +1044,7 @@ class ExecutePreflightTests(unittest.TestCase):
             "            finish\n        }\n"
             '        on "b" {\n            finish\n        }\n'
             "    }\n}\n")
-        with self.assertRaises(ScriptRuntimeError) as caught:
+        with self.assertRaises(ScriptPreflightError) as caught:
             execute_script(script, machine_id=self.machine_id,
                            context=self.home)
         self.assertIn("declares no drive floppy1", str(caught.exception))
@@ -914,7 +1053,7 @@ class ExecutePreflightTests(unittest.TestCase):
         self._write_state()
         script = parse_script(
             _HEAD + "machine stopped\nset-boot cdrom0 hdd0\n")
-        with self.assertRaises(ScriptRuntimeError) as caught:
+        with self.assertRaises(ScriptPreflightError) as caught:
             execute_script(script, machine_id=self.machine_id,
                            context=self.home)
         self.assertIn("declares no drive cdrom0", str(caught.exception))
@@ -923,7 +1062,7 @@ class ExecutePreflightTests(unittest.TestCase):
         self._write_state()
         script = parse_script(
             _HEAD + "machine stopped\ninsert hdd0 @some-image\n")
-        with self.assertRaises(ScriptRuntimeError) as caught:
+        with self.assertRaises(ScriptPreflightError) as caught:
             execute_script(script, machine_id=self.machine_id,
                            context=self.home)
         self.assertIn("not a removable drive slot", str(caught.exception))

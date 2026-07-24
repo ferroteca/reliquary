@@ -103,7 +103,7 @@ class CheckScriptTests(unittest.TestCase):
                     "scripts": {},
                     "drives": {"hdd0": {"medium": "hdd"}},
                 }
-                with self.assertRaises(reliquary.ScriptRuntimeError) as caught:
+                with self.assertRaises(reliquary.PreflightError) as caught:
                     check_script("use-cd", machine="plain-0", context=home)
             self.assertIn("no drive cdrom0", str(caught.exception))
 

@@ -19,14 +19,20 @@ import hashlib
 import os
 import shutil
 import sys
+import time
 import zipfile
 from urllib.request import urlopen
 
-from . import ledger, resolve
+from . import events as _events, ledger, resolve
 from .home import media_cache_dir
 
 _CHUNK = 1024 * 1024
 _MISMATCH_POLICIES = ("fail", "prompt", "refetch")
+
+# How often a long transfer reports itself. Honest totals only: a
+# byte count appears when the source named one, and hashing and
+# extraction report elapsed time alone (media-spec "Fetch progress").
+_PROGRESS_INTERVAL = 0.5
 
 
 def _sha256(path):
@@ -73,51 +79,104 @@ def _approve_refetch(name, actual, expected, on_mismatch, source, context):
         + "\ndelete it, or pre-approve with on_mismatch='refetch'")
 
 
-def _download(url, destination):
-    """Stream a URL into destination atomically."""
+def _content_length(response):
+    """The byte total the source named, or ``None`` when it named none."""
+    try:
+        length = int(response.headers.get("Content-Length"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return length if length > 0 else None
+
+
+def _download(url, destination, name, events):
+    """Stream a URL into destination atomically, reporting progress."""
     os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
     partial = destination + ".part"
-    print(f"downloading {url}", file=sys.stderr)
+    _events.note(events, _events.TRANSFER_START, f"downloading {url}",
+                 name=name, source=url, operation="download")
+    started = time.monotonic()
+    moved = 0
     with urlopen(url) as response, open(partial, "wb") as handle:
-        shutil.copyfileobj(response, handle, _CHUNK)
+        total = _content_length(response)
+        last = started
+        while True:
+            chunk = response.read(_CHUNK)
+            if not chunk:
+                break
+            handle.write(chunk)
+            moved += len(chunk)
+            now = time.monotonic()
+            if events is not None and now - last >= _PROGRESS_INTERVAL:
+                last = now
+                events.emit(_events.TRANSFER_PROGRESS, name=name,
+                            transferred=moved, total=total)
     os.replace(partial, destination)
+    if events is not None:
+        events.emit(_events.TRANSFER_END, name=name, source=url,
+                    operation="download", transferred=moved,
+                    elapsed=round(time.monotonic() - started, 3))
 
 
-def _extract(container_path, member, destination):
+def _extract(container_path, member, destination, name, events):
     """Extract one zip member to destination atomically."""
-    print(f"extracting {member} from {os.path.basename(container_path)}",
-          file=sys.stderr)
+    container = os.path.basename(container_path)
+    _events.note(events, _events.TRANSFER_START,
+                 f"extracting {member} from {container}",
+                 name=name, source=f"{container}/{member}",
+                 operation="extract")
+    started = time.monotonic()
     os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
     partial = destination + ".part"
     with zipfile.ZipFile(container_path) as bundle:
         with bundle.open(member) as source, open(partial, "wb") as handle:
             shutil.copyfileobj(source, handle, _CHUNK)
     os.replace(partial, destination)
+    if events is not None:
+        # Extraction reports elapsed time only: a compressed member
+        # has no honest running total to show against.
+        events.emit(_events.TRANSFER_END, name=name, operation="extract",
+                    source=f"{container}/{member}",
+                    elapsed=round(time.monotonic() - started, 3))
 
 
-def _verify(path, expected, describe):
+def _verify(path, expected, describe, name=None, events=None):
     if expected is None:
         return
+    _events.note(events, _events.VERIFY_START, f"verifying {describe}",
+                 name=name or describe, algorithm="sha256")
+    started = time.monotonic()
     actual = _sha256(path)
     if actual != expected:
         raise RuntimeError(
             f"{describe} at {path} has SHA-256 {actual}, expected {expected}")
+    if events is not None:
+        events.emit(_events.VERIFY_END, name=name or describe,
+                    algorithm="sha256",
+                    elapsed=round(time.monotonic() - started, 3))
 
 
-def _run(plan, name, extension, context, on_mismatch):
+def _run(plan, name, extension, context, on_mismatch, events=None):
     """Produce the file ``plan`` yields, verified, returning its path."""
     if isinstance(plan, resolve.Alternatives):
         errors = []
         for option in plan.options:
             try:
-                return _run(option, name, extension, context, on_mismatch)
+                return _run(option, name, extension, context, on_mismatch,
+                            events)
             except (OSError, RuntimeError) as error:
+                # Each mirror attempt is its own event: a fallback that
+                # succeeded should not hide the one that did not.
                 errors.append(f"{_describe(option)}: {error}")
+                if events is not None:
+                    events.emit(_events.TRANSFER_END, name=name,
+                                source=_describe(option),
+                                operation="attempt", error=str(error))
         raise RuntimeError(
             f"every location for {name!r} failed:\n  " + "\n  ".join(errors))
 
     if isinstance(plan, resolve.LocalFile):
-        _verify(plan.path, plan.sha256, f"local file for {name!r}")
+        _verify(plan.path, plan.sha256, f"local file for {name!r}",
+                name, events)
         return plan.path
 
     destination = os.path.join(media_cache_dir(context),
@@ -127,8 +186,9 @@ def _run(plan, name, extension, context, on_mismatch):
         if _cache_hit(destination, name, plan.sha256, on_mismatch,
                       plan.url, context):
             return destination
-        _download(plan.url, destination)
-        _verify(destination, plan.sha256, f"downloaded {name!r}")
+        _download(plan.url, destination, name, events)
+        _verify(destination, plan.sha256, f"downloaded {name!r}", name,
+                events)
         ledger.record(name, filename=os.path.basename(destination),
                       sha256=plan.sha256 or _sha256(destination),
                       provenance=ledger.REFETCHABLE, source=plan.url,
@@ -140,9 +200,10 @@ def _run(plan, name, extension, context, on_mismatch):
                       f"{plan.parent}/{plan.member}", context):
             return destination
         container = _run(plan.inner, plan.parent, _plan_ext(plan.inner),
-                         context, on_mismatch)
-        _extract(container, plan.member, destination)
-        _verify(destination, plan.sha256, f"extracted {name!r}")
+                         context, on_mismatch, events)
+        _extract(container, plan.member, destination, name, events)
+        _verify(destination, plan.sha256, f"extracted {name!r}", name,
+                events)
         ledger.record(
             name, filename=os.path.basename(destination),
             sha256=plan.sha256 or _sha256(destination),
@@ -202,7 +263,7 @@ def _payload_ext(media, plan):
 
 
 def fetch_media(media, namespace, context=None, on_mismatch="fail",
-                properties=None):
+                properties=None, events=None):
     """Return a media's verified payload path, fetching on demand.
 
     ``media`` is a :class:`reliquary.document.Media`; ``namespace`` a
@@ -219,4 +280,4 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail",
     if plan is None:
         return None
     return _run(plan, media.name, _payload_ext(media, plan), context,
-                on_mismatch)
+                on_mismatch, events)

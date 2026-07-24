@@ -10,7 +10,18 @@ Reliquary is an OS installation scripter built on its own generic QEMU
 runner, with DOS as the default and currently only complete platform
 workflow:
 
-- `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `home.py` owns home and
+- `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `errors.py` owns the
+  error taxonomy — `ReliquaryError` the root every deliberate error subclasses, with the run surface's
+  `StaticError` (exit 2) / `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5, a sibling of `RunFailure`,
+  never a subclass) and the `exit_code` / `outcome` mapping both the CLI and the terminal event read; exit `1` is
+  precisely a fault outside the taxonomy, `events.py` owns the run event stream — the `Event` envelope
+  (`seq` / `time` / `elapsed` / `kind` plus the kind's own fields, flattened at serialization), the `EventStream`
+  that records and renders as it goes (redacting every string through the run's secret set, ticking a live display
+  without recording the tick), and `note()`, the emit-or-say-it-on-stderr helper media movement uses so a fetch
+  outside a run is still honest; `progress.py` owns the renderings — `resolve_mode` (`auto` by stderr tty),
+  `describe` (the one human line per event both human modes share), and the `pretty` / `plain` / `jsonl` renderers,
+  with the output discipline enforced there: human modes render everything to stderr and leave stdout empty, `jsonl`
+  owns stdout alone; `home.py` owns home and
   cache resolution, layout, and containment, plus the `Context` type every path-resolving function accepts (now also
   carrying the authored-asset selection — `HOME_ASSETS`/`set_assets`), `assets.py` owns authored-asset residency: the
   resolution source seam (`HomeSource` = the home's canonical folders + codex seeding, the CLI default; `DirSource` =
@@ -79,7 +90,19 @@ workflow:
   stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
   already-materialized media image) / `get_machine_dir` (the out-of-band door) /
   `list_machines` /
-  `resolve_machine`; ids are `<blueprint_name>-<machine_number>` with
+  `resolve_machine` / the exec-run family — `set_machine_var` /
+  `get_machine_var` (the script→host scalar channel: a `machine.json`
+  `variables` map under the op lock, cleared at `start` so a variable
+  always reports the current boot, the `rlq`/`reliquary` key
+  namespaces reserved; the setter's world-facing spelling is the
+  script `set` verb, which is how the capability reaches the CLI
+  without a command of its own) and `put_file` / `get_file` (in-band
+  file exchange addressed in guest terms — P17 — over a
+  directory-source drive, stopped-only, with a non-vvfat target and
+  an unmapped letter failing closed naming the gap, P11; the letter
+  map itself is `platform_dos.drive_letters`, built from declared
+  facts alone — P10);
+  ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
   numbering and an exclusive per-machine operation lock
   (`.locks/<id>.op.lock`) serializes every mutating op; each carries an
@@ -90,7 +113,11 @@ workflow:
   (`insert_media` / `eject_media` / `set_boot_order` /
   `mark_stopped` — insert/eject are floppy and cdrom only and work
   running-or-stopped (a running change is applied live over the
-  identity-verified QMP session by drive id, then persisted to state)
+  identity-verified QMP session by drive id, then persisted to state;
+  `insert_media(slot, media=None, file=None)` takes exactly one of a
+  declared media — fetched and verified — or `file=`, an anonymous
+  `local`+`use` image mounted in place, mutable, unverified, never
+  copied: U20's live-iteration transport)
   or stopped (persisted for the next start); `set_boot_order` is
   stopped-only (a launch-time firmware order); boot-order keys may name
   any declared drive; all three persist and survive stop/start),
@@ -99,7 +126,9 @@ workflow:
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
   and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
-  `platform_dos.py` owns DOS provisioning and facades. The
+  `platform_dos.py` owns DOS provisioning and facades plus the guest-address mapping (`drive_letters` —
+  floppies to A:/B: by slot, hard disks C: onward, CD-ROMs after them, from Reliquary's own drive assignment
+  and never from a guest; `split_address`). The
   `.rlqs` language is four layers: `script_nodes.py` (the lexer and its diagnostics),
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
   `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
@@ -129,11 +158,26 @@ workflow:
   `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
-  create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys,
+  create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys
+  (a `ScriptPreflightError`, exit 3 — it is caught before the first guest input),
   property binding before the machine starts, secret redaction, and
   the run **returning its output** to the caller — no run-record
   persistence, milestone 9's return model; the `runs/` archive is
-  async-backlog work, D36), `cli.py` owns command parsing, and
+  async-backlog work, D36). Everything it reports goes through the
+  one event stream, so no surface can report what the stream does not
+  carry; it keeps the failure report's raw material as it goes (the
+  pending condition or action, the route with its per-phase revisit
+  counts, the last sample) and emits `failure` before the terminal
+  event, naming the expired clock and its scope, the nearest miss on
+  the last screen read, an automatic screenshot (suppressed for the
+  rest of a run once a secret reaches the guest), and the next
+  command to try. Ctrl-C installs a handler that sets a cancel flag
+  the boundary checks read (`_check_clocks`, at statement starts and
+  dispatch samples), so a cancellation ends the run at a boundary
+  with an input delivery already in flight completed — never
+  wherever the interrupt happened to land. `cli.py` owns command
+  parsing, exit codes (`errors.exit_code` over one `ReliquaryError`
+  arm), and the output discipline, and
   `__main__.py` preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
   package.
@@ -292,9 +336,12 @@ unrelated cache state file):
 - `cache/machines/<name>-<n>/` — machine materializations (`machines_cache_dir`;
   parent via `cache_dir`), under the cache root, each with `machine.json` (the
   resolved state; while running its `vm` section carries the live VM identity,
-  port, PID; and machine variables a script `set`s, cleared on start — D36),
+  port, PID; and a `variables` map holding the machine variables a
+  script `set`s, cleared on start — D36),
   `media/` (the machine's per-machine images and vvfat directories,
-  named by media), and a `<backend>/` subdir
+  named by media), `screenshots/` (where a script's `screenshot` verb
+  and an automatic failure capture land, now that there is no run
+  directory), and a `<backend>/` subdir
   (e.g. `qemu/qemu-stderr.log`). A run stores nothing here — it
   returns its output to the caller (D36); the `runs/` archive is
   async-backlog work.
@@ -520,6 +567,17 @@ Lifecycle changes need focused tests, especially for failure paths. Preserve cov
 - a name match with a uuid mismatch is an identity mismatch
 - a stop refused on identity mismatch leaves the machine phase `running`
 - stale state produces clear diagnostics and cannot target another VM
+
+Milestone-9 guarantees needing the same care:
+
+- every deliberate error subclasses `ReliquaryError`, and the four run-surface classes exit 2/3/4/5
+- a run creates no `runs/` directory and writes nothing to the machine directory
+- `--progress jsonl` puts the event stream on stdout and nothing else, terminal event last
+- a human `--progress` mode leaves stdout empty
+- a bound secret never reaches the event stream, and it suppresses automatic screenshots afterwards
+- a cancellation ends at a boundary with an in-flight input delivered whole
+- a machine variable is cleared by `start`
+- a non-vvfat or unmapped in-band file target fails closed naming the gap
 
 Use stdlib `unittest` and `unittest.mock` unless a compelling reason justifies another dependency.
 

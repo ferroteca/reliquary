@@ -17,13 +17,21 @@ from .library import (list_blueprints, list_scripts, search_blueprints,
                      seed_blueprint, seed_script)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
+from .errors import (PreflightError, ReliquaryError, RunCancelled,
+                     RunFailure, StaticError)
+from .events import Event, EventStream
 from .machines import (apply_blueprint, create, create_machine,
-                       destroy_machine, eject_media, get_machine_dir,
+                       destroy_machine, eject_media, get_file,
+                       get_machine_dir, get_machine_var,
                        insert_media, list_machines, load_machine_state,
                        machine_dir_path, machine_drive_args, mark_stopped,
-                       recreate_machine, resolve_machine, set_boot_order,
-                       start_machine,
+                       put_file, recreate_machine, resolve_machine,
+                       set_boot_order, set_machine_var, start_machine,
                        stop_machine)
+# The one-shot member of the run family; named for its command under
+# the twin-name identity rule (the builtin stays reachable as
+# ``builtins.exec``).
+from .machines import exec  # noqa: A001
 from .media import (add_media, fetch_media, clean_media, list_media,
                     prune_media)
 from .resolve import load_namespace
@@ -42,6 +50,8 @@ from .script_runner import (ScriptCheck, ScriptRun, ScriptRuntimeError,
 __all__ = [
     "Condition",
     "Document",
+    "Event",
+    "EventStream",
     "Handler",
     "Machine",
     "Qmp",
@@ -52,8 +62,13 @@ __all__ = [
     "ScriptRuntimeError",
     "BoundProperties",
     "CredentialError",
+    "PreflightError",
     "PropertiesError",
     "PropertyBindingError",
+    "ReliquaryError",
+    "RunCancelled",
+    "RunFailure",
+    "StaticError",
     "Phase",
     "Property",
     "Statement",
@@ -69,8 +84,13 @@ __all__ = [
     "delete_blueprint",
     "destroy_machine",
     "eject_media",
+    "exec",
+    "get_file",
     "get_machine_dir",
+    "get_machine_var",
     "insert_media",
+    "put_file",
+    "set_machine_var",
     "blueprints_dir",
     "cache_dir",
     "bind_properties",
