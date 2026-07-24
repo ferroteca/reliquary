@@ -96,7 +96,13 @@ already landed is accepted and delivered in one act), then
 **delivered** (moved to
 the current list) — or dead at any point before delivery
 (recorded in DECISIONS.md and removed here, triggering the
-sweep above). A
+sweep above). Delivery moves it **automatically** (D34): whoever
+lands the milestone or task that fully meets a use case promotes
+it in the same change — into the current list, out of here,
+recorded in DECISIONS.md — not on a separate sign-off. Full
+delivery is the trigger: a use case a milestone accepts but does
+not fully meet stays here (milestone 8 accepted U5 but its
+canonical scenario waits on the GUI era). A
 clarification claims no number of its own — it attaches to the
 use case it sharpens — and skips the argument: it is simply
 delivered, applied in place to the current list and removed

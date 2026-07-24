@@ -48,6 +48,43 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D34 — PROMOTION ON DELIVERY IS AUTOMATIC — DECIDED (owner,
+  2026-07-24). Supports P8; sharpens D23. THE RULE: when a
+  milestone or a task FULLY delivers a use case or a principle,
+  moving it from its proposals doc to its standing list is a step
+  OF THAT DELIVERY, not a later owner adjudication. D23 already
+  said "DELIVERY makes it current and moves it over"; what was
+  unstated is that the mover is whoever lands the work, in the
+  same change, the moment the code honors the entry. No holding
+  it for a separate sign-off.
+  THE TRIGGER IS FULL DELIVERY, NOT ACCEPTANCE. A milestone that
+  cites a proposal accepts it (D23, acceptance-is-scheduling); a
+  milestone whose landed code honors it in full delivers it. The
+  two can diverge: milestone 8 accepted both U5 and P13, but only
+  P13 is fully delivered — U5's canonical customized-Windows
+  scenario waits on the GUI era, so U5 stays
+  accepted-awaiting-delivery while P13 promotes. The one who
+  lands the work makes that call by the same test the P1–P12
+  delivery pass used: does the project honor the entry as the
+  code stands today?
+  THE MECHANICS (the same for a U and a P): add the entry to its
+  standing list at its normative home (root PRINCIPLES.md /
+  USE-CASES.md), in number order; DELETE it from the proposals
+  doc, no placeholder left behind (D23's no-stub rule); and
+  record the move here, the entry's number the search key for the
+  planning-doc sweep. A partly-delivered entry does not move —
+  the standing lists are an implementation claim (D23,
+  implemented-only), so a half-honored entry would be a false one.
+  FIRST APPLICATION: P13 (property sources) promotes to
+  PRINCIPLES.md with milestone 8 — the binding pipeline, the
+  layered sources, custody and per-resolution provenance are all
+  landed (T1–T5, verified against the code). FOLDED: this entry;
+  PRINCIPLES.md (P13 added between P12 and P15);
+  PRINCIPLE-PROPOSALS.md (P13 removed from Drafted) and its
+  lifecycle preamble; USE-CASE-PROPOSALS.md's parallel preamble;
+  ROADMAP milestone 8's note (P13 promoted, U5 still awaiting the
+  GUI era). U5's own move waits on its delivery, by this same rule.
+
 - D33 — THE NUMBERED ARC ENDS AT MILESTONE 9 — DECIDED (owner,
   2026-07-23). Supports P8; applies D23's acceptance-is-scheduling
   rule and follows the ground D23 itself set when machine

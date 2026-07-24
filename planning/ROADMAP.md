@@ -2200,12 +2200,13 @@ conformance corpus.
 > its `rlq.*` facts, T5 the `${key}` location references binding at
 > create/apply. Windows is the only host whose credential backend is
 > exercised (Horizon, host portability). This is the acceptance of
-> U5 and P13 (D23 — the citing item is the acceptance record). P13's
-> property-source model is now honored by the code and is ready to
-> move to the standing principles; U5's value-seam half is delivered
-> but its canonical customized-Windows scenario still waits on the
-> GUI era, so U5 stays accepted-awaiting-delivery. Both list-moves
-> are the owner's to make.
+> U5 and P13 (D23 — the citing item is the acceptance record). **P13
+> (property sources) is delivered and promoted** to the standing
+> principles ([PRINCIPLES.md](../PRINCIPLES.md)) with this milestone,
+> automatically on full delivery (D34). U5's value-seam half is
+> delivered, but its canonical customized-Windows scenario still
+> waits on the GUI era, so U5 stays accepted-awaiting-delivery and
+> its move waits on that.
 
 All of [planning/design/script-properties.md](design/script-properties.md)
 — the sources script-declared properties bind through. Small and
@@ -2214,11 +2215,13 @@ independently useful.
 Demanded by **U5** — customization is what properties are for,
 and this milestone is where the author's run-specific data
 (owner names, login names, product keys) stops being embedded in
-scripts; scheduling here is U5's acceptance, and delivery is
-what returns it to the current list. It is likewise **P13**'s
+scripts; scheduling here is U5's acceptance, and full delivery is
+what returns it to the current list (its canonical scenario still
+pending — the completion note above). It is likewise **P13**'s
 acceptance (property sources — the layered chain, custody and
-provenance over a frozen order), P13 joining the standing list
-when this lands. Also serving **U4** twice — the
+provenance over a frozen order); P13, fully delivered, is promoted
+to the standing principles with this milestone (D34). Also serving
+**U4** twice — the
 project-committed properties file a `--properties` run reads,
 which is "the repository defines everything except what it must
 not contain", and the `RELIQUARY_PROPERTY_*` injection path a CI

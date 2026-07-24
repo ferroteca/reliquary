@@ -19,7 +19,14 @@ SPDX-License-Identifier: BSD-3-Clause
 > reshaped freely here (its number stays; work already
 > scheduled against it is re-checked in the same edit), and a
 > proposal moves over when the project actually honors it,
-> with no placeholder left behind. A dead proposal is recorded in
+> with no placeholder left behind. That move is **automatic on
+> full delivery** (D34): whoever lands the milestone or task that
+> makes the code honor a principle promotes it in the same
+> change — adds it to the standing list, deletes it here, records
+> the move in DECISIONS.md — rather than holding it for a separate
+> sign-off. Full delivery, not acceptance, is the trigger: a
+> partly-honored principle stays here, since the standing list is
+> an implementation claim. A dead proposal is recorded in
 > [DECISIONS.md](DECISIONS.md) and triggers the same
 > planning-doc sweep, its P-number the search key.
 
@@ -385,28 +392,6 @@ Statement (candidate; question 1 may add a clause):
 >   declared facts leave an address ambiguous, the call fails
 >   closed naming the ambiguity (P11). (Normative home: TBD on
 >   acceptance.)
-
-**P13 — Property sources** — drafted (add, 2026-07-23; the
-owner's name for it — the house noun: script-properties.md's
-own section, D19's title). The principle-sized kernel of the
-property source model, distinct from the tier list, which
-stays design (normative in
-[planning/design/script-properties.md](design/script-properties.md)).
-Delivery is milestone 8; citing P13 there is its acceptance.
-The secret-custody contract (credential store, redaction)
-stays with the spec; whether it earns its own principle is
-open. Statement:
-
-> - **P13 — Property sources.** Values reach a run through one
->   layered chain: every source speaks the same declared keys,
->   the flattened precedence is semantics — never per-user
->   configuration — and growth happens only at the named seams
->   (a new tier by design decision, provider plurality behind
->   a capability contract, programmatic injection with custody
->   in code), with every resolution recording its supplying
->   source. Custody and introspection, not a frozen order, are
->   what make layering safe. (Normative:
->   planning/design/script-properties.md; D19, D20.)
 
 ### Tracked
 

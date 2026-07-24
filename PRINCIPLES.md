@@ -73,6 +73,16 @@ SPDX-License-Identifier: BSD-3-Clause
   the Reliquary home (the cache separable); Reliquary never
   writes beside the module or into a source repository in
   normal use. (AGENTS.md "Home-directory containment".)
+- **P13 — Property sources.** Values reach a run through one
+  layered chain: every source speaks the same declared keys,
+  the flattened precedence is semantics — never per-user
+  configuration — and growth happens only at the named seams
+  (a new tier by design decision, provider plurality behind
+  a capability contract, programmatic injection with custody
+  in code), with every resolution recording its supplying
+  source. Custody and introspection, not a frozen order, are
+  what make layering safe. (Normative:
+  planning/design/script-properties.md; D19, D20.)
 - **P15 — The closed input model.** Everything reaches
   Reliquary through four channels: three authored — **specs**
   carry the data, **scripts** the logic, **properties** the
