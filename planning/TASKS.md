@@ -144,6 +144,27 @@ moves to Accepted.
   exactly the box-ticking the governance rules exist to prevent.
   Proposed rather than accepted: my suggestion, not a request.
 
+- **The vision-utility audit — the reverse-citation check.**
+  The traceability linter above verifies every *cited*
+  identifier resolves; this is its mirror — every *defined*
+  vision statement (a use case, principle, or interface) is
+  cited or codified *somewhere*, or is surfaced as suspect. A
+  statement nothing leans on is suspect of no utility:
+  legislated but never used.
+  DISCIPLINE — a look-list, not a kill-list. Finding the orphans
+  is mechanical (a grep over the numbered handles); the verdict
+  is a judgment the audit must not pre-empt. Each orphan earns
+  one question — *guardrail or ballast?* — since a ceiling or
+  closure cited only when pressure arrives is working, not idle.
+  Principles get more rope than use cases: some cannot be
+  codified and are legitimately hard to cite.
+  DELIVERY — greppable by hand today; a monthly CI run is the
+  richer eventual form. Per the no-CI-*at-this-time* principle,
+  scheduling that run is itself the argued case for turning CI on
+  when its day comes, not a breach of it.
+  Proposed rather than accepted: raised 2026-07-25, a
+  suggestion, not a request.
+
 ## Accepted
 
 Approved to do, not scheduled — the numbered arc ended with

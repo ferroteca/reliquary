@@ -5,6 +5,18 @@ tests, and code changes are welcome when they preserve the project's BSD
 licensing and its role as a self-contained OS installation scripter
 with an agentless QEMU guest automation layer.
 
+We know your time is worth something, and we're glad you're spending
+some of it here. This project has a firm sense of what it's for and
+what it's trying to be, and we weigh contributions against that, to
+keep it coherent for everyone who relies on it. Most contributions fit
+without any fuss.
+
+And when one doesn't, that's not the end of the conversation. It might
+mean the idea's a poor fit — or that our sense of the project is too
+narrow and should change. Tell us either way. The most valuable thing
+you could hand us isn't a feature or a fix; it's a better sense of what
+this should be. That door is wide open.
+
 Reliquary is pre-release. Contributions that add built-in blueprints
 (with their media, source, and archive components) or scripts should
 follow the repository structure in AGENTS.md and keep user-facing
