@@ -47,13 +47,13 @@ def _image_stem(media, key):
 
 
 def _fetch(media_name, context, *, namespace=None, on_mismatch="fail",
-           events=None):
+           events=None, cancelled=None):
     """Resolve a media by name against the source namespace and fetch
     its verified payload path (or ``None`` for a ``new`` blank)."""
     namespace = namespace if namespace is not None else load_namespace(context)
     media = resolve_media(media_name, namespace)
     return _acquire_fetch(media, namespace, context, on_mismatch,
-                          events=events)
+                          events=events, cancelled=cancelled)
 
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
@@ -273,7 +273,7 @@ def _drive_common(key, drive):
 
 
 def _materialize_drive(key, drive, media_root, namespace, context,
-                       properties=None, events=None):
+                       properties=None, events=None, cancelled=None):
     """Materialize one enabled drive, returning its resolved state entry.
 
     The drive names a media (or is an empty removable slot); the media
@@ -306,10 +306,12 @@ def _materialize_drive(key, drive, media_root, namespace, context,
         entry.update(size=media.size, path=path)
     elif mode == "use":
         entry["path"] = _acquire_fetch(
-            media, namespace, context, properties=properties, events=events)
+            media, namespace, context, properties=properties, events=events,
+            cancelled=cancelled)
     elif mode in ("difference", "copy"):
         base_payload = _acquire_fetch(
-            media, namespace, context, properties=properties, events=events)
+            media, namespace, context, properties=properties, events=events,
+            cancelled=cancelled)
         dest = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
         if mode == "copy":
             create_duplicate_image(dest, base_payload)
@@ -877,7 +879,8 @@ def _reconcile_phase(machine_id, context=None):
         f"machine {machine_id} is in an unrecognized phase {phase!r}")
 
 
-def start_machine(machine_id, *, display=False, context=None, events=None):
+def start_machine(machine_id, *, display=False, context=None, events=None,
+                  cancelled=None):
     """Start a ready machine and return its QMP port.
 
     Under the per-machine lock, reconciles any interrupted phase,
@@ -906,7 +909,8 @@ def start_machine(machine_id, *, display=False, context=None, events=None):
             # recorded path.
             if media_name is not None and drive.get("materialize") == "use":
                 drive["path"] = _fetch(
-                    media_name, context, namespace=namespace, events=events)
+                    media_name, context, namespace=namespace, events=events,
+                    cancelled=cancelled)
         # The backend fixes a floppy drive's geometry from whatever
         # medium is attached at launch, so record it: a later live
         # swap must match, and this is the only moment the fact is
@@ -1084,7 +1088,7 @@ def _anonymous_local(file):
 
 
 def insert_media(machine_id, slot, media=None, *, file=None, context=None,
-                 events=None):
+                 events=None, cancelled=None):
     """Insert a medium into a floppy or cdrom slot.
 
     Exactly one of ``media`` (a defined media item, fetched and
@@ -1109,7 +1113,8 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
         state = _reconcile_phase(machine_id, context)
         _removable_drive(state, slot)
         path = (_anonymous_local(file) if file is not None
-                else _fetch(media, context, events=events))
+                else _fetch(media, context, events=events,
+                            cancelled=cancelled))
         drive = state["drives"][slot]
         if state.get("phase") == "running":
             _check_live_geometry(state, slot, drive, path)

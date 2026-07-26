@@ -423,12 +423,18 @@ class _ScriptEngine:
     def cancel(self):
         """Request a stop; the run ends at the next event boundary.
 
-        Boundaries are statement starts and dispatch samples, so an
-        input delivery in flight completes atomically — the execution
-        model's severability (script-spec "The run's output and
-        failure").
+        Boundaries are statement starts, dispatch samples, and the
+        chunk boundaries of a host transfer, so an input delivery in
+        flight completes atomically while a large media fetch aborts
+        where it stands — the execution model's severability
+        (script-spec "The run's output and failure").
         """
         self._cancelled.set()
+
+    @property
+    def cancelled(self):
+        """Whether a stop has already been requested."""
+        return self._cancelled.is_set()
 
     def _error(self, message, statement=None):
         return ScriptRuntimeError(
@@ -1069,8 +1075,12 @@ class _ScriptEngine:
             except KeyError:
                 raise _PropertyUnbound(name) from None
         self._action(statement, "insert", f"{slot} @{name}")
+        # The stream carries the fetch's transfer/verify events (an
+        # insert can pull hundreds of megabytes, and silence reads as
+        # a hang); the cancel event makes that fetch severable.
         self._machine_change(
-            statement, _machines.insert_media, slot, name)
+            statement, _machines.insert_media, slot, name,
+            events=self.events, cancelled=self._cancelled)
         self._completed(statement, "insert")
 
     def _eject(self, statement):
@@ -1085,10 +1095,18 @@ class _ScriptEngine:
         self._machine_change(statement, _machines.set_boot_order, keys)
         self._completed(statement, "set-boot")
 
-    def _machine_change(self, statement, operation, *arguments):
-        """Apply a persistent machine-state change, naming failures."""
+    def _machine_change(self, statement, operation, *arguments, **options):
+        """Apply a persistent machine-state change, naming failures.
+
+        ``options`` reach the operation unchanged, so a change that
+        fetches media can be given the run's stream and cancel event
+        without every other change growing parameters it has no use
+        for. A ``RunCancelled`` raised inside is deliberately not
+        caught here: it is the run stopping, not this change failing.
+        """
         try:
-            operation(self._machine_id, *arguments, context=self._context)
+            operation(self._machine_id, *arguments, context=self._context,
+                      **options)
         except (RuntimeError, ValueError) as exc:
             raise self._error(str(exc), statement) from exc
 
@@ -1096,7 +1114,7 @@ class _ScriptEngine:
         self._action(statement, "start")
         self._port = _machines.start_machine(
             self._machine_id, display=self._display, context=self._context,
-            events=self.events)
+            events=self.events, cancelled=self._cancelled)
         self._completed(statement, "start")
 
     def _stop(self, statement):
@@ -1280,12 +1298,27 @@ def _cancel_on_interrupt(engine):
     Signal handlers belong to the main thread; a run driven from any
     other thread simply keeps Python's default behavior, and the
     ``KeyboardInterrupt`` is translated below instead.
+
+    A *second* Ctrl-C restores the default handler and interrupts at
+    once. The graceful stop is the promise, not a trap: without an
+    escalation the only way out of a stop that will not land is
+    killing the terminal.
     """
     installed = False
     previous = None
+
+    def _interrupt(*_):
+        if engine.cancelled:
+            # Asked twice: the caller wants out now, not at the next
+            # boundary. Hand the signal back to Python and let this
+            # one raise.
+            with contextlib.suppress(ValueError, OSError, TypeError):
+                signal.signal(signal.SIGINT, previous)
+            raise KeyboardInterrupt
+        engine.cancel()
+
     try:
-        previous = signal.signal(
-            signal.SIGINT, lambda *_: engine.cancel())
+        previous = signal.signal(signal.SIGINT, _interrupt)
         installed = True
     except (ValueError, AttributeError, OSError):
         pass

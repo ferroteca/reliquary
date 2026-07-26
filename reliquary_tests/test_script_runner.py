@@ -7,6 +7,7 @@ import http.client
 import io
 import json
 import os
+import signal
 import socket
 import tempfile
 import unittest
@@ -19,7 +20,8 @@ from reliquary.errors import RunCancelled
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (ScriptPreflightError,
                                      ScriptRuntimeError, _normalize_row,
-                                     _resolve_key, _HttpResponse,
+                                     _resolve_key, _cancel_on_interrupt,
+                                     _HttpResponse,
                                      _HttpService, _ScriptEngine,
                                      execute_script)
 from reliquary.script_validation import PORTABLE_KEY_NAMES
@@ -552,7 +554,8 @@ class InputVerbTests(_RuntimeCase):
                     {"disk": "supplemental"}, {"disk": "flag"}))
             self.run_linear(engine)
         machines.insert_media.assert_called_once_with(
-            "plain-0", "cdrom0", "supplemental", context="/tmp/home")
+            "plain-0", "cdrom0", "supplemental", context="/tmp/home",
+            events=engine.events, cancelled=engine._cancelled)
 
     def test_a_secret_value_is_redacted_from_the_event_stream(self):
         bound = BoundProperties(
@@ -576,9 +579,15 @@ class MachineOperationTests(_RuntimeCase):
         with mock.patch(
                 "reliquary.script_runner._machines") as machines:
             self.run_linear(engine)
+            # The run's own stream and cancel event travel with the
+            # insert: an insert can pull hundreds of megabytes, so
+            # without the stream the fetch reports nothing (silence
+            # reads as a hang) and without the event a Ctrl-C is not
+            # seen until the whole statement finishes.
             machines.insert_media.assert_called_once_with(
                 "plain-0", "cdrom0", "freedos-livecd",
-                context="/tmp/home")
+                context="/tmp/home",
+                events=engine.events, cancelled=engine._cancelled)
 
     def test_insert_from_a_property_is_not_bound_yet(self):
         engine = self.engine(
@@ -1094,6 +1103,50 @@ class ExecutePreflightTests(unittest.TestCase):
                            context=self.home)
             machines.start_machine.assert_not_called()
             machines.insert_media.assert_called_once()
+
+
+class _AskableEngine:
+    """The two members ``_cancel_on_interrupt`` uses."""
+
+    def __init__(self):
+        self.cancels = 0
+
+    @property
+    def cancelled(self):
+        return self.cancels > 0
+
+    def cancel(self):
+        self.cancels += 1
+
+
+class InterruptEscalationTests(unittest.TestCase):
+    """Ctrl-C asks once, then insists.
+
+    The graceful stop is a promise, not a trap: a stop that will not
+    land must still have a way out that is not killing the terminal.
+    """
+
+    def test_the_first_interrupt_requests_a_graceful_stop(self):
+        engine = _AskableEngine()
+        with _cancel_on_interrupt(engine):
+            signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+        self.assertEqual(engine.cancels, 1)
+
+    def test_a_second_interrupt_raises_immediately(self):
+        engine = _AskableEngine()
+        with _cancel_on_interrupt(engine):
+            handler = signal.getsignal(signal.SIGINT)
+            handler(signal.SIGINT, None)
+            with self.assertRaises(KeyboardInterrupt):
+                handler(signal.SIGINT, None)
+        # The second press interrupts rather than asking again.
+        self.assertEqual(engine.cancels, 1)
+
+    def test_the_previous_handler_is_restored(self):
+        before = signal.getsignal(signal.SIGINT)
+        with _cancel_on_interrupt(_AskableEngine()):
+            pass
+        self.assertIs(signal.getsignal(signal.SIGINT), before)
 
 
 if __name__ == "__main__":

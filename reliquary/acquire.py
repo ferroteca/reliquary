@@ -15,15 +15,16 @@ place and are never copied in.
 Design: planning/design/blueprint-model.md ("The cache").
 """
 
+import contextlib
 import hashlib
 import os
-import shutil
 import sys
 import time
 import zipfile
 from urllib.request import urlopen
 
 from . import events as _events, ledger, resolve
+from .errors import RunCancelled
 from .home import media_cache_dir
 
 _CHUNK = 1024 * 1024
@@ -34,11 +35,55 @@ _MISMATCH_POLICIES = ("fail", "prompt", "refetch")
 # extraction report elapsed time alone (media-spec "Fetch progress").
 _PROGRESS_INTERVAL = 0.5
 
+# Per-operation socket timeout. A mirror that accepts the connection
+# and then stalls is a failed location, not a reason to hang forever:
+# the timeout surfaces as an OSError, which ``_run`` already treats as
+# one location failing so the next alternative is tried.
+_SOCKET_TIMEOUT = 30
 
-def _sha256(path):
+
+@contextlib.contextmanager
+def _scratch(partial):
+    """Discard the scratch file unless the transfer reaches its replace.
+
+    A transfer writes ``<destination>.part`` and renames it only once
+    it is whole, so an interrupted one leaves that file behind. There
+    is no resume — the next attempt opens it ``"wb"`` and starts over —
+    so an abandoned partial is never anything but garbage, and a
+    cancelled LiveCD fetch would otherwise strand hundreds of
+    megabytes in the cache. The file is this function's own creation,
+    and by the time this runs the writing handle is closed.
+    """
+    try:
+        yield
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(partial)
+        raise
+
+
+def _check_cancelled(cancelled):
+    """Abort a host transfer at a chunk boundary when the run stops.
+
+    Cancellation reaches the transfer loops as the run engine's own
+    ``threading.Event``, threaded from the caller — a fetch outside a
+    run passes ``None`` and is simply uninterruptible. The check sits
+    at every chunk boundary because that is the severability the
+    execution model promises: input deliveries are atomic, *host
+    transfers abort* (planning/ROADMAP.md, "Cancel ends the run, not
+    the machine"). Without it a Ctrl-C during a large fetch is not
+    seen until the whole statement finishes, which can be minutes.
+    """
+    if cancelled is not None and cancelled.is_set():
+        raise RunCancelled(
+            "the run was cancelled during a host transfer")
+
+
+def _sha256(path, cancelled=None):
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
         for chunk in iter(lambda: handle.read(_CHUNK), b""):
+            _check_cancelled(cancelled)
             digest.update(chunk)
     return digest.hexdigest()
 
@@ -88,7 +133,7 @@ def _content_length(response):
     return length if length > 0 else None
 
 
-def _download(url, destination, name, events):
+def _download(url, destination, name, events, cancelled=None):
     """Stream a URL into destination atomically, reporting progress."""
     os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
     partial = destination + ".part"
@@ -96,20 +141,23 @@ def _download(url, destination, name, events):
                  name=name, source=url, operation="download")
     started = time.monotonic()
     moved = 0
-    with urlopen(url) as response, open(partial, "wb") as handle:
-        total = _content_length(response)
-        last = started
-        while True:
-            chunk = response.read(_CHUNK)
-            if not chunk:
-                break
-            handle.write(chunk)
-            moved += len(chunk)
-            now = time.monotonic()
-            if events is not None and now - last >= _PROGRESS_INTERVAL:
-                last = now
-                events.emit(_events.TRANSFER_PROGRESS, name=name,
-                            transferred=moved, total=total)
+    with _scratch(partial):
+        with urlopen(url, timeout=_SOCKET_TIMEOUT) as response, \
+                open(partial, "wb") as handle:
+            total = _content_length(response)
+            last = started
+            while True:
+                _check_cancelled(cancelled)
+                chunk = response.read(_CHUNK)
+                if not chunk:
+                    break
+                handle.write(chunk)
+                moved += len(chunk)
+                now = time.monotonic()
+                if events is not None and now - last >= _PROGRESS_INTERVAL:
+                    last = now
+                    events.emit(_events.TRANSFER_PROGRESS, name=name,
+                                transferred=moved, total=total)
     os.replace(partial, destination)
     if events is not None:
         events.emit(_events.TRANSFER_END, name=name, source=url,
@@ -117,7 +165,8 @@ def _download(url, destination, name, events):
                     elapsed=round(time.monotonic() - started, 3))
 
 
-def _extract(container_path, member, destination, name, events):
+def _extract(container_path, member, destination, name, events,
+             cancelled=None):
     """Extract one zip member to destination atomically."""
     container = os.path.basename(container_path)
     _events.note(events, _events.TRANSFER_START,
@@ -127,9 +176,18 @@ def _extract(container_path, member, destination, name, events):
     started = time.monotonic()
     os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
     partial = destination + ".part"
-    with zipfile.ZipFile(container_path) as bundle:
-        with bundle.open(member) as source, open(partial, "wb") as handle:
-            shutil.copyfileobj(source, handle, _CHUNK)
+    with _scratch(partial):
+        with zipfile.ZipFile(container_path) as bundle:
+            with bundle.open(member) as source, \
+                    open(partial, "wb") as handle:
+                # Copied a chunk at a time rather than with copyfileobj
+                # so decompressing a large member stays severable.
+                while True:
+                    _check_cancelled(cancelled)
+                    chunk = source.read(_CHUNK)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
     os.replace(partial, destination)
     if events is not None:
         # Extraction reports elapsed time only: a compressed member
@@ -139,13 +197,14 @@ def _extract(container_path, member, destination, name, events):
                     elapsed=round(time.monotonic() - started, 3))
 
 
-def _verify(path, expected, describe, name=None, events=None):
+def _verify(path, expected, describe, name=None, events=None,
+            cancelled=None):
     if expected is None:
         return
     _events.note(events, _events.VERIFY_START, f"verifying {describe}",
                  name=name or describe, algorithm="sha256")
     started = time.monotonic()
-    actual = _sha256(path)
+    actual = _sha256(path, cancelled)
     if actual != expected:
         raise RuntimeError(
             f"{describe} at {path} has SHA-256 {actual}, expected {expected}")
@@ -155,14 +214,18 @@ def _verify(path, expected, describe, name=None, events=None):
                     elapsed=round(time.monotonic() - started, 3))
 
 
-def _run(plan, name, extension, context, on_mismatch, events=None):
+def _run(plan, name, extension, context, on_mismatch, events=None,
+         cancelled=None):
     """Produce the file ``plan`` yields, verified, returning its path."""
     if isinstance(plan, resolve.Alternatives):
         errors = []
         for option in plan.options:
+            # A cancellation is not a failed location: RunCancelled sits
+            # outside the classes caught here, so it leaves the mirror
+            # loop rather than sending the fetch to the next alternative.
             try:
                 return _run(option, name, extension, context, on_mismatch,
-                            events)
+                            events, cancelled)
             except (OSError, RuntimeError) as error:
                 # Each mirror attempt is its own event: a fallback that
                 # succeeded should not hide the one that did not.
@@ -176,7 +239,7 @@ def _run(plan, name, extension, context, on_mismatch, events=None):
 
     if isinstance(plan, resolve.LocalFile):
         _verify(plan.path, plan.sha256, f"local file for {name!r}",
-                name, events)
+                name, events, cancelled)
         return plan.path
 
     destination = os.path.join(media_cache_dir(context),
@@ -184,40 +247,42 @@ def _run(plan, name, extension, context, on_mismatch, events=None):
 
     if isinstance(plan, resolve.Download):
         if _cache_hit(destination, name, plan.sha256, on_mismatch,
-                      plan.url, context):
+                      plan.url, context, cancelled):
             return destination
-        _download(plan.url, destination, name, events)
+        _download(plan.url, destination, name, events, cancelled)
         _verify(destination, plan.sha256, f"downloaded {name!r}", name,
-                events)
+                events, cancelled)
         ledger.record(name, filename=os.path.basename(destination),
-                      sha256=plan.sha256 or _sha256(destination),
+                      sha256=plan.sha256 or _sha256(destination, cancelled),
                       provenance=ledger.REFETCHABLE, source=plan.url,
                       context=context)
         return destination
 
     if isinstance(plan, resolve.Extract):
         if _cache_hit(destination, name, plan.sha256, on_mismatch,
-                      f"{plan.parent}/{plan.member}", context):
+                      f"{plan.parent}/{plan.member}", context, cancelled):
             return destination
         container = _run(plan.inner, plan.parent, _plan_ext(plan.inner),
-                         context, on_mismatch, events)
-        _extract(container, plan.member, destination, name, events)
+                         context, on_mismatch, events, cancelled)
+        _extract(container, plan.member, destination, name, events,
+                 cancelled)
         _verify(destination, plan.sha256, f"extracted {name!r}", name,
-                events)
+                events, cancelled)
         ledger.record(
             name, filename=os.path.basename(destination),
-            sha256=plan.sha256 or _sha256(destination),
+            sha256=plan.sha256 or _sha256(destination, cancelled),
             provenance=ledger.DERIVED,
             source=f"{plan.parent}/{plan.member}",
             derivation={"parent": plan.parent, "path": plan.member,
-                        "parent-sha": _sha256(container)},
+                        "parent-sha": _sha256(container, cancelled)},
             context=context)
         return destination
 
     raise TypeError(f"unknown plan step: {plan!r}")
 
 
-def _cache_hit(destination, name, expected, on_mismatch, source, context):
+def _cache_hit(destination, name, expected, on_mismatch, source, context,
+               cancelled=None):
     """Whether the cached file is already the one wanted.
 
     This is the deterministic preflight identity check: it runs before
@@ -226,7 +291,7 @@ def _cache_hit(destination, name, expected, on_mismatch, source, context):
     """
     if not os.path.exists(destination):
         return False
-    actual = _sha256(destination)
+    actual = _sha256(destination, cancelled)
     if expected is None or actual == expected:
         return True
     _approve_refetch(name, actual, expected, on_mismatch, source, context)
@@ -263,7 +328,7 @@ def _payload_ext(media, plan):
 
 
 def fetch_media(media, namespace, context=None, on_mismatch="fail",
-                properties=None, events=None):
+                properties=None, events=None, cancelled=None):
     """Return a media's verified payload path, fetching on demand.
 
     ``media`` is a :class:`reliquary.document.Media`; ``namespace`` a
@@ -271,6 +336,11 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail",
     returns ``None``. A local payload is used in place; everything else
     caches at ``cache/media/<media-name>.<ext>``. ``properties`` binds
     any ``${key}`` in the media's location (milestone 8, T5).
+
+    ``cancelled`` is the run engine's ``threading.Event``, checked at
+    every transfer chunk so a cancelled run stops mid-fetch instead of
+    at the end of the statement; ``None`` (a fetch outside a run)
+    leaves the transfer uninterruptible, as before.
     """
     if on_mismatch not in _MISMATCH_POLICIES:
         raise ValueError(
@@ -280,4 +350,4 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail",
     if plan is None:
         return None
     return _run(plan, media.name, _payload_ext(media, plan), context,
-                on_mismatch, events)
+                on_mismatch, events, cancelled)

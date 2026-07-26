@@ -48,6 +48,62 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D40 — CANCELLATION REACHES A HOST TRANSFER BY ITS OWN
+  PARAMETER — DECIDED (owner, 2026-07-26). Supports the
+  execution model's severability; fixes a gap against a standing
+  promise rather than making a new one, so it is a
+  gap-is-a-bug fix (D38's exclusion) whose *seam* is the decided
+  part.
+  THE DEFECT. planning/ROADMAP.md ("Cancel ends the run, not the
+  machine") already promised that on Ctrl-C "input deliveries are
+  atomic, **host transfers abort**". They did not. Cancellation
+  was a `threading.Event` read only by `_check_clocks` at
+  statement boundaries, and `acquire.py`'s transfer loops knew
+  nothing of it — so a Ctrl-C during `insert cdrom0 @…` was not
+  observed until the download, its SHA-256, the extraction, and
+  *its* SHA-256 had all finished. Reported from the field as
+  minutes of an unresponsive Ctrl-C on a 294 MB LiveCD fetch.
+  Aggravating it, the same statement passed no `events`, so the
+  transfer reported no progress at all: silence for minutes reads
+  as a hang, which is how it was found.
+  THE SEAM, WHICH IS THE DECISION. Cancellation travels as its own
+  `cancelled=` keyword — the run engine's `threading.Event`,
+  threaded through `insert_media` / `start_machine` / `fetch_media`
+  to the chunk loops, checked at every chunk. `None` (a fetch
+  outside a run) is uninterruptible exactly as before, so the
+  addition is inert wherever it is not passed.
+  WEIGHED AND DECLINED: carrying the token on the `EventStream`,
+  which is already threaded end-to-end and would have cost ~4
+  lines against ~10 signatures. Declined because it couples two
+  unrelated properties to one keyword — and that coupling is
+  precisely the failure that produced this bug. One call site
+  (`_machine_change`) dropped `events` and silently lost progress
+  reporting; under the coupled design the same omission would also
+  have made a multi-minute transfer uninterruptible, with nothing
+  to fail closed on since `events=None` is a supported state. Two
+  orthogonal keywords keep the two failure modes independently
+  diagnosable, and keep `acquire.py` free of any dependency on run
+  control flow.
+  CTRL-C ESCALATES. A second interrupt restores the default
+  handler and raises at once. The graceful stop is a promise, not
+  a trap: the previous handler swallowed every repeat into the
+  same flag, so a stop that would not land left killing the
+  terminal as the only way out.
+  ALSO: `urlopen` gained a 30s timeout. A mirror that accepts a
+  connection and then stalls is a failed location, not a reason to
+  hang forever — it surfaces as `OSError`, which the alternatives
+  loop already treats as one location failing, so the next mirror
+  is tried.
+  AND THE SCRATCH FILE GOES WITH THE TRANSFER. A transfer writes
+  `<destination>.part` and renames it only once whole, so an
+  interrupted one stranded that file — previously rare, since
+  mid-transfer interruption was barely reachable; now the ordinary
+  case. Cleanup was put on *every* incomplete path rather than on
+  cancellation alone: there is no resume (the next attempt opens
+  the file `"wb"` and starts over), so an abandoned partial is
+  never anything but garbage, and a rule that holds only for one
+  way of ending would have been the arbitrary one.
+
 - D39 — THE TWO RAW INPUT QUEUES; NOTHING ENTERS ELSEWHERE —
   DECIDED (owner, 2026-07-24). Supports P8; completes D38 by
   naming what it is an exception *to*.

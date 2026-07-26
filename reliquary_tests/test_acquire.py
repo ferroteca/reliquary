@@ -5,11 +5,14 @@
 import hashlib
 import os
 import tempfile
+import threading
 import unittest
 import zipfile
+from unittest import mock
 
 from reliquary import acquire, resolve
 from reliquary.document import parse_document
+from reliquary.errors import RunCancelled
 from reliquary.home import Context
 
 
@@ -128,6 +131,151 @@ class AcquireTests(unittest.TestCase):
             # into the cache, so there is nothing for the ledger to
             # describe. Only cached files get entries.
             self.assertIsNone(ledger.entry("outer", ctx))
+
+
+class _CancelAfter:
+    """Reports cancelled only once ``after`` checks have happened.
+
+    Duck-typed for the one method ``_check_cancelled`` uses, so a test
+    can prove the transfer loops ask at *every* chunk rather than once
+    before the work starts.
+    """
+
+    def __init__(self, after):
+        self.after = after
+        self.checks = 0
+
+    def is_set(self):
+        self.checks += 1
+        return self.checks > self.after
+
+
+class _FailingResponse:
+    """A response that delivers one chunk and then drops the connection."""
+
+    headers = {}
+
+    def __init__(self, chunks=1):
+        self.chunks = chunks
+
+    def read(self, size):
+        if self.chunks <= 0:
+            raise OSError("connection reset by peer")
+        self.chunks -= 1
+        return b"X" * size
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class CancellationTests(unittest.TestCase):
+    """A cancelled run aborts a host transfer where it stands.
+
+    The execution model's severability: input deliveries are atomic,
+    host transfers abort (planning/ROADMAP.md, "Cancel ends the run,
+    not the machine"). Before this, cancellation was only observed at
+    statement boundaries, so a Ctrl-C during a large fetch was not
+    seen until the download, its hash, the extraction, and *its* hash
+    had all finished.
+    """
+
+    def _extract_case(self, root, member_size=1):
+        payload = b"P" * member_size
+        container = os.path.join(root, "outer.zip")
+        with zipfile.ZipFile(container, "w") as bundle:
+            bundle.writestr("inner/p.img", payload)
+        # The container declares no sha256, so verification is skipped
+        # and the extraction itself is the work under test.
+        doc = parse_document([{
+            "name": "outer", "location": {"local": container},
+            "children": [{"path": "inner/p.img", "name": "p"}]}])
+        return resolve.namespace_of(doc), payload
+
+    def test_a_cancelled_run_stops_a_hash_verification(self):
+        with tempfile.TemporaryDirectory() as root:
+            payload = b"PAYLOAD-BYTES-" * 1000
+            local = os.path.join(root, "p.img")
+            with open(local, "wb") as handle:
+                handle.write(payload)
+            doc = parse_document([{
+                "name": "p", "location": {"local": local},
+                "sha256": _sha(payload)}])
+            ns = resolve.namespace_of(doc)
+            cancelled = threading.Event()
+            cancelled.set()
+            with self.assertRaises(RunCancelled):
+                acquire.fetch_media(
+                    ns.media["p"], ns, context=Context(cache=root),
+                    cancelled=cancelled)
+
+    def test_a_cancelled_run_stops_an_extraction(self):
+        with tempfile.TemporaryDirectory() as root:
+            ns, _ = self._extract_case(root)
+            cache = os.path.join(root, "cache")
+            cancelled = threading.Event()
+            cancelled.set()
+            with self.assertRaises(RunCancelled):
+                acquire.fetch_media(
+                    ns.media["p"], ns, context=Context(cache=cache),
+                    cancelled=cancelled)
+            # Nothing half-extracted is ever presented as the payload:
+            # the destination only appears on the atomic replace.
+            media = os.path.join(cache, "media")
+            self.assertFalse(os.path.exists(os.path.join(media, "p.img")))
+            # Nor is the scratch file left behind. There is no resume,
+            # so an abandoned partial is only garbage — and cancelling
+            # a LiveCD fetch would otherwise strand hundreds of
+            # megabytes in the cache.
+            self.assertEqual(
+                [entry for entry in os.listdir(media)
+                 if entry.endswith(".part")], [])
+
+    def test_the_transfer_loops_check_at_every_chunk(self):
+        """Not merely once before the work begins.
+
+        A single up-front check would leave a multi-gigabyte member
+        just as uninterruptible as before.
+        """
+        with tempfile.TemporaryDirectory() as root:
+            # Comfortably more than one _CHUNK, so the loop iterates.
+            ns, _ = self._extract_case(root, member_size=acquire._CHUNK * 3)
+            cancelled = _CancelAfter(1)
+            with self.assertRaises(RunCancelled):
+                acquire.fetch_media(
+                    ns.media["p"], ns,
+                    context=Context(cache=os.path.join(root, "cache")),
+                    cancelled=cancelled)
+            self.assertGreater(cancelled.checks, 1)
+
+    def test_a_failed_download_leaves_no_scratch_file(self):
+        """Not only cancellation: a dropped connection tidies up too.
+
+        The scratch file is garbage on every incomplete path, so the
+        cleanup belongs to the transfer, not to one way of ending it.
+        """
+        with tempfile.TemporaryDirectory() as root:
+            destination = os.path.join(root, "p.img")
+            with mock.patch.object(acquire, "urlopen",
+                                   return_value=_FailingResponse()):
+                with self.assertRaises(OSError):
+                    acquire._download(
+                        "http://example.invalid/p.img", destination,
+                        "p", None)
+            self.assertFalse(os.path.exists(destination + ".part"))
+            self.assertFalse(os.path.exists(destination))
+
+    def test_an_uncancelled_run_fetches_normally(self):
+        """The event being present changes nothing while it is unset."""
+        with tempfile.TemporaryDirectory() as root:
+            ns, payload = self._extract_case(root)
+            path = acquire.fetch_media(
+                ns.media["p"], ns,
+                context=Context(cache=os.path.join(root, "cache")),
+                cancelled=threading.Event())
+            self.assertEqual(_read(path), payload)
 
 
 if __name__ == "__main__":

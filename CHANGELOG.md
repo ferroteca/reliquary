@@ -442,6 +442,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Ctrl-C now stops a run during a large media fetch instead of
+  minutes later. Cancellation was only observed at statement
+  boundaries, so an `insert` that had to download a LiveCD ran the
+  download, its hash check, the extraction, and *its* hash check to
+  completion before noticing — against the documented promise that
+  input deliveries are atomic while host transfers abort. The run
+  engine's cancellation now reaches the transfer loops and is
+  checked at every chunk (D40).
+- An `insert` that fetches media reports its progress. The statement
+  never passed the run's event stream down, so a multi-hundred-
+  megabyte download printed one line and then nothing until it
+  finished — silence that reads as a hang. Transfer and verify
+  events now appear as they happen, like every other fetch (D40).
+- A second Ctrl-C interrupts immediately rather than repeating the
+  same graceful request. The handler previously folded every repeat
+  into one flag, leaving no way out of a stop that would not land
+  short of killing the terminal (D40).
+- A download that stalls after connecting now fails that location
+  instead of hanging forever: `urlopen` has a 30s timeout, and a
+  timed-out mirror falls through to the next alternative (D40).
+- An interrupted transfer no longer strands its scratch file in
+  `cache/media/`. A fetch writes `<name>.part` and renames it only
+  once whole, so a cancelled or failed one used to leave the partial
+  behind — up to hundreds of megabytes for a LiveCD. There is no
+  resume, so the partial is now discarded on every incomplete path
+  (D40).
 - The built-in FreeDOS install script no longer stalls at the
   installer's first confirmation. It pressed Enter on a menu the
   installer draws *before* it starts reading the keyboard, so the
