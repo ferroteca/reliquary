@@ -179,6 +179,11 @@ until it stops. Anything else raises `PreflightError` naming the gap.
   `resolve_media(name, namespace)` lives in `reliquary.resolve`.)
 - `new_blueprint(name, *, platform="dos", context=None)` - Scaffold a
   home ``blueprints/<name>.rlqb``. CLI twin: `new-blueprint`.
+- `add_media(name, path, *, context=None)` - Write a home
+  ``blueprints\<name>.rlqb`` declaring a media located at `path` and
+  pinned to its computed SHA-256. The file stays where it is; nothing
+  is cached. Returns the blueprint path, and raises `FileExistsError`
+  rather than overwriting one. CLI twin: `add-media`.
 - `delete_blueprint(name, *, context=None)` - Remove the home blueprint
   file; fails closed while any machine of it exists. Never touches
   package builtins. CLI twin: `delete-blueprint`.
@@ -203,15 +208,16 @@ until it stops. Anything else raises `PreflightError` naming the gap.
   CLI twin: `list-media`.
 - `clean_media(name=None, *, context=None)` - Reclaim cached
   payloads, returning the names reclaimed. Blunt with no name,
-  sparing `supplied` payloads and anything a running machine holds;
-  targeted with one. CLI twin: `clean-media`.
+  skipping anything a running machine holds; targeted with one. The
+  cache holds only what can be fetched or derived again, so nothing
+  is spared on provenance. CLI twin: `clean-media`.
 - `prune_media(*, context=None, dry_run=False)` - Drop cached
   payloads outside the attachment closure, returning the names
   pruned (or, under `dry_run`, the names that would be). CLI twin:
   `prune-media`.
-- `add_media(name, path, *, context=None)` - Supply a payload nothing
-  can locate, verified against the media's pin and recorded as
-  `supplied`. Returns the cached path. CLI twin: `add-media`.
+
+`add_media` is an authoring call and lives with the blueprint verbs
+below, not here — it writes a declaration and never touches the cache.
 
 ## User properties
 

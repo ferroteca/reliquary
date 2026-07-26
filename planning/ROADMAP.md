@@ -286,8 +286,8 @@ once the state format settles.
 └── cache/               reliquary's regenerable files
     ├── media/           every cached payload, keyed by the name of the
     │                    media it is (a container is a media too),
-    │                    fetched/extracted/verified on demand, with
-    │                    .ledger.json recording what each file is
+    │                    fetched/extracted/verified on demand; the
+    │                    filename is the whole of a file's identity
     └── machines/<id>/   cached materializations (above —
                          disposable: drives regenerate from
                          blueprint and media; a run stores nothing,
@@ -745,11 +745,13 @@ Lifecycle semantics:
   complete binding for programs. Every property command accepts
   `--properties <path>`, maintaining a selected file in place of
   the home's `user.properties`.
-- `clean-media` reclaims payloads Reliquary can fetch or derive
-  again, sparing what a person supplied and what a running machine
-  holds; naming one evicts it deliberately. `prune-media` keeps the
-  attachment closure and drops what only existed to produce it.
-  `add-media` supplies a payload nothing can locate.
+- `clean-media` reclaims cached payloads, skipping what a running
+  machine holds; naming one evicts it deliberately. `prune-media`
+  keeps the attachment closure and drops what only existed to
+  produce it. Nothing is spared on provenance: the cache holds only
+  what can be fetched or derived again (D41). `add-media` is an
+  authoring verb — it declares a media for a file already on disk,
+  computing its sha256, and caches nothing (D41).
 - `recreate-machine` is exactly destroy + create under the same
   machine id: drives regenerate as declared (`size`
   blank, `base` differenced or copied afresh). Since resolution
@@ -2117,17 +2119,19 @@ Deliverables:
    same path.)
 4. The cache rework — **delivered**: the single name-keyed
    `cache/media/`
-   (`cache/archives/` retired), the identity ledger (recorded
-   sha256, derivation keys, provenance
-   refetchable/derived/supplied, source lineage), the
-   deterministic preflight identity check feeding the
-   on-mismatch contract with lineage-informed messages; the
-   command family with API twins — `clean-media` (blunt; spares
-   `supplied`; skips running-machine attachments), `clean-media
+   (`cache/archives/` retired), wholly regenerable and recording
+   no provenance — a payload's filename is the whole of its
+   identity (D41 deleted the identity ledger this milestone
+   shipped); the
+   deterministic preflight identity check (a hash comparison
+   before any transfer) feeding the on-mismatch contract; the
+   command family with API twins — `clean-media` (blunt; skips
+   running-machine attachments), `clean-media
    <name>` (targeted eviction), `prune-media`
    (attachment-closure prune; scope-relative; `--dry-run`), and
-   `add-media <name> <file>` (the guarded door — a pinned
-   unlocated media resolves by cache hit). U4 writes this
+   `add-media <name> <file>` (an authoring verb: it declares a
+   media for a file already on disk, computing its sha256, and
+   copies nothing — D41). U4 writes this
    deliverable twice over — *"the developer disposes of the
    large VM and reclaims the disk space"* is `prune-media` and
    `clean-media`, and *"supplying just the two things the

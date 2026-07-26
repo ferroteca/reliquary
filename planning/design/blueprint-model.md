@@ -567,41 +567,41 @@ archive type. The cached filename tracks the spec's **name**
 always `<name>.<ext>` with the extension from the location or
 the `extension` override.
 
-Beside it sits an **identity ledger** recording, per entry:
+Nothing else is recorded about a cached file — the filename is
+the whole of its identity, and there is no sidecar (D41 deleted
+the identity ledger). The cache can afford that because it is
+**entirely reconstructible**: nothing enters it except by
+download or extraction, so no payload there is irreplaceable.
 
-- the **sha256** actually observed,
-- the **derivation key** — `(parent-sha, path)` — for a derived
-  payload,
-- **provenance**: `refetchable` · `derived` · `supplied`,
-- **source lineage**.
-
-The ledger buys a **deterministic preflight identity check
-before any fetch**, which feeds the standing on-mismatch
-contract with **lineage-informed messages** — a version bump and
-a cross-project name collision are distinguishable at a glance,
-which is exactly what name-keying could not do on its own.
+The **preflight identity check before any fetch** stands on its
+own — hashing the cached file against the media's pin, which
+catches both a version bump and a cross-project name collision
+without needing to know which it found. The on-mismatch message
+names both causes and points at `--cache`, the flag that
+isolates one project's cache from another's.
 
 **Content addressing was weighed and declined twice.** An opaque
 hash-named cache cuts against "the cache is not an interface",
-and the ledger closes the detection gap that was content
-addressing's real argument. It stays the recorded escalation if
-collision friction ever proves real.
+and the pinned hash already makes a silent collision impossible —
+detection was never what name-keying lacked. It stays the
+recorded escalation if collision friction ever proves real.
 
 ### The command family
 
 Each has an API twin (P6):
 
-- **`clean-media`** — blunt reclamation; **spares `supplied`**
-  entries (nothing irreplaceable is ever deleted) and skips
-  payloads attached to a running machine.
+- **`clean-media`** — blunt reclamation; everything goes, since
+  everything here can be got again. Skips payloads attached to a
+  running machine.
 - **`clean-media <name>`** — targeted eviction.
 - **`prune-media`** — attachment-closure prune: keep what the
   scope's machines and blueprints actually need, drop the rest.
   Scope-relative, with `--dry-run`.
-- **`add-media <name> <file>`** — the guarded door. A pinned but
-  unlocated media resolves by **cache hit**: the user supplies
-  the file once, it is verified against the pin, and the
-  blueprint never has to be edited.
+
+`add-media <name> <file>` is **not** in this family: it authors
+a media declaration for a file already on disk, computing its
+sha256, and copies nothing into the cache (D41). It belongs with
+the blueprint verbs.
 
 ## Machine directory layout
 

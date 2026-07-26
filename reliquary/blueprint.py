@@ -4,7 +4,8 @@
 
 Parsing and validating a composed ``.rlqb`` blueprint lives in
 ``document.py``; this module is the thin file-authoring surface the CLI
-drives — scaffolding a new blueprint and removing a machineless one.
+drives — scaffolding a new blueprint, writing a media spec for a file
+already on disk, and removing a machineless blueprint.
 """
 
 import json
@@ -44,6 +45,53 @@ def new_blueprint(name, *, platform="dos", context=None):
         json.dump(data, handle, indent=2)
         handle.write("\n")
     return path
+
+
+def add_media(name, path, *, context=None):
+    """Write a media spec for a file already on disk. Returns the path.
+
+    The file stays where it is: what this authors is the *declaration*
+    a blueprint was missing, with the one field a person should never
+    have to produce by hand — the ``sha256`` — computed from the file.
+    The result is an ordinary ``blueprints/<name>.rlqb`` the user owns
+    and can edit, not a cache entry (D41).
+
+    Raises ``FileNotFoundError`` if the file is not there, and
+    ``FileExistsError`` if the blueprint already exists — an existing
+    declaration is edited, never silently rewritten.
+    """
+    from . import document
+    from .acquire import _sha256
+    from .home import blueprints_dir
+
+    source = os.path.abspath(os.fspath(path))
+    if not os.path.isfile(source):
+        raise FileNotFoundError(f"no such file: {source}")
+
+    destination = os.path.join(blueprints_dir(context), f"{name}.rlqb")
+    if os.path.exists(destination):
+        raise FileExistsError(
+            f"blueprint already exists: {destination}\n"
+            f"edit it to declare {name!r}, or choose another name")
+
+    # Forward slashes read the same on every host and need no JSON
+    # escaping; the locator's drive-letter exemption accepts 'D:/…'.
+    spec = {
+        "type": "media",
+        "name": name,
+        "location": source.replace("\\", "/"),
+        "sha256": _sha256(source),
+    }
+    # Parse before writing, so a name the charter refuses fails here
+    # rather than leaving an unloadable file behind.
+    document.parse_document([spec])
+
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    with open(destination, "w", encoding="utf-8") as handle:
+        handle.write(f"// Media {name} — supplied locally\n")
+        json.dump([spec], handle, indent=2)
+        handle.write("\n")
+    return destination
 
 
 def delete_blueprint(name, *, context=None):

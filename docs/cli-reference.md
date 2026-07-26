@@ -261,11 +261,11 @@ alone, and each mirror attempt is its own event.
 ### `rlq clean-media [<name>]`
 
 Reclaim cached payloads from `cache/media/`. With no argument it is
-blunt: everything the project can fetch or derive again goes. A
-**supplied** payload — one you put there with `add-media`, which
-nothing can reproduce — is spared, and so is anything a running
-machine is holding open. Naming a media evicts just that one,
-whatever its provenance.
+blunt: everything goes. The cache holds only what Reliquary can fetch
+or derive again, so nothing there is irreplaceable — a file you
+supplied yourself stays wherever you keep it and is never copied in.
+Anything a running machine is holding open is skipped. Naming a media
+evicts just that one.
 
 ### `rlq prune-media [--dry-run]`
 
@@ -278,12 +278,20 @@ would go without touching anything.
 
 ### `rlq add-media <name> <file>`
 
-Supply a payload nothing can locate. A blueprint may pin a `sha256`
-for media it cannot legally distribute; resolution fails closed until
-someone provides the file. This copies it into the cache under the
-media's own name, verified against the pin, so the blueprint never has
-to be edited. The payload is recorded as **supplied** and is not
-reclaimed unless you name it.
+Declare a media for a file you already have. Codex blueprints for
+commercial systems ship pinned but without a URL — Reliquary has no
+right to distribute a Windows ISO — so they name the build their
+scripts target and leave you to supply it.
+
+This writes `blueprints/<name>.rlqb` declaring that media, located at
+your file and pinned to its SHA-256, which it computes for you. The
+file is not copied or moved: the blueprint points at it where it sits.
+Prints the blueprint path.
+
+The result is an ordinary blueprint you own — edit it freely, and if
+the pin needs to differ from the codex's (a different edition, your
+own rip), that is your copy's business. `add-media` refuses to
+overwrite an existing blueprint of that name.
 
 ### `rlq insert-media <slot> (<media> | --file PATH) (--blueprint NAME | --machine ID)`
 

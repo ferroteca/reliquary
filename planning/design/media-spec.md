@@ -11,8 +11,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > parent/children containment, unknown-key rejection, catalog
 > resolution with identity dedup and collision detection,
 > hash-verified fetch and extraction with the mismatched-file
-> contract, the identity ledger, JSONC acceptance, and the media
-> command family.
+> contract, JSONC acceptance, and the media command family.
 >
 > **This document covers acquisition** — where a payload comes from
 > in practice, how it is verified, and how the cache behaves. The
@@ -40,18 +39,18 @@ artifact-residency split, PRINCIPLES.md P4).
 ```text
 <asset root>/…/freedos.rlqb        the machine and the media it draws on
 <reliquary_home>/cache/media/
-├── .ledger.json                   what each cached file is
 ├── freedos-livecd-zip.zip         the container, cached by its name
 └── freedos-livecd.iso             the payload read out of it
 ```
 
 One name-keyed cache holds every payload, keyed by the name of the
 media it *is* — a container is a media like any other, so there is
-no second directory for containers. It is entirely reconstructible
-except where a person supplied a payload nothing can re-fetch
-(`add-media`), which the ledger records so reclamation can tell the
-difference. A bare file dropped into the directory does nothing:
-the cache is Reliquary's, not an interface.
+no second directory for containers. It is **entirely
+reconstructible**, without exception: nothing enters it except by
+download or extraction, so no payload there is irreplaceable and
+reclamation never has to ask where a file came from (D41). A bare
+file dropped into the directory does nothing: the cache is
+Reliquary's, not an interface.
 
 ## The media component
 
@@ -172,26 +171,28 @@ What matters for acquisition is what each shape costs at fetch time:
 - A **property-supplied** location resolves through the property
   chain at `create` / `apply`, never at `start`.
 
-### Supplying what nothing can locate
+### Supplying what the project cannot distribute
 
-A media may pin its `sha256` and name a location nothing supplies —
-the licensed, non-redistributable case, which is how codex media
-ship ([the codex's licensing rule](codex.md#non-redistributable-media)).
-Resolution **fails closed** naming the media until someone provides
-the payload, and there are two ways to do that without editing the
-shipped spec's identity:
+A codex blueprint may name the build its scripts target without
+naming anywhere to get it — the licensed, non-redistributable case
+([the codex's licensing rule](codex.md#non-redistributable-media)).
+The user supplies the payload themselves, in one of two ways:
 
-- **`add-media <name> <file>`** — the guarded door. The file is
-  verified against the pin and copied into the cache under the
-  media's own name, recorded `supplied`. This is the home-CLI path,
-  and the one case where a payload legitimately enters the cache
-  from outside.
+- **`add-media <name> <file>`** — the home-CLI path. It computes the
+  file's `sha256` and writes a `blueprints/<name>.rlqb` declaring a
+  media located at that file. The file is **not copied**: the
+  declaration points at it where it sits, and the result is an
+  ordinary blueprint the user owns and can edit (D41). **Nothing
+  ever enters the cache from outside** — the cache holds only what
+  Reliquary can fetch or derive again.
 - **A property-valued location** — the project and CI path, and the
   hermetic one: the committed hash still determines the input, and
   the path that supplies it is per-run.
 
-Editing your own seeded copy is always the third option; that is
-what seeding is for.
+Editing your own seeded copy is always available and is not a last
+resort — that is what seeding is for, and never-overwrite seeding is
+what makes the copy safe to edit. A pin that does not match the
+build you legitimately hold is your copy's to change.
 
 ## Fetching
 
@@ -345,11 +346,10 @@ rlq clean-media [<name>]
 rlq prune-media [--dry-run]
 ```
 
-- **`clean-media`** is blunt: it takes back everything the project
-  can get again. A `supplied` payload is spared, because nothing
-  could put it back, and so is anything a running machine is holding
-  open. Naming a media evicts that one deliberately, whatever its
-  provenance.
+- **`clean-media`** is blunt: it takes back everything, because
+  everything there can be got again. Anything a running machine is
+  holding open is skipped. Naming a media evicts that one
+  deliberately.
 - **`prune-media`** is informed: it keeps the **attachment
   closure** — what the active scope can still attach — and drops
   what only existed to produce it. A container goes once its
@@ -363,19 +363,22 @@ the active source declares and the machines that exist, so pruning
 in one project never reasons about another's. The API twins are
 `clean_media(name=None)` and `prune_media(dry_run=)`.
 
-### The identity ledger
+### What a cached file is
 
-Beside the payloads, `cache/media/.ledger.json` records what each
-cached file actually is: the sha256 observed when it was written,
-its provenance (`refetchable`, `derived`, `supplied`), the source it
-came from, and for a derived payload the `(parent-sha, path)` that
-produced it.
+Its filename. A payload is written as `<media-name>.<ext>` and
+nothing else is recorded about it — no sidecar, no provenance (D41).
+The cache can afford that because it is entirely reconstructible:
+everything in it arrived by download or extraction and can arrive
+that way again.
 
-That is what makes the preflight identity check a diagnosis rather
-than a comparison. A bare hash mismatch cannot tell a **version
-bump** — same location, changed bytes — from a **cross-project name
-collision** — two different media sharing one name — and those want
-opposite fixes. The ledger names which one you have.
+Identity is still checked before every fetch, by hashing the cached
+file against the media's pin. That catches a **version bump** — same
+location, changed bytes — and a **cross-project name collision** —
+two different media sharing one name across a common cache — with
+equal reliability; a colliding payload is never silently accepted.
+What it cannot do is say which of the two it found, so the mismatch
+message names both possibilities and points at `--cache`, the flag
+that isolates one project's cache from another's.
 
 ## Sharing
 

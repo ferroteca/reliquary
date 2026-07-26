@@ -42,20 +42,24 @@ workflow:
   `drives` — a media name, `null`, `{media, controller, enabled}`, or an inline media (the anonymous blank included) —
   `boot`, `name` (the id-safe identity, not a
   display label), `description`, `scripts`, `control-planes`, `backend-settings`, `parameters`),
-  `blueprint.py` is authoring-only — scaffolds (`new_blueprint`) and removes home blueprint files (`delete_blueprint` —
+  `blueprint.py` is authoring-only — scaffolds (`new_blueprint`), writes a media declaration for a file already
+  on disk (`add_media(name, file)`: computes the sha256, writes `blueprints/<name>.rlqb` locating the media at
+  that path, copies nothing, refuses to overwrite — the supply seam for pinned-but-unlocated codex media, D41),
+  and removes home blueprint files (`delete_blueprint` —
   fails closed while any machine of that blueprint exists), `resolve.py` builds the merged `(name, type)` resolution
   namespace from every `.rlqb` in the active source (`load_namespace` / `build_namespace`, cross-file collision
   detection), resolves a media by name (`resolve_media`), and lowers it to a nested fetch plan
   (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,
   on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the one `cache/media/`
-  cache, keyed by the name of the media each file is, recording provenance in `ledger.py`'s identity ledger
-  (`refetchable` / `derived` / `supplied`, with a derived payload's `(parent-sha, path)` derivation key) and
-  attaching a `local` payload in place, `media.py` is acquisition-only — `fetch_media(name,
+  cache, keyed by the name of the media each file is, and attaches a `local` payload in place. The cache is
+  wholly regenerable — every payload arrived by download or extraction, so no verb asks where a file came from
+  before reclaiming it and nothing records provenance (D41 deleted the identity ledger),
+  `media.py` is acquisition-only — `fetch_media(name,
   context, on_mismatch)` and `list_media` over the namespace, plus the cache family — `clean_media(name=None)`
-  (blunt, sparing `supplied` and running attachments; targeted when named), `prune_media(dry_run=)` (the
-  attachment closure: a container goes once its children are cached), and `add_media(name, file)` (the guarded
-  door for payloads nothing can locate) — with no `delete_media`: removing a media is editing the `.rlqb` that
-  declares it (D30),
+  (blunt, skipping running attachments; targeted when named) and `prune_media(dry_run=)` (the
+  attachment closure: a container goes once its children are cached) — with no `delete_media`: removing a media
+  is editing the `.rlqb` that declares it (D30), and no `add_media`: supplying a file is authoring a
+  declaration, which is `blueprint.py`'s (D41),
   `properties.py` owns the user properties file — the line-based
   `<home>/user.properties` (`key = value`, `#` comments, dotted
   letter-initial keys with the `rlq`/`reliquary` namespaces reserved,
@@ -331,8 +335,8 @@ unrelated cache state file):
 
 - `blueprints/` — composed blueprints, media components included (`blueprints_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
-- `cache/media/` — every cached payload (`media_cache_dir`), keyed by media name, under the cache root, with
-  the identity ledger (`.ledger.json`) recording what each file is
+- `cache/media/` — every cached payload (`media_cache_dir`), keyed by media name, under the cache root; each
+  file is named `<media-name>.<ext>`, which is the whole of its identity — no sidecar record (D41)
 - `cache/machines/<name>-<n>/` — machine materializations (`machines_cache_dir`;
   parent via `cache_dir`), under the cache root, each with `machine.json` (the
   resolved state; while running its `vm` section carries the live VM identity,

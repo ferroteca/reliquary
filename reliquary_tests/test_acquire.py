@@ -12,8 +12,8 @@ from unittest import mock
 
 from reliquary import acquire, resolve
 from reliquary.document import parse_document
-from reliquary.errors import RunCancelled
-from reliquary.home import Context
+from reliquary.errors import PreflightError, RunCancelled
+from reliquary.home import Context, media_cache_dir
 
 
 def _sha(data):
@@ -86,6 +86,45 @@ class AcquireTests(unittest.TestCase):
                 ns.media["win"], ns, context=Context(cache=os.path.join(root, "c")))
             self.assertEqual(path, iso)  # used in place, not copied to cache
 
+    def test_a_missing_local_payload_names_the_media_and_the_path(self):
+        """It must not reach the backend as a failure to open a path."""
+        with tempfile.TemporaryDirectory() as root:
+            gone = os.path.join(root, "moved-away.iso")
+            doc = parse_document([
+                {"name": "win98-cd", "location": {"local": gone},
+                 "sha256": "a" * 64}])
+            ns = resolve.namespace_of(doc)
+            with self.assertRaises(PreflightError) as caught:
+                acquire.fetch_media(ns.media["win98-cd"], ns,
+                                    context=Context(cache=root))
+            message = str(caught.exception)
+            self.assertIn("win98-cd", message)
+            self.assertIn(gone, message)
+
+    def test_a_missing_local_payload_is_caught_without_a_pin(self):
+        """Unpinned, it would otherwise pass a dead path straight on."""
+        with tempfile.TemporaryDirectory() as root:
+            gone = os.path.join(root, "moved-away.img")
+            doc = parse_document([
+                {"name": "floppy", "location": {"local": gone}}])
+            ns = resolve.namespace_of(doc)
+            with self.assertRaises(PreflightError):
+                acquire.fetch_media(ns.media["floppy"], ns,
+                                    context=Context(cache=root))
+
+    def test_a_directory_source_is_not_treated_as_missing(self):
+        """A directory location is legal — it attaches as vvfat."""
+        with tempfile.TemporaryDirectory() as root:
+            staging = os.path.join(root, "staging")
+            os.makedirs(staging)
+            doc = parse_document([
+                {"name": "exchange", "location": {"local": staging}}])
+            ns = resolve.namespace_of(doc)
+            self.assertEqual(
+                acquire.fetch_media(ns.media["exchange"], ns,
+                                    context=Context(cache=root)),
+                staging)
+
     def test_remote_without_hash_fails_before_network(self):
         # A remote location with no sha256 parses — the required-once-
         # remote rule is a resolution check, since a referenced rung may
@@ -97,40 +136,30 @@ class AcquireTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             acquire.fetch_media(ns.media["x"], ns, context=Context(cache="."))
 
-    def test_extraction_records_its_derivation_in_the_ledger(self):
-        """A derived payload records what produced it, not just its hash.
+    def test_extraction_caches_the_child_and_not_a_local_container(self):
+        """The derived payload is cached under its own name.
 
-        The derivation key is what lets the cache answer "is this the
-        file this blueprint means?" without re-deriving it.
+        A local container is used in place, never copied in — so the
+        cache holds exactly the media that had to be produced.
         """
-        from reliquary import ledger
-
         with tempfile.TemporaryDirectory() as root:
             payload = b"PAYLOAD"
             container = os.path.join(root, "outer.zip")
             with zipfile.ZipFile(container, "w") as bundle:
                 bundle.writestr("inner/p.img", payload)
-            container_sha = _sha(_read(container))
 
             doc = parse_document([{
                 "name": "outer", "location": {"local": container},
-                "sha256": container_sha,
+                "sha256": _sha(_read(container)),
                 "children": [{"path": "inner/p.img", "name": "p",
                               "sha256": _sha(payload)}]}])
             ns = resolve.namespace_of(doc)
             ctx = Context(cache=os.path.join(root, "cache"))
-            acquire.fetch_media(ns.media["p"], ns, context=ctx)
+            cached = acquire.fetch_media(ns.media["p"], ns, context=ctx)
 
-            entry = ledger.entry("p", ctx)
-            self.assertEqual(entry["provenance"], ledger.DERIVED)
-            self.assertEqual(entry["sha256"], _sha(payload))
-            self.assertEqual(entry["derivation"]["parent"], "outer")
-            self.assertEqual(entry["derivation"]["path"], "inner/p.img")
-            self.assertEqual(entry["derivation"]["parent-sha"], container_sha)
-            # The container here is local: used in place, never copied
-            # into the cache, so there is nothing for the ledger to
-            # describe. Only cached files get entries.
-            self.assertIsNone(ledger.entry("outer", ctx))
+            self.assertEqual(_read(cached), payload)
+            self.assertEqual(
+                sorted(os.listdir(media_cache_dir(ctx))), ["p.img"])
 
 
 class _CancelAfter:

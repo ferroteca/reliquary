@@ -48,6 +48,97 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+- D41 — THE IDENTITY LEDGER IS DELETED; `add-media` AUTHORS A
+  DECLARATION — DECIDED (owner, 2026-07-26). Supports P4, P8;
+  **amends D22** (its cache clauses only — the identity ledger,
+  and `add-media` as the guarded door). Supports U4's
+  supply-what-the-repository-cannot clause by a different
+  mechanism than D22 named.
+
+  WHAT THE REVIEW FOUND. Asked what the ledger was for, the
+  code answered: of the five fields `record()` wrote, only
+  `provenance`, `source`, and `file` were ever read back, and
+  `file` was redundant because a cached payload is always
+  `<media-name>.<ext>`. The `sha256` and the `(parent-sha,
+  path)` derivation key — D22's two headline fields — were
+  written and never read by anything. The preflight identity
+  check D22 credits to the ledger is a hash comparison in
+  `_cache_hit` that consults no ledger at all.
+
+  THE ROUND TRIP NEVER CLOSED. D22's `add-media` clause says a
+  pinned unlocated media "resolves by cache hit". It does not,
+  and could not: `_media_plan` returns `None` for a media with
+  no location, `fetch_media` returns `None` without consulting
+  the cache, and `machines.py` reads that `None` as an EMPTY
+  REMOVABLE SLOT — so a supplied payload silently became a
+  machine with an empty CD drive. Worse, the format cannot
+  express the case at all: a `use` media with no location is a
+  PARSE ERROR, so the "pinned but unlocated" media the door
+  existed to open can never be written down. Nothing tested any
+  of this; the only coverage mocked the function out.
+
+  THE CONSTRAINT WAS IMAGINARY. The whole apparatus existed so
+  a user need not edit their seeded blueprint — a rule from
+  codex.md that CONTRADICTS ITS OWN never-overwrite seeding
+  (D21's neighbourhood): if a codex update can never reach your
+  copy, there is nothing to protect by leaving it pristine. The
+  rule reads as a survival from a READ-THROUGH codex, where
+  editing meant forking and losing upstream fixes; seeding
+  replaced that model and the surrounding prose was never
+  revisited (the same section still describes the `source` spec
+  type, retired since D22). EDITING YOUR SEEDED COPY IS THE
+  NORMAL PATH, and always was — D22 itself names the supply
+  seam "edit-your-seeded-copy or a property-valued location".
+
+  THE DECISION. `ledger.py` is DELETED, with its provenance
+  vocabulary (`refetchable` / `derived` / `supplied`) and
+  `.ledger.json`. The cache becomes WHOLLY REGENERABLE by
+  construction: nothing enters it except by download or
+  extraction, so `clean-media` and `prune-media` need no
+  provenance test and reclaim uniformly. `add-media <name>
+  <file>` MOVES FROM THE CACHE FAMILY TO THE AUTHORING FAMILY
+  (`blueprint.py`, beside `new-blueprint`): it computes the
+  file's sha256 — the one field a person should never produce
+  by hand, and the whole of the command's value — and writes
+  `blueprints/<name>.rlqb` declaring a media located at that
+  file. THE FILE IS NEVER COPIED OR MOVED. The result is an
+  ordinary blueprint the user owns, which is the point: if
+  their rip legitimately differs from the codex's pin, that is
+  their copy's business. Refuses to overwrite an existing
+  blueprint.
+
+  CONTENT ADDRESSING STAYS DECLINED, AND ITS GROUND IS
+  UNCHANGED. D22 credits the ledger with closing "the detection
+  gap name-keying had". It never did: detection is the hash
+  comparison, which stands without it, so a colliding payload
+  is CAUGHT EVERY TIME and never silently wrong. What the
+  ledger added was DIAGNOSIS — naming which of two causes it
+  was. That is now a static hint on the mismatch message
+  ("either the payload changed upstream, or another project
+  caches a different media under this name — isolate them with
+  --cache"), which names both causes and the existing remedy.
+  CAS remains the recorded escalation if collision friction
+  proves real.
+
+  WEIGHED AND DECLINED: keeping a trimmed ledger of provenance
+  alone (it would exist to protect a COPY of a file whose
+  original the record itself names — the cache is not where
+  irreplaceable things belong); deriving "irreplaceable" from
+  the catalog instead, a media with no location (unrepresentable
+  — see the parse error above); a `--cache-it` flag on a located
+  media, making a payload survive its source going away (a real
+  want, and the one thing under here with merit, but it is a
+  CACHING feature, not a provenance one — TASKS.md).
+
+  FOLDED: this entry; D22 annotated at its two cache clauses;
+  ROADMAP milestone 7's deliverable and command family;
+  media-spec.md ("Supplying what nothing can locate");
+  codex.md's non-redistributable section (the never-hand-feed
+  rule, the retired `source` prose, a broken anchor);
+  AGENTS.md; docs/cli-reference.md; docs/api-reference.md;
+  CHANGELOG (unreleased, amended in place); TASKS.md's
+  `download-media` entry reconciled.
+
 - D40 — CANCELLATION REACHES A HOST TRANSFER BY ITS OWN
   PARAMETER — DECIDED (owner, 2026-07-26). Supports the
   execution model's severability; fixes a gap against a standing
@@ -1496,6 +1587,8 @@ record, and often the most useful part of it (D29).
   supply seam is edit-your-seeded-copy (home) or a
   property-valued location (project/CI). THE CACHE: one
   name-keyed `cache/media/` (`cache/archives/` retires) with an
+  [AMENDED BY D41: the identity ledger is deleted — the cache
+  is wholly regenerable and records no provenance]
   IDENTITY LEDGER — recorded sha256, derivation keys
   `(parent-sha, path)`, provenance
   refetchable/derived/supplied, source lineage — giving a
@@ -1510,7 +1603,10 @@ record, and often the most useful part of it (D29).
   `clean-media <name>` (targeted eviction), `prune-media`
   (attachment-closure prune; scope-relative; `--dry-run`),
   `add-media <name> <file>` (the guarded door — a pinned
-  unlocated media resolves by cache hit). WEIGHED AND DECLINED
+  unlocated media resolves by cache hit)
+  [AMENDED BY D41: it never did and could not; `add-media` is
+  now an authoring verb writing a media declaration for a local
+  file, and copies nothing into the cache]. WEIGHED AND DECLINED
   along the way: wrapper-key root discrimination (self-describing
   `type` travels with pasted fragments); document-scoped
   anonymous names (a middle scoping tier — anonymous means

@@ -742,17 +742,19 @@ class CliMachineLifecycleTests(unittest.TestCase):
         prune.assert_called_once_with(dry_run=True)
         self.assertIn("husk", out.getvalue())
 
-    def test_add_media_supplies_a_payload(self):
+    def test_add_media_writes_a_declaration_for_a_local_file(self):
         payload = os.path.join(self.home, "supplied.iso")
         with open(payload, "wb") as handle:
             handle.write(b"ISO")
-        with mock.patch("reliquary.cli.add_media",
-                        return_value=payload) as add, \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(
                 cli.main(["add-media", "win", payload,
                           "--home", self.home]), 0)
-        add.assert_called_once_with("win", payload)
+        written = out.getvalue().strip()
+        self.assertTrue(written.endswith("win.rlqb"))
+        self.assertTrue(os.path.isfile(written))
+        # The file it declares is left exactly where the user had it.
+        self.assertTrue(os.path.isfile(payload))
 
 
 class CliExecRunTests(unittest.TestCase):

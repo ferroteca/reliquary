@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """OS installation scripting over agentless QEMU guest automation."""
 
-from .blueprint import delete_blueprint, new_blueprint
+from .blueprint import add_media, delete_blueprint, new_blueprint
 from .cli import main
 from .document import Document, load_document, parse_document
 from .home import (HOME_ASSETS, Context,
@@ -32,8 +32,7 @@ from .machines import (apply_blueprint, create, create_machine,
 # the twin-name identity rule (the builtin stays reachable as
 # ``builtins.exec``).
 from .machines import exec  # noqa: A001
-from .media import (add_media, fetch_media, clean_media, list_media,
-                    prune_media)
+from .media import fetch_media, clean_media, list_media, prune_media
 from .resolve import load_namespace
 from .binding import (BoundProperties, PropertyBindingError,
                       bind_properties, describe_sources)

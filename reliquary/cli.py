@@ -37,8 +37,7 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
 # Aliased on import: the twin is named for its command under the
 # identity rule, and the builtin stays reachable here.
 from .machines import exec as exec_guest
-from .media import (add_media, fetch_media, clean_media, list_media,
-                    prune_media)
+from .media import fetch_media, clean_media, list_media, prune_media
 from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
 from .properties import (get_property, has_credential, set_property,
@@ -492,10 +491,10 @@ def main(argv=None):
         help="report what would be pruned, without pruning it")
 
     command = subcommands.add_parser(
-        "add-media", help="supply a payload nothing can locate")
+        "add-media", help="declare a media for a local file")
     _add_home(command)
-    command.add_argument("name", help="the media the file supplies")
-    command.add_argument("file", help="the payload file")
+    command.add_argument("name", help="the media name to declare")
+    command.add_argument("file", help="the file it is located at")
 
     # state ops
     command = subcommands.add_parser(
@@ -1033,7 +1032,7 @@ def _prune_media(arguments):
 
 
 def _add_media(arguments):
-    path = add_media(arguments.name, arguments.file)
+    path = blueprint_mod.add_media(arguments.name, arguments.file)
     return _emit(arguments, path, lambda: print(path))
 
 

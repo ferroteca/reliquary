@@ -110,21 +110,23 @@ induces the download of, media it has no right to distribute.
 The codex deliberately includes blueprints for operating systems
 whose installation media cannot be distributed — Windows and other
 commercial systems. Their codex media ship **with hashes but
-without URLs** — pinned but *unlocated*, naming a `source`
-component nothing supplies yet: the media pins exactly which build
-and edition the blueprint's scripts were written against, and the
-user supplies the media themselves.
+without URLs**: the media pins exactly which build and edition the
+blueprint's scripts were written against, and the user supplies the
+media themselves.
 
-Materializing such a machine before the media is supplied **fast
-fails by design**: resolution finds a media with a pinned hash and
-a missing source, and stops before anything is created, naming the
-missing media and source. That failure is the prompt — the user
-drops a matching `source` component beside the seeded blueprint (a
-`local` path, or a `url`), **without editing the seeded media** —
-the cache is never hand-fed; components are the interface. The
-SHA-256 hash then verifies that what they supplied is the exact
-media the scripts were built for (see
-[media-spec.md](media-spec.md#unlocated-media-non-redistributable)).
+The supply seam is **`rlq add-media <name> <file>`**: it computes
+the file's SHA-256 and writes a blueprint declaring that media,
+located at the file where it already sits (D41). Nothing is copied,
+and nothing is hand-fed into the cache — what the user gains is a
+declaration they own.
+
+That declaration is theirs to edit, and the codex's pin is a
+statement of *what the scripts were tested against*, not a gate the
+user must satisfy. A retail disc, an OEM variant, or a differently
+made rip will not match the codex hash, and the user is free to
+keep their own — the never-overwrite seeding rule above is what
+makes an edited copy safe. See
+[media-spec.md](media-spec.md#supplying-what-the-project-cannot-distribute).
 
 ## Naming conventions
 

@@ -7,6 +7,7 @@ test_document.py / test_resolve.py / test_acquire.py; this module
 covers the name-level module surface (fetch/list/clean/delete).
 """
 
+import hashlib
 import json
 import os
 import tempfile
@@ -63,9 +64,8 @@ class MediaModuleTests(unittest.TestCase):
                              ["husk", "junk"])
             self.assertEqual(os.listdir(cache), [])
 
-    def test_clean_media_spares_a_supplied_payload(self):
-        """Nothing can put it back, so nothing takes it blindly."""
-        from reliquary import ledger
+    def test_clean_media_targets_just_the_named_payload(self):
+        """Naming one leaves the rest of the cache alone."""
         from reliquary.home import media_cache_dir
         with tempfile.TemporaryDirectory() as home:
             ctx = Context(home=home, cache=os.path.join(home, "cache"),
@@ -75,13 +75,9 @@ class MediaModuleTests(unittest.TestCase):
             for name in ("win.iso", "husk.zip"):
                 with open(os.path.join(cache, name), "wb") as handle:
                     handle.write(b"x")
-            ledger.record("win", filename="win.iso", sha256="a" * 64,
-                          provenance=ledger.SUPPLIED, context=ctx)
-            self.assertEqual(media.clean_media(context=ctx), ["husk"])
-            self.assertTrue(os.path.exists(os.path.join(cache, "win.iso")))
-            # Named explicitly, it goes: the user asked for it.
             self.assertEqual(media.clean_media("win", context=ctx), ["win"])
             self.assertFalse(os.path.exists(os.path.join(cache, "win.iso")))
+            self.assertTrue(os.path.exists(os.path.join(cache, "husk.zip")))
 
 
 class PruneTests(unittest.TestCase):
@@ -135,19 +131,17 @@ class PruneTests(unittest.TestCase):
             media.prune_media(context=ctx, dry_run=True), ["husk"])
         self.assertTrue(os.path.exists(os.path.join(cache, "husk.zip")))
 
-    def test_prune_spares_a_supplied_payload(self):
-        from reliquary import ledger
+    def test_prune_keeps_a_cached_media_the_catalog_declares(self):
+        """Nothing derives from it, so it stays in the closure."""
         ctx, cache = self._home(
             [{"type": "media", "name": "payload", "location": "p.iso"}],
-            cached=["stray.iso"])
-        ledger.record("stray", filename="stray.iso", sha256="a" * 64,
-                      provenance=ledger.SUPPLIED, context=ctx)
+            cached=["payload.iso"])
         self.assertEqual(media.prune_media(context=ctx), [])
-        self.assertTrue(os.path.exists(os.path.join(cache, "stray.iso")))
+        self.assertTrue(os.path.exists(os.path.join(cache, "payload.iso")))
 
 
-class LedgerTests(unittest.TestCase):
-    """What the ledger buys: a mismatch that explains itself."""
+class AddMediaTests(unittest.TestCase):
+    """`add-media` authors a declaration; it never touches the cache."""
 
     def _ctx(self):
         tmp = tempfile.TemporaryDirectory()
@@ -155,50 +149,66 @@ class LedgerTests(unittest.TestCase):
         return Context(home=tmp.name, cache=os.path.join(tmp.name, "cache"),
                        assets=HOME_ASSETS)
 
-    def test_records_and_forgets(self):
-        from reliquary import ledger
-        ctx = self._ctx()
-        ledger.record("iso", filename="iso.iso", sha256="a" * 64,
-                      provenance=ledger.REFETCHABLE,
-                      source="https://x.test/a.iso", context=ctx)
-        entry = ledger.entry("iso", ctx)
-        self.assertEqual(entry["provenance"], ledger.REFETCHABLE)
-        self.assertEqual(entry["source"], "https://x.test/a.iso")
-        self.assertTrue(ledger.forget("iso", ctx))
-        self.assertIsNone(ledger.entry("iso", ctx))
+    def _payload(self, ctx, body=b"ISO"):
+        path = os.path.join(ctx.home, "win98.iso")
+        with open(path, "wb") as handle:
+            handle.write(body)
+        return path
 
-    def test_a_different_source_reads_as_a_name_collision(self):
-        from reliquary import ledger
+    def test_it_writes_a_media_spec_pinning_the_computed_hash(self):
+        from reliquary import blueprint
+        from reliquary.document import load_document
         ctx = self._ctx()
-        ledger.record("iso", filename="iso.iso", sha256="a" * 64,
-                      provenance=ledger.REFETCHABLE,
-                      source="https://one.test/a.iso", context=ctx)
-        message = ledger.explain("iso", "b" * 64, "a" * 64,
-                                 source="https://two.test/a.iso", context=ctx)
-        self.assertIn("share one name", message)
-        self.assertIn("one.test", message)
-        self.assertIn("two.test", message)
+        payload = self._payload(ctx)
+        expected = hashlib.sha256(b"ISO").hexdigest()
 
-    def test_the_same_source_reads_as_a_version_bump(self):
-        from reliquary import ledger
-        ctx = self._ctx()
-        url = "https://x.test/a.iso"
-        ledger.record("iso", filename="iso.iso", sha256="a" * 64,
-                      provenance=ledger.REFETCHABLE, source=url, context=ctx)
-        message = ledger.explain("iso", "b" * 64, "a" * 64, source=url,
-                                 context=ctx)
-        self.assertIn("changed", message)
-        self.assertNotIn("share one name", message)
+        written = blueprint.add_media("win98-cd", payload, context=ctx)
 
-    def test_a_supplied_mismatch_never_suggests_refetching(self):
-        from reliquary import ledger
+        self.assertTrue(written.endswith("win98-cd.rlqb"))
+        declared = load_document(written).media["win98-cd"]
+        self.assertEqual(declared.sha256, expected)
+        self.assertEqual(len(declared.location), 1)
+        self.assertEqual(declared.location[0].kind, "local")
+
+    def test_the_file_stays_put_and_the_cache_is_untouched(self):
+        from reliquary import blueprint
+        from reliquary.home import media_cache_dir
         ctx = self._ctx()
-        ledger.record("win", filename="win.iso", sha256="a" * 64,
-                      provenance=ledger.SUPPLIED, source="D:/isos/win.iso",
-                      context=ctx)
-        message = ledger.explain("win", "b" * 64, "a" * 64, context=ctx)
-        self.assertIn("supplied by hand", message)
-        self.assertIn("clean-media win", message)
+        payload = self._payload(ctx)
+
+        blueprint.add_media("win98-cd", payload, context=ctx)
+
+        self.assertTrue(os.path.exists(payload))
+        self.assertFalse(os.path.isdir(media_cache_dir(ctx)))
+
+    def test_the_declaration_resolves_and_fetches_in_place(self):
+        """The whole point: the media now works, unpinned from a cache."""
+        from reliquary import blueprint
+        ctx = self._ctx()
+        payload = self._payload(ctx)
+        blueprint.add_media("win98-cd", payload, context=ctx)
+
+        fetched = media.fetch_media("win98-cd", context=ctx)
+        # Forward slashes in the spec, so compare identity, not spelling.
+        self.assertTrue(os.path.samefile(fetched, payload))
+
+    def test_an_existing_blueprint_is_never_rewritten(self):
+        from reliquary import blueprint
+        ctx = self._ctx()
+        payload = self._payload(ctx)
+        blueprint.add_media("win98-cd", payload, context=ctx)
+        with self.assertRaises(FileExistsError):
+            blueprint.add_media("win98-cd", payload, context=ctx)
+
+    def test_a_missing_file_fails_before_writing_anything(self):
+        from reliquary import blueprint
+        from reliquary.home import blueprints_dir
+        ctx = self._ctx()
+        with self.assertRaises(FileNotFoundError):
+            blueprint.add_media("win98-cd", os.path.join(ctx.home, "nope"),
+                                context=ctx)
+        self.assertFalse(os.path.exists(
+            os.path.join(blueprints_dir(ctx), "win98-cd.rlqb")))
 
 
 if __name__ == "__main__":

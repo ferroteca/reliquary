@@ -23,7 +23,8 @@ import time
 import zipfile
 from urllib.request import urlopen
 
-from . import events as _events, ledger, resolve
+from . import events as _events, resolve
+from .errors import PreflightError
 from .errors import RunCancelled
 from .home import media_cache_dir
 
@@ -96,18 +97,26 @@ def _cached_name(name, extension):
     return name + ("." + extension if extension else "")
 
 
-def _approve_refetch(name, actual, expected, on_mismatch, source, context):
-    """Gate deleting an existing cached file that fails verification.
+def _explain_mismatch(name, expected, actual, source):
+    """Why a cached file is not the one this blueprint means.
 
-    The ledger supplies the diagnosis: a bare hash comparison cannot
-    tell a version bump from two projects sharing one media name, and
-    those want different fixes. A ``supplied`` payload is never
-    deleted on a policy — nothing could put it back.
+    Two causes look identical to a hash comparison and want different
+    fixes — the payload upstream changed, or two projects share one
+    media name across a common cache — so the message names both and
+    the flag that separates them.
     """
-    explanation = ledger.explain(name, expected, actual, source=source,
-                                 context=context)
-    if ledger.provenance(name, context) == ledger.SUPPLIED:
-        raise RuntimeError(explanation)
+    return (f"cached {name!r} has SHA-256 {actual}, but this blueprint "
+            f"pins {expected}"
+            + (f" for {source}" if source else "")
+            + ".\nEither the payload changed upstream, or another "
+            "project caches a different media under this name — "
+            "isolate them with --cache")
+
+
+def _approve_refetch(name, actual, expected, on_mismatch, source, context):
+    """Gate deleting an existing cached file that fails verification."""
+    del context
+    explanation = _explain_mismatch(name, expected, actual, source)
     if on_mismatch == "refetch":
         print(explanation + "\ndeleting for refetch", file=sys.stderr)
         return
@@ -238,6 +247,16 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
             f"every location for {name!r} failed:\n  " + "\n  ".join(errors))
 
     if isinstance(plan, resolve.LocalFile):
+        # A local payload is used in place, so it has to still be
+        # there. Checked before verifying: an absent file is a
+        # different problem from a wrong one, and saying so here keeps
+        # it from reaching the backend as a failure to open a path.
+        # (A directory source is legal — vvfat — so this is `exists`.)
+        if not os.path.exists(plan.path):
+            raise PreflightError(
+                f"media {name!r} is declared at {plan.path}, but nothing "
+                "is there.\nRestore the file, or edit the blueprint that "
+                "declares it to name where it lives now")
         _verify(plan.path, plan.sha256, f"local file for {name!r}",
                 name, events, cancelled)
         return plan.path
@@ -252,10 +271,6 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
         _download(plan.url, destination, name, events, cancelled)
         _verify(destination, plan.sha256, f"downloaded {name!r}", name,
                 events, cancelled)
-        ledger.record(name, filename=os.path.basename(destination),
-                      sha256=plan.sha256 or _sha256(destination, cancelled),
-                      provenance=ledger.REFETCHABLE, source=plan.url,
-                      context=context)
         return destination
 
     if isinstance(plan, resolve.Extract):
@@ -268,14 +283,6 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
                  cancelled)
         _verify(destination, plan.sha256, f"extracted {name!r}", name,
                 events, cancelled)
-        ledger.record(
-            name, filename=os.path.basename(destination),
-            sha256=plan.sha256 or _sha256(destination, cancelled),
-            provenance=ledger.DERIVED,
-            source=f"{plan.parent}/{plan.member}",
-            derivation={"parent": plan.parent, "path": plan.member,
-                        "parent-sha": _sha256(container, cancelled)},
-            context=context)
         return destination
 
     raise TypeError(f"unknown plan step: {plan!r}")
@@ -285,9 +292,9 @@ def _cache_hit(destination, name, expected, on_mismatch, source, context,
                cancelled=None):
     """Whether the cached file is already the one wanted.
 
-    This is the deterministic preflight identity check: it runs before
-    any network or extraction work, and a mismatch is explained from the
-    ledger rather than merely reported.
+    The preflight identity check: it runs before any network or
+    extraction work, so a pinned media that is already cached costs one
+    hash and nothing else.
     """
     if not os.path.exists(destination):
         return False
@@ -296,7 +303,6 @@ def _cache_hit(destination, name, expected, on_mismatch, source, context,
         return True
     _approve_refetch(name, actual, expected, on_mismatch, source, context)
     os.remove(destination)
-    ledger.forget(name, context)
     return False
 
 

@@ -599,8 +599,10 @@ issues land here. Most would qualify as housekeeping (D38) and
 need no entry at all once someone picks them up.
 
 - `download-media` command (owner request, 2026-07-22; shape to
-  re-derive under the revised model — milestone 7's `add-media`
-  covers its cache-warming half): `rlq download-media
+  re-derive under the revised model. D41 settled the overlap
+  below: `add-media` is the `--local` half already, so what is
+  left here is the *download* half — fetch, hash, scaffold):
+  `rlq download-media
   https://freedos.org/downloads/FreeDOS14.zip` downloads the file
   into `cache/media/`,
   computes its sha256, and scaffolds a standalone `.rlqb` into
@@ -613,11 +615,12 @@ need no entry at all once someone picks them up.
   inferred, so the stub stops at the container and the user adds
   the extraction tree (with `extract-media`); stem-default naming
   from
-  the URL filename; a `--local <file>` variant for
-  non-downloadable
-  payloads (overlaps `add-media` — reconcile when picked up);
-  CLI+API parity (a twin returning the written blueprint
-  path).
+  the URL filename; no `--local <file>` variant is needed —
+  that is `add-media`, which D41 settled as exactly this
+  command's local half (compute the hash, scaffold the spec,
+  copy nothing), so the two should end up siblings sharing one
+  scaffolder; CLI+API parity (a twin returning the written
+  blueprint path, as `add_media` already does).
 - `extract-media` command (owner request, 2026-07-23; re-derive
   under the revised model) — the
   incremental companion to `download-media`: `rlq extract-media
@@ -901,8 +904,9 @@ Found while landing it, and fixed in passing:
   archive absorbed as the container reading), a flat typed root
   array, one schemed `location` field, no source component, no
   composition (identity-dedup instead), and the single name-keyed
-  `cache/media/` with the identity ledger (content addressing
-  declined in both rounds). blueprint-model.md is now the
+  `cache/media/` (content addressing declined in both rounds; the
+  identity ledger that round added was deleted by D41, which left
+  the decline's ground unchanged). blueprint-model.md is now the
   worked design of the revised model, rewritten at milestone 7's
   S1 and normative in the decision entries' place.
 - Media lifecycle commands — RESOLVED (owner, 2026-07-23,
