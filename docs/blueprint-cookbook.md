@@ -3,7 +3,11 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Machine blueprint — cookbook
+# Blueprint — cookbook
+
+> **Descriptive.** Recipes, not rules — the format's norm is the
+> published schema plus
+> [the composed blueprint model](spec/blueprint-model.md).
 
 > **Status:** examples using the implemented subset (`platform`,
 > `memory`, `drives` naming media, `boot`, `description`, `scripts`,
@@ -15,9 +19,9 @@ Complete, working blueprints for common machine shapes. Each
 entry shows the blueprint (what you write) and, where instructive,
 the state document Reliquary resolves it into. A drive names a
 **media** component; the media owns its content (see the
-[media spec](media-spec.md)). Concepts — including the blueprint/state
-split — are in [the guide](machine-blueprint.md); every rule is in the
-[field reference](machine-blueprint-reference.md).
+[media spec](spec/media-spec.md)). Concepts — including the blueprint/state
+split — are in [the guide](blueprint-guide.md); every rule is in the
+[field reference](blueprint-reference.md).
 
 Throughout, save the blueprint as `<name>.rlqb` under your asset
 root and create a
@@ -122,21 +126,21 @@ warning:
 The `hdd` drive names the `blank-20m` media — `materialize: new`,
 so rlq creates a 20 MiB dynamically-allocated image at the
 media-keyed path (`media/blank-20m.qcow2` on QEMU — the
-[naming and format](machine-blueprint-reference.md#image-naming-and-formats)
+[naming and format](blueprint-reference.md#image-naming-and-formats)
 are Reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
 blueprint and state make no claim about the guest's contents. After
 install, the same boot order boots the hard disk. Scripts that need
 a different order can use the
-[`set-boot`](script-spec.md#set-boot) verb while the machine is
+[`set-boot`](spec/script-spec.md#set-boot) verb while the machine is
 stopped.
 
 > **Media note:** the installer medium never appears on a drive
 > here — the empty `cdrom` slot is the convention. The install
 > script inserts it (`insert cdrom0 @freedos-livecd`) and
 > ejects it as its last act. `freedos-livecd` names a
-> [media component](media-spec.md) — a `read-only` `use` media,
+> [media component](spec/media-spec.md) — a `read-only` `use` media,
 > extracted from an `archive` (the LiveCD's download URL and
 > hashes), carried inside this same `.rlqb` or a sibling in the
 > source. Every media reference — a blueprint's or a script's —
@@ -376,7 +380,7 @@ across the board, which is what DOS-era guests want.
 Vendor variants (BusLogic vs. LsiLogic, etc.) are backend-specific
 and go in `backend-settings` when they matter. And note the
 ordering caveat from the
-[reference](machine-blueprint-reference.md#controller--optional--string):
+[reference](blueprint-reference.md#controller--optional--string):
 slot order is authoritative within one controller type, so prefer a
 single type per machine when drive lettering matters.
 
@@ -385,7 +389,7 @@ single type per machine when drive lettering matters.
 ## 9. A parameterized install
 
 A blueprint written to be seeded and customized (its
-[customization seams](machine-blueprint.md#customization-seams)):
+[customization seams](blueprint-guide.md#customization-seams)):
 the install script declares the `identity.full-name` and
 `os.install-key` properties, and the blueprint binds them.
 
@@ -434,7 +438,7 @@ either binding for one invocation
 (`rlq run-script install --blueprint win98 --property identity.full-name="Paul Galbraith"`).
 
 Both are value seams. Installing the *German* edition instead is
-a [composition seam](machine-blueprint.md#customization-seams):
+a [composition seam](blueprint-guide.md#customization-seams):
 the seeded blueprint's `drives` media reference and `scripts` map
 are pointed at a localized media/script pair, and each script
 stands alone against the installer it was written for.

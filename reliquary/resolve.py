@@ -14,7 +14,7 @@ URL, so parse could not know) and every deferred coercion land at this
 layer, as does containment — parents exist, cycles are named, and the
 container-format roster is enforced.
 
-Design: planning/design/blueprint-model.md ("Resolution", "Containment",
+Design: docs/spec/blueprint-model.md ("Resolution", "Containment",
 "Two-phase validation").
 """
 

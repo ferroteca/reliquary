@@ -39,9 +39,6 @@ except ImportError:
 
 _HERE = os.path.dirname(__file__)
 _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
-_STATE_SCHEMA_DIR = os.path.join(
-    os.path.dirname(_HERE), "planning", "design")
-_HAVE_STATE_SCHEMA = os.path.isdir(_STATE_SCHEMA_DIR)
 
 
 def _fixtures(bucket):
@@ -181,17 +178,14 @@ class BlueprintCorpusTests(unittest.TestCase):
 class MachineStateSchemaTests(unittest.TestCase):
     """A real materialized state validates against the state schema."""
 
-    @unittest.skipUnless(
-        _HAVE_JSONSCHEMA and _HAVE_STATE_SCHEMA,
-        "jsonschema and the repo state schema are required")
+    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_materialized_state_matches_schema(self):
         import tempfile
         from reliquary import Context
         from reliquary.machines import create_machine, load_machine_state
-        with open(os.path.join(_STATE_SCHEMA_DIR,
-                               "machine-state.schema.json"),
-                  encoding="utf-8") as handle:
-            schema = jsonc.load(handle)
+        schema = jsonc.loads(
+            (resources.files("reliquary") / "schemas"
+             / "machine-state.schema.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.join(tmp, "proj")
             os.makedirs(root)

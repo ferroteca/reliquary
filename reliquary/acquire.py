@@ -12,7 +12,7 @@ one ``cache/media/`` directory — a container is a media like any other
 now, so there is no second cache for it. ``local`` payloads attach in
 place and are never copied in.
 
-Design: planning/design/blueprint-model.md ("The cache").
+Design: docs/spec/blueprint-model.md ("The cache").
 """
 
 import contextlib
@@ -71,8 +71,8 @@ def _check_cancelled(cancelled):
     run passes ``None`` and is simply uninterruptible. The check sits
     at every chunk boundary because that is the severability the
     execution model promises: input deliveries are atomic, *host
-    transfers abort* (planning/ROADMAP.md, "Cancel ends the run, not
-    the machine"). Without it a Ctrl-C during a large fetch is not
+    transfers abort* (docs/spec/cli.md, "Cancel ends the run,
+    not the machine"). Without it a Ctrl-C during a large fetch is not
     seen until the whole statement finishes, which can be minutes.
     """
     if cancelled is not None and cancelled.is_set():

@@ -6,7 +6,7 @@ A secret property's value never enters `user.properties`: the file
 holds an `@secret` marker and the value lives in the host's
 protected credential service, scoped by the absolute path of the
 properties file holding that marker and by the property name
-(planning/design/script-properties.md, "Secret storage").
+(docs/spec/script-properties.md, "Secret storage").
 
 The public contract is the *capability*, not the library. Everything
 here goes through one three-method provider — the shape `keyring`
@@ -35,7 +35,7 @@ class CredentialError(ReliquaryError):
     """The credential store could not be reached or used.
 
     Deliberate, but outside the run surface's four classes, so it
-    subclasses the root directly (planning/design/api.md).
+    subclasses the root directly (docs/spec/api.md).
     """
 
 def scope_for(path):

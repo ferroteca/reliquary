@@ -3,12 +3,12 @@
 """Live renderings of the run event stream.
 
 ``--progress (auto | pretty | plain | jsonl)`` selects one
-(planning/design/cli.md, "Running scripts"); the API twins take the
+(docs/spec/cli.md, "Running scripts"); the API twins take the
 same ``progress=`` value under parity. Every renderer reads the one
 :mod:`reliquary.events` stream, so none can report what the stream
 does not carry.
 
-The output discipline (planning/design/cli.md, "Output discipline"):
+The output discipline (docs/spec/cli.md, "Output discipline"):
 the human modes render **everything** to stderr and leave stdout
 empty — the outcome travels by exit code. ``jsonl`` is the named
 exception: its stdout events *are* the result, the last line being

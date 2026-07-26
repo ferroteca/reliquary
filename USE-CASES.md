@@ -5,18 +5,20 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Use cases
 
-> **Status:** the use-case list — the current state of
-> the decision surface of Reliquary's guiding principles,
-> [planning/INTERFACES.md](planning/INTERFACES.md). Every use case here is
-> in force. Interface decisions are weighed against this list
+> **Status:** the use-case list, in force. Together with the
+> architectural principles ([ARCHITECTURE.md](ARCHITECTURE.md))
+> and the specifications ([docs/spec/](docs/spec/)) it forms the
+> project's **vision** — the standing statement of what Reliquary
+> is and is for. Interface decisions are weighed against this list
 > and the accepted proposals under the interface-change rule
-> there; proposed changes are tracked in
-> [planning/USE-CASE-PROPOSALS.md](planning/USE-CASE-PROPOSALS.md) and
+> ([planning/INTERFACES.md](planning/INTERFACES.md)); proposed
+> changes are tracked in
+> [planning/proposed/USE-CASES.md](planning/proposed/USE-CASES.md) and
 > land here only when delivered — every use case here is met
 > by the code today, and a settled use case with unimplemented
 > demands lives there instead, with no placeholder here (the
 > shared U-namespace keeps its citations valid). When this
-> list and planning/ROADMAP.md disagree, the guiding
+> list and a planning document disagree, the architectural
 > principles and this list govern.
 
 Interface decisions are weighed against these. They are numbered
@@ -24,10 +26,11 @@ so a decision, review, or spec section can cite the use case it
 serves — and so a proposed change can be rejected by naming the
 use case it costs. This list is the decision surface: significant
 interface changes arrive as proposed amendments to it (see the
-[interface-change rule](planning/INTERFACES.md#the-interface-change-rule)),
+[interface-change rule](planning/INTERFACES.md#the-rule)),
 drafted and tracked in
-[planning/USE-CASE-PROPOSALS.md](planning/USE-CASE-PROPOSALS.md), and
-moved here when delivered — scheduling in the roadmap is
+[planning/proposed/USE-CASES.md](planning/proposed/USE-CASES.md), and
+moved here when delivered — the move to
+[planning/accepted/USE-CASES.md](planning/accepted/USE-CASES.md) is
 acceptance; delivery makes it current.
 
 This list is an implementation claim: every use case here is
@@ -35,7 +38,7 @@ met by the code as it stands today, in full. A use case with
 any unimplemented demand — however settled — lives in the
 proposals doc instead, and moves here only when its delivery
 lands. That claim is why this file sits at the repository root
-beside [PRINCIPLES.md](PRINCIPLES.md) rather than under
+beside [ARCHITECTURE.md](ARCHITECTURE.md) rather than under
 `planning/`: both describe current reality, and neither is a
 plan.
 

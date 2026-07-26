@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Secret properties: the credential store and the fail-safe order.
 
-Spec: planning/design/script-properties.md, "Secret storage".
+Spec: docs/spec/script-properties.md, "Secret storage".
 
 Every test here runs against an in-memory provider, so the rules are
 verified on any host. Only the thin keyring adapter is platform-bound,

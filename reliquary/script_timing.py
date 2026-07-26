@@ -3,7 +3,7 @@
 """The timing model of the reliquary script language.
 
 Two families scope differently
-(planning/design/script-spec.md, "Timing"):
+(docs/spec/script-spec.md, "Timing"):
 
 - ``timeout`` and ``stable`` are per-observation settings and
   **lexically scoped**, so a container's ``timeout`` is the

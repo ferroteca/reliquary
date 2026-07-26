@@ -20,8 +20,8 @@ Reliquary provides agentless automation for DOS guests through QEMU. No guest ag
 
 A machine's platform, memory, boot order, and drives are declared in its
 blueprint (`<name>.rlqb`) — see the [blueprint guide](blueprint-guide.md),
-the [field reference](../planning/design/machine-blueprint-reference.md),
-and the [media spec](../planning/design/media-spec.md). A drive names a
+the [field reference](blueprint-reference.md),
+and the [media spec](../docs/spec/media-spec.md). A drive names a
 **media** by name; the media owns its content — `materialize: new` for a
 blank disk of `size`, `difference`/`copy` over a payload, or `use` to
 attach a payload (an ISO, or a host directory served as vvfat).

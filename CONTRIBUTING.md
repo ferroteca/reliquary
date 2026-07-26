@@ -50,7 +50,7 @@ new dependency before adding it.
 
 - Match the existing style and keep lines near 79 columns.
 - Add or update stdlib `unittest` coverage for changed behavior.
-- Update README.md, CHANGELOG.md, and planning/ROADMAP.md when public behavior changes.
+- Update README.md, CHANGELOG.md, and the affected docs/spec/ specification when public behavior changes.
 - Add SPDX headers to new files as described below.
 
 Run the required checks from the project virtual environment:
@@ -82,7 +82,7 @@ BSD-3-Clause license cannot be accepted.
 Codex media components follow an additional
 top-priority rule: a media (or its `source`) may include a download
 `url` only together with an explicit assertion that the media's own
-licensing permits redistribution (see planning/design/codex.md).
+licensing permits redistribution (see docs/spec/codex.md).
 Changes that add or alter URLs in built-in media without that
 assertion cannot be accepted; media for non-redistributable payloads
 ship hashes only.

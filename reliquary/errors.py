@@ -5,7 +5,7 @@
 Every deliberate reliquary error subclasses :class:`ReliquaryError`,
 so ``except ReliquaryError`` is always the catch-all. The run
 surface's four classes are the CLI's exit codes and the API's
-exceptions under one mapping (planning/design/script-spec.md,
+exceptions under one mapping (docs/spec/script-spec.md,
 "Error classes and exit codes"):
 
 ===================  =====  ==========================================
@@ -21,7 +21,7 @@ class                exit   tier
 taxonomy — reliquary's own unexpected fault. A deliberate error with
 no run-surface class subclasses the root directly and exits ``1``
 until the general programmatic-contract work names finer classes;
-growth there is additive, never a break (planning/design/api.md).
+growth there is additive, never a break (docs/spec/api.md).
 """
 
 

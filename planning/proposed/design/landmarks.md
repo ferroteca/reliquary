@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > adjudication trail is in planning/DECISIONS.md). The full asset
 > spec — the `.rlql` JSON schema, the similarity metric, and
 > landmark-block placement within a script — is settled at
-> planning/ROADMAP.md's GUI-era backlog "Decide first" round, where
+> planning/proposed/FEATURES.md.s GUI-era "Decide first" round, where
 > implementation lands; pointer input and the match-and-click
 > verbs land with it.
 
@@ -46,7 +46,7 @@ the closest variant.
 **Catalog form.** The declaration is `<name>.rlql`, a JSONC
 authored document — the third authored extension beside
 `.rlqb` / `.rlqs`, resolved under exactly the same
-rules (planning/ROADMAP.md "Authored-asset resolution": home mode
+rules (docs/spec/asset-resolution.md: home mode
 vs a hermetic `--assets` project root, discovery by extension;
 a `landmarks/` subdirectory is optional dressing). Variant renderings are plain
 PNGs attached by stem-and-number adjacency — `<name>.<n>.png`

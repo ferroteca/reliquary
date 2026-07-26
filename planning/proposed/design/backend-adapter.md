@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > and ownership doctrines, and the non-goals. Method signatures and
 > exact types are deliberately absent: they land at the seam
 > extraction, defined by the working QEMU implementation per that
-> item's own doctrine (planning/ROADMAP.md "The backend adapter
+> item's own doctrine (planning/proposed/FEATURES.md "The backend adapter
 > seam"). That extraction — the former milestone 10 — is
 > **backlog work since 2026-07-23**, unscheduled for lack of
 > use-case backing (DECISIONS.md D33); the doctrine below stands
@@ -23,7 +23,9 @@ SPDX-License-Identifier: BSD-3-Clause
 ## What the adapter API is
 
 One API, four adapters — QEMU, VirtualBox, VMware Workstation,
-Hyper-V (planning/ROADMAP.md "Backend adapters"). It is the
+Hyper-V ([ARCHITECTURE.md](../../../ARCHITECTURE.md), "The seams"; the
+per-backend control-plane inventory is in
+[guest-communication.md](../../design/guest-communication.md)). It is the
 *provider* contract behind Reliquary's semantic surface, and it is
 none of the things the primary interfaces are:
 
@@ -60,8 +62,7 @@ The extraction splits what `machines.py`, `lifecycle.py`, and
    process launch, monitor sessions, identity verification, input
    injection, screen capture and readback.
 3. **Control planes — compositions over adapter carriers.** Per
-   the settled vocabulary (planning/ROADMAP.md "Guest communication
-   design"), a control plane composes carriers and a protocol and
+   the settled vocabulary (planning/design/guest-communication.md), a control plane composes carriers and a protocol and
    presents capabilities to platform workflows. The agentless
    display console is the first real one; it receives an adapter
    machine handle exactly as `AgentlessGuestExec` receives a
@@ -166,7 +167,7 @@ only after a failed verification proves them stale.
 
 ## Endpoint lifecycle
 
-A control plane may need two phases (planning/ROADMAP.md
+A control plane may need two phases (planning/design/guest-communication.md
 "Configuration and lifecycle"): contribute validated launch
 configuration for its carrier before the machine starts, and
 connect to the realized endpoint after startup. The adapter
@@ -209,6 +210,36 @@ materialization.
   a Vagrantfile / box handoff around a provider VM — but it does
   not own the native virtualization capabilities Reliquary needs to
   verify. The real backend remains the provider underneath.
+
+## Backend assignment
+
+Discovery establishes availability; **assignment** picks the
+backend a machine is built on, and happens at materialization
+(`create` / `recreate`). Reliquary walks its internal backend
+priority list one by one, probing each for availability, and picks
+the first available *and capable* backend. Capability is judged
+against the whole blueprint: referenced media and image types the
+backend must be able to attach, required control planes, and the
+settings that apply to that candidate backend.
+
+Backend-specific settings are **conditional, not a selector**: a
+blueprint may say "if this materializes on VirtualBox, disable I/O
+APIC" without requiring VirtualBox, and candidates without
+applicable settings simply ignore that backend's settings block.
+Only an explicit `backend` field pins the choice and skips the
+walk — that backend is probed alone, and `create` fails closed if
+it is unavailable or incapable. The assignment is recorded in the
+machine state, so the machine stays on that backend thereafter.
+
+The priority order itself is the seam extraction's decide-first
+question ([proposed/FEATURES.md](../FEATURES.md); proposed:
+QEMU, VirtualBox, VMware Workstation, Hyper-V — best scriptability
+first).
+
+**Backend state stays in the cached materialization.** Each backend
+is instructed to keep its machine files (disk images, `.vbox`,
+`.vmx`, Hyper-V VM/VHD paths) inside `cache/machines/<id>/`, so a
+machine's cache directory is the whole materialization.
 
 ## Extraction map
 

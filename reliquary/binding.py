@@ -5,7 +5,7 @@
 A script declares each property it consumes; before the machine
 starts, every declaration is bound from the first source that
 answers. The flattened order is normative in
-planning/design/script-spec.md, "The property sources":
+docs/spec/script-spec.md, "The property sources":
 
     1. an explicit --property value      (the caller's answer)
     2. a blueprint parameter             (the design's answer)

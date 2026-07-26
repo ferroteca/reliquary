@@ -13,7 +13,7 @@ Validation is **two-phase**: shape here, value at resolution. A field
 carrying a ``${...}`` reference cannot be coerced until the reference
 binds, so it is parsed into a :class:`Deferred` and finished later.
 
-Design: planning/design/blueprint-model.md (normative).
+Design: docs/spec/blueprint-model.md (normative).
 """
 
 import collections.abc

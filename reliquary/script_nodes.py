@@ -14,7 +14,7 @@ The milestone-5 ``content`` declaration has one structural
 extension: a trailing ``\"\"\"`` opens a raw body that is skipped
 until its closing ``\"\"\"`` line.
 
-Source of truth: planning/design/script-spec.md, "Lexical rules"
+Source of truth: docs/spec/script-spec.md, "Lexical rules"
 and "Core grammar".
 """
 

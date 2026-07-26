@@ -14,8 +14,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > shape entirely. Where it and those entries differ, this
 > document governs; where it is silent, they remain the record.
 > The **implemented** surface is still described by
-> [machine-blueprint.md](machine-blueprint.md), its
-> [field reference](machine-blueprint-reference.md), and
+> [blueprint-guide.md](../blueprint-guide.md), its
+> [field reference](../blueprint-reference.md), and
 > [media-spec.md](media-spec.md) — those realign to this model at
 > milestone 7's deliverable 7, and until they do they describe
 > the pre-composition formats, not this one.
@@ -33,7 +33,7 @@ remain their own kinds.
 The format is deliberately **logic-free** and stays that way:
 what it may say is capped by P14, and the ceiling is stated here
 as a closed grammar rather than left to judgment. See
-[Format stability](machine-blueprint.md#format-stability-none-yet)
+[Format stability](#format-stability-none-yet)
 for the growth rule; this document states the grammar it closes.
 
 ## The file
@@ -729,6 +729,186 @@ D:/isos/en_windows.iso` resolves it by cache hit against the
 pin. Editing your seeded copy is always the third option, and
 that is the point of seeding.
 
+## Format stability: none, yet
+
+Reliquary is evolving rapidly and **maintains no backward
+compatibility until a GA 1.0 release** (see AGENTS.md, the
+normative home — beta included, where an occasional cushion may
+be granted when warranted but none is promised). That applies to
+the blueprint format in full:
+
+- The format may change shape at any time, without migration
+  support.
+- There is no in-place upgrading of old documents, no
+  compatibility parsing, no deprecated-field aliasing.
+- A blueprint written for an older Reliquary may simply fail
+  validation after an update. The remedy is to recreate the
+  machine (or update the blueprint by hand to the current format
+  as documented here).
+
+There is deliberately no version field. Versioning is
+compatibility machinery, and the blueprint carries none until a real
+second format version exists — no earlier than 1.0.
+
+For the same reason a blueprint carries no `$schema` field: a
+document pinning the schema it was written against is a version
+field in disguise, and pre-1.0 a document has no format vintage —
+the only schema that matters is the installed Reliquary's, which
+editors bind by file association (tracking the installation, where
+an embedded pin would go stale and let the editor pass what
+Reliquary rejects). When versioning arrives, no earlier than 1.0,
+`$schema` as a versioned URL is the leading candidate spelling of
+the version field (planning/DECISIONS.md "Open questions" (was "Decisions still
+needed").
+
+The blueprint's value grammar is JSON, and JSON only — there is
+no YAML form, and none is planned. Because a blueprint is a
+document you author and Reliquary only ever reads (`import` and
+`init` write one once, then never again), the file accepts the
+JSONC dialect: JSON (RFC 8259) plus `//` and `/* */` comments
+and trailing commas in arrays and objects — the dialect editors
+already apply to files like `tsconfig.json`, and nothing more
+(no unquoted keys, no single-quoted strings, no other JSON5
+extensions). Comments are the author's margin notes — a seeded
+built-in blueprint uses them to point out its customization
+seams (U5) — and carry no meaning: Reliquary never reads them,
+and nothing normative may live in one; anything the contract
+needs is a field. A blueprint without comments remains valid
+strict JSON; one with them is not parseable by strict JSON
+tooling — a deliberate trade. Machine-written documents are
+different: the state — and every other file Reliquary writes —
+is strict canonical JSON, always.
+
+The format's growth rule is likewise decided ahead of the
+growth (planning/DECISIONS.md, 2026-07-23). Computational
+expansion is an anticipated pressure — variant expansion,
+member itemization, derived values — and one line governs it:
+**a construct that enriches values may land as data;
+computation that decides structure never enters the tree.** A
+bounded, purpose-built declarative construct (a member glob, a
+variant matrix) may be added when it earns its keep, expanded
+by Reliquary, never by an author-side expression. General
+computation — arithmetic, conditionals, string interpolation,
+user logic of any kind — is a layer switch, not a tree
+extension: it would arrive only as a layer that *produces*
+plain blueprints, either generation above (the embedding API is
+computation's designated home, the same principle the script
+language records as G2) or a JSON-superset evaluation layer
+emitting the format documented here — leaving parsing,
+validation, and resolution unchanged underneath. In-tree
+function objects and string templating are permanently
+rejected.
+
+The tree rule has a twin governing the *strings*, because a
+format of this kind dies from the inside as readily as from the
+top (planning/DECISIONS.md, D26): **the `${…}` reference body is
+closed, and operations are closed while namespaces are open.**
+The body is one of exactly two productions — a qualified
+`qualifier:media-name[/path]`, or a dotted property key — and
+neither has a position an operator could occupy. No operator
+ever joins them: no defaults, no filters or pipes, no calls, no
+indexing, no arithmetic, no comparison, no nesting, no second
+escape.
+
+Two tests apply in order, and both are needed (D27). The
+character class `[A-Za-z0-9._:/-]` is the **first screen** —
+every character in it is load-bearing already (`:` separates the
+qualifier, `/` the containment path, `.` the property dot-path,
+`_` and `-` the media-name charter), so anything reaching for
+`|`, `(`, `[`, `?`, `=`, or whitespace is rejected on sight. The
+**productions decide** the rest, which matters because an
+operator can be assembled from legal characters: `${mem:-512M}`
+passes the class and is still refused, the text before the first
+colon being the qualifier and `mem` not being one. A proposal
+that fails either test is a layer switch, not a grammar
+extension.
+
+What stays open is new *qualifiers* (`env:`, `file:`,
+`machine:`, `script:`, `landmark:`, `secret:` are reserved): a
+qualifier names a namespace to look in, never an operation to
+perform, and adds no position an operator could take.
+
+### When a request arrives
+
+The standing answer is not "no." An author writes: *"CI needs
+2G, my laptop 512M — let `memory` take `${mem:-512M}` so an
+unset property still boots."* The answer is **that already
+works, one channel over.** A default is not missing from
+Reliquary; it lives in the property channel, which is built to
+have exactly this argument — the project's properties file gives
+CI its 2G, the user file gives the laptop its 512M, and the
+blueprint says `${mem}` and needs no fallback at all. Where a
+value must survive an unset property, that is a question about
+property sources and their precedence
+([script-properties.md](script-properties.md), the repeatable
+`default=` candidates), answered where defaults already live.
+
+This is the shape of nearly every such request. The feature is
+not absent from the project; it is present in another channel
+and has been addressed to the grammar because the grammar is the
+surface the author had open. The first move is always to find
+where it already lives.
+
+The danger of simply agreeing is not the default itself but what
+the default makes sayable next. `${mem:-512M}` requires deciding
+what an unset property *is* (absent? empty? null?), which is a
+specification. Then comes `${mem:-${fallback}}`, because a
+literal default is obviously less useful than a computed one.
+Then a conditional, because two defaults need choosing between.
+None of those is a stretch; each follows from the one before.
+Meanwhile the published schema can no longer say what a valid
+`memory` is, and the editor stops completing the field — which
+is what the plain format was chosen to buy (U4, U5).
+
+### When it is time for a layer
+
+Not a threshold — a conjunction. Volume is not a signal: a
+hundred requests for defaults and conditionals mean the property
+channel is under-documented, not that the ceiling is wrong. The
+signal is all four of these holding at once.
+
+1. **The need is structural, not value-shaped.** It asks *how
+   many specs exist*, or *which*, rather than what goes in a
+   field. Value-shaped needs always have an answer; structural
+   ones may not. Twelve near-identical blueprints differing only
+   in a localized ISO's URL and hash is structural.
+2. **It recurs across independent authors.** Not one project's
+   convenience — a shape two or more unrelated consumers hit, or
+   one the codex itself wants.
+3. **The declarative escape was tried and failed.** The ceiling
+   has its own growth route: a bounded construct that enriches
+   values, expanded by Reliquary. A variant matrix must be
+   designed against the real case first, and must either fail to
+   express it or turn into a language when specified. Skipping
+   this gate is how a layer gets adopted for a problem a
+   twenty-line construct would have solved.
+4. **Generation above fails for the user who has no project and
+   no language.** The embedding API can emit twelve blueprints
+   today, and P4 puts the generator and its output in the
+   consuming project's tree — so for the automating author (U4)
+   this gate is rarely passed. It is the *home* CLI user (U1,
+   U5), with no repository and no host language beyond the
+   shell, for whom both routes are genuinely poor. That user is
+   the layer's constituency, and the residency split predicts
+   it.
+
+With all four holding, the answer is an evaluation step: a
+`freedos.rlqb.jsonnet` producing an ordinary `freedos.rlqb`, as
+its own file kind. Argued and recorded under the
+interface-change rule when it happens — never pre-committed
+here, and never as a mode flag that makes the existing parser
+evaluate.
+
+When the layer switch does come, it arrives as a **separate file
+kind or an explicit step** — never as a widening of what `.rlqb`
+means. A document evaluated before it is read cannot be
+schema-validated or completed by an editor, and that cost would
+otherwise fall on every blueprint in the format, including the
+large majority wanting no computation at all. Plain `.rlqb`
+keeps its schema, its completion, and its strictness
+permanently.
+
+
 ## What this supersedes
 
 - The first-round four-component model — `source` and `archive`
@@ -736,7 +916,7 @@ that is the point of seeding.
   `members` tree, and the two-directory cache — is superseded
   entirely by this document.
 - `.rlqm` retires.
-- machine-blueprint.md, its field reference and cookbook, and
+- blueprint-guide.md, its field reference and cookbook, and
   media-spec.md realign to this model (milestone 7, deliverable
   7); until then they describe the implemented pre-composition
   surface.

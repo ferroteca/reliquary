@@ -7,7 +7,7 @@
 it *surgically* — every comment, blank line, and ordering choice
 outside the one line a command names survives untouched, which is
 why the format is line-based rather than JSON. The normative spec
-is planning/design/script-properties.md.
+is docs/spec/script-properties.md.
 
 Despite the familiar extension this is deliberately not the Java
 properties format: no unicode escapes, no line continuations, no
@@ -35,7 +35,7 @@ class PropertiesError(ReliquaryError):
     """A malformed properties file, key, or value.
 
     Deliberate, but outside the run surface's four classes, so it
-    subclasses the root directly (planning/design/api.md).
+    subclasses the root directly (docs/spec/api.md).
     """
 
 def secret_marker():

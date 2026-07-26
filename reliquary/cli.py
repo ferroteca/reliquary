@@ -232,7 +232,7 @@ def _emit(arguments, value, render):
     JSON document on stdout (a void twin passes ``{}``); otherwise
     ``render()`` prints the human form. Returns exit code 0.
 
-    The output discipline (planning/design/cli.md): a result-bearing
+    The output discipline (docs/spec/cli.md): a result-bearing
     command's pretty stdout is exactly the human rendering of what
     its twin returns — the same value ``--json`` serializes — so it
     pipes clean with no flags. Narration around it, and every line of

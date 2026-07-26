@@ -8,16 +8,16 @@ SPDX-License-Identifier: BSD-3-Clause
 > **Status:** the control-plane design for guest communication:
 > the carrier / protocol / guest-integration vocabulary, the
 > control plane families, the consume-native-agents-only doctrine
-> (PRINCIPLES.md P3, the control-plane arc), and the
+> (ARCHITECTURE.md P3, the control-plane arc), and the
 > capability seam between control planes and platform workflows.
 > The `GuestExec` protocol, isolated agentless adapter, and its
 > use by the DOS workflow are implemented; later control planes
 > and their implementation details remain open. QEMU-first but
 > backend-neutral: `GuestExec` and the control-plane vocabulary
 > apply to every backend adapter
-> ([backend-adapter.md](backend-adapter.md)). Native-agent
+> ([backend-adapter.md](../../planning/proposed/design/backend-adapter.md)). Native-agent
 > control planes and the VNC plane are both **backlog work**
-> (planning/ROADMAP.md "Guest agent communication" and the GUI
+> (planning/proposed/FEATURES.md "Guest agent communication" and the GUI
 > era), unscheduled since 2026-07-23 (DECISIONS.md D33). This
 > document does not by itself
 > authorize further implementation.
@@ -119,7 +119,7 @@ shared fixed-font recognizer** over the captured framebuffer
 carriers, never a per-backend reimplementation. The portable
 snapshot contract — character rows plus opaque,
 equality-comparable per-cell attribute tokens — is in
-[backend-adapter.md](backend-adapter.md).
+[backend-adapter.md](../../planning/proposed/design/backend-adapter.md).
 
 ### VNC
 
@@ -159,7 +159,7 @@ alternative → worst-case a dedicated project — never built here.
 vvfat stays the built-in agentless fallback (P2). Demand is the
 swap/reboot cost; scheduling it may sharpen P3 from "guest agents"
 to "transport agents, host or guest"
-([PRINCIPLE-PROPOSALS.md](PRINCIPLE-PROPOSALS.md)).
+([PRINCIPLE-PROPOSALS.md](../../planning/proposed/ARCHITECTURE.md)).
 
 ### Guest agents
 
@@ -175,7 +175,7 @@ operations:
   where they earn their keep.
 
 Guests without a native agent are not a gap to fill: they stay
-agentless (PRINCIPLES.md P3 — writing an agent would be a
+agentless (ARCHITECTURE.md P3 — writing an agent would be a
 whole project unto itself, outside Reliquary's scope).
 
 ## Consuming native guest agents
@@ -184,7 +184,7 @@ Reliquary consumes the guest agents that already exist —
 [QGA](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html),
 VirtualBox Guest Additions, VMware Tools, Hyper-V integration
 services — and never builds or ships a guest-side agent of its
-own (PRINCIPLES.md P3, the control-plane arc): agents may
+own (ARCHITECTURE.md P3, the control-plane arc): agents may
 not exist for some operating systems, but writing one would be a
 whole project unto itself, outside Reliquary's scope. Guests
 without a native agent — DOS-era systems above all — are served
@@ -200,7 +200,7 @@ reconnect and stale-stream recovery, `guest-ping` / `guest-info`
 for readiness and capability discovery, and `guest-exec` /
 `guest-exec-status` for process completion, output, and exit
 status. Bounded `guest-file-*` operations are a later capability
-(planning/ROADMAP.md "Horizon"), never a prerequisite for
+(planning/proposed/FEATURES.md "Horizon"), never a prerequisite for
 execution.
 Backend-native agents are wrapped by their backend adapters
 where they earn their keep, behind the same capability seam.

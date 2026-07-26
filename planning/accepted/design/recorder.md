@@ -9,7 +9,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > (USE-CASES.md U6; owner rounds, 2026-07-21 — the
 > adjudication trail is in planning/DECISIONS.md). Delivery is
 > deliberately unscheduled: the recorder sits in
-> planning/ROADMAP.md "Horizon", earning a numbered milestone
+> planning/proposed/FEATURES.md "Horizon", earning a numbered milestone
 > when its turn comes; work items are listed in
 > planning/TASKS.md.
 
@@ -37,7 +37,7 @@ draft. Text-mode capture comes first and needs no new language
 surface; GUI capture rides the landmark/click work, and a click's
 position seeds its landmark's spot. The draft is ordinary script
 text, self-contained by default — landmarks travel as embedded
-resolve-in-place blocks (planning/design/landmarks.md) — with
+resolve-in-place blocks (planning/proposed/design/landmarks.md) — with
 factored
 catalog files on request; written once and user-owned from then
 on, like `import-vm` output.
@@ -61,7 +61,7 @@ concepts only, per AGENTS.md.)
 unchanged step is an *asset refresh*: a new landmark variant,
 never touching the script — the numbered-adjacency variant shape
 (`<name>.<n>.png` beside the declaration, or beside the script
-for an embedded landmark; planning/design/landmarks.md) makes
+for an embedded landmark; planning/proposed/design/landmarks.md) makes
 refresh
 file-creation, never file-rewrite. New or changed steps
 are *step capture*: the fragment is emitted beside the script for

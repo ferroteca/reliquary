@@ -5,6 +5,10 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # CLI reference
 
+> **Descriptive.** The CLI's norm is
+> [docs/spec/cli.md](spec/cli.md); where this reference disagrees
+> with it, this reference has the bug.
+
 This is the complete reference for the `rlq` command-line interface
 (alias: `reliquary`). Every command is its API twin's name,
 dash-separated (`create-machine` ↔ `create_machine`); flags may
@@ -493,7 +497,7 @@ ordinary `set-property` on that key refuses to write over, naming
 > **Not yet:** binding these properties into a script run — the
 > layered sources, the declared derivation, and the runtime secret
 > rules — arrives with the rest of milestone 8
-> (`planning/design/script-properties.md`).
+> (`docs/spec/script-properties.md`).
 
 ## Keyboard and command input
 

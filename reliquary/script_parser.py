@@ -4,7 +4,7 @@
 
 reliquary's own lexer (:mod:`reliquary.script_nodes`) feeds lark's
 LALR(1) parser over ``script_grammar.lark``, which mirrors the
-normative EBNF in planning/design/script-spec.md. The lexer keeps
+normative EBNF in docs/spec/script-spec.md. The lexer keeps
 the lexical diagnostics; the grammar fixes node names and
 positional argument types; this module's transformer checks each
 node's modifiers against its signature and builds the typed tree.

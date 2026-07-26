@@ -28,7 +28,7 @@ identified by extension. In home mode (the CLI default) they
 resolve from the home's canonical `scripts/` folder, seeding from
 the codex on first reference; under `--assets <dir>` they are
 discovered anywhere in that project root, which is the sole source
-(planning/ROADMAP.md, "Authored-asset resolution").
+(docs/spec/asset-resolution.md).
 One `<name>.rlqs` file per script; a run selects its machine with
 `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:
@@ -51,11 +51,137 @@ CLI–API parity.
 
 Scripts are authored documents: Reliquary reads but never rewrites
 them — with one named exception: the authoring recorder's opt-in
-fragment apply (U6; [planning/ROADMAP.md](../ROADMAP.md), "Script authoring
-by recording") inserts a captured fragment at its playback anchor
+fragment apply (U6; [recorder.md](../../planning/accepted/design/recorder.md)) inserts a captured
+fragment at its playback anchor
 and touches no other byte. They belong in version control beside
 the machine blueprints (media components and all) on which they
 depend.
+
+## Primary language goals
+
+Every language decision is judged against these. They are numbered
+so later decisions, reviews, and spec sections can cite them, and
+so a proposed feature can be rejected by naming the goal it costs.
+
+- **G1 — Agentless at the guest seam.** The guest is a black box
+  that cannot be configured, only watched and typed at. No feature
+  may depend on guest cooperation. This is a permanent requirement
+  ([AGENTS.md](../../AGENTS.md)), not a current limitation.
+- **G2 — Non-computational.** No expressions, variables,
+  arithmetic, functions, or general-purpose loops. Anything
+  computational belongs in Python via the embedding API, which
+  remains a first-class surface.
+- **G3 — Statically inspectable before the machine starts.**
+  Parsing, binding, control-flow analysis, and whole-script
+  capability preflight all complete before the first guest input.
+  The authored graph is explicit and finite even when a run cycles.
+- **G4 — Legible in real time.** A run is usually long, unattended,
+  and watched by someone who wants to know where it is. The
+  language's own structure — named phases, the pending observation,
+  declared budgets — must be sufficient to answer "where am I, what
+  is it waiting for, how long has it got" without extra syntax.
+- **G5 — Backend- and control-plane-agnostic at the surface.** A
+  script says "wait for this text"; the machine's backend and
+  selected control plane decide how that is observed. Verbs stay
+  intent-level, above portable input events.
+- **G6 — Small and unambiguous.** Brevity, succinctness, structure,
+  clarity. One concept, one spelling. Surface area is the scarce
+  resource; deletion is the preferred remedy.
+- **G7 — Grows coherently.** New capabilities extend observation and
+  action without adding a second control-flow model or a second
+  syntax. Growth stays explicit and preflightable.
+
+## The procedural–declarative seam
+
+The language is deliberately a hybrid, and the seam between its two
+halves is the most load-bearing decision in the design. Naming the
+seam early is what keeps later decisions consistent; most of the
+language's prohibitions exist to keep it clean. The rule itself is
+stated with the language model below; this section is the argument
+behind it.
+
+Everything knowable before the run starts is declared — the
+platform, the machine state the script expects, which phases exist,
+their timing budgets, the media it needs, the inputs it binds.
+Everything the guest dictates is procedural — which key to send,
+what text to wait for, the order its own installer screens arrive
+in. The seam falls where our knowledge ends:
+
+| concern | paradigm | why |
+|---|---|---|
+| machine shape | declarative (the blueprint) | ours, and knowable |
+| which phases exist, their budgets | declarative | ours, and knowable |
+| media and property references | declarative | ours, and knowable |
+| keystrokes and observations within a phase | procedural | the guest's installer dictates the order |
+| which route the run takes | procedural choice over a declarative graph | the guest chooses at run time |
+
+**Why not fully declarative.** OS installation has a mature
+declarative form — Kickstart, preseed, AutoYaST, Windows
+`unattend.xml` — in which the author states what the installed
+system should be and the installer does the rest. Where those
+exist they are strictly better: Reliquary does not invent a
+competing declarative install language. For guests that accept
+them, it serves the answer file the way Packer does today — a
+local HTTP server the installer fetches from
+([http-serve.md](http-serve.md)).
+Procedural keystroke scripting remains for the guests where
+answer files do not exist: DOS, Win9x, and similar. G1's
+agentless requirement is about the control plane — no dependence
+on a guest agent or other cooperating software for observation
+and input — not a ban on an installer's native answer-file
+path. Using Kickstart (or its kin) is that path; it is not a
+substitute for agentless scripting on guests that lack one.
+
+**Why not fully procedural.** A plain imperative script — the
+AutoHotkey or Expect shape — would be shorter to specify and would
+need no phase concept at all. It is rejected because it forfeits
+G3 and G4 together: a straight-line script with ad-hoc loops has
+no statically knowable shape to analyze, and no named units to
+report progress against. The declarative half is what makes a run
+checkable before it starts and legible while it runs.
+
+**The tensions this creates, which we accept.** These are real and
+should not be papered over; several are already catalogued as
+residual problems in [`script-examples/`](../../planning/design/script-examples/):
+
+- `phase` is a declarative construct whose body is procedural. The
+  hybrid is not hidden; it is the point.
+- A sequential phase is procedural, a reactive phase is
+  declarative, and both are spelled `phase`. The two are forbidden
+  to mix rather than given a combined semantics — a prohibition,
+  not a definition.
+- The paradigm boundary shows in the handler keywords: `on` is a
+  case in a branching `wait`, `always` a standing rule in a
+  reactive phase — one shape, two named lifetimes, which the
+  keyword split resolved.
+- Declarative timing scopes annotate procedural statements, so an
+  observation's effective bound is not locally readable
+  (`script-examples/03`, open).
+- Procedural `insert`/`eject`/`set-boot` mutate declarative
+  machine state that outlives the run, deliberately diverging a
+  machine from its blueprint until restored — the `set-` prefix
+  naming the persistence is what settled the spelling.
+
+**The prohibitions that keep the seam clean.** Each exists to stop
+the procedural half from eroding the declarative half:
+
+- no author-side conditionals — the only decisions that matter are
+  the guest's, expressed as observations of what it actually
+  showed, never as the script author's logic (G2);
+- inputs supply data and may never select a branch, a phase, or a
+  path, so the graph stays static (G3, P19);
+- no fallthrough and no anonymous phases, so every route is named
+  and searchable (G3, G4);
+- no `sleep` or `delay`, so every pause is justified by an
+  observation rather than a guess about guest speed (G1, G5);
+- no implicit machine teardown, so a failed run leaves state to
+  diagnose rather than a tidied crime scene.
+
+OS installation automation is expressed as install and verify scripts
+attached to machine blueprints. Media acquisition (download, hash-verify,
+cache under `cache/media/`) stays a host-side capability the language can
+invoke, with pinned hashes kept in shared definitions or directly inside
+the script.
 
 ## The language model
 
@@ -113,8 +239,7 @@ notably that a phase is either sequential or reactive but never
 both, that properties may supply data but never select a branch or a
 phase, and that there are no author-side conditionals, because the
 only decisions that matter are the guest's. The reasoning is
-recorded under "Procedural and declarative" in
-[planning/ROADMAP.md](../ROADMAP.md).
+recorded above, under "The procedural–declarative seam".
 
 The authored control-flow graph is statically finite, but a run may
 be unbounded when transitions form a cycle. Execution is
@@ -294,7 +419,7 @@ answer file
 ([http-serve.md](http-serve.md)). A script carries no JSON: media
 travel as `media` components in the blueprint and landmark
 declarations are authored files of their own, resolved from the
-active source (planning/ROADMAP.md, "Authored-asset resolution"),
+active source (docs/spec/asset-resolution.md),
 and answer files are `content` entries with inline or file-backed
 bodies.
 
@@ -793,7 +918,7 @@ by the machine blueprint, which selects the media/script pair;
 value seams supply
 data only, and each script stands alone against the guest it was
 written for (U5; see [customization
-seams](machine-blueprint.md#customization-seams)).
+seams](../blueprint-guide.md#customization-seams)).
 
 ### The property sources
 
@@ -812,7 +937,7 @@ link here:
    supplied key must be declared by the running script — an
    unknown key is a preflight error, never a silent ignore.
 2. **A [blueprint
-   parameter](machine-blueprint-reference.md#parameters)** —
+   parameter](../blueprint-reference.md#parameters)** —
    *the design's* answer, for every machine of the blueprint: a
    direct value, or a *redirect* (`{"property": "<key>"}`) that
    resolves another key through the remaining sources below.
@@ -860,8 +985,7 @@ planning/DECISIONS.md, 2026-07-23).
 
 Asking requires an interactive context: stdin and stderr both
 ttys — prompt text writes to stderr, the answer reads from
-stdin (the CLI output discipline, planning/ROADMAP.md "The
-CLI") — under the
+stdin (the CLI output discipline, docs/spec/cli.md) — under the
 interactive progress renderings (`auto`/`pretty`). Without one — no
 terminal, or an explicit `plain`/`jsonl` progress selection — a
 still-unbound property fails before
@@ -882,7 +1006,7 @@ property. Kind
 mismatches fail rather than silently downgrading protected data.
 Blueprint parameters follow the same kind rules, and a `secret`
 declaration never takes a direct blueprint value — the [field
-reference](machine-blueprint-reference.md#parameters) states the
+reference](../blueprint-reference.md#parameters) states the
 blueprint-side rules. A secret never travels through
 `--property` — argv leaks into process listings and shell
 history, exactly the `set-property` rule; the environment may
@@ -1018,8 +1142,8 @@ event carrying a sequence number, timestamp, elapsed time, and
 kind — as **live output** to the run's driver, never a stored
 file (owner, 2026-07-24; D36: the run returns its output and
 stores nothing; the persisted `run-events.jsonl` and the run
-directory are async-backlog work, ROADMAP "Asynchronous runs
-(backlog)"). Under `--progress jsonl` / `run_script`'s event
+directory are async-backlog work, proposed/FEATURES.md "Asynchronous
+runs"). Under `--progress jsonl` / `run_script`'s event
 iterator the stream *is* the machine-readable output; the pretty
 and plain displays and the transcript a caller keeps are
 *renderers* of it — no surface reports anything the stream does
@@ -1071,7 +1195,7 @@ unknown fields. Pre-1.0 the shapes track this spec with no
 stability promise. The human renderings (`pretty`/`plain`) are
 deliberately uncontracted; the machine surfaces are this
 stream (as live output), `--json` documents, and exit codes
-(planning/ROADMAP.md "The CLI"; run-record files dropped with
+(docs/spec/cli.md; run-record files dropped with
 persistence, D36).
 
 ## Observations
@@ -1489,7 +1613,7 @@ slot and record the change in the machine's state document, not
 its blueprint. Hard-disk slots are never targets: `insert` and
 `eject` address removable slots only. Slot names, ranges, and the
 alias/canonical rule are defined once, in the
-[blueprint field reference](machine-blueprint-reference.md);
+[blueprint field reference](../blueprint-reference.md);
 `set-boot` keys use the same vocabulary. The verbs never create or remove
 the drive itself: drives are guest-visible hardware the blueprint
 declares — an installer-driven blueprint declares the slot empty
@@ -1509,7 +1633,7 @@ at the next `start`).
 across `stop`/`start` exactly like an installer's writes to a hard
 disk: the machine has diverged from its blueprint, and stays
 diverged until a later `insert`/`eject` changes the slot again or
-[`apply`](machine-blueprint.md#applying-blueprint-edits) returns
+[`apply`](../blueprint-guide.md#applying-blueprint-edits) returns
 the machine to its blueprint. A script that changes machine state
 it should not leave behind — an install script's installer CD —
 ends by explicitly restoring it, conventionally with `eject` as
@@ -1534,7 +1658,7 @@ declares; duplicates are rejected. The machine must be stopped —
 the new order takes effect on the next `start`. Like
 `insert`/`eject`, the change diverges the machine from its
 blueprint until a later `set-boot`, or
-[`apply`](machine-blueprint.md#applying-blueprint-edits), restores
+[`apply`](../blueprint-guide.md#applying-blueprint-edits), restores
 it.
 
 Most install scripts never need this: a blueprint that boots
@@ -1708,7 +1832,7 @@ classes are the CLI's exit codes and the API's
 exception taxonomy — one mapping, under parity: Python spells it
 `StaticError` / `PreflightError` / `RunFailure` / `RunCancelled`
 under the `ReliquaryError` root every deliberate Reliquary error
-subclasses (planning/design/api.md), and exit `1` is precisely
+subclasses (docs/spec/api.md), and exit `1` is precisely
 an error outside the taxonomy. Every diagnostic
 carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
@@ -1725,7 +1849,7 @@ no persisted `run-events.jsonl` or `transcript.txt`, no
 retention, and no `run` management family: persistence is the
 substrate a cross-process follower would read, and following a
 run from a process that did not start it is asynchronous work in
-the backlog (ROADMAP "Asynchronous runs (backlog)", D35/D36) —
+the backlog (proposed/FEATURES.md "Asynchronous runs", D35/D36) —
 which is where the whole record model now lives (the `runs/<n>/`
 archive, monotonic numbering, retention, `list-runs` / `run
 status` / `run delete`, and interaction runs). Milestone 9
@@ -1773,8 +1897,8 @@ each command returns its output, and the caller's own driving code
 collecting those outputs is its record (D36). The `begin-run` /
 `end-run` bracket that records such a loop into one persisted run
 record is part of the record model, which moved to the
-asynchronous-runs backlog with the rest of persistence (ROADMAP
-"Asynchronous runs (backlog)", D35/D36); it returns if that work
+asynchronous-runs backlog with the rest of persistence (proposed/FEATURES.md
+"Asynchronous runs", D35/D36); it returns if that work
 schedules.
 
 U3's unit-test loop is served without it: per-run test selection

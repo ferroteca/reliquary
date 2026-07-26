@@ -5,13 +5,13 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Python API reference
 
-This is the reference for Reliquary's implemented Python surface —
-the first binding of the embedding API. Everything below is
-importable from the `reliquary` package and mirrors the CLI: the
-two are one semantic surface. The end-goal API design, including
-the surface still ahead of implementation and the settled naming
-it realigns to, is in
-[planning/design/api.md](../planning/design/api.md).
+This is the **descriptive** reference for Reliquary's implemented
+Python surface — the first binding of the embedding API. Everything
+below is importable from the `reliquary` package and mirrors the
+CLI: the two are one semantic surface. The API's norm is
+[docs/spec/api.md](spec/api.md) — the binding realizes the surface,
+never defines it — and where this reference disagrees with the
+spec, this reference has the bug.
 
 Reliquary attaches no meaning to guest output; interpreting
 results belongs to the caller.

@@ -34,11 +34,10 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The documents that teach the authored blueprint format.
 _DOCUMENTS = (
     "docs/blueprint-guide.md",
-    "planning/design/blueprint-model.md",
-    "planning/design/machine-blueprint.md",
-    "planning/design/machine-blueprint-reference.md",
-    "planning/design/machine-blueprint-cookbook.md",
-    "planning/design/media-spec.md",
+    "docs/spec/blueprint-model.md",
+    "docs/blueprint-reference.md",
+    "docs/blueprint-cookbook.md",
+    "docs/spec/media-spec.md",
 )
 
 # Prose carries fragments as well as documents — one field in

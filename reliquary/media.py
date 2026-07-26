@@ -21,7 +21,7 @@ The reclamation verbs differ in what they know:
 - ``prune_media()`` is **informed** — it keeps the attachment closure
   and drops what only existed to produce it.
 
-Design: planning/design/blueprint-model.md ("The cache").
+Design: docs/spec/blueprint-model.md ("The cache").
 """
 
 import os
@@ -41,7 +41,7 @@ def fetch_media(name, context=None, on_mismatch="fail", progress="auto"):
     Stream-bearing: ``progress`` selects the live rendering of the
     transfer and verification events (``auto | pretty | plain |
     jsonl``), the same vocabulary and the same event kinds a run's own
-    fetches ride (planning/design/media-spec.md, "Fetch progress").
+    fetches ride (docs/spec/media-spec.md, "Fetch progress").
     The stream is ephemeral — nothing is written down (D36).
     """
     from .progress import stream_for

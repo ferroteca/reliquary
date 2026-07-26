@@ -34,7 +34,7 @@ bind by name. In home mode (the CLI default) that is the whole home,
 seeding from the codex on a miss; under `--assets <dir>` it is the
 whole project root — the sole hermetic source, where neither home
 specs nor the codex behind them reach an automated run (the
-artifact-residency split, PRINCIPLES.md P4).
+artifact-residency split, ARCHITECTURE.md P4).
 
 ```text
 <asset root>/…/freedos.rlqb        the machine and the media it draws on
@@ -220,7 +220,7 @@ the API move together (planning/INTERFACES.md). `fetch_media` is the
 blocking form: a typed result, errors raised by class. Its
 asynchronous twin `start_fetch(...)` is **backlog work** (D35 —
 the async pillar left the numbered arc for lack of a use case,
-drafted as U19; ROADMAP "Asynchronous runs (backlog)"); the
+drafted as U19; proposed/FEATURES.md "Asynchronous runs"); the
 blocking `fetch_media` and its foreground `--progress` rendering
 stay in milestone 9. Design as settled, for when it returns:
 `start_fetch(...)` (same parameters) returns a
@@ -239,7 +239,7 @@ attach-by-id; reattachment is what run records exist to provide.
 Nor is there a CLI command: `start_fetch` is the one async
 starter without one, because for a CLI driver the `fetch-media`
 process itself is the handle — background it and read
-`--progress jsonl` (planning/design/api.md, the async-starter
+`--progress jsonl` (docs/spec/api.md, the async-starter
 convention).
 A handle is a follower, never the owner: dropping it never
 cancels — the fetch runs to completion unless `cancel()` is
@@ -261,7 +261,7 @@ machine never boots against silently changed media (U1, U4).
 
 Fetching is Reliquary's longest operation outside a run, and it
 reports progress under the same feedback model as script runs
-(the feedback split, PRINCIPLES.md P5): one event
+(the feedback split, ARCHITECTURE.md P5): one event
 vocabulary, every surface a renderer of it. Media movement —
 download, extraction, verification — emits the same transfer
 and verification event kinds the run-event stream defines
@@ -274,7 +274,7 @@ and verification event kinds the run-event stream defines
   as on `run-script`: pretty, live progress under `auto` when
   stderr is a tty, the human modes drawing entirely on stderr
   with stdout left empty (the CLI output discipline,
-  planning/ROADMAP.md "The CLI");
+  docs/spec/cli.md);
   under `jsonl`, stdout carries the event stream as JSON lines
   and nothing else, the last line the terminal event stating the
   outcome. The stream is ephemeral — media has no state document

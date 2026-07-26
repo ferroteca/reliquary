@@ -204,8 +204,8 @@ class CancellationTests(unittest.TestCase):
     """A cancelled run aborts a host transfer where it stands.
 
     The execution model's severability: input deliveries are atomic,
-    host transfers abort (planning/ROADMAP.md, "Cancel ends the run,
-    not the machine"). Before this, cancellation was only observed at
+    host transfers abort (docs/spec/cli.md, "Cancel ends the
+    run, not the machine"). Before this, cancellation was only observed at
     statement boundaries, so a Ctrl-C during a large fetch was not
     seen until the download, its hash, the extraction, and *its* hash
     had all finished.

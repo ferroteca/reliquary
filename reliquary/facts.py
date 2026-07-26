@@ -11,11 +11,11 @@ does not answer and resolution falls through to the next candidate or
 the ask.
 
 The catalog is deliberately small. Growth is a design decision like
-any new source tier (planning/design/script-properties.md); transforms
+any new source tier (docs/spec/script-properties.md); transforms
 in derivation syntax are permanently out — normalization lives here,
 in a fact's definition, arbitrary computation in the embedding API.
 
-Spec: planning/design/script-properties.md, "The property sources".
+Spec: docs/spec/script-properties.md, "The property sources".
 """
 
 import getpass

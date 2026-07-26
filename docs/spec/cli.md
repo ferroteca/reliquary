@@ -7,11 +7,11 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** working document for brainstorming the command-line
 > structure; expected to be short-lived. Settled decisions live in
-> [ROADMAP.md](../ROADMAP.md) ("The CLI" and the milestones);
+> [the design directory](.) ("The CLI" and the milestones);
 > concepts introduced here are documented durably in
 > [codex.md](codex.md) (the codex,
 > `seed`, naming conventions, provenance) and the
-> [blueprint field reference](machine-blueprint-reference.md)
+> [blueprint field reference](../blueprint-reference.md)
 > (`description`, `scripts`).
 
 Every command maps one-to-one onto a public API call — and is
@@ -804,7 +804,7 @@ machine phase and touches nothing.
 
 The path is the door to out-of-band file exchange, the
 sanctioned way files cross the host/guest boundary until the
-deferred in-band file operations land (planning/ROADMAP.md
+deferred in-band file operations land (planning/proposed/FEATURES.md
 "Horizon"): while the machine is stopped on every control
 plane, its drives are plain host state — a `hostdir` drive *is*
 its directory, and image drives are readable and writable with
@@ -839,7 +839,7 @@ rlq hmp "info block" -m freedos-0
 The `begin-run` / `end-run` bracket that records a primitive-driven
 loop into one persisted run record is part of the record model,
 which moved to the asynchronous-runs backlog with the rest of
-persistence (D36; ROADMAP "Asynchronous runs (backlog)").
+persistence (D36; proposed/FEATURES.md "Asynchronous runs").
 Milestone 9 stores nothing: the interaction commands each *return*
 their output, and a caller wanting a record collects those returned
 outputs in its own code (the driving program is the record). The
@@ -974,8 +974,8 @@ a rendering a person watches (D36). It stores nothing: there is
 no run directory, no persisted record, and no `run` management
 family (that whole record model — persisted runs, `run status` /
 `run delete` / `list-runs`, the async followers and handle, and
-interaction runs — is asynchronous-runs backlog work, ROADMAP
-"Asynchronous runs (backlog)", D35/D36). Ctrl-C cancels the run
+interaction runs — is asynchronous-runs backlog work
+(planning/proposed/FEATURES.md, D35/D36). Ctrl-C cancels the run
 at the next event boundary (a `cancelled` terminal event, exit
 `5`) and leaves the machine as-is.
 

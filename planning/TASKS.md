@@ -5,98 +5,69 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # TASKS
 
-The work queue — and the parking place for non-GitHub issues
+The work backlog — and the parking place for non-GitHub issues
 (the tracker:
 <https://github.com/ferroteca/reliquary/issues>).
 
-**An idea enters this project through exactly two raw queues**
-(D39): GitHub issues — the unfiltered intake, often from outside —
-and the `proposed/` directory, where the same idea is argued in
-the project's own vocabulary as a drafted use case, principle or
-task. Nothing flows without starting in one of them, and the only
-exception is a small raw commit approved under housekeeping
-(below). Issues are upstream of proposals, not their peer: raw
-intake is triaged into a drafted proposal, fixed directly as
-housekeeping, or rejected with its reason recorded in
-[DECISIONS.md](DECISIONS.md). Composed with housekeeping's refusal
-of anything touching an interface, this is what guarantees that
-**no interface changes without having passed through a queue**.
+**This file is the third work input queue** (owner, 2026-07-26,
+amending D39's two), and it works differently from the other two.
+Work entered here is **small and pre-approved**: entering it is
+approving it, so nothing waits on a verdict, and nothing here needs
+a citation, a use case, or a decision of its own. It sits at the
+planning root rather than under `proposed/` or `accepted/` for
+exactly that reason — the lifecycle directories classify *demand
+and capability*, which is argued before it is accepted, and this
+queue is the work that skips the argument because it is too small
+to need one.
 
-Tasks flow from the roadmap and from issues; small one-offs really
-just are issues, and a small, obvious, needed fix goes directly to
-tasks. **A task carries the same lifecycle as a use case or a
-principle** (owner, 2026-07-24): it is *proposed*, *accepted*,
-*completed*, or *rejected*, and this file is grouped by that
-state. One vocabulary now runs through the whole planning
-machinery — the same four words classify demand, rules and work
-alike. In theory
-every issue points to the use case or principle it serves;
-principles ([PRINCIPLES.md](../PRINCIPLES.md)) drive tasks just as
-use cases do. The exception is a standing one:
-**housekeeping** (D38) approves small cleanups and small reported
-defects as a class, in advance — tiny in scope *and* crystal clear
-they are a problem — so they need no citation, no issue and no
-decision of their own. Whoever lands the work invokes it by naming
-it in the commit, and the commit is the record. Refusing is half
-the rule: anything failing that test is **rejected** under
-housekeeping and takes the rigorous route instead. The first
-question is mechanical and absolute — **does it change an
-interface?** INTERFACES.md enumerates them, so this is a lookup
-rather than a judgement, and a yes is automatically not
-housekeeping however small the diff. A use-case or principle
-amendment and a design decision are likewise never admissible.
-Past that, doubt escalates — if it has to be argued into the
-bucket, it does not belong in it. (A defect against a *standing* principle is not
-housekeeping either: the principle is already its demand, so it
-needs no approval, only fixing.) An issue can
-easily trigger a use-case or principle change, drafted as a
-proposal in [USE-CASE-PROPOSALS.md](USE-CASE-PROPOSALS.md) or
-[PRINCIPLE-PROPOSALS.md](PRINCIPLE-PROPOSALS.md) through the
-interface-change rule (INTERFACES.md), which weighs the two
-alike. Large work belongs in
-the roadmap; a milestone item is picked up by translating it
-into a sprint tasklist here. The adjudicated design-decision
-records live in
-[DECISIONS.md](DECISIONS.md). Completed milestone
-task-breakdowns are pruned once the milestone lands — the
-record survives in git history, DECISIONS.md, and the ROADMAP
-milestone notes (the milestone-4, -6, and -7 breakdowns were
-pruned 2026-07-23).
+**There is no order here.** Nothing in this file is scheduled, and
+nothing claims priority over anything else; whoever picks work up
+picks whatever they like. The one ordering that does bind is a
+feature's: **work that only makes sense as part of one accepted
+feature lives with that feature**, in
+[accepted/FEATURES.md](accepted/FEATURES.md), and has to be done to
+complete it — the U6 recorder's items are the standing example. A
+task here that merely *relates* to a feature is still free to be
+picked whenever.
 
-The lifecycle in this file:
+Housekeeping (D38) is the same instinct one size smaller: work tiny
+enough and obvious enough that it needs no entry here **at all**,
+approved as a class in advance, with the commit as its record. This
+file is where the pre-approved work that is still worth writing
+down goes. The full intake machinery — the raw queues, the
+housekeeping test, and how acceptance is recorded — is in
+[README.md](README.md).
 
-- **[Proposed](#proposed)** — argued but not approved. Nothing may
-  be worked from here.
-- **[Accepted](#accepted)** — approved to do, and grouped by kind
-  below because the actor and the gate differ. Accepted is not
-  scheduled: the numbered arc ended with milestone 9, so nothing
-  here is currently on a sprint.
+The sections below:
+
+- **[Proposed](#proposed)** — the exception to everything above:
+  work that was *argued rather than requested*, and is waiting on a
+  verdict. Nothing may be worked from here. An entry earns its
+  place by being too big or too contestable to pre-approve.
+- **[Accepted](#accepted)** — the queue proper. Grouped by kind,
+  because the actor and the gate differ, but the grouping is not a
+  running order.
 - **[Completed](#completed)** — done. Kept until its record is
-  folded where it belongs and pruned, per the rule above.
+  folded where it belongs and pruned.
 - **[Rejected](#rejected)** — refused, with the reason recorded in
-  [DECISIONS.md](DECISIONS.md), which is already the guard against
-  re-litigating. The section here is a thin index pointing at
-  those entries, never a second record of the argument.
+  [DECISIONS.md](DECISIONS.md), which is already the guard
+  against re-litigating. The section here is a thin index pointing
+  at those entries, never a second record of the argument.
 
-Two things below are deliberately *not* tasks and sit outside the
-lifecycle: [Watches](#watches) are standing questions to re-ask as
-the design hardens, and the completed milestone breakdowns are
-landing records awaiting their prune.
-
-Housekeeping (D38) is best read in this vocabulary: it is a
-**standing acceptance**. A qualifying item is accepted on sight
-and needs no entry here at all; everything else is accepted
-explicitly, or rejected.
+Standing questions to re-ask as the design hardens are not tasks
+and live with the decision record, under
+[DECISIONS.md](DECISIONS.md)'s open questions.
 
 ## Proposed
 
-Argued but not approved. Nothing is worked from here until it
-moves to Accepted.
+Argued but not approved. Nothing is worked from here until it moves
+to [Accepted](#accepted).
 
 - **Audit design documents against accepted demand.** Raised
   unprompted during the 2026-07-24 traceability audit rather than
   requested, so it waits here. Findings that motivate it are
-  recorded with the audit tasks under Governance.
+  recorded with the audit tasks under Governance in
+  [Accepted](#accepted).
 
 - **A traceability linter over the planning documents.** Check the
   invariants the governance rules already assert, in the required
@@ -114,8 +85,8 @@ moves to Accepted.
   milestone that delivered them.
   EACH CHECK EARNED ITS PLACE — the 2026-07-24 hand audit found a
   real violation of every one:
-  * every ROADMAP section cites a U/P/G demand — *12 of 34 cite
-    none*;
+  * every planning section cites a U/P/G demand — *12 of 34 sections
+    in the then-current roadmap cited none*;
   * every DECISIONS entry carries supports — *22 lack them, and
     D29 sat outside the range the existing task assumed*;
   * no *delivered* work cites *unaccepted* demand — *U9 and U12*,
@@ -159,19 +130,53 @@ moves to Accepted.
   Principles get more rope than use cases: some cannot be
   codified and are legitimately hard to cite.
   DELIVERY — greppable by hand today; a monthly CI run is the
-  richer eventual form. Per the no-CI-*at-this-time* principle,
+  richer eventual form. Per P22 (no CI, at this time),
   scheduling that run is itself the argued case for turning CI on
   when its day comes, not a breach of it.
   Proposed rather than accepted: raised 2026-07-25, a
   suggestion, not a request.
 
+- **Generate the API reference from docstrings** (raised
+  2026-07-26, the spec/descriptive round; owner asked for it to
+  be filed with its argument). Adopt a documentation generator
+  (pdoc / mkdocstrings / Sphinx autodoc) to produce
+  docs/api-reference.md from the binding's docstrings.
+  SCOPE, and it is the whole point: **plumbing for the
+  descriptive layer, never a transfer of authority.** A generated
+  reference is *mechanically* faithful to the binding — the tool
+  reads the signatures, so reference-disagrees-with-code becomes
+  impossible by construction, which automates the apology the
+  reference's banner already makes. The norm of the surface stays
+  [docs/spec/api.md](../docs/spec/api.md): code-as-norm would
+  invert P8 — an unargued code change would *redefine* the
+  interface rather than violate it — and the project has already
+  lived the counterexample: the twin-name realignment settled
+  names in the spec while the code still said
+  `create_from_blueprint`, and the code was realigned to the doc.
+  Parity alone cannot replace that direction: it binds shape, not
+  semantics, and under twin-name identity the CLI's spellings
+  derive from the API's names, so code-as-norm would put the
+  guard downstream of the thing guarded. The multi-binding future
+  sharpens it — two bindings mean two codes, and "the code is the
+  norm" stops being well-formed; generation then rightly yields
+  one descriptive reference *per binding*, all answering to the
+  one spec.
+  THE BAR TO CLEAR, before adopting even the plumbing: P21 binds
+  infrastructure — the surface today is small enough that the
+  hand-written reference is not obviously losing; without CI
+  (P22) a generated document needs a local required check to
+  regenerate, or it goes stale in a new way; and
+  `test_documented_examples.py` executes fenced examples from the
+  docs, so generated output must preserve that property or exit
+  that test deliberately.
+  Proposed rather than accepted: the owner agreed it needs to win
+  this argument, not that it has.
+
 ## Accepted
 
-Approved to do, not scheduled — the numbered arc ended with
-milestone 9, so nothing below is on a sprint. Grouped by kind,
-because the actor and the gate differ: an adjudication is the
-owner's alone, an audit is mechanical, a restructure is
-citation-heavy and must run in order.
+Grouped by kind, because the actor and the gate differ: an
+adjudication is the owner's alone, an audit is mechanical, a
+restructure is citation-heavy and must run in order.
 
 ### Governance — adjudications
 
@@ -180,7 +185,7 @@ None depends on the others.
 
 - **Accept and promote U9 and U12 — delivered work is standing on
   unaccepted demand.** Milestone 9's own text cites "live feedback
-  for a watched install (U12, P5)", and ROADMAP's "The run and its
+  for a watched install (U12, P5)", and the roadmap's "The run and its
   output" cites "an automating program reads machine-readable
   events as they happen and takes the result (U9, U14)" — both
   flatly, not conditionally. Both use cases are **drafted, never
@@ -202,12 +207,12 @@ None depends on the others.
 - **Promote the principles reality has already caught up with.**
   The standing list is P1, P2, P3, P4, P6, P7, P8, P10, P11, P12,
   P13, P15 — P5, P9 and P14 are missing from it while being cited
-  throughout DECISIONS.md, AGENTS.md and ROADMAP.md, and P17/P18
+  throughout DECISIONS.md and AGENTS.md, and P17/P18
   are drafted with milestone 9's code as evidence for both.
   WHY IT MATTERS, and it is not bookkeeping: **promotion is what
   arms a principle** (owner, 2026-07-24). Before it, an entry is
   accepted vision and a shortfall is unbuilt work; after it,
-  PRINCIPLES.md asserts the thing is true of the code, so a
+  ARCHITECTURE.md asserts the thing is true of the code, so a
   divergence is a *bug*. P9 is the sharpest case — AGENTS.md
   enforces "no backward compatibility before 1.0" as a required
   invariant and milestone 9 obeyed it deliberately when it deleted
@@ -221,7 +226,7 @@ None depends on the others.
   hypothetical (D37).
 
 - **Record the gap-is-a-bug rule, and the two promotion bars.**
-  PRINCIPLES.md's preamble says the list is standing-only and
+  ARCHITECTURE.md's preamble says the list is standing-only and
   every entry honored by the code today — true, but passive: it
   never says what a divergence *is*. It is a bug, and that is the
   mechanism by which principles drive work with no use case asking
@@ -286,13 +291,13 @@ outran its justification). The audits below are the standing way
 to find them, not a one-off.
 
 
-- **Sweep ROADMAP items for demand citations** (owner,
+- **Sweep planning items for demand citations** (owner,
   2026-07-23; audited 2026-07-24). Every item names the U- or
   P-number that demands it. Audit result: **12 of 34 sections cite
   no U/P/G at all.** Two are upstream of demand and need none
   ("Vision", "Design principles" — the latter being the source of
   P-numbers, and already tracked for itemizing into
-  PRINCIPLES.md). The rest divide: five completed milestones (1,
+  ARCHITECTURE.md). The rest divide: five completed milestones (1,
   2, 3, 4, 6 — milestone 6 the largest at 116 lines), which the
   condensation item below should not erase without first
   recording what demanded them; four delivered design sections
@@ -313,7 +318,7 @@ to find them, not a one-off.
 
 - **Audit design documents against accepted demand.** Two
   documents cite no U/P/G at all: `backend-adapter.md` (230 lines)
-  and `machine-blueprint-cookbook.md` (440 lines, examples —
+  and `blueprint-cookbook.md` (440 lines, examples —
   arguably exempt). Beyond citation, three designs exist for
   pillars whose demand was never accepted — `backend-adapter.md`,
   `guest-communication.md`, `landmarks.md`, all demoted by D33
@@ -324,109 +329,76 @@ to find them, not a one-off.
 
 ### Governance — restructures
 
-Mechanical, citation-heavy, and **sequenced** — each depends on
-the one before it. Run them in this order or the later ones move
-content twice.
+**Executed 2026-07-26** (owner, interactively). The
+four-step plan below ran as one pass, and the roadmap is gone. What
+landed, and where it diverged from what step 2 decided:
 
-1. Split the unscheduled work into `planning/BACKLOG.md`
-2. Restructure `planning/` around the lifecycle (and create
-   `spec/`) — takes the backlog pillar designs with step 1
-3. Migrate delivered design out of ROADMAP into `spec/` — its
-   destination is decided by step 2
-4. Condense the completed milestone sections to notes — must not
-   run before the ROADMAP demand-citation audit above, which would
-   otherwise lose what demanded milestones 1, 2, 3, 4 and 6
-
-- **Split the unscheduled work into planning/BACKLOG.md**
-  (decided, owner, 2026-07-24). Everything unscheduled goes:
-  ROADMAP's four backlog pillars, "Asynchronous runs (backlog)"
-  and Horizon (~400 lines), plus this file's Backlog, Language,
-  U6 authoring recorder and Watches sections. TASKS.md is then
-  purely the scheduled list — currently empty, which honestly
-  reflects the numbered arc having ended. Sections inside keep the
-  gates visible, because they differ: a pillar returns by
-  *accepting a use case* (D23), a small item when someone has an
-  hour. Cost: roughly twenty inbound citations to rewrite.
-
-- **Restructure planning/ around the lifecycle** (decided, owner,
-  2026-07-24). Three primary subfolders, one pipeline rather than
-  two axes: **proposed/** (argued, not accepted) → **accepted/**
-  (accepted, not delivered) → **design/**, which is *implementation
-  planning of accepted items*. The governing files —
-  INTERFACES.md, DECISIONS.md, ROADMAP.md, TASKS.md, BACKLOG.md —
-  stay at planning/ root; docs/ stays user-facing and unchanged.
-  THE RULE HAS TEETH: **nothing gets a design doc until its demand
-  is accepted.** Applied to what exists, that is not a formality —
-  the project wrote `backend-adapter.md`, `guest-communication.md`
-  and `landmarks.md`, and D33 then demoted all three pillars *for
-  lack of use-case backing*. The folder would have made that
-  visible while the designs were being written rather than after.
-  A trial sort found design/ doing four jobs, only one of which is
-  the stated meaning:
-  * ~10 normative specs of **delivered** interfaces (`media-spec`,
-    `script-properties`, `http-serve`, `machine-blueprint`,
-    `codex`, `instance-model`, …) — these describe what exists, so
-    planning/ is the wrong parent. **Decided: a top-level `spec/`**,
-    with a doc moving `planning/design/` → `spec/` as its milestone
-    lands, which puts the lifecycle in the path end to end. This
-    also settles the destination for the ROADMAP migration item
-    below, so that one should not start first.
-  * 2 that fit the stated meaning — `recorder.md` (U6, accepted)
-    and `api.md` (the end-goal embedding API).
-  * 3 designs for backlog pillars whose demand was never accepted.
-    **Decided: they move with the backlog they serve**, beside
-    BACKLOG.md — D33 kept each "settled and intact" precisely so it
-    survives the demotion, and this keeps design/ meaning what it
-    says.
-  * 1 outright misfiled: `cli.md` self-describes as a "working
-    document for brainstorming the command-line" — a proposal
-    sitting in the design folder.
-  CORROBORATION: `.agents/skills/documentation-rules.md` already
-  defines `planning/design/` as "end-goal designs, **not current
-  truth**", while ~10 of its documents say "implemented" or
-  "normative and implemented" in their own status banners. The
-  folder drifted from its own written rule; this restructure is
-  what brings the two back together.
-  ALSO DECIDED: USE-CASE-PROPOSALS.md and PRINCIPLE-PROPOSALS.md
-  each split across the two folders (proposed/ and accepted/
-  halves), so promotion becomes moving an entry between two files
-  in two folders — D34's "add there, delete here, no stub" made
-  mechanical and visible in the diff instead of a discipline
-  someone has to remember.
-  Cost: ~30 file moves, their inbound citations, and rewrites of
-  AGENTS.md's layout section and documentation-rules.md's
-  placement rules — both of which currently teach the old shape.
-
-- **Migrate delivered design out of ROADMAP into its specs.**
-  ~1,100 lines describe interfaces that now have normative homes:
-  "The CLI" (476 lines), "The machine model" (184),
-  "Authored-asset resolution" (66), "The scripting language"
-  (283), "The run and its output" (88). The governing rule to
-  adopt: **the roadmap holds what is planned, the spec holds what
-  is decided, and the milestone note records that it landed** —
-  AGENTS.md already scopes ROADMAP to "planned interfaces and
-  architecture".
-  MEASURED BEFORE PROPOSING, because it changes the job: this is
-  **not** de-duplication. Only 2 of 120 sentences in ROADMAP's CLI
-  section appear anywhere in design/cli.md, and none in
-  docs/cli-reference.md — the command synopsis overlaps (41 of 53
-  commands) but the lifecycle semantics, the stability contract
-  and the output discipline exist *only* in the roadmap, which is
-  why 24 citations point at it. So the content must move and carry
-  its citations, never be deleted: ~40 inbound references across
-  the set (24 "The CLI", 12 async, 8 authored-asset, 5 Horizon).
-  Deliberately its own pass — the citation rewrites must be exact
-  or the traceability rule breaks.
-- **Condense the completed milestone sections to notes**
-  (decided, owner, 2026-07-24). Milestones 1–9 occupy ~940 of
-  ROADMAP's ~2,800 lines in deliverable lists and Done-when
-  clauses that are now all satisfied; git and DECISIONS.md hold
-  the record. Keep title, what it delivered, and the decisions it
-  cites — roughly 180 lines. This is the rule this file already
-  applies one level down when it prunes completed breakdowns
-  "into the ROADMAP milestone notes", turned on the notes
-  themselves. Takes the milestone-8 and milestone-9 breakdowns
-  above with it: both say they are kept only until this happens.
+1. ~~Split the unscheduled work into `planning/BACKLOG.md`~~ —
+   **done**, as `planning/proposed/FEATURES.md` rather than
+   BACKLOG.md: the lifecycle word beat the scheduling word, and the
+   file sits in the folder that already means "not accepted".
+2. ~~Restructure `planning/` around the lifecycle~~ — **done** as
+   `proposed/` + `accepted/` + `design/`, landing as decided: the
+   proposals files split across the two folders, and the governing
+   files (`INTERFACES.md`, `DECISIONS.md`, `TASKS.md`) stayed at the
+   planning root. Both took a wrong turn first and were corrected in
+   the same pass, each correction found by the owner asking the
+   right question. Filing the proposals whole under `proposed/` made
+   "nothing is worked from proposed/" false, since P5, P14 and U1–U6
+   are accepted; filing `DECISIONS.md` under `accepted/` put the
+   *refusal* record — and the open questions — in a folder claiming
+   the opposite. **The rule the second one yielded is worth keeping:
+   the lifecycle folders are for artifacts that *move between them*.
+   Machinery that never moves belongs at the root.**
+   One thing is new rather than decided: `TASKS.md` is reframed as
+   the third input queue (small, pre-approved, unordered), which
+   widens D39's two and wants a D-number.
+3. ~~Migrate delivered design out of ROADMAP~~ — **done**, first
+   into `planning/design/` and then out again (step 5).
+4. ~~Condense the completed milestone sections to notes~~ —
+   **done**, and harder than the ~180 lines planned: milestones 1–9
+   are one paragraph in [Completed](#completed). The
+   demand-citation audit above had not run first, so what demanded
+   milestones 1, 2, 3, 4 and 6 was **not** captured before the
+   deliverable lists went. It survives in git history
+   (`git show 50b67b2:planning/ROADMAP.md`) and must be recovered from
+   there if that audit still wants it.
+5. ~~Split the delivered specs out of `planning/`~~ — **done**, and
+   this was the plan's sharpest finding: `planning/design/` was
+   doing four jobs, and the largest was ~12 normative specs of
+   *delivered* interfaces, which is current truth and does not
+   belong under `planning/`. The decided remedy was a top-level
+   `spec/`; **what landed is `docs/spec/`** (owner, 2026-07-26),
+   because `docs/` already means the live situation, so the spec
+   sits beside the reference that derives from it rather than in a
+   third tree of its own. `docs/spec/README.md` states the
+   normative direction: the spec binds the implementation, and a
+   disagreement is the code's bug.
+   Design was resolved along the same axis rather than being left
+   as a residue: feature design moved beside its feature
+   (`proposed/design/`, `accepted/design/`), and only design
+   serving no single feature stayed in `planning/design/`.
+   Machine-readable schemas moved into the package,
+   `reliquary/schemas/`, since code consumes them — which also
+   deleted two dead ones (`machine-blueprint.schema.json`,
+   `media-definition.schema.json`): zero references anywhere, and
+   both described the pre-composition format milestone 7 replaced,
+   so they contradicted the shipped schema rather than duplicating
+   it.
+6. **PRINCIPLES.md became ARCHITECTURE.md** (owner, 2026-07-26):
+   the root document is the architecture in force — the
+   whole-system view (absorbed from the former
+   `planning/design/architecture.md`) plus the P-numbered
+   principles, matching the ARCHITECTURE.md convention readers
+   expect at a repo root. The mirrors renamed with it
+   (`proposed/ARCHITECTURE.md`, `accepted/ARCHITECTURE.md`),
+   restoring mirror-by-name across all three ladders. The same
+   pass itemized the model doc's unnumbered principles as
+   P19–P21, and stated P22 (no CI, at this time) — a rule
+   previously cited in this file but written down nowhere.
+   The P-additions and the rename want D-numbers, with
+   acceptance-is-the-move (amends D23) and the third queue
+   (widens D39).
 
 ### Defects
 
@@ -533,27 +505,36 @@ already its demand, so these need no acceptance, only fixing.
 ### Language
 
 - residual language problems catalogued in
-  planning/design/script-examples/*.rlqs (see its README) —
+  design/script-examples/*.rlqs (see its README) —
   best-guess priority, fix-cost order, NOT validated against
   real authoring pain; reorder freely once we've actually
   written/debugged scripts under this surface:
   1. [08] reserve the small closed vocabularies (key names,
      drive slots) globally so they can't shadow phase/artifact
      names — mechanical, no spec redesign, also closes most of
-     [01]'s asymmetry
+     the asymmetry the deleted [01] showed
   2. [06]'s remaining half: warn when an `@`-reference matches no
      known item (the label/item split itself is gone with the
      media block — DECISIONS.md, no JSON in scripts)
-  - [03], [05], [07] — provisionally leave as documented
+  - [03], [07] — provisionally leave as documented
     tradeoffs, not bugs: boundary tax (guest-text escaping) or
     placement-equals-scope consequences, where a "fix" mostly
     just relocates the mush rather than removing it
-  - [01], [02], [04], [09] are resolved (DECISIONS.md: milestone
-    zero and the observation-channel decisions); their files are
-    regression notes
+  - [01], [02], [04], [05], [09] were resolved, and their files
+    were **deleted 2026-07-26**: they claimed to be regression
+    notes, but nothing in the tree executed them and [04] had
+    silently drifted into invalid syntax. The resolutions are in
+    DECISIONS.md, which is where they belong. ([05] sat in the
+    tradeoff group above until this pass — the README had it
+    resolved by D5 dropping the file-exchange verbs, and the
+    README was right.)
+  - [03] does not currently parse either: its `on` handler bodies
+    end without a terminal. Fix it with whatever touches [03]
+    next — it is a live example, so it should be valid where it
+    is not deliberately illegal
   - note: several of these are the procedural/declarative seam
     showing through the syntax — see "Primary language goals"
-    (G1–G7) and "Procedural and declarative" in ./ROADMAP.md
+    (G1–G7) and "The procedural–declarative seam" in design/script-spec.md
     before proposing fixes, and judge any fix against the goals
     it costs rather than in isolation
 - the full Reason-blockquote editorial sweep of script-spec.md
@@ -564,39 +545,22 @@ already its demand, so these need no acceptance, only fixing.
   recorded in DECISIONS.md — but their spec audits hit the
   session limit
 
-### U6 authoring recorder
-
-Use case U6 in planning/USE-CASE-PROPOSALS.md (accepted,
-awaiting delivery — moved 2026-07-23); design in
-planning/design/recorder.md. Work items, in rough
-dependency order:
-
-- Reliquary-owned console viewer over the vnc control plane
-  (recording prerequisite: backend display-window input is
-  invisible to Reliquary)
-- text-mode recorder first (no new language surface: waits from
-  VGA scrapes, type/press actions, generated-comment
-  uncertainty flags)
-- runner run-to-point / breakpoint / human-takeover machinery
-  (also the failure report's "take over from here" suggested
-  next command)
-- round-trip: fragment emission anchored by playback position;
-  opt-in surgical apply at the anchor (never regenerate, never
-  text-merge)
-- landmark catalog shape: decided (DECISIONS.md, the wrinkle
-  round; planning/design/landmarks.md) — implementation rides
-  the asset spec work
-- run-events: handover event kinds (script/human control
-  passing); a capture session is one run record with mixed
-  drivers
-- CLI record command family + API twins land together (parity)
-
 ### Small items
 
 Small, obvious, just haven't met the bar for scheduling (the
 section formerly named Wishlist, then Backlog). Parked non-GitHub
 issues land here. Most would qualify as housekeeping (D38) and
 need no entry at all once someone picks them up.
+
+- **Audit the blueprint field reference for orphaned norms**
+  (2026-07-26, from the spec/descriptive split). The blueprint's
+  norm is now the published schema (structure) plus
+  docs/spec/blueprint-model.md (semantics), and
+  docs/blueprint-reference.md was demoted to descriptive.
+  Walk its per-field contracts (units, controller vocabulary,
+  boot semantics, materialize modes): anything load-bearing that
+  neither the schema nor the model states gets promoted into one
+  of them, so no rule is left normless.
 
 - `download-media` command (owner request, 2026-07-22; shape to
   re-derive under the revised model. D41 settled the overlap
@@ -665,241 +629,44 @@ need no entry at all once someone picks them up.
   specific floppy image mounted; QEMU machine #4 with 16 MB of
   memory and a specific cdrom mounted
 
+
 ## Completed
 
 Done. Kept until each record is folded where it belongs and
 pruned — which is itself an accepted task above.
 
-### Milestone 8 — script properties (complete)
+### The numbered arc — milestones 1–9 (complete)
 
-All five stages landed (T1–T5). This breakdown is kept until the
-milestone-8 record is folded into the ROADMAP note and pruned like
-milestones 4/6/7; the stage markers below are the landing record.
+**The numbered arc ran 1 through 9 and ended there**, carrying
+text-mode DOS on QEMU from the north-star command to the
+programmatic testing loop: the vertical slice and the built-in
+blueprint bundle (1), the media library and caches (2), the
+scripting language on its first, now-superseded surface (3), the
+script-surface realignment to the July 2026 redesign (4), the local
+HTTP server for installer answer files (5), the instance model and
+machine blueprints with authored-asset residency (6), the composed
+blueprint model folding the blueprint and media formats into one
+(7), the script properties — user properties file, secret storage,
+binding pipeline, declared derivation, `${key}` references (8), and
+the programmatic testing loop — the run returning its output, live
+feedback, the error taxonomy, and the exec-run mechanics (9).
+Asynchronous runs left the arc for lack of a use case (D35/D36).
 
-The sprint tasklist, translated from ROADMAP milestone 8. The
-roadmap holds the *what* and
-[script-properties.md](design/script-properties.md) the
-normative detail; this holds the **landing order**, which is not
-the deliverable numbering. Only the sequencing argument lives
-here.
-
-**What shapes this one:** nothing must land as one piece — the
-milestone is new capability over a stub (`properties.py` today
-is a JSON file with a `set_property(secret=)` parameter that
-does nothing with it), so each stage is independently green.
-What does bind the order is that two decisions are expensive to
-retrofit: the **credential scope key** (the properties file's
-absolute path) and the **rank of a source**. Both are cheap to
-get right the first time and silently corrupting to change
-later — an orphaned credential nobody can name, or a bundle that
-resolves differently than it did last release.
-
-- **T1 — the properties file — DONE.** Deliverable 1. Replace the JSON
-  stub with the line-based format: `key = value`, `#` full-line
-  comments, blank lines, the `@secret` marker and `@@` literal
-  escape, dot-separated letter-initial segments with the `rlq` /
-  `reliquary` namespaces refused, comment- and order-preserving
-  surgical edits, atomic writes. Invalid files report path and
-  line and are never partly rewritten. Pure host-side and fully
-  unit-testable — no credential store, no binding. **Gate:** a
-  file with comments, blank lines, and a deliberate ordering
-  survives a set and an unset with everything but the named line
-  untouched.
-- **T2 — the credential store and the command family — DONE.**
-  Deliverables 2 and 3, **plus `--properties <path>` pulled
-  forward from deliverable 4**. Use the `keyring` package rather
-  than hand-rolling Credential Manager / Keychain / Secret
-  Service; its `(service, username)` model takes the spec's
-  scoping directly — properties-file path as service, property
-  name as username — behind a thin Reliquary-owned seam, so an
-  absent or unusable store fails closed and there is never a
-  plaintext fallback. The four commands with their secret rules
-  (no-echo prompt on a tty, stdin to EOF otherwise, empty
-  rejected; get and list never revealing; prefix filtering by
-  dotted descendants, not string prefix; a kind change requiring
-  `unset-property` first), the fail-safe update order
-  (credential before marker, marker before credential) and
-  orphan reporting. API twins in the same commit (P6), including
-  the named divergence — `set_property` takes a secret's value
-  in-process, because argv is what the CLI's entry channels
-  exist to avoid. **Why `--properties` lands here and not in
-  T4:** credentials scope by the selected file's absolute path,
-  so the scoping rule is untestable without it, and changing a
-  scope key after credentials exist orphans every one of them.
-  **Gate:** the milestone's own — secrets round-trip with no
-  secret material in the file, and an interrupted update can
-  leave neither a plaintext value nor a marker whose credential
-  was reported bound but is absent.
-- **T3 — the binding pipeline — DONE.** Deliverable 4: the flattened
-  order minus derivation — flag > parameter > env > file > ask.
-  It lands where `script_runner.py` today raises "property
-  binding arrives with the property family", and reaches
-  preflight (every failure before a media materializes or a
-  machine starts), `check-script` (each key's supplying source
-  named, never its value), and the runtime secret rules
-  (transcripts record key and source only; diagnostics redact;
-  failure screenshots suppressed for the rest of a run after
-  secret entry). Env mangling with the fail-closed collision
-  preflight over the keys a run actually consults; blueprint
-  `parameters` direct and redirect (`document.py` already parses
-  both). **Gate:** one script bound from each tier in turn, each
-  naming its source, and a noninteractive miss failing in
-  preflight before the machine is created.
-- **T4 — the declared derivation rank — DONE.** Deliverable 5 (D20).
-  `default=` candidates in declaration order, first-answerable
-  wins, with static cycle detection, dead literal candidates and
-  any secret involvement as static errors, and the `rlq.*` facts
-  (`host.username` login-normalized, `host.full-name`,
-  `rlq.env.<NAME>`; an empty fact is unanswerable by design).
-  The grammar already parses the modifier — this is semantics.
-  Deliberately after T3: it is a one-rank insertion between file
-  and ask, which is the model's own claim (D19 — new tiers land
-  at fixed ranks) getting its first real test. **Gate:** a
-  derivation-backed key binds with no ask, naming its winning
-  candidate as the supplying source.
-- **T5 — `${key}` location references — DONE.** Deliverable 6. The
-  grammar landed at milestone 7 parsing-only, failing closed
-  naming properties; now it binds through T3's order at `create`
-  / `apply`, with the resolved location recorded in the state
-  and never re-adopted at `start`, no chaining (a resolved value
-  that is itself a reference fails closed), and noninteractive
-  misses naming both the media and the key. Last because it is
-  the only consumer outside scripts and wants the order settled
-  under it. **Gate:** a media whose `location` is `${key}`
-  materializes, with the resolved location in the machine state.
-
-Cross-cutting, every stage: docs and CHANGELOG land with the
-code (AGENTS "Documentation maintenance"), and
-script-properties.md's status banner — *"None of it is
-implemented yet"* — comes off as its sections land. A banner
-that outlives the code it disclaims is the wrong-instruction
-failure DECISIONS.md's preamble names.
-
-### Milestone 9 — the programmatic testing loop (complete)
-
-All seven stages landed (T1–T7). This breakdown is kept until the
-milestone-9 record is folded into the ROADMAP note and pruned like
-milestones 4/6/7; the stage markers below are the landing record.
-
-The sprint tasklist, translated from ROADMAP milestone 9 as
-reframed by D36 — the vertical's culmination: the programmatic
-drive loop (U14/U20) plus live feedback for a watched install
-(U12). Normative detail lives in script-spec.md and the U14/U20
-entries (USE-CASE-PROPOSALS.md); this holds the **landing order**.
-
-**What shapes this one:** the run model flips, and two behaviors
-are unproven. The model flips from "rlq retains a record archive"
-to "**rlq runs and returns output**" (D36) — the `runs/<n>/`
-persistence, retention, and record verbs are deleted first, a
-clean break (P9), so nothing is built against a model that is
-leaving. And U20 rests on two unproven QEMU/DOS behaviors (live
-floppy media-change, eject-flush); prove them before design rests
-on them. The error taxonomy also folds milestone 8's debt — five
-orphan classes (`PropertiesError`, `PropertyBindingError`,
-`CredentialError`, `ScriptParseError`, `ScriptRuntimeError`) with
-no common root and a CLI that collapses everything but a parse
-error to exit 1.
-
-- **T1 — Spike: prove the transports — DONE.** Before any code rests on
-  them, confirm on QEMU/DOS: a live `insert-media`/`eject-media`
-  floppy swap is *seen* by DOS (media-change detection), `eject`
-  flushes guest writes to the local `.img`, and vvfat's
-  stop/start flush holds (U14). **Gate:** a swap-run-swap cycle
-  where DOS reads the new floppy's contents, and a guest-written
-  file reads back host-side after eject. If either fails, U20 is
-  reshaped here, not later.
-
-  **Result: both hold, with one condition.** Run against an
-  installed FreeDOS 1.4 on QEMU: a live `insert-media --file` swap
-  is seen by DOS (a `DIR A:` after the swap lists the *new* image's
-  files, never the previous disk's), and a guest write reaches the
-  host `.img` — verified byte-wise after `eject-media`, and again
-  after swapping back, each image carrying only its own rounds.
-  U20 needs no reshaping. THE CONDITION: **a floppy drive's
-  geometry is fixed when the backend attaches it at launch, and a
-  live change does not revise it.** A slot launched empty gets
-  QEMU's own default (2.88M), so inserting a 1.44M image into it
-  live reaches the guest as "general failure" on every read and
-  write. Reliquary did not choose that geometry, so it now records
-  the launched medium's size and refuses a mismatched live insert
-  naming both sizes and the fix (P11) — the spike's finding turned
-  into a guard rather than a footnote.
-- **T2 — The run model: return, don't store — DONE.** Delete `runs/<n>/`
-  persistence (the `<timestamp>-<id>/` layout and the `output/`
-  subdir die), stored `run-events.jsonl`/`transcript.txt`,
-  retention, `list-runs`/`run status`/`run delete`, and
-  interaction runs (`begin-run`/`end-run`). `run_script`/`exec`
-  **return** their output directly; the `exec` API twin lands
-  here (parity). **Gate:** a run returns its output with no
-  `runs/` dir created; two concurrent runs return independently,
-  no shared store.
-- **T3 — Error taxonomy and exit codes — DONE.** `ReliquaryError` the
-  root every deliberate error subclasses, `StaticError` (2) /
-  `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5)
-  and their exit-code mapping, the milestone-8 classes folded
-  under the root, the CLI's except-arms remapped from the
-  everything-is-1 collapse, and the `--json` document contract.
-  Ctrl-C on a foreground run emits `cancelled`, exit 5.
-  **Gate:** the four classes exit 2/3/4/5, and
-  `except ReliquaryError` catches all four.
-- **T4 — Live feedback (P5) — DONE.** `--progress (auto | pretty |
-  plain | jsonl)` rendered live during a run and **never
-  stored**, jsonl stdout purity (terminal event last,
-  diagnostics to stderr), the stdout/stderr discipline, and the
-  noninteractive no-prompt rule (a missing input under
-  `plain`/`jsonl` is a PREFLIGHT ERROR before the machine
-  starts). Serves U12 (watch an install) and U9 (timely machine
-  output). **Gate:** an install renders live in pretty; rerun
-  under jsonl it emits the event stream to stdout, terminal event
-  last, with zero bytes written to disk.
-- **T5 — Machine variables and readiness — DONE.** A `set` script verb
-  + `get-machine-var` query (a `machine.json` field, cleared on
-  `start`, under the op lock) — the script→host scalar/signal
-  channel. Readiness rides it: the consumer's ready script `set`s
-  a var, `get-machine-var` polls; no Reliquary-provided default
-  script (P18). **Gate:** a `set` var is readable by any process,
-  cleared on start; a consumer ready script drives boot-to-ready
-  with no Reliquary-side prompt knowledge.
-- **T6 — In-band file put/get over vvfat (U14) — DONE.** Guest-terms
-  addressing (P17) → vvfat hostdir mapping (P10-safe from the
-  declared drive assignment), stopped-only, non-vvfat fails
-  closed (P11). Put before start, get after stop. **Gate:**
-  put/get a guest-addressed file to/from a vvfat drive; a
-  non-vvfat target fails closed naming the gap.
-- **T7 — `insert-media --file` (U20) — DONE.** `insert-media <slot>
-  --file <path>` (twin `insert_media(slot, file=)`) mounting an
-  anonymous `local`+`use` media (mutable, unverified, in place),
-  live; the declared-media form stays. **Gate:** a freshly-built
-  floppy `.img` mounts live by path, runs, ejects, and remounts
-  with new content picked up.
-
-Cross-cutting, every stage: CLI–API parity lands in the same
-change (P6), and docs (README, `docs/api-reference.md`,
-`docs/cli-reference.md`) and CHANGELOG land with the code
-(AGENTS "Documentation maintenance").
-
-Found while landing it, and fixed in passing:
-
-- the codex `freedos-install.rlqs` pressed `enter` on the
-  installer's first Yes/No menu, which the installer draws before it
-  reads the keyboard — the keystroke was swallowed and the install
-  timed out at the next wait. Reproduced on the pre-milestone tree,
-  so it was not a milestone-9 regression. Now `select "Yes"`, as
-  every other confirmation in that script already was: `select` is
-  feedback-driven and verifies the highlight moved.
-- the guest-console commands (`screen`, `type`, `enter`, `press`,
-  `exec`, `select`, `wait`, `screenshot`, `hmp`) resolved a selected
-  machine's QMP port but not its directory, so the identity check
-  looked for the recorded VM under the home, found none, and refused
-  every one of them as a mismatch. Found by the failure report's own
-  suggested next command (`rlq screen --machine …`) not working.
+The per-milestone deliverable and stage breakdowns are **pruned**:
+the record survives in git history, the CHANGELOG, and the D-numbers
+each round produced, which is the standing rule for completed
+breakdowns. Generalizing beyond that one vertical is unbuilt and
+unscheduled (D33) — it lives in
+[proposed/FEATURES.md](proposed/FEATURES.md), design settled and
+intact, and returns to a numbered arc when the case it serves is
+accepted.
 
 ### Design rounds resolved
 
 - Media residency vs the download cache AND composable authored
   specs — RESOLVED together (owner, 2026-07-23, the media/composition
   design round), then REVISED same day by the blueprint revision
-  round (both in DECISIONS.md; ROADMAP milestone 7 is the
+  round (both in DECISIONS.md; milestone 7 is the
   retargeted implementation): two spec types (machine / media —
   archive absorbed as the container reading), a flat typed root
   array, one schemed `location` field, no source component, no
@@ -927,7 +694,7 @@ Found while landing it, and fixed in passing:
   eviction) and `prune-media` (attachment-closure prune of
   unneeded entries) land at milestone 7; `clean-archives`
   retires with the single cache dir. Machine-cache cleaning
-  remains the open decision in ROADMAP "Decisions still
+  remains the open decision in DECISIONS.md "Open questions" (was "Decisions still
   needed".
 
 ## Rejected
@@ -941,21 +708,3 @@ the single cache dir) were recorded straight to DECISIONS.md
 before this section existed, and are indexed with the design round
 that made them.
 
-## Watches (re-ask as these harden)
-
-- live-run progress surface (G4 during the run — ties to
-  run-events; the feedback split, PRINCIPLES.md P5, names
-  the demand)
-- GUI/landmark assets forming a new authored artifact class
-  (hardened 2026-07-21: .rlql is the fourth authored extension —
-  the INTERFACES listing is due at the asset-spec/realignment
-  pass)
-- published JSON Schemas elevating `reliquary-machine.json` into a
-  public contract (the blueprint and media-definition schemas
-  are authored — DECISIONS.md; the state schema and its
-  public-contract elevation stay with milestone 6)
-- the adapter API becoming world-facing
-  (planning/design/backend-adapter.md is INTERNAL by decision,
-  owner 2026-07-21 — a real third-party adapter story elevates
-  it into the INTERFACES inventory through the interface-change
-  rule, never by drift)

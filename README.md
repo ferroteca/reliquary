@@ -72,9 +72,9 @@ Read the [Blueprint guide](docs/blueprint-guide.md) for the implemented
 milestone-1 surface, the [CLI reference](docs/cli-reference.md) for
 commands, and the [API reference](docs/api-reference.md) for the
 Python surface. The full design (including fields not yet implemented) is in
-[The machine blueprint](planning/design/machine-blueprint.md) —
+[The machine blueprint](docs/blueprint-guide.md) —
 starting with "The model at a glance" and its diagrams — and
-[Machine blueprints and machines](planning/design/instance-model.md).
+[Machine blueprints and machines](docs/spec/instance-model.md).
 
 > **Status:** milestone-1 blueprint materialization, lifecycle CLI
 > (`create-machine` / `start-machine` / `stop-machine` /
@@ -216,7 +216,8 @@ guest program's raw output, and interpreting it is left to the caller.
 4. **Take the results.** A run returns its output to you and keeps
    nothing of its own. A small value comes back through a machine
    variable (`rlq get-machine-var`); a file comes back by its guest
-   address (`rlq get-file "A:\RESULT.TXT" .esult.txt`); a whole
+   address (`rlq get-file "A:\RESULT.TXT" .
+esult.txt`); a whole
    image comes back by swapping it out. Out of band, `rlq
    get-machine-dir` prints the machine directory: while the machine is
    stopped, its directory-source and image drives are ordinary host
@@ -621,7 +622,7 @@ with the same names as their CLI twins: `create_machine` /
 run's output** — the whole event stream, plus the final script phase
 and the machine's phase — and writes nothing to disk; it raises by
 error class on failure. See the [API reference](docs/api-reference.md)
-for the full surface and [`planning/design/api.md`](planning/design/api.md)
+for the full surface and [`docs/spec/api.md`](docs/spec/api.md)
 for the end-goal design.
 
 ## Troubleshooting

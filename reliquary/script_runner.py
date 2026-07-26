@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Runtime executor for ``.rlqs`` scripts on QEMU/DOS.
 
-The dynamic semantics are planning/design/script-spec.md's
+The dynamic semantics are docs/spec/script-spec.md's
 "Execution model": execution is defined over **samples** — discrete
 readings of the machine — and over the **episodes** a condition's
 consecutive holding samples form. Dispatch is single-threaded and
@@ -1403,8 +1403,7 @@ def _blueprint_parameters(state, context):
     """The blueprint's `parameters` map, read live at invocation.
 
     Parameters configure script binding, not machine shape: they carry
-    no state, `apply`, or baseline-digest involvement (ROADMAP "The
-    machine model"), so they are read from the blueprint file each run
+    no state, `apply`, or baseline-digest involvement (docs/spec/instance-model.md), so they are read from the blueprint file each run
     rather than from the machine snapshot. A machine whose blueprint
     file has since moved simply contributes no parameters — its own
     state remains authoritative for shape.

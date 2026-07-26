@@ -38,7 +38,7 @@ have ids.
 A blueprint's name — its identity, the selection key — is its
 declared `name` field when it carries one, else its file stem
 (`<name>.rlqb`), resolved from whichever source supplies it
-(planning/ROADMAP.md, "Authored-asset resolution"). It must be
+(docs/spec/asset-resolution.md). It must be
 id-safe: it becomes a machine-id segment and a cache directory
 name. Two assets of one kind resolving to one effective name in a
 source are an error. The machine's state records which file it
@@ -79,7 +79,7 @@ the standard selectors, valid in any phase, touching nothing.
 The path is the door to **out-of-band file exchange**, the
 sanctioned way files cross the host/guest boundary (owner,
 2026-07-22 — the run-collection model was dropped; in-band file
-operations are a deferred capability, planning/ROADMAP.md
+operations are a deferred capability, planning/proposed/FEATURES.md
 "Horizon"). While the machine is stopped on every control
 plane, the content under `media/` is plain host state: a
 `hostdir` drive *is* its directory, and image drives are
@@ -187,7 +187,7 @@ is intentionally not implicit in clone.
 ## The machine state
 
 The blueprint remains the plain machine JSON object described by the
-[machine blueprint](machine-blueprint.md). The machine's one document is
+[machine blueprint](../blueprint-guide.md). The machine's one document is
 `cache/machines/<id>/machine.json` — the resolved
 blueprint fields plus the machine's own bookkeeping, not a second
 spelling of the blueprint schema:
@@ -234,8 +234,8 @@ the run returns to the caller (D36) — naming the script, its
 source digest, result, and produced artifacts — never a stored
 claim about the guest's contents. The run stores nothing in the
 cache; persisting a run into a record archive is
-asynchronous-runs backlog work (ROADMAP "Asynchronous runs
-(backlog)"), and the consumer keeps whatever output is worth
+asynchronous-runs backlog work (proposed/FEATURES.md "Asynchronous
+runs"), and the consumer keeps whatever output is worth
 keeping.
 
 ## Naming and identity
@@ -262,6 +262,6 @@ validation the parser's and a shared valid/invalid fixture corpus —
 run against both parser and schema at realignment — keeping the two
 honest against each other. The machine-state schema is authored
 beside this spec
-([machine-state.schema.json](machine-state.schema.json)); the schema
+([machine-state.schema.json](../../reliquary/schemas/machine-state.schema.json)); the schema
 version tracks the Reliquary release, not a version field in user
 documents before 1.0.

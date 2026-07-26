@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """The run event stream — live output, never a file.
 
-A run emits one normative event stream (planning/design/script-spec.md,
+A run emits one normative event stream (docs/spec/script-spec.md,
 "The run event stream"): JSON Lines, each event carrying a sequence
 number, timestamp, elapsed time, and kind. It is **live output**
 rendered to the run's driver and returned to whoever started the run;

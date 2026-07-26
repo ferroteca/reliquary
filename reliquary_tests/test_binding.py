@@ -4,7 +4,7 @@
 
 Order: --property, blueprint parameter, environment, properties file,
 interactive ask. The declared derivation (T4) slots between file and
-ask later. Spec: planning/design/script-spec.md, "The property
+ask later. Spec: docs/spec/script-spec.md, "The property
 sources".
 """
 

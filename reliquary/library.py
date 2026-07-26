@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """The built-in library: copy-out seeding of shipped artifacts.
 
-The library is a seed, not a resolution tier (planning/design/codex.md).
+The library is a seed, not a resolution tier (docs/spec/codex.md).
 Blueprints, media definitions, and scripts ship inside the package
 under ``reliquary/codex/``; referencing one that does not yet
 exist in the home copies it out as an ordinary user-owned file. A

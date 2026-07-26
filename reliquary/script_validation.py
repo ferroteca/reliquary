@@ -3,7 +3,7 @@
 """The static-validation layer of the reliquary script language.
 
 The S-numbered legality rules that the grammar deliberately does
-not carry (planning/design/script-spec.md, "Syntactic
+not carry (docs/spec/script-spec.md, "Syntactic
 restrictions"), checked over the typed tree so each diagnostic can
 name the offending construct and cite its rule:
 

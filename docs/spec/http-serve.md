@@ -5,7 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Local HTTP server for installer answer files
 
-> **Status:** implemented - ROADMAP milestone 5 completed on
+> **Status:** implemented - milestone 5 completed on
 > 2026-07-22. Packer parity is the settled shape, and the
 > milestone's decide-first round is recorded here: scripts declare
 > named run-scoped served content, inline or from a script-relative
@@ -27,7 +27,7 @@ Reliquary adopts the same pattern.
 
 This does not compete with those formats, and it does not weaken
 agentless keystroke scripting for guests that lack them
-(planning/ROADMAP.md "Procedural and declarative"; language goal
+(docs/spec/script-spec.md "The procedural–declarative seam"; language goal
 G1 is about the control plane, not a ban on the installer's own
 answer-file mechanism).
 

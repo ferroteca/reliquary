@@ -6,7 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 # The conformance corpus
 
 The shared valid/invalid corpus for the **composed blueprint model** —
-[planning/design/blueprint-model.md](../../../../planning/design/blueprint-model.md),
+[docs/spec/blueprint-model.md](../../../../docs/spec/blueprint-model.md),
 which is normative for every fixture here.
 
 Written at milestone 7's **S2**, before the parser, so that S3 had an

@@ -3,7 +3,7 @@
 """The old script surface and superseded CLI names do not survive.
 
 Milestone 4 task 11: a whole-tree sweep. Historical records
-(released CHANGELOG, DECISIONS, completed ROADMAP notes) and
+(released CHANGELOG, DECISIONS, completed milestone notes) and
 intentional negative / regression fixtures may still spell the old
 forms; live code, tests, user docs, and shipped scripts must not.
 """
@@ -46,7 +46,6 @@ _SWEEP_ROOTS = (
     "docs",
     "README.md",
     "AGENTS.md",
-    "planning/examples",
 )
 
 # Files that may quote the old surface deliberately.
@@ -56,6 +55,11 @@ _ALLOW_PATH_SUFFIXES = (
     os.path.join("reliquary_tests", "test_script_validation.py"),
     # This module names the forbidden spellings.
     os.path.join("reliquary_tests", "test_old_surface_purge.py"),
+    # The API spec's realignment section records a completed rename
+    # and names the spellings it replaced. Historical prose, not a
+    # surface anyone can reach: the names it quotes are exactly the
+    # ones this module forbids, which is the point of quoting them.
+    os.path.join("docs", "spec", "api.md"),
 )
 
 # Patterns that would be live old-surface / superseded-command use.
@@ -108,6 +112,34 @@ def _allowed(path):
                for suffix in _ALLOW_PATH_SUFFIXES)
 
 
+# Patterns that match a *script statement* by anchoring to the start
+# of a line. In markdown they must be applied only inside fenced code
+# blocks: prose wraps, and a sentence continuing onto a line that
+# happens to begin "boot order with the listed drive keys" is not the
+# retired `boot` verb. Identifier patterns stay whole-file.
+_SCRIPT_STATEMENT_LABELS = frozenset({
+    "old state keyword",
+    "old arrow goto",
+    "old done terminator",
+    "old expect",
+    "bare wait stopped",
+    "old boot verb",
+})
+
+
+def _fenced_only(text):
+    """Blank every line outside a fenced block, keeping line numbers."""
+    kept = []
+    inside = False
+    for line in text.split("\n"):
+        if line.lstrip().startswith("```"):
+            inside = not inside
+            kept.append("")
+            continue
+        kept.append(line if inside else "")
+    return "\n".join(kept)
+
+
 def _iter_sweep_files():
     for root in _SWEEP_ROOTS:
         path = os.path.join(_REPO_ROOT, root)
@@ -139,7 +171,7 @@ class RetiredMediaDefinitionTests(unittest.TestCase):
     media/composition round); no `.rlqm` file survives anywhere in the
     package, the shipped codex, the examples, or the fixtures. The
     string may still appear in historical records (CHANGELOG,
-    DECISIONS, completed ROADMAP notes) and design prose that names the
+    DECISIONS, completed milestone notes) and design prose that names the
     retired format — this guards the *files*, not the spelling.
     """
 
@@ -299,8 +331,11 @@ class LiveTreePurgeTests(unittest.TestCase):
             # AST-string form inside allowlisted negative tests —
             # already handled by path allowlist.
             relative = os.path.relpath(path, _REPO_ROOT)
+            fenced = _fenced_only(text) if path.endswith(".md") else text
             for label, pattern in _FORBIDDEN:
-                for match in pattern.finditer(text):
+                haystack = (fenced if label in _SCRIPT_STATEMENT_LABELS
+                            else text)
+                for match in pattern.finditer(haystack):
                     line = text.count("\n", 0, match.start()) + 1
                     hits.append(
                         f"{relative}:{line}: {label}: "

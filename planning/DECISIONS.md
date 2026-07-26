@@ -9,15 +9,18 @@ The adjudicated design-decision record: the July 2026 design
 rounds and gap queues, moved out of [TASKS.md](TASKS.md)
 (2026-07-22) so the task list stays a task list. Each entry
 records what was decided, by whom and when, what was weighed and
-declined, and where it folded. The specs, planning/ROADMAP.md, and
-planning/INTERFACES.md / root USE-CASES.md remain the
+declined, and where it folded. The specs in
+[planning/design/](design/), and
+[INTERFACES.md](INTERFACES.md) / root
+[USE-CASES.md](../USE-CASES.md), remain the
 normative homes — this file is the adjudication trail, and the
 guard against re-litigating: anything recorded here as killed,
 declined, or superseded is not revisited without new evidence,
 argued through the interface-change rule
-(planning/INTERFACES.md). Entries keep the spellings of their
-time; mentions of "TASKS" records inside entries refer to
-entries now in this file.
+([INTERFACES.md](INTERFACES.md)). Entries keep the spellings of
+their time; mentions of "TASKS" records inside entries refer to
+entries now in this file, and mentions of ROADMAP refer to the
+roadmap dissolved into these directories on 2026-07-26.
 
 Decisions are numbered in the order first recorded — D1 the
 earliest — and a number is never reused; the list reads
@@ -25,7 +28,7 @@ newest-first, so the top entry carries the highest number and
 a new entry prepends with the next free one. The D-number is
 the decision's citation handle everywhere: a decision
 generally supports use cases (U-numbers), governing principles
-([PRINCIPLES.md](../PRINCIPLES.md), P-numbers), or language goals
+([PRINCIPLES.md](../ARCHITECTURE.md), P-numbers), or language goals
 (G-numbers), and names what it supports; and it is citable
 downstream — design docs, specs, and code commits justify
 choices by citing D-numbers. New entries carry their supports;
@@ -47,6 +50,108 @@ search will act on it. A dated word cannot cause a bug; a
 wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
+
+## Open questions
+
+Questions awaiting adjudication — the front of this record rather
+than a separate one, since what settles them is an entry below.
+Nothing here binds anything; a question leaves this section by
+becoming a D-number, and the commit that moves it is the record.
+
+A question that gates a specific unbuilt feature is **not** here: it
+sits in that feature's own "Decide first" block, in
+[proposed/FEATURES.md](proposed/FEATURES.md) or
+[accepted/FEATURES.md](accepted/FEATURES.md), because it is the design round
+to run before that feature's deliverables start. What follows is
+what gates nothing in particular.
+
+### Still needed
+
+- **Cross-script reuse**: whether repeated behavior eventually
+  justifies a constrained include mechanism. There is deliberately
+  no handler-splicing macro in the initial language; real scripts
+  must establish the need and a design that preserves local control
+  flow and transcript provenance. A named user desire is now on
+  record (owner, 2026-07-21, the bundling wrinkle): complex
+  scripts split into multiple interacting files, like programming
+  source files. Asset *factoring* — several scripts, catalog
+  landmarks, and media definitions referencing each other through
+  one asset root — is already served by authored-asset
+  resolution; what stays open is behavior reuse, and any future
+  include must preserve the static graph (G3), the
+  non-computational surface (G2), and transcript provenance.
+- **Blueprint computational constructs**: which bounded
+  declarative constructs the blueprint format eventually grows.
+  Computational expansion is an anticipated growth area, and its
+  governing rule is decided (this file, 2026-07-23):
+  a construct that enriches values may land as plain data
+  expanded by Reliquary — the parked extraction short-circuit
+  and a variant/matrix expansion are the candidates on record —
+  while general computation never enters the JSON tree. It would
+  arrive only as a layer producing plain blueprints: generation
+  above via the embedding API, or a JSON-superset evaluation
+  layer (Jsonnet the leading candidate — JSONC is already valid
+  Jsonnet). In-tree function objects and string templating are
+  permanently rejected. What stays open is only which constructs,
+  and when one earns its keep.
+- **Per-drive backend settings**: whether they are ever needed
+  beyond the top-level `backend-settings` scope.
+- **Promoting runtime changes**: whether a convenience command
+  copies a state-side runtime change (e.g. attached media) back
+  into the blueprint, or users always edit the blueprint by hand.
+- **Machine cache cleaning**: whether a `clean machines` command
+  reclaims cached materializations of stopped machines wholesale
+  (they regenerate like everything else under `cache/`), or
+  whether `recreate-machine`/`destroy-machine` per machine is
+  enough.
+- **Friendly machine aliases**: machine identity is already
+  human-readable (`<blueprint>-<n>`); still open is whether
+  listings and selectors additionally offer docker-style generated
+  word aliases, or whether numbered ids plus blueprint selection
+  make them unnecessary.
+
+### Deferred to 1.0
+
+- **Format versioning**: pre-1.0, user documents carry no
+  version field and no `$schema` field (settled, owner 2026-07-21;
+  the horizon moved from beta to 1.0 with the compatibility rule,
+  D25, on the same argument:
+  a pinned schema reference is a version field in disguise, and a
+  pre-1.0 document has no format vintage — the only schema that
+  matters is the installed Reliquary's, which editors bind by file
+  association; an embedded pin would go stale in seeded files
+  under never-overwrite and let the editor pass what Reliquary
+  rejects). When compatibility guarantees arrive — no earlier than
+  1.0 — the leading candidate spelling for the version field is
+  `$schema` as a versioned URL: one field declaring the document's
+  format version and binding editors to the matching published
+  schema.
+
+### Watches — re-ask as these harden
+
+Standing questions rather than pending decisions: each is a design
+pressure to re-examine as the surface around it firms up, and none
+is waiting on an answer today.
+
+- live-run progress surface (G4 during the run — ties to
+  run-events; the feedback split,
+  [PRINCIPLES.md](../ARCHITECTURE.md) P5, names
+  the demand)
+- GUI/landmark assets forming a new authored artifact class
+  (hardened 2026-07-21: .rlql is the fourth authored extension —
+  the INTERFACES listing is due at the asset-spec/realignment
+  pass)
+- published JSON Schemas elevating `reliquary-machine.json` into a
+  public contract (the blueprint and media-definition schemas
+  are authored — below; the state schema and its
+  public-contract elevation landed with milestone 6)
+- the adapter API becoming world-facing
+  (../design/backend-adapter.md is INTERNAL by decision,
+  owner 2026-07-21 — a real third-party adapter story elevates
+  it into the INTERFACES inventory through the interface-change
+  rule, never by drift)
+
+## Decided
 
 - D41 — THE IDENTITY LEDGER IS DELETED; `add-media` AUTHORS A
   DECLARATION — DECIDED (owner, 2026-07-26). Supports P4, P8;
@@ -652,7 +757,7 @@ record, and often the most useful part of it (D29).
   FOLDED: the move; USE-CASES.md's own links and its
   root-placement note; PRINCIPLES.md, AGENTS.md,
   planning/INTERFACES.md, planning/ROADMAP.md,
-  planning/USE-CASE-PROPOSALS.md, planning/design/recorder.md,
+  planning/USE-CASE-PROPOSALS.md, planning/accepted/design/recorder.md,
   this file's preamble, and the documentation-rules skill's
   placement list. Historical DECISIONS entries keep their
   `planning/USE-CASES.md` spellings under the spellings rule.
@@ -683,7 +788,7 @@ record, and often the most useful part of it (D29).
   STATE THE ROUND FOUND: cli.py registers the subparser,
   docs/cli-reference.md documents it, README mentions it, and
   the only thing it can do is raise `NotImplementedError` —
-  while planning/design/cli.md already states "There is no
+  while docs/spec/cli.md already states "There is no
   `delete-media`". THE SHIPPED SURFACE AND ITS DESIGN DOC WERE
   IN CONTRADICTION, and the doc was right. A live world-facing
   command whose entire behavior is a failure is the
@@ -1969,7 +2074,7 @@ record, and often the most useful part of it (D29).
   FILES — DECIDED (owner, 2026-07-22). A new ROADMAP milestone 5
   lands Packer's ephemeral local HTTP server for Kickstart /
   preseed / AutoYaST / `unattend.xml` and kin
-  (planning/design/http-serve.md). Former milestones 5–12 renumber
+  (docs/spec/http-serve.md). Former milestones 5–12 renumber
   to 6–13. Interface triage (planning/INTERFACES.md): strong
   alignment with U1 and with U4/U5 where those answer files are
   the installer's native path — easy approval; no use-case
@@ -1985,7 +2090,7 @@ record, and often the most useful part of it (D29).
   pointers in ROADMAP, TASKS, and design status notes move with
   the renumber. Folded: ROADMAP (synopsis, procedural/declarative,
   milestones 5–13, Horizon, guest-communication closing),
-  planning/design/http-serve.md (new), TASKS forward refs,
+  docs/spec/http-serve.md (new), TASKS forward refs,
   backend-adapter / guest-communication / landmarks status
   banners.
 
@@ -2093,7 +2198,7 @@ record, and often the most useful part of it (D29).
     script plus asset files, one mode instead of two
 
 - D11 — THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED;
-  planning/design/script-spec.md is the source of truth (full typed
+  docs/spec/script-spec.md is the source of truth (full typed
   EBNF included) and planning/design/script-examples/design-install.rlqs
   the reference script. Realigning the implementation is ROADMAP
   milestone 4, the arc's next work. The round records:
@@ -2630,7 +2735,7 @@ record, and often the most useful part of it (D29).
      destroy_machine; lifecycle.py's legacy start_machine(config)
      name collision dies with the root-home model. FOLLOW-UP (owner,
      2026-07-21): the API now has its own documents — the design is
-     consolidated in planning/design/api.md (principles, conventions,
+     consolidated in docs/spec/api.md (principles, conventions,
      the CLI↔API surface index, the two handles, realignment
      renames) and the implemented binding is documented in
      docs/api-reference.md; INTERFACES' embedding-API section and
@@ -2877,7 +2982,7 @@ record, and often the most useful part of it (D29).
       -cookbook, instance-model, media-spec, property-registry.
       docs/ and README follow at implementation realignment
 - D7 — API DESIGN GAP QUEUE (owner-requested review, 2026-07-21:
-  planning/design/api.md walked against planning/INTERFACES.md /
+  docs/spec/api.md walked against planning/INTERFACES.md /
   planning/USE-CASES.md, the CLI design, and Python practice; verdict:
   the twin-name identity rule, the --json twin's-return rule, pull-only
   handles, and the named-omission discipline are sound — the gaps were
@@ -3028,7 +3133,7 @@ record, and often the most useful part of it (D29).
      queued, landing per item 5's hybrid homes
   8. RESOLVED (owner, 2026-07-21, design session — all four forks
      on the recommendations): the backend-adapter design output is
-     AUTHORED — planning/design/backend-adapter.md, the provider
+     AUTHORED — planning/proposed/design/backend-adapter.md, the provider
      seam's doctrine: the three-layer split (machine model above
      the seam unmoved, adapter, control planes composing
      carriers), the seam inventory with extraction sources
@@ -3683,7 +3788,7 @@ reopening one is argued through the interface-change rule.
   round, before any of it was implemented) — COMPOSED BLUEPRINT
   MODEL + MEDIA-RESIDENCY CACHE — DECIDED
   (owner, 2026-07-23, the media/composition design round). Full
-  worked design: planning/design/blueprint-model.md (the source of
+  worked design: docs/spec/blueprint-model.md (the source of
   truth, normative until the specs realign to it). Interface triage
   (planning/INTERFACES.md): the machine blueprint and the media
   definition are both world-facing interfaces, so this is a MAJOR

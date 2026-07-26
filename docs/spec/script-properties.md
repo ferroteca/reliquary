@@ -22,8 +22,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > location references** binding at `create` / `apply` through the
 > same order, the resolved location recorded in state and never
 > re-resolved at `start`, chaining refused. Windows is the
-> only host whose credential backend is exercised (ROADMAP
-> "Horizon", host portability). Details may still change before
+> only host whose credential backend is exercised (planning/proposed/FEATURES.md,
+> "Host portability"). Details may still change before
 > first release.
 
 Script properties carry the values scripts consume without
@@ -130,7 +130,7 @@ blueprint's parameters, the environment, this file, then an
 interactive ask (owner, 2026-07-21; the order is normative in the
 [script spec](script-spec.md#the-property-sources)). The blueprint
 side belongs to the [blueprint
-reference](machine-blueprint-reference.md#parameters); this
+reference](../blueprint-reference.md#parameters); this
 document owns the operator-side mechanics:
 
 - **Command line** — a repeatable `--property <key>=<value>`
@@ -224,7 +224,7 @@ the parked candidates); transforms in derivation syntax are
 permanently out — normalization lives in a fact's definition,
 arbitrary computation in the embedding API's provider seam.
 
-A blueprint [redirect](machine-blueprint-reference.md#parameters)
+A blueprint [redirect](../blueprint-reference.md#parameters)
 resolves its target key through the non-blueprint sources here: a
 CI run may satisfy a redirect to
 `products.windows-98.install-key` from its own
@@ -321,7 +321,7 @@ its credential.
 
 The embedding-API twins are `list_properties(prefix=None)`,
 `get_property(key)`, `set_property(key, value, secret=False)`, and
-`unset_property(key)` (planning/design/api.md). One named divergence
+`unset_property(key)` (docs/spec/api.md). One named divergence
 (owner, 2026-07-21): `set_property` takes a secret's value as its
 ordinary in-memory `value` parameter — the CLI's entry channels exist
 because argv leaks into process listings and shell history, which an

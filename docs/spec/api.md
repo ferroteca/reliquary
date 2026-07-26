@@ -37,7 +37,7 @@ SPDX-License-Identifier: BSD-3-Clause
   typed results and raise by error class; the CLI speaks streams,
   documents (`--json`), and exit codes. Twins in capability,
   divergent in presentation — a named decision, not drift
-  (planning/ROADMAP.md "Asynchronous runs").
+  (planning/proposed/FEATURES.md "Asynchronous runs").
 - **No backward compatibility before 1.0.** The implemented
   binding realigns to the settled names below when the
   realignment lands; there are no aliases or shims.
@@ -82,7 +82,7 @@ SPDX-License-Identifier: BSD-3-Clause
   mirror is exact (settled 2026-07-21): the command prints the
   twin's return serialized as one JSON document, so a return
   contract is also the command's machine-readable output
-  contract (planning/ROADMAP.md "The CLI"). Returns are plain
+  contract (docs/spec/cli.md). Returns are plain
   JSON-shaped values (owner, 2026-07-21): a union of document
   shapes is ordinary JSON — `get_property` returns an ordinary
   value's string but a secret's marker, exactly as `--json`
@@ -94,7 +94,7 @@ SPDX-License-Identifier: BSD-3-Clause
   appear, an existing field never changes type or meaning, and a
   removal or rename is a breaking change — consumers tolerate
   unknown fields; pre-1.0 the shapes may change with the specs
-  (the CLI stability contract, planning/ROADMAP.md "The CLI").
+  (the CLI stability contract, docs/spec/cli.md).
 - **Errors — the taxonomy is named** (owner, 2026-07-21):
   blocking forms raise by error class under one root. Python
   spells the root `ReliquaryError` — every deliberate Reliquary
@@ -117,7 +117,7 @@ SPDX-License-Identifier: BSD-3-Clause
   which *return* their output and store nothing — D36, so the
   record-management verbs go to the backlog too): a long
   operation is one start+attach model with
-  two projections (planning/ROADMAP.md "Asynchronous runs"). The
+  two projections (planning/proposed/FEATURES.md "Asynchronous runs"). The
   CLI composes them: every foreground command is
   start-plus-attach, and `--detach` is start without attach. The
   API separates them: the blocking twin (`run_script()`,
@@ -154,7 +154,7 @@ carries the exceptions and each family's contract home.
 
 | CLI | API twin | contract home |
 |---|---|---|
-| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores | [blueprint guide](machine-blueprint.md) |
+| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores | [blueprint guide](../blueprint-guide.md) |
 | `export-drive` / `export-machine` | `export_drive(key, destination)` / `export_machine(to=, destination=None)` — stream-bearing; `to=` names an exporter (a vocabulary decoupled from backends) and is required | blueprint guide |
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |
@@ -168,7 +168,7 @@ carries the exceptions and each family's contract home.
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the out-of-band door | [instance model](instance-model.md) |
 | `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
 | in-band file put/get | guest-terms addressed (P17), over a vvfat drive, stopped-only, non-vvfat fails closed (P11) — milestone 9 (U14); names settle with the work | script spec |
-| `list-machines` / `list-blueprints` / `list-scripts` / `list-media`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [ROADMAP "The CLI"](../ROADMAP.md); each noun's returns: that noun's spec, as they land |
+| `list-machines` / `list-blueprints` / `list-scripts` / `list-media`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
 | guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
 
@@ -200,7 +200,7 @@ interaction run (`begin_run` / `end_run`) exactly as a script
 run.
 Contract:
 [script spec](script-spec.md) "Failure, runs, and transcripts"
-and planning/ROADMAP.md "Asynchronous runs".
+and planning/proposed/FEATURES.md "Asynchronous runs".
 
 **The fetch handle** (`start_fetch()`): the same pull vocabulary
 over an ephemeral stream — process-local, no attach-by-id
@@ -223,6 +223,6 @@ surface is superseded by the blueprint machine model
 to a stopped machine's drives — `hostdir` drives and the user's
 own image tooling, the machine directory reported by
 `get-machine-dir` — with in-band file operations deferred to a
-late milestone (planning/ROADMAP.md "Horizon") and no script
+late milestone (planning/proposed/FEATURES.md "Horizon") and no script
 verbs; vvfat survives as the QEMU adapter's `hostdir`
 mechanism).

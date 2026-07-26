@@ -83,7 +83,7 @@ class AssetSource:
         """Return every composed ``.rlqb`` document in this source.
 
         The composed model reads all ``.rlqb`` into one ``(name, type)``
-        component namespace (planning/design/blueprint-model.md), rather
+        component namespace (docs/spec/blueprint-model.md), rather
         than indexing one file kind per extension.
         """
         raise NotImplementedError

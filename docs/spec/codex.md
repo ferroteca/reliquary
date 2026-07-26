@@ -36,7 +36,7 @@ Reliquary **copies it out**. From that point on it is an ordinary
 user-owned file — edit it, delete it, version it. (The codex
 serves the home's human-interaction side only: it is never used
 for machine automation — a project commits its own copies. See
-[PRINCIPLES.md](../../PRINCIPLES.md) P4, the artifact-residency split.)
+[ARCHITECTURE.md](../../ARCHITECTURE.md) P4, the artifact-residency split.)
 
 Two rules carry the model:
 
@@ -88,9 +88,9 @@ Both paths obey the never-overwrite rule.
 
 Codex blueprints are JSONC
 documents (see
-[format stability](machine-blueprint.md#format-stability-none-yet))
+[format stability](../blueprint-guide.md#format-stability-none-yet))
 and use comments deliberately: a codex blueprint annotates its
-[customization seams](machine-blueprint.md#customization-seams) —
+[customization seams](../blueprint-guide.md#customization-seams) —
 `// this parameter is your registered owner name` — so the
 seeded copy teaches at exactly the point of edit (U5). Extraction
 copies files verbatim, comments included.
@@ -179,7 +179,7 @@ convention identifies ownership, not a namespace.
 A blueprint may declare a `scripts` map — short labels naming
 `.rlqs` script files — plus an optional `description`
 fields for discovery (see the
-[field reference](machine-blueprint-reference.md)). The labels are
+[field reference](../blueprint-reference.md)). The labels are
 the verbs you use with `run-script`:
 `rlq run-script install --blueprint freedos` looks up
 `scripts.install` and runs the script it names, creating a machine

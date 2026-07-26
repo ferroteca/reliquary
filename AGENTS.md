@@ -28,7 +28,7 @@ workflow:
   a `--assets <dir>` project root walked recursively by extension as the sole hermetic source), `source_for`, and the
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API names its
   source or fails closed (no home/CWD default), and an `ObjectSource` of JSON-imported objects is the planned third
-  source, `document.py` is the `.rlqb` parser (normative spec: `planning/design/blueprint-model.md`) —
+  source, `document.py` is the `.rlqb` parser (normative spec: `docs/spec/blueprint-model.md`) —
   `parse_document` / `load_document` build a `Document` of `machines` / `media` from a root array of specs (a lone
   spec object is sugar for the array of one; `type` defaults to `media`, so an untyped object is a media and the
   media branch's unknown-field error carries a did-you-mean when machine vocabulary appears), dataclasses `Machine`,
@@ -189,42 +189,75 @@ workflow:
   media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
-- `planning/ROADMAP.md` contains maintainer-facing design and roadmap for planned interfaces and architecture. The
-  flow runs one way: the roadmap flows from the use cases, and `planning/TASKS.md` flows from the roadmap and from
-  issues — the GitHub tracker, with the TASKS.md backlog the parking place for non-GitHub issues. A task is either
-  scheduled for the sprint or backlogged, and a milestone item is picked up by translating it into a sprint
-  tasklist; small one-offs are issues, and a small obvious needed fix goes directly to tasks. In theory every
-  issue points to a use case or principle; small ones may be deemed obvious.
-- `planning/INTERFACES.md` is the governing document for Reliquary's world-facing interfaces: it names the interface
-  inventory (CLI, embedding API, scripting language, and machine blueprints — media, source, and archive are
-  components inside the blueprint — plus the
-  script properties, recorded outputs, and the home layout) and the
-  vetting rule every interface-changing decision must follow. The numbered use cases — the decision
+- `planning/README.md` is the map of the maintainer-facing planning machinery, and the place to start. The
+  directories are the classification, and they hold the **same three filenames** — `USE-CASES.md`,
+  `ARCHITECTURE.md`, `FEATURES.md` — because they hold the same three artifacts in two states:
+  `planning/proposed/` is argued but not accepted, and nothing is worked from there; `planning/accepted/` is
+  approved but not yet delivered. Promotion is by *moving* a document or an entry, and the commit is the
+  acceptance record. The **planning root** holds what never moves and so has no state — the map, the vetting
+  rule (`INTERFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, accepted, refused and
+  retired alike), and the task queue. Design sits with what it serves: `planning/proposed/design/` and
+  `planning/accepted/design/` for a feature's own design, `planning/design/` for open design problems serving
+  no single feature — the whole-system view itself (the seams model and the P-numbered principles) is root
+  `ARCHITECTURE.md`. Once an interface ships, its normative spec moves to `docs/spec/` — current truth does not
+  live under `planning/`.
+- `planning/TASKS.md` is the third work input queue, beside GitHub issues and `planning/proposed/`: small,
+  **pre-approved** work — entering it is approving it — with no scheduled order, so anyone may pick up
+  anything. Work that only makes sense as part of one accepted feature lives with that feature in
+  `planning/accepted/FEATURES.md` instead. Small one-offs are really just issues, and work small and obvious
+  enough needs no entry at all (housekeeping, D38). In theory every issue points to a use case or principle;
+  small ones may be deemed obvious.
+- `planning/INTERFACES.md` is the interface-change rule: how every interface-changing decision is weighed. The
+  interface inventory it scopes over (CLI, embedding API, scripting language, and machine blueprints — media,
+  source, and archive are components inside the blueprint — plus the script properties, recorded outputs, and
+  the home layout) lives in root `ARCHITECTURE.md` "The interfaces", where the housekeeping lookup answers by
+  checklist. The use cases, the architectural principles, and the specs are together the project's **vision** —
+  the standing statement of what Reliquary is and is for. The numbered use cases — the decision
   surface that rule weighs against — live in root `USE-CASES.md` (implemented-only: every use case there is
-  met by the code today, no placeholders); everything else is tracked in `planning/USE-CASE-PROPOSALS.md`, numbering from the
-  same global U-sequence and moving over when delivered (scheduling in the roadmap is acceptance; delivery
-  makes it current). Every roadmap item cites the use case — in force or proposed — or the governing principle
-  that demands it: principles drive tasks and roadmap items just as use cases do. The governing
-  principles are itemized as P-numbers in root `PRINCIPLES.md` — standing-only, every entry honored by the code
-  today (proposed changes in
-  `planning/PRINCIPLE-PROPOSALS.md`, same lifecycle); decisions in `planning/DECISIONS.md` carry
+  met by the code today, no placeholders). Use cases run through **three** locations, because acceptance and
+  delivery are different events: drafted in `planning/proposed/USE-CASES.md`, accepted in
+  `planning/accepted/USE-CASES.md` (the move is the acceptance), and current at the root on full delivery — one
+  global U-sequence throughout, no placeholder left by either move. Every accepted item cites the use case — in
+  force, accepted, or proposed — or the architectural principle that demands it: principles drive tasks and features
+  just as use cases do. The architectural
+  principles are itemized as P-numbers in root `ARCHITECTURE.md` — standing-only, every entry honored by the code
+  today, with `planning/proposed/ARCHITECTURE.md` and `planning/accepted/ARCHITECTURE.md` the same three-state
+  ladder; promotion to the root list is what *arms* a principle, since only there does a divergence become a
+  bug. Decisions in `planning/DECISIONS.md` carry
   permanent D-numbers, generally support use cases or principles, and are the citation handle for design choices
   and code commits — overruled decisions sit in that file's Retired list.
-- `planning/examples/` contains a complete FreeDOS example: a composed `.rlqb` blueprint (the machine plus its media and
-  archive components) and scripts, the install script inserting the LiveCD media the blueprint carries. Its README
-  carries the status note. Keep the examples synchronized with `planning/design/` when the formats change.
-- `docs/` holds user-facing documentation for implemented features
-  (CLI reference, Python API reference, blueprint guide, DOS
-  automation). Design documents
-  and planned interfaces live in `planning/design/` — the directory
-  is the classification; file names carry no suffix. The one composed
-  blueprint JSON Schema is published and packaged at
-  `reliquary/schemas/blueprint-schema-v1.json` (versioned v1 so
-  editors can bind it today); the machine-state schema
-  (`machine-state.schema.json`) sits beside its spec in
-  `planning/design/`. Both must stay synchronized with the prose specs
-  (which are normative); the shared valid/invalid conformance corpus
-  (`reliquary_tests/fixtures/conformance/`,
+- The worked FreeDOS example is the shipped codex itself (`reliquary/codex/`): the `freedos.rlqb` blueprint with
+  its media and archive components, and the install and verify scripts. It is the live, tested copy — seeded into
+  a user's home on first reference — so there is no second copy to keep synchronized.
+- `docs/` describes the live situation. `docs/spec/` holds the
+  **normative specifications** of every interface — the CLI, the
+  embedding API, the scripting language, the blueprint model, media,
+  properties, asset resolution, the instance model, the codex, and
+  the answer-file server. A spec is the authority
+  the implementation answers to, not a report on it: where a spec and
+  the code disagree, the spec is right and the code has a bug, unless
+  the spec is changed first through the interface-change rule. The
+  rest of `docs/` is descriptive — user-facing references and guides,
+  and a reference that contradicts a spec is the reference's bug.
+  **The banner is the marker, the directory is shelving**: every
+  spec declares its standing in its own banner, and every
+  descriptive document names the norm it defers to. One norm is
+  split across artifact kinds: the blueprint's structure is normed
+  by the published schema and its semantics by
+  `docs/spec/blueprint-model.md`, so the blueprint guide, field
+  reference, and cookbook are descriptive `docs/`.
+  Design lives under `planning/` instead: with its feature in
+  `planning/proposed/design/` or `planning/accepted/design/`, or in
+  `planning/design/` when it serves no single feature.
+- **Machine-readable schemas ship inside the package**, at
+  `reliquary/schemas/`, because code consumes them:
+  `blueprint-schema-v1.json` (versioned v1 so editors can bind it
+  today) and `machine-state.schema.json`. `docs/spec/` refers to
+  them rather than holding them. Both must stay synchronized with the
+  prose specs, **which are normative** — a schema captures only the
+  structural subset JSON Schema can express, and schema validity
+  never implies document validity. The shared valid/invalid
+  conformance corpus (`reliquary_tests/fixtures/conformance/`,
   `test_conformance_corpus.py`) runs every fixture against both the
   parser and the schema so the two cannot drift. Placement rules
   are in `.agents/skills/documentation-rules.md`.
@@ -261,8 +294,8 @@ changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md)
 numbered use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
 work starting only after the amendment lands — then the change is named across every surface it touches
-and landed coherently on all of them. Where planning/ROADMAP.md and planning/INTERFACES.md or USE-CASES.md disagree, the
-principles and use cases govern; the roadmap is realigned to them.
+and landed coherently on all of them. Where a docs/spec/ specification and planning/INTERFACES.md or
+USE-CASES.md disagree, the principles and use cases govern; the design is realigned to them.
 
 ### CLI–API parity
 
@@ -312,7 +345,7 @@ process-global default via `--home`/`--cache` — scoped `Context` objects are a
 plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
 deliberately left alone. Never write beside the module or into the source repository during normal use.
 
-Authored-asset residency is a separate axis from the home (ROADMAP "Authored-asset resolution"; `assets.py`). Blueprints
+Authored-asset residency is a separate axis from the home (design/asset-resolution.md; `assets.py`). Blueprints
 (their media, source, and archive components included) and scripts resolve in one of two modes, carried on
 `Context.assets` / the `set_assets` global:
 **home mode** (`HOME_ASSETS` — the CLI default when `--assets` is absent) reads the home's canonical `blueprints/` /
@@ -379,7 +412,7 @@ reads that section); `start_machine()` returns the port for callers to propagate
 ### DOS boot and scripting
 
 A machine's drives are declared in its blueprint (the field reference,
-`planning/design/machine-blueprint-reference.md`), each naming a media
+`docs/blueprint-reference.md`), each naming a media
 component; per-machine images are materialized into
 `cache/machines/<id>/media/`, named for the media.
 `machine_drive_args()` (`machines.py`) renders them from the machine
@@ -410,7 +443,7 @@ hard disk, `floppy` as a vvfat 1.44M FAT12 floppy).
 ### Script dispatch
 
 The `.rlqs` runtime's semantics are defined over **samples** (discrete readings of the machine) and the
-**episodes** a condition's consecutive holding samples form — planning/design/script-spec.md, "Execution
+**episodes** a condition's consecutive holding samples form — docs/spec/script-spec.md, "Execution
 model". Preserve these when touching `script_runner.py`:
 
 - Dispatch is single-threaded and run to completion: no sample is taken while a statement list executes, so
@@ -442,7 +475,7 @@ the old root-home state files (a root `machine.json`, `drives/`,
 model writes), and the legacy `drives.py` auto-discovery — was absorbed
 into this model and deleted (no backward compatibility before 1.0). The user-facing reference is
 `docs/api-reference.md`; the end-goal API design (settled twin names,
-conventions, handles) is `planning/design/api.md`.
+conventions, handles) is `docs/spec/api.md`.
 
 Doctrine to preserve:
 
@@ -462,7 +495,7 @@ Doctrine to preserve:
 - The project is pre-release; prefer a coherent interface over
   compatibility shims when its architecture changes. The embedding API
   expects native bindings beyond Python (planning/INTERFACES.md;
-  planning/ROADMAP.md "The CLI"): never adopt a design that would be
+  docs/spec/cli.md): never adopt a design that would be
   difficult to express in a common binding language such as C or Java,
   and hold the CLI to the same constraint as the fallback binding for
   unbound languages — never make it difficult to drive from a program.
@@ -484,7 +517,7 @@ Doctrine to preserve:
   support the project has not tested. Under P11 an untested platform
   is an unclaimed capability, not a quiet promise. Claiming another
   host means running the suite there, in CI or on real hardware —
-  the three gating jobs are itemized in ROADMAP "Horizon" under
+  the three gating jobs are itemized in proposed/FEATURES.md "Horizon" under
   host portability (U18 is the drafted case for reaching one from
   here).
 - Keep lines near 79 columns and match existing formatting.

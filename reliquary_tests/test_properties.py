@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """The line-based user properties file.
 
-Spec: planning/design/script-properties.md.
+Spec: docs/spec/script-properties.md.
 """
 
 import os

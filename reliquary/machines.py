@@ -80,7 +80,7 @@ def _default_control_planes(platform):
     """The platform's default control-plane policy.
 
     Every current platform defaults to agentless display — the
-    universal, cooperation-free plane (machine-blueprint-reference.md).
+    universal, cooperation-free plane (blueprint-reference.md).
     Richer per-platform defaults arrive with the adapter seam.
     """
     return ["agentless-display"]
@@ -384,7 +384,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
             # `enabled: false` removes the drive from the machine
-            # entirely (machine-blueprint-reference.md).
+            # entirely (blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
             key, drive, media_root, namespace, context, properties, events)
