@@ -180,3 +180,56 @@ Work items:
 - a D-number recording the interface-change triage. As it stands:
   no use case is cost and several are served — an easy approval
   under the interface-change rule
+
+## F23 — In-band listing and whole-tree file transfer
+
+> **Pledged 2026-07-27 by D57**, which pledged **P16** and priced
+> it: these two operations are the only places the shipped
+> QEMU/DOS workflow fails P16's test, so they stop being deferred
+> convenience and become owed work. Promoted out of
+> [proposed/FEATURES.md](../proposed/FEATURES.md)'s Horizon, where
+> they had been sequenced against the second backend; **that
+> coupling is cut** — the second backend left the numbered arc
+> with D33, and P16 does not wait on it. Serves **U14** and
+> **U20**, demanded by **P16**.
+
+THE GAP, IN P16'S TERMS. A consumer that needs to know what files
+a stopped machine's drive holds, or to move a whole tree in or
+out, has no verb to ask. It must open the drive directory itself —
+which is exactly what P16 forbids Reliquary to require. Single-file
+exchange is already served (`put-file` / `get-file`, milestone 9),
+so the gap is precisely listing and bulk.
+
+THE VERBS: `list-files` / `get-files` / `put-files` (twins
+`list_files` / `get_files` / `put_files`), stopped-machine
+operations under CLI–API parity.
+
+**THE ADDRESSING MUST BE REDESIGNED, NOT RESUMED.** D5's rough
+`<drive-key>:<path>` shape is illegal: **P17 refuses it**, armed
+D47, because `hdd0:` is a blueprint key no guest ever says. The
+shipped verbs address in guest terms (`A:\JOB.BAT`) and these must
+match — one address vocabulary, not two spellings of it. F15 is
+the neighbour that settles the same question from the other side.
+
+The rest of D5's shape stands: images reached through the
+adapter's at-rest filesystem access, directory-source media
+directly; capability-honest per call, so a drive whose filesystem
+the adapter cannot read fails **by name** (P11); `media` drives
+excluded; directories recursive; no record custody — files land
+where the caller says.
+
+Work items:
+
+- the guest-terms address form these share with `put-file` /
+  `get-file`, settled once for all five verbs
+- `list-files`, and what it returns: the shape is a contracted
+  `--json` document under P7, so it is designed before it is built
+- `get-files` / `put-files` over a directory-source drive, the
+  path the shipped single-file verbs already take
+- the same over an image through the adapter's at-rest access,
+  where the filesystem may be unreadable and must fail by name
+- `get-files`' destination default, which D5 left to this round
+- CLI and API twins land together (parity)
+- P16's promotion rides this work (D34): when these land, P16
+  moves to the root list with its residue — backends with no
+  vvfat equivalent — filed as a defect in the same change

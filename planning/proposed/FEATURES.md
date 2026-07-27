@@ -858,17 +858,19 @@ here before any work starts.
 
 > **Entered 2026-07-27** from a consuming project's proposal
 > (owner: admitted as a proposal). Demanded by **P17**, in force
-> since D47, and the **P16** draft — P16 because the capability is
-> reached today only by a caller reproducing Reliquary's internal
-> model outside it, and P17 because the answer it owes is an
-> address in the guest's own terms. Half this citation is now a
-> standing rule rather than a hope, which is the practical
-> difference arming makes. Serves **U14** and **U20**. Its
-> neighbour is the deferred in-band file family (D5's
-> `<drive-key>:<path>` shape, Horizon below) — an address form
-> P17 refuses outright now that it binds, so reopening it is no
-> longer optional; if both land, they settle one address
-> vocabulary or two spellings of it.
+> since D47, and **P16**, pledged since D57 — P16 because the
+> capability is reached today only by a caller reproducing
+> Reliquary's internal model outside it, and P17 because the
+> answer it owes is an address in the guest's own terms. **Neither
+> half of this citation is a hope any more**: one is a standing
+> rule, the other an owed one, which is what arming and pledging
+> respectively buy. Serves **U14** and **U20**. Its neighbour is
+> [F23](../pledged/FEATURES.md), the in-band file family, pledged
+> out of Horizon by the same decision — D5's
+> `<drive-key>:<path>` shape is an address form P17 refuses
+> outright now that it binds, so redesigning it is no longer
+> optional; if both land, they settle one address vocabulary
+> rather than two spellings of it.
 
 A caller that needs a host directory visible to a guest **synthesizes
 a directory-source drive into the blueprint**, which forces it to
@@ -1331,32 +1333,12 @@ before the work does.
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.
-- In-band **directory** operations against a stopped machine's
-  drives — what is left of the deferred half of the dropped
-  run-collection model (owner, 2026-07-22), **narrowed and
-  partly overtaken 2026-07-27**: single-file exchange is no
-  longer deferred, `put-file` / `get-file` having landed at
-  milestone 9. What remains is listing and whole-tree transfer:
-  `list-files` / `get-files` / `put-files` (twins `list_files` /
-  `get_files` / `put_files`).
-  **Its recorded addressing is now illegal and must be
-  redesigned, not resumed.** The `<drive-key>:<path>` shape D5
-  roughed is the host-flavoured form **P17 refuses** — armed
-  D47, and `hdd0:` is a blueprint key no guest ever says. The
-  shipped verbs address in guest terms (`A:\JOB.BAT`), and
-  whatever these grow must match; F15's text says reopening this
-  is no longer optional.
-  The rest of the rough shape stands: images reached through the
-  adapter's at-rest filesystem access, directory-source media
-  directly; capability-honest per call — a drive whose
-  filesystem the adapter cannot read fails by name; `media`
-  drives excluded; directories recursive; no record custody —
-  files land where the caller says (details such as
-  `get-files`' destination default are that round's to settle).
-  Value concentrates where out-of-band access thins — non-QEMU
-  backends, which have no vvfat equivalent, and non-FAT guest
-  filesystems — so sequence at or soon after the second backend
-  (backlog).
+*(The in-band directory operations that sat here were promoted
+to [F23](../pledged/FEATURES.md) on 2026-07-27, when D57
+pledged P16 and made them the two places the shipped workflow
+fails its test. Their sequencing against the second backend is
+cut with the move: P16 does not wait on it.)*
+
 - Media commands beyond `fetch-media` (verify, remove) —
   **split by D46** (2026-07-27), which put U13 in force:
   `verify` now stands on a use case in force ("verifies it is

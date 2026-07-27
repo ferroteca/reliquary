@@ -250,9 +250,11 @@ realistically a native guest agent for a tight loop. So it is
 not a near-term schedule request. What makes it worth numbering
 now is what it would *demand* if pledged: it is the first case
 that would put in-force weight behind the backlogged guest-agent
-work (D33 demoted it for lack of exactly this), behind the
-deferred in-band file operations, and behind **P16** and
-**P17** — a developer driving a Linux guest from Windows cannot
+work (D33 demoted it for lack of exactly this), behind
+[F23](../pledged/FEATURES.md)'s in-band file operations — pledged
+since D57, so this would schedule rather than justify them — and
+behind **P16**, pledged by the same decision, and **P17**, in
+force: a developer driving a Linux guest from Windows cannot
 reach around Reliquary into the guest's own filesystem, and
 would name that guest's files in the guest's own terms. Reliquary self-hosting
 its own cross-platform tests is the motivating instance; the

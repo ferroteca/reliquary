@@ -178,6 +178,86 @@ is waiting on an answer today.
 
 ## Decided
 
+- D57 — P16 IS PLEDGED; THE TEST IS WHAT A CONSUMER MUST DO —
+  DECIDED (owner, 2026-07-27, adjudicating the four questions the
+  2026-07-23 draft left open). Supports U14, U20; P11.
+  P16 moves to [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md);
+  the move is the pledge.
+  THE PRINCIPLE REDUCES TO ONE TEST (owner): *can every supported
+  use case be completed without the consumer reaching around
+  Reliquary?* Everything else the draft asked follows from it, and
+  two of its four questions dissolved under it rather than needing
+  answers of their own.
+  **THE OBLIGATION BINDS RELIQUARY, NOT THE USER** (owner,
+  verbatim: *"we can never prevent a consumer from reaching around
+  reliquary, and we shouldn't be overly surprised if they do. They
+  should never have to do this, to complete a supported use
+  case."*). This is the clause that makes P16 enforceable: it
+  constrains what Reliquary may *require*, so the violation is a
+  missing verb rather than a user's behaviour — and a missing verb
+  is a thing that can be built, tested, and struck.
+  **THE MECHANISM IS INVISIBLE TO THE TEST**, which dissolved
+  question 3. That question asked whether a `hostdir` drive is
+  "in-band by declaration, or the canonical instance of the
+  violation", and called the answer decisive for whether QEMU/DOS
+  complies. It was unanswerable twice over: `hostdir` retired at
+  milestone 7 (a host directory is now a media whose `location` is
+  a directory), and — the deeper fault — it asked about a
+  *mechanism* where the principle only ever asked about *who
+  reaches*. Reliquary serving `get-file` out of a vvfat directory
+  is an implementation detail. So compliance is not a property of
+  any drive type, and the question was wrong rather than merely
+  stale. Its restatement is the test above.
+  **QUESTION 1 (REACH) DISSOLVED TOO.** It asked whether P16
+  covers file exchange or every touch, naming `--display` and
+  `hmp` as the cases at stake. Under the consumer-obligation test
+  neither is a violation: no use case *requires* either, so they
+  are extras rather than routes. The scope list the question
+  wanted is unnecessary — one test settles it, which is the
+  cheaper shape (G6's instinct, applied to a principle).
+  QUESTION 4 (FORESEEABLE) TAKES THE DRAFT'S OWN CANDIDATE: a use
+  case **in force or pledged**. A principle binding on foresight
+  needs a test or it is unfalsifiable and can never be armed;
+  this one keeps P16 inside the lifecycle that already exists, and
+  makes a citation checkable — point at a U-number, not at an
+  intuition. Cost accepted: P16 cannot be cited against gaps
+  nobody has written a use case for.
+  QUESTION 2 (THE OUT-OF-BAND ROUTE) SURVIVES AS CONVENIENCE,
+  never as the answer. `get-machine-dir` stays and reaching in
+  stays possible; what changes is that no supported use case may
+  be *documented* as reachable only that way. D5 is not retired —
+  its drops (the `results` header, `stage`/`collect`, record
+  custody) stand on their own reasoning, and only its out-of-band
+  clause is narrowed. The edges D5 contracted are kept: running
+  drives untouchable, media cache read-only.
+  **WHAT THE PLEDGE COSTS, MEASURED AGAINST TODAY RATHER THAN
+  JULY.** Under the test, QEMU/DOS complies wherever a verb
+  serves the need — single-file exchange since `put-file` /
+  `get-file` landed at milestone 9 — and violates it in exactly
+  two places: **listing and whole-tree transfer**, where a
+  consumer needing either must read the drive directory itself.
+  Those stop being deferred convenience and become owed work,
+  pledged as F23 and decoupled from the second backend they had
+  been sequenced against. Nothing else in the shipped workflow is
+  in violation, so the pledge is cheaper than the draft feared —
+  the draft was written when the file half of U14 was served only
+  out of band, and milestone 9 moved that ground.
+  THE CITATION STRENGTHENED WHILE THE DRAFT SAT: U3 retired into
+  U14 (D51), so the loop P16 rests on is a use case in force
+  rather than a pledged one.
+  WHAT WOULD ARM IT: those two needs served by Reliquary verbs,
+  with every remaining residue filed as a defect in the same
+  change (D48). The residue to expect is backends with no vvfat
+  equivalent, where out-of-band is the only route that exists —
+  P11 names such a gap rather than hiding it.
+  FOLDED: this entry; proposed/ARCHITECTURE.md (P16 removed, no
+  stub — D23); pledged/ARCHITECTURE.md (P16, rewritten around the
+  test); pledged/FEATURES.md (F23, the two owed operations);
+  proposed/FEATURES.md (the Horizon in-band item promoted out;
+  F15's P16 citation upgraded from draft to pledged); TASKS.md
+  (the question-3 defect struck, its premise dissolved). No
+  CHANGELOG line: nothing release-facing moved.
+
 - D56 — RELIQUARY ADDRESSES ONLY WHAT IT CAN REASON ABOUT; P17
   CLARIFIED — DECIDED (owner, 2026-07-27). Supports P10, P11,
   P17. Fixes the drive-letter defect D47 filed the hour P17

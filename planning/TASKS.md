@@ -108,27 +108,6 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **P16's open question 3 asks about a construct that retired**
-  (left 2026-07-27 by the `hostdir` sweep, which fixed the other
-  five mentions and stopped here on purpose).
-  [proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md) asks
-  whether *"a `hostdir` drive is in-band by declaration, or the
-  canonical instance of the violation"*, and calls the answer
-  decisive: *"it decides whether QEMU/DOS is already compliant or
-  is the first thing to fix."* Milestone 7 retired that drive
-  type — a host directory is now a media whose `location` is a
-  directory — so the question cannot be answered as written, and
-  the thing it was meant to decide is still undecided.
-  **This is the owner's, not a sweep's**: rewording an open
-  adjudication's questions changes what is being adjudicated, and
-  this one is load-bearing. D47 recorded the question as
-  dissolved without touching the text, which is how it survived.
-  Whoever takes it should also read the correction the same sweep
-  made just above it — **milestone 9 narrowed P16's strongest
-  example**, since single-file in-band exchange now ships and the
-  violation P16 named has shrunk to listing, whole-tree transfer,
-  and backends with no vvfat equivalent.
-
 - **Ordinary user errors exit 1, the code reserved for
   Reliquary's own faults** (found 2026-07-27 while starting D55's
   preflight pass, which this blocks).

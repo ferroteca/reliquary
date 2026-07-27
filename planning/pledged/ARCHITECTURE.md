@@ -44,13 +44,76 @@ SPDX-License-Identifier: BSD-3-Clause
 > [DECISIONS.md](../DECISIONS.md) and triggers the planning-doc sweep,
 > its P-number the search key.
 
-**Empty today** (D47, 2026-07-27). P5 and P14 were the last two
-entries and both promoted: each had stated its own delivery
-condition — P5 when milestone 9 landed, P14 when milestone 7's
-parser refused an operator-bearing reference — and both conditions
-were met without anyone making the move D34 says rides the work.
+*(It was empty from D47 until P16 arrived. P5 and P14 were the
+previous entries and both promoted: each had stated its own
+delivery condition — P5 when milestone 9 landed, P14 when
+milestone 7's parser refused an operator-bearing reference — and
+both conditions were met without anyone making the move D34 says
+rides the work. An empty shelf is the healthy state rather than a
+gap to fill: a principle sits here only in the window between the
+project owing it and the code honoring it, and that window is
+meant to be short. A long occupancy is the thing to be
+uncomfortable about.)*
 
-An empty shelf is the healthy state rather than a gap to fill: a
-principle sits here only in the window between the project owing it
-and the code honoring it, and that window is meant to be short. A
-long occupancy is the thing to be uncomfortable about.
+**P16 — Reliquary is the only interface to a machine** — pledged
+2026-07-27 (D57, which adjudicated the four questions the draft
+left open; drafted 2026-07-23). Owner's proposal, verbatim: *"All
+foreseeable interaction with a VM should be through Reliquary. A
+known use case which expects out-of-band access to fulfil the
+user's goal, would violate this principle."* Rests on **U14** —
+the inject-execute-observe loop, in force since U3 retired into it
+(D51) — and **U20**.
+
+**THE TEST, WHICH IS THE WHOLE PRINCIPLE:**
+
+> Can every supported use case be completed without the consumer
+> reaching around Reliquary?
+
+**The obligation binds Reliquary, not the user** (owner, D57).
+Consumers can always reach around — a stopped machine's drives are
+plain host state and always will be — and nobody should be
+surprised when they do. What P16 forbids is *requiring* it: a
+supported use case whose completion needs the consumer to fetch
+for themselves is the violation, and reaching around is then a
+capability gap wearing a workflow's clothes.
+
+**THE MECHANISM IS INVISIBLE TO THE TEST** (owner, D57, dissolving
+the draft's third question). That Reliquary serves `get-file` out
+of a vvfat host directory is an implementation detail and no
+concern of this principle. The question is never what Reliquary
+uses; it is whether a Reliquary verb answers the need.
+
+WHAT IT DOES NOT ASSERT, or it will over-read on first citation:
+
+- **Export is a handoff, not a breach.** `export-machine` ends
+  with Reliquary letting go on purpose (P1); the artifact leaves
+  its purview by design. P16 governs machines Reliquary still owns.
+- **The guest's own world is untouched.** Guest logs, guest
+  history, and what a person does at a console are the guest's, as
+  the transcript-redaction contract already says.
+- **It is not the closed input model.** P15 closes how *authored
+  input* reaches Reliquary; P16 closes how *interaction with a
+  running or stopped machine* does.
+- **It is not a rule about escape hatches.** `--display` and `hmp`
+  are extras rather than routes: no use case requires either, so
+  neither is in violation. The consumer-obligation test settles
+  this without a scope list, which is why the draft's reach
+  question needed no separate answer.
+
+**WHAT IT COSTS, ALREADY PRICED** (D57). Under the test, QEMU/DOS
+complies for everything a verb serves — single-file exchange
+since `put-file` / `get-file` landed at milestone 9 — and violates
+it in exactly two places: **listing and whole-tree transfer**,
+where a consumer needing either must read the drive directory
+themselves. Those become owed work rather than deferred
+convenience, pledged as [F23](../pledged/FEATURES.md) and
+decoupled from the second backend they had been sequenced against.
+
+**WHAT WOULD ARM IT.** Promotion to the root list when those two
+needs are served by Reliquary verbs, with every remaining residue
+filed as a defect in the same change (D48's bar: *honored as a
+rule*, not exhaustively proven). The known residue to expect is
+backends with no vvfat equivalent, where the out-of-band route is
+the only one that exists — capability honesty (P11) names such a
+gap rather than hiding it, and a named gap is not a silent
+violation.
