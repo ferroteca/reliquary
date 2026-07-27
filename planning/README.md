@@ -204,12 +204,19 @@ exception is a small raw commit approved under housekeeping.
 The queues are not peers; issues are upstream of both others. Raw
 intake is triaged into a drafted proposal, entered as a task, fixed
 directly as housekeeping, or rejected with its reason recorded in
-[DECISIONS.md](DECISIONS.md). What keeps the third queue
-from being a hole in the vetting is the same test housekeeping
-uses: **does it change an interface?** A yes is never small work,
-however small the diff, and takes the argued route. Composed that
-way, the guarantee still holds — **no interface changes without
-having passed through a queue.**
+[DECISIONS.md](DECISIONS.md). What keeps the third queue from being
+a hole in the vetting is **the gate at its door**: only authority
+writes to it, and entering an item *is* approving it (D43). It is
+**not** housekeeping's interface test — that boundary is
+housekeeping's alone (D45), compensating for a class nobody with
+authority ever reviews, and a queue only the owner can write to
+needs no such compensation. So **a small interface change may be a
+task**, admitted on size and kind and never refused for the surface
+it touches; what it may not do is skip the landing rules, which
+bind it exactly as they bind a feature. Composed that way the
+guarantee still holds — **no interface change without having passed
+through a queue** — because passing through this one means an
+approval was given, not that the subject was safe.
 
 **Housekeeping** (D38) is the same instinct one size below the third
 queue: small cleanups and small reported defects — tiny in scope
@@ -219,11 +226,13 @@ qualifying item is approved on sight and needs no entry anywhere;
 whoever lands the work invokes the bucket by naming it in the
 commit, and the commit is the record.
 
-Refusing is half of both rules. The interface test above is the
-first gate and it is a lookup, not a judgement — root
+Refusing is half of both rules. Housekeeping's interface test is
+its first gate and it is a lookup, not a judgement — root
 ARCHITECTURE.md "The interfaces" enumerates them, and the rule that
-weighs a hit is [INTERFACES.md](INTERFACES.md). A use-case or principle amendment and a design
-decision are likewise never admissible to either bucket. Past that,
+weighs a hit is [INTERFACES.md](INTERFACES.md). It governs that
+bucket only; the third queue's gate is authority at entry (above).
+A use-case or principle amendment and a design
+decision are never admissible to either bucket. Past that,
 doubt escalates: if it has to be argued in, it does not belong in.
 (A defect against a *standing* principle is neither — the principle
 is already its own demand, so it needs no approval, only fixing.)

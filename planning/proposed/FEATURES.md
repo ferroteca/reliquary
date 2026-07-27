@@ -39,6 +39,16 @@ delivery order; that order has no standing here (D42 — `proposed/`
 is not a queue), and what survives of it is the dependency each
 entry records in its own text.
 
+**F18–F20 arrived from [TASKS.md](../TASKS.md)** (owner,
+2026-07-27), by the gate audit of that day. Each adds a CLI command
+or changes a CLI spelling — which is **no bar to being a task**
+(D45; the housekeeping boundary that excludes an interface change
+is housekeeping's alone, and F16 below is where that misreading
+started). What holds all three here is the same thing: each
+carries an **open shape question** in its own text, and an argument
+still to finish is what `proposed/` is for. F17 made the same
+journey to `pledged/`, on its size rather than its surface.
+
 A feature that is pledged but not yet built moves to
 [pledged/FEATURES.md](../pledged/FEATURES.md) and carries its work
 breakdown with it. Small work that is not a feature at all goes
@@ -382,11 +392,26 @@ hidden prompt.
 
 **Audit design documents against pledged demand.** Raised
 unprompted during the 2026-07-24 traceability audit rather than
-requested, so it waits here. Findings that motivate it are
-recorded with the audit tasks under Governance in
-[Pledged](#pledged).
+requested — a suggestion, not a request — so it waits here.
 
-Raised unprompted during the audit — a suggestion, not a request.
+The findings that motivate it, folded in from
+[TASKS.md](../TASKS.md) by the 2026-07-27 gate audit, which found
+this item pledged there and proposed here at once and kept the
+proposal:
+
+- Two documents cite no U/P/G at all:
+  [design/backend-adapter.md](design/backend-adapter.md) (230
+  lines) and
+  [blueprint-cookbook.md](../../docs/blueprint-cookbook.md) (440
+  lines, examples — arguably exempt).
+- Beyond citation, three designs exist for pillars whose demand was
+  never pledged — `backend-adapter.md`,
+  [guest-communication.md](../design/guest-communication.md) and
+  [design/landmarks.md](design/landmarks.md) — all demoted by D33
+  *for lack of use-case backing* after their designs were written.
+  This is the retrospective pass over what predates the current
+  shelving, where a design sits with the feature it serves and is
+  swept with it.
 
 ## F8 — The planning traceability linter
 
@@ -849,8 +874,15 @@ and its inverse.
 > outside Reliquary because the public surface does not carry it.
 > **They are small but they are not housekeeping** — every one adds
 > to the embedding API, which the housekeeping boundary excludes
-> absolutely ([INTERFACES.md](../INTERFACES.md)), which is why they
-> are here and not in [TASKS.md](../TASKS.md). Serves **U14**;
+> absolutely ([INTERFACES.md](../INTERFACES.md)). **That is not why
+> they sit here rather than in [TASKS.md](../TASKS.md)**, and this
+> entry is where that misreading began: the boundary is
+> housekeeping's alone, and a small interface change may be a task
+> (D45, which the 2026-07-27 gate audit cited this very sentence as
+> precedent for before the reading was caught). What holds them
+> here is that two of the three are **unsettled below** — item 2
+> asks which artifact owns the answer, item 3 is probably F2's work
+> rather than its own. Serves **U14**;
 > item 1 cites **P10** and **P17**, item 3 belongs to **F2**.
 
 1. **A public drive-address query.** `platform_dos.drive_letters` is
@@ -873,6 +905,106 @@ and its inverse.
    Lowest priority of the three, and **probably not its own work**:
    the honest version of it is F2's autodiscovery deliverable, so
    this is a note against that feature as much as a request.
+
+## F18 — The media authoring commands
+
+> Moved from [TASKS.md](../TASKS.md)'s Small items by the
+> 2026-07-27 gate audit. Adding a CLI command is no bar to being a
+> task (D45); what moved it is that **the shape is not settled** —
+> both entries carry their own open question, and D41 has already
+> moved the ground under them once, which is an argument to finish
+> rather than work to pick up. Serves **U4** in force
+> (a repository refers precisely to media it cannot distribute) and
+> the **U13** draft (media fetches and verifies itself).
+
+**They are one feature because they share a scaffolder.** D41
+settled that `add-media` is the local half already — compute the
+sha256, write the declaration, copy nothing — so what is left is
+the *download* half and the *drill-down* half of one authoring
+motion, and the three should end up siblings over one writer.
+
+**`download-media`** (owner request, 2026-07-22; shape to
+re-derive under the revised model). `rlq download-media
+https://freedos.org/downloads/FreeDOS14.zip` downloads the file
+into `cache/media/`, computes its sha256, and scaffolds a
+standalone `.rlqb` into the home library carrying the url and
+sha256 — a media spec, with `children` left for the user to add
+when the payload is a container. A home-mode convenience: it warms
+the cache and writes the committed-source stub, so the user need
+not hand-author it and then `fetch`. Open shape: members cannot be
+inferred, so the stub stops at the container and the user adds the
+extraction tree with `extract-media`; stem-default naming from the
+URL filename; no `--local <file>` variant is needed, that being
+`add-media`; CLI+API parity, the twin returning the written
+blueprint path as `add_media` already does.
+
+**`extract-media`** (owner request, 2026-07-23; re-derive under the
+revised model) — the incremental companion. `rlq extract-media
+--parent FreeDOS14 FreeDOS14-LiveCD.zip` extracts the child from
+the named media, computes its sha256, and records it by **appending
+a child** (path + sha256) to the existing media spec's `children` —
+the leaning option — rather than writing a separate file, or as a
+flat `${media:…}`-located spec; reconcile when picked up. A child
+that is itself a container becomes another node to drill into
+(`extract` it again); a payload child is extracted to
+`cache/media/`. So a nested source is hand-authored by walking down
+it one `extract-media` at a time, the `children` tree growing in
+place. Open: new-file vs append-to-existing (lean append), and node
+shape (a container child is a node with its own `children`, else a
+leaf).
+
+## F19 — The home inventory report
+
+> Moved from [TASKS.md](../TASKS.md)'s Small items by the
+> 2026-07-27 gate audit. Being a new CLI command is no bar to being
+> a task (D45); what moved it is the open shape question below,
+> which decides whether this is one command at all. **No
+> use case asks for it**, said plainly. It serves **P12** by making
+> what home containment holds visible, and **P11** in the reading
+> that an orphan the tool cannot account for is a gap it should
+> name rather than pass over.
+
+Every item in the home and cache directories itemized in one way or
+another, backend implementation files ignored — the presence of a
+machine is noticed, its `qemu/` innards are not:
+
+- **orphaned first**, because either you really want to keep it or
+  you really should delete it: media declarations (not cached
+  payloads), and scripts
+- **blueprints**: materialized (online machines, offline machines),
+  then unmaterialized
+- **media**: referenced
+- **scripts**: orphaned, then referenced
+
+Open shape, and it decides whether this is one command at all:
+whether the orphans lead the whole report or only their own
+section, and whether this is a document of its own or a `--verbose`
+column on the existing `list-*` commands.
+
+## F20 — `version` and `help` as commands
+
+> Moved from [TASKS.md](../TASKS.md)'s Small items by the
+> 2026-07-27 gate audit. The diff is tiny and the CLI is an
+> interface, but neither fact bars it from the task queue (D45 —
+> the housekeeping boundary is housekeeping's alone). What moved it
+> is the P6 question below, which is the actual work and is
+> unsettled. Serves **P6**. No use case asks for it. Raised from
+> the CLI's own help text.
+
+`version` and `help` become command words, with `--version` / `-v`
+and `-h` / `--help` surviving as undocumented aliases.
+
+**The question is P6's, not cosmetic**, which is why this is a
+feature and not a rename. Under the twin-name identity rule a
+command *is* its API twin's name, so `version` implies a twin the
+embedding API does not have today; settling whether it gains one is
+the work, and a command word that maps to no call is exactly the
+shape the parity rule exists to catch. `help` may or may not answer
+the same way — a CLI presentation with no semantic behind it is the
+other possible reading, and naming it a named omission is a
+legitimate outcome.
+[docs/spec/cli.md](../../docs/spec/cli.md) documents neither
+spelling today, so nothing has to be unsaid first.
 
 ## Horizon — smaller and later
 
@@ -929,6 +1061,12 @@ and its inverse.
   `new-blueprint` scaffolding lands in milestone 6) —
   currently unjustified: no use case demands it, and
   `seed-blueprint` already serves the seed-and-customize seam.
+- `diff-blueprint <name>` — diff a user blueprint against the codex
+  blueprint of the same name (moved from [TASKS.md](../TASKS.md) by
+  the 2026-07-27 gate audit). Currently unjustified: no use case
+  demands it. It lands here rather than as a feature because one
+  line of intent is all there is, and here rather than in the task
+  queue because it is a CLI addition.
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.

@@ -68,8 +68,10 @@ and live with the decision record, under
 ## Pledged
 
 Grouped by kind, because the actor and the gate differ: an
-adjudication is the owner's alone, an audit is mechanical, a
-restructure is citation-heavy and must run in order.
+adjudication is the owner's alone, an audit is mechanical, a defect
+needs no pledge because the norm it violates already is one.
+(A fourth group, the restructures, left for
+[Completed](#completed) on 2026-07-27 — it had finished.)
 
 ### Governance — adjudications
 
@@ -98,25 +100,25 @@ None depends on the others.
   working, not failing.
 
 - **Promote the principles reality has already caught up with.**
-  The standing list is P1, P2, P3, P4, P6, P7, P8, P10, P11, P12,
-  P13, P15 — P5, P9 and P14 are missing from it while being cited
-  throughout DECISIONS.md and AGENTS.md, and P17/P18
-  are drafted with milestone 9's code as evidence for both.
   WHY IT MATTERS, and it is not bookkeeping: **promotion is what
   arms a principle** (owner, 2026-07-24). Before it, an entry is
   pledged vision and a shortfall is unbuilt work; after it,
   ARCHITECTURE.md asserts the thing is true of the code, so a
-  divergence is a *bug*. P9 is the sharpest case — AGENTS.md
-  enforces "no backward compatibility before 1.0" as a required
-  invariant and milestone 9 obeyed it deliberately when it deleted
-  the run-record model rather than shimming it, yet because P9 is
-  not standing, a shim that crept in tomorrow would be a debatable
-  design choice rather than a defect. The delay is costing
-  enforcement.
-  P16 and P17 carry open adjudication questions (P17 four of
-  them); P17's first — where the drive-letter mapping comes from —
-  now has a worked implementation to argue against rather than a
-  hypothetical (D37).
+  divergence is a *bug*.
+  **Rescoped 2026-07-27** by the gate audit. The standing list has
+  since grown to P1–P4, P6–P13, P15 and P19–P23, which takes P9 —
+  this entry's sharpest case, and the whole of its "the delay is
+  costing enforcement" argument — off the list: no-backward-
+  compatibility is now armed, so a shim that crept in tomorrow is a
+  defect rather than a debatable design choice.
+  What is left: **P5 and P14** sit pledged in
+  [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md) while being
+  cited throughout DECISIONS.md and AGENTS.md, and **P17/P18** are
+  drafted with milestone 9's code as evidence for both. P16 and P17
+  carry open adjudication questions (P17 four of them); P17's
+  first — where the drive-letter mapping comes from — now has a
+  worked implementation to argue against rather than a hypothetical
+  (D37).
 
 - **Record the gap-is-a-bug rule, and the two promotion bars.**
   ARCHITECTURE.md's preamble says the list is standing-only and
@@ -138,34 +140,39 @@ None depends on the others.
   D-number so the divergence from D34 is deliberate rather than a
   contradiction someone trips over.
 
+- **Issue the D-numbers the 2026-07-26 restructure left owing**
+  (found 2026-07-27 by the gate audit, in the restructure record
+  now folded into [Completed](#completed)). That record's step 6
+  says the P-additions and the rename "want D-numbers" and none
+  was ever issued: nothing in DECISIONS.md adjudicates
+  **PRINCIPLES.md becoming ARCHITECTURE.md**, nor the itemizing
+  of the model document's unnumbered principles as **P19–P21**,
+  nor the statement of **P22**. Step 2's own debt was paid (D43);
+  this is what is left of the same sentence. It matters for the
+  same reason the promotion entry above does — the rename moved
+  where a principle is *armed*, which is a governance act with no
+  record of its own.
+
 - **Take or refuse U3's supersession.** D36 settled that U14
   supersedes U3 alone; U14 is now delivered and promoted (D37).
   Retiring U3 is the lifecycle's Retire clause — an owner
-  adjudication, not a step of that delivery — so it waits in
-  USE-CASE-PROPOSALS.md with a note saying so.
-
-- **Define "horizon", or drop it.** The word is never defined
-  anywhere in the repo; it entered through a documentation
-  restructure and its only gloss is its own heading, "(sequenced
-  later, not yet scheduled)". It has since collapsed into a
-  synonym for *backlog*: machine mobility sits under Horizon "for
-  lack of use-case backing", which is verbatim D33's reason for
-  sending the pillars to the backlog. Unlike backlog — a defined
-  Scrum artifact every reader arrives knowing — horizon has no
-  established meaning as a planning container ("planning horizon"
-  is a *time span*; McKinsey's Three Horizons is a portfolio
-  model whose horizons are all active). Either define it at first
-  use or drop it and name the sections after what actually
-  distinguishes them: demand pledged and awaiting scheduling (U6's
-  recorder) versus design settled with demand not pledged (the
-  pillars, async, machine mobility).
+  adjudication, not a step of that delivery — so it waits, with a
+  note saying so, in
+  [pledged/USE-CASES.md](pledged/USE-CASES.md) (**pointer
+  corrected 2026-07-27**: the entry said USE-CASE-PROPOSALS.md,
+  which no longer exists). The move sharpened the question rather
+  than settling it — U3 is *pledged*, so what waits is a use case
+  the project still owes being superseded by one it has already
+  delivered.
 
 ### Governance — audits
 
-Backlogged (unscheduled). Problems in the planning machinery
+Unscheduled. Problems in the planning machinery
 itself, found while landing milestone 9 and while asking where the
-roadmap's bulk belongs (2026-07-24). They move to
-planning/BACKLOG.md when that split lands — which is one of them.
+roadmap's bulk belongs (2026-07-24). (They once said they would
+move to planning/BACKLOG.md "when that split lands"; it landed as
+[proposed/FEATURES.md](proposed/FEATURES.md) instead, and these
+stay here — they are work, not capability.)
 The former "Planning docs" section is folded in here: its two
 sweeps are the same class as everything else below (owner,
 2026-07-24 — *something exists in the planning machinery without
@@ -185,20 +192,21 @@ to find them, not a one-off.
 
 
 - **Sweep planning items for demand citations** (owner,
-  2026-07-23; audited 2026-07-24). Every item names the U- or
-  P-number that demands it. Audit result: **12 of 34 sections cite
-  no U/P/G at all.** Two are upstream of demand and need none
-  ("Vision", "Design principles" — the latter being the source of
-  P-numbers, and already tracked for itemizing into
-  ARCHITECTURE.md). The rest divide: five completed milestones (1,
-  2, 3, 4, 6 — milestone 6 the largest at 116 lines), which the
-  condensation item below should not erase without first
-  recording what demanded them; four delivered design sections
-  ("The machine model", "The codex", "Home layout", "Guest
-  communication design"), which migrate to `spec/` and should
-  carry a citation when they do; and **"The GUI era" (94 lines) —
-  a whole backlog pillar citing no demand whatsoever**, which is
-  the D33 pattern in its purest form.
+  2026-07-23; audited 2026-07-24; **rescoped 2026-07-27**). Every
+  item names the U- or P-number that demands it.
+  The 2026-07-24 audit result — **12 of 34 sections cite no U/P/G
+  at all** — was measured against ROADMAP.md, which the
+  restructure has since deleted, so the count no longer indexes
+  anything readable. Re-run it over what replaced that file:
+  `proposed/`, `pledged/`, and `design/`. The one finding that
+  survived the move intact is the pillar it named — **"The GUI
+  era", now [F5](proposed/FEATURES.md), still citing no demand
+  whatsoever**, which is the D33 pattern in its purest form.
+  What was lost with ROADMAP.md, and is the reason to run this
+  before anything else prunes further: five completed milestones
+  (1, 2, 3, 4, 6) went with their deliverable lists, so **what
+  demanded them was never recorded**. It survives only in
+  `git show 50b67b2:planning/ROADMAP.md`.
 
 - **Retrofit supports onto DECISIONS.md entries** (owner,
   2026-07-23; audited 2026-07-24). Each names the use cases (U),
@@ -209,18 +217,251 @@ to find them, not a one-off.
   which the original range missed. Correct the scope when picking
   it up.
 
-- **Audit design documents against pledged demand.** Two
-  documents cite no U/P/G at all: `backend-adapter.md` (230 lines)
-  and `blueprint-cookbook.md` (440 lines, examples —
-  arguably exempt). Beyond citation, three designs exist for
-  pillars whose demand was never pledged — `backend-adapter.md`,
-  `guest-communication.md`, `landmarks.md`, all demoted by D33
-  *for lack of use-case backing* after their designs were written.
-  The restructure item below encodes the preventive rule (nothing
-  gets a design doc until its demand is pledged); this is the
-  retrospective pass over what predates it.
+*(The third audit — "Audit design documents against pledged
+demand" — left here on 2026-07-27. It was in two lifecycle states
+at once: pledged by sitting in this file, and proposed as
+[F7](proposed/FEATURES.md), which D43 created from this file's
+legacy Proposed section without removing the twin. The proposal
+was kept and its findings folded into F7.)*
 
-### Governance — restructures
+### Defects
+
+A gap against a *standing* principle is a bug: the principle is
+already its demand, so these need no pledge, only fixing. A gap
+against a **shipped spec** is the same class and sits here too —
+where `docs/spec/` and the code disagree the spec is right and the
+code has the bug, so the norm is already the demand.
+
+- `--qemu` is removed by the spec and still declared in the code
+  (found 2026-07-27 by the gate audit, checking a task that
+  proposed renaming it). [docs/spec/cli.md](../docs/spec/cli.md)
+  says the old global `--qemu`, `--platform` and `--port` "are
+  removed", yet `_FLAG_ARITY` in `reliquary/cli.py` still lists
+  `--qemu`, which no subparser defines. Delete the entry.
+  `--platform` and `--port` stay: they are live per-command
+  options, and their place in that table is the documented
+  position-carries-no-meaning rewrite, not the removed globals.
+  **The consequence is small and worth stating so it is not
+  oversold** (measured, not reasoned): `rlq --qemu foo
+  list-machines` today fails with "unrecognized arguments: --qemu
+  foo", which is a perfectly clear message — the arity entry is
+  what makes it clear, by letting the reorder carry the pair past
+  the command word. Deleting it drops `--qemu` into the
+  unknown-leading-token path, where the message is *worse*
+  ("invalid choice: 'foo'"), so the honest fix is the deletion
+  plus whatever keeps a removed option from degrading into that
+  path — which is a question about the reorder, not about
+  `--qemu`. What makes this a defect either way is the
+  divergence: the code names an option the spec says is gone.
+  (This also retires the "`--qemu` → `--qemu-home`" task that had
+  sat under Small items since before the option was specified
+  away — renaming it would reinstate it.)
+
+- validate declared control-planes at materialization: the
+  parser accepts `vnc` / `serial-console` / `guest-agent` as
+  `control-planes` values, but nothing refuses them at create
+  or start — a blueprint declaring an unimplemented plane is
+  pledged silently, against P11 (capability gaps fail closed
+  naming themselves). Refuse anything but `agentless-display`
+  until the plane exists (found by the P1–P12 delivery pass,
+  2026-07-23).
+
+### Language
+
+The **script-language residuals** stay here rather than becoming a
+feature (D45): they change the scripting language, which is no bar
+to being a task, and on size they are two items and a ride-along.
+**No use case asks for them**, said plainly rather than papered
+over — they serve language goal **G6**, one small vocabulary and
+one spelling — and the catalogue behind them is
+[design/script-examples/](design/script-examples/), whose README
+carries the numbering and the deletion rule. The order below is a
+guess at fix cost, never validated against real authoring pain;
+reorder freely once scripts have been written and debugged under
+this surface.
+
+- **[08] reserve the small closed vocabularies globally** — key
+  names and drive slots, so they cannot be shadowed by phase or
+  artifact names. Mechanical, no spec redesign, and it closes most
+  of the asymmetry the deleted [01] showed
+- **[06]'s remaining half** — warn when an `@`-reference matches
+  no known item. The label/item split itself is gone with the
+  media block (DECISIONS.md, no JSON in scripts)
+- riding along with whatever touches it next: **[03] does not
+  currently parse** — its `on` handler bodies end without a
+  terminal. It is a live example, so it should be valid where it is
+  not deliberately illegal
+
+  *Deliberately not tasks.* [03] and [07] stay documented
+  tradeoffs rather than bugs — boundary tax (guest-text escaping)
+  or placement-equals-scope consequences, where a "fix" mostly
+  relocates the mush rather than removing it. Several are the
+  procedural/declarative seam showing through the syntax: read
+  "Primary language goals" (G1–G7) and "The procedural–declarative
+  seam" in [script-spec.md](../docs/spec/script-spec.md) before
+  proposing fixes, and judge any fix against the goals it costs
+  rather than in isolation.
+
+- the full Reason-blockquote editorial sweep of script-spec.md
+  remains deliberately open (may trail realignment); the
+  error-id INDEX is deferred to beta
+- resume the spec-audit work the AHK/Python failure-catalog
+  studies were feeding: the studies themselves are complete and
+  their imports are recorded in DECISIONS.md, but the spec audits
+  hit the session limit. (The workflow handle the entry carried,
+  `wf_1a266a6b-ff8`, is dead — a run id resumes only within its
+  own session — so this restarts rather than resumes.)
+
+### Small items
+
+Small, obvious, just haven't met the bar for scheduling (the
+section formerly named Wishlist, then Backlog). Parked non-GitHub
+issues land here. Most would qualify as housekeeping (D38) and
+need no entry at all once someone picks them up.
+
+- **Audit the blueprint field reference for orphaned norms**
+  (2026-07-26, from the spec/descriptive split). The blueprint's
+  norm is now the published schema (structure) plus
+  docs/spec/blueprint-model.md (semantics), and
+  docs/blueprint-reference.md was demoted to descriptive.
+  Walk its per-field contracts (units, controller vocabulary,
+  boot semantics, materialize modes): anything load-bearing that
+  neither the schema nor the model states gets promoted into one
+  of them, so no rule is left normless.
+  The audit is a task, but **its findings may not be** (noted
+  2026-07-27): relocating a rule unchanged passes P23's clarify
+  test, while anything that reads as a *new* requirement on the
+  blueprint is an interface change and takes the argued route.
+
+- **DECISIONS.md still calls ARCHITECTURE.md "PRINCIPLES.md"**
+  (found 2026-07-27 by the gate audit) — 17 times in prose, while
+  every one of those links already points at `../ARCHITECTURE.md`.
+  Half-renamed is the actual defect: a reader following the words
+  looks for a file that is not there, and a reader following the
+  links does not. Decide the rule as much as the edit — whether an
+  adjudication record is corrected in place at all, or whether the
+  entries are left as written and the drift lives with dated
+  history the way the CHANGELOG's does.
+
+- CLI help: run-script's text says little more than "runs a
+  script on a machine". Not an interface change — it changes no
+  rule, and pretty output is uncontracted — so it is housekeeping
+  the moment someone picks it up; it keeps its line only because
+  writing the replacement is authoring rather than a one-word fix.
+
+- README, blueprints and machines: give several clear examples
+  to illustrate the concepts — e.g. a 1 MB MS-DOS blueprint;
+  QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
+  specific floppy image mounted; QEMU machine #4 with 16 MB of
+  memory and a specific cdrom mounted
+
+
+## Completed
+
+Records whose reasoning outlives the work — audits, restructures,
+resolved rounds — kept until each is folded where it belongs and
+pruned, which is itself a pledged task above.
+
+**An ordinary task is struck, not moved here** (D45): its record is
+its commit and its CHANGELOG line, so it leaves this file by
+deletion the moment it is done. Parking one here is the ceremony
+this file already refuses for work that arrives done.
+
+### The gate audit — 2026-07-27
+
+Every entry in [Pledged](#pledged) walked against this file's own
+gate: *is this free-standing work small enough to be a task?*
+**Size and kind, never subject matter.** Touching an interface is
+no bar (D45) — entry here is approval, so the gate that matters
+already sat at the door. The walk's first pass asked the wrong
+question, borrowing the **housekeeping** boundary that excludes
+interface changes absolutely; that boundary compensates for
+housekeeping being ungoverned and does not reach a queue only the
+owner can write to. [F16](proposed/FEATURES.md) is where the
+borrowed reading started and is corrected in its own text.
+
+**Six entries left**, none of them rejected: they were pledged
+already, and the audit changed where they are housed, not what
+they are.
+
+- To [pledged/FEATURES.md](pledged/FEATURES.md), on its **size**:
+  **F17** (input pacing, from Design) — seven work items with a
+  bisection rig among them, which no queue of small work can hold.
+  The script-language residuals travelled with it on the first
+  reading and stayed here instead, being two items and mechanical.
+- To [proposed/FEATURES.md](proposed/FEATURES.md), each carrying an
+  open shape question — the argument, not the surface, being what
+  keeps them out of a queue of pre-approved work: **F18**
+  (`download-media` + `extract-media`, one feature because they
+  share a scaffolder), **F19** (the home inventory report), **F20**
+  (`version` and `help` as commands, which is a P6 question about
+  the API twin rather than a rename).
+- To that file's **Horizon** list: `diff-blueprint`, one line of
+  intent and no design.
+- Folded into **F7**: the design-document audit, which was pledged
+  here and proposed there at once.
+
+**Two defects came out of the walk**, entered above: `--qemu`
+survives in the code after the spec removed it, and DECISIONS.md
+still names ARCHITECTURE.md by its old title. **One entry closed**
+as satisfied ("Define horizon, or drop it" — see below), **two were
+rescoped** against a tree that had moved under them (the principles
+promotion, the demand-citation sweep), and **one pointer was
+corrected** (U3's, which named a file that no longer exists).
+
+What stays is what the gate admits: adjudications, audits of the
+machinery, defects, documentation work, and the script-language
+residuals. Some of those touch an interface, which is exactly the
+point — the file admits work by its size and its kind, and asks
+nothing about which surface it lands on.
+
+### "Define horizon, or drop it" — satisfied 2026-07-26
+
+Closed by the restructure rather than by being worked. The word now
+carries a definition at first use —
+[proposed/FEATURES.md](proposed/FEATURES.md)'s Horizon section
+opens "Not a feature, and so unnumbered. This is a holding list of
+items too small or too unformed to be one" — with an exit rule
+saying how an item leaves. That answers the entry's first branch
+("define it at first use"), and the complaint behind it is gone
+with the roadmap: the collapse it objected to was *horizon* drifting
+into a synonym for backlog, and the lifecycle folders now carry
+that distinction structurally. The four documents that use the word
+(AGENTS.md, `cli.md`, `instance-model.md`, `api.md`) all point at
+that section, so the definition is reachable from every use.
+
+### The numbered arc — milestones 1–9 (complete)
+
+**The numbered arc ran 1 through 9 and ended there**, carrying
+text-mode DOS on QEMU from the north-star command to the
+programmatic testing loop: the vertical slice and the built-in
+blueprint bundle (1), the media library and caches (2), the
+scripting language on its first, now-superseded surface (3), the
+script-surface realignment to the July 2026 redesign (4), the local
+HTTP server for installer answer files (5), the instance model and
+machine blueprints with authored-asset residency (6), the composed
+blueprint model folding the blueprint and media formats into one
+(7), the script properties — user properties file, secret storage,
+binding pipeline, declared derivation, `${key}` references (8), and
+the programmatic testing loop — the run returning its output, live
+feedback, the error taxonomy, and the exec-run mechanics (9).
+Asynchronous runs left the arc for lack of a use case (D35/D36).
+
+The per-milestone deliverable and stage breakdowns are **pruned**:
+the record survives in git history, the CHANGELOG, and the D-numbers
+each round produced, which is the standing rule for completed
+breakdowns. Generalizing beyond that one vertical is unbuilt and
+unscheduled (D33) — it lives in
+[proposed/FEATURES.md](proposed/FEATURES.md), design settled and
+intact, and returns to a numbered arc when the case it serves is
+pledged.
+
+### The planning restructure — executed 2026-07-26
+
+*Moved out of [Pledged](#pledged) on 2026-07-27: it was a
+finished record sitting in a queue, and a queue holds what
+waits. The one obligation it still carries — the D-numbers step
+6 says are owed — is entered as an adjudication above.*
 
 **Executed 2026-07-26** (owner, interactively). The
 four-step plan below ran as one pass, and the roadmap is gone. What
@@ -292,267 +533,6 @@ landed, and where it diverged from what step 2 decided:
    The P-additions and the rename want D-numbers, with
    pledge-is-the-move (amends D23) and the third queue
    (widens D39).
-
-### Defects
-
-A gap against a *standing* principle is a bug: the principle is
-already its demand, so these need no pledge, only fixing.
-
-- validate declared control-planes at materialization: the
-  parser accepts `vnc` / `serial-console` / `guest-agent` as
-  `control-planes` values, but nothing refuses them at create
-  or start — a blueprint declaring an unimplemented plane is
-  pledged silently, against P11 (capability gaps fail closed
-  naming themselves). Refuse anything but `agentless-display`
-  until the plane exists (found by the P1–P12 delivery pass,
-  2026-07-23).
-
-### Design
-
-- Built-in input pacing before guest input — OPEN (owner,
-  2026-07-24, raised by milestone 9's FreeDOS install failure).
-  Shape settled in that day's question round; unscheduled.
-  Demand: G1, G5; serves U12, U14, U20 — a script that cannot
-  reliably land a keystroke serves none of them.
-  THE PROBLEM, with evidence: `freedos-install.rlqs` waited for
-  the installer's welcome screen and then `press enter`, and the
-  keystroke was swallowed — the installer paints the screen
-  *before* it starts reading the keyboard. The wait timed out 30s
-  later at the next step. Pressing Enter by hand, seconds after,
-  advanced it immediately. Reproduced on the pre-milestone tree,
-  so this is structural, not a regression. It was worked around by
-  switching that one line to `select "Yes"`, which is
-  feedback-driven and re-reads the screen between keys — which is
-  also *why* every other confirmation in that script already
-  worked.
-  THE OWNER'S POSITION: this will be very common — "wait for
-  <this>, then do <that>" needs a gap between the two — and
-  authors should not have to code that gap every time. A standard
-  delay belongs in the system; only *changing* it should require
-  writing anything.
-  THE FRAMING THAT MAKES IT LEGAL: this is **not** a `delay` verb,
-  and the language's prohibition on one stands. script-spec.md's
-  Timing section already ends "Screen polling and input-event
-  pacing remain control-plane-owned; the script does not tune
-  them" — a gap between observing a screen and delivering the next
-  input *is* input-event pacing. G1 supplies the argument:
-  agentlessly, the guest's *input* readiness is unobservable (only
-  its output is), so a control plane that types the instant a
-  screen paints asserts something it cannot know. The mechanism is
-  half-present already — `send_keys` paces at 0.06s *between* key
-  events; what is missing is the pause before the *first* one.
-  `stable=` is the wrong tool: it strengthens the observation
-  (does the condition keep holding?) where the need is to pace the
-  actor, it costs a poll interval plus its duration, it changes
-  what the author is asserting, and it must be written on every
-  wait — the burden being objected to.
-  SETTLED IN THE 2026-07-24 QUESTION ROUND (owner):
-  * **Scope: header > phase > statement**, the same lexical ladder
-    `timeout` uses — innermost-wins, resolved at parse time,
-    reported by `check-script`. A column in the placement matrix,
-    not a second model.
-  * **Applies to every guest-input verb** — `enter`, `type`,
-    `press`, `select`. One invariant needing no context: before
-    typing at an agentless guest, let it settle. Host-side verbs
-    (`insert`, `eject`, `set-boot`, `screenshot`, `start`, `stop`,
-    `set`, `http`) are not guest input and do not pay it.
-  * **Default 0.1s for now, expected to be revisited.** The owner's
-    note is the important part: this number will swing wildly — a
-    plain text screen renders quickly, while the colourful
-    exploding TUI menus render very slowly. So the default cannot
-    serve every screen by construction, which is itself the
-    argument for the per-phase and per-statement override carrying
-    real weight rather than being speculative generality.
-  * **The term is *pacing*** (owner, 2026-07-24, settling the one
-    question the round left open). It is the spec's own word for
-    this — Timing already says "input-event pacing remain[s]
-    control-plane-owned" — so the language adopts a term the design
-    already used rather than coining one, and the name says plainly
-    which half of the model it belongs to: it paces the actor, it
-    does not strengthen an observation. It collides with nothing.
-    The rejected candidates are worth keeping: `settle` read best
-    on meaning but sat a near-homophone away from `stable` in one
-    small vocabulary, on the opposite half of the model — a real G6
-    cost; `ready` reads naturally but collides with the resting
-    machine phase.
-    Residual nit for the implementing round, not a reopening:
-    whether the token spells `pacing` or `pace` in both positions
-    (`pacing 300ms` in a header, `press enter pacing=300ms` on a
-    statement). Lean `pacing` for both — one spelling everywhere
-    (G6), and a *pace* is naturally a rate while what is being set
-    is an interval.
-  ALSO UNMEASURED: no evidence yet fixes the number against the
-  case that motivated it. What is known is that "immediately" is
-  too little and "several seconds later" is enough; the interval
-  that reliably lands a keystroke on that installer screen was
-  never bisected. Worth doing when this is picked up — the rig is
-  cheap to stand up now.
-  When it lands: script-spec.md's Timing section is the normative
-  home (the placement matrix, and the "there is no `delay`"
-  paragraph amended to distinguish the absent *verb* from
-  control-plane pacing), plus a D-number recording the
-  interface-change triage. Triage as it stands: no use case is
-  cost, several are served — an easy approval under the
-  interface-change rule.
-
-### Language
-
-- residual language problems catalogued in
-  design/script-examples/*.rlqs (see its README) —
-  best-guess priority, fix-cost order, NOT validated against
-  real authoring pain; reorder freely once we've actually
-  written/debugged scripts under this surface:
-  1. [08] reserve the small closed vocabularies (key names,
-     drive slots) globally so they can't shadow phase/artifact
-     names — mechanical, no spec redesign, also closes most of
-     the asymmetry the deleted [01] showed
-  2. [06]'s remaining half: warn when an `@`-reference matches no
-     known item (the label/item split itself is gone with the
-     media block — DECISIONS.md, no JSON in scripts)
-  - [03], [07] — provisionally leave as documented
-    tradeoffs, not bugs: boundary tax (guest-text escaping) or
-    placement-equals-scope consequences, where a "fix" mostly
-    just relocates the mush rather than removing it
-  - [01], [02], [04], [05], [09] were resolved, and their files
-    were **deleted 2026-07-26**: they claimed to be regression
-    notes, but nothing in the tree executed them and [04] had
-    silently drifted into invalid syntax. The resolutions are in
-    DECISIONS.md, which is where they belong. ([05] sat in the
-    tradeoff group above until this pass — the README had it
-    resolved by D5 dropping the file-exchange verbs, and the
-    README was right.)
-  - [03] does not currently parse either: its `on` handler bodies
-    end without a terminal. Fix it with whatever touches [03]
-    next — it is a live example, so it should be valid where it
-    is not deliberately illegal
-  - note: several of these are the procedural/declarative seam
-    showing through the syntax — see "Primary language goals"
-    (G1–G7) and "The procedural–declarative seam" in design/script-spec.md
-    before proposing fixes, and judge any fix against the goals
-    it costs rather than in isolation
-- the full Reason-blockquote editorial sweep of script-spec.md
-  remains deliberately open (may trail realignment); the
-  error-id INDEX is deferred to beta
-- resume the spec-audit workflow (wf_1a266a6b-ff8): the
-  AHK/Python failure-catalog studies are complete — imports
-  recorded in DECISIONS.md — but their spec audits hit the
-  session limit
-
-### Small items
-
-Small, obvious, just haven't met the bar for scheduling (the
-section formerly named Wishlist, then Backlog). Parked non-GitHub
-issues land here. Most would qualify as housekeeping (D38) and
-need no entry at all once someone picks them up.
-
-- **Audit the blueprint field reference for orphaned norms**
-  (2026-07-26, from the spec/descriptive split). The blueprint's
-  norm is now the published schema (structure) plus
-  docs/spec/blueprint-model.md (semantics), and
-  docs/blueprint-reference.md was demoted to descriptive.
-  Walk its per-field contracts (units, controller vocabulary,
-  boot semantics, materialize modes): anything load-bearing that
-  neither the schema nor the model states gets promoted into one
-  of them, so no rule is left normless.
-
-- `download-media` command (owner request, 2026-07-22; shape to
-  re-derive under the revised model. D41 settled the overlap
-  below: `add-media` is the `--local` half already, so what is
-  left here is the *download* half — fetch, hash, scaffold):
-  `rlq download-media
-  https://freedos.org/downloads/FreeDOS14.zip` downloads the file
-  into `cache/media/`,
-  computes its sha256, and scaffolds a standalone `.rlqb` into
-  the home library carrying the url + sha256 — a media spec,
-  with `children` left for the user to add when the payload is a
-  container. A home-mode
-  convenience: it warms the cache and writes the committed-source
-  stub so the user need not hand-author it and then `fetch`. Open
-  shape: members can't be
-  inferred, so the stub stops at the container and the user adds
-  the extraction tree (with `extract-media`); stem-default naming
-  from
-  the URL filename; no `--local <file>` variant is needed —
-  that is `add-media`, which D41 settled as exactly this
-  command's local half (compute the hash, scaffold the spec,
-  copy nothing), so the two should end up siblings sharing one
-  scaffolder; CLI+API parity (a twin returning the written
-  blueprint path, as `add_media` already does).
-- `extract-media` command (owner request, 2026-07-23; re-derive
-  under the revised model) — the
-  incremental companion to `download-media`: `rlq extract-media
-  --parent FreeDOS14 FreeDOS14-LiveCD.zip` extracts the child
-  from
-  the named media,
-  computes its sha256, and records it by
-  **appending a child** (path + sha256) to the
-  existing media spec's `children` (the leaning option)
-  rather than writing a separate file — or as a flat
-  `${media:…}`-located spec; reconcile when picked up. A child
-  that is itself a
-  container becomes another node to drill into (`extract` it
-  again); a
-  payload child is extracted to `cache/media/`. So
-  a nested source is hand-authored by walking down it one
-  `extract-media` at a time, the `children` tree growing
-  in place. Open: new-file vs append-to-existing (lean append);
-  node shape (child is itself a container → node with its own
-  `children`, else leaf).
-- new command diff-blueprint <name>: diff the user blueprint
-  against the codex blueprint of the same name
-- CLI, from cli help: --version should be `version` with an
-  undocumented --version/-v alias; -h should be `help` with
-  undocumented -h/--help aliases
-- --qemu → --qemu-home
-- CLI help: run-script's text says little more than "runs a
-  script on a machine"
-- an 'inventory' report: every item in the home and cache dirs
-  itemized in one way or another (backend implementation files
-  ignored — just the presence of a machine is noticed):
-  - orphaned listed first (because either you *really* want to
-    keep it, or you really *should* delete it): media
-    (definitions, not cached payloads), scripts
-  - blueprints: materialized (online machines, offline
-    machines), unmaterialized
-  - media: referenced
-  - scripts: orphaned (listed first??), referenced
-- README, blueprints and machines: give several clear examples
-  to illustrate the concepts — e.g. a 1 MB MS-DOS blueprint;
-  QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
-  specific floppy image mounted; QEMU machine #4 with 16 MB of
-  memory and a specific cdrom mounted
-
-
-## Completed
-
-Done. Kept until each record is folded where it belongs and
-pruned — which is itself a pledged task above.
-
-### The numbered arc — milestones 1–9 (complete)
-
-**The numbered arc ran 1 through 9 and ended there**, carrying
-text-mode DOS on QEMU from the north-star command to the
-programmatic testing loop: the vertical slice and the built-in
-blueprint bundle (1), the media library and caches (2), the
-scripting language on its first, now-superseded surface (3), the
-script-surface realignment to the July 2026 redesign (4), the local
-HTTP server for installer answer files (5), the instance model and
-machine blueprints with authored-asset residency (6), the composed
-blueprint model folding the blueprint and media formats into one
-(7), the script properties — user properties file, secret storage,
-binding pipeline, declared derivation, `${key}` references (8), and
-the programmatic testing loop — the run returning its output, live
-feedback, the error taxonomy, and the exec-run mechanics (9).
-Asynchronous runs left the arc for lack of a use case (D35/D36).
-
-The per-milestone deliverable and stage breakdowns are **pruned**:
-the record survives in git history, the CHANGELOG, and the D-numbers
-each round produced, which is the standing rule for completed
-breakdowns. Generalizing beyond that one vertical is unbuilt and
-unscheduled (D33) — it lives in
-[proposed/FEATURES.md](proposed/FEATURES.md), design settled and
-intact, and returns to a numbered arc when the case it serves is
-pledged.
 
 ### Design rounds resolved
 

@@ -23,6 +23,17 @@ Each feature carries an **F-number** and must fit in **one sprint**
 large is cut on pledge, the split retiring the parent's number
 for a fresh one per piece.
 
+**F17 arrived from [TASKS.md](../TASKS.md)** (owner, 2026-07-27),
+by the gate audit of that day, pledged already by sitting in that
+file — the move changes where it is housed, not what it is, and
+nothing below is newly promised. **It moved on its size, not its
+surface.** Touching an interface is no bar to being a task (D45),
+and the audit's first reading said otherwise; what disqualifies
+F17 from the task queue is that it is seven work items with a
+bisection rig among them, which is a feature by any measure. The
+script-language residuals travelled with it under that first
+reading and **went back**, being genuinely small.
+
 ## F1 — The U6 authoring recorder
 
 > **Unusually large — flagged, not cut** (owner, 2026-07-26). On the
@@ -67,3 +78,104 @@ the lifecycle, which D42 treats as a flaw rather than a dependency —
 tolerated here alongside the size, and noted so it is not mistaken
 for the normal shape. The text-mode half is the part that depends on
 nothing unpledged.
+
+## F17 — Input pacing before guest input
+
+> Moved from [TASKS.md](../TASKS.md)'s Design section by the
+> 2026-07-27 gate audit — **on its size**. It adds a keyword to the
+> scripting language, which is no bar to being a task (D45); what
+> puts it here is the seven-item breakdown below, a bisection rig
+> among them. Serves
+> **U14** and **U20** in force and the **U12** draft — a script
+> that cannot reliably land a keystroke serves none of them — on
+> language goals **G1** and **G5**. Raised by milestone 9's FreeDOS
+> install failure (owner, 2026-07-24); the design was settled in
+> that day's question round and stands as written.
+
+THE PROBLEM, with evidence. `freedos-install.rlqs` waited for the
+installer's welcome screen and then `press enter`, and the
+keystroke was swallowed — the installer paints the screen *before*
+it starts reading the keyboard. The wait timed out 30s later at the
+next step; pressing Enter by hand, seconds after, advanced it
+immediately. Reproduced on the pre-milestone tree, so this is
+structural rather than a regression. It was worked around by
+switching that one line to `select "Yes"`, which is feedback-driven
+and re-reads the screen between keys — which is also *why* every
+other confirmation in that script already worked.
+
+THE OWNER'S POSITION. This will be very common — "wait for
+<this>, then do <that>" needs a gap between the two — and authors
+should not have to code that gap every time. A standard delay
+belongs in the system; only *changing* it should require writing
+anything.
+
+THE FRAMING THAT MAKES IT LEGAL. This is **not** a `delay` verb,
+and the language's prohibition on one stands.
+[script-spec.md](../../docs/spec/script-spec.md)'s Timing section
+already ends "Screen polling and input-event pacing remain
+control-plane-owned; the script does not tune them" — and a gap
+between observing a screen and delivering the next input *is*
+input-event pacing. G1 supplies the argument: agentlessly, the
+guest's *input* readiness is unobservable where its output is not,
+so a control plane that types the instant a screen paints asserts
+something it cannot know. The mechanism is half-present already —
+`send_keys` paces at 0.06s *between* key events; what is missing is
+the pause before the *first* one. `stable=` is the wrong tool: it
+strengthens the observation where the need is to pace the actor, it
+costs a poll interval plus its duration, it changes what the author
+is asserting, and it must be written on every wait — the burden
+being objected to.
+
+Settled in the 2026-07-24 question round (owner):
+
+- **Scope: header > phase > statement**, the same lexical ladder
+  `timeout` uses — innermost-wins, resolved at parse time, reported
+  by `check-script`. A column in the placement matrix, not a second
+  model.
+- **Applies to every guest-input verb** — `enter`, `type`, `press`,
+  `select`. One invariant needing no context: before typing at an
+  agentless guest, let it settle. Host-side verbs (`insert`,
+  `eject`, `set-boot`, `screenshot`, `start`, `stop`, `set`,
+  `http`) are not guest input and do not pay it.
+- **Default 0.1s for now, expected to be revisited.** The number
+  will swing wildly — a plain text screen renders quickly, a
+  colourful exploding TUI menu very slowly — so the default cannot
+  serve every screen by construction, which is itself the argument
+  for the per-phase and per-statement override carrying real weight
+  rather than being speculative generality.
+- **The term is *pacing***, which is the spec's own word for it:
+  the language adopts a term the design already used rather than
+  coining one, and the name says plainly which half of the model it
+  belongs to — it paces the actor, it does not strengthen an
+  observation. The rejected candidates are worth keeping: `settle`
+  read best on meaning but sat a near-homophone away from `stable`
+  in one small vocabulary, on the opposite half of the model — a
+  real G6 cost; `ready` reads naturally but collides with the
+  resting machine phase.
+
+Work items:
+
+- bisect the interval that reliably lands a keystroke on the
+  installer screen that motivated this. No evidence yet fixes the
+  number: what is known is that "immediately" is too little and
+  "several seconds later" is enough, and the rig is cheap to stand
+  up now
+- the parse-time plan — pacing resolved on the same ladder as
+  `timeout`, every guest-input verb carrying its effective value
+  and the scope that supplied it
+- `check-script` reports it beside the timing plan
+- the runtime pause, before the first key event of every
+  guest-input verb
+- settle the residual spelling nit, which is this feature's and not
+  a reopening: whether the token spells `pacing` or `pace` in both
+  positions (`pacing 300ms` in a header, `press enter pacing=300ms`
+  on a statement). Lean `pacing` for both — one spelling everywhere
+  (G6), and a *pace* is naturally a rate where what is being set is
+  an interval
+- [script-spec.md](../../docs/spec/script-spec.md)'s Timing section
+  is the normative home: the placement matrix, and the "there is no
+  `delay`" paragraph amended to distinguish the absent *verb* from
+  control-plane pacing
+- a D-number recording the interface-change triage. As it stands:
+  no use case is cost and several are served — an easy approval
+  under the interface-change rule

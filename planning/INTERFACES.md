@@ -63,6 +63,21 @@ that changes no rule (the clarify test) is documentation work. This matters beca
 the work, and the smallest-looking change is the one most likely
 to be a contract change wearing a small diff.
 
+**The boundary is housekeeping's alone** ([DECISIONS.md](DECISIONS.md)
+D45), and saying so is the negative half this section was missing.
+It exists *because* housekeeping is ungoverned — approved as a
+class in advance, its remaining two tests judged by whoever wants
+the work — so the interface exclusion is the whole of what stands
+between that class and an unreviewed contract change. It does
+**not** reach the pledged task queue ([TASKS.md](TASKS.md)), where
+the gate sits at entry and only authority may enter anything
+(D43): **a small interface change may be a task**, admitted on size
+and kind and never refused for the surface it touches. Read across,
+the boundary counts the same protection twice and turns away work
+authority has already approved. What this rule governs is how a
+change *lands* — the three steps below — not which queue it waited
+in.
+
 ## The rule
 
 Requests triage by their use-case and principle impact. A change

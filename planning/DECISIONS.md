@@ -170,6 +170,82 @@ is waiting on an answer today.
 
 ## Decided
 
+- D45 — THE HOUSEKEEPING BOUNDARY IS HOUSEKEEPING'S ALONE; A SMALL
+  INTERFACE CHANGE MAY BE A TASK — DECIDED (owner, 2026-07-27).
+  Supports P8, P23; **completes D43** by supplying the negative
+  boundary its own reasoning implied, and amends nothing — D43 had
+  settled the distinguisher and this says what follows from it.
+
+  THE RULE, STATED (owner): *"Changes to interfaces can be tasks,
+  if they are legitimately small in size, the important thing is
+  that they are governed, and since tasks are governed, that is
+  fine."* D43 reached the same place from the other end —
+  **entry is approval**, and *THAT KIND DISTINCTION IS THE
+  DISTINGUISHER, not size*. Neither said what the housekeeping
+  boundary does **not** reach, and that silence is where the
+  misreading grew.
+
+  THE MISREADING, AND WHERE IT CAME FROM — **which is this file's
+  own machinery, not a stray sentence**. INTERFACES.md's
+  housekeeping boundary (*"stops at the interfaces, absolutely …
+  whatever its diff looks like"*) was **generalized to the task
+  queue by [README.md](README.md)**, which stated it as doctrine:
+  *"What keeps the third queue from being a hole in the vetting is
+  the same test housekeeping uses: does it change an interface? A
+  yes is never small work, however small the diff."* That is the
+  root. [F16](proposed/FEATURES.md) then repeated it in its own
+  text, and the 2026-07-27 gate audit's first pass cited F16 as
+  precedent and began moving entries out of TASKS.md — all three
+  faithfully following the map. Caught during that audit, so the
+  correction lands at the source: README.md's clause is replaced,
+  F16's sentence corrected, and the audit landed on the rule below.
+  **The lesson is the shape of the error**: a boundary was extended
+  to a second thing without asking whether the reason for it
+  extended too, and it did not.
+
+  WHY IT DOES NOT TRANSFER, which is the whole of the argument.
+  The boundary exists because housekeeping is **ungoverned**:
+  approved as a class in advance, its remaining tests ("tiny",
+  "clearly a problem") judged by whoever wants the work, so nobody
+  holding authority sees the change before it lands. The interface
+  exclusion is the entirety of the compensation. The task queue is
+  the opposite case — D43 puts the gate **at entry**, owner-only,
+  and says it weighs most there, *"where it is all that separates
+  pre-approval from SELF-approval"*. That protection is already
+  present and is the stronger of the two. Reading the boundary
+  across counts it twice and turns away work authority has already
+  approved.
+
+  AND THE QUEUE WAS NEVER THE RULE'S SUBJECT. INTERFACES.md governs
+  **how a change lands** — name every surface, land it coherently,
+  record it — never which queue it waited in. Authority may already
+  compress those steps into a single PR (D43), so an owner entering
+  a small interface change in TASKS.md *is* the weighing,
+  compressed, rather than a way around it. The three landing steps
+  bind that work exactly as they bind a feature's.
+
+  WHAT THE AUDIT DID WITH IT. **F17** (input pacing) is a feature
+  on its **size** — seven work items with a bisection rig among
+  them — not on its surface. The **script-language residuals stay a
+  task**: two items, the first mechanical, and they change the
+  scripting language, which is now explicitly no bar. **F18–F20**
+  sit in `proposed/` on their **open shape questions**, an argument
+  still to finish being what that shelf is for; the surface each
+  touches is not the reason and never was.
+
+  A TASK IS STRUCK WHEN IT IS DONE (owner, 2026-07-27). Completed
+  holds audits, restructures and rounds — records whose reasoning
+  outlives the work. An ordinary task's record is its commit and
+  its CHANGELOG line, so it leaves by deletion; parking it in
+  Completed is the ceremony TASKS.md already refuses for work that
+  arrives done.
+
+  FOLDED: README.md's third-queue clause (the source, replaced);
+  INTERFACES.md's housekeeping boundary (the negative statement it
+  was missing); TASKS.md (the gate restated, the residuals kept,
+  the strike rule); proposed/FEATURES.md (F16's sentence, and
+  F18–F20's stated grounds); pledged/FEATURES.md (F17's).
+
 - D44 — THE SECOND SHELF IS `pledged/`, NOT `accepted/` — DECIDED
   (owner, 2026-07-27). Supports P8, P23. The three states, the
   gates, the authority, and D42's no-roadmap closure are all
