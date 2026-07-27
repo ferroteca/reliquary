@@ -1175,12 +1175,15 @@ activation (the phase deadline's scope), a span per observation
   and its source scope, the route taken with phase revisit
   counts, the nearest-miss screen row, the automatic screenshot
   reference, and the suggested next command;
-- `screen`'s CLI-only read kind (emitted by the `screen` command);
-- reserved with the backlogged record model (D36): interaction
-  runs' neutral `ended` terminal event, and the authoring
-  recorder's (U6) handover kinds — control passing from script to
-  human and back, a capture session as one record with mixed
-  drivers.
+- reserved, designed but not emitted: `screen`'s CLI-only read
+  kind, which waits on the guest-console commands carrying a
+  stream at all (only `run-script` and `fetch-media` do today);
+  and, with the backlogged record model (D36), interaction runs'
+  neutral `ended` terminal event and the authoring recorder's
+  (U6) handover kinds — control passing from script to human and
+  back, a capture session as one record with mixed drivers. A
+  reserved kind has no constant in the implementation: the
+  vocabulary the code declares is the vocabulary it emits.
 
 Events carry their originating statement's source line and
 number wherever one exists (owner, 2026-07-22) — action,

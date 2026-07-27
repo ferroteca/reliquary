@@ -45,6 +45,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `screen.read` was declared event vocabulary that nothing emitted.
+  It had a constant, a rendering arm, and a line in the script
+  spec's minimum vocabulary saying it was "emitted by the `screen`
+  command" — and `screen` prints its rows straight to stdout and
+  never touches a stream, only `run-script` and `fetch-media`
+  carrying `--progress` at all, so there was nowhere for the event
+  to go. A consumer written against the stream would have waited
+  for it forever. It joins the spec's existing reserved bullet,
+  beside the `ended` terminal event and the U6 handover kinds, and
+  loses its constant and its renderer arm to match: **a reserved
+  kind has no constant**, which is now stated in the spec and
+  enforced by a test that compares the declared vocabulary against
+  what any module actually emits. `events.KINDS` is that declared
+  set. Nothing else was dead — 19 kinds, all emitted.
+
+  This is P24's pass over the recorded outputs. The spec gives the
+  vocabulary as prose rather than a table, so there is no name set
+  to diff against; what is checkable is the claim beneath the
+  list, that the stream carries these kinds.
+
 - `fetch_media` was missing from the package's `__all__`. It was
   importable, documented in the API reference, and the twin of a
   shipped command, but absent from the declared embedding surface —

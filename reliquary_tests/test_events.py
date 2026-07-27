@@ -4,10 +4,19 @@
 
 import io
 import json
+import os
 import re
 import unittest
 
 from reliquary import events, progress
+
+_PACKAGE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "reliquary")
+# Every consumer spells the module `_events` (`from . import events
+# as _events`); the optional underscore keeps the plain spelling
+# working too, and the uppercase tail keeps `.events.emit` out.
+_KIND_REFERENCE = re.compile(r"\b_?events\.([A-Z][A-Z_]*)\b")
 
 
 class _Clock:
@@ -36,6 +45,74 @@ class _Recorder:
 
     def close(self):
         self.closed += 1
+
+
+class KindVocabularyTests(unittest.TestCase):
+    """The declared vocabulary is the emitted vocabulary.
+
+    P24's inventory pass over the recorded outputs. The script spec
+    lists the stream's minimum vocabulary in prose rather than as a
+    table of names, so there is no set to diff the constants
+    against; what *is* checkable is the claim underneath the list —
+    that the stream carries these kinds. A constant nothing emits
+    is vocabulary the surface advertises and never produces, which
+    a consumer written against it would wait for forever.
+
+    It found `screen.read` on 2026-07-27: declared, given a
+    rendering arm, emitted by nothing, and specified in present
+    tense as "emitted by the `screen` command" — which has no
+    stream to emit into, only `run-script` and `fetch-media`
+    carrying `--progress` at all. It is now spec-reserved and
+    carries no constant, which is the rule the spec now states and
+    `KINDS` embodies.
+
+    **How emission is measured, and its limit**: a kind counts as
+    emitted when a module other than `events` or `progress`
+    references its constant. Referencing a kind outside the
+    renderer is only ever done to emit it, but this measures
+    reachability rather than a literal call — `script_runner`
+    emits through one `emit(kind, **fields)` helper, so no
+    call-site analysis could see the kinds its callers pass in.
+
+    The converse — "renderers may omit what the stream carries;
+    they may never add to it" — gets no test here because it needs
+    none: `describe` dispatches on the constants themselves, so a
+    kind it could invent would have to be declared first, and
+    `test_kinds_lists_every_declared_constant` is where that
+    fails. A test that cannot fail is worse than an absent one.
+    """
+
+    def _referenced_outside(self, *exclude):
+        found = set()
+        for name in sorted(os.listdir(_PACKAGE)):
+            if not name.endswith(".py") or name[:-3] in exclude:
+                continue
+            with open(os.path.join(_PACKAGE, name),
+                      encoding="utf-8") as handle:
+                found.update(_KIND_REFERENCE.findall(handle.read()))
+        return {getattr(events, name) for name in found
+                if isinstance(getattr(events, name, None), str)}
+
+    def test_kinds_lists_every_declared_constant(self):
+        declared = {value for name, value in vars(events).items()
+                    if name.isupper() and not name.startswith("_")
+                    and isinstance(value, str)}
+        self.assertEqual(
+            declared, set(events.KINDS),
+            "KINDS is the stream's declared vocabulary and the set the "
+            "checks below compare against; a kind constant outside it "
+            "is invisible to them.")
+
+    def test_every_declared_kind_is_emitted(self):
+        unemitted = sorted(set(events.KINDS)
+                           - self._referenced_outside("events", "progress"))
+        self.assertEqual(
+            unemitted, [],
+            f"{unemitted} are declared and emitted by nothing. The "
+            "stream is the one place every surface reports through, so "
+            "a kind it never carries is a promise to consumers that "
+            "cannot come true; a designed-but-unbuilt kind is reserved "
+            "in docs/spec/script-spec.md and gets no constant.")
 
 
 class EventEnvelopeTests(unittest.TestCase):

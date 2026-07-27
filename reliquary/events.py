@@ -48,10 +48,21 @@ TRANSFER_PROGRESS = "transfer.progress"
 TRANSFER_END = "transfer.end"
 VERIFY_START = "verify.start"
 VERIFY_END = "verify.end"
-SCREEN_READ = "screen.read"
 FAILURE = "failure"
 
-#: The event kinds carrying no ``line``, for renderers that cite one.
+#: Every kind above, so a test can compare what is declared with
+#: what is emitted. A kind that is designed but not yet emitted is
+#: *reserved* and named only in the spec — it gets no constant
+#: here, because this tuple is the claim that the stream carries it.
+KINDS = (
+    RUN_START, RUN_PREFLIGHT, RUN_END, PROPERTY_BOUND,
+    PHASE_START, PHASE_END, TRANSITION,
+    OBSERVATION_ARM, OBSERVATION_MATCH, OBSERVATION_TIMEOUT,
+    HANDLER_FIRE, ACTION_START, ACTION_END,
+    TRANSFER_START, TRANSFER_PROGRESS, TRANSFER_END,
+    VERIFY_START, VERIFY_END, FAILURE,
+)
+
 _TIMESTAMP = "%Y-%m-%dT%H:%M:%S"
 
 

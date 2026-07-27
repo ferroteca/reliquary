@@ -162,8 +162,6 @@ def describe(event):
             return (f"{fields.get('name')}: {_bytes(moved)} / "
                     f"{_bytes(total)}")
         return f"{fields.get('name')}: {_bytes(moved)}"
-    if kind == _events.SCREEN_READ:
-        return None
     if kind == _events.FAILURE:
         return _failure_report(fields)
     if kind == _events.RUN_END:
