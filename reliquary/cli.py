@@ -158,7 +158,8 @@ def _require_machine_selector(arguments):
     if not getattr(arguments, "blueprint", None) and not getattr(
             arguments, "machine", None):
         raise StaticError(
-            "select a machine with --blueprint or --machine")
+            "select a machine with --blueprint or --machine",
+            rule_id="machine.no-selector")
     return resolve_machine(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None),
@@ -182,13 +183,15 @@ def _interaction_target(arguments):
         if state.get("phase") != "running":
             raise PreflightError(
                 f"machine {machine_id} is not running "
-                f"(phase: {state.get('phase')})")
+                f"(phase: {state.get('phase')})",
+                rule_id="machine.not-running")
         machine_home = machine_dir_path(machine_id)
         vm = read_vm_state(home=machine_home)
         if vm is None:
             raise PreflightError(
-                f"machine {machine_id} is running but has no recorded "
-                "VM identity")
+                f"machine {machine_id} is running but has no "
+                "recorded VM identity",
+                rule_id="machine.no-vm-identity")
         return vm["port"], machine_home
     return getattr(arguments, "port", None), None
 
@@ -236,10 +239,13 @@ def _explicit_properties(arguments):
         key, sep, value = pair.partition("=")
         if not sep:
             raise StaticError(
-                f"--property expects KEY=VALUE, got: {pair!r}")
+                f"--property expects KEY=VALUE, got: {pair!r}",
+                rule_id="prop.flag-not-key-value")
         key = key.strip()
         if key in explicit:
-            raise StaticError(f"--property {key} given more than once")
+            raise StaticError(
+                f"--property {key} given more than once",
+                rule_id="prop.flag-repeated")
         explicit[key] = value
     return explicit
 
@@ -274,7 +280,8 @@ def _reject_stream_json(arguments, command):
     if getattr(arguments, "json", False):
         raise StaticError(
             f"{command} is a stream, not a document; use "
-            "--progress jsonl for machine-readable output")
+            "--progress jsonl for machine-readable output",
+            rule_id="progress.document-on-a-stream")
 
 
 def _add_progress(parser):
@@ -678,7 +685,8 @@ def main(argv=None):
             raise PreflightError(
                 f"cannot reach QMP on {target}: {error}\n"
                 "  is the VM running? "
-                "(rlq start-machine --blueprint NAME)") from error
+                "(rlq start-machine --blueprint NAME)",
+                rule_id="machine.qmp-unreachable") from error
     except ReliquaryError as error:
         # The taxonomy is the exit codes: STATIC ERROR 2, PREFLIGHT
         # ERROR 3, RUN FAILURE 4, cancelled 5, an InternalError 1
@@ -714,7 +722,8 @@ def _create(arguments):
     if getattr(arguments, "machine", None):
         raise StaticError(
             "create-machine allocates the machine number; "
-            "do not pass --machine")
+            "do not pass --machine",
+            rule_id="machine.selector-not-allowed")
     machine_id = create_machine(
         arguments.blueprint,
         properties=_explicit_properties(arguments),
@@ -760,7 +769,8 @@ def _script(arguments):
     machine_selector = getattr(arguments, "machine", None)
     if not blueprint_name and not machine_selector:
         raise StaticError(
-            "run-script requires --blueprint or --machine")
+            "run-script requires --blueprint or --machine",
+            rule_id="machine.no-selector")
     run_script(
         arguments.label,
         blueprint=blueprint_name,
@@ -1026,7 +1036,9 @@ def _read_secret_value(key):
         if value.endswith("\r"):
             value = value[:-1]
     if not value:
-        raise PreflightError(f"no value supplied for the secret {key!r}")
+        raise PreflightError(
+            f"no value supplied for the secret {key!r}",
+            rule_id="prop.secret-not-supplied")
     return value
 
 
@@ -1049,12 +1061,14 @@ def _set_property(arguments):
                 "set-property --secret takes no value argument: "
                 "process listings and shell history are not "
                 "credential stores; it prompts on a terminal and "
-                "reads stdin otherwise")
+                "reads stdin otherwise",
+                rule_id="prop.set-secret-takes-no-value")
         value = _read_secret_value(arguments.key)
     else:
         if arguments.value is None:
             raise StaticError(
-                "set-property needs a value (or --secret)")
+                "set-property needs a value (or --secret)",
+                rule_id="prop.set-needs-a-value")
         value = arguments.value
     set_property(arguments.key, value, secret=arguments.secret,
                  properties_file=_properties_file(arguments))
@@ -1257,7 +1271,9 @@ def _dispatch(arguments):
                 timeout=timeout or 120)
         else:
             if platform != "dos":
-                raise PreflightError("exec requires platform='dos'")
+                raise PreflightError(
+                    "exec requires platform='dos'",
+                    rule_id="platform.verb-not-implemented")
             rows = AgentlessGuestExec(Machine(port, machine_home)).execute(
                 arguments.dos_command, timeout or 120)
         rows = list(rows or ())

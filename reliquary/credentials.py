@@ -62,7 +62,7 @@ class _Keyring:
         except KeyringError as error:
             raise CredentialError(
                 f"the host credential store could not {action}: "
-                f"{error}") from error
+                f"{error}", rule_id="store.unusable") from error
 
     def get_password(self, service, name):
         return self._guarded(
@@ -86,13 +86,13 @@ def _default_provider():
         raise CredentialError(
             "secret properties need the 'keyring' package for the "
             "host credential store; there is no plaintext "
-            "fallback") from error
+            "fallback", rule_id="store.missing-dependency") from error
     from keyring.backends.fail import Keyring as FailKeyring
     if isinstance(keyring.get_keyring(), FailKeyring):
         raise CredentialError(
             "this host has no usable credential store, so secret "
             "properties cannot be stored or read; there is no "
-            "plaintext fallback")
+            "plaintext fallback", rule_id="store.unavailable")
     return _Keyring(keyring)
 
 def _current_provider():

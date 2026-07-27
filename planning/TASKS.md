@@ -108,70 +108,90 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **Diagnostics carry no stable identifier — every surface but
-  the script one** (found 2026-07-27 by finishing the script
-  surface's pass; D55's requirement, D58's reach).
+- **Diagnostics carry no stable identifier — the surfaces left**
+  (filed 2026-07-27 by finishing the script surface; D55's
+  requirement, D58's reach. Second pass 2026-07-27: properties,
+  credentials, the CLI and the duplicate-rule sites done.)
   [script-spec.md](../docs/spec/script-spec.md) requires an id of
-  *every* diagnostic. The script surface now has them — 82 static
-  plus 43 preflight and runtime, the corpus asserting each in both
-  directions — and nothing else does.
+  *every* diagnostic.
 
   **This is D58's consequence, not a new demand.** The four error
   classes used to be read as tiers of a script run, so the id
   requirement was read as the script surface's too. D58 made the
-  classes describe every surface, and the requirement travelled
-  with them: a malformed blueprint is a STATIC ERROR exactly as a
-  malformed script is, so it owes an id on the same terms. The
-  population went from 30 to 288 without a single new rule being
-  written.
+  classes describe every surface and the requirement travelled with
+  them: a malformed blueprint is a STATIC ERROR exactly as a
+  malformed script is, so it owes an id on the same terms.
 
   **Measured, not estimated.** Diagnostics carrying no id:
 
   | module | what it diagnoses | without an id |
   |---|---|---|
   | `document.py` | the blueprint document | 97 |
-  | `machines.py` | the machine verbs | 53 |
+  | `machines.py` | the machine verbs | 44 |
   | `lifecycle.py` | the VM's own lifecycle | 26 |
-  | `properties.py` | the properties file | 15 |
-  | `cli.py` | invocation shape | 13 |
   | `machine.py` | the guest console | 12 |
-  | the remaining 11 | assets, media, DOS addressing, … | 29 |
+  | the remaining 10 | acquire, blueprint, DOS addressing, … | 26 |
 
-  245 across 17 modules. The count is a one-command measurement —
-  walk every `raise` and look for a `rule_id` keyword — so it can
-  be re-derived rather than trusted.
+  205 across 14 modules, down from 245 across 17. The count is a
+  one-command measurement — walk every `raise` and look for a
+  `rule_id` keyword — so it is re-derived rather than trusted.
 
-  **The scheme needs nothing new; the subjects do.** The prefix is
-  the subject, never the error class or the tier, and that rule
-  held when `media.` and `machine.` arrived — `media.unknown` is
-  one id whether the resolution namespace lacks the media or a
-  script's `insert` names it. The blueprint surface is the one
-  place needing an argued answer: `document.py`'s 97 are field
-  and shape rules over a JSON document, and whether their subject
-  is the field (`drives.`, `boot.`, `location.`), the document
-  (`blueprint.`), or the rule class is the real question. Guessing
-  it 97 times is how a namespace goes bad.
+  **`document.py`'s subjects are decided; the pass is mechanical**
+  (owner, 2026-07-27). Subjects come from
+  [blueprint-model.md](../docs/spec/blueprint-model.md)'s own
+  vocabulary rather than being invented, and the families are
+  counted:
 
-  **Where to start, and why it is not the biggest module.**
-  `properties.py`'s 15 are a closed, well-understood family and
-  `PropertiesError` is already one class; they would settle the
-  pattern for a non-script surface cheaply. `cli.py`'s 13 are
-  invocation shape and mostly want one subject. `document.py` is
-  last, after its subjects are argued.
+  | family | count | subject |
+  |---|---|---|
+  | reference grammar | 29 | `ref.` |
+  | value shape | 27 | `value.` |
+  | name charter and derivation | 16 | **`name.`** (exists) |
+  | unknown / retired vocabulary | 8 | `field.` |
+  | media semantics | 6 | **`media.`** (exists) |
+  | drive and boot structure | 6 | `drive.` |
+  | other | 5 | by the same test |
+
+  Three new subjects, and two families join ids that already exist.
+  A one-`blueprint.` scheme was refused: it would make the prefix
+  name the *surface*, which the spec forbids, and it would give the
+  16 name-charter rules a second id where `name.` already covers
+  them. A per-field scheme was refused for churn — a dozen subjects
+  for one document, several with a single id, and a field rename
+  moving ids that are meant to be stable.
+
+  **The subject list is closed and enforced now**, which is what
+  makes the rest mechanical: `test_script_corpus.py` holds the
+  code's subjects and the spec's prefix list to each other in both
+  directions, so a new subject is an edit to the spec rather than a
+  local decision. Adding `ref.`, `value.`, `field.` and `drive.`
+  means adding them there in the same change.
+
+  **One rule keeps one id across surfaces** — that is the payoff and
+  it is asserted, not described. `machine.not-running` is raised
+  from five places, `machine.no-selector` and
+  `machine.no-vm-identity` from three each, and
+  `name.duplicate-property`, `name.property-reserved-namespace`,
+  `media.unknown` and `platform.verb-not-implemented` from two.
+  Applying the scheme to a new module means looking for the rule
+  before minting an id.
 
   **A located diagnostic is the other half, and only the blueprint
   surface lacks it.** `ScriptParseError` carries line and column;
   the runner's `_Located` cites a statement. A blueprint diagnostic
   carries neither, and `jsonc.loads` hanging `lineno`/`colno` on a
   raised `StaticError` as plain attributes is the stopgap that
-  proves the need rather than meeting it.
+  proves the need rather than meeting it. `document.py` walks a
+  parsed object with a `where` breadcrumb and no line, so a real
+  location means carrying position through the parse — the larger
+  half of that module's work, and separable from the ids.
 
   **What is already true** (do not redo it): `rule_id` lives on
   `ReliquaryError`, so every class has the field and nothing needs
-  a new one; the spec's prefix list carries `media.` and
-  `machine.`; and `RULE_OF` maps the static tier alone by
+  a new one; the spec's prefix list carries all 17 current
+  subjects; and `RULE_OF` maps the static script tier alone by
   construction, S-numbers naming syntactic restrictions only, so a
-  preflight id absent from it is correct rather than missing.
+  non-script id absent from it is correct rather than missing.
 
   **The index is still not the gap.** Deferring the id *index* to
   beta stays where the spec says it; generating it is cheap now

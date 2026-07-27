@@ -136,7 +136,8 @@ def _resolve_control_planes(machine):
         names = ", ".join(repr(plane) for plane in missing)
         raise PreflightError(
             f"control-planes names {names}; only 'agentless-display' "
-            "is wired so far (the adapter seam owns the other planes)")
+            "is wired so far (the adapter seam owns the other "
+            "planes)", rule_id="machine.control-plane-not-wired")
     return planes
 
 
@@ -301,7 +302,8 @@ def _drive_common(key, drive):
             raise PreflightError(
                 f"drive {key!r} declares controller {controller!r}; "
                 "only ide is wired on QEMU so far (the adapter seam "
-                "owns richer controller topology)")
+                "owns richer controller topology)",
+                rule_id="machine.controller-not-wired")
         entry["controller"] = controller
     return entry
 
@@ -753,7 +755,8 @@ def resolve_machine(*, machine=None, blueprint=None, context=None):
     """
     if machine is None and blueprint is None:
         raise StaticError(
-            "select a machine with --blueprint or --machine")
+            "select a machine with --blueprint or --machine",
+            rule_id="machine.no-selector")
     if machine is not None and blueprint is not None:
         raise StaticError(
             "--blueprint and --machine are mutually exclusive; "
@@ -1020,7 +1023,8 @@ def stop_machine(machine_id, context=None):
         if phase != "running":
             raise PreflightError(
                 f"machine {machine_id} is not running "
-                f"(phase: {phase})")
+                f"(phase: {phase})",
+                rule_id="machine.not-running")
         _write_phase(machine_id, "stopping", context, bump=True)
         _complete_stop(machine_id, context)
 
@@ -1055,7 +1059,7 @@ def _change_media_live(machine_id, slot, path, context):
     if vm is None:
         raise PreflightError(
             f"machine {machine_id} is running but has no recorded VM "
-            "identity")
+            "identity", rule_id="machine.no-vm-identity")
     with Machine(port=vm["port"], home=machine_home).qmp() as qmp:
         if path is None:
             qmp.hmp(f"eject {slot}")
@@ -1336,18 +1340,20 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
     if platform != "dos":
         raise PreflightError(
             f"exec is not implemented for platform {platform!r}; DOS "
-            "is the delivered workflow")
+            "is the delivered workflow",
+            rule_id="platform.verb-not-implemented")
     phase = state.get("phase")
     if phase != "running":
         raise PreflightError(
             f"machine {machine_id} is not running (phase: {phase}); "
-            f"start it first: rlq start-machine --machine {machine_id}")
+            f"start it first: rlq start-machine --machine "
+            f"{machine_id}", rule_id="machine.not-running")
     machine_home = machine_dir_path(machine_id, context)
     vm = read_vm_state(machine_home)
     if vm is None:
         raise PreflightError(
             f"machine {machine_id} is running but has no recorded VM "
-            "identity")
+            "identity", rule_id="machine.no-vm-identity")
     return AgentlessGuestExec(
         Machine(vm["port"], machine_home)).execute(command, timeout)
 
@@ -1365,7 +1371,8 @@ def _addressing(platform):
     if platform != "dos":
         raise PreflightError(
             f"in-band file exchange is not implemented for platform "
-            f"{platform!r}; DOS is the delivered workflow")
+            f"{platform!r}; DOS is the delivered workflow",
+            rule_id="platform.verb-not-implemented")
     from . import platform_dos
     return platform_dos
 

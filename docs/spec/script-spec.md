@@ -1927,19 +1927,29 @@ and `obs.two-channels` is one of the six ways to break it. The
 two are not competing schemes and a message carries only the id;
 the [syntactic restrictions](#syntactic-restrictions) list the
 ids that enforce each rule, which is where a reader goes from one
-to the other. The prefix is the subject, never the error class,
-because the namespace is shared across the classes: `obs.`,
+to the other. The prefix is the subject, never the error class or
+the surface, because the namespace is shared across both: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
-`node.`, `http.`, `media.`, `machine.`.
+`node.`, `http.`, `media.`, `machine.`, `platform.`, `progress.`,
+`store.`, `lex.`, `syn.`.
 
-`media.` and `machine.` arrived with the preflight and runtime
-tiers, and they are the reason the subject rule earns its keep:
-the same subject spans classes. `media.unknown` is raised both
-where the resolution namespace defines no such media and where a
-script's `insert` names one, and it is the same id in both,
-because a consumer asking *what went wrong* has one answer. Had
-the prefix named the tier, one condition would have carried two
-ids and the caller would have had to know which layer noticed.
+**This list is closed and enforced.** A diagnostic whose subject
+is not on it does not get a new prefix invented for it in passing;
+the list grows by an edit here, and a test holds the code and this
+list to each other in both directions — an id with an unlisted
+subject fails, and a listed subject nothing raises fails too.
+
+The subject rule is what lets **one rule keep one id across
+surfaces**, which is its whole purpose. `media.unknown` is raised
+where the resolution namespace defines no such media *and* where a
+script's `insert` names one: one condition, one answer for a
+caller asking what went wrong. `name.duplicate-property` covers a
+script declaring a property twice and a properties file defining a
+key twice. `machine.not-running` covers the CLI, the script runner
+and the machine verbs. Had the prefix named the tier or the
+surface, each of those would have carried two or three ids for one
+rule, and a consumer would have had to know which layer noticed
+before it could tell what happened.
 
 An id is a **contract**: it is what a consumer switches on, so it
 is stable where the message text is not. The message wording,

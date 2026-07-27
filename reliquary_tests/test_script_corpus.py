@@ -44,6 +44,7 @@ cannot outlive what it records, which is the difference between
 naming a gap and quietly keeping one.
 """
 
+import collections
 import glob
 import os
 import re
@@ -75,6 +76,39 @@ def _fixtures(bucket):
 def _header(path):
     with open(path, encoding="utf-8") as handle:
         return handle.read()
+
+
+def _package_ids():
+    """Every `rule_id="..."` in the package, with its occurrence count."""
+    root = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "reliquary")
+    counts = collections.Counter()
+    for folder, _dirs, names in os.walk(root):
+        for name in sorted(names):
+            if not name.endswith(".py"):
+                continue
+            with open(os.path.join(folder, name), encoding="utf-8") as handle:
+                counts.update(
+                    re.findall(r'rule_id\s*=\s*"([^"]+)"', handle.read()))
+    return counts
+
+
+def _raised_counts():
+    return _package_ids()
+
+
+def _raised_subjects():
+    return {rule_id.split(".", 1)[0] for rule_id in _package_ids()}
+
+
+def _spec_subjects():
+    """The subjects the spec's prefix list declares."""
+    with open(_SPEC, encoding="utf-8") as handle:
+        spec = handle.read()
+    start = spec.index("The prefix is the subject")
+    end = spec.index("**This list is closed and enforced.**", start)
+    return set(re.findall(r"`([a-z]+)\.`", spec[start:end]))
+
 
 
 class ValidCorpusTests(unittest.TestCase):
@@ -195,6 +229,65 @@ class InvalidCorpusTests(unittest.TestCase):
                     f"{declared} rejects a corpus fixture and appears "
                     "in no S-rule's id list in "
                     "docs/spec/script-spec.md.")
+
+    def test_every_subject_the_code_uses_is_one_the_spec_lists(self):
+        """The prefix list is closed, and this is what closes it.
+
+        The spec says the prefix is the subject, never the error
+        class or the surface, and gives the list. Without holding
+        the code to it, a new diagnostic gets whatever prefix its
+        author felt like and the namespace stops being one — which
+        is the failure the subject rule exists to prevent, since a
+        rule spanning two surfaces can only keep one id if both
+        surfaces reach for the same subject.
+
+        Asserted in both directions: an unlisted subject fails here,
+        and a listed subject nothing raises fails below.
+        """
+        listed, used = _spec_subjects(), _raised_subjects()
+        self.assertEqual(
+            sorted(used - listed), [],
+            "these id subjects appear in the code and not in "
+            "docs/spec/script-spec.md's prefix list. Add them there "
+            "or reuse an existing subject — the list is the closed "
+            "vocabulary, not a sample of it.")
+
+    def test_the_spec_lists_no_subject_the_code_does_not_use(self):
+        """A listed subject nothing raises is a namespace of nothing."""
+        listed, used = _spec_subjects(), _raised_subjects()
+        self.assertEqual(
+            sorted(listed - used), [],
+            "these subjects are listed in the spec's prefix list and "
+            "no diagnostic uses them, which is the same defect as a "
+            "spec naming a command that does not exist.")
+
+    def test_one_rule_keeps_one_id_across_surfaces(self):
+        """The subject rule's payoff, asserted rather than described.
+
+        Each of these is one rule raised from more than one module,
+        and the id is the rule's rather than the site's. If a future
+        change gives any of them a second id, a consumer switching
+        on it starts having to know which layer noticed — which is
+        exactly what the id was for.
+        """
+        shared = {
+            "machine.not-running": 3,
+            "machine.no-selector": 3,
+            "machine.no-vm-identity": 3,
+            "media.unknown": 2,
+            "name.duplicate-property": 2,
+            "name.property-reserved-namespace": 2,
+            "platform.verb-not-implemented": 2,
+        }
+        counts = _raised_counts()
+        for rule_id, least in sorted(shared.items()):
+            with self.subTest(id=rule_id):
+                self.assertGreaterEqual(
+                    counts[rule_id], least,
+                    f"{rule_id} is raised from {counts[rule_id]} "
+                    f"place(s) and should reach at least {least}. If a "
+                    "site was renamed to its own id, one rule now has "
+                    "two names.")
 
     def test_the_spec_lists_no_id_the_code_does_not_raise(self):
         """The reverse: a listed id that nothing raises is fiction."""

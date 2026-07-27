@@ -73,18 +73,21 @@ def check_key(key):
     `reliquary` namespaces are reserved for Reliquary's own facts.
     """
     if not isinstance(key, str) or not key:
-        raise PropertiesError("a property key is required")
+        raise PropertiesError("a property key is required",
+                              rule_id="name.property-empty")
     segments = key.split(".")
     for segment in segments:
         if not _SEGMENT.match(segment):
             raise PropertiesError(
                 f"invalid property key {key!r}: each segment starts "
                 "with a letter and continues with letters, digits, "
-                "'_' or '-'")
+                "'_' or '-'",
+                rule_id="name.property-charter")
     if segments[0] in _RESERVED:
         raise PropertiesError(
             f"invalid property key {key!r}: the {segments[0]!r} "
-            "namespace is reserved for Reliquary's own facts")
+            "namespace is reserved for Reliquary's own facts",
+            rule_id="name.property-reserved-namespace")
     return key
 
 def _decode(text, path, number):
@@ -97,7 +100,7 @@ def _decode(text, path, number):
         raise PropertiesError(
             f"{path}:{number}: {text!r} is not a known value kind; "
             "a leading '@' is reserved (write '@@' for a literal "
-            "'@')")
+            "'@')", rule_id="prop.value-reserved-sigil")
     return text
 
 def _encode(value):
@@ -107,16 +110,18 @@ def _encode(value):
     if not isinstance(value, str):
         raise PropertiesError(
             "a property value must be text; every ordinary value "
-            "is a string and the declaration provides the type")
+            "is a string and the declaration provides the type",
+            rule_id="prop.value-not-text")
     if value != value.strip():
         raise PropertiesError(
             f"a property value may not lead or trail with "
             f"whitespace: {value!r} would not read back as written "
-            "(the format has no quoting)")
+            "(the format has no quoting)",
+            rule_id="prop.value-untrimmed")
     if "\n" in value or "\r" in value:
         raise PropertiesError(
             "a property value is one line; it may not contain a "
-            "line break")
+            "line break", rule_id="prop.value-multiline")
     if value.startswith("@"):
         return "@" + value
     return value
@@ -197,7 +202,8 @@ def _read(path):
                 text = handle.read()
         except UnicodeDecodeError as error:
             raise PropertiesError(
-                f"{path}: the properties file is not UTF-8") from error
+                f"{path}: the properties file is not UTF-8",
+                rule_id="prop.file-not-utf8") from error
         if text:
             ending = "\r\n" if "\r\n" in text else "\n"
         lines = [line.rstrip("\r") for line in text.split("\n")]
@@ -214,17 +220,23 @@ def _read(path):
         if not separator:
             raise PropertiesError(
                 f"{path}:{number}: expected 'key = value', a comment, "
-                "or a blank line")
+                "or a blank line",
+                rule_id="prop.file-line-malformed")
         key = key.strip()
         try:
             check_key(key)
         except PropertiesError as error:
-            raise PropertiesError(f"{path}:{number}: {error}") from error
+            # The key charter is one rule wherever the key was
+            # written, so the id travels and only the location is
+            # added here.
+            raise PropertiesError(f"{path}:{number}: {error}",
+                                  rule_id=error.rule_id) from error
         if key in entries:
             first = entries[key][0] + 1
             raise PropertiesError(
                 f"{path}:{number}: duplicate property {key!r}, first "
-                f"defined on line {first}")
+                f"defined on line {first}",
+                rule_id="name.duplicate-property")
         entries[key] = (index, _decode(written.strip(), path, number))
     return _File(path, lines, entries, ending)
 
@@ -277,7 +289,8 @@ def _refuse_orphan(path, key):
         raise PropertiesError(
             f"an orphaned credential exists for {key!r} (stored, but "
             f"no marker in {path} — an interrupted secret set); run "
-            f"'rlq unset-property {key}' to clear it first")
+            f"'rlq unset-property {key}' to clear it first",
+            rule_id="prop.orphaned-credential")
 
 def set_property(key, value, secret=False, context=None,
                  properties_file=None):
@@ -300,11 +313,13 @@ def set_property(key, value, secret=False, context=None,
     if secret:
         if not isinstance(value, str) or not value:
             raise PropertiesError(
-                "a secret needs a non-empty value")
+                "a secret needs a non-empty value",
+                rule_id="prop.secret-empty")
         if current is not None and not is_secret(current):
             raise PropertiesError(
-                f"{key!r} is an ordinary property; unset it first to "
-                "store a secret under that key")
+                f"{key!r} is an ordinary property; unset it first "
+                "to store a secret under that key",
+                rule_id="prop.kind-change-on-set")
         credentials.store_secret(credentials.scope_for(path), key, value)
         properties.set(key, secret_marker())
         properties.save()
@@ -312,7 +327,8 @@ def set_property(key, value, secret=False, context=None,
     if is_secret(current):
         raise PropertiesError(
             f"{key!r} is a secret property; unset it first to store "
-            "an ordinary value under that key")
+            "an ordinary value under that key",
+            rule_id="prop.kind-change-on-set")
     if current is None:
         _refuse_orphan(path, key)
     properties.set(key, value)

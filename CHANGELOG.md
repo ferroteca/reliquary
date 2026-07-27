@@ -191,6 +191,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Diagnostic ids reach the properties file, the credential store
+  and the CLI.** 40 more diagnostics carry one: `properties.py`'s 15,
+  `credentials.py`'s 3, `cli.py`'s 13, and 9 sites in `machines.py`
+  that raise a rule already named elsewhere. Three modules leave the
+  idless list entirely, and the measured remainder is 205 across 14
+  modules, down from 245 across 17.
+
+  **The reuse is the point, and applying the scheme to a second
+  surface proved it immediately.** Two of the properties file's rules
+  were already named on the script surface — a key in the reserved
+  `rlq` namespace is `name.property-reserved-namespace` whether a
+  script declares it or a file defines it, and a key defined twice is
+  `name.duplicate-property` either way. Had the prefix named the
+  surface or the tier, those would be four ids for two rules. The same
+  held for the CLI: "machine is not running", "select a machine with
+  --blueprint or --machine", "is running but has no recorded VM
+  identity" and "not implemented for platform" were all rules the
+  script surface had already named, so the CLI reuses them and the
+  duplicate sites in `machines.py` were brought along — leaving one
+  copy of a rule identified and its twin bare is worse than either.
+  `machine.not-running` now answers from five places with one id.
+
+  **The subject list is closed and enforced.** The spec said the
+  prefix is the subject and gave the list; nothing held the code to
+  it, so a new diagnostic could take whatever prefix its author felt
+  like — and a namespace that drifts cannot keep one id for a rule
+  spanning two surfaces, which is the whole reason the rule exists. A
+  test now holds the code's subjects and the spec's list to each other
+  in both directions: an unlisted subject fails, and a listed subject
+  nothing raises fails too. Both sides currently agree on 17 subjects,
+  `platform.`, `progress.` and `store.` having joined with this work.
+  The shared ids are asserted as well, so a future change cannot
+  quietly give one rule a second name.
+
 - **A blueprint naming an unbuilt backend is refused instead of
   silently getting QEMU.** `"backend": "virtualbox"` was accepted,
   recorded, and then ignored: `create-machine` materialized a
