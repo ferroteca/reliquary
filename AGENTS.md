@@ -364,7 +364,7 @@ process-global default via `--home`/`--cache` — scoped `Context` objects are a
 plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
 deliberately left alone. Never write beside the module or into the source repository during normal use.
 
-Authored-asset residency is a separate axis from the home (design/asset-resolution.md; `assets.py`). Blueprints
+Authored-asset residency is a separate axis from the home (docs/spec/asset-resolution.md; `assets.py`). Blueprints
 (their media, source, and archive components included) and scripts resolve in one of two modes, carried on
 `Context.assets` / the `set_assets` global:
 **home mode** (`HOME_ASSETS` — the CLI default when `--assets` is absent) reads the home's canonical `blueprints/` /

@@ -45,6 +45,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `asset-resolution.md` had no status banner at all, and had drifted
+  in six places behind its absence. It was the one document in
+  `docs/spec/` breaking the rule that directory itself states —
+  *the banner is the marker; this directory is only shelving* — so
+  its standing was undeclared and nothing it said had to be true.
+  It now declares itself normative, which is what it always
+  intended: its own closing line already called the home layout a
+  world-facing contract, and the spec index already listed it under
+  "The interfaces".
+
+  What was behind it: `.rlqm` described as a media file kind, when
+  media retired as files with the composed model and are specs
+  inside a `.rlqb` (D30); `.json` unmentioned though the code
+  accepts it as the legacy blueprint spelling; home mode said to
+  resolve from a `media/` folder that does not exist and that the
+  document's *own* layout diagram did not show; dir mode called
+  "*every* embedding-API call" ten lines above the passage
+  explaining that the API reaches home mode through an explicit
+  marker; and a `landmarks/` folder in the home layout with no
+  `landmarks_dir` behind it.
+
+  The sixth was a `.rlql` landmark kind in `KIND_EXTENSIONS` that
+  nothing ever requested — only `blueprint` and `script` are asked
+  for, and home mode had no folder to resolve a landmark from. It
+  is gone from the code and reserved in the banner beside the
+  `ObjectSource` third source, the same treatment `screen.read`
+  received. Landmarks remain settled design in
+  planning/proposed/design/landmarks.md.
+
+  Two tests hold it there: the kind table against the kinds any
+  module actually requests, and the home-layout diagram against the
+  folders `home.py` resolves — with reserved names read out of the
+  banner, so designed-but-unbuilt stays documented without becoming
+  a claim.
+
 - The codex spec's status banner called `search-`, `seed-` and the
   provenance column "still planned" while all three shipped. That
   is not a cosmetic slip: by the banner-is-the-marker rule a

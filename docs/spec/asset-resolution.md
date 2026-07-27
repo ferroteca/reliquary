@@ -5,6 +5,25 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Authored-asset resolution and the home
 
+> **Status:** normative. The two modes, the extension-and-name
+> identity rule, the recorded blueprint source, and the home
+> layout are implemented and are what the code answers to; the
+> home layout is a world-facing contract, so changes to it follow
+> the interface-change rule
+> ([INTERFACES.md](../../planning/INTERFACES.md)). Two things
+> below are **reserved**, named so they are not mistaken for
+> today's behaviour: the `ObjectSource` fileless third source, and
+> landmark declarations (`.rlql`, the home `landmarks/` folder) —
+> settled design in
+> [landmarks.md](../../planning/proposed/design/landmarks.md) and
+> entirely unbuilt, so no asset kind is declared for them. Details
+> may change before first release.
+>
+> This banner was absent until 2026-07-27, and the document had
+> drifted in six places behind it — the directory's own rule is
+> that the banner is the marker and shelving proves nothing
+> ([README.md](README.md)).
+
 Where Reliquary looks for the files a user authors, and where
 Reliquary keeps its own. This is the mechanism behind the
 artifact-residency split ([ARCHITECTURE.md](../../ARCHITECTURE.md) P4);
@@ -16,13 +35,21 @@ and [landmarks.md](../../planning/proposed/design/landmarks.md).
 ## Assets are identified by extension
 
 Assets are identified by **extension**, not location: `.rlqb` a
-machine blueprint, `.rlqm` a media definition, `.rlqs` a script,
-`.rlql` a landmark declaration (its `<name>.<n>.png` variant
-renderings attach by stem adjacency, not discovery —
-[landmarks.md](../../planning/proposed/design/landmarks.md)). An asset's **identity** is its
+machine blueprint (`.json` is accepted as its legacy spelling),
+`.rlqs` a script. There is **no media file kind** — `.rlqm`
+retired with the composed model, and a media is a spec inside a
+`.rlqb` (D30), resolved through the component namespace rather
+than by this rule. Reserved: `.rlql` a landmark declaration (its
+`<name>.<n>.png` variant renderings attaching by stem adjacency,
+not discovery —
+[landmarks.md](../../planning/proposed/design/landmarks.md)),
+which no source resolves today.
+
+An asset's **identity** is its
 declared `name` when it carries one, else its filename stem; two
 files of one kind resolving to the same effective name within a
-source are an error.
+source are an error. A script carries no `name` field, so it is
+always stem-identified.
 
 ## Two modes, one knob
 
@@ -31,13 +58,15 @@ Resolution has two modes, selected per invocation by one knob —
 the selected source is the sole source.
 
 - **Home mode** — the CLI default, when `--assets` is absent.
-  Resolves from the home's canonical `blueprints/` / `media/` /
-  `scripts/` folders and seeds a missing name from the built-in
+  Resolves from the home's canonical `blueprints/` and `scripts/`
+  folders and seeds a missing name from the built-in
   codex on first reference. Home assets are a convenience for
   human CLI interaction — one shared place a person reuses across
-  scenarios (U1, U5).
-- **Dir mode** — `--assets <dir>`, and *every* embedding-API
-  call. The directory is walked recursively by extension (a
+  scenarios (U1, U5). There is no home `media/` folder: media ride
+  inside the blueprints that declare them.
+- **Dir mode** — `--assets <dir>`, and the embedding API's only
+  file-backed source short of naming the home marker explicitly
+  (below). The directory is walked recursively by extension (a
   project lays its files out however it likes; dot-directories
   like `.git`/`.venv` are pruned) and is the **sole** source: no
   home, no codex, no seeding. Strictly project-scoped resolution,
@@ -84,11 +113,9 @@ asset root untouched and a CI tree clean.
 
 ```text
 <reliquary_home>/
-├── blueprints/          machine blueprints, <name>.rlqb
+├── blueprints/          machine blueprints, <name>.rlqb — media
+│                        ride inside them, so there is no media/
 ├── scripts/             reliquary automation scripts
-├── landmarks/           landmark declarations and their variant
-│                        renderings, <name>.rlql + <name>.<n>.png
-│                        (see landmarks.md)
 ├── user.properties      personal user properties (line-based
 │                        key = value; ordinary values and @secret
 │                        markers for host-stored secrets)
@@ -102,6 +129,11 @@ asset root untouched and a CI tree clean.
                          a run stores nothing, returning its output
                          to the caller (D36)
 ```
+
+A `landmarks/` folder joins this layout with landmark support and
+is reserved until then (see the banner); the recorder's drafts
+above land in the asset root the session ran with, which under
+`--assets` is the project tree rather than the home.
 
 Everything under `cache/` is Reliquary's and disposable. Nothing is
 ever hand-placed there; pre-existing content enters a machine

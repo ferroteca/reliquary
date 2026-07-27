@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Authored-asset residency: the resolution source seam.
 
-Authored assets — machine blueprints (``.rlqb``, media included),
-scripts (``.rlqs``), and landmark declarations (``.rlql``) — resolve
-through one of two file-backed sources, selected per invocation
-(``home.assets_mode``):
+Authored assets — machine blueprints (``.rlqb``, media included)
+and scripts (``.rlqs``) — resolve through one of two file-backed
+sources, selected per invocation (``home.assets_mode``):
 
 - **home mode** (``HomeSource``) — the CLI default. Resolves from the
   home's canonical ``blueprints/`` and ``scripts/`` folders and seeds
@@ -20,8 +19,7 @@ declares one, else its filename stem; two files of one kind claiming
 the same effective name within a source is an error. Media are not a
 file kind at all — they are specs inside a blueprint, identified by
 their own names — so they resolve through the catalog rather than by
-this rule; scripts and landmarks carry no ``name`` field and stay
-stem-identified.
+this rule; scripts carry no ``name`` field and stay stem-identified.
 
 An ``ObjectSource`` (JSON-imported objects supplied by an embedding
 caller, no files at all) is the planned third source and slots onto
@@ -35,13 +33,18 @@ from .home import (HOME_ASSETS, assets_mode, blueprints_dir,
 
 
 # Authored-asset file extensions by kind. ``.json`` is the accepted
-# legacy spelling for blueprints; scripts and landmarks have no legacy
-# form. There is no media kind: ``.rlqm`` retired with the composed
-# model, and a media is a spec inside a ``.rlqb``.
+# legacy spelling for blueprints; scripts have no legacy form.
+#
+# Two kinds are deliberately absent, both reserved in
+# docs/spec/asset-resolution.md rather than declared here. ``.rlqm``
+# retired with the composed model — a media is a spec inside a
+# ``.rlqb`` (D30). ``.rlql`` landmarks are unbuilt: nothing requests
+# the kind, and home mode has no ``landmarks/`` folder to resolve one
+# from, so declaring it would only advertise a resolution that
+# cannot happen.
 KIND_EXTENSIONS = {
     "blueprint": (".rlqb", ".json"),
     "script": (".rlqs",),
-    "landmark": (".rlql",),
 }
 
 
