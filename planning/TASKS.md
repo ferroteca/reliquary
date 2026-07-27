@@ -78,27 +78,6 @@ needs no pledge because the norm it violates already is one.
 Owner-only: each settles a question the record is waiting on.
 None depends on the others.
 
-- **Promote the principles reality has already caught up with.**
-  WHY IT MATTERS, and it is not bookkeeping: **promotion is what
-  arms a principle** (owner, 2026-07-24). Before it, an entry is
-  pledged vision and a shortfall is unbuilt work; after it,
-  ARCHITECTURE.md asserts the thing is true of the code, so a
-  divergence is a *bug*.
-  **Rescoped 2026-07-27** by the gate audit. The standing list has
-  since grown to P1–P4, P6–P13, P15 and P19–P23, which takes P9 —
-  this entry's sharpest case, and the whole of its "the delay is
-  costing enforcement" argument — off the list: no-backward-
-  compatibility is now armed, so a shim that crept in tomorrow is a
-  defect rather than a debatable design choice.
-  What is left: **P5 and P14** sit pledged in
-  [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md) while being
-  cited throughout DECISIONS.md and AGENTS.md, and **P17/P18** are
-  drafted with milestone 9's code as evidence for both. P16 and P17
-  carry open adjudication questions (P17 four of them); P17's
-  first — where the drive-letter mapping comes from — now has a
-  worked implementation to argue against rather than a hypothetical
-  (D37).
-
 - **Record the gap-is-a-bug rule, and the two promotion bars.**
   ARCHITECTURE.md's preamble says the list is standing-only and
   every entry honored by the code today — true, but passive: it
@@ -210,6 +189,31 @@ already its demand, so these need no pledge, only fixing. A gap
 against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
+
+- **The DOS drive-letter map assumes one volume per hard disk
+  and does not say so** (filed 2026-07-27 by D47, the hour P17
+  armed). P17 requires that where the declared facts leave an
+  address ambiguous the call fails closed naming the ambiguity
+  (P11). `platform_dos.drive_letters` instead assumes one volume
+  per hard disk — its own docstring says so, and offers the
+  caller a workaround: address a floppy, or declare fewer disks.
+  A guest that partitioned a disk shifts every letter after it,
+  and `put-file "D:\X"` then writes confidently to the wrong
+  drive with nothing reported.
+  **Reliquary is right not to look** — asking the guest is
+  exactly what P10 forbids, so the fix is not detection. It is
+  honesty about the assumption: report it where the machine
+  declares more than one hard disk and a letter at or past the
+  second one is addressed, or narrow what the mapping claims.
+  Which of those is the design question this carries.
+  **[F16](proposed/FEATURES.md) already names the same hazard
+  from the other side** — a caller who copies the letter rule
+  "cannot know" when a disk carries several volumes — which is
+  worth knowing before designing a fix: whatever this reports,
+  the public query F16 proposes has to report too.
+  Filed as a defect and not a feature because the norm it
+  violates is already standing — that is the whole mechanism
+  P5/P14/P17/P18's promotion turned on.
 
 - `--qemu` is removed by the spec and still declared in the code
   (found 2026-07-27 by the gate audit, checking a task that

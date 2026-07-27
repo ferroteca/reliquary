@@ -1716,7 +1716,7 @@ path.
 In-band file operations **landed at milestone 9 as a CLI/API
 capability, not a language one**: `put-file` / `get-file` (twins
 `put_file` / `get_file`) address their target the way the guest
-names it — `A:\TEST.EXE`, per P17's candidate statement, and not
+names it — `A:\TEST.EXE`, per **P17**, in force since D47, and not
 the `<drive-key>:<path>` form D5 had roughed — over a
 directory-source drive, stopped-only, with a non-vvfat target or an
 unmapped drive letter failing closed naming the gap (P11). The

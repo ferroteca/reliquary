@@ -170,6 +170,105 @@ is waiting on an answer today.
 
 ## Decided
 
+- D47 — P5, P14, P17 AND P18 ENTER FORCE; THE PLEDGED SHELF IS
+  EMPTY — DECIDED (owner, 2026-07-27, the second TASKS.md
+  adjudication). Supports P8, P10, P11; applies D34's
+  promotion-on-delivery rule and answers D37's explicit hold.
+  Four principles reach root [ARCHITECTURE.md](../ARCHITECTURE.md)
+  and are thereby **armed**: a divergence from any of them is now
+  a bug rather than unbuilt work. P16 is untouched and stays
+  drafted.
+  TWO WERE NEVER ADJUDICATIONS AT ALL. P5 and P14 each stated its
+  own delivery condition in the pledged file — *"P5 returns to the
+  standing list when milestone 9 lands"*, and P14 *"joins the
+  standing list when [milestone 7] lands"*, honored the moment the
+  parser refuses an operator-bearing reference. Both conditions
+  were met and neither move was made, so under D34 these are
+  **missed automatic promotions**, the same defect class D46
+  closed for U9 and U12 — the second instance in two days, which
+  is the argument for F8 restated as evidence rather than
+  prediction. Verified before moving: `progress.py` renders one
+  `Event` stream three ways, `describe()` shared by the two human
+  modes alone, so neither rendering is scraped from the other
+  (P5); `document.py` closes the reference grammar at two
+  productions — *"the character class screens; the two productions
+  decide"* — and refuses an operator outright (P14's spec channel,
+  the last of its three to land).
+  P17 TAKEN, ALL FOUR QUESTIONS SETTLED AS THE CODE ANSWERED THEM.
+  D37 held it back and said why: *"the implementation is evidence
+  for that adjudication, not a substitute for it."* The evidence is
+  in. (1) **The mapping comes from Reliquary's own drive
+  assignment** — `platform_dos.drive_letters`, floppies by slot,
+  hard disks C: onward, CD-ROMs after — plus the declared
+  platform, and never from a guest. No blueprint declaration was
+  needed, which is the P10-compatible answer the candidate hoped
+  for rather than the one it feared. (2) **Ambiguity fails
+  closed**: an unmapped letter and a non-vvfat target each fail
+  closed naming the gap (see the defect below for the one place
+  this is not yet true). (3) **Normalization is a design detail
+  beneath the principle, not a clause in it** — `split_address`
+  normalizes the drive letter, DOS case being insignificant, and
+  passes path segments through as written, leaving 8.3 to the
+  filesystem. (4) **`get-machine-dir` is the named exemption**,
+  written into the statement: the out-of-band door returns a host
+  path by definition (D5). The question's `hostdir` half has
+  dissolved — milestone 7 replaced that drive type with
+  directory-source media, so there is no host-directory drive
+  left to exempt.
+  P18 TAKEN, AND IT WAS THE MOST OVERDUE OF THE FOUR. No open
+  questions, the code honors it (no shipped readiness script —
+  `wait_ready()` detects a bare prompt generically; the codex holds
+  examples seeded as the user's own files, never a library), and it
+  is cited **flatly in four places in the normative specs** —
+  cli.md, instance-model.md, and script-spec.md twice. That is
+  D46's defect one level worse: the artifacts the implementation
+  answers to were resting on a principle that bound nothing.
+  Stated so it is not misread on first citation: the codex's
+  `freedos-install.rlqs` is not a breach of *"no blessed scripts
+  of any kind"* — the statement's own next clause carries it, the
+  codex being examples under P4.
+  ONE DEFECT FILED, WHICH IS WHAT ARMING IS FOR (owner). P17's
+  statement stands verbatim, including *"where the declared facts
+  leave an address ambiguous, the call fails closed naming the
+  ambiguity"* — and `drive_letters` does not, in one case: it
+  assumes one volume per hard disk and documents the workaround in
+  its own docstring rather than reporting the assumption. Strictly
+  the declared facts *do* determine a letter, so nothing is
+  ambiguous to Reliquary; but a guest that partitioned a disk
+  shifts every later letter, and Reliquary would then be
+  confidently wrong while saying nothing, which is what P11
+  refuses. Before today that was a documented design note. It is
+  now a bug, entered under TASKS.md's Defects — **the mechanism
+  working exactly as the pledged file describes it**, on the day
+  the principle armed.
+  P16 LEFT DRAFTED (owner). Its blocker is an argument with D5,
+  not missing evidence: pledging it converts the Horizon in-band
+  file operations into demanded work and reopens D5's out-of-band
+  clause. That is its own round. P17's promotion does not prejudge
+  it — the pairing always allowed either to be pledged alone.
+  ONE THING CORRECTED IN PASSING. Seating P5's prose put it beside
+  a paragraph of root ARCHITECTURE.md still describing run records
+  as retained cache artifacts to be copied out before a machine
+  dies — a feature D36 deleted outright. It is rewritten to the
+  return model in the same edit, under the land-coherently rule;
+  leaving a stale claim in the paragraph that introduces the
+  principle being armed would have been the worse choice.
+  P5's PROSE CITATIONS REFRESHED, not reshaped. Its person half
+  now cites U1, U5 and U12, its program half U9 and U14 — the
+  cases D46 put in force, U9's own text being *"machine-readable
+  output as timely as the pretty rendering"*, which is P5 stated
+  from the demand side. It passes the clarify test: no past
+  decision citing P5 reads differently.
+  FOLDED: this entry; ARCHITECTURE.md (P5, P14, P17, P18 added in
+  number order; the cross-cutting prose gains P5's paragraph and
+  loses the stale run-records sentence); pledged/ARCHITECTURE.md
+  (both entries removed — the file is empty, and says why an empty
+  shelf is the healthy state); proposed/ARCHITECTURE.md (P17 and
+  P18 removed, no placeholder — P16 and the P3 sharpening stay);
+  script-spec.md (P17's citation loses "candidate statement");
+  TASKS.md (the adjudication struck, the drive-letter defect
+  entered). No CHANGELOG line: nothing release-facing moved.
+
 - D46 — U9 AND THE U11–U13 CHUNK TRIO ARE PLEDGED AND IN FORCE —
   DECIDED (owner, 2026-07-27, the first TASKS.md adjudication).
   Supports P6, P7, P8; applies D23's pledged-and-delivered-in-one-act

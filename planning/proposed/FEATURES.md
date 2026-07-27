@@ -834,14 +834,18 @@ here before any work starts.
 ## F15 — Host-directory attachment as a first-class operation
 
 > **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). Demanded by the **P16** and
-> **P17** drafts — P16 because the capability is reached today only
-> by a caller reproducing Reliquary's internal model outside it, and
-> P17 because the answer it owes is an address in the guest's own
-> terms. Serves **U14** and **U20**. Its neighbour is the deferred
-> in-band file family (D5's `<drive-key>:<path>` shape, Horizon
-> below), which P17 already proposes to reopen; if both land, they
-> settle one address vocabulary or two spellings of it.
+> (owner: admitted as a proposal). Demanded by **P17**, in force
+> since D47, and the **P16** draft — P16 because the capability is
+> reached today only by a caller reproducing Reliquary's internal
+> model outside it, and P17 because the answer it owes is an
+> address in the guest's own terms. Half this citation is now a
+> standing rule rather than a hope, which is the practical
+> difference arming makes. Serves **U14** and **U20**. Its
+> neighbour is the deferred in-band file family (D5's
+> `<drive-key>:<path>` shape, Horizon below) — an address form
+> P17 refuses outright now that it binds, so reopening it is no
+> longer optional; if both land, they settle one address
+> vocabulary or two spellings of it.
 
 A caller that needs a host directory visible to a guest **synthesizes
 a directory-source drive into the blueprint**, which forces it to

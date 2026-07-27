@@ -271,6 +271,11 @@ differently under the new wording — is mere documentation work.
   CLI convenience; automation artifacts are source code in the
   consuming project's tree and never live in the home; the
   codex never feeds automation. (Prose below.)
+- **P5 — The feedback split.** One run, two renderings: pretty
+  and legible for a person, machine-readable and just as
+  timely for a program — neither scraped from the other.
+  (Prose below; docs/spec/script-spec.md "The run event
+  stream"; D35, D36.)
 - **P6 — One semantic surface.** The CLI and the embedding API
   are twin presentations of one surface: every command is its
   API twin, nothing is CLI-only, and no capability is
@@ -314,6 +319,26 @@ differently under the new wording — is mere documentation work.
   source. Custody and introspection, not a frozen order, are
   what make layering safe. (Normative:
   docs/spec/script-properties.md; D19, D20.)
+- **P14 — The expressive ceiling.** Each of P15's three
+  authored channels holds an expressive ceiling, and none
+  takes on another's job: a spec never grows expressions,
+  closed in its tree and its strings alike; a script never
+  nests a second format; a property never gains a transform.
+  Ceilings are stated as closed grammars ahead of the
+  pressure, because every request to raise one arrives
+  individually well justified and a channel that grants them
+  one at a time cannot take them back. When a ceiling binds
+  the answer is a layer — arriving as its own kind, never as
+  a wider dialect of the channel it feeds — argued under the
+  interface-change rule and chosen then, never pre-committed.
+  Computation lives outside all three, in the caller's own
+  language. A ceiling governs what a channel may *say*, never
+  how widely an already-permitted form may be *used*. This is
+  what P4, P6, and P7 require of the authored inputs, held as
+  one standing rule. (Normative:
+  docs/spec/blueprint-model.md "Format stability",
+  docs/spec/script-spec.md "How the vocabulary grows";
+  D12, D18, D26.)
 - **P15 — The closed input model.** Everything reaches
   Reliquary through four channels: three authored — **specs**
   carry the data, **scripts** the logic, **properties** the
@@ -325,6 +350,31 @@ differently under the new wording — is mere documentation work.
   request across a stated boundary. (P6 and P7 govern the
   invocation channel; the authored three carry expressive
   ceilings. Prose below; D27.)
+- **P17 — Guest files are named in the guest's terms.** A
+  file action against a machine addresses its target as the
+  guest OS does — that system's paths, separators, and roots —
+  never as the host stores it: not an image file, an offset,
+  or a staging directory. How the address resolves is
+  Reliquary's plumbing and may change with the backend; what
+  the user writes may not. The mapping is built from declared
+  facts — the blueprint's platform and Reliquary's own drive
+  assignment — never from inspecting a guest (P10). Where the
+  declared facts leave an address ambiguous, the call fails
+  closed naming the ambiguity (P11). `get-machine-dir` is the
+  named exemption: the out-of-band door returns a host path by
+  definition (D5). (docs/spec/script-spec.md, the in-band file
+  capability; docs/spec/api.md's transport table; D36, D37.)
+- **P18 — Mechanism, not content.** Reliquary provides
+  mechanism — machines, drive and file transports, the value
+  channels in and out — and never standardized content. No
+  blessed scripts of any kind, no reusable authored library:
+  the codex carries examples to copy a first draft from (P4),
+  and anything reusable is the consuming project's or another
+  project's to build. Reliquary attaches no meaning to what
+  runs through its mechanisms; computation and interpretation
+  live on the caller's side of the seam (G2).
+  (docs/spec/cli.md, docs/spec/script-spec.md; AGENTS.md
+  "The embedding surface"; D36.)
 - **P19 — One script, one target.** Each OS version and edition
   gets one install script. Properties and blueprint parameters
   supply that target's run-specific data; they never select a
@@ -433,13 +483,21 @@ Reliquary's own ground — caches, machines, the personal
 user-properties file — so a project's artifacts must work in
 place: runnable
 from the source tree, with nothing copied into a home to make
-them usable. One cache artifact is disposable without being
-reconstructible: run records are evidence, not regenerable
-output. Their contents are delivered live to whoever drives the
-run (the feedback split, P5), and the record is retained for
-its machine's life; durability beyond the machine is the
-consumer's claim — copy the record out while the machine exists
-(U3, U4).
+them usable. Nothing a run produces is a cache artifact at all:
+the run returns its output to whoever drove it and stores
+nothing (D36), so there is no record to retain, reclaim, or
+copy out — a run's product is the consumer's, taken across the
+seam and kept on their own side of it.
+
+Alongside these runs a feedback split (P5). Reliquary's runs
+are long, and whoever drives one gets timely progress —
+presented for the driver. A person at the CLI (U1, U5, U12)
+gets pretty, legible, real-time progress; an automating program
+(U9, U14) gets machine-readable output that is just as timely.
+The two are renderings of the same run, and neither is derived
+by scraping the other: the pretty rendering is never what a
+program parses, and the machine rendering is never what a
+person is left to read.
 
 ## The four channels (P15)
 
