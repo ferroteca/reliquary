@@ -111,7 +111,11 @@ pledging a use case can never put it there. Three locations, three
 states, and the file an entry sits in says which it is. This is also
 what arms a principle: below the root list it is pledged vision and
 a shortfall is unbuilt work; at the root list the project asserts
-the code honors it, and a divergence becomes a bug.
+the code honors it, and a divergence becomes a bug — the
+gap-is-a-bug rule, whose home is that document's own banner (D48).
+Promotion runs on **two bars**, not one: a use case moves on *full*
+delivery, a principle on being *honored as a rule* with every known
+residue filed as a defect in the same change.
 
 **Design sits with what it serves.** A design for one feature lives
 beside that feature — `proposed/design/` or `pledged/design/` — so

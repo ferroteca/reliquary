@@ -12,6 +12,16 @@ SPDX-License-Identifier: BSD-3-Clause
 > shipped system's and every principle is honored as the code
 > stands today (it lives at the root for that reason), with the
 > few forward-looking edges named and pointed at `planning/`.
+> **A divergence from anything here is therefore a bug** (D48) —
+> not a debatable design choice, not unbuilt work, and not a
+> reason to soften the entry. That is the whole force of arming a
+> principle, and it is how a principle drives work with no use
+> case asking: the gap is its own demand, so it needs no approval,
+> only fixing. Below this list an entry is pledged vision and a
+> shortfall is work not yet done; here it is a claim, and a claim
+> can be false. Where the code and an entry disagree, **the entry
+> is right** unless it is changed first through the interface-change
+> rule (P23).
 > Proposed architecture lives in
 > [planning/proposed/ARCHITECTURE.md](planning/proposed/ARCHITECTURE.md)
 > and pledged-but-undelivered architecture in
@@ -398,7 +408,8 @@ differently under the new wording — is mere documentation work.
   P8 and won **before** it lands, never after. *At this time*
   means the door is real: the cases expected to knock are named
   (the vision-utility audit's monthly run; host portability's
-  suite-must-run-there job), and when one wins the argument this
+  suite-must-run-there job; automating **P24**'s every-commit
+  gate), and when one wins the argument this
   entry is retired with the decision that retires it. (Stated
   here; this is the rule's normative home.)
 
@@ -436,6 +447,20 @@ differently under the new wording — is mere documentation work.
   architecture" above; the enforcement point is
   planning/INTERFACES.md's housekeeping boundary. P8 says how
   the argument is weighed; this says it must happen first.)
+
+- **P24 — Every interface is tested against its
+  specification.** Each interface enumerated in "The interfaces"
+  above carries automated tests checking it against the norm that
+  defines it, and the suite passes on every commit to `main`.
+  There is no "to whatever extent possible" clause: the claim is
+  stated so it can be *violated*, and a surface that genuinely
+  cannot be tested names the gap rather than being quietly
+  exempted. What enforces it is discipline rather than
+  machinery — the project runs no CI (**P22**), so the suite is a
+  gate whoever lands the work walks through. (AGENTS.md
+  "Required checks" and "Test expectations"; the conformance
+  corpus, `reliquary_tests/test_conformance_corpus.py`, is the
+  pattern the rest is measured against; D49.)
 
 
 ## The cross-cutting prose

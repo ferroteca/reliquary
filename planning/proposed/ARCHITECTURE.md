@@ -24,10 +24,10 @@ SPDX-License-Identifier: BSD-3-Clause
 > never changed in nature — while a proposed one may still be
 > reshaped freely here (its number stays; work already scheduled
 > against it is re-checked in the same edit). The second move is
-> **automatic on full delivery** (D34), and full delivery, not
-> pledge, is its trigger: a partly-honored principle stays in
-> the pledged file, since the standing list is an implementation
-> claim. A dead proposal is recorded in
+> **automatic** (D34), and its trigger is delivery rather than
+> pledge — for a principle, *honored as a rule* with every known
+> residue filed as a defect in the same change (D48), never the
+> full-delivery bar a use case answers to. A dead proposal is recorded in
 > [DECISIONS.md](../DECISIONS.md) and triggers the same
 > planning-doc sweep, its P-number the search key.
 

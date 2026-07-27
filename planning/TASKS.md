@@ -78,26 +78,6 @@ needs no pledge because the norm it violates already is one.
 Owner-only: each settles a question the record is waiting on.
 None depends on the others.
 
-- **Record the gap-is-a-bug rule, and the two promotion bars.**
-  ARCHITECTURE.md's preamble says the list is standing-only and
-  every entry honored by the code today — true, but passive: it
-  never says what a divergence *is*. It is a bug, and that is the
-  mechanism by which principles drive work with no use case asking
-  (the control-planes item under [Defects](#defects) is one such
-  bug, filed against P11 by the P1–P12 delivery pass; milestone
-  9's floppy-geometry guard is another).
-  This also sharpens D34, which sets **one** promotion test for
-  use cases and principles alike and refuses a partly-delivered
-  entry as "a false one". That flattens a real difference: a use
-  case is a discrete journey, so *full* delivery is the honest and
-  testable bar (U14's loop either runs end to end or does not); a
-  principle is a standing property of the whole codebase that
-  cannot be exhaustively proven, so its bar is "honored as a
-  rule", and promoting at *largely there* is exactly what converts
-  the residue from invisible shortfall into filed bugs. Wants a
-  D-number so the divergence from D34 is deliberate rather than a
-  contradiction someone trips over.
-
 - **Issue the D-numbers the 2026-07-26 restructure left owing**
   (found 2026-07-27 by the gate audit, in the restructure record
   now folded into [Completed](#completed)). That record's step 6
@@ -189,6 +169,29 @@ already its demand, so these need no pledge, only fixing. A gap
 against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
+
+- **P24's tests check behavior, not specifications** (filed
+  2026-07-27 by D49, the same hour P24 armed — D48's second bar).
+  P24 claims every enumerated interface carries automated tests
+  checking it **against its specification**. Every interface does
+  carry test modules and the suite is green, which is why the
+  principle is armed rather than pledged; what is uneven is the
+  second half. Only the blueprint has a true conformance
+  artifact — `test_conformance_corpus.py`, one fixture corpus run
+  against both the parser and the published schema so the two
+  cannot drift. Everywhere else the tests assert behavior the
+  author knew about, which catches regressions but cannot catch
+  **a requirement the spec states and the code never
+  implemented** — the failure mode P24 exists for.
+  The work is not "write more tests": it is deciding, per
+  interface, what a spec-derived case set looks like and whether
+  the conformance-corpus pattern generalizes past a document
+  format. Where a surface genuinely cannot be tested that way,
+  P24's own clause applies — **name the gap**, do not exempt it
+  quietly.
+  Was [design/audits.md](design/audits.md)'s third audit question;
+  under D48 a named gap against an armed principle is a defect,
+  not a proposal.
 
 - **The DOS drive-letter map assumes one volume per hard disk
   and does not say so** (filed 2026-07-27 by D47, the hour P17

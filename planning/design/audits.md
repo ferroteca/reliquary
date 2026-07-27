@@ -81,11 +81,21 @@ is worse than no audit, because the record is trusted.
   the claim the whole arming mechanism rests on.
 - **Are the in-force principles actually honored?** Same, and
   harder: some principles are not codifiable.
-- **Is P24 true clause by clause?** It was armed 2026-07-26 on
-  structural inspection — every named interface has a test module,
-  suite green at 764 passing — not on a conformance audit against
-  each specification. It is the strongest claim in the list with the
-  thinnest verification behind it.
+- **Is P24 true clause by clause?** *Superseded 2026-07-27 by
+  D49: this question is now a filed defect rather than a proposed
+  audit, and the paragraph it replaces was wrong about the
+  premise.* P24 was **not** armed on 2026-07-26 — it was decided
+  in a commit message and reached no document at all, its
+  D-number reused the same day, and this entry was the only place
+  in the repository that referred to it. D49 restates and arms
+  it (768 passing at adjudication), and files the gap this
+  question named — most modules test behavior rather than
+  deriving cases from the norm — under TASKS.md's Defects,
+  because a named gap against an armed principle is a bug and
+  not an audit idea. **The lesson is this file's own**: a
+  finding is not a fact until re-tested, and that cuts both
+  ways — an entry here asserting something *is* true needs the
+  same re-test as one asserting something is broken.
 - **Is every defined vision statement cited or codified somewhere?**
   A statement nothing leans on is suspect of no utility. A
   look-list, never a kill-list; each orphan earns one question,

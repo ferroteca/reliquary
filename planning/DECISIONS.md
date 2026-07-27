@@ -170,6 +170,144 @@ is waiting on an answer today.
 
 ## Decided
 
+- D49 — P24 RESTATED AND ARMED, AFTER LANDING NOWHERE — DECIDED
+  (owner, 2026-07-27). Supports P8, P22, P23; **restores a
+  decision made 2026-07-27 in commit `42c8c75` that reached no
+  document**, and is the first promotion made under D48's second
+  bar.
+  WHAT WAS LOST, AND HOW. That commit's message says *"state P24
+  in D44 — every enumerated interface carries automated tests
+  checking it against its specification, and the suite passes on
+  every commit to main — dropping 'to whatever extent possible'
+  so the principle can actually be violated, and requiring an
+  untestable surface to name its gap."* None of it landed: P24
+  never entered ARCHITECTURE.md, the D-number was **reused the
+  same day** by D44 (the `accepted/` → `pledged/` rename), and
+  the companion edit that bullet describes — adding P24's
+  every-commit gate to P22's list of expected knocks — is absent
+  from P22 too. The decision existed only in a commit message.
+  WHY NOBODY NOTICED, which is the interesting part. The single
+  surviving trace is [design/audits.md](design/audits.md), which
+  refers to P24 as an accomplished fact — *"armed 2026-07-26 …
+  the strongest claim in the list with the thinnest verification
+  behind it"* — so the one document that talks about P24 asserts
+  it exists. A dangling reference is only findable against
+  something; this one pointed at a number that had been silently
+  spent, which reads as a valid citation to every check that
+  matters. Found while tracing where principles get recorded for
+  D48, not by looking for it.
+  VERIFIED BEFORE ARMING, by D23's standard — against the code,
+  not the docs. Every interface enumerated in "The interfaces"
+  carries test modules: CLI (`test_cli`), embedding API
+  (`test_machines`, `test_media`, `test_run_script`, `test_core`,
+  with `test_old_surface_purge` guarding the deleted one),
+  scripting language (the five `test_script_*` modules and
+  `test_check_script`), machine blueprint (`test_document` plus
+  `test_conformance_corpus`, which runs one corpus against both
+  parser and schema so the two cannot drift), script properties
+  (`test_properties`, `test_binding`, `test_credentials`,
+  `test_facts`), recorded outputs (`test_events`, `test_errors`),
+  home layout (`test_home`, `test_assets`). Suite run at
+  adjudication: **768 passing, 1 skipped** — the opt-in FreeDOS
+  integration test.
+  ARMED, NOT PLEDGED — and the residue filed, which is D48's
+  second bar doing its first work on the day it was written.
+  Pledged would be the false state: the tests exist and the suite
+  is green, so the project does honor this as a rule. What it does
+  not yet honor evenly is the phrase *"against its
+  specification"* — most modules test behavior rather than
+  deriving cases from the norm, and only the blueprint has a true
+  conformance corpus. audits.md had already named exactly this
+  gap; under D48 a named gap against an armed principle is not an
+  audit idea, it is a **defect**, and it is entered in TASKS.md
+  as one.
+  THE SECOND CLAUSE IS HONORED BY DISCIPLINE, said plainly. *"The
+  suite passes on every commit to main"* has no machinery behind
+  it, because P22 says there is no CI — and P22 now names
+  automating this gate as one of the cases expected to knock.
+  That is not a weakness in P24; it is the same posture written
+  from the other side.
+  FOLDED: this entry; ARCHITECTURE.md (P24 stated after P23; P22's
+  expected-knocks list gains it, the companion edit `42c8c75`
+  intended); design/audits.md (its P24 question corrected — the
+  principle was armed today, not on the 26th, and the audit it
+  proposes is now the filed defect); TASKS.md (the conformance-
+  depth defect entered). No CHANGELOG line: nothing
+  release-facing moved.
+
+- D48 — A GAP AGAINST A STANDING ENTRY IS A BUG; THE PROMOTION
+  BAR IS TWO BARS — DECIDED (owner, 2026-07-27, the third
+  TASKS.md adjudication). Supports P8, P23; **sharpens D34**,
+  which stays as written with a pointer here (this file annotates,
+  never rewrites).
+  PART ONE — THE RULE GETS A HOME. *The gap-is-a-bug rule* is
+  cited **by name** in D38, D40 and D43, and stated in
+  [README.md](README.md) and TASKS.md's Defects preamble — but
+  never in root ARCHITECTURE.md, which is the document that makes
+  the claim and therefore the only place the rule binds. A rule
+  cited four times and defined nowhere authoritative is F8's
+  "every cited identifier resolves" check failing on a name
+  instead of a number. It is now stated in that document's own
+  banner: everything in the list is a claim, a divergence is a
+  bug, and where the code and an entry disagree the entry is right
+  until changed under P23.
+  THIS HALF IS A CLARIFICATION, not an amendment, and the
+  distinction is load-bearing under P23. No past decision reads
+  differently: D38, D40 and D43 already acted on the rule, and the
+  Defects section of TASKS.md is built on it. Writing it at the
+  root changes where it is findable, not what it requires.
+  PART TWO — ONE BAR WAS ALWAYS TWO. D34 is internally
+  inconsistent, which is sharper than the task's reading of it as
+  a single flattened test. It imports a rule-shaped test from the
+  P1–P12 delivery pass — *"does the project honor the entry as the
+  code stands today?"* — and then states a use-case-shaped
+  mechanic beside it: *"A partly-delivered entry does not move …
+  a half-honored entry would be a false one."* Both are in the
+  same entry. The split is therefore a recognition rather than an
+  invention.
+  THE TWO BARS. A **use case** is a discrete journey, so *full
+  delivery* is the honest and testable bar — U14's loop either
+  runs end to end or it does not, and a half-met journey in the
+  root list is a false claim with nothing to recommend it. A
+  **principle** is a standing property of the whole codebase and
+  cannot be exhaustively proven; its bar is *honored as a rule*.
+  Holding a principle below the root list until it is perfect is
+  not caution, it is the worse outcome: unarmed, every shortfall
+  is invisible shortfall, and nothing in the machinery can see it.
+  THE CONDITION THAT KEEPS THE SECOND BAR FROM BEING A LOOPHOLE
+  (owner): **every known residue is filed as a defect in the same
+  change.** Promotion at *largely there* is precisely the act that
+  converts invisible shortfall into filed bugs, and it does that
+  only if the filing actually happens. Not a new guard — it
+  codifies what both precedents did.
+  THE PRACTICE PRECEDED THE RULE, twice, once end to end. The
+  P1–P12 delivery pass (D23, 2026-07-23) armed **P11** while
+  simultaneously finding and filing a P11 leak — declared
+  control-planes vocabulary-checked but never refused at
+  materialization — and that residue was fixed three days later
+  in commit `64b34c5`. Promote at *honored as a rule* → residue
+  becomes a filed bug → bug gets fixed: the full cycle ran before
+  anyone wrote the rule down. **D47 is the second instance**, and
+  it is why this entry is load-bearing rather than tidy: under
+  D34 as written, yesterday's promotion of P17 was **not
+  permitted**, P17 being partly honored. This makes that
+  divergence deliberate, which is what the task asked for.
+  ONE EXAMPLE RETIRED BY SUCCESS. The task's own text cited *"the
+  control-planes item under Defects"* as a standing instance, and
+  there is no such item — because it was fixed. Milestone 9's
+  floppy-geometry guard, its other example, was fixed inline. The
+  live instance today is D47's drive-letter gap.
+  NOT REOPENED: when a gap is fixed inline versus filed. D39 left
+  that edge open and **D43 closed it** — the principle is its own
+  demand, so an in-scope discovery may be fixed within the work
+  that found it and anything else is filed. This entry leaves it
+  exactly there.
+  FOLDED: this entry; ARCHITECTURE.md (the banner states the
+  rule); D34 (pointer here, text untouched); README.md and
+  pledged/ARCHITECTURE.md (their statements of the rule now name
+  its home); TASKS.md (the adjudication struck). No CHANGELOG
+  line: nothing release-facing moved.
+
 - D47 — P5, P14, P17 AND P18 ENTER FORCE; THE PLEDGED SHELF IS
   EMPTY — DECIDED (owner, 2026-07-27, the second TASKS.md
   adjudication). Supports P8, P10, P11; applies D34's
@@ -1230,6 +1368,11 @@ is waiting on an answer today.
   planning-doc sweep. A partly-delivered entry does not move —
   the standing lists are an implementation claim (D23,
   implemented-only), so a half-honored entry would be a false one.
+  [D48 splits this into two bars: it holds for a use case, while
+  a principle promotes at *honored as a rule* with every known
+  residue filed in the same change. The tension is inside this
+  entry — the test two sentences above, inherited from the P1–P12
+  pass, is already the rule-shaped one.]
   FIRST APPLICATION: P13 (property sources) promotes to
   PRINCIPLES.md with milestone 8 — the binding pipeline, the
   layered sources, custody and per-resolution provenance are all
