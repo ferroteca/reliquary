@@ -370,7 +370,26 @@ differently under the new wording — is mere documentation work.
   facts — the blueprint's platform and Reliquary's own drive
   assignment — never from inspecting a guest (P10). Where the
   declared facts leave an address ambiguous, the call fails
-  closed naming the ambiguity (P11). `get-machine-dir` is the
+  closed naming the ambiguity (P11).
+  **Reliquary therefore addresses fewer locations than it has
+  facts for, and refuses the rest rather than guessing.** A disk
+  the guest partitioned in two shifts every address after it, and
+  what a drive was made into is not something a blueprint
+  declares — so today those addresses are refused, the refusal
+  naming the reason and never claiming the target is absent. A
+  wrong address and an unknowable one are different failures.
+  **This is an unbuilt capability, not a closed door.** Volume
+  layout is readable from the drive image on the host — a
+  partition table, and past it the volume managers a guest may
+  layer on top — which is no more guest inspection than reading
+  an image's format is. The facts a mapping may use can grow that
+  way, and the reason they have not is cost rather than
+  principle: each layout is its own reader, and the tail is long.
+  What may never grow is a *declaration* of the guest's own
+  arrangement: a blueprint saying how a disk was partitioned
+  would carry a spec's authority over an assertion the guest can
+  silently contradict, which is worse than the gap it closes.
+  `get-machine-dir` is the
   named exemption: the out-of-band door returns a host path by
   definition (D5). (docs/spec/script-spec.md, the in-band file
   capability; docs/spec/api.md's transport table; D36, D37.)

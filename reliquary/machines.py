@@ -1362,6 +1362,23 @@ def _host_path(machine_id, address, context):
     if key is None:
         known = ", ".join(f"{name}: ({letters[name]})"
                           for name in sorted(letters)) or "none"
+        # Two different failures wear one shape, and saying "no such
+        # drive" for the second would be a lie: the machine may well
+        # have a drive there, and reliquary simply cannot say which
+        # letter it took (P17). Reading volume layout off the images
+        # would let it -- that is unbuilt, not forbidden.
+        undetermined = platform.undetermined_letters(drives)
+        if undetermined:
+            raise PreflightError(
+                f"{address}: reliquary cannot determine which drive "
+                f"is {letter}: on this machine. Its letter depends on "
+                "how many volumes the disks before it carry, which a "
+                "blueprint does not declare and reliquary does not "
+                "yet read from the drive images. "
+                f"Determined letters: {known}. Undetermined drives: "
+                f"{', '.join(undetermined)} — address one of the "
+                "determined letters, or give the exchange drive a "
+                "floppy slot, whose letter no disk can shift")
         raise PreflightError(
             f"{address}: the machine declares no drive at {letter}:; "
             f"declared letters: {known}")

@@ -178,6 +178,87 @@ is waiting on an answer today.
 
 ## Decided
 
+- D56 — RELIQUARY ADDRESSES ONLY WHAT IT CAN REASON ABOUT; P17
+  CLARIFIED — DECIDED (owner, 2026-07-27). Supports P10, P11,
+  P17. Fixes the drive-letter defect D47 filed the hour P17
+  armed, and clarifies P17 to say plainly what it always
+  required.
+  THE DEFECT. `platform_dos.drive_letters` mapped every declared
+  drive — floppies to A:/B:, hard disks C: onward, cdroms after
+  them — on an assumption its own docstring admitted: one volume
+  per hard disk. A guest that partitions a disk shifts every
+  later letter, so `put-file "D:\X"` wrote confidently to the
+  wrong drive and reported nothing.
+  THE BOUNDARY IS WIDER THAN THE DEFECT SAID, which the fix had
+  to establish first. The entry blamed the multi-disk case; the
+  truth is that **only two things are knowable**: floppies, which
+  DOS letters A:/B: whatever the disks carry, and the *first*
+  hard disk, which is C:. Everything after depends on volume
+  counts — including a cdrom behind a *single* disk, since that
+  disk may carry two volumes. With **no** hard disk declared,
+  cdroms are knowable again: nothing can shift them.
+  THE OPTION THAT WAS REFUSED, and the reasoning is the entry's
+  real content (owner). A per-drive volume count in the blueprint
+  was proposed — it would make the mapping exact from declared
+  facts and refuse nothing that works today. **Refused**: *"the
+  volumes are deterministic within the guest VM, so that is the
+  source of truth. It may be difficult for us to reason about
+  what the guest VM is doing, but I prefer to fail when we can't
+  reason correctly, than to add 'fake' specification that looks
+  like the source of truth, but in fact isn't."* A declaration
+  would carry a spec's authority over an assertion the guest can
+  silently contradict — worse than the assumption it replaced,
+  because a reader would trust it. This also answers P17's open
+  question 1 in its remaining half: the mapping takes nothing
+  from a blueprint about the guest's own arrangement.
+  WHAT SHIPS. `drive_letters` maps only the determined letters,
+  and `undetermined_letters` names the drives it deliberately did
+  not place. Addressing an undetermined letter is a preflight
+  error saying **reliquary cannot determine which drive that is**,
+  why (volume counts are the guest's, and P10 forbids asking),
+  which letters are determined, which drives are not, and the
+  fix — address a determined letter, or give the exchange drive a
+  floppy slot, whose letter no disk can shift. It never says
+  "no such drive": a wrong address and an unknowable one are
+  different failures and were wearing one message.
+  UNBUILT, NOT IMPOSSIBLE — a correction made in the round
+  (owner), and it changes what P17 may say. **Volume layout is
+  readable from the drive image on the host**: the partition
+  table, and past it the volume managers a guest may layer on —
+  LVM and its kin. None of that is guest inspection; it is no
+  more so than `probe_image_format` reading an image's format,
+  because P10 forbids inferring from a *guest* and an image file
+  on the host is not one. So the refusal is a capability
+  Reliquary has not built rather than a boundary it has drawn.
+  What holds it back is **cost, not principle** — each layout is
+  its own reader and the tail is long — which is exactly the kind
+  of reason that does not belong in a principle.
+  The first draft of this entry had the refusal as permanent
+  design, and the distinction is not cosmetic: stating a closure
+  P17 never contained would have been an amendment wearing a
+  clarification's clothes.
+  P17 CLARIFIED, NOT CHANGED. Its text implied the map covers a
+  machine's drives with ambiguity as an edge case; the reverse is
+  true. The entry now says Reliquary addresses fewer locations
+  than it has facts for and refuses the rest, that the refusal
+  never claims absence, that growing the facts by reading the
+  images is open, and that one thing is closed permanently — a
+  *declared* arrangement, for the reason above. **This passes
+  P23's clarify test**: D47 armed P17 and filed this defect in
+  the same act, so it already read the clause this way — the
+  wording changes, no decision citing it does.
+  COST, MEASURED. One real setup stops working: an exchange
+  directory on `hdd1` behind a system disk, which resolved to D:
+  and was right only while `hdd0` happened to carry one volume.
+  It now fails with an explanation instead of writing to the
+  wrong place. The FreeDOS integration is unaffected — it
+  addresses `A:`.
+  FOLDED: this entry; ARCHITECTURE.md (P17's clarification);
+  platform_dos.py (`drive_letters` narrowed, `undetermined_letters`
+  added, the refused option recorded where the next reader will
+  look); machines.py (`_host_path`'s two diagnostics);
+  test_machines.py; TASKS.md (the defect struck); CHANGELOG.
+
 - D55 — THE REASON-BLOCKQUOTE SWEEP IS DROPPED — DECIDED (owner,
   2026-07-27, closing out the Language queue). Supports P8, P23.
   The 2026-07-21 spec-craft round left one editorial proposal

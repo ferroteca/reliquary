@@ -13,6 +13,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- In-band file exchange no longer guesses a DOS drive letter it
+  cannot know. The letter map assumed one volume per hard disk, so a
+  guest that partitioned a disk shifted every later letter and
+  `put-file "D:\X.TXT"` wrote confidently to the wrong drive. Only
+  two things are actually determined by what a blueprint declares:
+  floppies, which take A: and B: whatever the disks carry, and the
+  first hard disk, which is C: — plus cdroms when no hard disk is
+  declared at all, since nothing can shift them. Addressing anything
+  else is now a preflight error saying Reliquary cannot determine
+  which drive it is, naming the determined letters, the undetermined
+  drives, and the fix: address a determined letter, or give the
+  exchange drive a floppy slot. It no longer reports "the machine
+  declares no drive at D:", which was untrue when a drive was there.
+  This is a capability Reliquary has not built rather than one it
+  refuses: volume layout is readable from the drive images on the
+  host, and the mapping may grow that way (D56).
+
 - Reserved node names are now actually reserved. The script spec has
   always said they "cannot name phases or property keys" — twice, in
   the grammar rules and in **S5** — and nothing enforced it, so

@@ -202,31 +202,6 @@ code has the bug, so the norm is already the demand.
   standing is undeclared — the same rule broken a different way,
   and unfixed.
 
-- **The DOS drive-letter map assumes one volume per hard disk
-  and does not say so** (filed 2026-07-27 by D47, the hour P17
-  armed). P17 requires that where the declared facts leave an
-  address ambiguous the call fails closed naming the ambiguity
-  (P11). `platform_dos.drive_letters` instead assumes one volume
-  per hard disk — its own docstring says so, and offers the
-  caller a workaround: address a floppy, or declare fewer disks.
-  A guest that partitioned a disk shifts every letter after it,
-  and `put-file "D:\X"` then writes confidently to the wrong
-  drive with nothing reported.
-  **Reliquary is right not to look** — asking the guest is
-  exactly what P10 forbids, so the fix is not detection. It is
-  honesty about the assumption: report it where the machine
-  declares more than one hard disk and a letter at or past the
-  second one is addressed, or narrow what the mapping claims.
-  Which of those is the design question this carries.
-  **[F16](proposed/FEATURES.md) already names the same hazard
-  from the other side** — a caller who copies the letter rule
-  "cannot know" when a disk carries several volumes — which is
-  worth knowing before designing a fix: whatever this reports,
-  the public query F16 proposes has to report too.
-  Filed as a defect and not a feature because the norm it
-  violates is already standing — that is the whole mechanism
-  P5/P14/P17/P18's promotion turned on.
-
 - `--qemu` is removed by the spec and still declared in the code
   (found 2026-07-27 by the gate audit, checking a task that
   proposed renaming it). [docs/spec/cli.md](../docs/spec/cli.md)

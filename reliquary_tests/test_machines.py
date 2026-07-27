@@ -1096,6 +1096,31 @@ class InBandFileTests(_HomeCase):
                     "location": {"local": exchange}}])
         return machine_id, exchange
 
+    def test_an_undetermined_letter_says_so_rather_than_denying_it(self):
+        # The machine has a second disk; which letter it took is the
+        # guest's answer, not reliquary's, so the refusal must not
+        # claim there is no drive there (P17, P11).
+        exchange = os.path.join(self.home, "exchange2")
+        os.makedirs(exchange)
+        machine_id = self._create(
+            "two-disks", {"platform": "dos",
+                          "drives": {"hdd0": "blank",
+                                     "hdd1": "exchange-dir"}},
+            media=[_BLANK,
+                   {"name": "exchange-dir", "materialize": "use",
+                    "location": {"local": exchange}}])
+        source = os.path.join(self.home, "X.TXT")
+        with open(source, "w", encoding="ascii") as handle:
+            handle.write("x")
+        with self.assertRaises(PreflightError) as caught:
+            put_file(source, r"D:\X.TXT", machine=machine_id,
+                     context=self.home)
+        message = str(caught.exception)
+        self.assertIn("cannot determine which drive is D:", message)
+        self.assertIn("volumes", message)
+        self.assertIn("hdd1", message)
+        self.assertNotIn("declares no drive", message)
+
     def test_a_put_lands_where_the_guest_will_read_it(self):
         machine_id, exchange = self._rig()
         source = os.path.join(self.home, "TEST.EXE")
@@ -1172,22 +1197,53 @@ class InBandFileTests(_HomeCase):
 class DosAddressingTests(unittest.TestCase):
     """The letter map comes from declared facts alone (P10/P17)."""
 
-    def test_floppies_take_a_and_b_and_disks_take_c_onward(self):
-        letters = platform_dos.drive_letters({
+    def test_only_the_determined_letters_are_mapped(self):
+        # Floppies always, and the first hard disk. Everything after
+        # depends on how many volumes the disks before it carry, which
+        # the guest decides and reliquary must not ask (P10) — so it
+        # is not mapped at all rather than guessed.
+        drives = {
             "floppy0": {"medium": "floppy", "slot": 0},
             "floppy1": {"medium": "floppy", "slot": 1},
             "hdd0": {"medium": "hdd", "slot": 0},
             "hdd1": {"medium": "hdd", "slot": 1},
             "cdrom0": {"medium": "cdrom", "slot": 0},
-        })
-        self.assertEqual(letters, {"A": "floppy0", "B": "floppy1",
-                                   "C": "hdd0", "D": "hdd1",
-                                   "E": "cdrom0"})
+        }
+        self.assertEqual(
+            platform_dos.drive_letters(drives),
+            {"A": "floppy0", "B": "floppy1", "C": "hdd0"})
+        self.assertEqual(platform_dos.undetermined_letters(drives),
+                         ["cdrom0", "hdd1"])
+
+    def test_cdroms_are_determined_when_no_hard_disk_shifts_them(self):
+        # With no disk to carry volumes, nothing can move a cdrom's
+        # letter, so they follow the floppies and are knowable.
+        drives = {
+            "floppy0": {"medium": "floppy", "slot": 0},
+            "cdrom0": {"medium": "cdrom", "slot": 0},
+            "cdrom1": {"medium": "cdrom", "slot": 1},
+        }
+        self.assertEqual(
+            platform_dos.drive_letters(drives),
+            {"A": "floppy0", "C": "cdrom0", "D": "cdrom1"})
+        self.assertEqual(platform_dos.undetermined_letters(drives), [])
 
     def test_a_cdrom_takes_c_when_there_is_no_hard_disk(self):
         letters = platform_dos.drive_letters(
             {"cdrom0": {"medium": "cdrom", "slot": 0}})
         self.assertEqual(letters, {"C": "cdrom0"})
+
+    def test_one_hard_disk_makes_a_cdrom_undetermined(self):
+        # Even a single disk can carry two volumes, so the cdrom after
+        # it is not D: by any fact reliquary holds.
+        drives = {
+            "hdd0": {"medium": "hdd", "slot": 0},
+            "cdrom0": {"medium": "cdrom", "slot": 0},
+        }
+        self.assertEqual(platform_dos.drive_letters(drives),
+                         {"C": "hdd0"})
+        self.assertEqual(platform_dos.undetermined_letters(drives),
+                         ["cdrom0"])
 
     def test_an_address_splits_into_letter_and_segments(self):
         self.assertEqual(platform_dos.split_address(r"c:\DOS\FOO.TXT"),

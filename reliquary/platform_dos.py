@@ -19,39 +19,71 @@ def program_name(path):
 def drive_letters(drives):
     """Map DOS drive letters to drive keys, from declared facts alone.
 
-    The mapping is built from reliquary's own drive assignment — each
-    drive's medium and slot, which reliquary chose — and never from
-    inspecting a guest (P10):
+    Built from reliquary's own drive assignment — each drive's medium
+    and slot, which reliquary chose — and never from inspecting a
+    guest (P10). **It maps only the letters the declared facts
+    determine**, which is fewer than the drives a machine has:
 
-    - floppies take ``A:`` and ``B:`` by slot;
-    - hard disks take ``C:`` onward, in slot order;
-    - CD-ROMs take the letters after the last hard disk, in slot order.
+    - floppies take ``A:`` and ``B:`` by slot, always: DOS gives the
+      floppy drives those letters whatever the disks carry;
+    - with **no hard disk** declared, CD-ROMs follow from ``C:`` in
+      slot order — nothing can shift them;
+    - with a hard disk declared, the first one is ``C:``.
 
-    That last rule assumes one volume per hard disk, which is what
-    reliquary's own materialization produces. A guest that partitions
-    a disk into several volumes shifts every later letter — the
-    ambiguity P17 names — and the caller resolves it by addressing a
-    drive reliquary assigned unambiguously (a floppy) or by declaring
-    fewer disks.
+    Nothing beyond that is mapped, and the omission is deliberate.
+    Every later letter depends on how many **volumes** the disks
+    before it carry: a disk the guest partitioned in two shifts every
+    letter after it. A blueprint declares drives, not what was made
+    of them, so reliquary has no fact to reason from and refuses
+    rather than guessing (P11, P17). The caller's fix today is to
+    address a determined drive — for in-band exchange, a floppy or
+    the first hard disk.
+
+    **This is unimplemented, not impossible.** Volume layout can be
+    read from the drive image on the host — the partition table, and
+    past it whatever volume manager a guest layered on — which is no
+    more guest inspection than
+    :func:`lifecycle.probe_image_format` is. Growing the mapping that
+    way is open; what stops it is that every layout is its own
+    reader, not a rule. The refusal here keeps the gap honest in the
+    meantime.
+
+    What is refused permanently is a *declared* volume count in the
+    blueprint (owner, 2026-07-27, D56): the guest is the source of
+    truth for its own volumes, and a declaration would carry a spec's
+    authority over an assertion the guest can silently contradict —
+    worse than the assumption it replaced.
     """
     letters = {}
-    floppies = sorted((drive.get("slot", 0), key)
-                      for key, drive in drives.items()
-                      if drive.get("medium") == "floppy")
-    for slot, key in floppies:
+    for slot, key in sorted((drive.get("slot", 0), key)
+                            for key, drive in drives.items()
+                            if drive.get("medium") == "floppy"):
         if slot in (0, 1):
             letters[chr(ord("A") + slot)] = key
-    ordinal = 0
     hdds = sorted((drive.get("slot", 0), key)
                   for key, drive in drives.items()
                   if drive.get("medium") == "hdd")
-    cdroms = sorted((drive.get("slot", 0), key)
-                    for key, drive in drives.items()
-                    if drive.get("medium") == "cdrom")
-    for _slot, key in hdds + cdroms:
+    if hdds:
+        letters["C"] = hdds[0][1]
+        return letters
+    for ordinal, (_slot, key) in enumerate(
+            sorted((drive.get("slot", 0), key)
+                   for key, drive in drives.items()
+                   if drive.get("medium") == "cdrom")):
         letters[chr(ord("C") + ordinal)] = key
-        ordinal += 1
     return letters
+
+
+def undetermined_letters(drives):
+    """The drive keys whose letter the declared facts do not fix.
+
+    Every drive a machine declares that :func:`drive_letters` cannot
+    place. Callers use it to say *why* a letter is unavailable — the
+    machine has drives beyond the determined ones, and which letter
+    each landed on is the guest's answer, not reliquary's.
+    """
+    placed = set(drive_letters(drives).values())
+    return [key for key in sorted(drives) if key not in placed]
 
 
 def split_address(address):
