@@ -45,6 +45,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `instance-model.md` still listed `clone-machine`, `export-drive`
+  and `export-machine` in a command synopsis — the same three
+  unbuilt verbs the 2026-07-27 sweep removed from the CLI spec,
+  written in the same `rlq ...` shape, contradicting this
+  document's own banner, which says clone and export remain
+  unbuilt. A neighbouring sentence claimed they "require `ready`".
+  Both are gone; the verbs are named as unbuilt with their design
+  left where it belongs.
+
+  **The test written to catch exactly this had a blind spot**: the
+  command inventory read `docs/spec/cli.md` and nothing else, so a
+  second copy of the defect it was written for survived one
+  directory over. It now reads every spec. The direction is
+  deliberately asymmetric — no spec may write a command that does
+  not exist, while "every command is documented" stays cli.md's
+  alone, since another spec is free to mention only the commands
+  its own subject touches.
+
+  The lifecycle phases are now pinned across all three places they
+  are stated: the prose sentence that enumerates them, the
+  `machine-state.schema.json` enum AGENTS.md requires to track it,
+  and the literals `machines.py` writes. All five agreed.
+
 - Media and the property facts now carry spec-derived tests, and —
   for the first time in this sweep — **found nothing wrong**. The
   `materialize` modes the media spec tabulates are exactly the four

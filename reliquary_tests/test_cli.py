@@ -18,7 +18,8 @@ home = importlib.import_module("reliquary.home")
 from reliquary import cli
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_CLI_SPEC = os.path.join(_REPO_ROOT, "docs", "spec", "cli.md")
+_SPEC_DIR = os.path.join(_REPO_ROOT, "docs", "spec")
+_CLI_SPEC = os.path.join(_SPEC_DIR, "cli.md")
 _COMMAND_WORD = re.compile(r"[a-z][a-z-]+")
 
 
@@ -69,12 +70,39 @@ class ClaimedCommandTests(unittest.TestCase):
         with open(_CLI_SPEC, encoding="utf-8") as handle:
             return _specified_commands(handle.read())
 
-    def test_the_spec_documents_no_command_that_does_not_exist(self):
-        absent = sorted(self._spec() - set(cli._COMMANDS))
+    @staticmethod
+    def _every_spec():
+        """Command words written after ``rlq`` anywhere in docs/spec.
+
+        Scoped to cli.md, this check had a blind spot that hid a
+        second copy of the very defect it was written for: on
+        2026-07-27 `instance-model.md` still carried
+        `clone-machine`, `export-drive` and `export-machine` in a
+        command synopsis, contradicting its own banner, which said
+        clone and export were unbuilt. Every spec is read now.
+        """
+        found = {}
+        for name in sorted(os.listdir(_SPEC_DIR)):
+            if not name.endswith(".md"):
+                continue
+            with open(os.path.join(_SPEC_DIR, name),
+                      encoding="utf-8") as handle:
+                for command in _specified_commands(handle.read()):
+                    found.setdefault(command, []).append(name)
+        return found
+
+    def test_no_spec_writes_a_command_that_does_not_exist(self):
+        # Forward only. The reverse -- that every command is
+        # documented -- stays cli.md's below: another spec is free
+        # to mention the commands its own subject touches and no
+        # more, but none of them may name one that is not there.
+        absent = {command: where
+                  for command, where in self._every_spec().items()
+                  if command not in cli._COMMANDS}
         self.assertEqual(
-            absent, [],
-            "docs/spec/cli.md specifies commands the CLI does not "
-            f"have: {absent}. A spec states what exists; unbuilt "
+            absent, {},
+            f"these specs write commands the CLI does not have: "
+            f"{absent}. A spec states what exists; unbuilt "
             "capability belongs in planning/proposed/FEATURES.md.")
 
     def test_every_command_is_documented(self):

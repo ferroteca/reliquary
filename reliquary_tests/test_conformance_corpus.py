@@ -25,6 +25,7 @@ The corpus README documents what single-document fixtures cannot reach.
 import glob
 import json
 import os
+import re
 import unittest
 import warnings
 from importlib import resources
@@ -173,6 +174,64 @@ class BlueprintCorpusTests(unittest.TestCase):
                 self.assertTrue(
                     _declares(path, "// schema: rejects"),
                     f"the {name} vocabulary must be schema-enforced")
+
+
+class SpecifiedPhaseTests(unittest.TestCase):
+    """The phase vocabulary is one set across spec, schema, and code.
+
+    P24's inventory pass over the instance model. The phase is a
+    closed enum in three places at once — prose in
+    `instance-model.md`, an `enum` in `machine-state.schema.json`,
+    and the literals `machines.py` writes — and the schema is the
+    one AGENTS.md requires to stay synchronized with the normative
+    prose. A phase in the schema and not the prose is undocumented
+    state a reader would meet in a file; one in the prose and not
+    the schema makes a documented state fail validation.
+    """
+
+    _SPEC = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "docs", "spec", "instance-model.md")
+
+    @classmethod
+    def _specified(cls):
+        with open(cls._SPEC, encoding="utf-8") as handle:
+            text = handle.read()
+        # The sentence that enumerates them, rather than every
+        # backticked mention: the state diagram and the narrative
+        # name phases too, and a set built from those would drift
+        # into whatever prose happens to cite.
+        start = text.index("The phase is one of")
+        return set(re.findall(r"`([a-z]+)`",
+                              text[start:text.index(".", start)]))
+
+    @staticmethod
+    def _schema_enum():
+        schema = jsonc.loads(
+            (resources.files("reliquary") / "schemas"
+             / "machine-state.schema.json").read_text(encoding="utf-8"))
+        return set(schema["properties"]["phase"]["enum"])
+
+    @unittest.skipUnless(os.path.isfile(_SPEC),
+                         "the instance-model spec is source-tree only")
+    def test_the_prose_and_the_schema_name_the_same_phases(self):
+        self.assertEqual(
+            self._specified(), self._schema_enum(),
+            "docs/spec/instance-model.md and "
+            "reliquary/schemas/machine-state.schema.json disagree "
+            "about the lifecycle phases. The prose is normative and "
+            "the schema must track it (AGENTS.md).")
+
+    def test_every_schema_phase_is_written_somewhere(self):
+        source = (resources.files("reliquary")
+                  / "machines.py").read_text(encoding="utf-8")
+        unwritten = sorted(phase for phase in self._schema_enum()
+                           if f'"{phase}"' not in source)
+        self.assertEqual(
+            unwritten, [],
+            f"{unwritten} are phases the schema admits and machines.py "
+            "never writes. A state no operation can produce is "
+            "vocabulary the format advertises and never emits.")
 
 
 class MachineStateSchemaTests(unittest.TestCase):

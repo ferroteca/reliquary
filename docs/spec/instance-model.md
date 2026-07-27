@@ -129,10 +129,9 @@ stateDiagram-v2
 `destroy` removes the machine entirely — there is no
 half-destroyed resting phase, because a machine is nothing but
 its cache directory. `recreate` is `destroy` + `create` as one
-command, reusing the same id; `clone` and `export` require
-`ready`. On startup Reliquary detects a machine stranded in a
-transitional phase and completes a safe rollback or fails with
-recovery instructions (see below).
+command, reusing the same id. On startup Reliquary detects a
+machine stranded in a transitional phase and completes a safe
+rollback or fails with recovery instructions (see below).
 
 ```text
 rlq list-blueprints
@@ -144,12 +143,13 @@ rlq apply-blueprint (--machine <id> | --blueprint <name>)
 rlq destroy-machine (--machine <id> | --blueprint <name>)
 rlq recreate-machine (--machine <id> | --blueprint <name>)
 rlq delete-blueprint <name>
-rlq clone-machine (--machine <id> | --blueprint <name>)
-rlq export-drive <key> <destination>
-    (--machine <id> | --blueprint <name>)
-rlq export-machine --to <exporter> [<destination>]
-    (--machine <id> | --blueprint <name>)
 ```
+
+The mobility verbs — `clone-machine`, `export-drive`,
+`export-machine` — are **unbuilt** (the banner; Machine mobility
+in planning/proposed/FEATURES.md), so they are not written here:
+a spec states what exists. Their settled design is
+[api.md](api.md)'s, which scopes itself to the end goal.
 
 `list-blueprints` shows each blueprint and its machine count;
 `list-machines` shows each machine's id, blueprint, phase, and
