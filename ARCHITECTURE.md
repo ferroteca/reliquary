@@ -198,8 +198,9 @@ machine: an array of specs of two types, `machine` and `media`
 (`type` defaulting to media). A source is a media's `location`, and
 an archive is a media that other media name as their parent — the
 distinction was never a property of the artifact, only of the use.
-Authored directly in an editor, seeded out of the codex, or
-synthesized from a native VM by `import-vm` —
+Authored directly in an editor or seeded out of the codex (the
+third route, synthesis from a native VM, is unbuilt: Machine
+mobility, planning/proposed/FEATURES.md) —
 the durable artifact from which machines are materialized, and
 the home of the parameter seams its author designs in for
 customization (U5). Its `media` components name installation media

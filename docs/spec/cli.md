@@ -334,59 +334,6 @@ rlq: blueprint 'freedos' still has 2 machine(s):
 destroy them first, then delete the blueprint
 ```
 
-### Importing a blueprint from a native VM
-
-```
-rlq import-vm <source> --name <name> --platform <platform>
-    [--hdd-images (duplicate | difference)] [--snapshot | --no-snapshot]
-```
-
-Synthesizes a blueprint from a native VM source's configuration —
-memory, drives, controllers, read by an **importer** (a
-vocabulary decoupled from the backend list, like export's
-exporters; no same-named backend is required) — capturing the
-VM's disks as `media`
-components in place: each gets a generated media whose `source` is
-a `local` locator at the disk where the native hypervisor
-keeps it (computed hash, no URL); nothing is copied or moved.
-The source must be at rest: a running or suspended VM fails
-closed naming its state — power it off first.
-
-Two choices are presented, never defaulted (U2) — on a terminal
-an absent flag prompts with its tradeoff; noninteractively it is
-an error:
-
-- `--snapshot` has the native hypervisor snapshot the disks
-  first — the one thing import may do to the source VM, and only
-  with this consent: the definitions pin the frozen extent and
-  the source VM stays free to keep running natively. The
-  snapshot is Reliquary-named and noted in the generated
-  definitions; its later fate in native tooling is yours
-  (verification reports a lost extent). `--no-snapshot` touches
-  nothing — but running the source VM again breaks verification
-  until re-import.
-- `--hdd-images` sets how machines materialize from the captured
-  disks, spelled into each generated media's `materialize`:
-  `duplicate` → `copy` (the image is copied into each created
-  machine, whose drive stands alone afterward); `difference`
-  differences against it (cheapest create, but per-start
-  verification refuses a source rewritten since).
-
-`--name` names the blueprint to write (`--blueprint` always
-selects an existing one) and `--platform` is required
-(no backend records the guest OS). Stops at the blueprint; run
-`create-machine` when you want a machine.
-
-```powershell
-rlq import-vm "C:\VMs\my-dos-box" --name my-dos-box `
-    --platform dos --hdd-images difference --snapshot
-```
-
-Machines created from an imported blueprint recreate from their
-media like any other. To move a captured image to more durable
-ground, move the file and repoint the media's `local` source —
-the media component is yours.
-
 ---
 
 ## Machines
@@ -401,10 +348,12 @@ returns its output to the caller (D36).
 Every machine verb *is* its embedding-API twin's name under the
 identity rule: `create-machine` ↔ `create_machine`,
 `start-machine`, `stop-machine`, `apply-blueprint`,
-`destroy-machine`, `recreate-machine`, `clone-machine`,
-`delete-blueprint`, and `import-vm` ↔ `import_vm`;
-`export-drive` ↔ `export_drive` and `export-machine` ↔
-`export_machine` (settled 2026-07-22).
+`destroy-machine`, `recreate-machine`, and `delete-blueprint`.
+The mobility verbs — `clone-machine`, `export-drive`,
+`export-machine`, `import-vm` — are unbuilt: their names are
+settled and their design stands in [api.md](api.md), which is the
+end-goal design rather than a claim about today, and in
+planning/proposed/FEATURES.md "Machine mobility".
 
 ### Creating a machine
 
@@ -1147,7 +1096,7 @@ blueprint with none yet. `check-script` uses a selector for label
 resolution and property binding when one is given. Commands that
 don't operate on a machine (`list-*`, `search-*`, `fetch-media`,
 the property family, `clean-*`, `new-blueprint`,
-`delete-blueprint`, `seed-*`, `import-vm`) ignore them.
+`delete-blueprint`, `seed-*`) ignore them.
 
 `--timeout` sets a per-command timeout where applicable (runtime
 defaults vary by command). It accepts the script language's

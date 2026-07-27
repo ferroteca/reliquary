@@ -59,7 +59,7 @@ _COMMANDS = frozenset({
     "seed-blueprint", "seed-script", "new-blueprint",
     "delete-blueprint", "search-blueprints",
     "get-property", "set-property", "unset-property",
-    "list-properties", "import-vm", "list-blueprints",
+    "list-properties", "list-blueprints",
     "list-machines", "list-scripts", "list-media",
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
@@ -445,13 +445,6 @@ def main(argv=None):
     command.add_argument(
         "prefix", nargs="?",
         help="limit to this key and its dotted descendants")
-
-    # import-vm
-    command = subcommands.add_parser(
-        "import-vm", help="import a VM as a blueprint")
-    _add_home(command)
-    command.add_argument("source")
-    command.add_argument("--name", required=True)
 
     # list-*
     command = subcommands.add_parser(
@@ -1012,10 +1005,6 @@ def _list_properties(arguments):
     return _emit(arguments, properties, render)
 
 
-def _import_vm(arguments):
-    raise NotImplementedError("import-vm is not yet implemented")
-
-
 def _clean_media(arguments):
     reclaimed = clean_media(getattr(arguments, "name", None))
     return _emit(
@@ -1119,8 +1108,6 @@ def _dispatch(arguments):
         return _unset_property(arguments)
     if arguments.command == "list-properties":
         return _list_properties(arguments)
-    if arguments.command == "import-vm":
-        return _import_vm(arguments)
     if arguments.command == "list-blueprints":
         return _list_blueprints(arguments)
     if arguments.command == "list-machines":

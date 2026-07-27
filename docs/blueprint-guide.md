@@ -89,13 +89,12 @@ selectors the CLI takes (a machine id, or the
 blueprint/machine-number pair, with `resolve_machine()` the
 shared resolution seam) plus the mirrored global keywords
 (`home=`, `assets=`). Returns mirror what the
-CLI prints — `create_machine` and `clone_machine` return the new
-machine id — and errors raise by class where the CLI exits by
-code. `import`'s twin is `import_vm`, because a bare `import` is
-a Python keyword in the first binding; export is two commands
-with twins settled 2026-07-22 — `export_drive` (a drive out as a
-standalone image) and `export_machine` (a native VM registered
-with an exporter).
+CLI prints — `create_machine` returns the new machine id — and
+errors raise by class where the CLI exits by code. The mobility
+twins are named but unbuilt (below): `clone_machine`,
+`export_drive`, `export_machine`, and `import_vm` — the last
+spelled that way because a bare `import` is a Python keyword in
+the first binding.
 
 Two rules carry the whole model:
 
@@ -479,9 +478,19 @@ way to move a machine between backends, and since the drive
 images regenerate as well, they arrive in the new backend's
 native formats.
 
-### Cloning, exporting, importing
+### Cloning, exporting, importing — unbuilt
 
-Three more lifecycle commands follow from the same model
+> None of the three ships today. Their names and behaviour are
+> settled and the design below stands as written, but there is no
+> `clone-machine`, `export-drive`, `export-machine`, or
+> `import-vm` command and no API twin for any of them: they are
+> Machine mobility in planning/proposed/FEATURES.md, off the
+> numbered arc since 2026-07-23 for want of use-case backing. The
+> normative CLI spec ([spec/cli.md](spec/cli.md)) states what
+> exists and so does not describe them; read this section as
+> design, not as instructions.
+
+Three more lifecycle commands would follow from the same model
 (machine stopped, in every case):
 
 **`clone`** duplicates a machine as a new machine under a new id

@@ -101,6 +101,7 @@ __all__ = [
     "add_media",
     "clean_media",
     "documents_dir",
+    "fetch_media",
     "find_qemu",
     "find_qemu_img",
     "get_property",

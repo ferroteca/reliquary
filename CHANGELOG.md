@@ -11,7 +11,65 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Removed
+
+- `import-vm` is gone from the CLI. It was a registered command
+  whose entire body was `raise NotImplementedError`, while the CLI
+  specification described it working in present tense — a synopsis
+  with `--platform`, `--hdd-images` and `--snapshot`, prose
+  semantics, and a worked PowerShell example — none of which the
+  shipped subparser even accepted. Nothing is lost: the design was
+  already settled and already recorded as unbuilt in two places
+  (planning/proposed/FEATURES.md "Machine mobility", which took it
+  off the numbered arc on 2026-07-23, and U2, which says in as many
+  words that nothing of it is implemented). Its normative text
+  leaves the CLI spec for the same reason the five phantom commands
+  did on 2026-07-27 — a spec states what exists — and its end-goal
+  design stays in `docs/spec/api.md`, whose banner scopes it to the
+  end goal rather than to today.
+
+  That sweep missed this one, and the reason is worth recording:
+  its inventory test compares command *words*, and `import-vm`'s
+  word was in both the spec and `_COMMANDS`. Only the parity check
+  below could see that the word led nowhere.
+
+  The same correction reaches the documents that described it and
+  its siblings as working. `docs/spec/cli.md` no longer asserts
+  twin identities for four unbuilt mobility verbs; the blueprint
+  guide's "Cloning, exporting, importing" section — which
+  documented `clone-machine`, `export-drive`, `export-machine` and
+  `import-vm` in present tense, none of which exist — now says so
+  in a banner and reads as design; and ARCHITECTURE.md no longer
+  lists synthesis from a native VM among the ways a blueprint comes
+  to be.
+
 ### Fixed
+
+- `fetch_media` was missing from the package's `__all__`. It was
+  importable, documented in the API reference, and the twin of a
+  shipped command, but absent from the declared embedding surface —
+  so `from reliquary import *` did not bring it in and the package
+  did not admit to having it. It was the only such omission.
+
+- CLI–API parity is now machine-checked. The twin-name identity
+  rule — the CLI command *is* the twin's name, dash-separated, with
+  nothing CLI-only — is a required invariant that until now only
+  discipline enforced; a test compares `cli._COMMANDS` against the
+  package's declared surface in both the has-a-twin and
+  is-exported directions. The guest-console family's exemption is
+  read out of `docs/spec/api.md` rather than listed in the test, so
+  the exemption cannot quietly widen.
+
+  This is P24's pass over the embedding API, and it is deliberately
+  not the inventory comparison the other interfaces get:
+  `docs/spec/api.md` declares itself the *end-goal design*, so it
+  names capability that does not exist by design and cannot be
+  diffed against the code. The rule it states about today is what
+  is checked instead. Named rather than quietly exempted: only one
+  direction is mechanical. "No public capability is unreachable
+  from the CLI" needs a curated roster of the non-command surface —
+  types, path helpers, parsers, lifecycle seams — which is a design
+  round, not a test.
 
 - In-band file exchange no longer guesses a DOS drive letter it
   cannot know. The letter map assumed one volume per hard disk, so a
