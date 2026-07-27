@@ -25,7 +25,11 @@ roadmap dissolved into these directories on 2026-07-26, and
 — is what 2026-07-27 renamed **pledged** (D44). Links to that
 directory were repointed throughout, since a broken path is a
 wrong instruction rather than a dated word; every other mention
-below stands as written.
+below stands as written. **Two renames sit under this rule, not
+one**: PRINCIPLES.md is what 2026-07-26 renamed root
+ARCHITECTURE.md (D50), and entries below name it by its title of
+the day — links repointed, words left standing, for the same
+reason.
 
 Decisions are numbered in the order first recorded — D1 the
 earliest — and a number is never reused; the list reads
@@ -169,6 +173,124 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D50 — THE 2026-07-26 RESTRUCTURE'S UNNUMBERED ACTS, ISSUED —
+  DECIDED (owner, 2026-07-27, the fourth TASKS.md adjudication).
+  Supports P8, P23; **amends D23** (pledge is the move) and pays
+  the debt commit `8241580` flagged in its own closing paragraph.
+  Six acts, each below with its own handle, in one entry because
+  they are one act on one date in one commit — D23's shape, whose
+  parts the project already cites individually.
+  THE DEBT WAS TWICE WHAT THE TASK SAID. That commit ends:
+  *"Flagged for D-numbers, adjudication pending: acceptance-is-the-
+  move (amends D23), the third queue (widens D39), the ARCHITECTURE
+  rename and merge, P19-P23, the INTERFACES split, the
+  norm-is-interface clause, and the format-stability promotion."*
+  Seven items; **one** was ever paid (the third queue, D43). The
+  task named three, having been written from the restructure
+  record's step-6 summary rather than from the commit.
+  THE PATTERN, NOW THREE ROUNDS RUNNING, and it is the finding
+  worth more than any single entry below: **the reasoning was
+  never missing, only misfiled.** D49 recovered P24 from a commit
+  message; this recovers six more from another. `8241580`'s body
+  is several hundred words of real adjudication reachable only by
+  someone who thinks to run `git show`. A commit message is a
+  fine place to *explain* a change and a useless place to *record*
+  a decision: this file's own preamble calls the D-number the
+  citation handle that design docs, specs and code commits justify
+  themselves by, and a decision with no number has no currency to
+  spend. **A change that flags its own debt has not paid it** —
+  the flag is evidence of good faith and nothing more, and three
+  rounds of finding these says the flag should be a blocker.
+  **(1) PLEDGE IS THE MOVE** — amends D23. Promoting a document,
+  or an entry within one, from `proposed/` to `pledged/` *is* the
+  pledge, and the commit that does it is the record; there is no
+  separate register and nothing is pledged by being cited. This
+  replaces D23's *acceptance-is-scheduling*, which routed the act
+  through a roadmap item that no longer exists (D42). Delivery
+  stays a distinct second event (D34, as split by D48). Already
+  stated in [README.md](README.md) "How an idea is pledged"; this
+  is its number.
+  **(2) THE ARCHITECTURE RENAME AND MERGE.** PRINCIPLES.md became
+  root ARCHITECTURE.md, absorbing the whole-system view and the
+  interface enumeration. The reason is placement, not taste: the
+  document describes **current reality** — the shipped system's
+  model, and principles the code honors today — which is the same
+  test that put USE-CASES.md at the root, and ARCHITECTURE.md is
+  the name a reader expects there. The mirrors renamed with it,
+  restoring mirror-by-name across all three ladders. **This was a
+  governance act, not a file move**: the root list is where a
+  principle is *armed* (D48), so renaming it moved the place a
+  divergence becomes a bug.
+  **(3) THE INTERFACES SPLIT.** The interface *inventory* left
+  INTERFACES.md for root ARCHITECTURE.md "The interfaces", and
+  INTERFACES.md reduced to the one thing it always governed — the
+  interface-change rule. The two had been filed together because
+  they are used together, but they answer different questions:
+  *what is an interface* is a fact about the shipped system, and
+  belongs with the architecture; *how a change to one is weighed*
+  is a rule, and belongs with the machinery that never moves. The
+  practical gain is that the housekeeping lookup and the
+  interface-change rule now both answer against a list living
+  where reality is described.
+  **(4) THE NORM-IS-INTERFACE CLAUSE.** Editing what a norm
+  *requires* is an interface change — proposed and gated first,
+  never housekeeping however small the diff — because the specs,
+  the published schemas and the interface enumeration are not
+  documentation *about* the architecture but architecture itself:
+  each is the exact statement of what an interface is. The
+  clarify test is the only exit. Stated in ARCHITECTURE.md's "The
+  norms are part of the architecture", and carried by **P23**.
+  **(5) P19–P23 JOIN THE STANDING LIST**, and they are not one
+  kind. **P19** (one script, one target) and **P21** (dependencies
+  pull their weight) *itemize* rules already written down —
+  script-spec.md's procedural–declarative seam and AGENTS.md's
+  dependency rule — so numbering them changed nothing but their
+  findability, the clarify test met by construction. **P20**
+  (installation media is input, disk images are output) and
+  **P22** (no CI, at this time) are **first written forms** of
+  rules the project had been applying while stating nowhere; P22's
+  entry says so in its own text. **P23** (the self-description
+  changes by proposal, never by arrival) is the only one that
+  brought a new mechanism — the citable rejection for a norm
+  change that arrives already made, refusing it for *not having
+  argued the merit* rather than for its quality. Each was written
+  in that commit and each is honored today, which is why they went
+  straight to the root list rather than through `pledged/` (D43's
+  compression clause, and D48's bar).
+  **P23's OWN ABSENCE WAS THE WORST OF IT.** It is the norm gate:
+  cited by D44, D45, D48 and D49 under *Supports*, and **widened**
+  by D43 — a decision amending a principle no decision had ever
+  stated. Nothing downstream was wrong; it simply rested on air.
+  **(6) THE FORMAT-STABILITY PROMOTION.** The JSONC dialect, the
+  closed `${…}` reference grammar and the growth rule moved from
+  design prose into blueprint-model.md "Format stability", making
+  them normative rather than explanatory. This is the promotion
+  **P14 cites**: P14's ceiling for the spec channel is only
+  enforceable because the closure it names is stated somewhere
+  that binds.
+  THE RECORD IS DATED HISTORY — the naming-drift question,
+  settled by pointing at the rule this file already has. DECISIONS
+  names ARCHITECTURE.md by its old title 17 times in prose while
+  every one of those links already resolves. That is not
+  half-renamed; it is the preamble's rule working: *"a broken path
+  is a wrong instruction rather than a dated word; every other
+  mention below stands as written."* Written for D44's shelf
+  rename, it answers this one identically, and the preamble now
+  names both renames instead of the later one alone. **An
+  adjudication record is corrected by annotation, never by
+  rewriting** — the CHANGELOG's never-retroactively-edited rule
+  and this file's own annotate-never-rewrite convention are the
+  same instinct, and the reason is stated three lines further
+  down: an error and its discovery are part of the record. This
+  closes the TASKS.md small item that raised it.
+  FOLDED: this entry; D23 (pointer at the superseded clause, text
+  untouched); this file's preamble (the spellings clause names
+  both renames); TASKS.md (the adjudication struck, the naming
+  small item struck as settled, the restructure record's step 6
+  marked paid). No document changes: all six acts landed in
+  2026-07-26 and were verified present before numbering — unlike
+  P24, which had not.
 
 - D49 — P24 RESTATED AND ARMED, AFTER LANDING NOWHERE — DECIDED
   (owner, 2026-07-27). Supports P8, P22, P23; **restores a
@@ -2214,6 +2336,11 @@ is waiting on an answer today.
   landed is accepted and delivered in one act. U5's acceptance
   rides milestone 8 (scheduled, citing it); its unscheduled
   canonical scenario is why it is not current.
+  [D50 supersedes the mechanism: **the move is the pledge**. The
+  roadmap this clause routes through was dissolved (D42), so
+  promotion from `proposed/` to `pledged/` is now the act and the
+  commit is the record. The pledged-and-delivered-in-one-act
+  sentence stands unchanged and is what D46 applied.]
   MILESTONE 12 DEMOTED TO HORIZON (owner, 2026-07-23): machine
   mobility — clone, export, import — leaves the numbered arc
   for lack of use-case backing (clone has none; export stands

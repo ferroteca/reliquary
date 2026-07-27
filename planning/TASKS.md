@@ -78,19 +78,6 @@ needs no pledge because the norm it violates already is one.
 Owner-only: each settles a question the record is waiting on.
 None depends on the others.
 
-- **Issue the D-numbers the 2026-07-26 restructure left owing**
-  (found 2026-07-27 by the gate audit, in the restructure record
-  now folded into [Completed](#completed)). That record's step 6
-  says the P-additions and the rename "want D-numbers" and none
-  was ever issued: nothing in DECISIONS.md adjudicates
-  **PRINCIPLES.md becoming ARCHITECTURE.md**, nor the itemizing
-  of the model document's unnumbered principles as **P19–P21**,
-  nor the statement of **P22**. Step 2's own debt was paid (D43);
-  this is what is left of the same sentence. It matters for the
-  same reason the promotion entry above does — the rename moved
-  where a principle is *armed*, which is a governance act with no
-  record of its own.
-
 - **Take or refuse U3's supersession.** D36 settled that U14
   supersedes U3 alone; U14 is now delivered and promoted (D37).
   Retiring U3 is the lifecycle's Retire clause — an owner
@@ -310,16 +297,6 @@ need no entry at all once someone picks them up.
   test, while anything that reads as a *new* requirement on the
   blueprint is an interface change and takes the argued route.
 
-- **DECISIONS.md still calls ARCHITECTURE.md "PRINCIPLES.md"**
-  (found 2026-07-27 by the gate audit) — 17 times in prose, while
-  every one of those links already points at `../ARCHITECTURE.md`.
-  Half-renamed is the actual defect: a reader following the words
-  looks for a file that is not there, and a reader following the
-  links does not. Decide the rule as much as the edit — whether an
-  adjudication record is corrected in place at all, or whether the
-  entries are left as written and the drift lives with dated
-  history the way the CHANGELOG's does.
-
 - CLI help: run-script's text says little more than "runs a
   script on a machine". Not an interface change — it changes no
   rule, and pretty output is uncontracted — so it is housekeeping
@@ -507,9 +484,15 @@ landed, and where it diverged from what step 2 decided:
    pass itemized the model doc's unnumbered principles as
    P19–P21, and stated P22 (no CI, at this time) — a rule
    previously cited in this file but written down nowhere.
-   The P-additions and the rename want D-numbers, with
+   ~~The P-additions and the rename want D-numbers, with
    pledge-is-the-move (amends D23) and the third queue
-   (widens D39).
+   (widens D39).~~ — **paid 2026-07-27**: the third queue by
+   D43, everything else by **D50**, which found the debt was
+   twice what this summary records. The commit's own closing
+   paragraph flagged seven items, not four; this step listed the
+   ones it could see from inside the restructure record, and
+   P23, the INTERFACES split, the norm-is-interface clause and
+   the format-stability promotion were owed too.
 
 ### Design rounds resolved
 
