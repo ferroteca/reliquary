@@ -24,8 +24,10 @@ asserting one could not tell six different failures apart.
 Writing the corpus measured how far the ids reach, and drove them
 further: it opened with four fixtures carrying `# id: none` and
 now has none — every one of the 39 names the diagnostic that
-rejects it. What remains unidentified is the preflight and
-runtime tiers, which no parse fixture can reach.
+rejects it. The preflight tier followed once D58 gave those
+diagnostics a class worth naming a rule for, so
+`invalid-at-preflight/` asserts a reason too rather than only
+"parses clean" — which is what the bucket was always for.
 
 One fixture carries `# caught-by:` instead. `s8-branching-with-a-
 condition` exercises S8 and is rejected by the *grammar*, so its
@@ -45,10 +47,15 @@ naming a gap and quietly keeping one.
 import glob
 import os
 import re
+import tempfile
 import unittest
 
+from reliquary.binding import bind_properties
+from reliquary.errors import PreflightError, ReliquaryError
+from reliquary.home import Context
 from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import load_script
+from reliquary.script_runner import _preflight_machine_rules
 
 _CORPUS = os.path.join(os.path.dirname(__file__), "fixtures",
                        "conformance", "script")
@@ -212,13 +219,23 @@ class InvalidCorpusTests(unittest.TestCase):
             "the same defect as a spec naming a command that does not "
             "exist.")
 
-    def test_rule_of_holds_exactly_the_ids_the_code_raises(self):
+    def test_rule_of_holds_exactly_the_ids_the_static_tier_raises(self):
         """The id-to-rule map is neither short nor imaginary.
 
         `RULE_OF` is what a consumer switching on an id reads, and
         what the unit tests assert through. An id raised but
         unmapped would report no rule; a mapped id nothing raises
         is an entry naming a diagnostic that cannot occur.
+
+        The three modules scanned are the **static tier**, and that
+        is the whole map by construction: `RULE_OF` maps an id to
+        the S-numbered restriction it enforces, and S-numbers name
+        syntactic restrictions only. A preflight or runtime id —
+        `machine.slot-not-declared`, `media.unknown` — enforces a
+        machine rule or the dynamic semantics, which have no
+        S-number to map to. Absent from `RULE_OF` is therefore
+        correct for them rather than a gap, and widening this scan
+        would demand entries that could only be invented.
         """
         raised = set()
         package = os.path.join(os.path.dirname(os.path.dirname(
@@ -255,7 +272,43 @@ class PreflightCorpusTests(unittest.TestCase):
     reason: a fixture whose rule needs a machine, a namespace or an
     invocation would fail a parse-time assertion for the wrong
     reason, and separating it is honester than weakening it.
+
+    This bucket used to assert only that a fixture *parses* — all it
+    could, while preflight diagnostics carried no ids. They do now, so
+    it asserts the reason as well, which is the whole point of the
+    bucket: a fixture that parses clean and is then rejected for the
+    wrong reason was previously indistinguishable from one rejected
+    for the right one.
     """
+
+    #: A machine declaring one slot of each kind, each carrying the
+    #: `medium` its removability is read from. The fixtures name
+    #: `cdrom7`, `hdd6` and the like precisely because nothing
+    #: plausible declares them.
+    MACHINE = {"drives": {"floppy0": {"medium": "floppy"},
+                          "cdrom0": {"medium": "cdrom"},
+                          "hdd0": {"medium": "hdd"}}}
+
+    def _preflight(self, path):
+        """Run preflight over a fixture, returning what it raised.
+
+        Both halves run, in the order a real invocation does: the
+        machine rules first, then property binding with no asker,
+        which is what `--progress plain` and every program driving
+        the CLI get. A fixture declares the one id that must come
+        out, so which half noticed is the harness's business rather
+        than the fixture's.
+        """
+        script = load_script(path)
+        with tempfile.TemporaryDirectory() as empty:
+            context = Context(home=empty, assets=empty)
+            try:
+                _preflight_machine_rules(
+                    script, self.MACHINE, path, context)
+                bind_properties(script, context=context, asker=None)
+            except ReliquaryError as raised:
+                return raised
+        return None
 
     def test_preflight_fixtures_parse_clean(self):
         paths = _fixtures("invalid-at-preflight")
@@ -263,6 +316,54 @@ class PreflightCorpusTests(unittest.TestCase):
         for path in paths:
             with self.subTest(fixture=os.path.basename(path)):
                 load_script(path)
+
+    def test_every_preflight_fixture_names_its_id(self):
+        for path in _fixtures("invalid-at-preflight"):
+            with self.subTest(fixture=os.path.basename(path)):
+                self.assertIsNotNone(
+                    _ID.search(_header(path)),
+                    "a preflight fixture names the diagnostic id that "
+                    "must reject it, or `none` where none exists yet.")
+
+    def test_a_preflight_rejection_carries_the_declared_id(self):
+        """The assertion this bucket could not make until D58.
+
+        Asserted in both directions, like the parse bucket's: a
+        fixture claiming `none` whose diagnostic has since gained an
+        id fails here until its header catches up.
+        """
+        for path in _fixtures("invalid-at-preflight"):
+            declared = _ID.search(_header(path)).group(1)
+            with self.subTest(fixture=os.path.basename(path)):
+                raised = self._preflight(path)
+                self.assertIsNotNone(
+                    raised,
+                    "this fixture is in the preflight bucket and "
+                    "preflight accepted it. Either it belongs in "
+                    "`valid/`, or the rule it exercises is unenforced.")
+                if declared == "none":
+                    self.assertIsNone(
+                        raised.rule_id,
+                        f"this fixture records no id and the diagnostic "
+                        f"now carries {raised.rule_id!r}. Put it in the "
+                        "header — the marker records a gap that closed.")
+                else:
+                    self.assertEqual(
+                        raised.rule_id, declared,
+                        "rejected by preflight, but not by the rule this "
+                        "fixture names. Failing for the wrong reason is "
+                        "a false pass.")
+
+    def test_a_preflight_rejection_is_the_preflight_class(self):
+        """Rejected *at preflight* is the bucket's claim, not just late.
+
+        A fixture rejected by a RUN FAILURE would be in the wrong
+        bucket, and one rejected by a STATIC ERROR would mean the
+        parse bucket should have caught it.
+        """
+        for path in _fixtures("invalid-at-preflight"):
+            with self.subTest(fixture=os.path.basename(path)):
+                self.assertIsInstance(self._preflight(path), PreflightError)
 
 
 if __name__ == "__main__":

@@ -57,11 +57,16 @@ KEYWORDS = (
 )
 
 
-#: Every diagnostic id, and the S-numbered rule it enforces.
+#: Every **statically** decided diagnostic id, and the S-numbered
+#: rule it enforces.
 #:
 #: Ids are finer than the rules — S7 is one restriction and
 #: ``obs.two-channels`` is one of six diagnostics under it — so this
-#: is many-to-one by design. It lives here rather than only in
+#: is many-to-one by design. It maps the static tier alone, and by
+#: construction rather than omission: an S-number names a syntactic
+#: restriction, so a preflight or runtime id — ``media.unknown``,
+#: ``machine.slot-not-declared`` — has no S-number to map to and
+#: belongs here only if one were invented for it. It lives here rather than only in
 #: docs/spec/script-spec.md because a consumer switching on an id
 #: needs the rule without parsing prose; the spec's rule list
 #: carries the same mapping and a test holds the two together.
@@ -187,10 +192,12 @@ class ScriptParseError(StaticError):
     diagnostics under it. The spec's rule list carries the mapping,
     and a test holds the two together.
 
-    ``rule_id`` is None only where an id has not been assigned yet.
-    The lexical, grammar and static tiers all carry one; preflight
-    and runtime do not, and the script conformance corpus measures
-    what remains rather than estimating it.
+    ``rule_id`` is inherited from :class:`~reliquary.errors.ReliquaryError`,
+    where it lives because the spec puts every id in one namespace
+    across the classes. Every tier of this surface carries one now,
+    preflight and runtime included; other surfaces do not yet, and
+    the conformance corpora measure what remains rather than
+    estimating it.
     """
 
     def __init__(self, line, message, column=1, rule_id=None):

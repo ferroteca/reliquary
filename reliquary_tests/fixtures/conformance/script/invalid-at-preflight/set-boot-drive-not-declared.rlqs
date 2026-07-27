@@ -1,5 +1,6 @@
 # invalid at preflight: a set-boot drive the machine does not declare
 # spec: Validation and preflight
+# id: machine.slot-not-declared
 
 platform dos
 set-boot hdd6

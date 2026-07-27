@@ -191,6 +191,66 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Every diagnostic the script surface can raise now carries a
+  stable identifier.** `script-spec.md` requires one of *every*
+  diagnostic; the static tier had 82 and the preflight and runtime
+  tiers had none, so a consumer switching on `rule_id` got `None` for
+  an unbound property, an unknown media, an undeclared slot, or any
+  expired clock. 43 diagnostics gained one across property binding,
+  media resolution, the script runner and the timing model.
+
+  `rule_id` lives on `ReliquaryError`, the root, rather than on a new
+  class per tier. The spec puts every id in one namespace shared
+  across the classes, and the field at the root is the code saying
+  the same thing — a diagnostic's identity is independent of which
+  tier raised it. Every existing class picked it up unchanged, and
+  no new machinery was needed: what was missing was only identity.
+  *Location* already existed in two shapes, `ScriptParseError`'s line
+  and column and the runner's statement citation, and conflating the
+  two is what had made this look like a bigger job than it was.
+
+  Two subjects arrived, `media.` and `machine.`, and they are why the
+  prefix names the subject rather than the tier: `media.unknown` is
+  the same id whether the resolution namespace defines no such media
+  or a script's `insert` names one. One condition, one answer for a
+  caller. Had the prefix named the tier, that single condition would
+  have carried two ids and the caller would have needed to know which
+  layer noticed. For the same reason four sites that restate a caught
+  error against a script line now **forward the cause's id** instead
+  of minting a new one, so `set-boot hdd6` inside a script reports
+  the same rule as `rlq set-boot-order hdd6`. Each clock got its own
+  id — run deadline, phase deadline, observation timeout, reactive
+  interval — since a program that cannot tell which one ran out
+  cannot act on it.
+
+  The script conformance corpus stops asserting less than it knows.
+  Its `invalid-at-preflight/` bucket previously asserted only that a
+  fixture *parses*, which was all it could while preflight
+  diagnostics were idless; it now runs preflight — the machine rules,
+  then noninteractive binding — and asserts the id that comes out,
+  in both directions like the parse bucket, plus that the rejection
+  is a PREFLIGHT ERROR rather than merely late. Writing that
+  assertion immediately caught a fixture rejected by
+  `machine.slot-not-removable` where it claimed `media.unknown`,
+  which was the harness's own fabricated machine being wrong — the
+  kind of false pass the bucket exists to prevent.
+
+  `RULE_OF` deliberately still maps the static tier alone. It maps an
+  id to the S-numbered restriction it enforces, and S-numbers name
+  syntactic restrictions only, so a machine rule has no S-number to
+  map to; absent from it is correct for those ids rather than a gap,
+  and the test that holds it to the spec now says so.
+
+  **This closed one gap and measured a larger one.** Because D58 made
+  the error classes describe every surface, the spec's id requirement
+  travelled with them: a malformed blueprint is a STATIC ERROR
+  exactly as a malformed script is, so it owes an id on the same
+  terms. 245 diagnostics across 17 modules do not carry one — 97 in
+  the blueprint document parser alone — which is filed as a defect
+  with the per-module measurement rather than left to be noticed. The
+  scheme needs nothing new for them; the blueprint surface needs its
+  subjects argued, which is that work rather than this one.
+
 - **Ordinary mistakes no longer exit `1`, the code reserved for
   Reliquary's own faults.** Five measured cases, five wrong codes:
   naming a media, blueprint, machine or script label that does not

@@ -108,94 +108,70 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **Diagnostics carry no stable identifier — the second pass**
-  (found 2026-07-27 by D55; the scheme and the static rules landed
-  2026-07-27, this is what they left).
+- **Diagnostics carry no stable identifier — every surface but
+  the script one** (found 2026-07-27 by finishing the script
+  surface's pass; D55's requirement, D58's reach).
   [script-spec.md](../docs/spec/script-spec.md) requires an id of
-  *every* diagnostic; 52 now exist and the rest do not.
+  *every* diagnostic. The script surface now has them — 82 static
+  plus 43 preflight and runtime, the corpus asserting each in both
+  directions — and nothing else does.
 
-  **The scheme is settled — do not reopen it.** The entry's
-  original question was whether `S5` becomes a dotted id or the
-  dotted scheme covers only what has none. It was a false choice:
-  an S-number names a **rule** and an id names one **diagnostic**
-  under it, S7 being one restriction with six ways to break it. So
-  they are different granularities rather than rival schemes, no
-  renaming happened, a message carries the id alone, and
-  script-spec.md's rule list carries the mapping. `RULE_OF`
-  (`script_nodes.py`) is the same mapping in code, held to the
-  spec by test. The prefix is the subject — `obs.`, `flow.`,
-  `name.`, `prop.`, `wait.`, `handler.`, `time.`, `key.`,
-  `node.`, `http.` — never the error class, the namespace being
-  shared across classes.
-  The argument that settled it came from the conformance corpus,
-  which was written against the S-numbers first and could not tell
-  `obs.missing-condition` from `obs.unknown-channel`.
+  **This is D58's consequence, not a new demand.** The four error
+  classes used to be read as tiers of a script run, so the id
+  requirement was read as the script surface's too. D58 made the
+  classes describe every surface, and the requirement travelled
+  with them: a malformed blueprint is a STATIC ERROR exactly as a
+  malformed script is, so it owes an id on the same terms. The
+  population went from 30 to 288 without a single new rule being
+  written.
 
-  **What remains, measured.** Raise sites carrying no id:
+  **Measured, not estimated.** Diagnostics carrying no id:
 
-  | module | tier | without an id |
+  | module | what it diagnoses | without an id |
   |---|---|---|
-  | `binding.py` | preflight | 7 |
-  | `resolve.py` | preflight | 10 |
-  | `script_runner.py` | runtime | 12 |
-  | `script_timing.py` | static | 1 |
+  | `document.py` | the blueprint document | 97 |
+  | `machines.py` | the machine verbs | 53 |
+  | `lifecycle.py` | the VM's own lifecycle | 26 |
+  | `properties.py` | the properties file | 15 |
+  | `cli.py` | invocation shape | 13 |
+  | `machine.py` | the guest console | 12 |
+  | the remaining 11 | assets, media, DOS addressing, … | 29 |
 
-  Everything decided from the script text alone is done — the
-  lexer, the grammar, the node signatures and the static rules,
-  82 ids across `script_nodes.py`, `script_parser.py` and
-  `script_validation.py`. What is left is the two tiers that need
-  more than the text in scope, which is also why no parse fixture
-  can reach them: they belong to the corpus's
-  `invalid-at-preflight/` bucket, and giving them ids is what lets
-  that bucket assert a reason rather than only "parses clean".
+  245 across 17 modules. The count is a one-command measurement —
+  walk every `raise` and look for a `rule_id` keyword — so it can
+  be re-derived rather than trusted.
 
-  `script_timing.py`'s single site is static and simply was not on
-  the earlier pass's path; it is a one-line fix whenever.
+  **The scheme needs nothing new; the subjects do.** The prefix is
+  the subject, never the error class or the tier, and that rule
+  held when `media.` and `machine.` arrived — `media.unknown` is
+  one id whether the resolution namespace lacks the media or a
+  script's `insert` names it. The blueprint surface is the one
+  place needing an argued answer: `document.py`'s 97 are field
+  and shape rules over a JSON document, and whether their subject
+  is the field (`drives.`, `boot.`, `location.`), the document
+  (`blueprint.`), or the rule class is the real question. Guessing
+  it 97 times is how a namespace goes bad.
 
-  **No longer blocked** (2026-07-27, D58). The prerequisite is
-  delivered: the four error classes now describe every surface, and
-  all four modules above carry **zero** builtin raises — every
-  diagnostic in them is in the taxonomy, so an id on one names a
-  rule for something the CLI reports as an error rather than as a
-  crash. What this entry said here — that only `binding.py`'s 7
-  were typed and the rest raised plain `ValueError` / `KeyError` /
-  `RuntimeError` — is no longer true of the code.
+  **Where to start, and why it is not the biggest module.**
+  `properties.py`'s 15 are a closed, well-understood family and
+  `PropertiesError` is already one class; they would settle the
+  pattern for a non-script surface cheaply. `cli.py`'s 13 are
+  invocation shape and mostly want one subject. `document.py` is
+  last, after its subjects are argued.
 
-  **The first move is a place to put an id, not the typing.** That
-  is what doing the prerequisite revealed: `rule_id` is a field on
-  `ScriptParseError` alone, and the taxonomy classes have none. So
-  the 30 sites now have a class and nowhere to carry an identifier,
-  and the pass opens by giving the preflight tier a
-  located-and-identified error of its own — the shape
-  `ScriptParseError` already has for the static tier, which is why
-  the 82 static ids were cheap. Whether the runtime tier wants the
-  same or reuses `ScriptRuntimeError`'s location is the second
-  question.
+  **A located diagnostic is the other half, and only the blueprint
+  surface lacks it.** `ScriptParseError` carries line and column;
+  the runner's `_Located` cites a statement. A blueprint diagnostic
+  carries neither, and `jsonc.loads` hanging `lineno`/`colno` on a
+  raised `StaticError` as plain attributes is the stopgap that
+  proves the need rather than meeting it.
 
-  The blueprint surface wants the same thing and has no more than a
-  stopgap: `jsonc.loads` hangs a malformed document's line and
-  column on the raised `StaticError` as plain attributes, which
-  works and is not a scheme. A located blueprint diagnostic belongs
-  in this pass.
-
-  **The prefix design is done too** — `lex.` for what the
-  tokenizer rejects, `syn.` for line, block and document shape,
-  with the typing layer reusing `node.`, `prop.` and `http.`. A
-  preflight tier will want its own; nothing else is open.
-
-  **The corpus is the meter, not a guess.**
-  `reliquary_tests/fixtures/conformance/script/` marks each
-  unidentified case `# id: none` and asserts it in both
-  directions. **It reads zero today**, down from six: every one of
-  the 39 invalid fixtures names the diagnostic that rejects it.
-
-  **One defect surfaced and is asserted rather than filed.**
-  A branching `wait` carrying a condition is rejected by the
-  *grammar*, so it reports `syn.unexpected-token` and the
-  `wait.branching-condition` arm in `script_validation` is
-  unreachable — the trade `script_grammar.lark` warns about in its
-  own header. The fixture carries `# caught-by: S1`, asserted in
-  both directions, so whichever fix lands retires the marker.
+  **What is already true** (do not redo it): `rule_id` lives on
+  `ReliquaryError`, so every class has the field and nothing needs
+  a new one; the spec's prefix list carries `media.` and
+  `machine.`; and `RULE_OF` maps the static tier alone by
+  construction, S-numbers naming syntactic restrictions only, so a
+  preflight id absent from it is correct rather than missing.
 
   **The index is still not the gap.** Deferring the id *index* to
   beta stays where the spec says it; generating it is cheap now

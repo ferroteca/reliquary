@@ -39,7 +39,40 @@ builtin is reserved for the invariants python itself enforces.
 
 
 class ReliquaryError(Exception):
-    """Root of every deliberate reliquary error."""
+    """Root of every deliberate reliquary error.
+
+    ``rule_id`` is the stable dotted identifier naming the rule this
+    diagnostic enforces — ``obs.two-channels`` and its siblings. It
+    lives here rather than on the classes below because the spec puts
+    every id in **one namespace shared across the classes**
+    (docs/spec/script-spec.md, "Error classes and exit codes"), and
+    the field at the root is the code saying the same thing: a
+    diagnostic's identity is independent of which tier raised it.
+
+    An id is a **contract** — it is what a consumer switches on, so
+    it is stable where the message text is not — and a *field* rather
+    than text baked into a message, so switching needs no prose
+    parsing and the beta id index can be generated.
+
+    Identity is not location. Where a diagnostic can also say *where*
+    it happened, that comes from the class: ``ScriptParseError``
+    carries line and column, and the script runner's ``_Located``
+    cites the statement. Preflight diagnostics about the media
+    namespace have no script line to cite and carry an id alone.
+
+    ``None`` means no id is assigned yet, which is a measured gap
+    rather than an estimate: the script conformance corpus asserts
+    each fixture's id in both directions, so a marker recording a
+    gap cannot outlive it.
+    """
+
+    #: Default for every subclass that does not set one.
+    rule_id = None
+
+    def __init__(self, *args, rule_id=None):
+        super().__init__(*args)
+        if rule_id is not None:
+            self.rule_id = rule_id
 
 
 class StaticError(ReliquaryError):

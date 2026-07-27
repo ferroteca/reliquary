@@ -1,6 +1,7 @@
 # invalid at preflight: a declared property no source answers; whether it binds depends on
 #          the invocation, never on the text
 # spec: Validation and preflight
+# id: prop.unbound
 
 platform dos
 property text unanswerable

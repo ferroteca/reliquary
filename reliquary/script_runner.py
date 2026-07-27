@@ -108,7 +108,8 @@ def _resolve_key(spelling):
         if len(parts) > 1 and len(part) == 1:
             resolved.extend(char_keys(part))
             continue
-        raise StaticError(f"{part!r} is not a portable key name")
+        raise StaticError(f"{part!r} is not a portable key name",
+                          rule_id="key.not-portable")
     return resolved
 
 
@@ -199,7 +200,7 @@ class _HttpService:
         detail = f": {last_error}" if last_error is not None else ""
         raise RunFailure(
             f"no free HTTP port in range {self._port_min}-"
-            f"{self._port_max}{detail}")
+            f"{self._port_max}{detail}", rule_id="http.no-free-port")
 
     def stop(self):
         """Stop the server; harmless when it is already stopped."""
@@ -267,8 +268,9 @@ class _PropertyUnbound(Exception):
 class _Located:
     """A diagnostic that can cite the statement it came from."""
 
-    def __init__(self, message, statement=None, path=None):
-        super().__init__(message)
+    def __init__(self, message, statement=None, path=None,
+                 rule_id=None):
+        super().__init__(message, rule_id=rule_id)
         self.statement = statement
         self.path = path
 
@@ -453,15 +455,17 @@ class _ScriptEngine:
         """Whether a stop has already been requested."""
         return self._cancelled.is_set()
 
-    def _error(self, message, statement=None):
+    def _error(self, message, statement=None, rule_id=None):
         return ScriptRuntimeError(
-            message, statement=statement, path=self._script_path)
+            message, statement=statement, path=self._script_path,
+            rule_id=rule_id)
 
-    def _expired(self, clock, bound, statement=None, detail=""):
+    def _expired(self, clock, bound, statement=None, detail="",
+                 rule_id=None):
         """A timing failure naming the clock and where it came from."""
         failure = self._error(
             f"{clock} of {bound.spelling} expired{detail} (from the "
-            f"{bound.source})", statement)
+            f"{bound.source})", statement, rule_id=rule_id)
         failure.clock = f"{clock} of {bound.spelling}"
         failure.scope = bound.source
         return failure
@@ -646,11 +650,13 @@ class _ScriptEngine:
             if phase == "running":
                 raise self._error(
                     "the script expects a stopped machine, but machine "
-                    f"{self._machine_id} is running; stop it first")
+                    f"{self._machine_id} is running; stop it first",
+                    rule_id="machine.expected-stopped")
             if phase != "ready":
                 raise self._error(
                     f"machine {self._machine_id} cannot execute a "
-                    f"script (phase: {phase})")
+                    f"script (phase: {phase})",
+                    rule_id="machine.phase-cannot-run")
         elif phase == "ready":
             self._port = _machines.start_machine(
                 self._machine_id, display=display, context=self._context,
@@ -661,12 +667,14 @@ class _ScriptEngine:
                 self._machine_id, self._context))
             if vm is None:
                 raise self._error(
-                    "machine phase is running but no VM identity recorded")
+                    "machine phase is running but no VM identity "
+                    "recorded", rule_id="machine.no-vm-identity")
             self._port = vm["port"]
         else:
             raise self._error(
                 f"machine {self._machine_id} cannot execute a script "
-                f"(phase: {phase})")
+                f"(phase: {phase})",
+                rule_id="machine.phase-cannot-run")
 
     def _run_phases(self):
         """Walk the phase graph from `entry` until a `finish`."""
@@ -745,7 +753,9 @@ class _ScriptEngine:
             elif verb == "set":
                 self._set(statement)
             else:
-                raise self._error(f"unknown statement: {verb}", statement)
+                raise self._error(f"unknown statement: {verb}",
+                                  statement,
+                                  rule_id="node.unknown-verb")
         except _PropertyUnbound as unbound:
             raise self._unbound(unbound, statement) from None
         return None
@@ -753,7 +763,7 @@ class _ScriptEngine:
     def _unbound(self, unbound, statement):
         return self._error(
             f"the property ${{{unbound.key}}} has no bound value",
-            statement)
+            statement, rule_id="prop.unbound-at-runtime")
 
     def _set(self, statement):
         """Record a machine variable — the script's channel to the host."""
@@ -764,7 +774,8 @@ class _ScriptEngine:
             _machines.set_machine_var(
                 self._machine_id, key, value, context=self._context)
         except ReliquaryError as exc:
-            raise self._error(str(exc), statement) from exc
+            raise self._error(str(exc), statement,
+                              rule_id=exc.rule_id) from exc
         self._completed(statement, "set")
 
     # -- observation ---------------------------------------------
@@ -842,7 +853,8 @@ class _ScriptEngine:
                                **{"timeout-source": bound.source})
                     raise self._expired(
                         "the reactive interval", bound,
-                        detail=" with no handler firing")
+                        detail=" with no handler firing",
+                        rule_id="time.reactive-interval-expired")
                 self._progress(expiry, bound.seconds, "dispatch", now)
                 self._sleep(_POLL_INTERVAL)
                 continue
@@ -892,7 +904,8 @@ class _ScriptEngine:
                            **{"timeout-source": bound.source})
                 raise self._expired(
                     "the observation timeout", bound, statement,
-                    f" waiting for {description}")
+                    f" waiting for {description}",
+                    rule_id="time.observation-expired")
             self._progress(expiry, bound.seconds, description, now)
             self._sleep(_POLL_INTERVAL)
 
@@ -921,10 +934,13 @@ class _ScriptEngine:
         run = self._plan.run_deadline
         if (run is not None and self._run_started is not None
                 and now - self._run_started > run.seconds):
-            raise self._expired("the run deadline", run, statement)
+            raise self._expired("the run deadline", run, statement,
+                                rule_id="time.run-deadline-expired")
         budget = self._phase_budget
         if budget is not None and now - self._phase_started > budget.seconds:
-            raise self._expired("the phase deadline", budget, statement)
+            raise self._expired(
+                "the phase deadline", budget, statement,
+                rule_id="time.phase-deadline-expired")
 
     def _require_screen(self, observations, node):
         """A screen observation needs a running machine to read."""
@@ -932,7 +948,7 @@ class _ScriptEngine:
                                       for observation in observations):
             raise self._error(
                 "the machine is not running; the script must start it "
-                "first", node)
+                "first", node, rule_id="machine.not-running")
 
     def _read(self):
         """Take one sample of every channel."""
@@ -985,7 +1001,7 @@ class _ScriptEngine:
         if self._port is None:
             raise self._error(
                 "the machine is not running; the script must start it "
-                "first", statement)
+                "first", statement, rule_id="machine.not-running")
 
     # -- input verbs ---------------------------------------------
 
@@ -1047,7 +1063,8 @@ class _ScriptEngine:
             try:
                 combos.append(_resolve_key(spelling))
             except StaticError as unknown:
-                raise self._error(str(unknown), statement) from None
+                raise self._error(str(unknown), statement,
+                                  rule_id=unknown.rule_id) from None
         self._requires_running(statement)
         with self._console() as console:
             console.send_keys(combos)
@@ -1124,7 +1141,8 @@ class _ScriptEngine:
         except RunCancelled:
             raise
         except ReliquaryError as exc:
-            raise self._error(str(exc), statement) from exc
+            raise self._error(str(exc), statement,
+                              rule_id=exc.rule_id) from exc
 
     def _start(self, statement):
         self._action(statement, "start")
@@ -1149,7 +1167,9 @@ class _ScriptEngine:
         elif command == "stop":
             self._http_stop()
         else:
-            raise self._error(f"unknown http action: {command}", statement)
+            raise self._error(f"unknown http action: {command}",
+                              statement,
+                              rule_id="http.unknown-action")
         self._completed(statement, "http")
 
     def _http_start(self, statement):
@@ -1162,7 +1182,8 @@ class _ScriptEngine:
         try:
             service.start()
         except RunFailure as exc:
-            raise self._error(str(exc), statement) from exc
+            raise self._error(str(exc), statement,
+                              rule_id=exc.rule_id) from exc
         self._http = service
         self._bindings.update({
             "rlq.http.ip": service.guest_ip,
@@ -1193,7 +1214,8 @@ class _ScriptEngine:
             if response.path in paths:
                 raise self._error(
                     f"http content produces duplicate path: "
-                    f"{response.path}", statement)
+                    f"{response.path}", statement,
+                    rule_id="http.duplicate-path")
             paths.add(response.path)
             responses.append(response)
         return tuple(responses)
@@ -1273,13 +1295,15 @@ def _preflight_machine_rules(script, machine_state, script_path,
             if drive is None:
                 raise ScriptPreflightError(
                     f"the machine declares no drive {slot}",
-                    statement=statement, path=script_path)
+                    statement=statement, path=script_path,
+                    rule_id="machine.slot-not-declared")
             if (removable_only
                     and drive.get("medium") not in _REMOVABLE_MEDIA):
                 raise ScriptPreflightError(
                     f"{slot} is not a removable drive slot "
                     "(insert/eject are floppy and cdrom only)",
-                    statement=statement, path=script_path)
+                    statement=statement, path=script_path,
+                    rule_id="machine.slot-not-removable")
         if statement.verb != "insert":
             continue
         kind, name = statement.arguments[1]
@@ -1290,7 +1314,8 @@ def _preflight_machine_rules(script, machine_state, script_path,
         if name not in namespace.media:
             raise ScriptPreflightError(
                 _no_such_media(name, namespace),
-                statement=statement, path=script_path)
+                statement=statement, path=script_path,
+                rule_id="media.unknown")
 
 
 def execute_script(script, *, machine_id, context=None, display=False,
@@ -1389,7 +1414,8 @@ def _existing_machine(*, machine=None, blueprint=None, context=None):
     """
     if machine is None and blueprint is None:
         raise StaticError(
-            "select a machine with --blueprint or --machine")
+            "select a machine with --blueprint or --machine",
+            rule_id="machine.no-selector")
     if machine is not None:
         return _machines.resolve_machine(
             machine=machine, blueprint=blueprint, context=context)
@@ -1417,14 +1443,17 @@ def _blueprint_component(blueprint, context):
 def _resolve_script_stem(label, scripts_map):
     """Map a label through the blueprint scripts map, else use bare stem."""
     if not isinstance(label, str) or not label.strip():
-        raise StaticError("script label must be a non-empty string")
+        raise StaticError("script label must be a non-empty string",
+                          rule_id="name.label-empty")
     label = label.strip()
     if label in (".", "..") or "/" in label or "\\" in label:
         raise StaticError(
-            f"script label must be a bare name, got: {label!r}")
+            f"script label must be a bare name, got: {label!r}",
+            rule_id="name.label-not-bare")
     if label.lower().endswith(".rlqs"):
         raise StaticError(
-            f"script label must omit the .rlqs suffix, got: {label!r}")
+            f"script label must omit the .rlqs suffix, got: "
+            f"{label!r}", rule_id="name.label-has-suffix")
     if isinstance(scripts_map, dict) and label in scripts_map:
         return scripts_map[label]
     return label

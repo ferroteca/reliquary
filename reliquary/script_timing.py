@@ -46,7 +46,8 @@ def parse_duration(spelling):
     try:
         return float(spelling[:-len(unit)]) * _UNITS[unit]
     except (KeyError, ValueError):
-        raise StaticError(f"not a duration: {spelling!r}") from None
+        raise StaticError(f"not a duration: {spelling!r}",
+                          rule_id="time.not-a-duration") from None
 
 
 @dataclass(frozen=True)

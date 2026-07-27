@@ -1,6 +1,7 @@
 # invalid at preflight: an insert slot the target machine does not declare; parse has no
 #          machine in scope
 # spec: Validation and preflight
+# id: machine.slot-not-declared
 
 platform dos
 insert cdrom7 @install-cd

@@ -1,6 +1,7 @@
 # invalid at preflight: a @name the namespace does not define; parse cannot know the
 #          namespace, so this is preflight's
 # spec: Validation and preflight
+# id: media.unknown
 
 platform dos
 insert cdrom0 @no-such-media

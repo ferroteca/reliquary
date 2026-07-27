@@ -63,8 +63,9 @@ def build_namespace(paths):
                     raise PreflightError(
                         f"two different {kind} specs are both named "
                         f"{name!r}:\n  {origin[(kind, name)]}\n  {path}\n"
-                        "identical specs may coexist; differing ones must "
-                        "be renamed")
+                        "identical specs may coexist; differing ones "
+                        "must be renamed",
+                        rule_id="name.duplicate-spec")
                 folded = {existing.lower(): existing for existing in bucket}
                 if name.lower() in folded:
                     other = folded[name.lower()]
@@ -72,7 +73,8 @@ def build_namespace(paths):
                         f"{kind} names {name!r} and {other!r} differ only by "
                         f"case:\n  {origin[(kind, other)]}\n  {path}\n"
                         "names match exactly but the media cache is "
-                        "name-keyed on filesystems that do not")
+                        "name-keyed on filesystems that do not",
+                        rule_id="name.case-collision")
                 bucket[name] = spec
                 origin[(kind, name)] = path
     return Namespace(
@@ -96,7 +98,8 @@ def resolve_media(name, namespace):
     try:
         return namespace.media[name]
     except KeyError:
-        raise PreflightError(f"no media named {name!r}")
+        raise PreflightError(f"no media named {name!r}",
+                             rule_id="media.unknown")
 
 
 # --- fetch plan ------------------------------------------------------
@@ -139,7 +142,8 @@ def _unbound_failure(where, keys):
     return PreflightError(
         f"{where} needs {names}, and no property supplies it; bind it with "
         "--property, a blueprint parameter, the environment, the properties "
-        "file, or (on a terminal) interactively")
+        "file, or (on a terminal) interactively",
+        rule_id="prop.unbound-reference")
 
 
 def _render_deferred(deferred, properties, where):
@@ -163,7 +167,8 @@ def _render_deferred(deferred, properties, where):
 def _chaining_failure(where, key, value):
     return PreflightError(
         f"{where}: the property ${{{key}}} resolved to {value!r}, which is "
-        "itself a reference; a location binds once and does not chain")
+        "itself a reference; a location binds once and does not "
+        "chain", rule_id="prop.reference-chains")
 
 
 def _location_from_value(value, where):
@@ -177,7 +182,8 @@ def _location_from_value(value, where):
         raise PreflightError(
             f"{where}: the bound location {value!r} is a "
             f"{location.kind} reference; a location must resolve to a "
-            "path or URL, not to another media or property")
+            "path or URL, not to another media or property",
+            rule_id="media.location-not-a-path")
     return location
 
 
@@ -199,7 +205,7 @@ def _container_format(plan, parent):
         raise PreflightError(
             f"media {parent!r} is read as a container but its format "
             f"{extension or 'unknown'!r} is not supported (supported: "
-            f"{supported})")
+            f"{supported})", rule_id="media.container-unsupported")
     return extension
 
 
@@ -231,16 +237,19 @@ def _parent_plan(rung, media, namespace, seen, properties):
     name = rung.parent
     if name in seen:
         cycle = " -> ".join(seen + (name,))
-        raise PreflightError(f"containment cycle: {cycle}")
+        raise PreflightError(f"containment cycle: {cycle}",
+                             rule_id="media.containment-cycle")
     parent = namespace.media.get(name)
     if parent is None:
         raise PreflightError(
-            f"no media named {name!r} for {media.name!r} to come from")
+            f"no media named {name!r} for {media.name!r} to come "
+            "from", rule_id="media.unknown-parent")
     inner = _media_plan(parent, namespace, seen + (name,), properties)
     if inner is None:
         raise PreflightError(
-            f"media {name!r} is a blank and has no bytes for {media.name!r} "
-            "to come from")
+            f"media {name!r} is a blank and has no bytes for "
+            f"{media.name!r} to come from",
+            rule_id="media.parent-has-no-bytes")
     if rung.path is None:
         # A bare ${media:X}: the parent's own bytes, which is how a
         # difference overlay names what it sits on.
@@ -273,7 +282,8 @@ def _media_plan(media, namespace, seen=(), properties=None):
         raise PreflightError(
             f"media {media.name!r} has a remote location and must carry a "
             "sha256: the hash is what verifies the payload is the exact "
-            "build the scripts target")
+            "build the scripts target",
+            rule_id="media.remote-without-hash")
     return plans[0] if len(plans) == 1 else Alternatives(options=plans)
 
 

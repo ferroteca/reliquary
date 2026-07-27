@@ -108,7 +108,8 @@ class _Binder:
                 f"the property {key!r} has no value from any source and "
                 "there is no interactive terminal to ask; supply it with "
                 f"--property, a blueprint parameter, {_env_name(key)}, "
-                "or the properties file")
+                "or the properties file",
+                rule_id="prop.unbound")
         value, source = answer
         self._sources[key] = source
         if value is not None:
@@ -155,7 +156,8 @@ class _Binder:
                 raise PropertyBindingError(
                     f"{key!r} is declared {kind} but the properties file "
                     "holds a secret under that key; unset it or fix the "
-                    "declaration")
+                    "declaration",
+                    rule_id="prop.secret-under-plain-key")
             if self._dry_run:
                 # A dry pass names the source without reading the value.
                 return (None, FILE)
@@ -166,12 +168,14 @@ class _Binder:
                 raise PropertyBindingError(
                     f"the secret {key!r} is marked in the properties file "
                     "but its credential is missing on this host; set it "
-                    f"with 'rlq set-property {key} --secret'")
+                    f"with 'rlq set-property {key} --secret'",
+                    rule_id="prop.credential-missing")
             return (value, FILE)
         if kind == "secret":
             raise PropertyBindingError(
                 f"{key!r} is declared secret but the properties file holds "
-                "an ordinary value under that key; store it as a secret")
+                "an ordinary value under that key; store it as a "
+                "secret", rule_id="prop.plain-under-secret-key")
         return (stored, FILE)
 
     def _derivation_answer(self, declaration):
@@ -222,7 +226,8 @@ class _Binder:
                 f"{key!r} is a secret and cannot be supplied with "
                 "--property: process listings and shell history are not "
                 "credential stores; store it with 'rlq set-property "
-                f"{key} --secret' or inject it through {_env_name(key)}")
+                f"{key} --secret' or inject it through "
+                f"{_env_name(key)}", rule_id="prop.secret-on-flag")
         return (self._explicit[key], FLAG)
 
     def _ask(self, declaration):
@@ -266,7 +271,8 @@ def _preflight_environment(declarations):
             raise PropertyBindingError(
                 f"the properties {seen[name]!r} and {declaration.key!r} "
                 f"both map to {name}; rename one so the environment can "
-                "tell them apart")
+                "tell them apart",
+                rule_id="prop.environment-collision")
         seen[name] = declaration.key
 
 def _validate_explicit(declarations, explicit):
@@ -277,7 +283,8 @@ def _validate_explicit(declarations, explicit):
     for key in explicit:
         if key not in declared:
             raise PropertyBindingError(
-                f"--property {key}=... is not declared by this script")
+                f"--property {key}=... is not declared by this "
+                "script", rule_id="prop.undeclared-flag")
 
 def _binding_order(declarations):
     """Order declarations so a derivation's referents bind first.

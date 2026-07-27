@@ -87,10 +87,25 @@ parse error and delete the dead arm); the spec calling S8 a rule
 asserted in both directions, so it retires itself when either
 lands.
 
-What has no id at all is the preflight and runtime tiers — 30
-raise sites across `binding`, `resolve`, `script_runner` and
-`script_timing` — which no parse fixture can reach, and which the
-`invalid-at-preflight/` bucket exists to hold when they do.
+The preflight and runtime tiers now carry ids too — 43 diagnostics
+across `binding`, `resolve`, `script_runner` and `script_timing`,
+landed once the error classes generalized to every surface (D58) and
+gave them a class worth naming a rule for. So the
+`invalid-at-preflight/` bucket no longer asserts only that a fixture
+parses: it runs preflight — the machine rules, then noninteractive
+binding — and asserts the id that comes out, in both directions like
+the parse bucket. Two new subjects arrived with them, `media.` and
+`machine.`, and `media.unknown` is deliberately the same id whether
+the resolution namespace lacks the media or a script's `insert`
+names it: one condition, one answer for a consumer.
+
+What has no id is every *other* surface. The requirement is the
+spec's and it travelled with the classes, so the blueprint document
+parser, the machine verbs, the VM lifecycle and the properties file
+owe ids on the same terms — some 245 diagnostics, filed as a defect
+rather than left here as a footnote. Nothing about the scheme
+changes for them; the blueprint surface will want subjects of its
+own, and choosing them is that work.
 
 ## Fixture headers
 
@@ -109,9 +124,10 @@ own list so neither can drift.
 Two markers record a gap instead, and both are asserted in the
 direction that retires them:
 
-- `# id: none` — the diagnostic has no identifier yet. None
-  remain; the marker stays because preflight and runtime fixtures
-  will need it.
+- `# id: none` — the diagnostic has no identifier yet. None remain
+  in either bucket; the marker stays for a surface that has not had
+  its ids yet, and because a diagnostic *losing* one has to be
+  expressible.
 - `# caught-by: S<n>` — a layer rejects the script before the
   rule's own diagnostic can, so the id serves a *different* rule
   than the fixture exercises. One fixture has it.
@@ -128,8 +144,9 @@ here is not coverage:
   each bound. `test_script_timing.py` owns them.
 - **Property binding** — the source order and the kind rules,
   which depend on the invocation rather than the text.
-  `test_binding.py` owns them; `invalid-at-preflight/` holds only
-  the parse half.
+  `test_binding.py` owns them. `invalid-at-preflight/` drives
+  binding far enough to assert which diagnostic rejects an
+  unanswerable property, and no further.
 - **Warnings** — unreachable phases, shadowed conditions, unused
   properties. The blueprint corpus grew a `// warns:` marker for
   this; the same marker is the obvious extension here and no

@@ -1930,19 +1930,40 @@ ids that enforce each rule, which is where a reader goes from one
 to the other. The prefix is the subject, never the error class,
 because the namespace is shared across the classes: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
-`node.`, `http.`.
+`node.`, `http.`, `media.`, `machine.`.
+
+`media.` and `machine.` arrived with the preflight and runtime
+tiers, and they are the reason the subject rule earns its keep:
+the same subject spans classes. `media.unknown` is raised both
+where the resolution namespace defines no such media and where a
+script's `insert` names one, and it is the same id in both,
+because a consumer asking *what went wrong* has one answer. Had
+the prefix named the tier, one condition would have carried two
+ids and the caller would have had to know which layer noticed.
 
 An id is a **contract**: it is what a consumer switches on, so it
 is stable where the message text is not. The message wording,
 like every human rendering, is uncontracted and free to improve.
 
-Coverage today is everything decided from the script text alone —
-the lexer, the grammar, the node signatures and the static rules.
-Preflight and runtime diagnostics do not carry ids yet, and the
+Coverage on this surface is complete: the lexer, the grammar, the
+node signatures, the static rules, and — since the error classes
+generalized to every surface (D58) — the preflight and runtime
+tiers too, property binding and media resolution included. The
 script conformance corpus
-(`reliquary_tests/fixtures/conformance/script/`) records what
-remains by refusing to let a fixture claim an id that is absent,
-or omit one that has arrived.
+(`reliquary_tests/fixtures/conformance/script/`) holds it there by
+refusing to let a fixture claim an id that is absent, or omit one
+that has arrived.
+
+**Other surfaces are not covered yet**, and the requirement above
+reaches them. Generalizing the error classes generalized this
+sentence with them: a malformed blueprint is a STATIC ERROR like a
+malformed script, so it owes an id on the same terms. The
+blueprint document parser, the machine verbs, the VM lifecycle and
+the properties file together hold some 245 diagnostics that carry
+none, tracked as a defect rather than left to be noticed. Nothing
+about the scheme changes for them — the prefix is still the
+subject — but the blueprint surface will want subjects of its own,
+and choosing them is that work rather than this sentence's.
 
 The grammar's own rejections are the coarsest ids in the scheme:
 `syn.unexpected-token` and `syn.unexpected-end` name a token, not
