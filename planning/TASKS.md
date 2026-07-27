@@ -31,6 +31,17 @@ act that grants approval with no argument behind it.
 appears here: there is nothing to schedule, only a decision to make,
 and an entry filed and closed in one act is ceremony.
 
+**Anything is struck when it is done** (D45, generalized by D52) —
+tasks, audits, restructures and rounds alike. Its record is its
+commit, its CHANGELOG line, and the D-numbers it produced, so it
+leaves this file by deletion and nothing is parked. The same holds
+for the **work-item breakdowns inside a pledged feature**: when the
+feature delivers, its list is deleted with its F-number rather than
+archived. A record whose reasoning outlives the work is a decision,
+and decisions live in [DECISIONS.md](DECISIONS.md) — kept beside
+the work instead, a summary drifts from what it summarizes and a
+reader has no way to tell.
+
 **There is no order here.** Nothing in this file is scheduled, and
 nothing claims priority over anything else; whoever picks work up
 picks whatever they like. The one ordering that does bind is a
@@ -49,17 +60,16 @@ down goes. The full intake machinery — the raw queues, the
 housekeeping test, and how pledge is recorded — is in
 [README.md](README.md).
 
-The sections below:
+**Refused work is not recorded here** (D52). Entry to this file
+*is* approval (D43), so a rejected task is one that never
+entered — refusal happens at the door, and its record is the issue
+that was closed or the [DECISIONS.md](DECISIONS.md) entry that
+argued it, that file already being the guard against
+re-litigating.
 
-- **[Pledged](#pledged)** — the queue proper. Grouped by kind,
-  because the actor and the gate differ, but the grouping is not a
-  running order.
-- **[Completed](#completed)** — done. Kept until its record is
-  folded where it belongs and pruned.
-- **[Rejected](#rejected)** — refused, with the reason recorded in
-  [DECISIONS.md](DECISIONS.md), which is already the guard
-  against re-litigating. The section here is a thin index pointing
-  at those entries, never a second record of the argument.
+The file is one section, [Pledged](#pledged) — the queue proper,
+grouped by kind because the actor and the gate differ, though the
+grouping is not a running order.
 
 Standing questions to re-ask as the design hardens are not tasks
 and live with the decision record, under
@@ -69,9 +79,10 @@ and live with the decision record, under
 
 Grouped by kind, because the actor and the gate differ: an audit
 is mechanical, a defect needs no pledge because the norm it
-violates already is one. (Two further groups left for
-[Completed](#completed) on 2026-07-27 — the restructures, and
-then the adjudications, both having finished.)
+violates already is one. (Two further groups — the restructures,
+then the adjudications — were struck on 2026-07-27 as each
+finished: D46–D51 are the adjudications' record, and D50 the
+restructures'.)
 
 ### Governance — audits
 
@@ -213,6 +224,35 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
+- **The CLI spec and the CLI have drifted apart in both
+  directions** (found 2026-07-27, checking one stale command
+  reference and sweeping the rest). Five divergences, same class
+  as `--qemu` above and larger.
+  **Specified but gone**: `clean-archives`, in
+  [docs/spec/cli.md](../docs/spec/cli.md) three times — the
+  synopsis, the prose, and a worked example — reclaiming
+  `cache/archives/`, which retired with it when the single media
+  cache landed (CHANGELOG, "One media cache, wholly
+  regenerable"). Neither the command nor the directory exists.
+  **Present but unspecified**: `prune-media`, `add-media`,
+  `put-file`, `get-file` — all four declared in `cli.py` and
+  absent from the spec entirely.
+  **The last two are the sharpest.** They are milestone 9's
+  in-band file exchange, the capability **P17** was armed over
+  (D47) — so the CLI spec does not declare the commands whose
+  addressing an armed principle governs. It also explains why
+  D47 gave P17 its normative home in `script-spec.md` and
+  `api.md` rather than here.
+  **This is evidence for the P24 defect above**, not a separate
+  worry: four commands with no specification are four commands no
+  conformance test could check even if one existed.
+  Direction matters for the fix. The `clean-archives` half is a
+  stale spec describing a deliberate removal, so the spec is
+  simply wrong and is corrected. The four missing commands are
+  live world-facing surface with no norm — writing that norm is
+  authoring, and whatever it states about `put-file`/`get-file`
+  must match what P17 already binds.
+
 ### Language
 
 The **script-language residuals** stay here rather than becoming a
@@ -290,269 +330,3 @@ need no entry at all once someone picks them up.
   to illustrate the concepts — e.g. a 1 MB MS-DOS blueprint;
   QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
   specific floppy image mounted; QEMU machine #4 with 16 MB of
-  memory and a specific cdrom mounted
-
-
-## Completed
-
-Records whose reasoning outlives the work — audits, restructures,
-resolved rounds — kept until each is folded where it belongs and
-pruned, which is itself a pledged task above.
-
-**An ordinary task is struck, not moved here** (D45): its record is
-its commit and its CHANGELOG line, so it leaves this file by
-deletion the moment it is done. Parking one here is the ceremony
-this file already refuses for work that arrives done.
-
-### The adjudications — all five settled 2026-07-27
-
-The **Governance — adjudications** group is gone, having emptied.
-Five entries, five decisions, in one sitting:
-
-- **U9 and the U11–U13 trio enter force** — D46. Delivered work
-  had been citing unpledged demand; scope widened from the
-  entry's two to four, all four being in the same state.
-- **P5, P14, P17 and P18 armed** — D47, which left
-  [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md) empty. Two
-  were missed automatic promotions rather than adjudications at
-  all.
-- **The gap-is-a-bug rule and the two promotion bars** — D48. A
-  rule cited by name in three decisions and defined in none of
-  them; and D34's single bar, which had always been two.
-- **The restructure's unnumbered acts** — D50, which found the
-  debt was twice what the entry recorded: seven flagged, one
-  paid, P23 among the missing.
-- **U3 retires, superseded by U14** — D51, with its thirteen-
-  citation sweep.
-
-**What the five had in common is worth keeping.** Four of them
-turned out to be **larger than their entry said** — the record
-consistently under-reported its own debt, because each entry was
-written from the previous summary rather than from the source.
-And three found the same failure: **reasoning that existed only
-in a commit message** (P24 in D49, six acts in D50) or in a
-delivered decision leaning on demand nobody had pledged (D46).
-None of these were disagreements to settle; they were things the
-project had already decided and failed to write down where the
-decision binds.
-
-### The gate audit — 2026-07-27
-
-Every entry in [Pledged](#pledged) walked against this file's own
-gate: *is this free-standing work small enough to be a task?*
-**Size and kind, never subject matter.** Touching an interface is
-no bar (D45) — entry here is approval, so the gate that matters
-already sat at the door. The walk's first pass asked the wrong
-question, borrowing the **housekeeping** boundary that excludes
-interface changes absolutely; that boundary compensates for
-housekeeping being ungoverned and does not reach a queue only the
-owner can write to. [F16](proposed/FEATURES.md) is where the
-borrowed reading started and is corrected in its own text.
-
-**Six entries left**, none of them rejected: they were pledged
-already, and the audit changed where they are housed, not what
-they are.
-
-- To [pledged/FEATURES.md](pledged/FEATURES.md), on its **size**:
-  **F17** (input pacing, from Design) — seven work items with a
-  bisection rig among them, which no queue of small work can hold.
-  The script-language residuals travelled with it on the first
-  reading and stayed here instead, being two items and mechanical.
-- To [proposed/FEATURES.md](proposed/FEATURES.md), each carrying an
-  open shape question — the argument, not the surface, being what
-  keeps them out of a queue of pre-approved work: **F18**
-  (`download-media` + `extract-media`, one feature because they
-  share a scaffolder), **F19** (the home inventory report), **F20**
-  (`version` and `help` as commands, which is a P6 question about
-  the API twin rather than a rename).
-- To that file's **Horizon** list: `diff-blueprint`, one line of
-  intent and no design.
-- Folded into **F7**: the design-document audit, which was pledged
-  here and proposed there at once.
-
-**Two defects came out of the walk**, entered above: `--qemu`
-survives in the code after the spec removed it, and DECISIONS.md
-still names ARCHITECTURE.md by its old title. **One entry closed**
-as satisfied ("Define horizon, or drop it" — see below), **two were
-rescoped** against a tree that had moved under them (the principles
-promotion, the demand-citation sweep), and **one pointer was
-corrected** (U3's, which named a file that no longer exists).
-
-What stays is what the gate admits: adjudications, audits of the
-machinery, defects, documentation work, and the script-language
-residuals. Some of those touch an interface, which is exactly the
-point — the file admits work by its size and its kind, and asks
-nothing about which surface it lands on.
-
-### "Define horizon, or drop it" — satisfied 2026-07-26
-
-Closed by the restructure rather than by being worked. The word now
-carries a definition at first use —
-[proposed/FEATURES.md](proposed/FEATURES.md)'s Horizon section
-opens "Not a feature, and so unnumbered. This is a holding list of
-items too small or too unformed to be one" — with an exit rule
-saying how an item leaves. That answers the entry's first branch
-("define it at first use"), and the complaint behind it is gone
-with the roadmap: the collapse it objected to was *horizon* drifting
-into a synonym for backlog, and the lifecycle folders now carry
-that distinction structurally. The four documents that use the word
-(AGENTS.md, `cli.md`, `instance-model.md`, `api.md`) all point at
-that section, so the definition is reachable from every use.
-
-### The numbered arc — milestones 1–9 (complete)
-
-**The numbered arc ran 1 through 9 and ended there**, carrying
-text-mode DOS on QEMU from the north-star command to the
-programmatic testing loop: the vertical slice and the built-in
-blueprint bundle (1), the media library and caches (2), the
-scripting language on its first, now-superseded surface (3), the
-script-surface realignment to the July 2026 redesign (4), the local
-HTTP server for installer answer files (5), the instance model and
-machine blueprints with authored-asset residency (6), the composed
-blueprint model folding the blueprint and media formats into one
-(7), the script properties — user properties file, secret storage,
-binding pipeline, declared derivation, `${key}` references (8), and
-the programmatic testing loop — the run returning its output, live
-feedback, the error taxonomy, and the exec-run mechanics (9).
-Asynchronous runs left the arc for lack of a use case (D35/D36).
-
-The per-milestone deliverable and stage breakdowns are **pruned**:
-the record survives in git history, the CHANGELOG, and the D-numbers
-each round produced, which is the standing rule for completed
-breakdowns. Generalizing beyond that one vertical is unbuilt and
-unscheduled (D33) — it lives in
-[proposed/FEATURES.md](proposed/FEATURES.md), design settled and
-intact, and returns to a numbered arc when the case it serves is
-pledged.
-
-### The planning restructure — executed 2026-07-26
-
-*Moved out of [Pledged](#pledged) on 2026-07-27: it was a
-finished record sitting in a queue, and a queue holds what
-waits. The one obligation it still carries — the D-numbers step
-6 says are owed — is entered as an adjudication above.*
-
-**Executed 2026-07-26** (owner, interactively). The
-four-step plan below ran as one pass, and the roadmap is gone. What
-landed, and where it diverged from what step 2 decided:
-
-1. ~~Split the unscheduled work into `planning/BACKLOG.md`~~ —
-   **done**, as `planning/proposed/FEATURES.md` rather than
-   BACKLOG.md: the lifecycle word beat the scheduling word, and the
-   file sits in the folder that already means "not pledged".
-2. ~~Restructure `planning/` around the lifecycle~~ — **done** as
-   `proposed/` + `pledged/` + `design/`, landing as decided: the
-   proposals files split across the two folders, and the governing
-   files (`INTERFACES.md`, `DECISIONS.md`, `TASKS.md`) stayed at the
-   planning root. Both took a wrong turn first and were corrected in
-   the same pass, each correction found by the owner asking the
-   right question. Filing the proposals whole under `proposed/` made
-   "nothing is worked from proposed/" false, since P5, P14 and U1–U6
-   are pledged; filing `DECISIONS.md` under `pledged/` put the
-   *refusal* record — and the open questions — in a folder claiming
-   the opposite. **The rule the second one yielded is worth keeping:
-   the lifecycle folders are for artifacts that *move between them*.
-   Machinery that never moves belongs at the root.**
-   One thing is new rather than decided: `TASKS.md` is reframed as
-   the third input queue (small, pre-approved, unordered), which
-   widens D39's two and wants a D-number. [D43 gives it one.]
-3. ~~Migrate delivered design out of ROADMAP~~ — **done**, first
-   into `planning/design/` and then out again (step 5).
-4. ~~Condense the completed milestone sections to notes~~ —
-   **done**, and harder than the ~180 lines planned: milestones 1–9
-   are one paragraph in [Completed](#completed). The
-   demand-citation audit above had not run first, so what demanded
-   milestones 1, 2, 3, 4 and 6 was **not** captured before the
-   deliverable lists went. It survives in git history
-   (`git show 50b67b2:planning/ROADMAP.md`) and must be recovered from
-   there if that audit still wants it.
-5. ~~Split the delivered specs out of `planning/`~~ — **done**, and
-   this was the plan's sharpest finding: `planning/design/` was
-   doing four jobs, and the largest was ~12 normative specs of
-   *delivered* interfaces, which is current truth and does not
-   belong under `planning/`. The decided remedy was a top-level
-   `spec/`; **what landed is `docs/spec/`** (owner, 2026-07-26),
-   because `docs/` already means the live situation, so the spec
-   sits beside the reference that derives from it rather than in a
-   third tree of its own. `docs/spec/README.md` states the
-   normative direction: the spec binds the implementation, and a
-   disagreement is the code's bug.
-   Design was resolved along the same axis rather than being left
-   as a residue: feature design moved beside its feature
-   (`proposed/design/`, `pledged/design/`), and only design
-   serving no single feature stayed in `planning/design/`.
-   Machine-readable schemas moved into the package,
-   `reliquary/schemas/`, since code consumes them — which also
-   deleted two dead ones (`machine-blueprint.schema.json`,
-   `media-definition.schema.json`): zero references anywhere, and
-   both described the pre-composition format milestone 7 replaced,
-   so they contradicted the shipped schema rather than duplicating
-   it.
-6. **PRINCIPLES.md became ARCHITECTURE.md** (owner, 2026-07-26):
-   the root document is the architecture in force — the
-   whole-system view (absorbed from the former
-   `planning/design/architecture.md`) plus the P-numbered
-   principles, matching the ARCHITECTURE.md convention readers
-   expect at a repo root. The mirrors renamed with it
-   (`proposed/ARCHITECTURE.md`, `pledged/ARCHITECTURE.md`),
-   restoring mirror-by-name across all three ladders. The same
-   pass itemized the model doc's unnumbered principles as
-   P19–P21, and stated P22 (no CI, at this time) — a rule
-   previously cited in this file but written down nowhere.
-   ~~The P-additions and the rename want D-numbers, with
-   pledge-is-the-move (amends D23) and the third queue
-   (widens D39).~~ — **paid 2026-07-27**: the third queue by
-   D43, everything else by **D50**, which found the debt was
-   twice what this summary records. The commit's own closing
-   paragraph flagged seven items, not four; this step listed the
-   ones it could see from inside the restructure record, and
-   P23, the INTERFACES split, the norm-is-interface clause and
-   the format-stability promotion were owed too.
-
-### Design rounds resolved
-
-- Media residency vs the download cache AND composable authored
-  specs — RESOLVED together (owner, 2026-07-23, the media/composition
-  design round), then REVISED same day by the blueprint revision
-  round (both in DECISIONS.md; milestone 7 is the
-  retargeted implementation): two spec types (machine / media —
-  archive absorbed as the container reading), a flat typed root
-  array, one schemed `location` field, no source component, no
-  composition (identity-dedup instead), and the single name-keyed
-  `cache/media/` (content addressing declined in both rounds; the
-  identity ledger that round added was deleted by D41, which left
-  the decline's ground unchanged). blueprint-model.md is now the
-  worked design of the revised model, rewritten at milestone 7's
-  S1 and normative in the decision entries' place.
-- Media lifecycle commands — RESOLVED (owner, 2026-07-23,
-  DECISIONS.md D30, run as milestone 7's decide-first round):
-  the noun in every media verb is the media, never the owning
-  file; `delete-media` and `seed-media` are deleted outright
-  (P9 — a command that can only fail and a no-op that "still
-  resolves" are the shim the rule names); `list-media` keeps
-  its plain name list with owning file, containment parent and
-  cache state behind `--verbose`, a dedup'd media showing every
-  declaring file on its one row, anonymous inline blanks never
-  listed. Component-removal tooling is parked, arriving as its
-  own named thing under the interface-change rule if a real
-  case appears.
-
-- CLI clean — RESOLVED by the blueprint revision round
-  (DECISIONS.md, 2026-07-23): `clean-media` (blunt + targeted
-  eviction) and `prune-media` (attachment-closure prune of
-  unneeded entries) land at milestone 7; `clean-archives`
-  retires with the single cache dir. Machine-cache cleaning
-  remains the open decision in DECISIONS.md "Open questions" (was "Decisions still
-  needed".
-
-## Rejected
-
-Refused work, indexed here and argued in
-[DECISIONS.md](DECISIONS.md) — that file is already the guard
-against re-litigating, so this section stays a pointer and never
-restates the argument. Empty today: historic refusals
-(`delete-media` and `seed-media` under D30, `clean-archives` with
-the single cache dir) were recorded straight to DECISIONS.md
-before this section existed, and are indexed with the design round
-that made them.
-

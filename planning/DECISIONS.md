@@ -29,7 +29,11 @@ below stands as written. **Two renames sit under this rule, not
 one**: PRINCIPLES.md is what 2026-07-26 renamed root
 ARCHITECTURE.md (D50), and entries below name it by its title of
 the day — links repointed, words left standing, for the same
-reason.
+reason. **"Milestone N"** refers to the numbered arc that ran 1
+through 9 and ended there (D33); entries cite it freely and it
+schedules nothing now — what each milestone delivered is in the
+CHANGELOG, in the entries citing it, and in full at
+`git show 50b67b2:planning/ROADMAP.md`.
 
 Decisions are numbered in the order first recorded — D1 the
 earliest — and a number is never reused; the list reads
@@ -173,6 +177,98 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D52 — EVERYTHING IS STRUCK WHEN IT IS DONE; TASKS.md'S COMPLETED
+  SECTION IS DELETED — DECIDED (owner, 2026-07-27). Supports P8,
+  P23; **amends D45**, which stays as written with a pointer here.
+  D45 GOT THE RULE RIGHT AND STOPPED HALFWAY. It said an ordinary
+  task is struck rather than parked, *"parking it in Completed
+  being the ceremony TASKS.md already refuses for work that arrives
+  done"* — and then carved out an exception for *"audits,
+  restructures and rounds — records whose reasoning outlives the
+  work."* The carve-out does not survive its own argument. A queue
+  holds what waits (TASKS.md's preamble); a record whose reasoning
+  outlives the work is a **decision**, and decisions have a file.
+  Every entry the exception protected has since proved it:
+  the restructure record was superseded by D50, the gate audit's
+  findings by F16–F20 and two defects, the adjudication summaries
+  by D46–D51, and the design-round list is an index into this file.
+  **THE CARVE-OUT WAS NOT MERELY REDUNDANT — IT MISLED.** D50's
+  central finding was that the restructure record's step-6 summary
+  **under-reported its own debt**: four items where the source
+  commit flagged seven, so the task built on it inherited the
+  error and P23 went unrecorded for a day longer. A summary of a
+  decision, kept beside the decision, is a second copy that drifts
+  and that a reader has no way to know is stale. That is the
+  positive case for deletion, not just the absence of a case for
+  keeping.
+  THE RULE, GENERALIZED: **anything is struck when it is done.**
+  Tasks, audits, restructures, rounds, and the work-item
+  breakdowns inside a feature alike. Its record is its commit, its
+  CHANGELOG line, and the D-numbers it produced.
+  THE BREAKDOWN CLAUSE, RESCUED RATHER THAN DELETED. The
+  Completed section carried one standing rule found nowhere else:
+  *"the per-milestone deliverable and stage breakdowns are pruned;
+  the record survives in git history, the CHANGELOG, and the
+  D-numbers each round produced."* Milestones are gone, but its
+  subject is not — **F1 and F17 each carry a seven-item breakdown
+  today**, and this is what says those lists are deleted rather
+  than archived when they deliver. D42's evaporating handles and
+  D45's strike rule between them *imply* it; P23's clarify test is
+  explicit that an implied requirement is not a requirement, and
+  D48 was written because a rule cited by name and defined nowhere
+  is how the record goes wrong. So it is restated here, in scope
+  terms rather than milestone terms.
+  WHAT WENT WITH THE SECTION, ITEMIZED so nothing is assumed. Six
+  entries, none carrying important history — checked against the
+  sources before deleting: the full pre-restructure ROADMAP is at
+  `git show 50b67b2:planning/ROADMAP.md`, 2803 lines, an ancestor
+  of `main` and so permanently reachable; the CHANGELOG names
+  milestones 1, 2, 4, 5 and 8 against dated releases and is never
+  retroactively edited. The demand-citation audit's warning —
+  *run it before anything else prunes further*, what demanded
+  milestones 1, 2, 3, 4 and 6 surviving only in that git object —
+  is **self-contained in the audit entry**, which stays, so the
+  deletion does not orphan it.
+  ONE STALE CLAUSE DIED WITH IT, worth naming since it was live
+  text: the milestone paragraph ended *"and returns to a numbered
+  arc when the case it serves is pledged."* There are no numbered
+  arcs — D42 abolished roadmaps as a standing rule, large items
+  being pledged one at a time in no pre-promised order. The
+  section was still describing a mechanism the project had decided
+  against.
+  A GLOSSARY LINE REPLACES IT, and it is *not* history. This file
+  uses "milestone" 104 times, and the deleted paragraph was the
+  only in-repo decoder for a numbering scheme that no longer runs.
+  The preamble already decodes ROADMAP, `accepted/`→`pledged/` and
+  PRINCIPLES.md→ARCHITECTURE.md for exactly this reason; milestone
+  numbers join that list in one sentence. It is a claim about a
+  document as it stands today — strip the 104 mentions and the
+  line becomes deletable — which is the test that sent the
+  paragraph itself away.
+  THE REJECTED SECTION GOES TOO, on a different argument — not
+  redundancy but **impossibility**. Entry to TASKS.md *is* approval
+  (D43), so nothing in the file can later be rejected; refusal
+  happens at the door, and what is refused never becomes an entry.
+  The section described a state the lifecycle cannot produce, and
+  had never held one in its life. Its record duty is already
+  discharged elsewhere: a closed issue, or the DECISIONS entry that
+  argued the refusal.
+  ITS ONE CLAIM WAS FALSE, WHICH IS THE CASE IN MINIATURE. The
+  section named three historic refusals and said all three *"were
+  recorded straight to DECISIONS.md."* Checked: `delete-media` and
+  `seed-media` are there under D30; **`clean-archives` is not in
+  this file at all.** Its removal is recorded in the CHANGELOG,
+  which is the durable record and needed no help — but a
+  hand-maintained index asserting otherwise is precisely the
+  drifting second copy this entry deletes Completed for. The index
+  was wrong about a third of its content and nothing could tell.
+  FOLDED: this entry; D45 (pointer at the carve-out, text
+  untouched); this file's preamble (the milestone glossary line);
+  TASKS.md (both the Completed and Rejected sections deleted, the
+  section list replaced by a statement of why refusals are not
+  recorded, the Pledged preamble's reference dropped). No CHANGELOG
+  line: nothing release-facing moved.
 
 - D51 — U3 RETIRES, SUPERSEDED BY U14 — DECIDED (owner,
   2026-07-27, the last of the TASKS.md adjudications). Supports
@@ -774,6 +870,11 @@ is waiting on an answer today.
   its CHANGELOG line, so it leaves by deletion; parking it in
   Completed is the ceremony TASKS.md already refuses for work that
   arrives done.
+  [D52 removes the carve-out and the section with it: **anything**
+  is struck when it is done, audits and restructures included, a
+  record whose reasoning outlives the work being a decision and
+  decisions having a file. The rule above is unchanged; only its
+  exception is gone.]
 
   FOLDED: README.md's third-queue clause (the source, replaced);
   INTERFACES.md's housekeeping boundary (the negative statement it
