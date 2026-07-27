@@ -45,6 +45,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `--qemu` is gone from the CLI's flag-arity table. The spec says
+  the old global `--qemu`, `--platform` and `--port` "are removed",
+  and no subparser has defined `--qemu` for some time, but the
+  table still listed it — the code naming an option the spec said
+  was gone. `--platform` and `--port` stay: they are live
+  per-command options, and their place in that table is the
+  position-carries-no-meaning rewrite rather than the removed
+  globals.
+
+  Deleting the entry alone would have made the diagnostic worse,
+  which is measured rather than reasoned: `rlq --qemu foo
+  list-machines` reported `unrecognized arguments: --qemu foo`
+  while the arity entry let the reorder carry the pair past the
+  command word, and without it argparse blamed the *value* —
+  `invalid choice: 'foo'`, never naming the flag that was actually
+  wrong. The reorder now looks past an unknown flag's value for a
+  real command word, so the useful message is restored. **This is
+  better than the state before the deletion**, not merely equal to
+  it: the good message previously depended on a flag having an
+  arity entry, so it worked for `--qemu` and for nothing else.
+  `rlq --qmu foo list-machines` now names `--qmu` too. A bare word
+  with no unknown flag ahead of it still stops the scan, so a
+  plainly misspelled command is still reported as the invalid
+  choice it is.
+
 - `instance-model.md` still listed `clone-machine`, `export-drive`
   and `export-machine` in a command synopsis — the same three
   unbuilt verbs the 2026-07-27 sweep removed from the CLI spec,

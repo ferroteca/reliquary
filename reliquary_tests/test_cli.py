@@ -219,6 +219,36 @@ class CliReorderArgvTests(unittest.TestCase):
             cli._reorder_argv(["--home=/tmp", "list-machines"]),
             ["list-machines", "--home=/tmp"])
 
+    def test_an_unknown_flag_with_a_value_still_finds_the_command(self):
+        # `--qemu` was removed by the spec and lingered in the arity
+        # table; deleting it dropped `rlq --qemu foo list-machines`
+        # into the unknown-leading-token path, where argparse blamed
+        # the *value*: "invalid choice: 'foo'". The scan now looks
+        # past an unknown flag's value for a real command word, so
+        # the flag that is actually wrong is the one named.
+        self.assertEqual(
+            cli._reorder_argv(["--qemu", "foo", "list-machines"]),
+            ["list-machines", "--qemu", "foo"])
+
+    def test_a_bare_misspelled_command_still_stops_the_scan(self):
+        # Only a word *after* an unknown flag is skipped. With no
+        # unknown flag ahead of it a bare word is the command, and a
+        # misspelling must still be reported as the invalid choice
+        # it is rather than scanned past.
+        self.assertEqual(
+            cli._reorder_argv(["list-machnes", "--home", "/tmp"]),
+            ["list-machnes", "--home", "/tmp"])
+
+    def test_removed_globals_are_not_in_the_arity_table(self):
+        # docs/spec/cli.md: the old global --qemu, --platform and
+        # --port "are removed". --platform and --port stay in the
+        # table as live per-command options; --qemu has no subparser
+        # anywhere, so its entry named an option that was gone.
+        self.assertNotIn("--qemu", cli._FLAG_ARITY)
+        for flag in ("--platform", "--port"):
+            with self.subTest(flag=flag):
+                self.assertIn(flag, cli._FLAG_ARITY)
+
 
 class CliProgNameTests(unittest.TestCase):
     """Usage/help text names whichever entry point was invoked."""

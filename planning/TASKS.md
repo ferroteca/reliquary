@@ -185,31 +185,6 @@ code has the bug, so the norm is already the demand.
   standing is undeclared — the same rule broken a different way,
   and unfixed.
 
-- `--qemu` is removed by the spec and still declared in the code
-  (found 2026-07-27 by the gate audit, checking a task that
-  proposed renaming it). [docs/spec/cli.md](../docs/spec/cli.md)
-  says the old global `--qemu`, `--platform` and `--port` "are
-  removed", yet `_FLAG_ARITY` in `reliquary/cli.py` still lists
-  `--qemu`, which no subparser defines. Delete the entry.
-  `--platform` and `--port` stay: they are live per-command
-  options, and their place in that table is the documented
-  position-carries-no-meaning rewrite, not the removed globals.
-  **The consequence is small and worth stating so it is not
-  oversold** (measured, not reasoned): `rlq --qemu foo
-  list-machines` today fails with "unrecognized arguments: --qemu
-  foo", which is a perfectly clear message — the arity entry is
-  what makes it clear, by letting the reorder carry the pair past
-  the command word. Deleting it drops `--qemu` into the
-  unknown-leading-token path, where the message is *worse*
-  ("invalid choice: 'foo'"), so the honest fix is the deletion
-  plus whatever keeps a removed option from degrading into that
-  path — which is a question about the reorder, not about
-  `--qemu`. What makes this a defect either way is the
-  divergence: the code names an option the spec says is gone.
-  (This also retires the "`--qemu` → `--qemu-home`" task that had
-  sat under Small items since before the option was specified
-  away — renaming it would reinstate it.)
-
 - **P16's open question 3 asks about a construct that retired**
   (left 2026-07-27 by the `hostdir` sweep, which fixed the other
   five mentions and stopped here on purpose).

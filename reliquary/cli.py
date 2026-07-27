@@ -77,7 +77,6 @@ _FLAG_ARITY = {
     "--blueprint": 1,
     "--machine": 1,
     "--port": 1,
-    "--qemu": 1,
     "--platform": 1,
     "--timeout": 1,
     "--display": 0,
@@ -100,10 +99,24 @@ def _reorder_argv(argv):
     Flags are declared once on each subparser; this rewrite makes
     position carry no meaning so the parent-parser SUPPRESS twin is
     unnecessary.
+
+    An *unknown* leading flag has no arity to skip by, so its value
+    (if it takes one) is an ordinary bare word. Stopping there would
+    hand argparse the value as the command word and produce
+    ``invalid choice: 'foo'`` — blaming the value and never naming
+    the flag that is actually wrong. Once an unknown flag has been
+    seen the scan therefore keeps looking for a real command word,
+    so the reorder still happens and the subparser reports
+    ``unrecognized arguments: --qemu foo``. The invocation is an
+    error either way; this only decides which error it gets, and
+    naming the unknown flag is the useful one. A bare word before
+    any unknown flag still stops the scan, so a plain misspelled
+    command is still reported as the invalid choice it is.
     """
     if not argv:
         return argv
     index = 0
+    after_unknown = False
     while index < len(argv):
         arg = argv[index]
         if arg == "--":
@@ -112,6 +125,7 @@ def _reorder_argv(argv):
             name, eq, _ = arg.partition("=")
             arity = _FLAG_ARITY.get(name)
             if arity is None:
+                after_unknown = True
                 index += 1
                 continue
             if eq:
@@ -125,6 +139,9 @@ def _reorder_argv(argv):
             leading = list(argv[:index])
             rest = list(argv[index:])
             return rest[:1] + leading + rest[1:]
+        if after_unknown:
+            index += 1          # the unknown flag's value; keep looking
+            continue
         break
     return list(argv)
 
