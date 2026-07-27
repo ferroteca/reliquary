@@ -30,14 +30,10 @@ import unittest
 import warnings
 from importlib import resources
 
+import jsonschema
+
 from reliquary import document, jsonc
 from reliquary.errors import StaticError
-
-try:
-    import jsonschema
-    _HAVE_JSONSCHEMA = True
-except ImportError:
-    _HAVE_JSONSCHEMA = False
 
 _HERE = os.path.dirname(__file__)
 _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
@@ -126,14 +122,12 @@ class BlueprintCorpusTests(unittest.TestCase):
                      if issubclass(w.category, document.BlueprintWarning)],
                     [])
 
-    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_valid_fixtures_match_the_schema(self):
         schema = _blueprint_schema()
         for path in _fixtures("valid"):
             with self.subTest(fixture=os.path.basename(path)):
                 jsonschema.validate(_load(path), schema)
 
-    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_schema_rejects_what_it_declares_it_rejects(self):
         schema = _blueprint_schema()
         for path in _fixtures("invalid"):
@@ -143,7 +137,6 @@ class BlueprintCorpusTests(unittest.TestCase):
                 with self.assertRaises(jsonschema.ValidationError):
                     jsonschema.validate(_load(path), schema)
 
-    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_unmarked_fixtures_really_are_beyond_the_schema(self):
         """The marker records the overlap; it must not go stale.
 
@@ -158,7 +151,6 @@ class BlueprintCorpusTests(unittest.TestCase):
             with self.subTest(fixture=os.path.basename(path)):
                 jsonschema.validate(_load(path), schema)
 
-    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_closed_vocabularies_are_schema_enforced(self):
         """What the reach trim buys, asserted rather than assumed.
 
@@ -238,7 +230,6 @@ class SpecifiedPhaseTests(unittest.TestCase):
 class MachineStateSchemaTests(unittest.TestCase):
     """A real materialized state validates against the state schema."""
 
-    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_materialized_state_matches_schema(self):
         import tempfile
         from reliquary import Context

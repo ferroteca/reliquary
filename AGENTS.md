@@ -541,6 +541,17 @@ Doctrine to preserve:
 - Runtime dependencies are welcome when they pull their weight; declare
   them under `[project].dependencies` in `pyproject.toml`. Prefer the
   stdlib only when it serves the need equally well.
+- **A test-only dependency is a hard requirement of the suite.** It goes
+  in `[dependency-groups].dev` and is imported at module top like any
+  other — never behind a `try`/`except ImportError` feeding a
+  `skipUnless`. That pattern turns an incomplete dev environment into
+  quiet skips, which is how the blueprint corpus came to run against
+  the parser and *not* the schema while claiming the two cannot drift.
+  A missing dev dependency should stop the suite and name itself.
+  `skipUnless` is for a resource that genuinely may be absent in a
+  supported configuration — the source-tree-only guards on `docs/` and
+  `planning/` are the legitimate case, since neither is packaged and
+  `reliquary_tests` is installable.
 - Pillow is the image library: screenshot conversion uses it, and the
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.

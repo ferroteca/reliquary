@@ -21,14 +21,10 @@ import unittest
 import warnings
 from importlib import resources
 
+import jsonschema
+
 from reliquary import document, jsonc, script_parser
 from reliquary.errors import StaticError
-
-try:
-    import jsonschema
-    _HAVE_JSONSCHEMA = True
-except ImportError:
-    _HAVE_JSONSCHEMA = False
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -110,7 +106,6 @@ class DocumentedExampleTests(unittest.TestCase):
         self.assertGreater(checked, 10,
                            "expected the docs to carry real examples")
 
-    @unittest.skipUnless(_HAVE_JSONSCHEMA, "jsonschema is required")
     def test_every_example_validates_against_the_schema(self):
         schema = _schema()
         for path in _DOCUMENTS:
