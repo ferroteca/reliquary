@@ -21,7 +21,7 @@ import unittest
 import warnings
 from importlib import resources
 
-from reliquary import document, jsonc
+from reliquary import document, jsonc, script_parser
 
 try:
     import jsonschema
@@ -112,6 +112,35 @@ class DocumentedExampleTests(unittest.TestCase):
             for label, value in _blocks(path):
                 with self.subTest(example=label):
                     jsonschema.validate(value, schema)
+
+
+_SCRIPT_EXAMPLES = os.path.join(
+    _REPO_ROOT, "planning", "design", "script-examples")
+
+
+@unittest.skipUnless(os.path.isdir(_SCRIPT_EXAMPLES),
+                     "the script-example catalogue is source-tree only")
+class ScriptExampleTests(unittest.TestCase):
+    """Every open script example parses.
+
+    The catalogue holds *unresolved* design problems, demonstrated
+    in real script text; lines that are deliberately illegal are
+    commented out and marked. So an example that will not parse is
+    drift, not intent — and drift is what happened: the five
+    resolved examples were deleted in 2026-07-26 partly because one
+    had rotted into syntax the language no longer accepts with
+    nobody noticing, the README concluding that "a note that cannot
+    fail is not a guard". This is that guard. Without it the
+    catalogue is prose claiming to be code.
+    """
+
+    def test_every_example_parses(self):
+        paths = sorted(glob.glob(os.path.join(_SCRIPT_EXAMPLES, "*.rlqs")))
+        for path in paths:
+            with self.subTest(example=os.path.basename(path)):
+                with open(path, encoding="utf-8") as handle:
+                    text = handle.read()
+                script_parser.parse_script(text)
 
 
 class RetiredVocabularyTests(unittest.TestCase):

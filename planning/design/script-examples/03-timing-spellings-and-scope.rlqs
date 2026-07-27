@@ -37,8 +37,12 @@ phase split timeout=2m {
     # the wait (the container owns the waiting) while stable moves
     # onto each condition (the condition owns the holding):
     wait timeout=90s {
-        on "Choice A" stable=1s { }
-        on "Choice B"           { }
+        on "Choice A" stable=1s {
+            press enter
+        }
+        on "Choice B" {
+            press esc
+        }
     }
     # The placement rule is mechanical, but the same two settings
     # land on one line in one form and two lines in the other.
@@ -46,8 +50,12 @@ phase split timeout=2m {
 }
 
 phase watchful timeout=5m deadline=30m {
-    on "Insert disk 2"  { press enter }
-    on "Setup complete" { finish }
+    always "Insert disk 2" {
+        press enter
+    }
+    always "Setup complete" {
+        finish
+    }
 }
 # PROBLEM 4: reset asymmetry, invisible in the syntax. In this
 # reactive phase the timeout bounds each QUIET INTERVAL and resets

@@ -285,17 +285,20 @@ code has the bug, so the norm is already the demand.
 
 ### Language
 
-The **script-language residuals** stay here rather than becoming a
-feature (D45): they change the scripting language, which is no bar
-to being a task, and on size they are now a ride-along alone.
-**No use case asks for them**, said plainly rather than papered
-over — they serve language goal **G6**, one small vocabulary and
-one spelling — and the catalogue behind them is
-[design/script-examples/](design/script-examples/), whose README
-carries the numbering and the deletion rule. The order below is a
-guess at fix cost, never validated against real authoring pain;
-reorder freely once scripts have been written and debugged under
-this surface.
+The **script-language residuals are gone** — all three settled
+2026-07-27 by walking them, and **none was the language change it
+was filed as**: [08] was withdrawn as a design already correct,
+[06]'s half was a defect against the preflight spec, and [03]'s
+was a rotted example. What is left below is editorial work on
+script-spec.md, which is not a residual at all.
+
+The catalogue they came from is
+[design/script-examples/](design/script-examples/) — three files
+now (03, 07, 08), whose README carries the numbering and the
+deletion rule. **It has a test** since 03's fix: every example
+parses, so the next one to rot fails the suite rather than sitting
+unread. That was the standing cause — the README's own words, *"a
+note that cannot fail is not a guard"*.
 
 *(**[08] was withdrawn 2026-07-27, D53** — reserving the key and
 slot vocabularies globally would have abandoned the line the spec
@@ -312,10 +315,13 @@ shipped spec, not a change to the language. The spec also settled
 warn-versus-error, which the entry had left open: preflight
 **rejects**.)*
 
-- riding along with whatever touches it next: **[03] does not
-  currently parse** — its `on` handler bodies end without a
-  terminal. It is a live example, so it should be valid where it is
-  not deliberately illegal
+*(**[03]'s parse fix — done 2026-07-27**, and it was four errors
+rather than the one the entry named. Empty handler bodies, two
+one-line `{ … }` blocks the lexical rules forbid, and `on` used
+for a reactive phase's standing rule where **S9** requires
+`always` — the same drift that helped condemn the deleted [04].
+Its *design* residuals, the timing spellings, stay deliberately
+not-tasks below.)*
 
   *Deliberately not tasks.* [03] and [07] stay documented
   tradeoffs rather than bugs — boundary tax (guest-text escaping)

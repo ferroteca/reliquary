@@ -27,6 +27,14 @@ Each file ends with an open question. Resolving one should update
 the spec first, then **delete the example** — numbers are not
 reused, and the argument survives in the D-number that settled it.
 
+**These files parse, and a test says so**
+(`test_documented_examples.ScriptExampleTests`, added 2026-07-27
+with 03's repair). Deliberately illegal lines are commented, so an
+example that will not parse is drift rather than intent — which is
+exactly what had happened to 03: empty handler bodies, one-line
+blocks, and `on` where a reactive phase requires `always`. The
+guard is the conclusion below applied forward.
+
 ## Why resolved examples are not kept here
 
 06 left 2026-07-27 (D54), the last of its three questions closed:
