@@ -1,6 +1,7 @@
 // invalid: the property qualifier is reserved-and-rejected, nudging toward the
 //         bare form
 // spec: Dispatch and degenerates
+// id: ref.qualifier-reserved
 [
   { "type": "media", "name": "x", "location": "${property:iso.path}" }
 ]

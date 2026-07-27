@@ -1,5 +1,6 @@
 // invalid: an absolute path suffix is refused
 // spec: The path suffix
+// id: ref.path-absolute
 [
   { "type": "media", "name": "outer", "location": "outer.zip" },
   { "type": "media", "name": "esc", "location": "${media:outer//etc/p.img}" }

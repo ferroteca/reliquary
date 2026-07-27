@@ -1,6 +1,7 @@
 // invalid: a nested type echo that disagrees is an error
 // spec: Spec types
 // schema: rejects
+// id: field.type-mismatch
 [
   { "type": "media", "name": "bundle", "location": "bundle.zip",
     "children": [ { "type": "machine", "path": "inner.img" } ] }

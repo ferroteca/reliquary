@@ -1,6 +1,7 @@
 // invalid: a malformed hash is refused
 // spec: media
 // schema: rejects
+// id: value.not-a-sha256
 [
   { "type": "media", "name": "x", "location": "https://x.test/p.iso",
     "sha256": "zz" }

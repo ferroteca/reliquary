@@ -38,6 +38,8 @@ from reliquary.errors import StaticError
 _HERE = os.path.dirname(__file__)
 _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
 
+_ID = re.compile(r"^// id: (\S+)", re.M)
+
 
 def _fixtures(bucket):
     return sorted(glob.glob(os.path.join(_CORPUS, bucket, "*.rlqb")))
@@ -52,6 +54,15 @@ def _header(path):
     with open(path, encoding="utf-8") as handle:
         return [line for line in handle.read().split("\n")
                 if line.startswith("//")]
+
+
+def _head(path):
+    """The header block as one string, for marker searches.
+
+    `_header` returns the comment lines without their terminators, so
+    the join is what the `re.M` anchors match against.
+    """
+    return "\n".join(_header(path))
 
 
 def _declares(path, marker):
@@ -86,6 +97,59 @@ class BlueprintCorpusTests(unittest.TestCase):
             with self.subTest(fixture=os.path.basename(path)):
                 with self.assertRaises(StaticError):
                     _parse(path)
+
+    def test_every_invalid_fixture_declares_its_id(self):
+        for path in _fixtures("invalid"):
+            with self.subTest(fixture=os.path.basename(path)):
+                self.assertIsNotNone(
+                    _ID.search(_head(path)),
+                    "an invalid fixture names the diagnostic id that must "
+                    "reject it, or `none` where no id exists yet.")
+
+    def test_a_rejection_carries_the_id_the_fixture_declares(self):
+        """The assertion this corpus could not make until now.
+
+        Its README said in as many words that the headers were
+        "documentation, not assertions" and that a fixture failing for
+        the *wrong* reason was a false pass a reviewer had to catch.
+        Blueprint diagnostics carry ids now, so the harness catches it
+        instead — the same assertion the script corpus was built with,
+        and the reason that one called itself the stronger pattern.
+
+        Asserted in both directions: `// id: none` records a
+        diagnostic with no identifier yet and fails the day it gains
+        one, so a marker cannot outlive the gap it records.
+        """
+        for path in _fixtures("invalid"):
+            declared = _ID.search(_head(path)).group(1)
+            with self.subTest(fixture=os.path.basename(path)):
+                with self.assertRaises(StaticError) as caught:
+                    _parse(path)
+                actual = caught.exception.rule_id
+                if declared == "none":
+                    self.assertIsNone(
+                        actual,
+                        f"this fixture records no id and the diagnostic "
+                        f"now carries {actual!r}. Put it in the header — "
+                        "the marker records a gap, and it has closed.")
+                else:
+                    self.assertEqual(
+                        actual, declared,
+                        "rejected, but not by the rule this fixture "
+                        "names. A fixture failing for the wrong reason "
+                        "is a false pass: it would keep passing after "
+                        "the rule it claims to exercise stopped working.")
+
+    def test_no_invalid_fixture_is_unidentified(self):
+        """The measurement, kept honest as the ids landed.
+
+        It reads zero, and moving up means a diagnostic lost its id
+        rather than a fixture being added carelessly.
+        """
+        unidentified = sorted(
+            os.path.basename(path) for path in _fixtures("invalid")
+            if _ID.search(_head(path)).group(1) == "none")
+        self.assertEqual(unidentified, [])
 
     def test_resolution_fixtures_parse_clean(self):
         """These are rejected at resolution, so parse must accept them.

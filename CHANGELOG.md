@@ -191,6 +191,46 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Every blueprint diagnostic carries a stable identifier, and the
+  blueprint conformance corpus asserts it.** `document.py`'s 97 rules
+  now name themselves — 73 distinct ids — leaving 108 across 13
+  modules, from 205 across 14.
+
+  The subjects come from the blueprint model's own vocabulary rather
+  than being invented for the occasion: `ref.` for the `${…}` grammar,
+  `value.` for what a field's value has to be, `field.` for the
+  document's field vocabulary, `drive.` for drive keys, slots and the
+  boot order, and `blueprint.` for the document as a whole. Two
+  families took ids that already existed instead — the name charter is
+  `name.`, being the same rule wherever a name was written, and media
+  semantics are `media.`, including `media.remote-without-hash`, which
+  resolution already raised. A single `blueprint.` prefix for all 97
+  was refused: it would have made the prefix name the *surface*, which
+  the spec forbids, and given 22 already-named rules a second id.
+
+  **The corpus can now assert what its README said it could not.**
+  That file stated in as many words that its headers were
+  "documentation, not assertions", because an invalid fixture failing
+  for the *wrong* reason is a false pass and only a reviewer could
+  catch it — and the script corpus's docstring cited exactly that as
+  the reason it was the stronger pattern. All 47 invalid fixtures now
+  declare the diagnostic that must reject them, the harness compares
+  it against the raised `rule_id`, and the marker is asserted in both
+  directions so it cannot outlive the gap it records. One difference
+  survives and is recorded rather than glossed: the script corpus also
+  checks that an id serves the rule a fixture *means* to exercise,
+  which it can do because its rules are S-numbered and blueprint rules
+  are not.
+
+  Some ids are deliberately coarse where the rule is one rule.
+  `ref.not-allowed-here` rejects nine fixtures from three raise
+  sites — a reference in `backend`, `control-planes`, `controller`,
+  `materialize`, `platform`, `type`, a name, a drive key or a children
+  path — because refusing a reference in a closed or identity position
+  is a single rule (D26/D27) and the message names the field. A
+  consumer switching on the id learns the rule; a person reading the
+  message learns the place.
+
 - **Diagnostic ids reach the properties file, the credential store
   and the CLI.** 40 more diagnostics carry one: `properties.py`'s 15,
   `credentials.py`'s 3, `cli.py`'s 13, and 9 sites in `machines.py`

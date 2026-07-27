@@ -1,6 +1,7 @@
 // invalid: names collide case-insensitively - the media cache is name-keyed on
 //         filesystems that are not
 // spec: Case
+// id: name.case-collision
 [
   { "type": "media", "name": "FDBOOT", "location": "a.img" },
   { "type": "media", "name": "fdboot", "location": "b.img" }

@@ -1,6 +1,7 @@
 // invalid: a scheme-shaped string that is not recognized is a parse error,
 //         never a silently relative path
 // spec: The location grammar
+// id: value.unknown-scheme
 [
   { "type": "media", "name": "x", "location": "ftp://x.test/p.iso" }
 ]

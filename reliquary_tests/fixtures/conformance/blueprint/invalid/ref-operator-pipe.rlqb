@@ -1,5 +1,6 @@
 // invalid: pipes and filters are closed out
 // spec: The closure
+// id: ref.malformed
 [
   { "type": "machine", "name": "rig", "platform": "dos",
     "memory": "${mem|default}", "drives": { "cdrom0": null } }

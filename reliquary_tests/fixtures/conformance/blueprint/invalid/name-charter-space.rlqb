@@ -1,6 +1,7 @@
 // invalid: an explicit name outside the charter is refused
 // spec: The name charter
 // schema: rejects
+// id: name.machine-charter
 [
   { "type": "media", "name": "my iso", "location": "p.iso" }
 ]

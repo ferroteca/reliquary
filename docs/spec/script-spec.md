@@ -1931,7 +1931,17 @@ to the other. The prefix is the subject, never the error class or
 the surface, because the namespace is shared across both: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
 `node.`, `http.`, `media.`, `machine.`, `platform.`, `progress.`,
-`store.`, `lex.`, `syn.`.
+`store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`, `drive.`,
+`blueprint.`.
+
+The last five arrived with the blueprint document, and they are the
+blueprint model's own nouns rather than names invented for the
+occasion (`docs/spec/blueprint-model.md`): `ref.` for the `${…}`
+grammar, `value.` for what a field's value has to be, `field.` for
+the document's field vocabulary, `drive.` for drive keys, slots and
+the boot order, and `blueprint.` for the document as a whole. That
+document's name-charter and media-semantics rules took `name.` and
+`media.` instead, being the same rules already named elsewhere.
 
 **This list is closed and enforced.** A diagnostic whose subject
 is not on it does not get a new prefix invented for it in passing;

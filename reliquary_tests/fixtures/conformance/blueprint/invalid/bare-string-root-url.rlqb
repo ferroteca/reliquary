@@ -1,3 +1,4 @@
 // invalid: a bare URL string has nowhere to put its required pin
 // spec: The file
+// id: media.remote-without-hash
 [ "https://x.test/p.iso" ]

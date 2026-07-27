@@ -2,6 +2,7 @@
 //         command-line argument
 // spec: The name charter
 // schema: rejects
+// id: name.machine-charter
 [
   { "type": "media", "name": "FD[SE]", "location": "p.iso" }
 ]

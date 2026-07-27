@@ -1,4 +1,5 @@
 // invalid: the plural root sections are retired
 // spec: The file
 // schema: rejects
+// id: blueprint.section-retired
 { "machines": [ { "name": "m", "platform": "dos" } ] }

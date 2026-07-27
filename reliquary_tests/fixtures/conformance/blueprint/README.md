@@ -43,6 +43,7 @@ where the rule lives:
 // invalid: P14's acceptance test: this passes the character class and
 //          is refused by the production - mem is not a qualifier
 // spec: The closure
+// id: ref.qualifier-unknown
 ```
 
 A `// warns:` line marks a fixture that is **valid but must emit a
@@ -50,9 +51,35 @@ warning** — currently the one name-repair case. There is no warning
 assertion yet; adding one is part of S3, and the header is the record
 of what it must say.
 
-The headers are documentation, not assertions. They are there because
-an invalid fixture that fails for the *wrong* reason is a false pass,
-and the header is what lets a reviewer catch that.
+**The headers are assertions now.** They were documentation, and this
+README said so, because an invalid fixture failing for the *wrong*
+reason is a false pass and only a reviewer could catch it. Blueprint
+diagnostics carry stable ids since 2026-07-27, so a `// id:` line
+names the diagnostic that must reject each fixture and the harness
+compares it against the raised `rule_id`. All 47 carry one; none reads
+`none`. That marker is asserted in both directions, so a fixture
+claiming `none` whose diagnostic has since gained an id fails until
+its header catches up — the marker cannot outlive the gap it records.
+
+This is the assertion the script corpus was built with and called the
+stronger pattern, naming this corpus's inability to make it as the
+cost. That cost is paid off; what remains different is that corpus's
+`# rule:` line, which it can have because the script rules are
+S-numbered and these are not — so an id here cannot be checked against
+the rule it is *meant* to serve, only against the one that fired.
+
+`// spec:` stays what it was: the section a reader goes to, not
+something the harness checks.
+
+One id is deliberately coarse. `ref.not-allowed-here` rejects nine
+fixtures — a reference in `backend`, `control-planes`, `controller`,
+`materialize`, `platform`, `type`, a name, a drive key and a children
+path — from three raise sites, because those are one rule (D26/D27:
+references are refused in identity and graph positions and in closed
+vocabularies) and the message names the field. A consumer switching on
+the id learns the rule; a person reading the message learns the place.
+Three more ids cover two fixtures each and `name.machine-charter`
+covers three, for the same reason.
 
 ## What this corpus deliberately does not cover
 

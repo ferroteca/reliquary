@@ -1,6 +1,7 @@
 // invalid: the source type is retired
 // spec: Spec types
 // schema: rejects
+// id: field.type-retired
 [
   { "type": "source", "name": "s", "url": "https://x.test/p.iso" }
 ]

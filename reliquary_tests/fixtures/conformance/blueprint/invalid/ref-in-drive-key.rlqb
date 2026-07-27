@@ -1,6 +1,7 @@
 // invalid: an object key never takes a reference
 // spec: Reach
 // schema: rejects
+// id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
     "drives": { "${slot}": null } }

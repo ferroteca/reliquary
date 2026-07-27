@@ -211,18 +211,18 @@ def _reference(body, where):
     if not body:
         raise StaticError(
             f"{where}: empty reference '${{}}' — name a property key or a "
-            "qualified target")
+            "qualified target", rule_id="ref.empty")
     if "\\" in body:
         # The Windows author's first guess. Name the rule, not the class.
         raise StaticError(
             f"{where}: '${{{body}}}' uses a backslash — a containment path "
             "is '/'-separated always, following the container formats' own "
-            "convention")
+            "convention", rule_id="ref.backslash")
     if not _REFERENCE_BODY.fullmatch(body):
         raise StaticError(
             f"{where}: malformed reference '${{{body}}}' — a reference body "
             "is a property key or '<qualifier>:<name>[/<path>]', and carries "
-            "no operators")
+            "no operators", rule_id="ref.malformed")
     if ":" not in body:
         return _property_reference(body, where)
 
@@ -230,23 +230,25 @@ def _reference(body, where):
     if not qualifier:
         raise StaticError(
             f"{where}: malformed reference '${{{body}}}' — nothing before "
-            "the qualifier separator")
+            "the qualifier separator", rule_id="ref.qualifier-empty")
     if qualifier != qualifier.lower():
         raise StaticError(
-            f"{where}: reference qualifier {qualifier!r} must be lowercase")
+            f"{where}: reference qualifier {qualifier!r} must be lowercase",
+            rule_id="ref.qualifier-not-lowercase")
     if qualifier in _RESERVED_QUALIFIERS:
         if qualifier == "property":
             raise StaticError(
                 f"{where}: the 'property:' qualifier is reserved — write the "
-                f"bare form '${{{rest}}}' instead")
+                f"bare form '${{{rest}}}' instead",
+                rule_id="ref.qualifier-reserved")
         raise StaticError(
             f"{where}: the {qualifier!r} qualifier is reserved and not "
-            "implemented")
+            "implemented", rule_id="ref.qualifier-reserved")
     if qualifier not in _KNOWN_QUALIFIERS:
         known = ", ".join(sorted(_KNOWN_QUALIFIERS))
         raise StaticError(
             f"{where}: unknown reference qualifier {qualifier!r} "
-            f"(known: {known})")
+            f"(known: {known})", rule_id="ref.qualifier-unknown")
     return _media_reference(rest, body, where)
 
 
@@ -254,12 +256,13 @@ def _property_reference(body, where):
     if body == "media":
         raise StaticError(
             f"{where}: '${{media}}' is not a property — did you mean "
-            "'${media:<name>}'?")
+            "'${media:<name>}'?", rule_id="ref.media-without-name")
     for segment in body.split("."):
         if not _PROPERTY_KEY.fullmatch(segment):
             raise StaticError(
                 f"{where}: malformed property key '{body}' — segments start "
-                "with a letter and hold letters, digits, '.', '_', '-'")
+                "with a letter and hold letters, digits, '.', '_', '-'",
+                rule_id="ref.property-key-malformed")
     return Reference(qualifier=None, target=body)
 
 
@@ -268,11 +271,12 @@ def _media_reference(rest, body, where):
     if not name:
         raise StaticError(
             f"{where}: malformed reference '${{{body}}}' — the media "
-            "qualifier takes a name")
+            "qualifier takes a name", rule_id="ref.media-without-name")
     if not _MEDIA_NAME.fullmatch(name):
         raise StaticError(
             f"{where}: {name!r} is not a media name (letters, digits, "
-            "'.', '_', '-', starting with a letter or digit)")
+            "'.', '_', '-', starting with a letter or digit)",
+            rule_id="name.media-charter")
     if not slash:
         return Reference(qualifier="media", target=name)
     return Reference(qualifier="media", target=name,
@@ -284,23 +288,24 @@ def _containment_path(path, where):
     if not path:
         raise StaticError(
             f"{where}: the containment separator '/' is followed by no "
-            "path")
+            "path", rule_id="ref.path-empty")
     if path.startswith("/"):
         raise StaticError(
             f"{where}: '{path}' is an absolute path — a containment path is "
-            "relative to its parent")
+            "relative to its parent", rule_id="ref.path-absolute")
     if path.endswith("/"):
         raise StaticError(f"{where}: containment path {path!r} has a trailing "
-                         "'/'")
+                         "'/'", rule_id="ref.path-trailing-slash")
     segments = path.split("/")
     for segment in segments:
         if not segment:
             raise StaticError(
-                f"{where}: containment path {path!r} has an empty segment")
+                f"{where}: containment path {path!r} has an empty segment",
+                rule_id="ref.path-empty-segment")
         if segment in (".", ".."):
             raise StaticError(
                 f"{where}: containment path {path!r} escapes its parent "
-                f"with {segment!r}")
+                f"with {segment!r}", rule_id="ref.path-escapes-parent")
     return "/".join(segments)
 
 
@@ -324,11 +329,12 @@ def _scan(text, where):
             if close < 0:
                 raise StaticError(
                     f"{where}: unterminated reference — '${{' with no "
-                    "closing brace")
+                    "closing brace", rule_id="ref.unterminated")
             body = text[index + 2:close]
             if body.strip() != body or " " in body or "\t" in body:
                 raise StaticError(
-                    f"{where}: whitespace inside '${{{body}}}'")
+                    f"{where}: whitespace inside '${{{body}}}'",
+                    rule_id="ref.whitespace")
             spans.append("".join(literal))
             literal = []
             spans.append(None)
@@ -351,20 +357,22 @@ def _text(value, where, *, closed=False, allowed=None):
     """
     if not isinstance(value, str) or not value.strip():
         raise StaticError(
-            f"{where} must be a non-empty string, got: {value!r}")
+            f"{where} must be a non-empty string, got: {value!r}",
+            rule_id="value.not-a-string")
     spans, references = _scan(value, where)
     if references and closed:
         raise StaticError(
             f"{where} is a closed vocabulary and takes no reference: "
             f"{value!r} — its values are fixed so editors can complete "
-            "them and the published schema can check them")
+            "them and the published schema can check them",
+            rule_id="ref.not-allowed-here")
     if references:
         return Deferred(text=value, references=references)
     resolved = "".join(span for span in spans if span is not None)
     if allowed is not None and resolved not in allowed:
         raise StaticError(
             f"{where} must be one of {', '.join(sorted(allowed))}, "
-            f"got: {resolved!r}")
+            f"got: {resolved!r}", rule_id="value.not-in-vocabulary")
     return resolved
 
 
@@ -372,12 +380,13 @@ def _plain(value, where):
     """An authored string that may never carry a reference (identity)."""
     if not isinstance(value, str) or not value.strip():
         raise StaticError(
-            f"{where} must be a non-empty string, got: {value!r}")
+            f"{where} must be a non-empty string, got: {value!r}",
+            rule_id="value.not-a-string")
     if "${" in value.replace("\\${", ""):
         raise StaticError(
             f"{where} takes no reference: {value!r} — identity and the "
             "authored graph stay static, so a name can never depend on a "
-            "resolved value")
+            "resolved value", rule_id="ref.not-allowed-here")
     return value
 
 
@@ -388,7 +397,8 @@ def _media_name(value, where="name"):
     if not _MEDIA_NAME.fullmatch(value):
         raise StaticError(
             f"{where} must be letters, digits, '.', '_' or '-', starting "
-            f"with a letter or digit, got: {value!r}")
+            f"with a letter or digit, got: {value!r}",
+            rule_id="name.machine-charter")
     return value
 
 
@@ -398,7 +408,8 @@ def _machine_name(value, where="name"):
     if value.isdigit():
         raise StaticError(
             f"{where} must not be all digits: a machine name becomes its "
-            f"id segment '<name>-<n>', got: {value!r}")
+            f"id segment '<name>-<n>', got: {value!r}",
+            rule_id="name.machine-all-digits")
     return value
 
 
@@ -443,14 +454,15 @@ def _derive_name(location, where):
     if not stem:
         raise StaticError(
             f"{where} has no filename to derive a name from; give it an "
-            "explicit name")
+            "explicit name", rule_id="name.not-derivable")
     if _MEDIA_NAME.fullmatch(stem):
         return stem
     repaired = _repair(stem)
     if not repaired or not _MEDIA_NAME.fullmatch(repaired):
         raise StaticError(
             f"{where}: the name derived from {source!r} cannot be repaired "
-            "into a usable name; give it an explicit name")
+            "into a usable name; give it an explicit name",
+            rule_id="name.not-repairable")
     warnings.warn(
         f"{where}: derived the name {repaired!r} from {source!r} "
         "(repaired to the media-name charter); write an explicit name to "
@@ -466,7 +478,8 @@ def _sha256(value, where):
         return checked
     if not _SHA256.fullmatch(checked):
         raise StaticError(
-            f"{where} must be a hex SHA-256 (64 hex chars), got: {value!r}")
+            f"{where} must be a hex SHA-256 (64 hex chars), got: {value!r}",
+            rule_id="value.not-a-sha256")
     return checked.lower()
 
 
@@ -475,12 +488,13 @@ def _size(value, where):
     if isinstance(checked, Deferred):
         return checked
     if not isinstance(checked, str):
-        raise StaticError(f"{where} must be a size string, got: {value!r}")
+        raise StaticError(f"{where} must be a size string, got: {value!r}",
+            rule_id="value.not-a-size")
     match = _SIZE.fullmatch(checked)
     if not match:
         raise StaticError(
             f"{where} must be a positive integer followed by K, M, G, or T, "
-            f"got: {value!r}")
+            f"got: {value!r}", rule_id="value.not-a-size")
     return f"{int(match.group(1))}{match.group(2).upper()}"
 
 
@@ -491,17 +505,20 @@ def _memory(value):
             return checked
     if isinstance(value, bool):
         raise StaticError(
-            "memory must be a positive integer MiB value or size string")
+            "memory must be a positive integer MiB value or size string",
+            rule_id="value.not-a-memory")
     if isinstance(value, int):
         if value <= 0:
-            raise StaticError("memory must be a positive integer MiB value")
+            raise StaticError("memory must be a positive integer MiB value",
+                rule_id="value.not-a-memory")
         return value
     size = _size(value, "memory")
     match = _SIZE.fullmatch(size)
     byte_count = int(match.group(1)) * _UNIT_BYTES[match.group(2)]
     if byte_count % _MIB:
         raise StaticError(
-            f"memory must resolve to a whole MiB value, got: {value!r}")
+            f"memory must resolve to a whole MiB value, got: {value!r}",
+            rule_id="value.not-a-memory")
     return byte_count // _MIB
 
 
@@ -511,13 +528,15 @@ def _cpus(value):
         if isinstance(checked, Deferred):
             return checked
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise StaticError(f"cpus must be a positive integer, got: {value!r}")
+        raise StaticError(f"cpus must be a positive integer, got: {value!r}",
+            rule_id="value.not-a-count")
     return value
 
 
 def _flag(value, where):
     if not isinstance(value, bool):
-        raise StaticError(f"{where} must be true or false, got: {value!r}")
+        raise StaticError(f"{where} must be true or false, got: {value!r}",
+            rule_id="value.not-a-boolean")
     return value
 
 
@@ -545,7 +564,7 @@ def _location_string(value, where):
             raise StaticError(
                 f"{where}: a '${{{qualified[0].qualifier}:…}}' reference is "
                 "whole-value only — it names a location, it does not build "
-                "one by interpolation")
+                "one by interpolation", rule_id="ref.not-whole-value")
         reference = qualified[0]
         return Location(kind="parent", parent=reference.target,
                         path=reference.path)
@@ -569,7 +588,8 @@ def _location_scheme(value, where):
         return Location(kind="local", local=value)
     raise StaticError(
         f"{where}: unrecognized location scheme {scheme + ':'!r} in "
-        f"{value!r} — write a bare path, an http(s) URL, or the object form")
+        f"{value!r} — write a bare path, an http(s) URL, or the object form",
+        rule_id="value.unknown-scheme")
 
 
 _LOCATION_OBJECT_FORMS = ("url", "local", "parent", "property")
@@ -578,16 +598,20 @@ _LOCATION_OBJECT_FORMS = ("url", "local", "parent", "property")
 def _location_object(value, where, register):
     unknown = set(value) - set(_LOCATION_OBJECT_FORMS) - {"path"}
     if unknown:
-        raise StaticError(f"unknown location field: {where}.{sorted(unknown)[0]}")
+        raise StaticError(
+            f"unknown location field: {where}.{sorted(unknown)[0]}",
+            rule_id="field.unknown")
     forms = [name for name in _LOCATION_OBJECT_FORMS if name in value]
     if len(forms) != 1:
         allowed = ", ".join(_LOCATION_OBJECT_FORMS)
         raise StaticError(
-            f"{where} must declare exactly one of {allowed}")
+            f"{where} must declare exactly one of {allowed}",
+            rule_id="field.not-exactly-one")
     form = forms[0]
     if form != "parent" and "path" in value:
         raise StaticError(
-            f"{where}.path belongs to the parent form, not {form!r}")
+            f"{where}.path belongs to the parent form, not {form!r}",
+            rule_id="field.not-for-this-form")
     if form == "url":
         return Location(kind="url", url=_text(value["url"], f"{where}.url"))
     if form == "local":
@@ -606,7 +630,8 @@ def _location_object(value, where, register):
         if parent_name is None:
             raise StaticError(
                 f"{where}.parent must be a named media: an inline parent is "
-                "a container to descend into, so it needs an identity")
+                "a container to descend into, so it needs an identity",
+                rule_id="media.inline-parent")
     else:
         parent_name = _media_name(parent, f"{where}.parent")
     path = None
@@ -622,13 +647,13 @@ def _location(value, where, register):
         if not value:
             raise StaticError(
                 f"{where} must not be an empty list — a mirror list holds "
-                "the locations to try in order")
+                "the locations to try in order", rule_id="value.empty-mirror")
         rungs = []
         for index, entry in enumerate(value):
             if isinstance(entry, list):
                 raise StaticError(
                     f"{where}[{index}] must not be a nested list — a mirror "
-                    "list is flat")
+                    "list is flat", rule_id="value.nested-mirror")
             rungs.extend(_location(entry, f"{where}[{index}]", register))
         return tuple(rungs)
     if isinstance(value, str):
@@ -637,7 +662,7 @@ def _location(value, where, register):
         return (_location_object(value, where, register),)
     raise StaticError(
         f"{where} must be a location string, a location object, or a list "
-        f"of them, got: {value!r}")
+        f"of them, got: {value!r}", rule_id="value.not-a-location")
 
 
 # --- media -----------------------------------------------------------
@@ -656,8 +681,9 @@ def _unknown_media_field(unknown, where):
         raise StaticError(
             f"unknown media field: {where}.{bad} — {bad!r} is machine "
             "vocabulary; did you mean to declare \"type\": \"machine\"? "
-            "(type defaults to media)")
-    raise StaticError(f"unknown media field: {where}.{bad}")
+            "(type defaults to media)", rule_id="field.unknown")
+    raise StaticError(f"unknown media field: {where}.{bad}",
+        rule_id="field.unknown")
 
 
 def _media(value, register, *, where="media", path=None, allow_anonymous=False):
@@ -669,14 +695,16 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
     if isinstance(value, str) and path is None:
         value = {"location": value}
     if not isinstance(value, collections.abc.Mapping):
-        raise StaticError(f"{where} must be an object, got: {value!r}")
+        raise StaticError(f"{where} must be an object, got: {value!r}",
+            rule_id="value.not-an-object")
     fields = _CHILD_FIELDS if path is not None else _MEDIA_FIELDS
     unknown = set(value) - fields
     if unknown:
         if path is not None and "location" in unknown:
             raise StaticError(
                 f"{where}: a children entry takes a path, not a location — "
-                "its location is its parent plus that path")
+                "its location is its parent plus that path",
+                rule_id="media.child-takes-a-path")
         _unknown_media_field(unknown, where)
     _check_type_echo(value, "media", where)
 
@@ -698,17 +726,20 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
     if materialize == "new":
         if location:
             raise StaticError(
-                f"{where}: a 'new' blank takes a size, not a location")
+                f"{where}: a 'new' blank takes a size, not a location",
+                rule_id="media.new-with-location")
         if size is None:
-            raise StaticError(f"{where}: a 'new' blank requires a size")
+            raise StaticError(f"{where}: a 'new' blank requires a size",
+                rule_id="media.new-without-size")
     else:
         if not location:
             raise StaticError(
-                f"{where}: a '{materialize}' media requires a location")
+                f"{where}: a '{materialize}' media requires a location",
+                rule_id="media.without-location")
         if size is not None:
             raise StaticError(
                 f"{where}: a '{materialize}' media takes a location, not a "
-                "size")
+                "size", rule_id="media.size-not-allowed")
 
     if "name" in value:
         name = _media_name(value["name"], f"{where}.name")
@@ -739,7 +770,7 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
         if name is None:
             raise StaticError(
                 f"{where}: a container with children needs a name for them "
-                "to hang from")
+                "to hang from", rule_id="media.container-unnamed")
         _children(value["children"], name, register, where)
     return media
 
@@ -747,7 +778,8 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
 def _children(value, parent, register, where):
     """Desugar a ``children`` batch into child-declares-parent specs."""
     if not isinstance(value, list):
-        raise StaticError(f"{where}.children must be an array")
+        raise StaticError(f"{where}.children must be an array",
+            rule_id="value.not-an-array")
     for index, entry in enumerate(value):
         site = f"{where}.children[{index}]"
         if isinstance(entry, str):
@@ -755,9 +787,10 @@ def _children(value, parent, register, where):
         if not isinstance(entry, collections.abc.Mapping):
             raise StaticError(
                 f"{site} must be a path string or a media object, "
-                f"got: {entry!r}")
+                f"got: {entry!r}", rule_id="value.not-a-child")
         if "path" not in entry:
-            raise StaticError(f"{site} requires a path")
+            raise StaticError(f"{site} requires a path",
+                rule_id="media.child-without-path")
         location = Location(
             kind="parent", parent=parent,
             path=_containment_path(
@@ -774,15 +807,16 @@ def _check_type_echo(value, expected, where):
         raise StaticError(
             f"{where}: the {declared!r} spec type is retired — a source is "
             "now a media's location, and an archive is a media other media "
-            "name as their parent")
+            "name as their parent", rule_id="field.type-retired")
     if declared not in _SPEC_TYPES:
         allowed = ", ".join(sorted(_SPEC_TYPES))
         raise StaticError(
-            f"{where}.type must be one of {allowed}, got: {declared!r}")
+            f"{where}.type must be one of {allowed}, got: {declared!r}",
+            rule_id="field.type-unknown")
     if declared != expected:
         raise StaticError(
             f"{where}.type says {declared!r} but this position is a "
-            f"{expected}")
+            f"{expected}", rule_id="field.type-mismatch")
 
 
 # --- machine ---------------------------------------------------------
@@ -798,22 +832,25 @@ _DRIVE_FIELDS = {"media", "controller", "enabled"}
 
 def _drive_key(value):
     if not isinstance(value, str):
-        raise StaticError(f"drive keys must be strings, got: {value!r}")
+        raise StaticError(f"drive keys must be strings, got: {value!r}",
+            rule_id="value.not-a-string")
     if "${" in value:
         raise StaticError(
             f"drive key {value!r} takes no reference: an object key is "
-            "authored graph, and the graph stays static")
+            "authored graph, and the graph stays static",
+            rule_id="ref.not-allowed-here")
     match = _DRIVE_KEY.fullmatch(value)
     if not match:
         raise StaticError(
             f"invalid drive key {value!r}: expected floppy[0..1], "
-            "hdd[0..3], or cdrom[0..3]")
+            "hdd[0..3], or cdrom[0..3]", rule_id="drive.key-invalid")
     medium = match.group(1)
     slot = int(match.group(2) or 0)
     if slot >= _SLOT_LIMITS[medium]:
         raise StaticError(
             f"invalid drive key {value!r}: {medium} slots run from "
-            f"0 to {_SLOT_LIMITS[medium] - 1}")
+            f"0 to {_SLOT_LIMITS[medium] - 1}",
+            rule_id="drive.slot-out-of-range")
     return medium, slot, f"{medium}{slot}"
 
 
@@ -821,7 +858,7 @@ def _controller(value, key, medium):
     if medium == "floppy":
         raise StaticError(
             f"drives.{key}.controller is invalid: floppies take no "
-            "controller key")
+            "controller key", rule_id="drive.controller-on-floppy")
     return _text(value, f"drives.{key}.controller", closed=True,
                  allowed=_CONTROLLERS)
 
@@ -831,7 +868,8 @@ def _drive(value, key, medium, slot, register):
         if medium == "hdd":
             raise StaticError(
                 f"drives.{key} cannot be null: only removable drives "
-                "(floppy, cdrom) may be declared empty")
+                "(floppy, cdrom) may be declared empty",
+                rule_id="drive.null-not-removable")
         return MachineDrive(key=key, medium=medium, slot=slot)
     if isinstance(value, str):
         return MachineDrive(key=key, medium=medium, slot=slot,
@@ -839,7 +877,7 @@ def _drive(value, key, medium, slot, register):
     if not isinstance(value, collections.abc.Mapping):
         raise StaticError(
             f"drives.{key} must be a media name, null, a drive object, or "
-            "an inline media")
+            "an inline media", rule_id="value.not-a-drive")
     if set(value) - _DRIVE_FIELDS:
         # Not the hardware-attribute object, so it is an inline media:
         # a full spec, or the {"size": ...} blank.
@@ -850,7 +888,7 @@ def _drive(value, key, medium, slot, register):
     if "media" not in value:
         raise StaticError(
             f"drives.{key} must name a media (or be null for an empty "
-            "removable slot)")
+            "removable slot)", rule_id="drive.without-media")
     controller = (_controller(value["controller"], key, medium)
                   if "controller" in value else None)
     return MachineDrive(
@@ -862,14 +900,15 @@ def _drive(value, key, medium, slot, register):
 
 def _drives(value, register):
     if not isinstance(value, collections.abc.Mapping):
-        raise StaticError("drives must be an object")
+        raise StaticError("drives must be an object",
+            rule_id="value.not-an-object")
     normalized, claimed = {}, {}
     for authored_key, declaration in value.items():
         medium, slot, key = _drive_key(authored_key)
         if key in claimed:
             raise StaticError(
                 f"drive key clash: {claimed[key]!r} and {authored_key!r} "
-                f"both mean {key}")
+                f"both mean {key}", rule_id="drive.key-clash")
         claimed[key] = authored_key
         normalized[key] = _drive(declaration, key, medium, slot, register)
     return types.MappingProxyType(normalized)
@@ -889,16 +928,21 @@ def _default_boot(drives):
 
 def _boot(value, drives):
     if not isinstance(value, list):
-        raise StaticError("boot must be an array of drive keys")
+        raise StaticError("boot must be an array of drive keys",
+            rule_id="value.not-an-array")
     normalized, seen = [], set()
     for index, authored_key in enumerate(value):
         _, _, key = _drive_key(authored_key)
         if key not in drives:
-            raise StaticError(f"boot[{index}] references undeclared drive {key}")
+            raise StaticError(
+                f"boot[{index}] references undeclared drive {key}",
+                rule_id="drive.boot-undeclared")
         if not drives[key].enabled:
-            raise StaticError(f"boot[{index}] references disabled drive {key}")
+            raise StaticError(f"boot[{index}] references disabled drive {key}",
+                rule_id="drive.boot-disabled")
         if key in seen:
-            raise StaticError(f"boot contains duplicate drive {key}")
+            raise StaticError(f"boot contains duplicate drive {key}",
+                rule_id="drive.boot-duplicate")
         seen.add(key)
         normalized.append(key)
     return tuple(normalized)
@@ -906,7 +950,8 @@ def _boot(value, drives):
 
 def _scripts(value):
     if not isinstance(value, collections.abc.Mapping):
-        raise StaticError("scripts must be an object")
+        raise StaticError("scripts must be an object",
+            rule_id="value.not-an-object")
     normalized = {}
     for label, script in value.items():
         label = _plain(label, "scripts label")
@@ -915,20 +960,22 @@ def _scripts(value):
                 or script.lower().endswith(".rlqs")):
             raise StaticError(
                 f"scripts.{label} must be the file stem under scripts/, "
-                f"got: {script!r}")
+                f"got: {script!r}", rule_id="value.not-a-script-stem")
         normalized[label] = script
     return types.MappingProxyType(normalized)
 
 
 def _control_planes(value):
     if not isinstance(value, list):
-        raise StaticError("control-planes must be an array of strings")
+        raise StaticError("control-planes must be an array of strings",
+            rule_id="value.not-an-array")
     normalized, seen = [], set()
     for index, entry in enumerate(value):
         plane = _text(entry, f"control-planes[{index}]", closed=True,
                       allowed=_CONTROL_PLANES)
         if plane in seen:
-            raise StaticError(f"control-planes contains duplicate {plane!r}")
+            raise StaticError(f"control-planes contains duplicate {plane!r}",
+                rule_id="machine.control-plane-duplicate")
         seen.add(plane)
         normalized.append(plane)
     return tuple(normalized)
@@ -936,24 +983,28 @@ def _control_planes(value):
 
 def _backend_settings(value):
     if not isinstance(value, collections.abc.Mapping):
-        raise StaticError("backend-settings must be an object")
+        raise StaticError("backend-settings must be an object",
+            rule_id="value.not-an-object")
     normalized = {}
     for backend_name, section in value.items():
         if backend_name not in _BACKENDS:
             allowed = ", ".join(sorted(_BACKENDS))
             raise StaticError(
                 f"backend-settings names unknown backend {backend_name!r}; "
-                f"expected one of {allowed}")
+                f"expected one of {allowed}",
+                rule_id="machine.backend-unknown")
         if not isinstance(section, collections.abc.Mapping):
             raise StaticError(
-                f"backend-settings.{backend_name} must be an object")
+                f"backend-settings.{backend_name} must be an object",
+                rule_id="value.not-an-object")
         normalized[backend_name] = types.MappingProxyType(dict(section))
     return types.MappingProxyType(normalized)
 
 
 def _parameters(value):
     if not isinstance(value, collections.abc.Mapping):
-        raise StaticError("parameters must be an object")
+        raise StaticError("parameters must be an object",
+            rule_id="value.not-an-object")
     normalized = {}
     for key, binding in value.items():
         key = _plain(key, "parameters key")
@@ -963,33 +1014,38 @@ def _parameters(value):
             if set(binding) != {"property"}:
                 raise StaticError(
                     f"parameters.{key} must be a string or a "
-                    '{"property": "<key>"} redirect')
+                    '{"property": "<key>"} redirect',
+                    rule_id="value.not-a-parameter")
             normalized[key] = types.MappingProxyType(
                 {"property": _plain(
                     binding["property"], f"parameters.{key}.property")})
         else:
             raise StaticError(
                 f"parameters.{key} must be a string or a "
-                '{"property": "<key>"} redirect')
+                '{"property": "<key>"} redirect',
+                rule_id="value.not-a-parameter")
     return types.MappingProxyType(normalized)
 
 
 def _machine(value, register, *, where="machine"):
     if not isinstance(value, collections.abc.Mapping):
-        raise StaticError(f"{where} must be a JSON object")
+        raise StaticError(f"{where} must be a JSON object",
+            rule_id="value.not-an-object")
     unknown = set(value) - _MACHINE_FIELDS
     if unknown:
         bad = sorted(unknown)[0]
         if bad in _STATE_ONLY:
             raise StaticError(
-                f"{bad} is a state-only field and is not valid in a blueprint")
-        raise StaticError(f"unknown machine field: {bad}")
+                f"{bad} is a state-only field and is not valid in a blueprint",
+                rule_id="field.state-only")
+        raise StaticError(f"unknown machine field: {bad}",
+            rule_id="field.unknown")
     if "platform" not in value:
-        raise StaticError("platform is required")
+        raise StaticError("platform is required", rule_id="field.required")
     platform = _text(value["platform"], "platform", closed=True,
                      allowed=_PLATFORMS)
     if "name" not in value:
-        raise StaticError(f"{where} requires a name")
+        raise StaticError(f"{where} requires a name", rule_id="field.required")
     name = _machine_name(value["name"], "name")
     drives = _drives(value["drives"], register) if "drives" in value \
         else types.MappingProxyType({})
@@ -1028,11 +1084,12 @@ def _spec_type(value, where):
         raise StaticError(
             f"{where}: the {declared!r} spec type is retired — a source is "
             "now a media's location, and an archive is a media that other "
-            "media name as their parent")
+            "media name as their parent", rule_id="field.type-retired")
     if declared not in _SPEC_TYPES:
         allowed = ", ".join(sorted(_SPEC_TYPES))
         raise StaticError(
-            f"{where}.type must be one of {allowed}, got: {declared!r}")
+            f"{where}.type must be one of {allowed}, got: {declared!r}",
+            rule_id="field.type-unknown")
     return declared
 
 
@@ -1055,14 +1112,14 @@ def parse_document(value, *, stem=None):
             raise StaticError(
                 f"the plural {sorted(sections)[0]!r} section is retired: a "
                 "blueprint root is an array of specs (a lone spec object is "
-                "the array of one)")
+                "the array of one)", rule_id="blueprint.section-retired")
         entries = [value]
     elif isinstance(value, list):
         entries = value
     else:
         raise StaticError(
             "a blueprint must be an array of specs or a lone spec object, "
-            f"got {type(value).__name__}")
+            f"got {type(value).__name__}", rule_id="blueprint.not-a-document")
 
     buckets = {"machine": {}, "media": {}}
 
@@ -1070,13 +1127,15 @@ def parse_document(value, *, stem=None):
         bucket = buckets[kind]
         if name in bucket:
             raise StaticError(
-                f"duplicate {kind} name {name!r} in one document")
+                f"duplicate {kind} name {name!r} in one document",
+                rule_id="name.duplicate-in-document")
         folded = {existing.lower() for existing in bucket}
         if name.lower() in folded:
             raise StaticError(
                 f"{kind} name {name!r} collides case-insensitively with "
                 "another in this document: names match exactly but the "
-                "media cache is name-keyed on filesystems that do not")
+                "media cache is name-keyed on filesystems that do not",
+                rule_id="name.case-collision")
         bucket[name] = spec
 
     for index, entry in enumerate(entries):
@@ -1100,14 +1159,16 @@ def _bare_string_spec(entry, where, register):
         raise StaticError(
             f"{where}: a bare remote location has nowhere to carry its "
             f"sha256 — write the object form: "
-            f'{{"location": {entry!r}, "sha256": "…"}}')
+            f'{{"location": {entry!r}, "sha256": "…"}}',
+            rule_id="media.remote-without-hash")
 
 
 def load_document(path):
     """Load and parse one ``.rlqb`` document."""
     path = os.path.abspath(os.fspath(path))
     if not os.path.exists(path):
-        raise PreflightError(f"blueprint not found: {path}")
+        raise PreflightError(f"blueprint not found: {path}",
+            rule_id="blueprint.unknown")
     with open(path, "r", encoding="utf-8") as handle:
         value = jsonc.load(handle)
     return parse_document(value)

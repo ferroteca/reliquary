@@ -4,14 +4,21 @@
 
 P24's second conformance corpus, and the answer to the question
 the defect actually asked — whether the blueprint corpus's pattern
-generalizes. It does, to another document format, and it arrives
-**stronger** than its parent: the script language has stable rule
-ids, so an invalid fixture can assert *why* it was rejected rather
-than only *that* it was. The blueprint corpus cannot, and its own
-README names the cost — "an invalid fixture that fails for the
-wrong reason is a false pass, and the header is what lets a
-reviewer catch that". Here the harness catches it instead of a
-reviewer.
+generalizes. It does, to another document format, and it arrived
+**stronger** than its parent: the script language had stable rule
+ids, so an invalid fixture could assert *why* it was rejected
+rather than only *that* it was, which the blueprint corpus could
+not — its own README named the cost, a fixture failing for the
+wrong reason being a false pass only a reviewer could catch.
+
+**The parent has caught up** (2026-07-27). Blueprint diagnostics
+carry ids now, so that corpus asserts its `// id:` line the same
+way and the harness catches the false pass there too. What remains
+different is the `# rule:` line: the script rules are S-numbered,
+so an id here can be checked against the rule it is *meant* to
+serve rather than only the one that fired. That is the assertion
+the blueprint corpus still cannot make, and the reason is its
+rules have no numbering to check against.
 
 The ids are the dotted scheme D55 required and the static rules
 now carry: a fixture names the diagnostic that must reject it —

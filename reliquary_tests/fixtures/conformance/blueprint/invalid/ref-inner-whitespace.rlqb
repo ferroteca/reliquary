@@ -1,5 +1,6 @@
 // invalid: whitespace inside the braces is a parse error
 // spec: Dispatch and degenerates
+// id: ref.whitespace
 [
   { "type": "media", "name": "x", "location": "${media: outer}" }
 ]

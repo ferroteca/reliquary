@@ -1,6 +1,7 @@
 // invalid: the archive type is retired
 // spec: Spec types
 // schema: rejects
+// id: field.type-retired
 [
   { "type": "archive", "name": "a", "location": "a.zip",
     "members": [ { "path": "p.img" } ] }

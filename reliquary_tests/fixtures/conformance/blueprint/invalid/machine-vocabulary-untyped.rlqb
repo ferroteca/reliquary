@@ -2,4 +2,5 @@
 //         branch, with a did-you-mean hint
 // spec: Spec types
 // schema: rejects
+// id: field.unknown
 { "name": "rig", "platform": "dos", "drives": { "cdrom0": null } }

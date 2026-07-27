@@ -1,5 +1,6 @@
 // invalid: a referenced location has no stem to derive from
 // spec: Derivation, repair, and failure
+// id: name.not-derivable
 [
   { "type": "media", "location": "${iso.path}" }
 ]

@@ -1,6 +1,7 @@
 // invalid: unknown fields are refused
 // spec: Spec types
 // schema: rejects
+// id: field.unknown
 [
   { "type": "machine", "name": "rig", "platform": "dos",
     "drives": { "cdrom0": null }, "frobnicate": true }

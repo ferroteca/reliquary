@@ -1,6 +1,7 @@
 // invalid: identity never takes a reference
 // spec: Reach
 // schema: rejects
+// id: ref.not-allowed-here
 [
   { "type": "media", "name": "${what.name}", "location": "p.img" }
 ]

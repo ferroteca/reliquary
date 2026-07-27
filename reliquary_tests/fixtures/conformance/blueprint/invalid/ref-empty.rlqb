@@ -1,5 +1,6 @@
 // invalid: an empty body is a parse error naming the malformed reference
 // spec: Dispatch and degenerates
+// id: ref.empty
 [
   { "type": "media", "name": "x", "location": "${}" }
 ]

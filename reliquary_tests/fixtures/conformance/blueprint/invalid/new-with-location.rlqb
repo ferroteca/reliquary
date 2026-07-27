@@ -1,6 +1,7 @@
 // invalid: a new blank takes no location
 // spec: media
 // schema: rejects
+// id: media.new-with-location
 [
   { "type": "media", "name": "blank", "materialize": "new", "size": "20M",
     "location": "p.img" }

@@ -2,6 +2,7 @@
 //         platform
 // spec: Reach
 // schema: rejects
+// id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "${target.platform}",
     "drives": { "cdrom0": null } }

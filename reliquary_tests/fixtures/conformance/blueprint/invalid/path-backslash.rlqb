@@ -1,6 +1,7 @@
 // invalid: a backslash after the brace errors naming the / rule - the Windows
 //         author's first guess
 // spec: The path suffix
+// id: ref.backslash
 [
   { "type": "media", "name": "outer", "location": "outer.zip" },
   { "type": "media", "name": "esc", "location": "${media:outer\\p.img}" }

@@ -110,8 +110,9 @@ code has the bug, so the norm is already the demand.
 
 - **Diagnostics carry no stable identifier — the surfaces left**
   (filed 2026-07-27 by finishing the script surface; D55's
-  requirement, D58's reach. Second pass 2026-07-27: properties,
-  credentials, the CLI and the duplicate-rule sites done.)
+  requirement, D58's reach. Second pass: properties, credentials, the
+  CLI. Third pass: the blueprint document, and its corpus now
+  asserting the ids.)
   [script-spec.md](../docs/spec/script-spec.md) requires an id of
   *every* diagnostic.
 
@@ -126,55 +127,53 @@ code has the bug, so the norm is already the demand.
 
   | module | what it diagnoses | without an id |
   |---|---|---|
-  | `document.py` | the blueprint document | 97 |
   | `machines.py` | the machine verbs | 44 |
   | `lifecycle.py` | the VM's own lifecycle | 26 |
   | `machine.py` | the guest console | 12 |
-  | the remaining 10 | acquire, blueprint, DOS addressing, … | 26 |
+  | `blueprint.py` | blueprint file authoring | 5 |
+  | `acquire.py` | fetch, verify, extract | 5 |
+  | `platform_dos.py` | DOS addressing | 5 |
+  | the remaining 7 | library, assets, progress, home, … | 11 |
 
-  205 across 14 modules, down from 245 across 17. The count is a
-  one-command measurement — walk every `raise` and look for a
-  `rule_id` keyword — so it is re-derived rather than trusted.
+  108 across 13 modules, from 205 across 14 and 245 across 17 before
+  that. The count is a one-command measurement — walk every `raise`
+  and look for a `rule_id` keyword — so it is re-derived rather than
+  trusted.
 
-  **`document.py`'s subjects are decided; the pass is mechanical**
-  (owner, 2026-07-27). Subjects come from
-  [blueprint-model.md](../docs/spec/blueprint-model.md)'s own
-  vocabulary rather than being invented, and the families are
-  counted:
+  **Nothing left needs a subject argued.** That was the blueprint
+  document's question and it is answered; what remains is machine
+  operations, the VM lifecycle, the guest console and small
+  helpers, all of which fall under subjects that already exist —
+  `machine.`, `media.`, `drive.`, `value.`, `name.`, `platform.`.
+  Expect heavy reuse rather than new prefixes, and check for the rule
+  before minting an id: `machines.py`'s 44 are the phase and
+  materialization rules, several of which the script runner and the
+  CLI have already named.
 
-  | family | count | subject |
-  |---|---|---|
-  | reference grammar | 29 | `ref.` |
-  | value shape | 27 | `value.` |
-  | name charter and derivation | 16 | **`name.`** (exists) |
-  | unknown / retired vocabulary | 8 | `field.` |
-  | media semantics | 6 | **`media.`** (exists) |
-  | drive and boot structure | 6 | `drive.` |
-  | other | 5 | by the same test |
+  **The subject list is closed and enforced**, which is what keeps
+  that honest: `test_script_corpus.py` holds the code's subjects and
+  the spec's prefix list to each other in both directions, so a new
+  subject is an edit to the spec rather than a local decision. All 22
+  current subjects are listed there.
 
-  Three new subjects, and two families join ids that already exist.
-  A one-`blueprint.` scheme was refused: it would make the prefix
-  name the *surface*, which the spec forbids, and it would give the
-  16 name-charter rules a second id where `name.` already covers
-  them. A per-field scheme was refused for churn — a dozen subjects
-  for one document, several with a single id, and a field rename
-  moving ids that are meant to be stable.
+  **One rule keeps one id across surfaces** — asserted, not
+  described. `machine.not-running` is raised from five places, and
+  `machine.no-selector`, `machine.no-vm-identity` and
+  `field.unknown` from four each. The reuse also shows up in the
+  corpus: `ref.not-allowed-here` rejects nine fixtures from three
+  raise sites, because refusing a reference in a closed or
+  identity position is one rule wherever the position is.
 
-  **The subject list is closed and enforced now**, which is what
-  makes the rest mechanical: `test_script_corpus.py` holds the
-  code's subjects and the spec's prefix list to each other in both
-  directions, so a new subject is an edit to the spec rather than a
-  local decision. Adding `ref.`, `value.`, `field.` and `drive.`
-  means adding them there in the same change.
-
-  **One rule keeps one id across surfaces** — that is the payoff and
-  it is asserted, not described. `machine.not-running` is raised
-  from five places, `machine.no-selector` and
-  `machine.no-vm-identity` from three each, and
-  `name.duplicate-property`, `name.property-reserved-namespace`,
-  `media.unknown` and `platform.verb-not-implemented` from two.
-  Applying the scheme to a new module means looking for the rule
-  before minting an id.
+  **Both corpora assert the id now.** The blueprint corpus could not
+  until its diagnostics had them, and its README said so — headers
+  were "documentation, not assertions" and a fixture failing for the
+  wrong reason was a false pass only a reviewer could catch. All 47
+  invalid fixtures now declare an id and the harness compares it.
+  What the blueprint corpus still cannot assert is that an id serves
+  the rule the fixture *means* to exercise: the script corpus checks
+  that through `# rule:` and the S-numbering, and blueprint rules
+  have no numbering to check against. That is a real remaining
+  difference, not an oversight.
 
   **A located diagnostic is the other half, and only the blueprint
   surface lacks it.** `ScriptParseError` carries line and column;
@@ -184,14 +183,15 @@ code has the bug, so the norm is already the demand.
   proves the need rather than meeting it. `document.py` walks a
   parsed object with a `where` breadcrumb and no line, so a real
   location means carrying position through the parse — the larger
-  half of that module's work, and separable from the ids.
+  half of that module's work, untouched by the ids, and worth its own
+  entry when it is picked up.
 
   **What is already true** (do not redo it): `rule_id` lives on
   `ReliquaryError`, so every class has the field and nothing needs
-  a new one; the spec's prefix list carries all 17 current
-  subjects; and `RULE_OF` maps the static script tier alone by
-  construction, S-numbers naming syntactic restrictions only, so a
-  non-script id absent from it is correct rather than missing.
+  a new one; the spec's prefix list carries all 22 current subjects;
+  and `RULE_OF` maps the static script tier alone by construction,
+  S-numbers naming syntactic restrictions only, so a non-script id
+  absent from it is correct rather than missing.
 
   **The index is still not the gap.** Deferring the id *index* to
   beta stays where the spec says it; generating it is cheap now

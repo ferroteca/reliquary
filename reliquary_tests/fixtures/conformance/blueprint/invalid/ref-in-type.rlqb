@@ -1,6 +1,7 @@
 // invalid: the type never takes a reference
 // spec: Reach
 // schema: rejects
+// id: ref.not-allowed-here
 [
   { "type": "${what.type}", "name": "x", "location": "p.img" }
 ]
