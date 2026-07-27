@@ -370,12 +370,6 @@ def _text_literals(script):
             yield content.body, content.line, content.column
 
 
-def _all_statements(script):
-    yield from _walk(script.statements)
-    for phase in script.phases:
-        yield from _walk(phase.statements, phase.handlers)
-
-
 def _statement_literals(statement):
     for arg in statement.arguments:
         if hasattr(arg, "parts"):
