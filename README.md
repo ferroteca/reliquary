@@ -68,20 +68,87 @@ recreated freely: the blueprint (media components and all) and its scripts are a
 Reliquary materializes is ever precious. Editing a blueprint never changes an existing machine by itself; a machine
 keeps the snapshot it was created from. To adopt blueprint edits, destroy the machine and create it again.
 
-Read the [Blueprint guide](docs/blueprint-guide.md) for the implemented
-milestone-1 surface, the [CLI reference](docs/cli-reference.md) for
-commands, and the [API reference](docs/api-reference.md) for the
-Python surface. The full design (including fields not yet implemented) is in
-[The machine blueprint](docs/blueprint-guide.md) —
-starting with "The model at a glance" and its diagrams — and
-[Machine blueprints and machines](docs/spec/instance-model.md).
+### A blueprint, and the machines it makes
 
-> **Status:** milestone-1 blueprint materialization, lifecycle CLI
-> (`create-machine` / `start-machine` / `stop-machine` /
-> `destroy-machine` / `list-machines`), and
-> `rlq run-script <label> --blueprint NAME` (resolve, create-if-none, run
-> records, persistent `insert`/`eject`) are implemented for the
-> QEMU/DOS subset.
+Here is a whole blueprint — an MS-DOS-era box with 1 MB of memory
+and one floppy drive, saved as `blueprints/msdos.rlqb`:
+
+```jsonc
+[
+  {
+    "type": "machine",
+    "name": "msdos",
+    "platform": "dos",
+    "memory": "1M",
+    "description": "A 1 MB MS-DOS box with one floppy drive",
+    "drives": {
+      // Declared but empty: what goes in is a per-machine choice.
+      "floppy0": null
+    },
+    "boot": ["floppy0"]
+  }
+]
+```
+
+Create two machines from it and they are identical, differing only
+in id — numbered from zero, lowest free number first:
+
+```powershell
+rlq create-machine --blueprint msdos   # prints msdos-0
+rlq create-machine --blueprint msdos   # prints msdos-1
+```
+
+Now put a disk in one of them. `insert-media` changes that machine
+and nothing else — it survives stop and start, and `msdos-0` never
+hears about it:
+
+```powershell
+rlq insert-media --machine msdos-1 floppy0 dos-622-disk1
+```
+
+That is the split worth remembering: **the blueprint is the design,
+and a machine's own state is what has happened to it since.** Memory,
+drive slots and boot order come from the blueprint, so changing them
+means editing the file. What is *in* a drive is the machine's.
+
+A different design is a different blueprint. This one has sixteen
+times the memory and a CD-ROM, so it is `blueprints/dos-cd.rlqb`
+rather than a variant of the first:
+
+```jsonc
+[
+  {
+    "type": "machine",
+    "name": "dos-cd",
+    "platform": "dos",
+    "memory": "16M",
+    "description": "A 16 MB DOS box that boots from CD",
+    "drives": {
+      "hdd0": { "type": "media", "size": "20M" },
+      "cdrom0": null
+    },
+    "boot": ["cdrom0", "hdd0"]
+  }
+]
+```
+
+Its machines are `dos-cd-0`, `dos-cd-1`, and so on — the id always
+names the blueprint it came from.
+
+Editing a blueprint does not reach back into machines already built
+from it; each keeps the snapshot it was created from. `rlq
+apply-blueprint --machine msdos-0` adopts the edits into a stopped
+machine, absorbing what it can — memory, boot order, CPU count — and
+failing closed where it cannot, such as a changed size on an image
+that has already been materialized. `rlq recreate-machine` is the
+answer when it refuses: destroy and rebuild under the same id.
+
+Read the [Blueprint guide](docs/blueprint-guide.md) for the format,
+the [CLI reference](docs/cli-reference.md) for commands, and the
+[API reference](docs/api-reference.md) for the Python surface. The
+normative definitions are
+[the composed blueprint model](docs/spec/blueprint-model.md) and
+[Machine blueprints and machines](docs/spec/instance-model.md).
 
 ## Installation
 

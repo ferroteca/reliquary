@@ -278,9 +278,3 @@ need no entry at all once someone picks them up.
   today and would be stated in a normative one after, so nothing
   is unspecified in the meantime — what changes is whether the
   code is free to diverge from them.
-
-- README, blueprints and machines: give several clear examples
-  to illustrate the concepts — e.g. a 1 MB MS-DOS blueprint;
-  QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
-  specific floppy image mounted; QEMU machine #4 with 16 MB of
-  memory and a specific cdrom mounted

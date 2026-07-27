@@ -45,6 +45,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The README's "Blueprints and machines" section now shows the
+  model instead of only describing it: a whole 1 MB MS-DOS
+  blueprint, two machines created from it, `insert-media` changing
+  one and not the other, and a second blueprint for a design that
+  genuinely differs. The point the examples exist to make is
+  stated once — the blueprint is the design, a machine's own state
+  is what has happened to it since — so a reader can tell which of
+  the two to edit.
+
+  **README.md joins the documented-examples test.** Every fenced
+  blueprint in the teaching documents is run through the real
+  parser and the published schema; the README was outside that set
+  while it had no examples, and is the document most likely to be
+  read first and copied from.
+
+  Three stale claims went with the rewrite: the section called the
+  blueprint surface "milestone-1" (the arc ended at nine), the
+  status note listed **run records** among what ships (D36 deleted
+  them; a run stores nothing), and it said adopting blueprint
+  edits means destroy-and-recreate, which predates
+  `apply-blueprint` — now described with the limit that actually
+  bites, a changed size on an already-materialized image.
+
 - `rlq run-script --help` now explains the command rather than
   restating its name. It covers what LABEL resolves against, where
   the machine comes from and when one is created, what happens

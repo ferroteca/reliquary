@@ -31,8 +31,12 @@ except ImportError:
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# The documents that teach the authored blueprint format.
+# The documents that teach the authored blueprint format. README.md
+# joined them when it grew worked examples: it is the document most
+# likely to be read first and copied from, so an example rotting
+# there costs more than anywhere else, not less.
 _DOCUMENTS = (
+    "README.md",
     "docs/blueprint-guide.md",
     "docs/spec/blueprint-model.md",
     "docs/blueprint-reference.md",
