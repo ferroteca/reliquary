@@ -1,0 +1,5 @@
+# valid: a regex condition; the dialect is Python re
+# spec: Lexical rules / Regexes
+
+platform dos
+wait /installed [0-9]+ of [0-9]+/

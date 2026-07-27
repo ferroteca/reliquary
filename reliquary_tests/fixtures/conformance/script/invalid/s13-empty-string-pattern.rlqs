@@ -1,0 +1,6 @@
+# invalid: watch patterns are non-empty
+# rule: S13
+# spec: Syntactic restrictions
+
+platform dos
+wait ""

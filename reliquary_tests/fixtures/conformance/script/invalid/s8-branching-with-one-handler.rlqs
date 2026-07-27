@@ -1,0 +1,10 @@
+# invalid: a branching wait has at least two handlers
+# rule: S8
+# spec: Syntactic restrictions
+
+platform dos
+wait {
+    on "a" {
+        press enter
+    }
+}

@@ -1,0 +1,6 @@
+# invalid at preflight: a set-boot drive the machine does not declare
+# spec: Validation and preflight
+
+platform dos
+set-boot hdd6
+wait "C:\>"

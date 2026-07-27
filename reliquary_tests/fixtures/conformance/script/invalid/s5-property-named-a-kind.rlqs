@@ -1,0 +1,7 @@
+# invalid: a key is not spelled text, media, or secret
+# rule: S5
+# spec: Syntactic restrictions
+
+platform dos
+property text media
+wait "x"

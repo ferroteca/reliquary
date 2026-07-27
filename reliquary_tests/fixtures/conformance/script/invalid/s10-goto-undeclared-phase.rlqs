@@ -1,0 +1,11 @@
+# invalid: every goto names a declared phase
+# rule: S10
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+deadline 5m
+
+phase a {
+    goto nowhere
+}

@@ -1,0 +1,8 @@
+# valid: ${key} inside a string, and an escaped \${ that is text
+# spec: Lexical rules / Strings
+
+platform dos
+property text owner
+
+wait "name:"
+type "${owner} paid \${5}"

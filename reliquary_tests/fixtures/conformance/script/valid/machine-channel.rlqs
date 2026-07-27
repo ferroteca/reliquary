@@ -1,0 +1,5 @@
+# valid: the machine channel takes a state word, never a string
+# spec: Observations / Channels
+
+platform dos
+wait machine=stopped

@@ -1,0 +1,15 @@
+# valid: a phase graph that can cycle, with the header deadline S12
+#        requires
+# spec: Syntactic restrictions / S12
+
+platform dos
+entry a
+deadline 10m
+
+phase a {
+    goto b
+}
+
+phase b {
+    goto a
+}

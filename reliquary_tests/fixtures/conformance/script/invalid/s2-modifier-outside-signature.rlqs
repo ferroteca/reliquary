@@ -1,0 +1,8 @@
+# invalid: a modifier outside the node's signature
+# rule: S2
+# cites: no -- the signature arm carries no id; only the
+#           placement-matrix arm cites S2
+# spec: Syntactic restrictions
+
+platform dos
+press enter stable=1s

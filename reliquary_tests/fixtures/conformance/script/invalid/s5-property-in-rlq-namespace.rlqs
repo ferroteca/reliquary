@@ -1,0 +1,7 @@
+# invalid: the rlq namespace is reserved
+# rule: S5
+# spec: Syntactic restrictions
+
+platform dos
+property text rlq.mine
+wait "x"

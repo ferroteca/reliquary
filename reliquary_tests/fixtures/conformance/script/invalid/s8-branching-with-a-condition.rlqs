@@ -1,0 +1,16 @@
+# invalid: a branching wait carries no condition of its own
+# rule: S8
+# cites: no -- the grammar rejects this before validation can cite S8,
+#           and the S8 arm in script_validation is unreachable as a
+#           result
+# spec: Syntactic restrictions
+
+platform dos
+wait "x" {
+    on "a" {
+        finish
+    }
+    on "b" {
+        finish
+    }
+}

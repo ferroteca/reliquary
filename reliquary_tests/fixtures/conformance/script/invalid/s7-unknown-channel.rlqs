@@ -1,0 +1,6 @@
+# invalid: the channel is known
+# rule: S7
+# spec: Syntactic restrictions
+
+platform dos
+wait serial="login:"

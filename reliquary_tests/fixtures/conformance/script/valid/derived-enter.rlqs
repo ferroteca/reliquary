@@ -1,0 +1,6 @@
+# valid: `enter` is the derived form of `type` + `press enter`
+# spec: Derived forms
+
+platform dos
+wait "login:"
+enter "guest"

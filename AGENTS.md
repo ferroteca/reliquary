@@ -276,10 +276,21 @@ workflow:
   prose specs, **which are normative** — a schema captures only the
   structural subset JSON Schema can express, and schema validity
   never implies document validity. The shared valid/invalid
-  conformance corpus (`reliquary_tests/fixtures/conformance/`,
+  conformance corpus (`reliquary_tests/fixtures/conformance/blueprint/`,
   `test_conformance_corpus.py`) runs every fixture against both the
   parser and the schema so the two cannot drift. Placement rules
   are in `.agents/skills/documentation-rules.md`.
+- **Two conformance corpora, and the second is the stronger
+  pattern.** `fixtures/conformance/script/` (`test_script_corpus.py`)
+  does for `.rlqs` what the blueprint corpus does for `.rlqb`, and
+  adds the assertion the first cannot make: an invalid fixture
+  declares the S-id that must reject it, and the harness checks the
+  diagnostic cites it — so a fixture failing for the *wrong* reason
+  is caught by the suite rather than by a reviewer. Where an id does
+  not exist yet the fixture carries `# cites: no`, asserted in both
+  directions so it retires itself when the id lands; that count is
+  the live measurement behind D55. Each corpus has its own README,
+  which is where its findings live.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no

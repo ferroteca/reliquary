@@ -1,0 +1,8 @@
+# invalid at preflight: a declared property no source answers; whether it binds depends on
+#          the invocation, never on the text
+# spec: Validation and preflight
+
+platform dos
+property text unanswerable
+wait "x"
+type "${unanswerable}"

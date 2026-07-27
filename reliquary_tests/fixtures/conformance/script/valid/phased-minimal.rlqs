@@ -1,0 +1,10 @@
+# valid: the smallest phased script; entry names its one phase and
+#        the sequential body terminates
+# spec: Script shapes / Phased script
+
+platform dos
+entry only
+
+phase only {
+    finish
+}

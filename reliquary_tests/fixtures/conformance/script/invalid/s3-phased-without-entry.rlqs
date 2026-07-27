@@ -1,0 +1,8 @@
+# invalid: a phased script declares its entry
+# rule: S3
+# spec: Syntactic restrictions
+
+platform dos
+phase a {
+    finish
+}

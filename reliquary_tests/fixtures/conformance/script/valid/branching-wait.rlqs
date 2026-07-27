@@ -1,0 +1,18 @@
+# valid: a branching wait carries no condition of its own and has
+#        two handlers
+# spec: on, always, and reactive phases
+
+platform dos
+entry begin
+
+phase begin {
+    wait timeout=2m {
+        on "Continue?" {
+            press enter
+        }
+        on machine=stopped {
+            finish
+        }
+    }
+    finish
+}

@@ -1,0 +1,17 @@
+# valid: every action verb the statement table lists
+# spec: Core grammar / Statements
+
+platform dos
+machine stopped
+
+insert cdrom0 @install-cd
+set-boot cdrom0 hdd0
+start
+wait "C:\>"
+type "dir"
+press enter
+select "Yes"
+screenshot after-install
+set result "ok"
+eject cdrom0
+stop

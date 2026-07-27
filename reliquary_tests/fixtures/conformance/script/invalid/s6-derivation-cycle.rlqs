@@ -1,0 +1,8 @@
+# invalid: derivations are acyclic
+# rule: S6
+# spec: Syntactic restrictions
+
+platform dos
+property text a default="${b}"
+property text b default="${a}"
+wait "x"

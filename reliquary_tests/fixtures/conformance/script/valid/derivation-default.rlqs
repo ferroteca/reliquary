@@ -1,0 +1,8 @@
+# valid: default= candidates tried in order; the literal is last
+# spec: The property sources / the declared derivation
+
+platform dos
+property text owner default="${rlq.host.full-name}" default="${rlq.host.username}" default="operator"
+
+wait "name:"
+type "${owner}"

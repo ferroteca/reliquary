@@ -1,0 +1,6 @@
+# valid: the smallest linear script: a platform header and one
+#        observation
+# spec: Script shapes / Linear script
+
+platform dos
+wait "C:\>"

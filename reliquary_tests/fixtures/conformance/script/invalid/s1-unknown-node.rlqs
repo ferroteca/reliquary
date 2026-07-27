@@ -1,0 +1,7 @@
+# invalid: no unknown node names
+# rule: S1
+# cites: no -- the lexer/grammar rejects; parse errors carry no id (D55)
+# spec: Syntactic restrictions
+
+platform dos
+frobnicate "x"

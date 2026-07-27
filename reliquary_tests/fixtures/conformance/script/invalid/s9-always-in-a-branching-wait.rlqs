@@ -1,0 +1,13 @@
+# invalid: always is only directly inside a reactive phase
+# rule: S9
+# spec: Syntactic restrictions
+
+platform dos
+wait {
+    always "a" {
+        press enter
+    }
+    on "b" {
+        press enter
+    }
+}

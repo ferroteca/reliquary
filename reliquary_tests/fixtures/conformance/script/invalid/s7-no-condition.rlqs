@@ -1,0 +1,6 @@
+# invalid: a wait requires a condition
+# rule: S7
+# spec: Syntactic restrictions
+
+platform dos
+wait timeout=5s

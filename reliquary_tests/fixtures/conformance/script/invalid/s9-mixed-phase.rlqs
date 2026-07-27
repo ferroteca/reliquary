@@ -1,0 +1,13 @@
+# invalid: a phase is sequential or reactive, never both
+# rule: S9
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    wait "x"
+    always "y" {
+        finish
+    }
+}

@@ -1,0 +1,6 @@
+# invalid: the screen is observed by a bare string or regex
+# rule: S7
+# spec: Syntactic restrictions
+
+platform dos
+wait ready

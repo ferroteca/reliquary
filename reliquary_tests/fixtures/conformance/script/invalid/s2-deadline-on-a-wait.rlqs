@@ -1,0 +1,6 @@
+# invalid: the placement matrix: a budget is not a wait's
+# rule: S2
+# spec: Syntactic restrictions
+
+platform dos
+wait "x" deadline=5m

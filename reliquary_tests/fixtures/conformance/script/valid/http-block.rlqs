@@ -1,0 +1,19 @@
+# valid: an http declaration with one content entry, served from an
+#        inline body
+# spec: http-serve.md
+
+platform openbsd
+entry begin
+
+http port-min=8000 port-max=8100 {
+    content answer "/auto_install.conf" """
+        System hostname = demo
+    """
+}
+
+phase begin {
+    http start answer
+    wait "boot>"
+    enter "bsd.rd"
+    finish
+}

@@ -1,0 +1,15 @@
+# valid: a reactive phase is all always handlers, and exits by a
+#        terminating statement inside one
+# spec: on, always, and reactive phases
+
+platform dos
+entry watch
+
+phase watch {
+    always "Press any key" {
+        press enter
+    }
+    always "C:\>" {
+        finish
+    }
+}

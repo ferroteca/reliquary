@@ -134,57 +134,6 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **P24's tests check behavior, not specifications** (filed
-  2026-07-27 by D49, the same hour P24 armed — D48's second bar).
-  P24 claims every enumerated interface carries automated tests
-  checking it **against its specification**. Every interface does
-  carry test modules and the suite is green, which is why the
-  principle is armed rather than pledged; what is uneven is the
-  second half. Only the blueprint has a true conformance
-  artifact — `test_conformance_corpus.py`, one fixture corpus run
-  against both the parser and the published schema so the two
-  cannot drift. Everywhere else the tests assert behavior the
-  author knew about, which catches regressions but cannot catch
-  **a requirement the spec states and the code never
-  implemented** — the failure mode P24 exists for.
-  The work is not "write more tests": it is deciding, per
-  interface, what a spec-derived case set looks like and whether
-  the conformance-corpus pattern generalizes past a document
-  format. Where a surface genuinely cannot be tested that way,
-  P24's own clause applies — **name the gap**, do not exempt it
-  quietly.
-  Was [design/audits.md](design/audits.md)'s third audit question;
-  under D48 a named gap against an armed principle is a defect,
-  not a proposal.
-
-  **The CLI half is done (2026-07-27), and it paid immediately.**
-  `ClaimedCommandTests` compares the command words
-  `docs/spec/cli.md` writes after `rlq` against `cli._COMMANDS`,
-  both directions. Writing it found the spec specifying **five
-  commands that did not exist** — `clone-machine`,
-  `export-machine`, `export-drive`, `search-media`,
-  `search-scripts`, in present tense with worked example
-  output — and **five that shipped undocumented**, one of which
-  (`get-machine-var`) a careful hand sweep the same day had
-  missed. The root cause was one line: cli.md's banner still
-  called it *"a working document for brainstorming"*, so by the
-  banner-is-the-marker rule it had never claimed to be true.
-  **What that suggests for the remaining interfaces**: look for
-  the cheap inventory comparison first — the thing where a spec
-  enumerates and the code enumerates, and a set difference is the
-  whole test. It is not the deep conformance the blueprint corpus
-  achieves, but it caught six divergences in one sitting and it
-  generalizes without a design round. Candidates: the S-id list
-  against the diagnostics that cite them; the error classes and
-  exit codes against `errors.exit_code`; the script language's
-  verb table against the grammar's node names.
-  **Check the banner first, wherever this goes next.** cli.md
-  could not be made true while it disclaimed being a spec, and
-  the sweep found one more marker wrong in the same way:
-  `asset-resolution.md` **has no status banner at all**, so its
-  standing is undeclared — the same rule broken a different way,
-  and unfixed.
-
 - **P16's open question 3 asks about a construct that retired**
   (left 2026-07-27 by the `hostdir` sweep, which fixed the other
   five mentions and stopped here on purpose).

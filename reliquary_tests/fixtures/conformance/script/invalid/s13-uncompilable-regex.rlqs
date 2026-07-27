@@ -1,0 +1,6 @@
+# invalid: regexes compile
+# rule: S13
+# spec: Syntactic restrictions
+
+platform dos
+wait /a(b/

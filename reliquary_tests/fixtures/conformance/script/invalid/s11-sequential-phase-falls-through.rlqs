@@ -1,0 +1,10 @@
+# invalid: a sequential phase's statement list terminates
+# rule: S11
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    wait "x"
+}

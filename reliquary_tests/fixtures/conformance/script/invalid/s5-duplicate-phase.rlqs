@@ -1,0 +1,14 @@
+# invalid: phase names are unique
+# rule: S5
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    finish
+}
+
+phase a {
+    finish
+}

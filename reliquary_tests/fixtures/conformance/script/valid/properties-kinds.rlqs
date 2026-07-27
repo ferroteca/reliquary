@@ -1,0 +1,10 @@
+# valid: the three property kinds, and prompt= on each
+# spec: Properties
+
+platform dos
+property text  owner    prompt="Owner name"
+property media disk     prompt="Install disc"
+property secret licence prompt="Licence key"
+
+wait "name:"
+type "${owner}"

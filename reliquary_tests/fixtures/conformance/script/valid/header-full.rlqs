@@ -1,0 +1,13 @@
+# valid: every header node, each at most once
+# spec: Header
+
+description "every header"
+platform    dos
+machine     stopped
+entry       begin
+timeout     30s
+deadline    45m
+
+phase begin {
+    finish
+}

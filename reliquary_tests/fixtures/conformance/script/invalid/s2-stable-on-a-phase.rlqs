@@ -1,0 +1,10 @@
+# invalid: only a match can be required to hold
+# rule: S2
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a stable=1s {
+    finish
+}

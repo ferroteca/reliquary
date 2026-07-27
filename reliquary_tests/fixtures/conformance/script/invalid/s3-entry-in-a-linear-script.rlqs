@@ -1,0 +1,7 @@
+# invalid: entry appears exactly in phased scripts
+# rule: S3
+# spec: Syntactic restrictions
+
+platform dos
+entry nowhere
+wait "x"

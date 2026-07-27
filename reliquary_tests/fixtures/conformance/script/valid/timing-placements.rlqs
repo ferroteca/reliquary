@@ -1,0 +1,19 @@
+# valid: every timing modifier at a placement the matrix allows
+# spec: Timing
+
+platform dos
+entry begin
+timeout 30s
+deadline 20m
+
+phase begin timeout=1m deadline=5m {
+    wait "ready" timeout=10s stable=500ms
+    wait timeout=1m {
+        on "a" stable=1s {
+            finish
+        }
+        on "b" {
+            finish
+        }
+    }
+}

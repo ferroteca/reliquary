@@ -1,0 +1,6 @@
+# invalid: goto is invalid in a linear script
+# rule: S10
+# spec: Syntactic restrictions
+
+platform dos
+goto elsewhere

@@ -1,0 +1,6 @@
+# invalid: key names are from the portable set
+# rule: S14
+# spec: Syntactic restrictions
+
+platform dos
+press hyperspace

@@ -1,0 +1,6 @@
+# invalid: the screen channel has no named spelling
+# rule: S7
+# spec: Syntactic restrictions
+
+platform dos
+wait screen="x"

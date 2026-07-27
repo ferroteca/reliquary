@@ -1,0 +1,6 @@
+# invalid: machine-variable keys avoid rlq
+# rule: S5
+# spec: Syntactic restrictions
+
+platform dos
+set rlq.result "x"

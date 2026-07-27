@@ -1,0 +1,10 @@
+# invalid: reserved node names are not identifiers
+# rule: S5
+# spec: Syntactic restrictions
+
+platform dos
+entry press
+
+phase press {
+    finish
+}

@@ -43,6 +43,55 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lists synthesis from a native VM among the ways a blueprint comes
   to be.
 
+### Added
+
+- **A conformance corpus for the `.rlqs` scripting language** —
+  58 fixtures in three buckets, written from `script-spec.md` and
+  run by `test_script_corpus.py`. This is the half of P24 the
+  inventory sweep did not reach: the defect asked what a
+  spec-derived *case set* looks like per interface and whether the
+  blueprint corpus's pattern generalizes, and a set difference over
+  an enumeration is not a case set.
+
+  **It generalizes, and it arrives stronger.** The blueprint corpus
+  can assert only that a fixture was rejected; its README names the
+  cost — an invalid fixture failing for the wrong reason is a false
+  pass, and only a reviewer can catch it. The script language has
+  stable rule ids, so a fixture declares the S-id that must reject
+  it and the harness checks the diagnostic cites it. That paid on
+  the first run: three fixtures were rejected by the wrong rule
+  (`finish` in a linear script trips S10 before the S8 or S9 clause
+  under test) and would have passed a rejected-or-not assertion,
+  then gone on passing after the rules they claimed to exercise
+  stopped working.
+
+  **Past a document format it does not generalize**, and the
+  blocker has a name. A corpus needs artifacts to feed an
+  implementation; for the CLI or the API those would be argv
+  vectors or call sequences, which is possible — but with no
+  stable diagnostic identifiers outside the S-numbers, such a
+  corpus could asserts only an exit code, a six-value alphabet.
+  That is why the other eight interfaces got inventory comparisons
+  instead, and why the depth available there is bounded by D55
+  rather than by effort.
+
+  The corpus measured D55 rather than arguing it: six of 39 invalid
+  fixtures cannot name their rule and carry a `# cites: no` line
+  saying why — parse errors, header cardinality, duplicate
+  modifiers, and S2's signature arm carry no identifier at all,
+  though the spec requires one of every diagnostic. The markers are
+  asserted in both directions, so one cannot outlive the gap it
+  records, and the count is asserted too.
+
+  One finding came out of writing it, recorded in the corpus
+  README: `wait "x" { … }` is rejected by the **grammar**, so the
+  S8 arm in `script_validation` for that clause is unreachable and
+  the diagnostic is an unnamed `'{' is not valid here`. The
+  grammar's own header says the S-rules stay above it "where a
+  diagnostic can cite its id — encoding them here would trade named
+  errors for 'unexpected token'", which is the trade this clause
+  makes.
+
 ### Fixed
 
 - `--qemu` is gone from the CLI's flag-arity table. The spec says
