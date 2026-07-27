@@ -287,8 +287,9 @@ U5 loop is edit the blueprint, run the script.
 Four fields exist only in the state; a blueprint containing any of
 them is rejected. (The state document also carries the machine's
 bookkeeping — its blueprint's name, creation time, and lifecycle
-phase — which is outside the blueprint field set entirely; script
-outcomes live in run records. See
+phase — which is outside the blueprint field set entirely. A
+script's outcome is not there at all: a run returns it to whoever
+drove the run and stores nothing. See
 [the instance model](spec/instance-model.md).)
 
 ### `id`

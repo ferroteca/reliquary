@@ -224,35 +224,22 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
-- **Three normative specs still require `runs/`** (found
-  2026-07-27 by the blueprint-field audit). D36 deleted run
-  records — the run returns its output and stores nothing, and the
-  suite's own guarantee is that a run creates no `runs/`
-  directory. The specs did not follow:
-  - [instance-model.md](../docs/spec/instance-model.md) — **four
-    places**, including the machine-directory tree and the flat
-    assertion that *"`runs/` records stay append-only evidence"*.
-    This is the home-layout spec, so it is the one a user reads to
-    learn what a machine directory contains;
-  - [blueprint-model.md](../docs/spec/blueprint-model.md):616 —
-    `runs/` in the machine-directory layout, under a heading
-    stating the layout is *"already delivered"*;
-  - [blueprint-reference.md](../docs/blueprint-reference.md):291 —
-    "script outcomes live in run records" (descriptive, so this
-    half is the cheaper fix).
-  **A spec binds the implementation**, so this is not stale prose:
-  three documents require a directory the code is tested never to
-  create. The same paragraph was corrected twice already — in root
-  ARCHITECTURE.md's cross-cutting prose (D47) and in
-  blueprint-guide.md (D51) — which is the argument for sweeping
-  every instance in one pass rather than fixing what the next
-  audit happens to walk past.
-  **A sibling found in the same sweep, not folded in because it
-  wants its own call:** `hostdir` survives in six live places
-  (api.md ×2, cli.md, instance-model.md, media-spec.md,
-  blueprint-model.md) for a drive type milestone 7 replaced with
-  directory-source media. Some of those read as history and some
-  as instruction; sorting which is the work.
+- **`hostdir` survives a drive type that retired** (found
+  2026-07-27 by the blueprint-field audit; the `runs/` half of
+  this entry was fixed the same day). Milestone 7 replaced the
+  `hostdir` drive with directory-source media — a media whose
+  `location` is a directory, with `materialize: use` — and the
+  word still appears in five live documents: `api.md` (twice),
+  `cli.md`, `instance-model.md`, `media-spec.md`, and
+  `blueprint-model.md`.
+  **The work is sorting which are which**, and they are not all
+  the same: `blueprint-model.md`'s is a *death record* ("the first
+  round's four-way content selector … is gone"), which is correct
+  and stays; the others read as live instruction naming a
+  construct an author cannot write. The QEMU adapter also still
+  uses "hostdir" internally for vvfat, so some mentions may be
+  describing the adapter rather than the authored surface — worth
+  keeping if so, and worth saying which is meant.
 
 - **Diagnostics carry no stable identifier** (found 2026-07-27 by
   D55, checking what the error-id bullet was actually deferring).

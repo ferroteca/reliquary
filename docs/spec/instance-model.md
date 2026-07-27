@@ -5,20 +5,22 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # Machine blueprints and machines
 
-> **Status:** milestone 1 spikes 5–6 implement materialization and the
-> lifecycle CLI (`create-machine` / `start-machine` / `stop-machine` /
-> `destroy-machine` / `list-machines`, `--blueprint` / `--machine`
-> selection) for the QEMU-only subset. Spike 10 adds append-only run
-> directories under `cache/machines/<id>/runs/` for `run-script <label>`.
-> Exclusive per-machine operation locks, operation generations, and
-> startup reconciliation of interrupted transitional phases
-> (`creating` / `stopping` / `destroying`) are implemented; `apply`,
-> `recreate`, clone / export, and absorbing the legacy root-home model
-> remain later milestones.
+> **Status:** implemented for the QEMU subset. Materialization and
+> the lifecycle CLI (`create-machine` / `start-machine` /
+> `stop-machine` / `destroy-machine` / `recreate-machine` /
+> `apply-blueprint` / `list-machines`, `--blueprint` / `--machine`
+> selection), exclusive per-machine operation locks, operation
+> generations, and startup reconciliation of interrupted
+> transitional phases (`creating` / `stopping` / `destroying`) all
+> ship. **A run stores nothing in the machine** — `run-script`
+> returns its output to whoever drove it (D36), so there is no run
+> directory and never was one on this model. Clone and export
+> remain unbuilt (proposed/FEATURES.md); the legacy root-home
+> machine model was absorbed and deleted.
 
 A **blueprint** is a reusable, user-owned JSON description of a kind of
 machine. A **machine** is one realization of that blueprint: its
-writable disks, backend object, run history, and lifecycle. One blueprint
+writable disks, backend object, and lifecycle. One blueprint
 may have zero, one, or many machines. Blueprints have names; machines
 have ids.
 
@@ -31,7 +33,8 @@ have ids.
         ├── machine.json      state; while running, the live VM
         │                     identity folds in as a `vm` section
         ├── media/            per-machine images, by media name
-        ├── runs/
+        ├── screenshots/      the `screenshot` verb's captures, and
+        │                     a failure's automatic one
         └── <backend>/        the backend's own files (e.g. qemu/)
 ```
 
@@ -95,9 +98,10 @@ The blessing has edges:
 - `cache/media/` payloads stay outside it: hash-verified and
   read-only by doctrine, and rewriting one breaks verification
   and any `difference` machine backed by it;
-- `runs/` records stay append-only evidence — reading and
-  copying them out is the sanctioned custody move, writing into
-  them is not;
+- a run's output is **not** in the machine to be custodied: it
+  returns to whoever drove it and is already on their side of the
+  seam (D36), so there is nothing here to read out, copy, or
+  write into;
 - `machine.json` (its live `vm` section included) and lock files
   are Reliquary's own state, not an editing surface.
 

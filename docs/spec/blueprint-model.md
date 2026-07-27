@@ -612,9 +612,13 @@ cache/machines/<id>/
 │                   VM identity (name, uuid, port, pid), written
 │                   atomically with phase so the two cannot disagree
 ├── media/          per-machine materialized images, <media-name>.<ext>
-├── <backend>/      the backend's own artifacts (qemu/ virtualbox/ …)
-└── runs/           append-only run records
+├── screenshots/    the `screenshot` verb's captures, and a
+│                   failure's automatic one
+└── <backend>/      the backend's own artifacts (qemu/ virtualbox/ …)
 ```
+
+A run adds nothing to this tree: it returns its output to whoever
+drove it and stores none of it (D36).
 
 This layout is **already delivered** — it landed with milestone
 6's absorption of the root-home machine model — and is recorded
