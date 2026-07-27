@@ -220,9 +220,10 @@ The implemented binding uses the settled family:
 dies with the root-home model, whose `Runner` / `MachineConfig`
 surface is superseded by the blueprint machine model
 (file exchange is settled 2026-07-22: out-of-band host access
-to a stopped machine's drives — `hostdir` drives and the user's
-own image tooling, the machine directory reported by
-`get-machine-dir` — with in-band file operations deferred to a
-late milestone (planning/proposed/FEATURES.md "Horizon") and no script
-verbs; vvfat survives as the QEMU adapter's `hostdir`
-mechanism).
+to a stopped machine's drives — directory-source media and the
+user's own image tooling, the machine directory reported by
+`get-machine-dir` — with the in-band *directory* operations
+deferred (planning/proposed/FEATURES.md "Horizon") and no script
+verbs; vvfat is the mechanism a directory-source media attaches
+through. Single-file in-band exchange is **not** deferred:
+`put-file` / `get-file` landed at milestone 9).

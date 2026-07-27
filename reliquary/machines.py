@@ -110,26 +110,6 @@ def _resolve_control_planes(machine):
     return planes
 
 
-def _resolve_hostdir(declared, source):
-    """Resolve a drive ``hostdir`` to an existing absolute directory.
-
-    A relative path resolves against the blueprint file's directory
-    (the invocation asset root supersedes this in the residency work);
-    an absolute path is used as given. A missing directory fails
-    closed naming the resolved path.
-    """
-    if os.path.isabs(declared):
-        resolved = declared
-    else:
-        base = os.path.dirname(source) if source else os.getcwd()
-        resolved = os.path.join(base, declared)
-    resolved = os.path.abspath(resolved)
-    if not os.path.isdir(resolved):
-        raise FileNotFoundError(
-            f"hostdir directory does not exist: {resolved}")
-    return resolved
-
-
 def _blueprint_digest(resolved, drives):
     """Digest the resolved blueprint snapshot (the machine baseline).
 
@@ -1108,8 +1088,8 @@ def _anonymous_local(file):
     if os.path.isdir(path):
         raise ValueError(
             f"{path} is a directory; --file mounts an image file. A "
-            "directory reaches a guest as a declared hostdir drive, "
-            "which is stopped-only")
+            "directory reaches a guest as a declared media whose "
+            "location is that directory, which is stopped-only")
     if not os.path.isfile(path):
         raise FileNotFoundError(f"no such image file: {path}")
     return path
@@ -1390,7 +1370,7 @@ def _host_path(machine_id, address, context):
         raise PreflightError(
             f"{address}: drive {key} ({letter}:) is an image, not a "
             "host directory; in-band file exchange needs a "
-            "directory-source (hostdir) drive there")
+            "directory-source drive there")
     resolved = os.path.abspath(os.path.join(root, *segments))
     root = os.path.abspath(root)
     if os.path.commonpath([root, resolved]) != root:

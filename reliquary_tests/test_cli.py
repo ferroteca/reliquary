@@ -840,7 +840,7 @@ class CliExecRunTests(unittest.TestCase):
             ["put-file", source, r"C:\X.TXT", "--machine", "rig-0"])
         # PREFLIGHT ERROR: the capability gap names itself (P11).
         self.assertEqual(code, 3)
-        self.assertIn("hostdir", err)
+        self.assertIn("directory-source", err)
 
     def test_insert_media_mounts_a_file_by_path(self):
         image = os.path.join(self.home, "round-1.img")

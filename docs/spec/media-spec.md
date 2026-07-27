@@ -86,8 +86,8 @@ spec carrying `size` and no `location` *is* `new`, which is what
 lets the drive-inline blank be written `{"size": "20M"}`. `new` / `difference` / `copy` materialize a per-machine
 image under `cache/machines/<id>/media/<name>.<ext>` (named for the
 media, not the slot); `use` attaches the shared payload — the
-`cache/media/` file, the `local` file, or the `hostdir` directory —
-**directly**, with no per-machine copy. This is what a machine
+`cache/media/` file, the `local` file, or the directory a
+location names — **directly**, with no per-machine copy. This is what a machine
 drive's declaration reaches: **to change how a drive materializes,
 change (or point at a different) media.**
 

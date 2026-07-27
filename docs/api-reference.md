@@ -159,7 +159,7 @@ no meaning to what travels through them.
 The drive-letter mapping is built from the machine's declared
 platform and Reliquary's own drive assignment — never from
 inspecting a guest. Both file calls are **stopped-only**, and the
-addressed drive must be a directory-source (`hostdir`) drive: the
+addressed drive must be a directory-source drive: the
 backend snapshots that directory at attach, so a put made while the
 machine runs would be invisible and a guest write is not flushed
 until it stops. Anything else raises `PreflightError` naming the gap.

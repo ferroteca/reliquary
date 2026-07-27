@@ -1707,7 +1707,7 @@ The language deliberately has no file-exchange verbs (owner,
 caller's side of the seam, like every interpretation of what a
 run produced (G2): while a machine is stopped on every control
 plane, its drives are plain host state — a
-[directory-source (`hostdir`) media](media-spec.md#the-media-component)
+[directory-source media](media-spec.md#the-media-component)
 *is* its directory, and drive images are readable and
 writable with the user's own tools — so exchange is ordinary
 out-of-band host work against the machine directory
@@ -1911,7 +1911,7 @@ travels as ordinary script properties (`--property` / the
 granular results are a caller-authored artifact (JUnit XML, TAP)
 the caller takes directly — retrieved in-band by guest-terms
 address (U14), swapped out as a disk image (U20), read from a
-`hostdir` results drive at rest, or captured as text through
+directory-source results drive at rest, or captured as text through
 `exec` — and keeps on its own side of the seam. Reliquary has
 deliberately no test-result vocabulary — no pass/fail schema, no
 result parsing (G2). Granularity comes from run structure: one

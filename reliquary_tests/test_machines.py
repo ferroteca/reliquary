@@ -170,7 +170,7 @@ class MaterializationTests(_HomeCase):
         self.assertEqual(self._state(machine_id)["drives"]["hdd0"][
             "materialize"], "copy")
 
-    def test_hostdir_media_renders_vvfat(self):
+    def test_directory_source_media_renders_vvfat(self):
         work = os.path.join(self.home, "work")
         os.makedirs(work)
         machine_id = self._create(
@@ -889,7 +889,8 @@ class AnonymousImageTests(_HomeCase):
         with self.assertRaises(ValueError) as caught:
             insert_media(machine_id, "floppy0", file=self.home,
                          context=self.home)
-        self.assertIn("hostdir", str(caught.exception))
+        self.assertIn("location is that directory",
+                      str(caught.exception))
 
 
 class LiveFloppyGeometryTests(_HomeCase):
@@ -1135,7 +1136,7 @@ class InBandFileTests(_HomeCase):
         with self.assertRaises(PreflightError) as caught:
             put_file(source, r"C:\X.TXT", machine=machine_id,
                      context=self.home)
-        self.assertIn("directory-source (hostdir) drive",
+        self.assertIn("directory-source drive",
                       str(caught.exception))
 
     def test_an_undeclared_letter_names_the_ones_that_exist(self):

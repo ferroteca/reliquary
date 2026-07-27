@@ -744,7 +744,7 @@ naming backend and capability):
 - controller types the backend cannot provide (e.g. anything but
   `scsi` on Hyper-V Generation 2);
 - `difference` media the backend/format pair cannot express;
-- directory-source (`hostdir`) media the backend cannot serve;
+- directory-source media the backend cannot serve;
 - image formats the backend cannot attach;
 - control planes the backend cannot offer;
 - boot orders the backend cannot honor.

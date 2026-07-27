@@ -13,6 +13,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Two diagnostics named `hostdir`, a drive field that retired with
+  the composed blueprint model. Trying to `insert-media --file` a
+  directory now says the directory reaches a guest as "a declared
+  media whose location is that directory" instead of "a declared
+  hostdir drive", and the in-band file-exchange refusal asks for a
+  "directory-source drive" without glossing it by the old name.
+  Neither spelling was writable in a blueprint, so both messages
+  named a construct the reader could not use. vvfat is unchanged:
+  it is still how such a media attaches.
+
 - A script inserting a media the active source does not define now
   fails at preflight instead of part-way through the run. The script
   spec has always required it — preflight rejects "media references

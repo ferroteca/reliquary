@@ -802,13 +802,14 @@ Prints the machine's cache directory —
 serializes it like any other return). A query: it works in any
 machine phase and touches nothing.
 
-The path is the door to out-of-band file exchange, the
-sanctioned way files cross the host/guest boundary until the
-deferred in-band file operations land (planning/proposed/FEATURES.md
-"Horizon"): while the machine is stopped on every control
-plane, its drives are plain host state — a `hostdir` drive *is*
-its directory, and image drives are readable and writable with
-the user's own tools. Reliquary neither mediates nor records
+The path is the door to out-of-band file exchange, and it is not
+the only door: single-file in-band exchange landed at milestone 9
+as `put-file` / `get-file`, while the in-band **directory**
+operations stay deferred (planning/proposed/FEATURES.md
+"Horizon"). While the machine is stopped on every control
+plane, its drives are plain host state — a drive whose media is a
+directory *is* that directory, and image drives are readable and
+writable with the user's own tools. Reliquary neither mediates nor records
 out-of-band access. The contract, including what stays
 untouchable (`cache/media/` payloads), lives
 in the [instance model](instance-model.md).

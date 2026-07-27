@@ -224,23 +224,6 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
-- **`hostdir` survives a drive type that retired** (found
-  2026-07-27 by the blueprint-field audit; the `runs/` half of
-  this entry was fixed the same day). Milestone 7 replaced the
-  `hostdir` drive with directory-source media — a media whose
-  `location` is a directory, with `materialize: use` — and the
-  word still appears in five live documents: `api.md` (twice),
-  `cli.md`, `instance-model.md`, `media-spec.md`, and
-  `blueprint-model.md`.
-  **The work is sorting which are which**, and they are not all
-  the same: `blueprint-model.md`'s is a *death record* ("the first
-  round's four-way content selector … is gone"), which is correct
-  and stays; the others read as live instruction naming a
-  construct an author cannot write. The QEMU adapter also still
-  uses "hostdir" internally for vvfat, so some mentions may be
-  describing the adapter rather than the authored surface — worth
-  keeping if so, and worth saying which is meant.
-
 - **Diagnostics carry no stable identifier** (found 2026-07-27 by
   D55, checking what the error-id bullet was actually deferring).
   [script-spec.md](../docs/spec/script-spec.md) requires it of

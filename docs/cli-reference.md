@@ -358,7 +358,7 @@ platform and Reliquary's own drive assignment; nothing is inferred by
 inspecting the guest.
 
 Both are **stopped-only**, and the addressed drive must be a
-directory-source (`hostdir`) drive: the backend snapshots that
+directory-source drive: the backend snapshots that
 directory when the drive is attached, so a change made while the
 machine runs would be invisible to the guest, and a guest write is
 not flushed until it stops. An image drive has no in-band route and

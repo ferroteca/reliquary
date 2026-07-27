@@ -81,12 +81,14 @@ the standard selectors, valid in any phase, touching nothing.
 
 The path is the door to **out-of-band file exchange**, the
 sanctioned way files cross the host/guest boundary (owner,
-2026-07-22 — the run-collection model was dropped; in-band file
-operations are a deferred capability, planning/proposed/FEATURES.md
-"Horizon"). While the machine is stopped on every control
-plane, the content under `media/` is plain host state: a
-`hostdir` drive *is* its directory, and image drives are
-readable and writable with the user's own tools. Reliquary
+2026-07-22 — the run-collection model was dropped; the in-band
+*directory* operations remain a deferred capability,
+planning/proposed/FEATURES.md "Horizon", while single-file
+in-band exchange landed at milestone 9 as `put-file` /
+`get-file`). While the machine is stopped on every control
+plane, the content under `media/` is plain host state: a drive
+whose media is a directory *is* that directory, and image drives
+are readable and writable with the user's own tools. Reliquary
 neither mediates nor records out-of-band access — what the
 next `start` finds on the drives is simply the machine's state,
 exactly as if the guest had written it.
