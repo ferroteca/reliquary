@@ -178,6 +178,46 @@ is waiting on an answer today.
 
 ## Decided
 
+- D55 — THE REASON-BLOCKQUOTE SWEEP IS DROPPED — DECIDED (owner,
+  2026-07-27, closing out the Language queue). Supports P8, P23.
+  The 2026-07-21 spec-craft round left one editorial proposal
+  deliberately open — a sweep giving script-spec.md's rules
+  per-rule rationale blockquotes — and it is refused rather than
+  finished. Recorded here so it is not re-raised as an oversight;
+  it was considered and declined.
+  **ITS DEFINITION WAS ALREADY LOST**, which is half the argument.
+  The entry naming it points at *"the review output — workflow
+  `wf_ac5f89b4-402` journal"*, and a run id resolves only inside
+  its own session; no copy exists in the repo. Three entries lean
+  on those journals and none is readable. So finishing the sweep
+  would have meant inventing what it was, not completing it —
+  there is not one `Reason` blockquote in the file to infer the
+  shape from.
+  THE SUBSTANTIVE GROUND, which stands even if the journal turned
+  up tomorrow. **The spec already points at its reasoning**: it
+  carries eleven D-number citations at load-bearing spots, and a
+  D-number is this project's citation currency by design. A
+  per-rule blockquote replaces that pointer with a *copy*, and
+  D52 deleted an entire section of TASKS.md on what copies do —
+  a summary kept beside what it summarizes drifts, and a reader
+  has no way to tell. The cost scales: 51 sections, no test, and a
+  normative document is the worst place for prose that can quietly
+  stop being true.
+  THE NEED IT SERVED IS REAL AND ALREADY MET. A reader weighing a
+  proposed change needs to know why a rule exists — which is
+  precisely what the interface-change rule sends them to
+  DECISIONS.md for, and what the D-citations in the spec make
+  reachable in one hop. Where a rule's reason is *not* reachable,
+  the fix is a citation, not a paragraph.
+  EVIDENCE FROM THE INTERVENING SIX DAYS: script-spec.md went
+  through a full realignment, three delivered milestones and this
+  week's audits without anyone missing the blockquotes.
+  FOLDED: this entry; TASKS.md (the Language bullet dropped, and
+  with it the error-id clause it carried — that half is a defect,
+  entered under Defects, the *index* staying deferred to beta in
+  the spec sentence that already says so). script-spec.md is
+  unchanged.
+
 - D54 — `@` VERSUS `$` IS INHERENT AND OBSERVABLE; EXAMPLE 06
   CLOSES — DECIDED (owner, 2026-07-27). Supports P5, P8, G6.
   The last open question in

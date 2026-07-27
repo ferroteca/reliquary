@@ -224,6 +224,34 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
+- **Diagnostics carry no stable identifier** (found 2026-07-27 by
+  D55, checking what the error-id bullet was actually deferring).
+  [script-spec.md](../docs/spec/script-spec.md) requires it of
+  *every* diagnostic: "**every diagnostic carries a stable dotted
+  identifier naming its rule** (`obs.two-channels` style);
+  identifiers share one namespace across the classes, and the full
+  id index is deferred to beta."
+  The scheme does not exist. `obs.two-channels` appears nowhere
+  outside that sentence. What ships instead:
+  - **static rules** carry `(S5)`-style ids — 44 of them — which
+    are neither dotted nor namespaced, and cover only the
+    S-numbered restrictions;
+  - **parse errors** (43 raise sites across `script_nodes.py` and
+    `script_parser.py`) carry no id;
+  - **preflight and runtime errors** carry none either — including
+    the media-reference rejection added the same day.
+  So one class has a *different* scheme and the rest have none,
+  where the spec asks for one namespace across all of them.
+  **The index is not the gap.** Deferring the id *index* to beta
+  is fine and stays where the spec says it; what is unmet is the
+  requirement that the identifiers exist at all, which is a
+  today-rule and not a beta one. Sequencing follows from that: ids
+  first, index at beta over whatever they turned out to be.
+  Worth settling on the way in: whether `S5` becomes a dotted id
+  under the one namespace, or stays and the dotted scheme covers
+  only what has no id today. The spec says one namespace, which
+  points at the first.
+
 - **Reserved node names are not reserved** (found 2026-07-27 by
   D53, walking task [08]).
   [script-spec.md](../docs/spec/script-spec.md) requires it twice —
@@ -289,8 +317,9 @@ The **script-language residuals are gone** — all three settled
 2026-07-27 by walking them, and **none was the language change it
 was filed as**: [08] was withdrawn as a design already correct,
 [06]'s half was a defect against the preflight spec, and [03]'s
-was a rotted example. What is left below is editorial work on
-script-spec.md, which is not a residual at all.
+was a rotted example. **One item is left** and it is not a
+residual either: an audit of script-spec.md against two studies
+already complete.
 
 The catalogue they came from is
 [design/script-examples/](design/script-examples/) — three files
@@ -323,25 +352,32 @@ for a reactive phase's standing rule where **S9** requires
 Its *design* residuals, the timing spellings, stay deliberately
 not-tasks below.)*
 
-  *Deliberately not tasks.* [03] and [07] stay documented
-  tradeoffs rather than bugs — boundary tax (guest-text escaping)
-  or placement-equals-scope consequences, where a "fix" mostly
-  relocates the mush rather than removing it. Several are the
-  procedural/declarative seam showing through the syntax: read
-  "Primary language goals" (G1–G7) and "The procedural–declarative
-  seam" in [script-spec.md](../docs/spec/script-spec.md) before
-  proposing fixes, and judge any fix against the goals it costs
-  rather than in isolation.
+*Deliberately not tasks.* [03] and [07] stay documented tradeoffs
+rather than bugs — boundary tax (guest-text escaping) or
+placement-equals-scope consequences, where a "fix" mostly
+relocates the mush rather than removing it. Several are the
+procedural/declarative seam showing through the syntax: read
+"Primary language goals" (G1–G7) and "The procedural–declarative
+seam" in [script-spec.md](../docs/spec/script-spec.md) before
+proposing fixes, and judge any fix against the goals it costs
+rather than in isolation.
 
-- the full Reason-blockquote editorial sweep of script-spec.md
-  remains deliberately open (may trail realignment); the
-  error-id INDEX is deferred to beta
-- resume the spec-audit work the AHK/Python failure-catalog
-  studies were feeding: the studies themselves are complete and
-  their imports are recorded in DECISIONS.md, but the spec audits
-  hit the session limit. (The workflow handle the entry carried,
-  `wf_1a266a6b-ff8`, is dead — a run id resumes only within its
-  own session — so this restarts rather than resumes.)
+- **Audit script-spec.md against the AHK/Python failure
+  catalogs.** The studies are complete and — this is the part the
+  entry used to bury — **their findings survive**: DECISIONS.md
+  records the three sharpest imports, so the dead workflow handle
+  the entry once carried took nothing with it. What stopped was
+  the audit, not the study.
+  Two of the three are live:
+  - a construct's lifetime should be recoverable from its own
+    text (it was raised against the deleted [04], and the point
+    outlived the example);
+  - a naming freeze is free before v1 and never after — which
+    prices itself: the window is open now and shuts at 1.0.
+
+  The third — *reserve future keyword space now* — is **closed by
+  D53**, which chose contextual keywording over reservation, under
+  which there is no keyword space to reserve. Do not re-audit it.
 
 ### Small items
 
