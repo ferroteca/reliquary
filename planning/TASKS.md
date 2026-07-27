@@ -257,15 +257,6 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
-- validate declared control-planes at materialization: the
-  parser accepts `vnc` / `serial-console` / `guest-agent` as
-  `control-planes` values, but nothing refuses them at create
-  or start — a blueprint declaring an unimplemented plane is
-  pledged silently, against P11 (capability gaps fail closed
-  naming themselves). Refuse anything but `agentless-display`
-  until the plane exists (found by the P1–P12 delivery pass,
-  2026-07-23).
-
 ### Language
 
 The **script-language residuals** stay here rather than becoming a

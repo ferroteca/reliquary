@@ -86,6 +86,30 @@ def _default_control_planes(platform):
     return ["agentless-display"]
 
 
+# The parser accepts the model's whole control-plane vocabulary; this
+# is the subset that exists.
+_IMPLEMENTED_CONTROL_PLANES = ("agentless-display",)
+
+
+def _resolve_control_planes(machine):
+    """The machine's control-plane policy, defaulted and checked.
+
+    A blueprint naming a plane Reliquary has not built fails closed
+    naming it, rather than materializing a machine whose recorded
+    policy promises a plane nothing can probe (P11).
+    """
+    planes = (list(machine.control_planes)
+              or _default_control_planes(machine.platform))
+    missing = [plane for plane in planes
+               if plane not in _IMPLEMENTED_CONTROL_PLANES]
+    if missing:
+        names = ", ".join(repr(plane) for plane in missing)
+        raise NotImplementedError(
+            f"control-planes names {names}; only 'agentless-display' "
+            "is wired so far (the adapter seam owns the other planes)")
+    return planes
+
+
 def _resolve_hostdir(declared, source):
     """Resolve a drive ``hostdir`` to an existing absolute directory.
 
@@ -380,6 +404,9 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
                          created, media_root, source, context,
                          properties=None, events=None):
+    # Checked before anything is materialized, so a refusal costs no
+    # image work.
+    control_planes = _resolve_control_planes(machine)
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
@@ -401,8 +428,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "name": machine.name,
         "description": machine.description,
         "scripts": dict(machine.scripts),
-        "control-planes": (list(machine.control_planes)
-                           or _default_control_planes(machine.platform)),
+        "control-planes": control_planes,
         "backend-settings": {
             name: dict(section)
             for name, section in machine.backend_settings.items()},
@@ -611,6 +637,9 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
                 f"no machine blueprint named {blueprint_name!r} to apply")
         parsed = namespace.machines[blueprint_name]
         path = namespace.origin.get(("machine", blueprint_name))
+        # Checked before the drives are reconciled, so a refused apply
+        # leaves the machine as it was.
+        control_planes = _resolve_control_planes(parsed)
 
         bound = _bind_location_properties(
             parsed, namespace, explicit=properties,
@@ -632,8 +661,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "name": parsed.name,
             "description": parsed.description,
             "scripts": dict(parsed.scripts),
-            "control-planes": (list(parsed.control_planes)
-                               or _default_control_planes(parsed.platform)),
+            "control-planes": control_planes,
             "backend-settings": {
                 name: dict(section)
                 for name, section in parsed.backend_settings.items()},

@@ -643,12 +643,22 @@ control plane listed twice fails validation.
 
 Working name set:
 
-| name                | mechanism                                  |
-|---------------------|--------------------------------------------|
-| `agentless-display` | keyboard injection + screen readback; no guest cooperation needed |
-| `vnc`               | framebuffer and input over VNC             |
-| `serial-console`    | text console on an emulated serial port    |
-| `guest-agent`       | structured agent protocol (QGA profile)    |
+| name                | mechanism                                  | built |
+|---------------------|--------------------------------------------|-------|
+| `agentless-display` | keyboard injection + screen readback; no guest cooperation needed | yes |
+| `vnc`               | framebuffer and input over VNC             | no    |
+| `serial-console`    | text console on an emulated serial port    | no    |
+| `guest-agent`       | structured agent protocol (QGA profile)    | no    |
+
+The names are the model's whole vocabulary and the parser accepts
+them all; only `agentless-display` exists today, so a blueprint
+listing any of the others is refused at materialization —
+`create-machine` and `apply-blueprint` fail closed naming the plane
+rather than recording a policy Reliquary cannot honor. A plane that
+is built is one Reliquary can probe, so the refusal is what keeps
+the state's list truthful. Listing a working plane alongside an
+unbuilt one does not excuse it: the policy is every plane Reliquary
+may use.
 
 Defaults by platform (DOS: `["agentless-display"]`); the resolved
 default appears in the state. Backends that cannot provide a
@@ -656,8 +666,13 @@ listed control plane fail capability checking (e.g. `vnc` on
 Hyper-V).
 
 ```json
-{"control-planes": ["guest-agent", "agentless-display"]}
+{"control-planes": ["agentless-display"]}
 ```
+
+Today that is the only list a machine can be built from. The
+preference order the field exists for — `["guest-agent",
+"agentless-display"]`, meaning *try the agent, fall back to the
+display* — is the shape it takes once a second plane is built.
 
 ---
 

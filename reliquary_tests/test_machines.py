@@ -200,6 +200,32 @@ class MaterializationTests(_HomeCase):
                 create_machine("scsi", context=self.home)
         self.assertIn("scsi", str(caught.exception))
 
+    def test_unimplemented_control_plane_fails_closed(self):
+        # A wired plane in the list excuses nothing: the policy is
+        # every plane Reliquary may use, so each has to exist.
+        self._write("vnc", {"platform": "dos",
+                            "drives": {"hdd0": "blank"},
+                            "control-planes": ["agentless-display", "vnc",
+                                               "guest-agent"]},
+                   media=[_BLANK])
+        with mock.patch("reliquary.machines.create_hdd_image") as image:
+            with self.assertRaises(NotImplementedError) as caught:
+                create_machine("vnc", context=self.home)
+        self.assertIn("'vnc'", str(caught.exception))
+        self.assertIn("'guest-agent'", str(caught.exception))
+        # Refused before any image work, and no machine left behind.
+        image.assert_not_called()
+        self.assertFalse(os.path.exists(
+            machine_dir_path("vnc-0", self.home)))
+
+    def test_declared_agentless_display_is_recorded(self):
+        machine_id = self._create(
+            "cp", {"platform": "dos", "drives": {"hdd0": "blank"},
+                   "control-planes": ["agentless-display"]},
+            media=[_BLANK])
+        self.assertEqual(self._state(machine_id)["control-planes"],
+                         ["agentless-display"])
+
     def test_disabled_drive_excluded_from_state(self):
         machine_id = self._create(
             "disabled", {"platform": "dos",
@@ -618,6 +644,25 @@ class LifecycleTests(_HomeCase):
         self.assertIn("cdrom0", state["drives"])
         self.assertFalse(os.path.exists(
             os.path.join(media_root, "big.qcow2")))
+
+    def test_apply_refuses_an_unimplemented_control_plane(self):
+        machine_id = self._create(
+            "cpa", {"platform": "dos",
+                    "drives": {"hdd0": "blank", "hdd1": "big"}},
+            media=[_BLANK, {"name": "big", "materialize": "new",
+                            "size": "30M"}])
+        self._write("cpa", {"platform": "dos",
+                           "drives": {"hdd0": "blank"},
+                           "control-planes": ["serial-console"]},
+                   media=[_BLANK])
+        with self.assertRaises(NotImplementedError) as caught:
+            apply_blueprint(machine=machine_id, context=self.home)
+        self.assertIn("'serial-console'", str(caught.exception))
+        # Refused before the drives are reconciled, so the dropped
+        # drive is still there and the machine is as it was.
+        state = self._state(machine_id)
+        self.assertIn("hdd1", state["drives"])
+        self.assertEqual(state["control-planes"], ["agentless-display"])
 
     def test_apply_requires_stopped(self):
         machine_id = self._ready()

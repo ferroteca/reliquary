@@ -9,6 +9,22 @@ All notable changes to Reliquary are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- A blueprint asking for a control plane Reliquary has not built now
+  fails closed naming it. The blueprint model's `control-planes`
+  vocabulary is four planes and only `agentless-display` is wired, so
+  `create-machine` and `apply-blueprint` (twins `create_machine` /
+  `apply_blueprint`) refused nothing and recorded a policy promising
+  `vnc`, `serial-console` or `guest-agent` — a machine whose state
+  claimed planes nothing could probe. The check runs before any image
+  work, so a refused create leaves no machine behind and a refused
+  apply leaves the machine exactly as it was. The parser still accepts
+  the full vocabulary: the model names the planes, and the refusal is
+  the capability report.
+
 ## 0.1.0.dev2 - 2026-07-26
 
 ### Added

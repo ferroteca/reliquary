@@ -89,7 +89,10 @@ workflow:
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
   matches codex + home blueprints and reports provenance `yes`/`seeded`/`user`), `machines.py` owns machine materialization under
-  `cache/machines/<blueprint>-<n>/` plus lifecycle (`create` / `start` / `stop` / `destroy` /
+  `cache/machines/<blueprint>-<n>/` — where the declared capabilities are checked against the built ones
+  before any image work, so a blueprint naming an unwired drive `controller` or an unbuilt
+  `control-planes` entry (only `agentless-display` exists) raises `NotImplementedError` naming the gap
+  rather than recording a policy nothing can honor (P11) — plus lifecycle (`create` / `start` / `stop` / `destroy` /
   `recreate_machine` (destroy+create under the same id) / `apply_blueprint` (adopt blueprint edits into a
   stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
   already-materialized media image) / `get_machine_dir` (the out-of-band door) /
