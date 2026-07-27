@@ -224,6 +224,36 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
+- **Three normative specs still require `runs/`** (found
+  2026-07-27 by the blueprint-field audit). D36 deleted run
+  records — the run returns its output and stores nothing, and the
+  suite's own guarantee is that a run creates no `runs/`
+  directory. The specs did not follow:
+  - [instance-model.md](../docs/spec/instance-model.md) — **four
+    places**, including the machine-directory tree and the flat
+    assertion that *"`runs/` records stay append-only evidence"*.
+    This is the home-layout spec, so it is the one a user reads to
+    learn what a machine directory contains;
+  - [blueprint-model.md](../docs/spec/blueprint-model.md):616 —
+    `runs/` in the machine-directory layout, under a heading
+    stating the layout is *"already delivered"*;
+  - [blueprint-reference.md](../docs/blueprint-reference.md):291 —
+    "script outcomes live in run records" (descriptive, so this
+    half is the cheaper fix).
+  **A spec binds the implementation**, so this is not stale prose:
+  three documents require a directory the code is tested never to
+  create. The same paragraph was corrected twice already — in root
+  ARCHITECTURE.md's cross-cutting prose (D47) and in
+  blueprint-guide.md (D51) — which is the argument for sweeping
+  every instance in one pass rather than fixing what the next
+  audit happens to walk past.
+  **A sibling found in the same sweep, not folded in because it
+  wants its own call:** `hostdir` survives in six live places
+  (api.md ×2, cli.md, instance-model.md, media-spec.md,
+  blueprint-model.md) for a drive type milestone 7 replaced with
+  directory-source media. Some of those read as history and some
+  as instruction; sorting which is the work.
+
 - **Diagnostics carry no stable identifier** (found 2026-07-27 by
   D55, checking what the error-id bullet was actually deferring).
   [script-spec.md](../docs/spec/script-spec.md) requires it of
@@ -318,19 +348,59 @@ section formerly named Wishlist, then Backlog). Parked non-GitHub
 issues land here. Most would qualify as housekeeping (D38) and
 need no entry at all once someone picks them up.
 
-- **Audit the blueprint field reference for orphaned norms**
-  (2026-07-26, from the spec/descriptive split). The blueprint's
-  norm is now the published schema (structure) plus
-  docs/spec/blueprint-model.md (semantics), and
-  docs/blueprint-reference.md was demoted to descriptive.
-  Walk its per-field contracts (units, controller vocabulary,
-  boot semantics, materialize modes): anything load-bearing that
-  neither the schema nor the model states gets promoted into one
-  of them, so no rule is left normless.
-  The audit is a task, but **its findings may not be** (noted
-  2026-07-27): relocating a rule unchanged passes P23's clarify
-  test, while anything that reads as a *new* requirement on the
-  blueprint is an interface change and takes the argued route.
+- **Promote the blueprint reference's orphaned norms** (the audit
+  ran 2026-07-27; this is its findings, not a second audit — all
+  18 sections walked, each rule checked against the published
+  schema and blueprint-model.md, and every orphan below verified
+  implemented in the code). A rule stated only in
+  [blueprint-reference.md](../docs/blueprint-reference.md) is
+  normless: that document was demoted to descriptive, so it binds
+  nothing and the code is free to drift from it.
+  **The orphans, by field:**
+  - **`memory`** — a bare integer means MiB (the size grammar the
+    reference defers to *requires* a suffix, so this case is
+    covered nowhere); the value must resolve to a whole MiB;
+    per-platform defaults, dos 16 / openbsd 512 / win9x 64 /
+    winnt 256, which live only in `machines._PLATFORM_MEMORY`;
+  - **`boot`** — entries must name declared *and enabled* drives;
+    entries are unique by slot in either spelling; an empty or
+    non-bootable entry is valid and falls through (the documented
+    install pattern depends on it); the default order when
+    omitted — slot-0 floppy, else slot-0 hdd, else first cdrom;
+  - **`controller`** — floppies reject the key; the default is
+    `ide`; **slot order is authoritative only within one
+    controller type**;
+  - **drive keys** — the bare-medium alias means slot 0, and
+    declaring alias plus indexed form is a slot clash;
+  - **`name`** — "never all digits". The schema's pattern admits
+    `123`; `document.py` rejects it;
+  - **`control-planes`** — entries unique; an unbuilt plane is
+    refused at materialization; the per-platform default;
+  - **`backend-settings`** — the only place backend config may
+    appear; it may not touch Reliquary-owned fields; its sections
+    steer default backend assignment;
+  - **image formats** — the backend→format table (qcow2 / VDI /
+    VMDK / VHDX) that the "format-portable by construction" claim
+    rests on.
+
+  Clean, deferring correctly, and needing nothing: `materialize`,
+  image *naming*, `platform`, `scripts` label priority,
+  `parameters`, `description`, the state-only fields.
+  **THE SPLIT THE ORIGINAL ENTRY WARNED ABOUT IS REAL, and two
+  items fall the wrong side of it.** Relocating a rule unchanged
+  passes P23's clarify test and is ordinary work. But
+  `controller`'s within-one-type ordering caveat and the
+  image-format table both read as *commitments* rather than
+  restatements — the first constrains what Reliquary may promise
+  about guest disk order, the second binds four backends to four
+  formats. Promoting those is an interface change and takes the
+  argued route; do not sweep them in with the rest.
+  **One finding reaches outside this task.** `controller`'s
+  ordering caveat is a *second* source of the drive-letter
+  ambiguity already filed against P17 above — that defect names
+  only the multi-volume case, and mixed controller types are an
+  independent way the guest's lettering diverges from Reliquary's
+  assignment. Whoever fixes either should read both.
 
 - CLI help: run-script's text says little more than "runs a
   script on a machine". Not an interface change — it changes no
