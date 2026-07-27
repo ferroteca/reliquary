@@ -178,6 +178,73 @@ is waiting on an answer today.
 
 ## Decided
 
+- D53 — BARE WORDS STAY POSITION-TYPED; TASK [08] IS REFUSED —
+  DECIDED (owner, 2026-07-27, walking the script-language
+  residuals). Supports P8, P23, G6. The task proposed reserving
+  the small closed vocabularies — key names and drive slots —
+  globally, so they could never name a phase or artifact. It is
+  refused, and the refusal is the *first* option its own example
+  offered: accept position-typed bare words as the price of a
+  sigil-light language.
+  THE PRIOR ART SETTLES IT. Mainstream languages meet this exact
+  problem and answer it with a line that is not the one the
+  example drew. **Syntax words are reserved; domain vocabularies
+  are not.** Java reserves `class` and `goto` — the latter not
+  even used — and reserves nothing resembling `println` or an
+  enum's members. The modern trend runs further the same way:
+  C# made `var`, `async`, `await`, `from` and `select` *contextual*
+  keywords, legal as identifiers elsewhere; C++ did the same for
+  `override` and `final`; Java added `var`, `record`, `sealed` and
+  `permits` as restricted identifiers specifically to avoid
+  reserving them. Reserving a word taxes every future author
+  forever, and position usually disambiguates without it.
+  **THE SPEC ALREADY DRAWS THE LINE CORRECTLY**, which is what
+  makes this a refusal rather than a design round. script-spec.md
+  says *"reserved node names (headers, declarations, and verbs)
+  cannot name phases or property keys"* — the 28 syntax words
+  reserved, key names and slots left contextual. That is exactly
+  the Java/C# split. The task would have moved a correct design
+  to the position those languages abandoned.
+  THE PRICE, MEASURED. Reserving the key vocabulary costs nine
+  ordinary English words as phase and artifact names — `space`,
+  `up`, `down`, `left`, `right`, `delete`, `home`, `end`, `tab`.
+  `phase end { finish }` and `screenshot home` are natural and
+  legal today. The example priced the change as *"who names a
+  phase `cdrom0`?"*, which is true of the ten slot names and not
+  of the thirty key names; it had priced two vocabularies as one.
+  WHAT THIS IS NOT: a rejection of the kind D52 says TASKS.md
+  cannot produce. That entry is about **intake** — refusal happens
+  at the door, and what is refused never becomes a task. This is a
+  **withdrawal**: an approved item whose premise did not survive
+  examination, which README.md already provides for — the shelf is
+  allowed to be wrong, and an item nobody intends to deliver is
+  withdrawn rather than left sitting as a pledge nobody means.
+  EXAMPLE 08 IS NARROWED, NOT DELETED. Its file poses two
+  problems, and the walk separated them (owner): the reservation
+  asymmetry, settled here, and the create-versus-must-exist
+  contrast — `screenshot installed` names an artifact to create
+  while `goto finished` names a phase that must exist, identical
+  in shape and opposite in failure. The second is untouched by
+  this decision and stays open, so the example survives carrying
+  only that half. The catalogue's delete-on-resolution rule
+  applies when its last question closes.
+  A DEFECT FOUND WHILE DECIDING, filed under TASKS.md's Defects:
+  **the code does not implement the reservation the spec
+  requires.** Tested at adjudication — `phase enter { … }` and
+  `phase cdrom0 { … }` both parse. The lexer treats a word as a
+  keyword only when it leads a line and nothing reserves anything
+  thereafter, so the implementation is pure contextual keywording
+  where the spec asks for the mixed line. The spec is right; the
+  code has the bug. Its likely cause is a comment in
+  `script_parser.py` asserting the reservation as though it were
+  enforced.
+  FOLDED: this entry; TASKS.md ([08] struck from Language, the
+  reservation defect entered); design/script-examples/08 (narrowed
+  to the create-versus-must-exist half, its open question
+  rewritten). script-spec.md is **unchanged** — the refusal is
+  what leaves it standing. No CHANGELOG line: nothing
+  release-facing moved.
+
 - D52 — EVERYTHING IS STRUCK WHEN IT IS DONE; TASKS.md'S COMPLETED
   SECTION IS DELETED — DECIDED (owner, 2026-07-27). Supports P8,
   P23; **amends D45**, which stays as written with a pointer here.

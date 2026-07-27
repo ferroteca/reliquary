@@ -224,6 +224,36 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
+- **Reserved node names are not reserved** (found 2026-07-27 by
+  D53, walking task [08]).
+  [script-spec.md](../docs/spec/script-spec.md) requires it twice —
+  the Grammar section's *"reserved node names (headers,
+  declarations, and verbs) cannot name phases or property keys"*,
+  and **S5**'s *"reserved node names are not identifiers"*. The
+  code enforces neither. Verified by parsing:
+
+  ```
+  phase enter { ... }      parses
+  phase cdrom0 { ... }     parses
+  ```
+
+  The cause is in the lexer: a word becomes a keyword token only
+  when it **leads a line** (`script_parser.py`, `_convert` —
+  `_KEYWORD_TERMINALS.get(...) if leading else "NAME"`), and no
+  validation rule reserves anything afterwards. So the
+  implementation is pure contextual keywording where the spec asks
+  for the mixed line — syntax words reserved, domain vocabularies
+  contextual.
+  **The spec is right and the code has the bug** (D53 refused the
+  opposite change, so the spec stands as written). The fix belongs
+  in validation rather than the grammar, which is where the spec
+  says closed vocabularies are checked.
+  Ride-along, and probably why nobody noticed: the comment above
+  `KEYWORDS` in `script_parser.py` states the reservation as
+  though it were enforced — *"reserved everywhere a
+  script-internal name may appear (S5)"*. It describes the intent
+  correctly and the behaviour not at all.
+
 - **The CLI spec and the CLI have drifted apart in both
   directions** (found 2026-07-27, checking one stale command
   reference and sweeping the rest). Five divergences, same class
@@ -257,7 +287,7 @@ code has the bug, so the norm is already the demand.
 
 The **script-language residuals** stay here rather than becoming a
 feature (D45): they change the scripting language, which is no bar
-to being a task, and on size they are two items and a ride-along.
+to being a task, and on size they are one item and a ride-along.
 **No use case asks for them**, said plainly rather than papered
 over — they serve language goal **G6**, one small vocabulary and
 one spelling — and the catalogue behind them is
@@ -267,10 +297,13 @@ guess at fix cost, never validated against real authoring pain;
 reorder freely once scripts have been written and debugged under
 this surface.
 
-- **[08] reserve the small closed vocabularies globally** — key
-  names and drive slots, so they cannot be shadowed by phase or
-  artifact names. Mechanical, no spec redesign, and it closes most
-  of the asymmetry the deleted [01] showed
+*(**[08] was withdrawn 2026-07-27, D53** — reserving the key and
+slot vocabularies globally would have abandoned the line the spec
+already draws correctly, the one Java and C# draw: syntax words
+reserved, domain vocabularies contextual. Walking it found a
+defect in the other direction, entered under
+[Defects](#defects): the code reserves nothing at all.)*
+
 - **[06]'s remaining half** — warn when an `@`-reference matches
   no known item. The label/item split itself is gone with the
   media block (DECISIONS.md, no JSON in scripts)

@@ -22,7 +22,7 @@ the implementation caught up (milestone 4).
 | [03-timing-spellings-and-scope.rlqs](03-timing-spellings-and-scope.rlqs) | `timeout 30s` vs `timeout=5m`; non-local defaults; the stable split; reset asymmetry |
 | [06-media-label-vs-item.rlqs](06-media-label-vs-item.rlqs) | the media label named a file while `@` referenced an item — resolved 2026-07-22 by deleting embedded media blocks; the `@` vs `$` definiteness half stands |
 | [07-regex-escaping-regimes.rlqs](07-regex-escaping-regimes.rlqs) | the same screen text escapes differently in `"..."` and `/.../` |
-| [08-bare-word-namespaces.rlqs](08-bare-word-namespaces.rlqs) | bare words span six namespaces; asymmetric reservations |
+| [08-bare-word-namespaces.rlqs](08-bare-word-namespaces.rlqs) | `screenshot installed` creates, `goto finished` must exist — identical shape, opposite failure. The reservation half was settled 2026-07-27 (D53) and the file narrowed to this |
 
 Each file ends with an open question. Resolving one should update
 the spec first, then **delete the example** — numbers are not
