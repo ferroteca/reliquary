@@ -113,6 +113,68 @@ The first round's four-way content selector (`size` / `base` /
 cross-boundary reference: **to change how a drive materializes,
 change the media, or point the drive at a different one.**
 
+#### What the topology fields mean
+
+The schema fixes each field's shape; these are the rules a schema
+cannot carry.
+
+- **`name`** follows the name charter below with one added
+  clause: a machine name is **never all digits**, because it
+  becomes an id segment in `<name>-<n>` and `42-0` would not read
+  as the pair it is. Media names carry no such restriction.
+- **`memory`** is a size string or an integer, and **a bare
+  integer means MiB** — `32` and `"32M"` are one declaration. A
+  size string uses the media `size` grammar (a positive integer
+  with a binary `K`/`M`/`G`/`T` suffix), which admits no bare
+  form, so this clause is what makes the integer legal. The value
+  must resolve to a **whole number of MiB**: the state carries the
+  canonical integer form, so `"1500K"` is refused rather than
+  rounded. Omitted, it takes the platform's default — dos 16,
+  openbsd 512, win9x 64, winnt 256.
+- **`cpus`** defaults to 1.
+- **drive keys** name a medium and a slot (`floppy` 0–1, `hdd`
+  0–3, `cdrom` 0–3). The **bare medium is an alias for slot 0**
+  (`hdd` ≡ `hdd0`); the state always records the indexed form.
+  Declaring both spellings of one slot is a **clash** and fails
+  validation, as does a slot outside its medium's range.
+- **`controller`** is valid on `hdd` and `cdrom` only — a floppy
+  attaches to the floppy controller implicitly and **rejects the
+  key**. Omitted, it resolves to `ide`, recorded into the state at
+  creation.
+- **`boot`** entries must each name a drive the machine
+  **declares and has not disabled**, and are unique by slot: the
+  same slot twice, in either spelling, fails validation. An empty
+  or non-bootable drive is a **valid** entry — firmware falls
+  through it — which is what makes `["hdd0", "cdrom0"]` with a
+  blank disk the standard install order, needing no boot change
+  after the install. Omitted, the order is the slot-0 floppy,
+  else the slot-0 hard disk, else the first cdrom; the resolved
+  order is recorded.
+- **`control-planes`** entries are unique — one listed twice
+  fails validation. The vocabulary is the model's whole set and
+  the parser accepts all of it, but a plane Reliquary has not
+  built is **refused at materialization**, naming it: the policy
+  is every plane Reliquary may use, so recording one nothing can
+  probe would make the state lie (P11). Omitted, it resolves to
+  the platform's default, which is `["agentless-display"]` for
+  every platform today — the universal, cooperation-free plane.
+  Defaults that differ by platform arrive with the adapter seam.
+- **`backend-settings`** is the **only** place backend-specific
+  configuration may appear, which is what makes a blueprint
+  without it portable by construction. One section per backend
+  name; only the section matching the machine's backend applies,
+  and the others are inert but preserved.
+  *Two further rules are designed and unbuilt, and are named here
+  rather than asserted*: that a section may not touch what
+  Reliquary owns through first-class fields (memory, drives, boot
+  order, CPU count, identity), with each adapter rejecting the
+  overlap in its own section; and that where a blueprint declares
+  no `backend`, sections for exactly one backend narrow the
+  default assignment to it. Both need the adapter seam and a
+  second backend — today `backend` resolves to `qemu` or the
+  declared value, and no section is validated. They arrive with
+  [F2](../../planning/proposed/FEATURES.md).
+
 ### media
 
 A media owns all content and materialization.
@@ -196,7 +258,10 @@ as a duration. So `86Box` is a perfectly good media name.
 
 What is mechanically forced out regardless: whitespace, `{`,
 `}`, `#`, `/` (the containment separator — `${media:C:/x}` is
-otherwise ambiguous), and control characters. Parentheses and
+otherwise ambiguous), and control characters. **A machine name
+carries one clause more** — never all digits, since it becomes
+the `<name>-<n>` id segment — and the charter is otherwise shared
+with media. Parentheses and
 brackets are excluded by **argv, not grammar**: every media name
 is a command-line argument at `fetch-media` / `add-media` /
 `clean-media`, and `rlq fetch-media FD(1)` is a shell syntax

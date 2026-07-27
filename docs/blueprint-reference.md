@@ -10,6 +10,13 @@ SPDX-License-Identifier: BSD-3-Clause
 > [the composed blueprint model](spec/blueprint-model.md)
 > (semantics); where this reference disagrees with either, this
 > reference has the bug.
+>
+> Every per-field rule here is stated by one of those two. That
+> was **not** true until 2026-07-27, when an audit found eight
+> fields whose contracts lived only here — where, being
+> descriptive, they bound nothing and the code was free to drift
+> from them. They now sit in the model, and what follows explains
+> and exemplifies them rather than defining them.
 
 > **Status:** the full field reference is validated at parse time —
 > `platform`, `backend`, `memory`, `cpus`, `drives` (a media name,
