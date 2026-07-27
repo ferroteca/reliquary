@@ -197,6 +197,19 @@ passes byte-for-byte.
 > **Dropped from the numbered arc to the backlog** (owner,
 > 2026-07-23): the former Milestone 13, not yet scheduled —
 > sequenced alongside the Horizon items below when its turn comes.
+>
+> **This entry cites no demand, and is the only feature that
+> doesn't** — confirmed by the demand-citation sweep of
+> 2026-07-27, which found it the one live violation across 22
+> features and 5 design documents. It is the **D33 pattern in its
+> purest form**: a settled design outrunning the argument for it.
+> The traceability rule's remedy is *find the demand or delete the
+> work*, and neither is an audit's to choose — it is an
+> adjudication, left open deliberately rather than papered over
+> with a citation written to fit. Two things point at demand
+> without being it: **U5**'s customized-Windows scenario waits on
+> this feature, and **U6**'s recorder needs the console viewer
+> that rides the VNC plane. Whoever adjudicates starts there.
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,
@@ -443,7 +456,13 @@ milestone that delivered them.
 EACH CHECK EARNED ITS PLACE — the 2026-07-24 hand audit found a
 real violation of every one:
 * every planning section cites a U/P/G demand — *12 of 34 sections
-  in the then-current roadmap cited none*;
+  in the then-current roadmap cited none; re-run by hand
+  2026-07-27 over what replaced it, **2 of 27**, and both already
+  known ([F5](#f5--the-gui-era-vnc-gui-scripting-and-the-last-backends)
+  and `design/backend-adapter.md`). The improvement is not
+  vigilance but construction — the restructure wrote each entry
+  with its demand — which is the argument for a linter rather than
+  against one: what construction fixed once, drift returns*;
 * every DECISIONS entry carries supports — *22 lack them, and
   D29 sat outside the range the existing task assumed*;
 * no *delivered* work cites *unpledged* demand — *U9 and U12*,
@@ -1244,6 +1263,15 @@ before the work does.
 > being written up as a feature — taking the next free F-number
 > then — or by going to [TASKS.md](../TASKS.md) if it turns out to
 > be ordinary small work.
+>
+> **The traceability rule does not reach here** (settled by the
+> 2026-07-27 demand-citation sweep, which would otherwise have
+> flagged four items). That rule binds *pledged* items and design
+> documents; a Horizon item is neither, and an item too unformed
+> to be a feature is too unformed to know what demands it.
+> Acquiring a citation is part of being written up — so an
+> uncited item here is the list working, and a re-run of that
+> sweep should not flag one.
 
 - Machine mobility: clone, export, import — the former
   milestone 12 (the number guest agents inherited in the

@@ -110,23 +110,6 @@ outran its justification). The audits below are the standing way
 to find them, not a one-off.
 
 
-- **Sweep planning items for demand citations** (owner,
-  2026-07-23; audited 2026-07-24; **rescoped 2026-07-27**). Every
-  item names the U- or P-number that demands it.
-  The 2026-07-24 audit result — **12 of 34 sections cite no U/P/G
-  at all** — was measured against ROADMAP.md, which the
-  restructure has since deleted, so the count no longer indexes
-  anything readable. Re-run it over what replaced that file:
-  `proposed/`, `pledged/`, and `design/`. The one finding that
-  survived the move intact is the pillar it named — **"The GUI
-  era", now [F5](proposed/FEATURES.md), still citing no demand
-  whatsoever**, which is the D33 pattern in its purest form.
-  What was lost with ROADMAP.md, and is the reason to run this
-  before anything else prunes further: five completed milestones
-  (1, 2, 3, 4, 6) went with their deliverable lists, so **what
-  demanded them was never recorded**. It survives only in
-  `git show 50b67b2:planning/ROADMAP.md`.
-
 - **Retrofit supports onto DECISIONS.md entries** (owner,
   2026-07-23; audited 2026-07-24). Each names the use cases (U),
   principles (P), or goals (G) it supports; new entries carry
@@ -226,6 +209,38 @@ code has the bug, so the norm is already the demand.
   (This also retires the "`--qemu` → `--qemu-home`" task that had
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
+
+- **`hostdir` survives in `planning/`, and one item still
+  specifies an address form P17 refuses** (found 2026-07-27 by
+  the demand-citation sweep). The earlier `hostdir` pass swept
+  `docs/` and `reliquary/` and **struck its own task believing it
+  done** — the grep behind it never covered `planning/`, so six
+  mentions of a drive type milestone 7 retired were never seen.
+  This entry is that task, re-filed with the scope it actually
+  had. The lesson is the cheaper finding: *a sweep is only as
+  wide as the grep behind it*, and striking a task on a partial
+  search is how a defect comes back.
+  Three of the six are the substance:
+  - **The in-band Horizon item** ([proposed/FEATURES.md](proposed/FEATURES.md))
+    is wrong three ways at once. It specifies
+    `<drive-key>:<path>` addressing — **the form P17 refuses**,
+    which F15's own text already says reopening is "no longer
+    optional"; it says `hostdir` directories; and it calls the
+    family deferred when `put-file` / `get-file` shipped at
+    milestone 9. Only the *directory* half is still deferred.
+  - **P16's open question 3** ([proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md))
+    asks whether a `hostdir` drive is "in-band by declaration or
+    the canonical instance of the violation" — about a construct
+    that no longer exists. D47 recorded that the question had
+    dissolved and the text was never updated, so a live
+    adjudication carries a question nobody can answer. **Editing
+    it changes what is being adjudicated**, so this one is the
+    owner's, not a sweep's.
+  - The remaining three (`design/guest-communication.md`,
+    `proposed/ARCHITECTURE.md`'s D5 summary,
+    `proposed/USE-CASES.md`'s U18 note) read as history and may
+    well stand — sorting which is the work, exactly as in the
+    `docs/` pass.
 
 - **Diagnostics carry no stable identifier** (found 2026-07-27 by
   D55, checking what the error-id bullet was actually deferring).
