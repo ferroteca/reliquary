@@ -1,5 +1,6 @@
 # invalid: derivations are acyclic
 # rule: S6
+# id: prop.derivation-cycle
 # spec: Syntactic restrictions
 
 platform dos

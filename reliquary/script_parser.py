@@ -305,18 +305,20 @@ def _modifiers(node, items):
     for name, value, line, column in items:
         if name in found:
             raise ScriptParseError(
-                line, f"duplicate modifier: {name}", column)
+                line, f"duplicate modifier: {name}", column,
+                rule_id="node.duplicate-modifier")
         if name not in allowed:
             display = _DISPLAY.get(node, node)
             reason = _PLACEMENT.get((node, name))
             if reason is not None:
                 raise ScriptParseError(
-                    line, f"{display} does not accept {name}=: {reason} "
-                    "(S2)", column)
+                    line, f"{display} does not accept {name}=: {reason}",
+                    column, rule_id="node.timing-placement")
             listing = ", ".join(allowed) if allowed else "none"
             raise ScriptParseError(
                 line, f"{display} does not accept the "
-                f"modifier {name!r} (accepts: {listing})", column)
+                f"modifier {name!r} (accepts: {listing})", column,
+                rule_id="node.modifier-not-allowed")
         if name in _DURATION_MODIFIERS and value.type != "DURATION":
             raise ScriptParseError(
                 line, f"{name} must be a duration", column)

@@ -1,5 +1,6 @@
 # invalid: always is only directly inside a reactive phase
 # rule: S9
+# id: handler.always-outside-reactive-phase
 # spec: Syntactic restrictions
 
 platform dos

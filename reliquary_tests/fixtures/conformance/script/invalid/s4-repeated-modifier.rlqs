@@ -1,6 +1,6 @@
 # invalid: a repeat is an error, never last-wins
 # rule: S4
-# cites: no -- the duplicate-modifier diagnostic carries no id (D55)
+# id: node.duplicate-modifier
 # spec: Syntactic restrictions
 
 platform dos

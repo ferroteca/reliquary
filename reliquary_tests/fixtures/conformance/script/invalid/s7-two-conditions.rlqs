@@ -1,5 +1,6 @@
 # invalid: an observation carries exactly one condition
 # rule: S7
+# id: obs.two-channels
 # spec: Syntactic restrictions
 
 platform dos

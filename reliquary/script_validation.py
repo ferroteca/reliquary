@@ -59,8 +59,9 @@ def _not_reserved(name, what, line, column):
     """
     if name in _RESERVED:
         raise ScriptParseError(
-            line, f"{what} may not be a reserved node name: {name} (S5)",
-            column)
+            line, f"{what} may not be a reserved node name: {name}",
+            column,
+            rule_id="name.reserved-node")
 
 # The observable channels, each with the condition kind it takes
 # and its closed value set. The screen is the default channel and
@@ -105,8 +106,9 @@ def _properties(script):
         _property_key(prop.key, prop.line, prop.column)
         if prop.key in seen:
             raise ScriptParseError(
-                prop.line, f"duplicate property: {prop.key} (S5)",
-                prop.column)
+                prop.line, f"duplicate property: {prop.key}",
+                prop.column,
+                rule_id="name.duplicate-property")
         seen[prop.key] = prop
 
 
@@ -125,8 +127,8 @@ def _derivations(script):
         if prop.kind == "secret":
             raise ScriptParseError(
                 prop.line,
-                f"a secret property may not carry default=: {prop.key} "
-                "(S5)", prop.column)
+                f"a secret property may not carry default=: {prop.key}",
+                prop.column, rule_id="prop.secret-default")
         # A literal candidate (no references) always answers, so any
         # candidate after it is dead code.
         for candidate in prop.defaults[:-1]:
@@ -134,8 +136,9 @@ def _derivations(script):
                 raise ScriptParseError(
                     prop.line,
                     f"a literal default= must be the last candidate; "
-                    f"those after it are dead: {prop.key} (S5)",
-                    prop.column)
+                    f"those after it are dead: {prop.key}",
+                    prop.column,
+                    rule_id="prop.dead-default")
         for candidate in prop.defaults:
             for key in candidate.keys:
                 _check_reference(prop, key, declared, facts)
@@ -150,13 +153,15 @@ def _check_reference(prop, key, declared, facts):
         raise ScriptParseError(
             prop.line,
             f"default= for {prop.key} references {key!r}, which is "
-            "neither a declared property nor an rlq.* fact (S6)",
-            prop.column)
+            "neither a declared property nor an rlq.* fact",
+            prop.column,
+            rule_id="prop.undefined-reference")
     if target.kind == "secret":
         raise ScriptParseError(
             prop.line,
             f"default= for {prop.key} references the secret {key!r}; "
-            "no derivation may reference a secret (S6)", prop.column)
+            "no derivation may reference a secret", prop.column,
+            rule_id="prop.secret-reference")
 
 
 def _forbid_derivation_cycles(script, declared):
@@ -178,8 +183,9 @@ def _forbid_derivation_cycles(script, declared):
             prop = declared[key]
             raise ScriptParseError(
                 prop.line,
-                f"default= derivations form a cycle: {cycle} (S6)",
-                prop.column)
+                f"default= derivations form a cycle: {cycle}",
+                prop.column,
+                rule_id="prop.derivation-cycle")
         state[key] = "open"
         for target in edges.get(key, ()):
             visit(target, trail + [key])
@@ -192,18 +198,21 @@ def _forbid_derivation_cycles(script, declared):
 def _property_key(key, line, column):
     if key in ("text", "media", "secret"):
         raise ScriptParseError(
-            line, f"{key!r} is reserved in property declarations (S5)",
-            column)
+            line, f"{key!r} is reserved in property declarations",
+            column,
+            rule_id="name.property-is-a-kind")
     if key == "rlq" or key.startswith("rlq."):
         raise ScriptParseError(
             line,
             "property keys in the rlq namespace are reserved for "
-            "reliquary-owned run facts (S5)", column)
+            "reliquary-owned run facts", column,
+            rule_id="name.property-reserved-namespace")
     if key == "reliquary" or key.startswith("reliquary."):
         raise ScriptParseError(
             line,
-            "property keys in the reliquary namespace are reserved (S5)",
-            column)
+            "property keys in the reliquary namespace are reserved",
+            column,
+            rule_id="name.property-reserved-namespace")
 
 
 # -- HTTP declarations -------------------------------------------
@@ -217,7 +226,8 @@ def _http(script):
     if not script.http.contents:
         raise ScriptParseError(
             script.http.line, "http requires at least one content entry",
-            script.http.column)
+            script.http.column,
+            rule_id="http.no-content")
     _ports(script.http)
     _content_set(script.http.contents)
 
@@ -229,7 +239,8 @@ def _content_set(contents):
         if content.name in names:
             raise ScriptParseError(
                 content.line, f"duplicate content name: {content.name}",
-                content.column)
+                content.column,
+                rule_id="http.duplicate-content-name")
         names[content.name] = content
         path = _plain(content.path, "content path", content.line,
                       content.column)
@@ -237,22 +248,26 @@ def _content_set(contents):
             raise ScriptParseError(
                 content.line,
                 f"content path must begin with '/': {path!r}",
-                content.column)
+                content.column,
+                rule_id="http.path-not-absolute")
         segments = path.split("/")
         if any(segment in (".", "..") for segment in segments):
             raise ScriptParseError(
                 content.line,
                 f"content path may not contain . or ..: {path!r}",
-                content.column)
+                content.column,
+                rule_id="http.path-traversal")
         if path in paths:
             raise ScriptParseError(
                 content.line, f"duplicate content path: {path}",
-                content.column)
+                content.column,
+                rule_id="http.duplicate-content-path")
         paths[path] = content
         if content.body.spelling == "":
             raise ScriptParseError(
                 content.line, f"content path {path!r} has an empty body",
-                content.column)
+                content.column,
+                rule_id="http.empty-body")
 
 
 def _http_statements(script):
@@ -267,13 +282,15 @@ def _http_statements(script):
             raise ScriptParseError(
                 statement.line,
                 f"http action must be start or stop: {command!r}",
-                statement.column)
+                statement.column,
+                rule_id="http.unknown-action")
         if command == "start" and script.http is None \
                 and not statement.contents:
             raise ScriptParseError(
                 statement.line,
                 "http start requires declared or inline content",
-                statement.column)
+                statement.column,
+                rule_id="http.start-without-content")
         if command == "start":
             _content_set(statement.contents)
             for name in statement.arguments[1:]:
@@ -281,11 +298,13 @@ def _http_statements(script):
                     raise ScriptParseError(
                         statement.line,
                         f"http start names undeclared content: {name}",
-                        statement.column)
+                        statement.column,
+                        rule_id="http.undeclared-content")
         elif len(statement.arguments) > 1 or statement.contents:
             raise ScriptParseError(
                 statement.line, "http stop takes no content names or block",
-                statement.column)
+                statement.column,
+                rule_id="http.stop-takes-nothing")
 
 
 def _has_inline_http_start(script):
@@ -304,12 +323,14 @@ def _ports(http):
         if port < 1 or port > 65535:
             raise ScriptParseError(
                 http.line, f"{name.replace('_', '-')} is not a TCP port: "
-                f"{port}", http.column)
+                f"{port}", http.column,
+                rule_id="http.port-out-of-range")
     if http.port_min is not None and http.port_max is not None:
         if int(http.port_min) > int(http.port_max):
             raise ScriptParseError(
                 http.line, "port-min must be less than or equal to port-max",
-                http.column)
+                http.column,
+                rule_id="http.port-range-inverted")
 
 
 def _plain(literal, what, line, column):
@@ -317,7 +338,8 @@ def _plain(literal, what, line, column):
         return literal.text
     except ValueError:
         raise ScriptParseError(
-            line, f"{what} may not contain property references", column)
+            line, f"{what} may not contain property references", column,
+            rule_id="http.reference-in-path")
 
 
 def _forbid_http_refs(script):
@@ -326,8 +348,9 @@ def _forbid_http_refs(script):
             if key.startswith("rlq.http."):
                 raise ScriptParseError(
                     line,
-                    "rlq.http.* properties require an http block (S6)",
-                    column)
+                    "rlq.http.* properties require an http block",
+                    column,
+                    rule_id="prop.http-without-block")
 
 
 def _text_literals(script):
@@ -389,8 +412,9 @@ def _observed(nodes):
 def _positive(spelling, name, line, column):
     if spelling is not None and parse_duration(spelling) <= 0:
         raise ScriptParseError(
-            line, f"{name} must be a positive duration: {spelling} (S5)",
-            column)
+            line, f"{name} must be a positive duration: {spelling}",
+            column,
+            rule_id="time.non-positive")
 
 
 def _timed(statements, handlers=()):
@@ -429,7 +453,8 @@ def _variables(script):
             raise ScriptParseError(
                 statement.line,
                 f"machine-variable keys in the {head} namespace are "
-                f"reserved: {key} (S5)", statement.column)
+                f"reserved: {key}", statement.column,
+                rule_id="name.variable-reserved-namespace")
 
 
 def _keys(script):
@@ -451,8 +476,9 @@ def _keys(script):
             if unknown is not None:
                 raise ScriptParseError(
                     statement.line,
-                    f"{unknown!r} is not a portable key name (S14)",
-                    statement.column)
+                    f"{unknown!r} is not a portable key name",
+                    statement.column,
+                    rule_id="key.not-portable")
 
 
 # -- the two shapes (S3, S10) ------------------------------------
@@ -463,13 +489,15 @@ def _linear(script):
         raise ScriptParseError(
             script.headers.get("entry", 1),
             "entry is invalid in a linear script: it names the phase a "
-            "phased script begins in (S3)")
+            "phased script begins in",
+            rule_id="flow.entry-in-linear")
     for statement in _walk(script.statements):
         if statement.verb in _TRANSFERS:
             raise ScriptParseError(
                 statement.line,
                 f"{statement.verb} is invalid in a linear script: reaching "
-                "end of file completes the run (S10)", statement.column)
+                "end of file completes the run", statement.column,
+                rule_id="flow.transfer-in-linear")
     _body(script.statements)
 
 
@@ -480,18 +508,21 @@ def _phased(script):
         _not_reserved(phase.name, "a phase", phase.line, phase.column)
         if phase.name in phases:
             raise ScriptParseError(
-                phase.line, f"duplicate phase: {phase.name} (S5)",
-                phase.column)
+                phase.line, f"duplicate phase: {phase.name}",
+                phase.column,
+                rule_id="name.duplicate-phase")
         phases[phase.name] = phase
     if script.entry is None:
         raise ScriptParseError(
             script.phases[0].line,
-            "a phased script declares the entry phase it begins in (S3)",
-            script.phases[0].column)
+            "a phased script declares the entry phase it begins in",
+            script.phases[0].column,
+            rule_id="flow.entry-missing")
     if script.entry not in phases:
         raise ScriptParseError(
             script.headers.get("entry", script.phases[0].line),
-            f"entry names an undeclared phase: {script.entry} (S10)")
+            f"entry names an undeclared phase: {script.entry}",
+            rule_id="flow.entry-undeclared")
     for phase in script.phases:
         _phase(phase)
         for statement in _walk(phase.statements, phase.handlers):
@@ -500,7 +531,8 @@ def _phased(script):
                 raise ScriptParseError(
                     statement.line,
                     "goto names an undeclared phase: "
-                    f"{statement.arguments[0]} (S10)", statement.column)
+                    f"{statement.arguments[0]}", statement.column,
+                    rule_id="flow.goto-undeclared")
     _cycles(script)
 
 
@@ -529,7 +561,8 @@ def _cycles(script):
                     statement.line,
                     f"the phase graph can cycle ({route}): a script that "
                     "can revisit a phase declares a header deadline, the "
-                    "backstop that bounds the run (S12)", statement.column)
+                    "backstop that bounds the run", statement.column,
+                    rule_id="flow.cycle-without-deadline")
             if target not in done:
                 visit(target)
         path.pop()
@@ -547,16 +580,18 @@ def _phase(phase):
         raise ScriptParseError(
             second.line,
             f"phase {phase.name} mixes ordered statements with standing "
-            "handlers: a phase is sequential or reactive, never both (S9)",
-            second.column)
+            "handlers: a phase is sequential or reactive, never both",
+            second.column,
+            rule_id="handler.mixed-phase")
     if phase.handlers:
         for handler in phase.handlers:
             if handler.keyword != "always":
                 raise ScriptParseError(
                     handler.line,
                     "on is legal only inside a branching wait: a standing "
-                    "rule in a reactive phase is written always (S9)",
-                    handler.column)
+                    "rule in a reactive phase is written always",
+                    handler.column,
+                    rule_id="handler.on-outside-branching-wait")
             _handler(handler)
         return
     _body(phase.statements)
@@ -565,8 +600,9 @@ def _phase(phase):
         raise ScriptParseError(
             last.line,
             f"phase {phase.name} does not end in goto or finish: a "
-            "sequential phase's statement list terminates (S11)",
-            last.column)
+            "sequential phase's statement list terminates",
+            last.column,
+            rule_id="flow.phase-falls-through")
 
 
 # -- statement lists (S7, S8, S9, S11) ---------------------------
@@ -580,7 +616,8 @@ def _body(statements, in_handler=False):
             raise ScriptParseError(
                 following.line,
                 f"unreachable statement: {statement.verb} ends its "
-                "statement list (S11)", following.column)
+                "statement list", following.column,
+                rule_id="flow.unreachable-statement")
 
 
 def _statement(statement, in_handler):
@@ -594,25 +631,29 @@ def _statement(statement, in_handler):
         raise ScriptParseError(
             statement.line,
             "a branching wait may not appear inside a handler body: "
-            "further branching belongs in the phase graph (S8)",
-            statement.column)
+            "further branching belongs in the phase graph",
+            statement.column,
+            rule_id="wait.branching-in-handler")
     if statement.conditions:
         condition = statement.conditions[0]
         raise ScriptParseError(
             condition.line,
             "a branching wait carries no condition of its own: each "
-            "handler carries its own (S8)", condition.column)
+            "handler carries its own", condition.column,
+            rule_id="wait.branching-condition")
     if len(statement.handlers) < 2:
         raise ScriptParseError(
             statement.line,
             "a branching wait requires at least two handlers: one "
-            "condition is a plain wait (S8)", statement.column)
+            "condition is a plain wait", statement.column,
+            rule_id="wait.too-few-handlers")
     for handler in statement.handlers:
         if handler.keyword != "on":
             raise ScriptParseError(
                 handler.line,
                 "always is legal only directly inside a reactive phase: a "
-                "branching wait's cases are written on (S9)", handler.column)
+                "branching wait's cases are written on", handler.column,
+                rule_id="handler.always-outside-reactive-phase")
         _handler(handler)
 
 
@@ -628,7 +669,8 @@ def _condition(node, what):
     """Check that an observation carries exactly one good condition."""
     if not node.conditions:
         raise ScriptParseError(
-            node.line, f"{what} requires a condition (S7)", node.column)
+            node.line, f"{what} requires a condition", node.column,
+            rule_id="obs.missing-condition")
     # Each condition is checked before the count, so a misspelled
     # channel is named as one rather than reported as a second
     # condition beside the string it was written next to.
@@ -640,7 +682,8 @@ def _condition(node, what):
         raise ScriptParseError(
             extra.line,
             f"{what} carries more than one condition: an observation "
-            "carries exactly one (S7)", extra.column)
+            "carries exactly one", extra.column,
+            rule_id="obs.two-channels")
 
 
 def _channel(condition):
@@ -651,27 +694,31 @@ def _channel(condition):
         raise ScriptParseError(
             condition.line,
             f"{condition.value!r} is not a condition: the screen is "
-            f"observed by a bare string or regex{hint} (S7)",
-            condition.column)
+            f"observed by a bare string or regex{hint}",
+            condition.column,
+            rule_id="obs.not-a-condition")
     if not condition.named:
         return                          # the screen, the one spelling
     if condition.channel == "screen":
         raise ScriptParseError(
             condition.line,
             "the screen channel has no named spelling: write the string "
-            "or regex alone (S7)", condition.column)
+            "or regex alone", condition.column,
+            rule_id="obs.screen-named")
     channel = _CHANNELS.get(condition.channel)
     if channel is None:
         raise ScriptParseError(
             condition.line,
             f"unknown observation channel: {condition.channel} (known: "
-            f"{', '.join(sorted(_CHANNELS))}) (S7)", condition.column)
+            f"{', '.join(sorted(_CHANNELS))})", condition.column,
+            rule_id="obs.unknown-channel")
     kind, values = channel
     if condition.kind != kind or condition.value not in values:
         raise ScriptParseError(
             condition.line,
             f"{condition.channel} observes the state "
-            f"{' or '.join(values)} (S7)", condition.column)
+            f"{' or '.join(values)}", condition.column,
+            rule_id="obs.wrong-kind")
 
 
 # -- watch patterns (S13) ----------------------------------------
@@ -702,7 +749,8 @@ def _pattern(condition):
         raise ScriptParseError(
             condition.line,
             "an empty watch pattern matches every screen: write what "
-            "the screen shows (S13)", condition.column)
+            "the screen shows", condition.column,
+            rule_id="obs.empty-pattern")
     if condition.kind == "regex":
         try:
             re.compile(condition.value)
@@ -710,7 +758,8 @@ def _pattern(condition):
             raise ScriptParseError(
                 condition.line,
                 f"the regex does not compile: {error}; the dialect is "
-                "Python's re syntax (S13)", condition.column) from None
+                "Python's re syntax", condition.column,
+                rule_id="obs.uncompilable-regex") from None
 
 
 # -- terminating statements (S11) --------------------------------

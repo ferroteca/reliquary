@@ -1,5 +1,6 @@
 # invalid: nothing follows a terminating statement
 # rule: S11
+# id: flow.unreachable-statement
 # spec: Syntactic restrictions
 
 platform dos

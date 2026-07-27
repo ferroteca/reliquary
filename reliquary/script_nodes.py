@@ -57,18 +57,107 @@ KEYWORDS = (
 )
 
 
+#: Every diagnostic id, and the S-numbered rule it enforces.
+#:
+#: Ids are finer than the rules — S7 is one restriction and
+#: ``obs.two-channels`` is one of six diagnostics under it — so this
+#: is many-to-one by design. It lives here rather than only in
+#: docs/spec/script-spec.md because a consumer switching on an id
+#: needs the rule without parsing prose; the spec's rule list
+#: carries the same mapping and a test holds the two together.
+RULE_OF = {
+    "node.duplicate-modifier": "S4",
+    "node.modifier-not-allowed": "S2",
+    "node.timing-placement": "S2",
+    "name.reserved-node": "S5",
+    "name.duplicate-phase": "S5",
+    "name.duplicate-property": "S5",
+    "name.property-is-a-kind": "S5",
+    "name.property-reserved-namespace": "S5",
+    "name.variable-reserved-namespace": "S5",
+    "time.non-positive": "S5",
+    "prop.secret-default": "S5",
+    "prop.dead-default": "S5",
+    "prop.undefined-reference": "S6",
+    "prop.secret-reference": "S6",
+    "prop.derivation-cycle": "S6",
+    "prop.http-without-block": "S6",
+    "obs.missing-condition": "S7",
+    "obs.two-channels": "S7",
+    "obs.not-a-condition": "S7",
+    "obs.unknown-channel": "S7",
+    "obs.screen-named": "S7",
+    "obs.wrong-kind": "S7",
+    "wait.branching-condition": "S8",
+    "wait.branching-in-handler": "S8",
+    "wait.too-few-handlers": "S8",
+    "handler.mixed-phase": "S9",
+    "handler.on-outside-branching-wait": "S9",
+    "handler.always-outside-reactive-phase": "S9",
+    "flow.entry-in-linear": "S3",
+    "flow.entry-missing": "S3",
+    "flow.entry-undeclared": "S10",
+    "flow.transfer-in-linear": "S10",
+    "flow.goto-undeclared": "S10",
+    "flow.unreachable-statement": "S11",
+    "flow.phase-falls-through": "S11",
+    "flow.cycle-without-deadline": "S12",
+    "obs.empty-pattern": "S13",
+    "obs.uncompilable-regex": "S13",
+    "key.not-portable": "S14",
+}
+
+#: Ids for static rules the S-numbers do not cover. The http
+#: declaration's rules are static and legality-tier like the rest;
+#: they simply predate the S-numbering and have no entry in it.
+RULE_OF.update({
+    "http.no-content": None,
+    "http.duplicate-content-name": None,
+    "http.duplicate-content-path": None,
+    "http.path-not-absolute": None,
+    "http.path-traversal": None,
+    "http.empty-body": None,
+    "http.unknown-action": None,
+    "http.start-without-content": None,
+    "http.undeclared-content": None,
+    "http.stop-takes-nothing": None,
+    "http.port-out-of-range": None,
+    "http.port-range-inverted": None,
+    "http.reference-in-path": None,
+})
+
+
 class ScriptParseError(StaticError):
     """A script syntax or static-validation error with a source line.
 
     The legality tier of the error taxonomy: it is decided from the
     script text alone, so it is a STATIC ERROR and exits ``2``.
+
+    ``rule_id`` is the stable dotted identifier naming the rule the
+    diagnostic enforces (docs/spec/script-spec.md, "Error classes
+    and exit codes"): ``obs.two-channels`` and its siblings, one
+    namespace across the error classes. It is a *field* rather than
+    text baked into the message, so a consumer can switch on it
+    without parsing prose and the beta id index can be generated
+    rather than hand-kept. The rendering appends it in parentheses,
+    which is where the S-numbers used to sit.
+
+    Ids are finer than the S-numbered rules they enforce: S7 is one
+    restriction and ``obs.two-channels`` is one of the several
+    diagnostics under it. The spec's rule list carries the mapping,
+    and a test holds the two together.
+
+    ``rule_id`` is None only where an id has not been assigned yet
+    (parse, preflight and runtime diagnostics, still to come); the
+    script conformance corpus measures how many of those remain.
     """
 
-    def __init__(self, line, message, column=1):
+    def __init__(self, line, message, column=1, rule_id=None):
         super().__init__(message)
         self.line = line
         self.column = column
         self.message = message
+        self.rule_id = rule_id
         self.path = None
         self.source_line = None
 
@@ -81,7 +170,8 @@ class ScriptParseError(StaticError):
     def __str__(self):
         """Render an actionable compiler-style diagnostic."""
         location = f"{self.path or '<script>'}:{self.line}:{self.column}"
-        result = f"{location}: error: {self.message}"
+        cited = f" ({self.rule_id})" if self.rule_id else ""
+        result = f"{location}: error: {self.message}{cited}"
         if self.source_line is not None:
             gutter = f"{self.line} | "
             caret = " " * (len(gutter) + self.column - 1) + "^"

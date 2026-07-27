@@ -1,5 +1,6 @@
 # invalid: entry appears exactly in phased scripts
 # rule: S3
+# id: flow.entry-in-linear
 # spec: Syntactic restrictions
 
 platform dos

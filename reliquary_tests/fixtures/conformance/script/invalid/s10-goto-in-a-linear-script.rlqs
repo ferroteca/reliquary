@@ -1,5 +1,6 @@
 # invalid: goto is invalid in a linear script
 # rule: S10
+# id: flow.transfer-in-linear
 # spec: Syntactic restrictions
 
 platform dos

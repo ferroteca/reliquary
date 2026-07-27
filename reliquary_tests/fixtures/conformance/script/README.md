@@ -20,7 +20,7 @@ finding.
 | directory | the assertion |
 |---|---|
 | `valid/` | parses and validates |
-| `invalid/` | rejected at parse, **citing the rule the fixture names** |
+| `invalid/` | rejected at parse, **by the diagnostic id the fixture names** |
 | `invalid-at-preflight/` | parses clean; rejected with a machine, a namespace or an invocation in scope |
 
 The third bucket is the blueprint corpus's third bucket for
@@ -39,10 +39,10 @@ What is new is the middle column above. The blueprint corpus can
 assert only that a fixture was *rejected*; its README states the
 cost plainly — "an invalid fixture that fails for the *wrong*
 reason is a false pass, and the header is what lets a reviewer
-catch that." The script language has stable rule ids, so the
-header stops being documentation and becomes an assertion: a
-fixture declaring `# rule: S7` must be rejected by a diagnostic
-citing `(S7)`. A reviewer is no longer the check.
+catch that." Here the header stops being documentation and
+becomes an assertion: a fixture declaring `# id: obs.two-channels`
+must be rejected by exactly that diagnostic. A reviewer is no
+longer the check.
 
 That was worth having immediately. Three fixtures in the first
 draft were rejected by the wrong rule — `finish` inside a linear
@@ -56,45 +56,60 @@ generalizing.** That is the reusable conclusion: a corpus is worth
 as much as the precision of the failure it can assert, and
 identifiers are what buy that precision.
 
+**The corpus came first, and it is why the ids are the shape they
+are.** Written against the S-numbers, it worked but blunted: an
+S-number names a *rule*, and S7 has six diagnostics under it, so
+a fixture asserting `S7` could not tell "no condition" from
+"unknown channel". That is the concrete argument for the dotted
+scheme being finer than the rules rather than a renaming of
+them — the question [D55](../../../../planning/DECISIONS.md)'s
+defect left open, answered by trying the coarse version first.
+
 ## What the corpus measured on the way
 
-Six of the 39 invalid fixtures cannot name their rule. Each
-carries a `# cites: no` line saying why, and the harness asserts
-the marker in **both** directions — a fixture without it must cite
-its rule, a fixture with it must not — so a marker cannot outlive
-the gap it records.
+Four of the 39 invalid fixtures cannot name their rule. Each
+carries `# id: none`, and the harness asserts the marker in
+**both** directions — a fixture naming an id must be rejected by
+exactly that id, a fixture saying `none` must be rejected by a
+diagnostic that still has none — so a marker cannot outlive the
+gap it records.
 
-Five are [D55](../../../../planning/DECISIONS.md) measured rather
-than argued. script-spec.md requires that **every** diagnostic
-carry a stable dotted identifier; parse errors (`s1-*`), the
-header-cardinality diagnostic (`s3-duplicate-header`), the
-duplicate-modifier diagnostic (`s4-repeated-modifier`) and the
-signature arm of S2 (`s2-modifier-outside-signature`) carry none.
-The count is asserted, so it moves in one direction as ids land
-and a move the other way means a diagnostic lost one.
+Three are [D55](../../../../planning/DECISIONS.md)'s remainder,
+measured rather than estimated. script-spec.md requires that
+**every** diagnostic carry a stable dotted identifier; the two
+lexical/grammar rejections (`s1-*`) and the header-cardinality
+diagnostic (`s3-duplicate-header`) carry none. The static rules
+and the node signatures gained theirs on 2026-07-27; the lexer,
+preflight and runtime have not. The count is asserted, so it
+moves down as ids land and a move upward means one was lost.
 
-The sixth is a different finding, filed here because the corpus is
-what found it. `s8-branching-with-a-condition` — `wait "x" { … }` —
+The fourth is a different finding, filed here because the corpus
+is what found it. `s8-branching-with-a-condition` — `wait "x" { … }` —
 is rejected by the **grammar**, with `'{' is not valid here`, and
-`script_validation._statement` carries an S8 arm for the same case
-that is therefore unreachable. The grammar's own header says the
-S-numbered rules stay above it *"where a diagnostic can cite its
-id — encoding them here would trade named errors for 'unexpected
-token'"*, which is precisely the trade this clause makes. Two
-defensible fixes (loosen the production so validation sees it, or
-accept the parse error and delete the dead arm); the spec calling
-S8 a rule "the grammar cannot carry" points at the first.
+`script_validation._statement` carries a `wait.branching-condition`
+arm for the same case that is therefore unreachable. The grammar's
+own header says the S-numbered rules stay above it *"where a
+diagnostic can cite its id — encoding them here would trade named
+errors for 'unexpected token'"*, which is precisely the trade this
+clause makes. Two defensible fixes (loosen the production so
+validation sees it, or accept the parse error and delete the dead
+arm); the spec calling S8 a rule "the grammar cannot carry" points
+at the first.
 
 ## Fixture headers
 
 ```rlqs
 # invalid: an observation carries exactly one condition
 # rule: S7
+# id: obs.two-channels
 # spec: Syntactic restrictions
 ```
 
-`# rule:` is the assertion. `# cites: no -- <why>` marks a rule
-the implementation cannot name yet, and is asserted to stay true.
+`# id:` is the assertion — the diagnostic that must reject the
+fixture. `# rule:` is the S-number that id serves, checked against
+the spec's own rule list so the two cannot drift. `# id: none`
+marks a diagnostic with no identifier yet, and is asserted to stay
+true.
 
 ## What this corpus deliberately does not cover
 

@@ -6,7 +6,7 @@ import os
 import unittest
 
 import reliquary
-from reliquary.script_nodes import ScriptParseError
+from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import parse_script
 from reliquary.script_timing import parse_duration, resolve
 
@@ -33,7 +33,7 @@ class DurationTests(unittest.TestCase):
                 parse_script(source)
             self.assertIn("must be a positive duration",
                           caught.exception.message)
-            self.assertIn("S5", caught.exception.message)
+            self.assertEqual(RULE_OF[caught.exception.rule_id], "S5")
 
 
 class PlacementMatrixTests(unittest.TestCase):
@@ -43,7 +43,8 @@ class PlacementMatrixTests(unittest.TestCase):
         with self.assertRaises(ScriptParseError, msg=source) as caught:
             parse_script(source)
         self.assertIn(reason, caught.exception.message, msg=source)
-        self.assertIn("S2", caught.exception.message, msg=source)
+        self.assertEqual(RULE_OF[caught.exception.rule_id], "S2",
+                         msg=source)
 
     def test_deadline_is_not_an_observation_bound(self):
         self.rejects(_HEAD + 'wait "x" deadline=5m\n',
@@ -185,7 +186,7 @@ class CycleTests(unittest.TestCase):
             parse_script(source)
         self.assertIn(f"the phase graph can cycle ({route})",
                       caught.exception.message)
-        self.assertIn("S12", caught.exception.message)
+        self.assertEqual(RULE_OF[caught.exception.rule_id], "S12")
         return caught.exception
 
     def test_a_self_loop_needs_a_deadline(self):

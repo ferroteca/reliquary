@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 import reliquary
-from reliquary.script_nodes import ScriptParseError
+from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import check_script
 from reliquary.script_timing import format_plan, resolve
@@ -85,7 +85,7 @@ class CheckScriptTests(unittest.TestCase):
                 handle.write(_HEAD + "entry a\nphase a {\n    goto a\n}\n")
             with self.assertRaises(ScriptParseError) as caught:
                 check_script("bad", context=home)
-            self.assertIn("S12", caught.exception.message)
+            self.assertEqual(RULE_OF[caught.exception.rule_id], "S12")
 
     def test_with_a_machine_media_slots_are_preflighted(self):
         with tempfile.TemporaryDirectory() as home:

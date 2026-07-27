@@ -1,5 +1,6 @@
 # invalid: entry names exactly one declared phase
 # rule: S10
+# id: flow.entry-undeclared
 # spec: Syntactic restrictions
 
 platform dos

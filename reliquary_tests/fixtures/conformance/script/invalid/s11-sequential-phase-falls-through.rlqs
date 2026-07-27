@@ -1,5 +1,6 @@
 # invalid: a sequential phase's statement list terminates
 # rule: S11
+# id: flow.phase-falls-through
 # spec: Syntactic restrictions
 
 platform dos

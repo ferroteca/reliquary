@@ -45,6 +45,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Diagnostics carry stable dotted identifiers**, which
+  `script-spec.md` has required of *every* one since the surface
+  was adopted while none existed. 52 ids across the static rules
+  and the node signatures — `obs.two-channels`, the spec's own
+  example, is now a thing the code raises rather than a style
+  illustration.
+
+  **The scheme is finer than the S-numbers, which is what the
+  defect left open to settle.** An S-number names a rule and an id
+  names one diagnostic under it: S7 is one restriction with six
+  ways to break it. So the two are not competing schemes and no
+  renaming was needed — a message carries the id alone, and the
+  spec's rule list carries the mapping. The corpus argued this
+  before the design did: written against the S-numbers first, it
+  worked but could not tell "no condition" from "unknown channel",
+  both being S7.
+
+  The id is a **field** on the error, not text in the message, so
+  a consumer switches on `rule_id` without parsing prose and the
+  beta index can be generated rather than hand-kept. Message
+  wording stays uncontracted and free to improve. `RULE_OF` maps
+  every id to its rule; three tests hold it, the spec's rule
+  lists, and the raised ids together in every direction.
+
+  Existing tests got stronger for free: the validation suite
+  asserted rule citations by substring, where `"S1"` matched a
+  message mentioning S12. It now goes through the id.
+
+  **The remainder is measured, not estimated.** The lexer,
+  preflight and runtime diagnostics have no ids yet; the script
+  corpus records exactly which cases that leaves — four fixtures
+  carrying `# id: none`, asserted in both directions so the marker
+  cannot outlive the gap. The id *index* stays deferred to beta,
+  where the spec always put it.
+
 - **A conformance corpus for the `.rlqs` scripting language** —
   58 fixtures in three buckets, written from `script-spec.md` and
   run by `test_script_corpus.py`. This is the half of P24 the

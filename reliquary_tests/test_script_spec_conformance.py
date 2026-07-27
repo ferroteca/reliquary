@@ -28,7 +28,7 @@ import re
 import unittest
 
 from reliquary import errors
-from reliquary.script_nodes import KEYWORDS
+from reliquary.script_nodes import KEYWORDS, RULE_OF
 from reliquary.script_parser import _DISPLAY, _SIGNATURES
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -113,23 +113,58 @@ class StaticRuleIdTests(SpecInventoryCase):
         return set(_RULE_BULLET.findall(_spec_text()))
 
     def _cited(self):
-        cited = set()
-        for name in sorted(os.listdir(_PACKAGE)):
-            if not name.endswith(".py"):
-                continue
-            with open(os.path.join(_PACKAGE, name),
-                      encoding="utf-8") as handle:
-                cited.update(_CITATION.findall(handle.read()))
-        return cited
+        """The rules some diagnostic enforces.
+
+        Diagnostics stopped citing `(Sn)` in their text when the
+        dotted ids landed; the rule a diagnostic serves is now
+        `RULE_OF[id]`, so that mapping is what this reads. Prose
+        `(Sn)` mentions in docstrings are deliberately *not* read —
+        a comment naming a rule is not an implementation of it,
+        and reading them would have let this test pass on
+        documentation alone.
+        """
+        return {rule for rule in RULE_OF.values() if rule is not None}
+
+    def _unidentified(self):
+        """Rules whose spec bullet says no id exists for them yet.
+
+        Read from the spec rather than listed here, so the
+        exemption retires itself: the day S1's diagnostics gain
+        ids, its bullet loses that phrase and the rule rejoins the
+        comparison below.
+        """
+        text = _spec_text()
+        start = text.index("- **S1** —")
+        end = text.index("\nThe grammar is line-oriented", start)
+        found = set()
+        for para in text[start:end].split("\n- **"):
+            match = re.match(r"(S\d+)\*\*", para.lstrip("- *"))
+            # "No ids yet" (plural) marks a rule with none at all.
+            # S4 says "No id yet for the header form" and does have
+            # one for the node form, so the two must not read alike.
+            if match and "No ids yet" in para:
+                found.add(match.group(1))
+        return found
 
     def test_every_specified_rule_is_enforced_somewhere(self):
-        unenforced = sorted(self._defined() - self._cited(),
-                            key=lambda id_: int(id_[1:]))
+        unenforced = sorted(
+            self._defined() - self._cited() - self._unidentified(),
+            key=lambda id_: int(id_[1:]))
         self.assertEqual(
             unenforced, [],
-            f"docs/spec/script-spec.md defines {unenforced} and no "
-            "diagnostic cites them. A rule nothing enforces is a "
-            "requirement the code never implemented, not a rule.")
+            f"docs/spec/script-spec.md defines {unenforced}, no "
+            "diagnostic id enforces them, and their bullets do not say "
+            "so. A rule nothing enforces is a requirement the code "
+            "never implemented, not a rule.")
+
+    def test_a_rule_marked_unidentified_really_has_no_id(self):
+        """The other direction, so the marking cannot go stale."""
+        wrongly_marked = sorted(self._unidentified() & self._cited())
+        self.assertEqual(
+            wrongly_marked, [],
+            f"{wrongly_marked} carry diagnostic ids and their spec "
+            "bullets still say none exists. Remove the phrase — the "
+            "note records a gap, and it has closed.")
 
     def test_no_diagnostic_cites_a_rule_the_spec_does_not_define(self):
         invented = sorted(self._cited() - self._defined(),

@@ -1,5 +1,6 @@
 # invalid: a property key is declared once per script
 # rule: S5
+# id: name.duplicate-property
 # spec: Syntactic restrictions
 
 platform dos

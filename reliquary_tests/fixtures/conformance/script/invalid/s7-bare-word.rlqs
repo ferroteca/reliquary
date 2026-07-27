@@ -1,5 +1,6 @@
 # invalid: the screen is observed by a bare string or regex
 # rule: S7
+# id: obs.not-a-condition
 # spec: Syntactic restrictions
 
 platform dos

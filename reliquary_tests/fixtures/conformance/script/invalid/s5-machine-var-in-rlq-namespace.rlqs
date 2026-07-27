@@ -1,5 +1,6 @@
 # invalid: machine-variable keys avoid rlq
 # rule: S5
+# id: name.variable-reserved-namespace
 # spec: Syntactic restrictions
 
 platform dos

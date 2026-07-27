@@ -4,7 +4,7 @@
 
 import unittest
 
-from reliquary.script_nodes import ScriptParseError
+from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import parse_script
 
 _HEAD = "platform dos\n"
@@ -12,12 +12,35 @@ _HEAD = "platform dos\n"
 
 class _ValidationCase(unittest.TestCase):
     def rejects(self, source, message, rule):
-        """Assert that a script fails, naming its problem and rule."""
+        """Assert that a script fails, naming its problem and rule.
+
+        ``rule`` is either the S-number a test was written against
+        or the diagnostic's own dotted id — the S-numbers where a
+        rule has several diagnostics and the test means any of
+        them, the id where it means one exactly. The http rules are
+        static but predate the S-numbering and have no S-number to
+        name, so they use ids.
+
+        Either way the assertion goes through the diagnostic's
+        ``rule_id`` rather than matching message text, which is
+        stronger than the substring check it replaced: `"S1"` used
+        to match a message that merely mentioned S12.
+        """
         with self.assertRaises(ScriptParseError, msg=source) as caught:
             parse_script(source)
-        self.assertIn(message, caught.exception.message, msg=source)
-        self.assertIn(rule, caught.exception.message, msg=source)
-        return caught.exception
+        error = caught.exception
+        self.assertIn(message, error.message, msg=source)
+        self.assertIsNotNone(
+            error.rule_id,
+            f"expected {rule}, but this diagnostic carries no id yet")
+        if rule in RULE_OF:
+            self.assertEqual(error.rule_id, rule, msg=source)
+        else:
+            self.assertEqual(
+                RULE_OF.get(error.rule_id), rule,
+                f"{error.rule_id} enforces {RULE_OF.get(error.rule_id)}, "
+                f"not {rule} (source: {source!r})")
+        return error
 
 
 class ScriptShapeTests(_ValidationCase):
@@ -325,48 +348,49 @@ class HttpValidationTests(_ValidationCase):
         self.rejects(
             _HEAD + 'http {\n    content answer "answer.txt" """\n'
             '        one\n    """\n}\nstart\n',
-            "content path must begin with '/'", "content")
+            "content path must begin with '/'", "http.path-not-absolute")
         self.rejects(
             _HEAD + 'http {\n    content answer "/../answer.txt" """\n'
             '        one\n    """\n}\nstart\n',
-            "content path may not contain . or ..", "content")
+            "content path may not contain . or ..", "http.path-traversal")
 
     def test_content_paths_are_unique(self):
         self.rejects(
             _HEAD + 'http {\n    content answer "/answer.txt" """\n'
             '        one\n    """\n    content other "/answer.txt" """\n'
             '        two\n    """\n}\nstart\n',
-            "duplicate content path: /answer.txt", "content")
+            "duplicate content path: /answer.txt", "http.duplicate-content-path")
 
     def test_content_names_are_unique_within_one_set(self):
         self.rejects(
             _HEAD + 'http {\n    content answer "/answer.txt" """\n'
             '        one\n    """\n    content answer "/other.txt" """\n'
             '        two\n    """\n}\nstart\n',
-            "duplicate content name: answer", "content")
+            "duplicate content name: answer", "http.duplicate-content-name")
         self.rejects(
             _HEAD + 'http start {\n    content answer "/answer.txt" """\n'
             '        one\n    """\n    content answer "/other.txt" """\n'
             '        two\n    """\n}\n',
-            "duplicate content name: answer", "content")
+            "duplicate content name: answer", "http.duplicate-content-name")
 
     def test_content_body_may_not_be_empty(self):
         self.rejects(
             _HEAD + 'http {\n    content answer "/answer.txt" """\n'
             '    """\n}\nstart\n',
-            "has an empty body", "content")
+            "has an empty body", "http.empty-body")
 
     def test_port_range_is_checked(self):
         self.rejects(
             _HEAD + 'http port-min=9000 port-max=8000 {\n'
             '    content answer "/answer.txt" """\n        one\n    """\n'
             '}\nstart\n',
-            "port-min must be less than or equal to port-max", "port")
+            "port-min must be less than or equal to port-max",
+            "http.port-range-inverted")
         self.rejects(
             _HEAD + 'http port-min=70000 {\n'
             '    content answer "/answer.txt" """\n        one\n    """\n'
             '}\nstart\n',
-            "port-min is not a TCP port", "port")
+            "port-min is not a TCP port", "http.port-out-of-range")
 
     def test_reserved_property_namespaces_are_rejected(self):
         self.rejects(_HEAD + "property rlq.http.url\nstart\n",
@@ -381,13 +405,13 @@ class HttpValidationTests(_ValidationCase):
     def test_http_start_requires_declared_content(self):
         self.rejects(_HEAD + "http start\n",
                      "http start requires declared or inline content",
-                     "http")
+                     "http.start-without-content")
 
     def test_http_action_names_are_closed(self):
         self.rejects(
             _HEAD + 'http {\n    content answer "/answer.txt" """\n'
             '        one\n    """\n}\nhttp begin\n',
-            "http action must be start or stop", "http")
+            "http action must be start or stop", "http.unknown-action")
 
     def test_http_stop_is_allowed_without_declared_content(self):
         script = parse_script(_HEAD + "http stop\n")
@@ -397,7 +421,8 @@ class HttpValidationTests(_ValidationCase):
         self.rejects(
             _HEAD + 'http {\n    content answer "/answer.txt" """\n'
             '        one\n    """\n}\nhttp start missing\n',
-            "http start names undeclared content: missing", "http")
+            "http start names undeclared content: missing",
+            "http.undeclared-content")
 
     def test_http_start_can_define_inline_content_without_declaration(self):
         script = parse_script(
@@ -417,7 +442,7 @@ class HttpValidationTests(_ValidationCase):
 
     def test_http_stop_takes_no_names_or_block(self):
         self.rejects(_HEAD + "http stop answer\n",
-                     "http stop takes no content names", "http")
+                     "http stop takes no content names", "http.stop-takes-nothing")
 
 
 class PortableKeyTests(_ValidationCase):

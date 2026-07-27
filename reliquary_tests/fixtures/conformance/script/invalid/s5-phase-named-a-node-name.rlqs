@@ -1,5 +1,6 @@
 # invalid: reserved node names are not identifiers
 # rule: S5
+# id: name.reserved-node
 # spec: Syntactic restrictions
 
 platform dos

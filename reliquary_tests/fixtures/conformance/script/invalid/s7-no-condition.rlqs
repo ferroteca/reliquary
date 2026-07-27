@@ -1,5 +1,6 @@
 # invalid: a wait requires a condition
 # rule: S7
+# id: obs.missing-condition
 # spec: Syntactic restrictions
 
 platform dos

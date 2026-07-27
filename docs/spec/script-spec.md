@@ -634,48 +634,91 @@ the CFG. Each has a stable id; diagnostics cite them:
 
 - **S1** — syntax is well formed: no unknown node names, no
   unbalanced blocks.
+  *No ids yet* — the lexer and grammar reject these; see the
+  coverage note under [Error classes](#error-classes-and-exit-codes).
+
 - **S2** — every argument, modifier, and block fits its node's
   signature, including each timing modifier's placement per the
   [placement matrix](#timing).
+  Ids: `node.modifier-not-allowed`, `node.timing-placement`.
+
 - **S3** — each header appears at most once; `entry` appears
   exactly in phased scripts.
+  Ids: `flow.entry-in-linear`, `flow.entry-missing`. The
+  header-cardinality half has no id yet.
+
 - **S4** — no node carries the same modifier name twice; a
   repeat is an error, never a last-wins override.
+  *No id yet* for the header form; the node form is
+  `node.duplicate-modifier`.
+
 - **S5** — names are valid and unique in their namespaces:
   reserved node names are not identifiers, property keys are
   declared once per script and are not spelled `text`, `media`,
   or `secret`, user-declared property keys do not use the
   reserved `rlq` or `reliquary` namespaces, durations are
   positive.
+  Ids: `name.reserved-node`, `name.duplicate-phase`,
+  `name.duplicate-property`, `name.property-is-a-kind`,
+  `name.property-reserved-namespace`,
+  `name.variable-reserved-namespace`, `time.non-positive`,
+  `prop.secret-default`, `prop.dead-default`.
+
 - **S6** — every `$` reference names a declared property or a
   Reliquary-owned run property in a reserved namespace made
   available by the script's declarations.
+  Ids: `prop.undefined-reference`, `prop.secret-reference`,
+  `prop.derivation-cycle`, `prop.http-without-block`. The
+  `${key}`-in-a-statement half is unenforced (see below).
+
 - **S7** — an observation carries **exactly one** condition — a
   bare string/regex beside a `machine=` modifier, or two
   `machine=` modifiers, are errors — the condition precedes any
   timing modifier, the channel is known, and its value is of the
   right kind (a state word for `machine=`, never a string).
+  Ids: `obs.missing-condition`, `obs.two-channels`,
+  `obs.not-a-condition`, `obs.unknown-channel`,
+  `obs.screen-named`, `obs.wrong-kind`.
+
 - **S8** — a branching `wait` carries no condition of its own,
   has at least two handlers, and appears nowhere inside a
   handler body. The recursion `handler → statement →
   observation` is deliberate: the grammar stays context-free and
   the depth limit is a static rule, not a parse rule.
+  Ids: `wait.branching-in-handler`, `wait.too-few-handlers`, and
+  `wait.branching-condition` — the last unreachable today, the
+  grammar rejecting that shape first.
+
 - **S9** — `on` appears only inside a branching `wait`, `always`
   only directly inside a reactive phase, and a phase is
   sequential or reactive, never mixed.
+  Ids: `handler.mixed-phase`, `handler.on-outside-branching-wait`,
+  `handler.always-outside-reactive-phase`.
+
 - **S10** — the two script shapes never mix; `goto` and `finish`
   are invalid in a linear script; every `goto` names a declared
   phase; `entry` names exactly one.
+  Ids: `flow.transfer-in-linear`, `flow.goto-undeclared`,
+  `flow.entry-undeclared`.
+
 - **S11** — the [terminating-statements rules](#terminating-statements):
   nothing follows a terminating statement, and a sequential
   phase's statement list terminates.
+  Ids: `flow.unreachable-statement`, `flow.phase-falls-through`.
+
 - **S12** — a phased script whose transition graph contains a
   cycle declares a header `deadline`.
+  Id: `flow.cycle-without-deadline`.
+
 - **S13** — watch patterns are non-empty and regexes compile.
+  Ids: `obs.empty-pattern`, `obs.uncompilable-regex`.
+
 - **S14** — closed vocabularies hold by name: key names are from
   the portable set, `insert`/`eject` name removable
   (floppy/cdrom) slots, `set-boot` names drive slots, and
   interpolation appears only where the argument accepts it.
+  Id: `key.not-portable` (the `press` vocabulary; the
+  insert/eject and set-boot vocabularies are preflight's).
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
@@ -1844,6 +1887,28 @@ an error outside the taxonomy. Every diagnostic
 carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
 across the classes, and the full id index is deferred to beta.
+
+**Ids are finer than the S-numbered rules.** An S-number names a
+restriction; an id names one diagnostic under it — S7 is one rule
+and `obs.two-channels` is one of the six ways to break it. The
+two are not competing schemes and a message carries only the id;
+the [syntactic restrictions](#syntactic-restrictions) list the
+ids that enforce each rule, which is where a reader goes from one
+to the other. The prefix is the subject, never the error class,
+because the namespace is shared across the classes: `obs.`,
+`wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
+`node.`, `http.`.
+
+An id is a **contract**: it is what a consumer switches on, so it
+is stable where the message text is not. The message wording,
+like every human rendering, is uncontracted and free to improve.
+
+Coverage today is the static rules above — the validation layer
+and the node signatures. Lexical, preflight and runtime
+diagnostics do not carry ids yet, and the script conformance
+corpus (`reliquary_tests/fixtures/conformance/script/`) records
+how many remain by refusing to let a fixture claim an id that is
+absent, or omit one that has arrived.
 
 ## The run's output and failure
 

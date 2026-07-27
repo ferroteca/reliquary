@@ -1,5 +1,6 @@
 # invalid: a phase is sequential or reactive, never both
 # rule: S9
+# id: handler.mixed-phase
 # spec: Syntactic restrictions
 
 platform dos

@@ -1,5 +1,6 @@
 # invalid: the placement matrix: a budget is not a wait's
 # rule: S2
+# id: node.timing-placement
 # spec: Syntactic restrictions
 
 platform dos

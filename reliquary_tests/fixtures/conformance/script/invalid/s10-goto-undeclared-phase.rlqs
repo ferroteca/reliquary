@@ -1,5 +1,6 @@
 # invalid: every goto names a declared phase
 # rule: S10
+# id: flow.goto-undeclared
 # spec: Syntactic restrictions
 
 platform dos

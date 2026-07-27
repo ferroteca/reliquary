@@ -1,7 +1,6 @@
 # invalid: a modifier outside the node's signature
 # rule: S2
-# cites: no -- the signature arm carries no id; only the
-#           placement-matrix arm cites S2
+# id: node.modifier-not-allowed
 # spec: Syntactic restrictions
 
 platform dos
