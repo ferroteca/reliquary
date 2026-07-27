@@ -105,7 +105,7 @@ the current list, out of the accepted file, recorded in
 DECISIONS.md — not on a separate sign-off. Full delivery is the
 trigger: a use case whose work has partly landed stays accepted
 rather than current (milestone 8 accepted U5, but its canonical
-scenario waits on the GUI era). A clarification claims no number of
+scenario waits on the GUI era, F5). A clarification claims no number of
 its own — it attaches to the use case it sharpens — and skips the
 argument entirely: it is simply delivered, applied in place to the
 current list and removed here.

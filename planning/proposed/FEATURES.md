@@ -11,20 +11,33 @@ it. Nothing here is worked ([README.md](../README.md)); the move to
 [accepted/FEATURES.md](../accepted/FEATURES.md) is the acceptance,
 and the commit that makes it is the record.
 
-Everything below left the numbered arc for the same reason (D33,
-owner, 2026-07-23): **no in-force or accepted use case demands it**.
-The numbered arc ran 1 through 9 and ended there, carrying text-mode
+F2–F6 left the numbered arc for the same reason (D33, owner,
+2026-07-23): **no in-force or accepted use case demands it**. The
+numbered arc ran 1 through 9 and ended there, carrying text-mode
 DOS on QEMU end to end; generalizing beyond that one vertical is
-what waits here. Each entry names the drafted use case that would
-schedule it — accepting that case is what returns the feature to a
-numbered arc.
+what waits here. Each names the drafted use case that would schedule
+it — accepting that case is what returns the feature to a numbered
+arc.
+
+**F7–F10 never were on the arc.** They are governance and tooling
+proposals moved out of TASKS.md's legacy Proposed section (D43), and
+they cite **principles** rather than use cases, which drive work
+just as well. What they share with the rest is the only thing that
+matters here: argued, unaccepted, and not worked from.
 
 A feature that is accepted but not yet built moves to
 [accepted/FEATURES.md](../accepted/FEATURES.md) and carries its work
 breakdown with it. Small work that is not a feature at all goes
 straight to [TASKS.md](../TASKS.md).
 
-## The backend adapter seam
+Each feature carries an **F-number** (D42; the rules are in
+[README.md](../README.md)). **Size is no bar to sitting here** — the
+sprint bound bites at acceptance, so every entry below is many
+sprints of work, and the "milestone's worth of work" above describes
+what these entries *are* rather than a size any may be accepted at.
+Cutting one into implementable pieces is part of accepting it.
+
+## F2 — The backend adapter seam
 
 > **Dropped from the numbered arc to the backlog** (owner,
 > 2026-07-23): the former Milestone 10, not yet scheduled — the
@@ -71,7 +84,7 @@ Deliverables:
 Done when: all QEMU interaction flows through the adapter API and
 the FreeDOS install script passes unchanged.
 
-## Second backend: VirtualBox
+## F3 — Second backend: VirtualBox
 
 > **Dropped from the numbered arc to the backlog** (owner,
 > 2026-07-23): the former Milestone 11, not yet scheduled on the
@@ -101,7 +114,7 @@ Deliverables:
 Done when: the FreeDOS install script runs unmodified on both
 backends from the same blueprint (minus a pinned backend field).
 
-## Guest agent communication
+## F4 — Guest agent communication
 
 > **Dropped from the numbered arc to the backlog** (owner,
 > 2026-07-23): the former Milestone 12 — numbered 13 until the
@@ -151,7 +164,7 @@ Done when: a guest command runs through QGA on QEMU with
 truthful capability reporting, and the agentless suite still
 passes byte-for-byte.
 
-## The GUI era: VNC, GUI scripting, and the last backends
+## F5 — The GUI era: VNC, GUI scripting, and the last backends
 
 > **Dropped from the numbered arc to the backlog** (owner,
 > 2026-07-23): the former Milestone 13, not yet scheduled —
@@ -220,8 +233,7 @@ Deliverables:
    framebuffer capture, key events, pointer events — behind the
    same input and screen capabilities as agentless display,
    reusing the pixel-level text recognition built for the
-   VirtualBox display plane ("Second backend: VirtualBox"
-   above).
+   VirtualBox display plane (F3 above).
    `control-planes: ["vnc"]` honored end to end, with a
    capability error naming Hyper-V where it cannot exist.
 2. The three portable input primitives exposed at the
@@ -245,7 +257,7 @@ VGA-scraping results on the same screens; and a GUI-era install
 script drives a setup end to end through landmarks on QEMU over
 VNC and on Hyper-V through its decided screen strategy.
 
-## Asynchronous runs
+## F6 — Asynchronous runs
 
 > **Deferred to the backlog** (owner, 2026-07-24, D35; scope
 > extended D36): the asynchronous-run pillar leaves the numbered
@@ -346,7 +358,161 @@ form is noninteractive by construction and rejects
 `on_mismatch="prompt"` — a background fetch can never hang on a
 hidden prompt.
 
+## F7 — Audit design documents against accepted demand
+
+> **Moved here from TASKS.md's legacy Proposed section** (owner,
+> 2026-07-26): argued but never approved, and a proposal belongs under
+> `proposed/`. Demanded by **P8** (interface and principle changes are
+> vetted): the audit checks that a design exists only where demand
+> does. No use case asks for it.
+
+**Audit design documents against accepted demand.** Raised
+unprompted during the 2026-07-24 traceability audit rather than
+requested, so it waits here. Findings that motivate it are
+recorded with the audit tasks under Governance in
+[Accepted](#accepted).
+
+Raised unprompted during the audit — a suggestion, not a request.
+
+## F8 — The planning traceability linter
+
+> **Moved here from TASKS.md's legacy Proposed section** (owner,
+> 2026-07-26): argued but never approved, and a proposal belongs under
+> `proposed/`. Demanded by **P8** and **P23** — it enforces
+> mechanically what those principles assert, rather than leaving them
+> to whoever happens to grep. Pairs with **F9**, its mirror. No use
+> case asks for it.
+
+**A traceability linter over the planning documents.** Check the
+invariants the governance rules already assert, in the required
+checks, so they are enforced rather than remembered.
+THE ARGUMENT: the artifacts are versioned files by necessity —
+the standing lists claim every entry is true of the code *at
+this commit*, which only something travelling in the commit can
+assert, and only a diff can review (this is why architecture
+decision records converged on markdown-in-repo, and why their
+tooling is indexers over files rather than trackers). What files
+do not give is **type and query**: nothing enforces that a
+decision carries supports or that delivered work cites accepted
+demand. Today those are checked by whoever happens to grep,
+which is exactly how U9 and U12 went unnoticed through the
+milestone that delivered them.
+EACH CHECK EARNED ITS PLACE — the 2026-07-24 hand audit found a
+real violation of every one:
+* every planning section cites a U/P/G demand — *12 of 34 sections
+  in the then-current roadmap cited none*;
+* every DECISIONS entry carries supports — *22 lack them, and
+  D29 sat outside the range the existing task assumed*;
+* no *delivered* work cites *unaccepted* demand — *U9 and U12*,
+  the sharpest defect of the set, and the one a linter would
+  have caught the day milestone 9 landed;
+* every design document's subject has accepted demand — *three
+  designs exist for pillars D33 demoted for lack of it*;
+* every cited identifier resolves — *U15 is cited 6 times and
+  defined nowhere*;
+* no entry appears in both a standing list and its proposals doc
+  (D23's no-stub rule).
+ONE DESIGN POINT IT RAISES. The U15 result is not simply a bug
+to fix: most of those citations are legitimate death-record
+references, and the lifecycle deliberately leaves **no stub**
+behind a retired number (D23). So a checker cannot distinguish a
+proper historical citation from a stale one without a
+machine-readable register of retired identifiers — which the
+no-stub rule currently forbids anywhere obvious. Reconcile the
+two before building: either the register lives in DECISIONS.md's
+Retired list in a parseable form, or retirement earns the one
+stub the rule otherwise refuses.
+SCOPE, deliberately narrow: mechanical invariants only. Whether
+a use case is *well argued*, whether a principle is *honored by
+the code*, whether a design is *good* — none of that is
+checkable, and a linter that pretended otherwise would licence
+exactly the box-ticking the governance rules exist to prevent.
+
+Raised 2026-07-24 as a suggestion, not a request.
+
+## F9 — The vision-utility audit
+
+> **Moved here from TASKS.md's legacy Proposed section** (owner,
+> 2026-07-26): argued but never approved, and a proposal belongs under
+> `proposed/`. Demanded by **P8**. The reverse-citation half of
+> **F8**: F8 checks every *citation* resolves, this checks every
+> *definition* is cited. Shares F8's design and should be sequenced
+> with it. No use case asks for it.
+
+**The vision-utility audit — the reverse-citation check.**
+The traceability linter above verifies every *cited*
+identifier resolves; this is its mirror — every *defined*
+vision statement (a use case, principle, or interface) is
+cited or codified *somewhere*, or is surfaced as suspect. A
+statement nothing leans on is suspect of no utility:
+legislated but never used.
+DISCIPLINE — a look-list, not a kill-list. Finding the orphans
+is mechanical (a grep over the numbered handles); the verdict
+is a judgment the audit must not pre-empt. Each orphan earns
+one question — *guardrail or ballast?* — since a ceiling or
+closure cited only when pressure arrives is working, not idle.
+Principles get more rope than use cases: some cannot be
+codified and are legitimately hard to cite.
+DELIVERY — greppable by hand today; a monthly CI run is the
+richer eventual form. Per P22 (no CI, at this time),
+scheduling that run is itself the argued case for turning CI on
+when its day comes, not a breach of it.
+
+Raised 2026-07-25 as a suggestion, not a request.
+
+## F10 — Generated API reference
+
+> **Moved here from TASKS.md's legacy Proposed section** (owner,
+> 2026-07-26): argued but never approved, and a proposal belongs under
+> `proposed/`. Demand uncited. It serves the descriptive layer's
+> accuracy; **P21** (dependencies must pull their weight) is the bar
+> it has to clear, not the demand for it.
+
+**Generate the API reference from docstrings** (raised
+2026-07-26, the spec/descriptive round; owner asked for it to
+be filed with its argument). Adopt a documentation generator
+(pdoc / mkdocstrings / Sphinx autodoc) to produce
+docs/api-reference.md from the binding's docstrings.
+SCOPE, and it is the whole point: **plumbing for the
+descriptive layer, never a transfer of authority.** A generated
+reference is *mechanically* faithful to the binding — the tool
+reads the signatures, so reference-disagrees-with-code becomes
+impossible by construction, which automates the apology the
+reference's banner already makes. The norm of the surface stays
+[docs/spec/api.md](../docs/spec/api.md): code-as-norm would
+invert P8 — an unargued code change would *redefine* the
+interface rather than violate it — and the project has already
+lived the counterexample: the twin-name realignment settled
+names in the spec while the code still said
+`create_from_blueprint`, and the code was realigned to the doc.
+Parity alone cannot replace that direction: it binds shape, not
+semantics, and under twin-name identity the CLI's spellings
+derive from the API's names, so code-as-norm would put the
+guard downstream of the thing guarded. The multi-binding future
+sharpens it — two bindings mean two codes, and "the code is the
+norm" stops being well-formed; generation then rightly yields
+one descriptive reference *per binding*, all answering to the
+one spec.
+THE BAR TO CLEAR, before adopting even the plumbing: P21 binds
+infrastructure — the surface today is small enough that the
+hand-written reference is not obviously losing; without CI
+(P22) a generated document needs a local required check to
+regenerate, or it goes stale in a new way; and
+`test_documented_examples.py` executes fenced examples from the
+docs, so generated output must preserve that property or exit
+that test deliberately.
+
+Raised 2026-07-26 in the spec/descriptive round; **the owner agreed
+it needs to win this argument, not that it has** — so unlike F7–F9
+this one was asked for, and still waits on its own case.
+
 ## Horizon — smaller and later
+
+> **Not a feature, and so unnumbered.** This is a holding list of
+> items too small or too unformed to be one. An item leaves it by
+> being written up as a feature — taking the next free F-number
+> then — or by going to [TASKS.md](../TASKS.md) if it turns out to
+> be ordinary small work.
 
 - Machine mobility: clone, export, import — the former
   milestone 12 (the number guest agents inherited in the

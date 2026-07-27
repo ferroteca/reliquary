@@ -41,14 +41,41 @@ none of them has a lifecycle state to be in:
   decisions that accepted something, decisions that **refused** it
   (TASKS.md's Rejected section is a thin index into this file), and
   a retired list binding nothing at all.
-- [TASKS.md](TASKS.md) — the queue. Work entered there is small and
-  **pre-approved**, so there is nothing to promote and no order to
-  work it in.
+- [TASKS.md](TASKS.md) — the queue, and **everything in it is
+  already accepted**, so there is nothing to promote and no order to
+  work it in. Its state is the one `accepted/` names; the directory
+  is not its home because `proposed/` and `accepted/` hold *demand
+  and capability* — use cases, principles, and the features that
+  deliver them — and a task is none of those. That kind distinction
+  is the distinguisher, not size alone.
 
 One exception cuts the other way: work that only makes sense as part
 of one accepted feature lives **with that feature**, under
 `accepted/FEATURES.md`, because it is meaningless apart from it.
 Only free-standing work goes in the queue.
+
+**There is no roadmap, deliberately** (D42). A roadmap classifies by
+*when* where everything here classifies by *state*, and promises an
+order nothing commits to. `accepted/` says the direction is agreed
+and nothing more; the absence of order in [TASKS.md](TASKS.md) holds
+equally for accepted features, the only binding order running inside
+a feature.
+
+**Features carry F-numbers and a size bound** (D42). The number is a
+handle for what depends on a feature, running in one sequence across
+both directories, recording order of issue and never priority; it
+**evaporates on delivery** and is never reused, so gaps are history
+rather than a promise. Designs take no number — a design serves one
+feature and is identified by its path. A feature must fit in one
+sprint, which here runs in minutes to hours; the bound bites at
+acceptance, so entries in `proposed/FEATURES.md` are each many
+sprints and cutting one up is part of accepting it.
+
+References between items are written in the dependent item and point
+at the prerequisite's handle. They are **not a delivery order**, and
+they run down the lifecycle or sideways, never up: an accepted item
+that cannot be completed without something still only proposed is a
+flaw to fix rather than a reference to record.
 
 The in-force artifacts live at the **repository root**, not here,
 because they are claims about the code as it exists today:
@@ -93,16 +120,16 @@ them, and `docs/spec/` refers to them.
 |---|---|
 | [`proposed/USE-CASES.md`](proposed/USE-CASES.md) | Drafted use cases, numbering from the same global U-sequence as the root list |
 | [`proposed/ARCHITECTURE.md`](proposed/ARCHITECTURE.md) | Proposed architecture: drafted principles under the global P-numbering, and model changes argued before acceptance |
-| [`proposed/FEATURES.md`](proposed/FEATURES.md) | Large unbuilt capabilities — each a milestone's worth of work, design settled and intact, awaiting the use case that schedules it |
+| [`proposed/FEATURES.md`](proposed/FEATURES.md) | Large unbuilt capabilities (F-numbered) — each many sprints of work, design settled and intact, awaiting the use case that schedules it; cut to sprint size only on acceptance |
 | [`accepted/USE-CASES.md`](accepted/USE-CASES.md) | Accepted use cases the code does not yet meet |
 | [`accepted/ARCHITECTURE.md`](accepted/ARCHITECTURE.md) | Accepted architecture the code does not yet honor — accepted vision, not yet armed |
-| [`accepted/FEATURES.md`](accepted/FEATURES.md) | Accepted-but-unbuilt capability, each carrying the work items that deliver it |
+| [`accepted/FEATURES.md`](accepted/FEATURES.md) | Accepted-but-unbuilt capability (F-numbered), each within one sprint and carrying the work items that deliver it |
 | [`INTERFACES.md`](INTERFACES.md) | *(root)* The interface-change rule every interface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The interfaces" |
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
-| [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small, pre-approved work, in no particular order |
+| [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already accepted, in no particular order |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `backend-adapter.md`, `landmarks.md` |
-| [`accepted/design/`](accepted/design/) | Design for accepted features — `recorder.md` (U6) |
-| [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing) and the script-language residual problems in `script-examples/` |
+| [`accepted/design/`](accepted/design/) | Design for accepted features — `recorder.md` (F1, U6) |
+| [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
 
 Not here, deliberately: the normative specs of shipped interfaces
 ([`docs/spec/`](../docs/spec/)) and the machine-readable schemas
@@ -114,9 +141,8 @@ second one.
 
 ## How an idea enters
 
-**An idea enters this project through three work queues** (owner,
-2026-07-26, widening D39's two — the widening wants a D-number of
-its own):
+**An idea enters this project through three work queues** (D43,
+widening D39's two):
 
 1. **GitHub issues** — the raw, unfiltered intake, often from
    outside: a bug hit, a question asked, a wish stated.
@@ -126,6 +152,36 @@ its own):
 3. **[TASKS.md](TASKS.md)** — small, **pre-approved** work. Entering
    it is approving it, so it needs no citation and no decision, and
    there is no order to work it in.
+
+**Writing into `planning/` is a governed act** (owner, 2026-07-26).
+The issue tracker is the one open door: anyone may file there, and
+entry grants nothing. Everything in this directory is the project
+speaking in its own voice, so the **same gate governs all three
+acts** — entering a document in `proposed/`, promoting it to
+`accepted/`, and entering work in [TASKS.md](TASKS.md). Only what
+each act grants differs: a live argument, an acceptance, an
+approval. Authority is a role rather than a person; today it is the
+owner alone, and the group may be widened whenever he chooses.
+
+The gate weighs most on the third act: a `proposed/` entry admits an
+argument and commits nothing, and a promotion is that argument's
+conclusion with its reasoning recorded, but a task entry *is* the
+whole vetting with nothing behind it. There, authority is all that
+stands between pre-approval and self-approval. The gate sits at
+entry only; anyone may pick up what is already there.
+
+**A task has no proposed state under `planning/`.** Both lanes run
+the same lifecycle, housed differently: demand and capability are
+proposed in `proposed/` and accepted in `accepted/`, while a task is
+proposed in the **issue tracker** and accepted in
+[TASKS.md](TASKS.md) — there being no argued middle stage for work
+too small to need the argument. So the tracker is the only queue a
+proposed task has, and an outside contributor needs no write access
+here to propose: they argue in the open, and transcription into
+`proposed/` is the governed act. The tracker takes everything, and
+an issue leaves by whichever exit fits — drafted as a proposal,
+entered as a task, fixed as a PR outright where it is a clear bug or
+housekeeping, or rejected with its reason recorded here.
 
 Nothing flows without starting in one of them, and the only
 exception is a small raw commit approved under housekeeping.

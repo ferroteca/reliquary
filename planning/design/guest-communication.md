@@ -17,7 +17,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > apply to every backend adapter
 > ([backend-adapter.md](../../planning/proposed/design/backend-adapter.md)). Native-agent
 > control planes and the VNC plane are both **backlog work**
-> (planning/proposed/FEATURES.md "Guest agent communication" and the GUI
+> (planning/proposed/FEATURES.md F4 "Guest agent communication" and the GUI
 > era), unscheduled since 2026-07-23 (DECISIONS.md D33). This
 > document does not by itself
 > authorize further implementation.

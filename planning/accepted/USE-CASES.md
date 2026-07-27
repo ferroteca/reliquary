@@ -26,7 +26,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > a separate sign-off. *Full* delivery is the trigger: a use case
 > whose work has partly landed stays here, since the root list is an
 > implementation claim (milestone 8 accepted U5, but its canonical
-> scenario waits on the GUI era).
+> scenario waits on the GUI era, F5).
 >
 > A use case in force is clarified, retired, or superseded — never
 > changed in nature. One accepted here may still be reshaped, its
@@ -141,7 +141,7 @@ and it waits here until made. Text verbatim as adopted:
 current list 2026-07-23 (owner: an in-force use case whose
 delivery is unscheduled is a real problem — proposed is the
 honest state). Its canonical scenario — a customized Windows
-install — waits on the unscheduled GUI era; the
+install — waits on the unscheduled GUI era (F5); the
 parameterization machinery lands at milestone 8 — the
 scheduled, U5-citing work that constitutes its acceptance,
 while the unscheduled scenario is why it is not current. U5

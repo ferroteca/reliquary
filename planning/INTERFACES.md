@@ -55,7 +55,9 @@ to a normative artifact — a `docs/spec/` specification, the
 published schema, the enumeration itself — that changes what the
 norm requires *is* an interface change and takes this rule,
 proposed and gated before it lands; work that arrives already
-made is rejected citing P23, whatever its merit. Only an edit
+made is rejected citing P23, whatever its merit — unless it comes
+from someone holding the authority to approve it, who may land the
+whole change at once (below). Only an edit
 that changes no rule (the clarify test) is documentation work. This matters because housekeeping's other two tests
 ("tiny", "clearly a problem") are judged by whoever wants to do
 the work, and the smallest-looking change is the one most likely
@@ -112,9 +114,54 @@ feature someone has already decided to build.
   has nothing to argue and is rejected, regardless of its
   elegance.
 
+**Authority may compress the steps** (owner, 2026-07-26). The
+staged workflow above is the route for someone who cannot approve
+their own change. A person holding governance authority — the owner,
+or whoever else the project entrusts with it — may land an interface
+or norm change **outright, in a single PR**, being entitled to
+perform every step it needs, and is never refused on the ground
+above. That is an *execution* of the governance steps all at once
+rather than a bypass of them: compressed in time, not reduced in
+content, so the use-case or principle amendment, the D-entry, and
+the specification update all still exist and land with it. A change
+arriving with none of them has not been compressed but skipped, and
+what is lost is the adjudication trail
+([DECISIONS.md](DECISIONS.md)) that this whole apparatus exists to
+keep. Anyone without that authority takes the staged route, and
+finished work from them is refused on one of two grounds, **never
+identity**: not having argued the merit, or having argued it and not
+won. Word it that way — the ground names the door back in. Note the
+limit honestly too: here the author of the standard is also its
+arbitrator, so this is not impartial adjudication. What it offers is
+a stated standard to be judged against and a recorded reasoning
+([DECISIONS.md](DECISIONS.md)) to disagree with later, which absent
+any separation of powers is the whole of the check. A refusal that cites a principle and stops
+is accurate and useless, reading as final when it means the
+opposite; every refusal states what would change the answer — argue
+it, argue the amendment, or bring what beats the recorded
+reasoning.
+
+**Compression reaches the process, never the claim.** A principle's
+route runs drafted → accepted → in force, and authority may collapse
+it: a principle *already true of the code* may be written straight
+into root [ARCHITECTURE.md](../ARCHITECTURE.md) in one act. What
+authority cannot do is place a false claim there — the root lists
+assert that the code complies today, so **placement is governed by
+truth, not by permission**. An unarmed principle sits under
+`accepted/` however unarguable it is, and an untrue one makes the
+list lie. Check the shape too: a principle is a rule the project
+holds itself to, not a state it merely happens to be in — and both
+get phrased the same way. "No CI" as a note that no pipeline exists
+would be a fact about tooling, and arming it would make *adopting*
+CI a bug; P22 is deliberately the other thing, a rule about how a
+pipeline may arrive. **Separate the expectation from its
+enforcement**: automation changes the cost of noticing a violation,
+never the status of one, so placement is governed by truth — not by
+permission, and not by tooling.
+
 Every approved change then lands the same way:
 
-1. **Name every surface it touches.** A change rarely touches one:
+1. **Name every interface it touches.** A change rarely touches one:
    the CLI and API move together under the one-to-one rule, the
    language grows only through its growth goals (G6, G7), and a
    document format changes with its spec. An intentionally

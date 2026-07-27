@@ -201,12 +201,28 @@ workflow:
   no single feature — the whole-system view itself (the seams model and the P-numbered principles) is root
   `ARCHITECTURE.md`. Once an interface ships, its normative spec moves to `docs/spec/` — current truth does not
   live under `planning/`.
+- **There is no roadmap** (D42): `accepted/` says the direction is agreed and nothing about when, so the absence
+  of order in `TASKS.md` holds equally for accepted features, the only binding order running inside a feature.
+  **Features carry F-numbers** — the handle a dependency, commit or decision points at — which unlike U-, P- and
+  D-numbers **evaporate on delivery**, retiring unreused, gaps being history rather than a promise. Designs take
+  no number. **A feature must fit in one sprint**, here minutes to hours, so an accepted feature is far smaller
+  than "milestone" suggests; the bound bites at acceptance. References between items run **down the lifecycle or
+  sideways, never up**. Full rules: `planning/README.md`.
+- **Search the record before a governed act.** Before drafting a proposal, accepting one, or changing a norm,
+  search `planning/DECISIONS.md` for what bears on it and report what you found — including finding nothing.
+  Anything recorded as killed, declined, or superseded is not revisited without new evidence, so re-raising one
+  unknowingly wastes the argument; an entry that *supports* the change is worth citing. The trigger is the act,
+  not a feeling of uncertainty — most entries carry a refusal, and what was declined is recorded nowhere else.
 - `planning/TASKS.md` is the third work input queue, beside GitHub issues and `planning/proposed/`: small,
   **pre-approved** work — entering it is approving it — with no scheduled order, so anyone may pick up
   anything. Work that only makes sense as part of one accepted feature lives with that feature in
   `planning/accepted/FEATURES.md` instead. Small one-offs are really just issues, and work small and obvious
   enough needs no entry at all (housekeeping, D38). In theory every issue points to a use case or principle;
-  small ones may be deemed obvious.
+  small ones may be deemed obvious. **Writing anywhere under `planning/` is a governed act** (D43): one gate
+  covers entering a document in `proposed/`, promoting one to `accepted/`, and entering work in `TASKS.md`,
+  with the issue tracker the one open door. Authority is the owner alone today. **Agents do not add tasks on
+  their own initiative and ask before editing that file at all**; the gate is at entry only, so anyone may pick
+  up what is already there.
 - `planning/INTERFACES.md` is the interface-change rule: how every interface-changing decision is weighed. The
   interface inventory it scopes over (CLI, embedding API, scripting language, and machine blueprints — media,
   source, and archive are components inside the blueprint — plus the script properties, recorded outputs, and

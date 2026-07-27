@@ -351,21 +351,42 @@ differently under the new wording — is mere documentation work.
   suite-must-run-there job), and when one wins the argument this
   entry is retired with the decision that retires it. (Stated
   here; this is the rule's normative home.)
-- **P23 — Norms change by proposal, never by arrival.** The
-  normative artifacts — the specs, the published schemas, the
-  interface enumeration, and the standing lists themselves —
-  change only through a proposal that wins its gate first: the
-  interface-change rule, entered through the queues (D39). A
-  change that arrives already made — a PR editing what a norm
-  requires with no accepted proposal behind it — is rejected by
-  citing this principle, whatever its technical merit; the
-  missing argument is the whole reason, and the rejection needs
-  no other. The one exception is the clarify test: an edit no
-  past decision would read differently under is documentation
-  work, not a norm change. (Prose: "The norms are part of the
+
+- **P23 — The self-description changes by proposal, never by
+  arrival.** What the project says it is and is for — the
+  standing lists (this document and USE-CASES.md), the normative
+  artifacts (the specs, the published schemas, the interface
+  enumeration), and everything under `planning/` — changes only
+  through a proposal that wins its gate first, entered through
+  the queues (D39). These are one category because they are the
+  documents that **bind other work**. The door is open: anyone
+  may argue for any change, and the argument is welcome. What is
+  refused is *arrival* — a change landing with no accepted
+  proposal behind it is rejected by citing this principle,
+  whatever its technical merit; the missing argument is the whole
+  reason, the rejection needs no other, and it is a rejection for
+  **not having argued the merit** — never for the work's quality,
+  and never for who submitted it. The ground names the missing
+  argument, which is also the door back in.
+  Proposing is open to all; **only authority accepts** (D43).
+  Two exceptions. The clarify
+  test: an edit no past decision would read differently under is
+  documentation work, not a norm change — and it is narrow, since
+  a requirement being already *implied* is not a requirement
+  unchanged. And **governance authority may compress the steps**
+  (D43): whoever is entitled to approve the change may propose,
+  accept and land it in one PR, the amendment and its record
+  landing with it — compressed in time, never reduced in content.
+
+  Approval is sometimes granted **in advance**, on trust in the
+  claim that qualifies it: work implementing an accepted decision,
+  and housekeeping (D38). That is standing approval, not an
+  absence of governance — a false claim means an unapproved change
+  landed. (Prose: "The norms are part of the
   architecture" above; the enforcement point is
   planning/INTERFACES.md's housekeeping boundary. P8 says how
   the argument is weighed; this says it must happen first.)
+
 
 ## The cross-cutting prose
 

@@ -5,20 +5,31 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # TASKS
 
-The work backlog — and the parking place for non-GitHub issues
-(the tracker:
-<https://github.com/ferroteca/reliquary/issues>).
+The accepted work backlog. A **proposed** task lives in the issue
+tracker — <https://github.com/ferroteca/reliquary/issues> — which is
+the only queue a proposed task has (D43): the tracker is a task's
+proposed state and this file is its accepted one. So nothing parks
+here awaiting a verdict; arriving *is* the verdict.
 
-**This file is the third work input queue** (owner, 2026-07-26,
-amending D39's two), and it works differently from the other two.
-Work entered here is **small and pre-approved**: entering it is
-approving it, so nothing waits on a verdict, and nothing here needs
-a citation, a use case, or a decision of its own. It sits at the
-planning root rather than under `proposed/` or `accepted/` for
-exactly that reason — the lifecycle directories classify *demand
-and capability*, which is argued before it is accepted, and this
-queue is the work that skips the argument because it is too small
-to need one.
+**Everything in this file is accepted** — the one vocabulary
+([README.md](README.md)) applying here exactly as in the
+directories. An entry is in the *accepted* state, so entering it is
+approving it: nothing waits on a verdict, nothing needs a citation
+or a decision of its own, and there is nothing to promote. The
+directory is not its home because `proposed/` and `accepted/` hold
+*demand and capability*, argued at length, and a task is none of
+those — free-standing work too small to be a feature and too small
+to need the argument. That kind distinction is the distinguisher,
+not size.
+
+**This file is the third work input queue** (D43, widening D39's
+two), and adding to it is governed by the gate covering all writing
+under `planning/` — weighing most here, this being the one governed
+act that grants approval with no argument behind it.
+
+**A queue holds what waits.** Work that arrives already done never
+appears here: there is nothing to schedule, only a decision to make,
+and an entry filed and closed in one act is ceremony.
 
 **There is no order here.** Nothing in this file is scheduled, and
 nothing claims priority over anything else; whoever picks work up
@@ -26,7 +37,7 @@ picks whatever they like. The one ordering that does bind is a
 feature's: **work that only makes sense as part of one accepted
 feature lives with that feature**, in
 [accepted/FEATURES.md](accepted/FEATURES.md), and has to be done to
-complete it — the U6 recorder's items are the standing example. A
+complete it — F1's items are the standing example. A
 task here that merely *relates* to a feature is still free to be
 picked whenever.
 
@@ -40,10 +51,6 @@ housekeeping test, and how acceptance is recorded — is in
 
 The sections below:
 
-- **[Proposed](#proposed)** — the exception to everything above:
-  work that was *argued rather than requested*, and is waiting on a
-  verdict. Nothing may be worked from here. An entry earns its
-  place by being too big or too contestable to pre-approve.
 - **[Accepted](#accepted)** — the queue proper. Grouped by kind,
   because the actor and the gate differ, but the grouping is not a
   running order.
@@ -57,120 +64,6 @@ The sections below:
 Standing questions to re-ask as the design hardens are not tasks
 and live with the decision record, under
 [DECISIONS.md](DECISIONS.md)'s open questions.
-
-## Proposed
-
-Argued but not approved. Nothing is worked from here until it moves
-to [Accepted](#accepted).
-
-- **Audit design documents against accepted demand.** Raised
-  unprompted during the 2026-07-24 traceability audit rather than
-  requested, so it waits here. Findings that motivate it are
-  recorded with the audit tasks under Governance in
-  [Accepted](#accepted).
-
-- **A traceability linter over the planning documents.** Check the
-  invariants the governance rules already assert, in the required
-  checks, so they are enforced rather than remembered.
-  THE ARGUMENT: the artifacts are versioned files by necessity —
-  the standing lists claim every entry is true of the code *at
-  this commit*, which only something travelling in the commit can
-  assert, and only a diff can review (this is why architecture
-  decision records converged on markdown-in-repo, and why their
-  tooling is indexers over files rather than trackers). What files
-  do not give is **type and query**: nothing enforces that a
-  decision carries supports or that delivered work cites accepted
-  demand. Today those are checked by whoever happens to grep,
-  which is exactly how U9 and U12 went unnoticed through the
-  milestone that delivered them.
-  EACH CHECK EARNED ITS PLACE — the 2026-07-24 hand audit found a
-  real violation of every one:
-  * every planning section cites a U/P/G demand — *12 of 34 sections
-    in the then-current roadmap cited none*;
-  * every DECISIONS entry carries supports — *22 lack them, and
-    D29 sat outside the range the existing task assumed*;
-  * no *delivered* work cites *unaccepted* demand — *U9 and U12*,
-    the sharpest defect of the set, and the one a linter would
-    have caught the day milestone 9 landed;
-  * every design document's subject has accepted demand — *three
-    designs exist for pillars D33 demoted for lack of it*;
-  * every cited identifier resolves — *U15 is cited 6 times and
-    defined nowhere*;
-  * no entry appears in both a standing list and its proposals doc
-    (D23's no-stub rule).
-  ONE DESIGN POINT IT RAISES. The U15 result is not simply a bug
-  to fix: most of those citations are legitimate death-record
-  references, and the lifecycle deliberately leaves **no stub**
-  behind a retired number (D23). So a checker cannot distinguish a
-  proper historical citation from a stale one without a
-  machine-readable register of retired identifiers — which the
-  no-stub rule currently forbids anywhere obvious. Reconcile the
-  two before building: either the register lives in DECISIONS.md's
-  Retired list in a parseable form, or retirement earns the one
-  stub the rule otherwise refuses.
-  SCOPE, deliberately narrow: mechanical invariants only. Whether
-  a use case is *well argued*, whether a principle is *honored by
-  the code*, whether a design is *good* — none of that is
-  checkable, and a linter that pretended otherwise would licence
-  exactly the box-ticking the governance rules exist to prevent.
-  Proposed rather than accepted: my suggestion, not a request.
-
-- **The vision-utility audit — the reverse-citation check.**
-  The traceability linter above verifies every *cited*
-  identifier resolves; this is its mirror — every *defined*
-  vision statement (a use case, principle, or interface) is
-  cited or codified *somewhere*, or is surfaced as suspect. A
-  statement nothing leans on is suspect of no utility:
-  legislated but never used.
-  DISCIPLINE — a look-list, not a kill-list. Finding the orphans
-  is mechanical (a grep over the numbered handles); the verdict
-  is a judgment the audit must not pre-empt. Each orphan earns
-  one question — *guardrail or ballast?* — since a ceiling or
-  closure cited only when pressure arrives is working, not idle.
-  Principles get more rope than use cases: some cannot be
-  codified and are legitimately hard to cite.
-  DELIVERY — greppable by hand today; a monthly CI run is the
-  richer eventual form. Per P22 (no CI, at this time),
-  scheduling that run is itself the argued case for turning CI on
-  when its day comes, not a breach of it.
-  Proposed rather than accepted: raised 2026-07-25, a
-  suggestion, not a request.
-
-- **Generate the API reference from docstrings** (raised
-  2026-07-26, the spec/descriptive round; owner asked for it to
-  be filed with its argument). Adopt a documentation generator
-  (pdoc / mkdocstrings / Sphinx autodoc) to produce
-  docs/api-reference.md from the binding's docstrings.
-  SCOPE, and it is the whole point: **plumbing for the
-  descriptive layer, never a transfer of authority.** A generated
-  reference is *mechanically* faithful to the binding — the tool
-  reads the signatures, so reference-disagrees-with-code becomes
-  impossible by construction, which automates the apology the
-  reference's banner already makes. The norm of the surface stays
-  [docs/spec/api.md](../docs/spec/api.md): code-as-norm would
-  invert P8 — an unargued code change would *redefine* the
-  interface rather than violate it — and the project has already
-  lived the counterexample: the twin-name realignment settled
-  names in the spec while the code still said
-  `create_from_blueprint`, and the code was realigned to the doc.
-  Parity alone cannot replace that direction: it binds shape, not
-  semantics, and under twin-name identity the CLI's spellings
-  derive from the API's names, so code-as-norm would put the
-  guard downstream of the thing guarded. The multi-binding future
-  sharpens it — two bindings mean two codes, and "the code is the
-  norm" stops being well-formed; generation then rightly yields
-  one descriptive reference *per binding*, all answering to the
-  one spec.
-  THE BAR TO CLEAR, before adopting even the plumbing: P21 binds
-  infrastructure — the surface today is small enough that the
-  hand-written reference is not obviously losing; without CI
-  (P22) a generated document needs a local required check to
-  regenerate, or it goes stale in a new way; and
-  `test_documented_examples.py` executes fenced examples from the
-  docs, so generated output must preserve that property or exit
-  that test deliberately.
-  Proposed rather than accepted: the owner agreed it needs to win
-  this argument, not that it has.
 
 ## Accepted
 
@@ -352,7 +245,7 @@ landed, and where it diverged from what step 2 decided:
    Machinery that never moves belongs at the root.**
    One thing is new rather than decided: `TASKS.md` is reframed as
    the third input queue (small, pre-approved, unordered), which
-   widens D39's two and wants a D-number.
+   widens D39's two and wants a D-number. [D43 gives it one.]
 3. ~~Migrate delivered design out of ROADMAP~~ — **done**, first
    into `planning/design/` and then out again (step 5).
 4. ~~Condense the completed milestone sections to notes~~ —

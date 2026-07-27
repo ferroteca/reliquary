@@ -150,8 +150,243 @@ is waiting on an answer today.
   owner 2026-07-21 — a real third-party adapter story elevates
   it into the INTERFACES inventory through the interface-change
   rule, never by drift)
+- **two norms for one semantic surface** (raised 2026-07-26).
+  `docs/spec/cli.md` and `docs/spec/api.md` are both normative for
+  what ARCHITECTURE.md calls one semantic surface. P6 states the
+  parity symmetrically and the twin-name rule derives only
+  *names*, so nothing says which wins if the two disagree on
+  **semantics**. **Both stay normative for now** (owner): they
+  align very closely, so the risk is dormant rather than absent.
+  Re-ask when they first diverge, or when a second binding lands —
+  the resolutions available are naming one of them normative and
+  the other derived (the API is the natural pick, and this needs
+  no move to code-as-norm), adding a tie-break clause, or placing
+  the semantics in one document both specs present.
 
 ## Decided
+
+- D43 — WRITING UNDER planning/ IS A GOVERNED ACT; AUTHORITY
+  COMPRESSES THE STEPS — DECIDED (owner, 2026-07-26). Supports P8,
+  P23; **amends D39** (widening its two queues to three) and
+  **closes D39's open edge**; **widens P23** to the whole
+  self-description and gives it a negative boundary. Standing
+  across every project the owner controls.
+
+  THE THIRD QUEUE, FINALLY NUMBERED. D39 named exactly two raw
+  input queues and drew its value from the closure — nothing
+  flows without starting in one of them. TASKS.md became a third
+  on 2026-07-26 without a number, and the widening needs one
+  because it breaks that closure claim and must replace the
+  argument. **Everything in TASKS.md is accepted**: the one
+  vocabulary applies to the file exactly as to the directories, so
+  entry is approval, nothing waits on a verdict and there is
+  nothing to promote. Its state is the one `accepted/` names; the
+  directory is not its home because `proposed/` and `accepted/`
+  hold demand and capability — use cases, principles, and the
+  features delivering them — and a task is none of those. THAT
+  KIND DISTINCTION IS THE DISTINGUISHER, not size.
+
+  A TASK HAS NO PROPOSED STATE UNDER planning/. Both lanes run the
+  same lifecycle, housed differently: demand and capability are
+  proposed in `proposed/` and accepted in `accepted/`, while a
+  task is proposed in the **issue tracker** and accepted in
+  TASKS.md, there being no argued middle stage for work too small
+  to need the argument. So the tracker is the only queue a
+  proposed task has, and this repository holds no record of
+  proposed tasks at all. APPLYING IT CLEARED ONE CONTRADICTION:
+  TASKS.md carried a **Proposed** section of four entries
+  predating this rule, none approved, three raised as suggestions
+  rather than requested. All four move to
+  [proposed/FEATURES.md](proposed/FEATURES.md) as **F7–F10**, and
+  the section is gone. A `proposed/TASKS.md` was considered and
+  not created: it would reverse this clause for the sake of four
+  entries, where the cost is not the D-number but a permanent
+  fifth artifact in the lifecycle directories. The tracker is not that lane's alone: it
+  takes everything, and an issue leaves by whichever exit fits —
+  drafted as a proposal, entered as a task, picked up and fixed as
+  a PR outright where it is a clear bug or housekeeping, or
+  rejected with its reason recorded here.
+
+  THE GATE IS THE SAME GATE. Writing anywhere under `planning/` is
+  the project speaking in its own voice, and only the tracker is
+  an open door. **One gate governs all three acts** — entering a
+  document in `proposed/`, promoting one to `accepted/`, entering
+  work in TASKS.md — and only what each grants differs: a live
+  argument, an acceptance, an approval. Authority is a role, not a
+  person; today the owner alone, a group he may widen. It weighs
+  most on the third act, the one that grants approval with no
+  argument behind it, where it is all that separates pre-approval
+  from SELF-approval — the "small and obvious" judgement otherwise
+  resting with whoever wants the work done. The gate sits at entry
+  only: anyone may pick up what is already there.
+
+  AUTHORITY COMPRESSES THE STEPS. The staged workflow is the route
+  for someone who cannot approve their own change. Whoever holds
+  governance authority may land an interface or norm change
+  outright, in a single PR, being entitled to perform every step —
+  an **execution** of the governance steps at once, not a bypass.
+  COMPRESSED IN TIME, NEVER REDUCED IN CONTENT: the amendment, the
+  D-entry and the norm update still exist and land with it, and a
+  change arriving with none of them has been skipped rather than
+  compressed, costing the adjudication trail this record exists to
+  keep. P23 carries this, and is **widened** in the same act: it
+  governed the norms and the standing lists but not `planning/`,
+  so it now names the whole self-description as one category —
+  the documents that bind other work — and states the boundary
+  the round found missing. NOTHING SAID WHAT IS *NOT* GOVERNED,
+  which is what made the fuzz feel unbounded. Downstream work
+  bringing code into line with a governed document follows from
+  that decision and needs no gate of its own; housekeeping and
+  bug fixes faithfully applied are exempt as a class (D38). No
+  new principle was added: the round drafted one and found it
+  restated P23's positive half, so P23 was widened instead. Anyone without that authority takes the
+  staged route, and finished work from them is refused for **who
+  performed the act**, never for its merit — which is how the
+  refusal is to be worded.
+
+  COMPRESSION REACHES THE PROCESS, NEVER THE CLAIM. A principle
+  may be written straight into root ARCHITECTURE.md when it is
+  *already true of the code*; what authority cannot do is place a
+  false claim there, the root lists asserting present compliance.
+  **Placement is governed by truth — not by permission, and not by
+  tooling.** An unarmed principle waits under `accepted/` however
+  unarguable it is. Check the shape too: a principle is a rule the
+  project holds itself to, not a state it happens to be in, and
+  the two get phrased identically.
+
+  THE CLARIFY TEST IS NARROW, AND IT IS WHERE A LOOPHOLE WOULD BE.
+  It asks one thing: does the edit change what the norm
+  *requires*? Not whether the requirement was already implied,
+  believed, or honoured in practice. **"It was implicit" is the
+  argument that dissolves the test**, since nearly any principle
+  can be presented as implied by an existing one; a rule the
+  project honours but has never stated is the *adds a new
+  principle* rung, additive and easy but still routed. And the
+  tempting near-miss: switching enforcement on leaves an
+  expectation exactly as it was and still lands on whatever entry
+  recorded that the enforcement did not exist. **Ask which entry
+  the edit touches, not which requirement you have in mind.**
+
+  D39'S OPEN EDGE, CLOSED. A defect found mid-work against a
+  standing principle started in neither queue, and D39 left the
+  distinguishing clause for a later round. The clause: the
+  principle is **its own demand**, so such a defect needs no
+  approval and only fixing — an in-scope discovery may be fixed
+  within the work that found it, and anything else is filed.
+
+- D42 — NO ROADMAP; FEATURES CARRY RETIRING F-NUMBERS AND A
+  SPRINT-SIZED BOUND — DECIDED (owner, 2026-07-26). Supports P9;
+  **completes the governance rebuild of 2026-07-26**, which
+  dissolved the roadmap into these directories without recording a
+  number for the act. Standing across every project the owner
+  controls, not this one alone.
+
+  NO ROADMAP, AS A STANDING RULE. A roadmap promises too much: it
+  asserts an order and a time that nothing else in this machinery
+  commits to, and it classifies by *when* where every other
+  artifact here classifies by *state*. Large items wait in
+  `proposed/`, are accepted one at a time, and are bitten off one
+  at a time in no pre-promised order. What this makes exact is
+  what a location promises: **`accepted/` says the direction is
+  agreed and nothing more** — it answers "is this right?" with yes
+  and "when?" with nothing at all. The absence of order is
+  uniform, TASKS.md's "no order here" holding equally for accepted
+  features; the one ordering that binds runs *inside* a feature,
+  where the work items delivering it must all be done.
+
+  DEPENDENCIES ARE REFERENCES, NOT A SCHEDULE. Items refer to each
+  other, written in the DEPENDENT item and pointing at the
+  prerequisite — the direction every other citation here runs.
+  Two properties keep the references from smuggling the roadmap
+  back in. **They point down the lifecycle or sideways, never
+  up**: a proposed item may depend on an accepted one, since the
+  prerequisite is already agreed, but an ACCEPTED item that cannot
+  be completed without something still only PROPOSED is not a
+  reference to record — it is a flaw, the project having accepted
+  work it cannot finish without a second decision it has not made.
+  Accept the prerequisite too, or withdraw the acceptance. And a
+  reference states an order between two items, never a position in
+  a queue: that B needs A says nothing about when either is picked
+  up. Nothing is promised by being pointed at, in either
+  direction.
+
+  FEATURES CARRY F-NUMBERS THAT EVAPORATE. Every item that can be
+  depended on needs a handle, because a heading someone may reword
+  is not something to point at. Features take numbers —
+  `## F3 — Second backend: VirtualBox`, number and name together,
+  the way `U6` already reads. **Designs take no number of their
+  own**: a design serves one feature and is identified by its
+  path, and a second handle would be a second identity that drifts
+  on the first rename. The handles fall in two classes and the
+  difference is not bureaucratic. Vision persists, so its handles
+  are permanent — a use case, a principle, a decision outlives the
+  work that delivered it and its number travels into the in-force
+  list. **Work completes, so its handles evaporate**: on delivery
+  a feature stops existing as an item, leaving the code and the
+  norms specifying it, with nothing left for the number to point
+  at, and its inbound references die with it because a satisfied
+  dependency is dead weight. Evaporating is not the same as
+  reusable — the number retires and is never issued again, so a
+  mention surviving in a commit message never resolves to
+  something else later. Gaps in the sequence are HISTORY, NOT A
+  PROMISE.
+
+  An F-number is the old milestone identifier and there is nothing
+  wrong with that. Dissolving the roadmap took away the ORDER and
+  the DATE, not the unit. What keeps the sequence from becoming
+  the delivery ledger is the evaporation plus the absence of a
+  status column, a count, a percentage, or any suggestion that
+  F-order is work-order; the number records order of issue,
+  exactly like a D-number.
+
+  A FEATURE MUST FIT IN ONE SPRINT. A feature too large to
+  implement in one sprint is broken up. The sprint MEASURES the
+  feature; it does not schedule it — nothing says which sprint or
+  when, only that once the work is picked up it can be carried to
+  completion in one bounded push. **A sprint is deliberately
+  unspecified**: a rough unit of time and size each project sets
+  for itself, resourcing usually dictating, never written down as
+  a number of days and never imported from another project. **Do
+  not read the traditional two weeks into it** (owner, 2026-07-26):
+  with AI tooling a solo project's sprint is often measured in
+  MINUTES OR HOURS, so an acceptable feature is far smaller than
+  the word "milestone" suggests, and this file's older
+  "milestone's worth of work" phrasing describes something too
+  large to accept rather than a target. Short sprints are also what
+  keeps the machinery turning over — handles evaporate often, a use
+  case arms soon after its acceptance, and `accepted/` never
+  settles into a backlog.
+
+  The bound bites at ACCEPTANCE, not at proposal. Large, shapeless
+  capability belongs in `proposed/` and is welcome there — F5 is
+  plainly several sprints — and cutting it into implementable
+  pieces is part of what accepting it means. Three things go wrong
+  when the bound is ignored, each a failure the rest of this
+  machinery exists to prevent: **the roadmap returns inside the
+  feature**, since an accepted feature's work items bind in order
+  and a months-long feature is a long ordered schedule sitting
+  where nothing looks for one; **acceptance outruns the design**,
+  the larger unit leaving more unsettled at acceptance and more
+  likely to depend on decisions not yet made; and **delivery
+  stalls the arming**, a use case reaching the in-force list only
+  on delivery, so a feature too big to finish leaves it half-landed
+  and the in-force list silently ages. Splitting RETIRES THE
+  PARENT: the old number goes and each piece takes a fresh one,
+  since sub-numbering (F3a, F3b) builds a hierarchy and hierarchy
+  is how a feature list turns into a work-breakdown schedule.
+
+  FOUND BY APPLYING IT. F1, the only accepted feature, fails both
+  new tests at once: its seven work items are not one feature but
+  at least seven, on any sprint this project actually runs; and
+  its console viewer rides the VNC control plane that lives in F5,
+  under `proposed/` — the accepted-depends-on-proposed flaw named
+  above. Its own sequencing note already marks where a cut would
+  fall (the text-mode recorder proceeds without the viewer).
+  **Both are tolerated and neither is fixed** (owner, same day):
+  F1 stands as written, carrying a notice that it is unusually
+  large, and the flag is the whole of the treatment. The bound
+  governs what is accepted from here; it is not applied
+  retroactively to the one entry predating it.
 
 - D41 — THE IDENTITY LEDGER IS DELETED; `add-media` AUTHORS A
   DECLARATION — DECIDED (owner, 2026-07-26). Supports P4, P8;
@@ -308,7 +543,9 @@ is waiting on an answer today.
   from outside: a bug hit, a question asked, a wish stated) and
   **the proposed/ directory** (the same idea argued in the
   project's own vocabulary, as a drafted use case, principle or
-  task). Nothing flows without starting in one of them. The single
+  task). Nothing flows without starting in one of them.
+  [D43 widens this to THREE queues: TASKS.md is the third, and
+  the closure argument is re-derived there.] The single
   exception is a small raw commit approved under housekeeping
   (D38).
   WHY IT IS WORTH STATING, given the docs already gesture at it:
@@ -337,6 +574,9 @@ is waiting on an answer today.
   wants a clause distinguishing them — probably that an in-scope
   discovery may be fixed within the work that found it, and
   anything else is filed. Left for the round that settles it.
+  [D43 settles it, on exactly that clause: the principle is its
+  own demand, so an in-scope discovery may be fixed within the
+  work that found it, and anything else is filed.]
 
 - D38 — HOUSEKEEPING IS A STANDING APPROVAL BUCKET — DECIDED
   (owner, 2026-07-24). Supports P8; sharpens TASKS.md's passive
@@ -549,7 +789,10 @@ is waiting on an answer today.
   stream-bearing commands, the error taxonomy and its exit
   codes, interaction runs (`begin-run`/`end-run`), and the
   record-management run verbs (`list-runs`, `run status`,
-  `run delete`). The asynchronous pillar — `run-script --detach`
+  `run delete`).
+  [D36 amends this same day: the run-record design was found
+  demand-less, so the whole persistence substrate leaves milestone 9
+  with the async pillar and milestone 9 stores nothing.] The asynchronous pillar — `run-script --detach`
   and the detached owned-child runner, writer identity and the
   crashed-run rule, the cross-process followers `run tail` /
   `run wait` / `run cancel [--stop-machine]`, and the API async

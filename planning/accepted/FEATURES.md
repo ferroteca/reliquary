@@ -13,12 +13,23 @@ acceptance and the commit is its record ([README.md](../README.md))
 — and leaves by being delivered.
 
 Accepted is not scheduled: the numbered milestone arc ended with
-milestone 9, so nothing below is on a sprint. The work items are
+milestone 9, so nothing below is queued or dated. The work items are
 tasks like any other and answer to the same rules as
 [TASKS.md](../TASKS.md); they sit with their feature rather than in
 that queue because they are meaningless apart from it.
 
-## The U6 authoring recorder
+Each feature carries an **F-number** and must fit in **one sprint**
+(D42; the rules are in [README.md](../README.md)). A feature too
+large is cut on acceptance, the split retiring the parent's number
+for a fresh one per piece.
+
+## F1 — The U6 authoring recorder
+
+> **Unusually large — flagged, not cut** (owner, 2026-07-26). On the
+> sprint this project runs, its seven work items are not one feature
+> but at least seven. It stands as written by decision, and the flag
+> is the whole of the treatment; the sequencing note below marks
+> where a cut would fall if one is ever wanted.
 
 Use case **U6 — accepted, awaiting delivery** (moved 2026-07-23);
 design in [design/recorder.md](design/recorder.md). The one
@@ -49,6 +60,10 @@ Work items, in rough dependency order:
 - CLI record command family + API twins land together (parity)
 
 **Sequencing note.** The console viewer rides the VNC control
-plane, which is itself unbuilt — it arrives with the GUI era in
-[proposed/FEATURES.md](../proposed/FEATURES.md). The text-mode
-recorder is what can proceed without it.
+plane, which is itself unbuilt — it arrives with the GUI era (F5,
+[proposed/FEATURES.md](../proposed/FEATURES.md)). The text-mode
+recorder is what can proceed without it. That reference runs *up*
+the lifecycle, which D42 treats as a flaw rather than a dependency —
+tolerated here alongside the size, and noted so it is not mistaken
+for the normal shape. The text-mode half is the part that depends on
+nothing unaccepted.
