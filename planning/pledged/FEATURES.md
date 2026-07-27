@@ -3,16 +3,16 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Accepted features
+# Pledged features
 
-Large capability that is **accepted but not yet built**, each
+Large capability that is **pledged but not yet built**, each
 carrying the work breakdown that delivers it. A feature arrives here
 by being moved out of
 [proposed/FEATURES.md](../proposed/FEATURES.md) — the move is the
-acceptance and the commit is its record ([README.md](../README.md))
+pledge and the commit is its record ([README.md](../README.md))
 — and leaves by being delivered.
 
-Accepted is not scheduled: the numbered milestone arc ended with
+Pledged is not scheduled: the numbered milestone arc ended with
 milestone 9, so nothing below is queued or dated. The work items are
 tasks like any other and answer to the same rules as
 [TASKS.md](../TASKS.md); they sit with their feature rather than in
@@ -20,7 +20,7 @@ that queue because they are meaningless apart from it.
 
 Each feature carries an **F-number** and must fit in **one sprint**
 (D42; the rules are in [README.md](../README.md)). A feature too
-large is cut on acceptance, the split retiring the parent's number
+large is cut on pledge, the split retiring the parent's number
 for a fresh one per piece.
 
 ## F1 — The U6 authoring recorder
@@ -31,10 +31,10 @@ for a fresh one per piece.
 > is the whole of the treatment; the sequencing note below marks
 > where a cut would fall if one is ever wanted.
 
-Use case **U6 — accepted, awaiting delivery** (moved 2026-07-23);
+Use case **U6 — pledged, awaiting delivery** (moved 2026-07-23);
 design in [design/recorder.md](design/recorder.md). The one
 capability the numbered arc deliberately did not deliver while its
-demand was already accepted: the arc ended at milestone 9 with the
+demand was already pledged: the arc ended at milestone 9 with the
 recorder unbuilt.
 
 Work items, in rough dependency order:
@@ -66,4 +66,4 @@ recorder is what can proceed without it. That reference runs *up*
 the lifecycle, which D42 treats as a flaw rather than a dependency —
 tolerated here alongside the size, and noted so it is not mistaken
 for the normal shape. The text-mode half is the part that depends on
-nothing unaccepted.
+nothing unpledged.

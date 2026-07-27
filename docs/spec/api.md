@@ -186,7 +186,7 @@ list.
 > case (drafted as U19). Milestone 9 delivers the blocking twins
 > (`run_script()`, `fetch_media()`) and the record-management
 > verbs; the pull-only handles and `attach_run()` return when U19
-> is accepted. The design stands as written.
+> is pledged. The design stands as written.
 
 **The run handle** (`start_script()`; reopened by
 `attach_run()`): a pull-only follower of the run's live

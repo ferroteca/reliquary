@@ -73,7 +73,7 @@ each other's machines (a machine with no recorded source matches by
 name alone).
 
 **Reliquary reads by extension and writes by convention**: U6's
-recorder ([recorder.md](../../planning/accepted/design/recorder.md)) emits its drafts — the
+recorder ([recorder.md](../../planning/pledged/design/recorder.md)) emits its drafts — the
 script, its landmark declarations, and their variant renderings —
 into the asset root the session ran with, as new source files their
 author commits. Nothing else writes an authored asset: a script

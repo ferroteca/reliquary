@@ -5,18 +5,18 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # TASKS
 
-The accepted work backlog. A **proposed** task lives in the issue
+The pledged work backlog. A **proposed** task lives in the issue
 tracker — <https://github.com/ferroteca/reliquary/issues> — which is
 the only queue a proposed task has (D43): the tracker is a task's
-proposed state and this file is its accepted one. So nothing parks
+proposed state and this file is its pledged one. So nothing parks
 here awaiting a verdict; arriving *is* the verdict.
 
-**Everything in this file is accepted** — the one vocabulary
+**Everything in this file is pledged** — the one vocabulary
 ([README.md](README.md)) applying here exactly as in the
-directories. An entry is in the *accepted* state, so entering it is
+directories. An entry is in the *pledged* state, so entering it is
 approving it: nothing waits on a verdict, nothing needs a citation
 or a decision of its own, and there is nothing to promote. The
-directory is not its home because `proposed/` and `accepted/` hold
+directory is not its home because `proposed/` and `pledged/` hold
 *demand and capability*, argued at length, and a task is none of
 those — free-standing work too small to be a feature and too small
 to need the argument. That kind distinction is the distinguisher,
@@ -34,9 +34,9 @@ and an entry filed and closed in one act is ceremony.
 **There is no order here.** Nothing in this file is scheduled, and
 nothing claims priority over anything else; whoever picks work up
 picks whatever they like. The one ordering that does bind is a
-feature's: **work that only makes sense as part of one accepted
+feature's: **work that only makes sense as part of one pledged
 feature lives with that feature**, in
-[accepted/FEATURES.md](accepted/FEATURES.md), and has to be done to
+[pledged/FEATURES.md](pledged/FEATURES.md), and has to be done to
 complete it — F1's items are the standing example. A
 task here that merely *relates* to a feature is still free to be
 picked whenever.
@@ -46,12 +46,12 @@ enough and obvious enough that it needs no entry here **at all**,
 approved as a class in advance, with the commit as its record. This
 file is where the pre-approved work that is still worth writing
 down goes. The full intake machinery — the raw queues, the
-housekeeping test, and how acceptance is recorded — is in
+housekeeping test, and how pledge is recorded — is in
 [README.md](README.md).
 
 The sections below:
 
-- **[Accepted](#accepted)** — the queue proper. Grouped by kind,
+- **[Pledged](#pledged)** — the queue proper. Grouped by kind,
   because the actor and the gate differ, but the grouping is not a
   running order.
 - **[Completed](#completed)** — done. Kept until its record is
@@ -65,7 +65,7 @@ Standing questions to re-ask as the design hardens are not tasks
 and live with the decision record, under
 [DECISIONS.md](DECISIONS.md)'s open questions.
 
-## Accepted
+## Pledged
 
 Grouped by kind, because the actor and the gate differ: an
 adjudication is the owner's alone, an audit is mechanical, a
@@ -76,15 +76,15 @@ restructure is citation-heavy and must run in order.
 Owner-only: each settles a question the record is waiting on.
 None depends on the others.
 
-- **Accept and promote U9 and U12 — delivered work is standing on
-  unaccepted demand.** Milestone 9's own text cites "live feedback
+- **Pledge and promote U9 and U12 — delivered work is standing on
+  unpledged demand.** Milestone 9's own text cites "live feedback
   for a watched install (U12, P5)", and the roadmap's "The run and its
   output" cites "an automating program reads machine-readable
   events as they happen and takes the result (U9, U14)" — both
   flatly, not conditionally. Both use cases are **drafted, never
-  accepted**, and both describe behavior that now ships
+  pledged**, and both describe behavior that now ships
   (`--progress` and the jsonl event stream). Under D23 scheduling
-  milestone 9 accepted them and the record never moved; under D34
+  milestone 9 pledged them and the record never moved; under D34
   their delivery should then have promoted them to USE-CASES.md
   beside U14 and U20. Missed by D37's promotion pass, which
   checked only the two use cases the milestone named as its own.
@@ -93,7 +93,7 @@ None depends on the others.
   than merely untidy.
   Distinguish from the legitimate citations the same audit found —
   U7, U8, U13, U18 and U19 are all named conditionally by backlog
-  work ("would stand on the U13 draft if accepted", "U7 is what
+  work ("would stand on the U13 draft if pledged", "U7 is what
   schedules this work back onto the arc"), which is the rule
   working, not failing.
 
@@ -104,7 +104,7 @@ None depends on the others.
   are drafted with milestone 9's code as evidence for both.
   WHY IT MATTERS, and it is not bookkeeping: **promotion is what
   arms a principle** (owner, 2026-07-24). Before it, an entry is
-  accepted vision and a shortfall is unbuilt work; after it,
+  pledged vision and a shortfall is unbuilt work; after it,
   ARCHITECTURE.md asserts the thing is true of the code, so a
   divergence is a *bug*. P9 is the sharpest case — AGENTS.md
   enforces "no backward compatibility before 1.0" as a required
@@ -156,8 +156,8 @@ None depends on the others.
   is a *time span*; McKinsey's Three Horizons is a portfolio
   model whose horizons are all active). Either define it at first
   use or drop it and name the sections after what actually
-  distinguishes them: demand accepted and awaiting scheduling (U6's
-  recorder) versus design settled with demand not accepted (the
+  distinguishes them: demand pledged and awaiting scheduling (U6's
+  recorder) versus design settled with demand not pledged (the
   pillars, async, machine mobility).
 
 ### Governance — audits
@@ -177,9 +177,9 @@ roadmap item, design document, and decision names the U-number (in
 force or proposed) or P-number that demands it. A violation takes
 one of three shapes, and each has its own remedy: work that cites
 *no* demand (find it or delete the work); work that cites
-*unaccepted* demand as though it were accepted (accept it, or
+*unpledged* demand as though it were pledged (pledge it, or
 mark the citation conditional); and a design written for demand
-that was never accepted at all (the D33 pattern — the design
+that was never pledged at all (the D33 pattern — the design
 outran its justification). The audits below are the standing way
 to find them, not a one-off.
 
@@ -209,15 +209,15 @@ to find them, not a one-off.
   which the original range missed. Correct the scope when picking
   it up.
 
-- **Audit design documents against accepted demand.** Two
+- **Audit design documents against pledged demand.** Two
   documents cite no U/P/G at all: `backend-adapter.md` (230 lines)
   and `blueprint-cookbook.md` (440 lines, examples —
   arguably exempt). Beyond citation, three designs exist for
-  pillars whose demand was never accepted — `backend-adapter.md`,
+  pillars whose demand was never pledged — `backend-adapter.md`,
   `guest-communication.md`, `landmarks.md`, all demoted by D33
   *for lack of use-case backing* after their designs were written.
   The restructure item below encodes the preventive rule (nothing
-  gets a design doc until its demand is accepted); this is the
+  gets a design doc until its demand is pledged); this is the
   retrospective pass over what predates it.
 
 ### Governance — restructures
@@ -229,16 +229,16 @@ landed, and where it diverged from what step 2 decided:
 1. ~~Split the unscheduled work into `planning/BACKLOG.md`~~ —
    **done**, as `planning/proposed/FEATURES.md` rather than
    BACKLOG.md: the lifecycle word beat the scheduling word, and the
-   file sits in the folder that already means "not accepted".
+   file sits in the folder that already means "not pledged".
 2. ~~Restructure `planning/` around the lifecycle~~ — **done** as
-   `proposed/` + `accepted/` + `design/`, landing as decided: the
+   `proposed/` + `pledged/` + `design/`, landing as decided: the
    proposals files split across the two folders, and the governing
    files (`INTERFACES.md`, `DECISIONS.md`, `TASKS.md`) stayed at the
    planning root. Both took a wrong turn first and were corrected in
    the same pass, each correction found by the owner asking the
    right question. Filing the proposals whole under `proposed/` made
    "nothing is worked from proposed/" false, since P5, P14 and U1–U6
-   are accepted; filing `DECISIONS.md` under `accepted/` put the
+   are pledged; filing `DECISIONS.md` under `pledged/` put the
    *refusal* record — and the open questions — in a folder claiming
    the opposite. **The rule the second one yielded is worth keeping:
    the lifecycle folders are for artifacts that *move between them*.
@@ -269,7 +269,7 @@ landed, and where it diverged from what step 2 decided:
    disagreement is the code's bug.
    Design was resolved along the same axis rather than being left
    as a residue: feature design moved beside its feature
-   (`proposed/design/`, `accepted/design/`), and only design
+   (`proposed/design/`, `pledged/design/`), and only design
    serving no single feature stayed in `planning/design/`.
    Machine-readable schemas moved into the package,
    `reliquary/schemas/`, since code consumes them — which also
@@ -284,25 +284,25 @@ landed, and where it diverged from what step 2 decided:
    `planning/design/architecture.md`) plus the P-numbered
    principles, matching the ARCHITECTURE.md convention readers
    expect at a repo root. The mirrors renamed with it
-   (`proposed/ARCHITECTURE.md`, `accepted/ARCHITECTURE.md`),
+   (`proposed/ARCHITECTURE.md`, `pledged/ARCHITECTURE.md`),
    restoring mirror-by-name across all three ladders. The same
    pass itemized the model doc's unnumbered principles as
    P19–P21, and stated P22 (no CI, at this time) — a rule
    previously cited in this file but written down nowhere.
    The P-additions and the rename want D-numbers, with
-   acceptance-is-the-move (amends D23) and the third queue
+   pledge-is-the-move (amends D23) and the third queue
    (widens D39).
 
 ### Defects
 
 A gap against a *standing* principle is a bug: the principle is
-already its demand, so these need no acceptance, only fixing.
+already its demand, so these need no pledge, only fixing.
 
 - validate declared control-planes at materialization: the
   parser accepts `vnc` / `serial-console` / `guest-agent` as
   `control-planes` values, but nothing refuses them at create
   or start — a blueprint declaring an unimplemented plane is
-  accepted silently, against P11 (capability gaps fail closed
+  pledged silently, against P11 (capability gaps fail closed
   naming themselves). Refuse anything but `agentless-display`
   until the plane exists (found by the P1–P12 delivery pass,
   2026-07-23).
@@ -526,7 +526,7 @@ need no entry at all once someone picks them up.
 ## Completed
 
 Done. Kept until each record is folded where it belongs and
-pruned — which is itself an accepted task above.
+pruned — which is itself a pledged task above.
 
 ### The numbered arc — milestones 1–9 (complete)
 
@@ -552,7 +552,7 @@ breakdowns. Generalizing beyond that one vertical is unbuilt and
 unscheduled (D33) — it lives in
 [proposed/FEATURES.md](proposed/FEATURES.md), design settled and
 intact, and returns to a numbered arc when the case it serves is
-accepted.
+pledged.
 
 ### Design rounds resolved
 

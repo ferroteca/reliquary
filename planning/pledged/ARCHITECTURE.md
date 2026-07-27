@@ -3,22 +3,22 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Accepted architecture — awaiting delivery
+# Pledged architecture — awaiting delivery
 
-> **Status:** principles the project has **accepted** but does not
+> **Status:** principles the project has **pledged** but does not
 > yet honor. Nothing here is in force: a principle only binds once
 > it reaches the standing list, and a shortfall against an entry
 > below is unbuilt work rather than a bug.
 >
 > That distinction is the point of this file. **Promotion is what
-> arms a principle**: before it, an entry is accepted vision; after
+> arms a principle**: before it, an entry is pledged vision; after
 > it, root [ARCHITECTURE.md](../../ARCHITECTURE.md) asserts the thing is
 > true of the code, so a divergence becomes a *defect* the
 > gap-is-a-bug rule can act on.
 >
 > Three locations hold three states. A principle is drafted in
 > [proposed/ARCHITECTURE.md](../proposed/ARCHITECTURE.md), moves here
-> when it is accepted, and moves to the root list when the code
+> when it is pledged, and moves to the root list when the code
 > actually honors it. All three share one global P-namespace;
 > numbers are permanent, never reused, and no placeholder is left
 > behind by either move.
@@ -28,24 +28,24 @@ SPDX-License-Identifier: BSD-3-Clause
 > in the same change — adds it to the standing list, deletes it
 > here, records the move in [DECISIONS.md](../DECISIONS.md) — rather
 > than holding it for a separate sign-off. Full delivery, not
-> acceptance, is the trigger: a partly-honored principle stays here,
+> pledge, is the trigger: a partly-honored principle stays here,
 > since the standing list is an implementation claim.
 >
 > A principle in force is clarified, retired, or superseded — never
-> changed in nature. One accepted here may still be reshaped, its
+> changed in nature. One pledged here may still be reshaped, its
 > number intact, with work already scheduled against it re-checked
 > in the same edit. A dead proposal is recorded in
 > [DECISIONS.md](../DECISIONS.md) and triggers the planning-doc sweep,
 > its P-number the search key.
 
-**P5 — The feedback split** — accepted; moved from the
+**P5 — The feedback split** — pledged; moved from the
 standing list 2026-07-23 by the delivery pass: the principle
 is run-scoped, and the machine-readable run rendering does not
 exist yet — no run-events stream, no `--progress` renderers
 (the flag appears only in an error message today). The query
 half (`--json`) is real, but the run half is milestone 9's
 work, whose scheduling — it cites the split — is this
-proposal's acceptance. The 2026-07-24 async deferral (D35)
+proposal's pledge. The 2026-07-24 async deferral (D35)
 and the return-not-store revision (D36) leave P5 whole within
 milestone 9: its two-rendering demand is on the run's *own
 driver* — pretty and machine-readable, both live — which the
@@ -69,7 +69,7 @@ lands. Statement and prose verbatim:
 > what a program parses, and the machine rendering is never
 > what a person is left to read.
 
-**P14 — The expressive ceiling** — accepted (add, 2026-07-23;
+**P14 — The expressive ceiling** — pledged (add, 2026-07-23;
 the format re-examination round, D26). The principle-sized
 kernel of a rule the project has been applying channel by
 channel without ever stating it as one. THE ARCHITECTURE IS
@@ -181,7 +181,7 @@ normative design, its refusal written before this round found
 it. ONLY THE SPEC CHANNEL WAITS, and on one deliverable:
 milestone 7's parser, honored when it refuses an
 operator-bearing reference. The milestone's citation of P14 is
-this acceptance, and P14 joins the standing list when the
+this pledge, and P14 joins the standing list when the
 milestone lands. What is deliberately NOT in it: how far a
 reference may *reach*, which is a different axis with the
 opposite economics (widening is cheap, narrowing is not) and

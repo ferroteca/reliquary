@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# RESOLVED (owner, 2026-07-22 — planning/accepted/DECISIONS.md, no JSON in
+# RESOLVED (owner, 2026-07-22 — planning/DECISIONS.md, no JSON in
 # scripts). Kept as a regression note.
 #
 # THE PROBLEM WAS: a media definition embedded in a script had TWO

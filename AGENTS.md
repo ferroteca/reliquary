@@ -192,34 +192,34 @@ workflow:
 - `planning/README.md` is the map of the maintainer-facing planning machinery, and the place to start. The
   directories are the classification, and they hold the **same three filenames** — `USE-CASES.md`,
   `ARCHITECTURE.md`, `FEATURES.md` — because they hold the same three artifacts in two states:
-  `planning/proposed/` is argued but not accepted, and nothing is worked from there; `planning/accepted/` is
+  `planning/proposed/` is argued but not pledged, and nothing is worked from there; `planning/pledged/` is
   approved but not yet delivered. Promotion is by *moving* a document or an entry, and the commit is the
-  acceptance record. The **planning root** holds what never moves and so has no state — the map, the vetting
-  rule (`INTERFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, accepted, refused and
+  pledge record. The **planning root** holds what never moves and so has no state — the map, the vetting
+  rule (`INTERFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, pledged, refused and
   retired alike), and the task queue. Design sits with what it serves: `planning/proposed/design/` and
-  `planning/accepted/design/` for a feature's own design, `planning/design/` for open design problems serving
+  `planning/pledged/design/` for a feature's own design, `planning/design/` for open design problems serving
   no single feature — the whole-system view itself (the seams model and the P-numbered principles) is root
   `ARCHITECTURE.md`. Once an interface ships, its normative spec moves to `docs/spec/` — current truth does not
   live under `planning/`.
-- **There is no roadmap** (D42): `accepted/` says the direction is agreed and nothing about when, so the absence
-  of order in `TASKS.md` holds equally for accepted features, the only binding order running inside a feature.
+- **There is no roadmap** (D42): `pledged/` says the project will do it and nothing about when, so the absence
+  of order in `TASKS.md` holds equally for pledged features, the only binding order running inside a feature.
   **Features carry F-numbers** — the handle a dependency, commit or decision points at — which unlike U-, P- and
   D-numbers **evaporate on delivery**, retiring unreused, gaps being history rather than a promise. Designs take
-  no number. **A feature must fit in one sprint**, here minutes to hours, so an accepted feature is far smaller
-  than "milestone" suggests; the bound bites at acceptance. References between items run **down the lifecycle or
+  no number. **A feature must fit in one sprint**, here minutes to hours, so a pledged feature is far smaller
+  than "milestone" suggests; the bound bites at the pledge. References between items run **down the lifecycle or
   sideways, never up**. Full rules: `planning/README.md`.
-- **Search the record before a governed act.** Before drafting a proposal, accepting one, or changing a norm,
+- **Search the record before a governed act.** Before drafting a proposal, pledging one, or changing a norm,
   search `planning/DECISIONS.md` for what bears on it and report what you found — including finding nothing.
   Anything recorded as killed, declined, or superseded is not revisited without new evidence, so re-raising one
   unknowingly wastes the argument; an entry that *supports* the change is worth citing. The trigger is the act,
   not a feeling of uncertainty — most entries carry a refusal, and what was declined is recorded nowhere else.
 - `planning/TASKS.md` is the third work input queue, beside GitHub issues and `planning/proposed/`: small,
   **pre-approved** work — entering it is approving it — with no scheduled order, so anyone may pick up
-  anything. Work that only makes sense as part of one accepted feature lives with that feature in
-  `planning/accepted/FEATURES.md` instead. Small one-offs are really just issues, and work small and obvious
+  anything. Work that only makes sense as part of one pledged feature lives with that feature in
+  `planning/pledged/FEATURES.md` instead. Small one-offs are really just issues, and work small and obvious
   enough needs no entry at all (housekeeping, D38). In theory every issue points to a use case or principle;
   small ones may be deemed obvious. **Writing anywhere under `planning/` is a governed act** (D43): one gate
-  covers entering a document in `proposed/`, promoting one to `accepted/`, and entering work in `TASKS.md`,
+  covers entering a document in `proposed/`, promoting one to `pledged/`, and entering work in `TASKS.md`,
   with the issue tracker the one open door. Authority is the owner alone today. **Agents do not add tasks on
   their own initiative and ask before editing that file at all**; the gate is at entry only, so anyone may pick
   up what is already there.
@@ -230,14 +230,14 @@ workflow:
   checklist. The use cases, the architectural principles, and the specs are together the project's **vision** —
   the standing statement of what Reliquary is and is for. The numbered use cases — the decision
   surface that rule weighs against — live in root `USE-CASES.md` (implemented-only: every use case there is
-  met by the code today, no placeholders). Use cases run through **three** locations, because acceptance and
-  delivery are different events: drafted in `planning/proposed/USE-CASES.md`, accepted in
-  `planning/accepted/USE-CASES.md` (the move is the acceptance), and current at the root on full delivery — one
-  global U-sequence throughout, no placeholder left by either move. Every accepted item cites the use case — in
-  force, accepted, or proposed — or the architectural principle that demands it: principles drive tasks and features
+  met by the code today, no placeholders). Use cases run through **three** locations, because pledging and
+  delivery are different events: drafted in `planning/proposed/USE-CASES.md`, pledged in
+  `planning/pledged/USE-CASES.md` (the move is the pledge), and current at the root on full delivery — one
+  global U-sequence throughout, no placeholder left by either move. Every pledged item cites the use case — in
+  force, pledged, or proposed — or the architectural principle that demands it: principles drive tasks and features
   just as use cases do. The architectural
   principles are itemized as P-numbers in root `ARCHITECTURE.md` — standing-only, every entry honored by the code
-  today, with `planning/proposed/ARCHITECTURE.md` and `planning/accepted/ARCHITECTURE.md` the same three-state
+  today, with `planning/proposed/ARCHITECTURE.md` and `planning/pledged/ARCHITECTURE.md` the same three-state
   ladder; promotion to the root list is what *arms* a principle, since only there does a divergence become a
   bug. Decisions in `planning/DECISIONS.md` carry
   permanent D-numbers, generally support use cases or principles, and are the citation handle for design choices
@@ -263,7 +263,7 @@ workflow:
   `docs/spec/blueprint-model.md`, so the blueprint guide, field
   reference, and cookbook are descriptive `docs/`.
   Design lives under `planning/` instead: with its feature in
-  `planning/proposed/design/` or `planning/accepted/design/`, or in
+  `planning/proposed/design/` or `planning/pledged/design/`, or in
   `planning/design/` when it serves no single feature.
 - **Machine-readable schemas ship inside the package**, at
   `reliquary/schemas/`, because code consumes them:

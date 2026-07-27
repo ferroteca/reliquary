@@ -19,8 +19,13 @@ declined, or superseded is not revisited without new evidence,
 argued through the interface-change rule
 ([INTERFACES.md](INTERFACES.md)). Entries keep the spellings of
 their time; mentions of "TASKS" records inside entries refer to
-entries now in this file, and mentions of ROADMAP refer to the
-roadmap dissolved into these directories on 2026-07-26.
+entries now in this file, mentions of ROADMAP refer to the
+roadmap dissolved into these directories on 2026-07-26, and
+**accepted** — the lifecycle state, and the `accepted/` directory
+— is what 2026-07-27 renamed **pledged** (D44). Links to that
+directory were repointed throughout, since a broken path is a
+wrong instruction rather than a dated word; every other mention
+below stands as written.
 
 Decisions are numbered in the order first recorded — D1 the
 earliest — and a number is never reused; the list reads
@@ -61,7 +66,7 @@ becoming a D-number, and the commit that moves it is the record.
 A question that gates a specific unbuilt feature is **not** here: it
 sits in that feature's own "Decide first" block, in
 [proposed/FEATURES.md](proposed/FEATURES.md) or
-[accepted/FEATURES.md](accepted/FEATURES.md), because it is the design round
+[pledged/FEATURES.md](pledged/FEATURES.md), because it is the design round
 to run before that feature's deliverables start. What follows is
 what gates nothing in particular.
 
@@ -165,6 +170,93 @@ is waiting on an answer today.
 
 ## Decided
 
+- D44 — THE SECOND SHELF IS `pledged/`, NOT `accepted/` — DECIDED
+  (owner, 2026-07-27). Supports P8, P23. The three states, the
+  gates, the authority, and D42's no-roadmap closure are all
+  untouched. **It is not purely nominal, though it began as a
+  rename**: the new word claims more than the old one, which the
+  fold found rather than intended — see WHAT PLEDGED CLAIMS below.
+
+  THE REPORT THAT STARTED IT (owner): *"when hit with a greenfield
+  feature request that I think is worth it, the first words I think
+  of are 'agreed' or 'approved' or 'accepted', and what I mean is
+  approved as a proposal, no more."* D43 gave one gate three acts,
+  and **both of the ones that matter need an approval word** —
+  admitting a document to `proposed/` is an approval exactly as
+  promoting it is. A shelf named after an act claims the words the
+  other gate still has to borrow, so the natural utterance landed
+  on the wrong shelf every time.
+
+  THE CRITERION, which the tree already followed everywhere else:
+  **a shelf names the item's standing, not the act that put it
+  there.** Nobody says "I proposed it" to mean "I approve your
+  proposal", which is why `proposed/` never collided; `accepted/`
+  broke the pattern alone. With both shelves naming standing —
+  *proposed*, argued and binding nothing; *pledged*, owed by the
+  project with no date — the approval words return to the gates,
+  and either gate may use any of them. The vocabulary is now
+  **proposed / pledged / completed / rejected**, and the promotion
+  act is *the pledge*.
+
+  WHAT PLEDGED CLAIMS: **a commitment to deliver, with no promised
+  timeline** (owner's words). This is where the change stopped
+  being a rename, and the fold is what surfaced it — the governance
+  skill said in as many words that *acceptance is agreement, not
+  commitment to deliver*, a guard written to keep the no-roadmap
+  closure honest. The guard survives intact, because what a roadmap
+  adds is the **date and the order**, and a pledge adds neither: it
+  answers "is this right?" with yes, "will it happen?" with yes,
+  and "when?" with nothing at all. What genuinely changes is that
+  the shelf **can now be wrong**. Under agreement-only, an item
+  that was never built broke nothing; under a pledge, it is a
+  promise nobody meant, and the remedy is to withdraw it to
+  `proposed/` or reject it outright and record why. Nothing
+  currently in `pledged/` fails that test — U2 and F1 are
+  unscheduled, which the claim permits, not disavowed, which it
+  does not — but the test now exists and did not before.
+
+  WEIGHED AND REFUSED. `planned/` was the owner's own first
+  instinct and came closest; an objection from D42 (no roadmap) was
+  raised against it and **withdrawn** — *planned* in the
+  Considering/Planned/Shipped sense claims intent, not order or
+  date, which is exactly what `accepted/` already claimed. What
+  refused it in the end was smaller and structural: the path
+  stutters, `planning/planned/`. `scheduled/` the owner refused
+  himself — it promises the timeline. `agreed/` and `adopted/` fail
+  the criterion outright, being approval verbs with the same
+  collision (`agreed/` was recommended before the criterion was
+  found, and withdrawn by it). `committed/` is the semantic
+  bullseye and this repository cannot have it: its governance prose
+  says *the commit is the record* on nearly every page. `backlog/`
+  is the industry word and is already taken here for the opposite
+  thing — the demoted, unscheduled pile. `settled/` (designs),
+  `standing/` (the root lists), `vision/` (the root lists plus the
+  specs), `bound/` (property binding), and `resolved/` (name
+  resolution) are each load-bearing elsewhere. `owed/`,
+  `intended/`, `outstanding/` and `to-deliver/` all cleared the
+  criterion and were offered; none was chosen.
+
+  THE ALTERNATIVE FIX, considered and not taken: leave the shelf
+  alone and give the *entry* act its own verb (*admitted*), which
+  is one paragraph of README.md against a sweep of some 300
+  occurrences. Refused because it asks the owner to retrain the
+  instinct rather than absorbing it, which is the problem restated
+  rather than solved.
+
+  FOLDED: the directory renamed (`git mv`, history intact);
+  planning/README.md's one-vocabulary section carrying the naming
+  rule itself; INTERFACES.md, TASKS.md, the three `pledged/` files
+  and the three `proposed/` ones; AGENTS.md, root ARCHITECTURE.md
+  and USE-CASES.md; docs/spec/README.md and api.md; the
+  documentation-rules skill; and the owner's global
+  project-governance-structure and project-vision-first skills with
+  their planning templates, the model being standing across every
+  project he controls (D43). **This file is the exception**: its
+  entries keep the spellings of their time (preamble), so only the
+  links were repointed. Ordinary English — "accepts a parameter",
+  "accepted contributions", "JSONC acceptance", "acceptance test" —
+  was left alone throughout.
+
 - D43 — WRITING UNDER planning/ IS A GOVERNED ACT; AUTHORITY
   COMPRESSES THE STEPS — DECIDED (owner, 2026-07-26). Supports P8,
   P23; **amends D39** (widening its two queues to three) and
@@ -180,15 +272,15 @@ is waiting on an answer today.
   argument. **Everything in TASKS.md is accepted**: the one
   vocabulary applies to the file exactly as to the directories, so
   entry is approval, nothing waits on a verdict and there is
-  nothing to promote. Its state is the one `accepted/` names; the
-  directory is not its home because `proposed/` and `accepted/`
+  nothing to promote. Its state is the one `pledged/` names; the
+  directory is not its home because `proposed/` and `pledged/`
   hold demand and capability — use cases, principles, and the
   features delivering them — and a task is none of those. THAT
   KIND DISTINCTION IS THE DISTINGUISHER, not size.
 
   A TASK HAS NO PROPOSED STATE UNDER planning/. Both lanes run the
   same lifecycle, housed differently: demand and capability are
-  proposed in `proposed/` and accepted in `accepted/`, while a
+  proposed in `proposed/` and accepted in `pledged/`, while a
   task is proposed in the **issue tracker** and accepted in
   TASKS.md, there being no argued middle stage for work too small
   to need the argument. So the tracker is the only queue a
@@ -210,7 +302,7 @@ is waiting on an answer today.
   THE GATE IS THE SAME GATE. Writing anywhere under `planning/` is
   the project speaking in its own voice, and only the tracker is
   an open door. **One gate governs all three acts** — entering a
-  document in `proposed/`, promoting one to `accepted/`, entering
+  document in `proposed/`, promoting one to `pledged/`, entering
   work in TASKS.md — and only what each grants differs: a live
   argument, an acceptance, an approval. Authority is a role, not a
   person; today the owner alone, a group he may widen. It weighs
@@ -249,7 +341,7 @@ is waiting on an answer today.
   *already true of the code*; what authority cannot do is place a
   false claim there, the root lists asserting present compliance.
   **Placement is governed by truth — not by permission, and not by
-  tooling.** An unarmed principle waits under `accepted/` however
+  tooling.** An unarmed principle waits under `pledged/` however
   unarguable it is. Check the shape too: a principle is a rule the
   project holds itself to, not a state it happens to be in, and
   the two get phrased identically.
@@ -287,7 +379,7 @@ is waiting on an answer today.
   artifact here classifies by *state*. Large items wait in
   `proposed/`, are accepted one at a time, and are bitten off one
   at a time in no pre-promised order. What this makes exact is
-  what a location promises: **`accepted/` says the direction is
+  what a location promises: **`pledged/` says the direction is
   agreed and nothing more** — it answers "is this right?" with yes
   and "when?" with nothing at all. The absence of order is
   uniform, TASKS.md's "no order here" holding equally for accepted
@@ -354,7 +446,7 @@ is waiting on an answer today.
   "milestone's worth of work" phrasing describes something too
   large to accept rather than a target. Short sprints are also what
   keeps the machinery turning over — handles evaporate often, a use
-  case arms soon after its acceptance, and `accepted/` never
+  case arms soon after its acceptance, and `pledged/` never
   settles into a backlog.
 
   The bound bites at ACCEPTANCE, not at proposal. Large, shapeless
@@ -1000,7 +1092,7 @@ is waiting on an answer today.
   FOLDED: the move; USE-CASES.md's own links and its
   root-placement note; PRINCIPLES.md, AGENTS.md,
   planning/INTERFACES.md, planning/ROADMAP.md,
-  planning/USE-CASE-PROPOSALS.md, planning/accepted/design/recorder.md,
+  planning/USE-CASE-PROPOSALS.md, planning/pledged/design/recorder.md,
   this file's preamble, and the documentation-rules skill's
   placement list. Historical DECISIONS entries keep their
   `planning/USE-CASES.md` spellings under the spellings rule.

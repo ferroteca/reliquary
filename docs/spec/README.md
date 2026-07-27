@@ -30,9 +30,9 @@ situation. A spec is the exact statement of that situation: what an
 interface *is*, in force today, citable in a bug report and binding
 on the next change. Speculative work — what an interface might
 become — is not here; it is argued in
-[planning/proposed/](../../planning/proposed/) and, once accepted
+[planning/proposed/](../../planning/proposed/) and, once pledged
 but not yet built, in
-[planning/accepted/](../../planning/accepted/).
+[planning/pledged/](../../planning/pledged/).
 
 ## Spec, reference, guide
 

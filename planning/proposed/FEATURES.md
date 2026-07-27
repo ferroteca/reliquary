@@ -8,34 +8,48 @@ SPDX-License-Identifier: BSD-3-Clause
 Large unbuilt capabilities — each a milestone's worth of work,
 **design settled and intact**, waiting on the demand that schedules
 it. Nothing here is worked ([README.md](../README.md)); the move to
-[accepted/FEATURES.md](../accepted/FEATURES.md) is the acceptance,
+[pledged/FEATURES.md](../pledged/FEATURES.md) is the pledge,
 and the commit that makes it is the record.
 
 F2–F6 left the numbered arc for the same reason (D33, owner,
-2026-07-23): **no in-force or accepted use case demands it**. The
+2026-07-23): **no in-force or pledged use case demands it**. The
 numbered arc ran 1 through 9 and ended there, carrying text-mode
 DOS on QEMU end to end; generalizing beyond that one vertical is
 what waits here. Each names the drafted use case that would schedule
-it — accepting that case is what returns the feature to a numbered
+it — pledging that case is what returns the feature to a numbered
 arc.
 
 **F7–F10 never were on the arc.** They are governance and tooling
 proposals moved out of TASKS.md's legacy Proposed section (D43), and
 they cite **principles** rather than use cases, which drive work
 just as well. What they share with the rest is the only thing that
-matters here: argued, unaccepted, and not worked from.
+matters here: argued, unpledged, and not worked from.
 
-A feature that is accepted but not yet built moves to
-[accepted/FEATURES.md](../accepted/FEATURES.md) and carries its work
+**F11–F16 arrived from outside** (owner, 2026-07-27): one consuming
+project's proposal, admitted to this document and nothing further —
+entry grants a live argument, exactly as it does for anything else
+here. They differ from everything above in where the demand comes
+from: an embedding caller reporting what the surface costs it,
+rather than the project's own arc. The consumer is not named, per
+the doctrine that the machine layer stays ignorant of who builds on
+it; its arguments are kept, generalized to "a caller". Several cite
+no use case at all, which each entry says plainly rather than
+papering over. The source proposal offered its own suggested
+delivery order; that order has no standing here (D42 — `proposed/`
+is not a queue), and what survives of it is the dependency each
+entry records in its own text.
+
+A feature that is pledged but not yet built moves to
+[pledged/FEATURES.md](../pledged/FEATURES.md) and carries its work
 breakdown with it. Small work that is not a feature at all goes
 straight to [TASKS.md](../TASKS.md).
 
 Each feature carries an **F-number** (D42; the rules are in
 [README.md](../README.md)). **Size is no bar to sitting here** — the
-sprint bound bites at acceptance, so every entry below is many
+sprint bound bites at pledge, so every entry below is many
 sprints of work, and the "milestone's worth of work" above describes
-what these entries *are* rather than a size any may be accepted at.
-Cutting one into implementable pieces is part of accepting it.
+what these entries *are* rather than a size any may be pledged at.
+Cutting one into implementable pieces is part of pledging it.
 
 ## F2 — The backend adapter seam
 
@@ -44,7 +58,7 @@ Cutting one into implementable pieces is part of accepting it.
 > multi-backend pillar has no in-force use case demanding it.
 > Its demand is the U7 draft
 > ([proposed/USE-CASES.md](USE-CASES.md),
-> "materialize on the hypervisor the host provides"); accepting
+> "materialize on the hypervisor the host provides"); pledging
 > U7 is what schedules this work back onto the arc, the citing
 > item the record. The design is settled and stands as written.
 
@@ -262,13 +276,13 @@ VNC and on Hyper-V through its decided screen strategy.
 > **Deferred to the backlog** (owner, 2026-07-24, D35; scope
 > extended D36): the asynchronous-run pillar leaves the numbered
 > arc — milestone 9 delivers the run, and its output, without it.
-> No in-force or accepted use case demands it: the feedback split
+> No in-force or pledged use case demands it: the feedback split
 > (P5) is satisfied by the run's own driver watching it live, and
 > detaching a run or following it from a process that did not
 > start it is a separable capability no case writes down. Its
 > demand is the U19 draft
 > ([proposed/USE-CASES.md](USE-CASES.md),
-> "start a long run and follow it from elsewhere"); accepting
+> "start a long run and follow it from elsewhere"); pledging
 > U19 is scheduling this work back onto the arc, the citing item
 > the record.
 >
@@ -358,7 +372,7 @@ form is noninteractive by construction and rejects
 `on_mismatch="prompt"` — a background fetch can never hang on a
 hidden prompt.
 
-## F7 — Audit design documents against accepted demand
+## F7 — Audit design documents against pledged demand
 
 > **Moved here from TASKS.md's legacy Proposed section** (owner,
 > 2026-07-26): argued but never approved, and a proposal belongs under
@@ -366,11 +380,11 @@ hidden prompt.
 > vetted): the audit checks that a design exists only where demand
 > does. No use case asks for it.
 
-**Audit design documents against accepted demand.** Raised
+**Audit design documents against pledged demand.** Raised
 unprompted during the 2026-07-24 traceability audit rather than
 requested, so it waits here. Findings that motivate it are
 recorded with the audit tasks under Governance in
-[Accepted](#accepted).
+[Pledged](#pledged).
 
 Raised unprompted during the audit — a suggestion, not a request.
 
@@ -393,7 +407,7 @@ assert, and only a diff can review (this is why architecture
 decision records converged on markdown-in-repo, and why their
 tooling is indexers over files rather than trackers). What files
 do not give is **type and query**: nothing enforces that a
-decision carries supports or that delivered work cites accepted
+decision carries supports or that delivered work cites pledged
 demand. Today those are checked by whoever happens to grep,
 which is exactly how U9 and U12 went unnoticed through the
 milestone that delivered them.
@@ -403,10 +417,10 @@ real violation of every one:
   in the then-current roadmap cited none*;
 * every DECISIONS entry carries supports — *22 lack them, and
   D29 sat outside the range the existing task assumed*;
-* no *delivered* work cites *unaccepted* demand — *U9 and U12*,
+* no *delivered* work cites *unpledged* demand — *U9 and U12*,
   the sharpest defect of the set, and the one a linter would
   have caught the day milestone 9 landed;
-* every design document's subject has accepted demand — *three
+* every design document's subject has pledged demand — *three
   designs exist for pillars D33 demoted for lack of it*;
 * every cited identifier resolves — *U15 is cited 6 times and
   defined nowhere*;
@@ -479,7 +493,7 @@ reference is *mechanically* faithful to the binding — the tool
 reads the signatures, so reference-disagrees-with-code becomes
 impossible by construction, which automates the apology the
 reference's banner already makes. The norm of the surface stays
-[docs/spec/api.md](../docs/spec/api.md): code-as-norm would
+[docs/spec/api.md](../../docs/spec/api.md): code-as-norm would
 invert P8 — an unargued code change would *redefine* the
 interface rather than violate it — and the project has already
 lived the counterexample: the twin-name realignment settled
@@ -506,6 +520,360 @@ Raised 2026-07-26 in the spec/descriptive round; **the owner agreed
 it needs to win this argument, not that it has** — so unlike F7–F9
 this one was asked for, and still waits on its own case.
 
+## F11 — `--dry-run`, and the end of the check family
+
+> **Entered 2026-07-27** from a consuming project's proposal
+> (owner: admitted as a proposal). Demand is **split, and only half
+> of it is thin.** The `run-script` half has *no use-case impact*:
+> it is a better spelling for `check-script`, which ships — the
+> first triage bullet of [INTERFACES.md](../INTERFACES.md) — and it
+> serves **P6** by retiring the second spelling of one semantic.
+> The `create-machine` half is new capability, and its demand is
+> the **U7** draft through the portability reading below, plus
+> **P11**, which is what a backend-aware validation reports.
+
+THE RULE that makes it one feature, and the reason it stays a
+validator: *a dry run performs every step that costs nothing and
+commits nothing, stops at the first step that would, and reports
+what it would have done.* Two invariants carry it. It **leaves no
+state behind** — no machine directory, no `machine.json`, no fetched
+payload, no started process; a step that cannot be evaluated without
+committing is reported unevaluated rather than performed. And its
+**return describes the run, never impersonating the run's output**,
+which is the line the exclusion at the end of this entry draws.
+
+**`create-machine --dry-run` is the gap worth filling first.**
+Scripts can be checked today; machines cannot, so there is no way to
+ask "is this blueprint sound, and what would it build?" without
+building it. Evaluate: blueprint parse, namespace resolution,
+reference closure, drive/medium compatibility, backend capability,
+slot limits, the machine id that would be allocated, and each
+drive's resolved plan — `new` (size), `use` (which location, cached
+or not), `difference` / `copy` (over which base). Stop before the
+machine directory, `machine.json`, `create_hdd_image`, and any
+fetch.
+
+MEDIA IS THE ONE REAL DESIGN QUESTION, because resolution and
+acquisition are different costs. Proposed: **resolve, never fetch** —
+report each medium as cached, would-download (with size and sha256),
+local-present, or local-missing. A missing *local* file is an error a
+dry run can and should catch; a not-yet-downloaded remote is not. A
+later `--dry-run=verify` that additionally hashes what is already
+cached is the check people want before a long install; it is noted
+and not proposed here.
+
+**`run-script --dry-run` is what `check-script` already is.**
+Everything `ScriptCheck` returns — script path, timing plan,
+resolved machine, property sources, printable report — is a dry run
+of a script. Evaluate parse, static checks, property binding (naming
+unbound keys and their sources), referenced media and landmarks,
+the timing plan, and the machine selector resolving to a real
+machine; stop before starting the machine and before any statement
+reaches a guest.
+
+Decide first: whether the report covers **the whole script** or only
+the statically reachable part. Conditions and handlers depend on
+guest state, so a plan can only ever be a plan — say so in the report
+(`3 statements not statically reachable`) rather than implying a
+completeness it cannot have.
+
+THE CHECK INVENTORY — three public names carrying the word, and they
+are not one thing:
+
+| name | disposition |
+|---|---|
+| `check_script()` | becomes `run_script(dry_run=True)` |
+| `ScriptCheck` | becomes `DryRun` |
+| `check_key()` | a different species — below |
+
+`check_key(key)` validates a property key and returns it. There is no
+operation to dry-run: it is a predicate on a string, like
+`str.isidentifier()`, and folding it into `--dry-run` would be
+forcing it. Either rename it `validate_key()` or — tidier — make it
+private, since it is a validator the parser should already be
+applying and a caller pre-validating a key is a thin use case.
+Whichever wins, **P9 deletes the old spellings** rather than aliasing
+them.
+
+SURFACE, both presentations together (P6):
+
+    rlq create-machine NAME --dry-run
+    rlq run-script NAME --dry-run
+
+    create_machine(name, *, dry_run=False, ...) -> str | DryRun
+    run_script(label, *, dry_run=False, ...)    -> ScriptRun | DryRun
+
+- **A distinct return type is the point.** A `dry_run=True` call must
+  not return something a caller can mistake for the real return: a
+  machine id naming no machine, or `None`, makes misuse a confusing
+  failure three layers down, where a `DryRun` object makes it a
+  `TypeError` at the call site. `ScriptCheck` is already shaped this
+  way and becomes `DryRun`'s script variant.
+- **`dry_run` is already the project's word** (`prune_media`), so
+  this is consistency rather than overloading.
+- **Per-call only.** No `set_dry_run()`, no `Context(dry_run=…)`. An
+  ambient mode is how a dry run gets left on.
+
+**`--backend` is meaningful under `--dry-run`, and it is not
+simulation.** Part of what a dry run validates is backend-dependent —
+controller support, medium compatibility, slot limits, whatever a
+backend has wired; Reliquary already refuses a non-`ide` controller
+because only `ide` is wired on QEMU. So
+`rlq create-machine NAME --dry-run --backend vmware` answers "would
+this blueprint work over there?" with nothing installed and nothing
+booted. That is the U7 contract — capability, not identity, failing
+closed by name (P11) — checked statically, and it falls out of
+machinery that already exists. Note the combination that is *not*
+simulation: `--dry-run --backend simulator` validates against the
+simulator's capabilities and stops; running simulated means dropping
+`--dry-run` and keeping the backend. Worth a line of help text,
+because the mistake is natural.
+
+WHAT IS DELIBERATELY EXCLUDED — mocked statement results, so control
+flow could execute. That is where the feature would change species,
+and the tell is sharp: **a dry run's output is *about* the run — a
+plan, a report, a verdict; a fake backend's output is *of* the run.**
+Once output is *of* the run, three obligations follow that a flag is
+a poor place to carry: somewhere to declare the responses, a way to
+distinguish simulated output from real, and a guarantee it cannot be
+switched on by accident. The accident is concrete for any caller that
+parses guest output — a misconfigured run reports every guest test
+passing having booted nothing. A plan can never be mistaken that way;
+fabricated output can. **F12 is where that belongs, and the two are
+documented in the same breath**: the first reading of `--dry-run`,
+including by this project's own author, is "simulate the run", so the
+fix is making the fake backends easy to find rather than making the
+validator into one.
+
+## F12 — The `simulator` backend
+
+> **Entered 2026-07-27** from a consuming project's proposal
+> (owner: admitted as a proposal). **No use case demands it, and
+> saying which one nearly does is the honest way to put it.** The
+> nearest is **U14** — its consumers are exactly who this serves —
+> but U14 is about driving a real machine; a caller testing *its own
+> Reliquary integration* with no hypervisor present is a use nothing
+> in the list names, so pledging this means drafting that case
+> first (P8). What *shapes* it is settled: **P11** (a simulated
+> result reports itself as one) and **P18** (Reliquary attaches no
+> meaning to guest output — so it cannot fabricate it either).
+
+**New values in existing plumbing, not a new seam.** The blueprint
+schema already carries `backend`; `create` writes it into machine
+state, `start` reads it back, and `_backend_dir()` already
+quarantines each backend's artifacts. This is an enum value and the
+adapter behind it.
+
+**Reliquary simulates what it owns**: phases and transitions, boot,
+drive materialization, the control plane, prompt and timing
+behaviour, and the failure modes (`PreflightError` when not running,
+timeouts, cancellation). All of that it knows exactly. It must **not
+simulate guest output** — a component that disclaims understanding
+what a command leaves on the screen cannot coherently fabricate it —
+so the guest half is **programmable**: the caller supplies the
+responder. That constraint is what makes the feature both honest and
+cheap: no transcript format, no recording, no guest modelling. A
+hook.
+
+WHY A HOOK AND NOT A RECORDING. A caller's command space can be
+combinatorial — a per-test invocation of a guest test runner issues a
+distinct command per test, and the set changes whenever a test is
+renamed — so nothing recorded keeps up. But the caller knows exactly
+what its own program prints, which makes answering trivial *for the
+caller* and impossible for Reliquary. What this replaces is real: a
+consumer's unit tests monkeypatch `start_machine` / `stop_machine` /
+`exec` today, which means asserting against guesses about
+Reliquary's behaviour and breaking on a rename. A sanctioned hook
+puts the real code path under those tests.
+
+**Simulated results are marked in the return value**, and the marking
+is not optional: it is P11 at the value level, and it is what lets a
+caller refuse simulated results everywhere outside its own tests —
+the guard against exactly the accident F11 refuses to enable.
+
+DECIDE FIRST, and it is a genuine obstacle rather than a detail:
+**what shape the responder takes under P6 and P7.** A callback is the
+natural Python spelling and one of the harder things to express in C
+or Java, and a callback has no CLI presentation at all — so either
+the hook takes a form an unbound language and the CLI can both drive,
+or this backend is knowingly API-only, which is a P6 exception that
+has to be argued and not discovered during implementation.
+
+## F13 — Recorded captures, and the `replay` backend
+
+> **Entered 2026-07-27** from a consuming project's proposal
+> (owner: admitted as a proposal). **The two tiers below have
+> different demand, and only the first is well-grounded.** Tier 1 is
+> the project's own verification and cites **P22** — the suite is
+> the gate, and this is what would make that gate real for the
+> interpretation layer, which today has no honest way to be tested
+> at all. Tier 2 is public surface and shares F12's uncited demand.
+
+**The primary customer is Reliquary itself**, which is why tier 1 is
+worth building independently of any consumer. The interpretation
+layer is heuristic over real-world text: `_PROMPT_RE` deciding what a
+DOS prompt looks like, `_command_output()` finding the echo by
+scanning back for a row ending with the command and containing `>`,
+`screen_text()`, `wait_text`, `cursor_menu_select`, and everything in
+`script_timing`. **That class of logic cannot be credibly unit tested
+on fabricated input**, because the fabrication encodes the same
+assumptions the heuristic does — you write the screen you believe DOS
+draws, and the parser passes on your own belief. Only captured
+screens carry the weird spacing, the stray CR, the half-drawn menu,
+the prompt that arrived mid-scroll.
+
+**Recording is a debugging tool, not a reward for success.** It is
+worth having *before* the heuristics are reliable, not after: capture
+the boots where prompt detection fails, and each capture becomes a
+regression fixture. The pathological captures are the valuable ones,
+and they are most abundant now. It also makes inspectable what is
+currently only reasoned about — the honest limit that a command
+scrolling more than a screenful leaves only its tail (F14).
+
+TWO TIERS, very different in cost:
+
+1. **Recorded captures as internal test fixtures** — a transcript of
+   screens and timings replayed through the interpretation layer. No
+   public surface, no enum value, no format stability guarantee.
+   Cheap, and justified on its own today.
+2. **A public `--backend replay`** — callers run whole flows off a
+   transcript. Needs a stable format and full lifecycle fidelity;
+   defer, and reuse tier 1's format when it arrives. If it happens,
+   the CLI pairing teaches itself —
+
+       rlq run-script install --record install.rlqt   # once, real QEMU
+       rlq run-script install --backend replay        # thereafter, free
+
+   and the file joins the existing extension family (`.rlqb`,
+   `.rlqs`, `.rlql`) as `.rlqt`.
+
+ONE RULE EITHER TIER NEEDS: **an unmatched request fails loudly.** No
+recorded response for a command is an error — never an improvised
+answer, never empty (P11). Improvising is how a caller ends up
+reporting a pass against a transcript that never covered the case.
+
+TWO DISAMBIGUATIONS, both easy to get wrong. **Against F12**: the
+names are precise *because* both exist — alone, `simulator` would
+overclaim (it models no guest) and `replay` would be too narrow (it
+cannot answer an unrecorded command); side by side each denotes what
+the other does not. **Against F1**, the authoring recorder: that one
+captures a human session to draft a *script*, and its product is
+authored text; this captures screens to test the *parser*, and its
+product is a fixture. Shared machinery is possible and shared purpose
+is not.
+
+## F14 — Full guest-output capture
+
+> **Entered 2026-07-27** from a consuming project's proposal
+> (owner: admitted as a proposal). **The strongest demand of the six,
+> and the only one that changes what a caller can do today rather
+> than how it is tested.** Demanded by **U14** (in force — granular
+> results reaching the caller) and **P11**: `exec` returns the
+> visible screen, so output longer than a screenful loses its head,
+> and loses it *silently*. A capability limit that does not name
+> itself at the point it bites is the P11 half, and it is close
+> enough to a standing-principle defect to be worth adjudicating on
+> that footing rather than this one.
+
+The limit is documented as an honest one — agentless capture leaves
+only a long command's tail on the screen — but **honesty about a
+limit in prose is not the same as reporting it in the return.** A
+caller enumerating work inside the guest (list what a guest program
+offers, then drive each item) enumerates short whenever the listing
+outruns the screen, and nothing in what it reads back says so. That
+is the difference between in-guest enumeration being usable and not.
+
+TWO SEPARABLE DELIVERABLES, and the cheap one may be the whole
+answer:
+
+1. **Say so.** A read that could have lost its head reports that it
+   might have. This is the P11 minimum, it needs no new transport,
+   and it converts a silent wrong answer into a visible one.
+2. **Capture the whole of it.** Scrollback beyond the visible screen
+   — a control-plane capability question rather than a scraping one,
+   since agentless VGA text memory holds exactly one screen. It is
+   either paced reading (drive the guest's own pager and capture per
+   page) or a different plane; whatever lands, **P2** binds it — the
+   agentless path may not come to depend on guest cooperation.
+
+DECIDE FIRST: **whether (2) is Reliquary's at all.** The competing
+answer is (1) plus the value channels that already exist — a guest
+program writing its long output to a file the caller retrieves in
+band, which is `get_file` today and attaches no meaning to the
+content (P18). If that is the answer, this entry shrinks to (1) and
+stops being a feature; if it is not, the argument for why belongs
+here before any work starts.
+
+## F15 — Host-directory attachment as a first-class operation
+
+> **Entered 2026-07-27** from a consuming project's proposal
+> (owner: admitted as a proposal). Demanded by the **P16** and
+> **P17** drafts — P16 because the capability is reached today only
+> by a caller reproducing Reliquary's internal model outside it, and
+> P17 because the answer it owes is an address in the guest's own
+> terms. Serves **U14** and **U20**. Its neighbour is the deferred
+> in-band file family (D5's `<drive-key>:<path>` shape, Horizon
+> below), which P17 already proposes to reopen; if both land, they
+> settle one address vocabulary or two spellings of it.
+
+A caller that needs a host directory visible to a guest **synthesizes
+a directory-source drive into the blueprint**, which forces it to
+know slot keys, slot limits, and the DOS drive-letter rule — three
+pieces of Reliquary's model reproduced outside Reliquary in order to
+reach a capability Reliquary supports. "Attach this host directory,
+and tell me its guest address" deletes all three: the request is what
+the caller actually means, and the answer is what P17 says an address
+looks like.
+
+CONSTRAINTS ALREADY SETTLED, which shape the verb rather than block
+it. QEMU snapshots a vvfat staging directory when the drive is
+attached, so a host-side change needs a stop/start cycle — this is a
+**stopped-machine** operation, and the live-iteration path stays
+U20's `insert-media` over a running machine. Slot limits and the
+directory-on-cdrom refusal stay exactly as they are: the verb hides
+the arithmetic, never the rules.
+
+DECIDE FIRST: whether the attachment is **state or request** — a
+persisted machine-state mutation in the family of `insert_media` /
+`set_boot_order`, or a per-call convenience that composes a blueprint
+edit. The first survives a stop/start and shows up in `machine.json`;
+the second leaves the blueprint the only durable statement of what a
+machine has. The answer decides whether this is one verb or a verb
+and its inverse.
+
+## F16 — The public surface a caller copies today
+
+> **Entered 2026-07-27** from a consuming project's proposal
+> (owner: admitted as a proposal). Three small exposures with one
+> shared argument: each is Reliquary's own knowledge, reproduced
+> outside Reliquary because the public surface does not carry it.
+> **They are small but they are not housekeeping** — every one adds
+> to the embedding API, which the housekeeping boundary excludes
+> absolutely ([INTERFACES.md](../INTERFACES.md)), which is why they
+> are here and not in [TASKS.md](../TASKS.md). Serves **U14**;
+> item 1 cites **P10** and **P17**, item 3 belongs to **F2**.
+
+1. **A public drive-address query.** `platform_dos.drive_letters` is
+   not on the root import surface, so a caller needing a guest
+   address copies the rule and guards the copy with a test against
+   Reliquary's own function. That is a **correctness risk, not
+   tidiness**: the mapping shifts when one disk carries several
+   volumes, which a copy cannot know. P10 is what makes the function
+   the only correct source — it is built from declared facts and
+   never from a guest — and P17 is the shape the answer takes.
+   Pairs with F15, which needs exactly this to answer with.
+2. **Public topology limits.** Slot counts per medium
+   (`_SLOT_LIMITS`), so a caller building a blueprint
+   programmatically stops carrying its own copied `4`. Blueprint-model
+   truth, and arguably the published schema's job rather than the
+   API's — settle which before adding a function.
+3. **A backend-agnostic availability check.** `backend_available()`
+   rather than `find_qemu()`, so a caller gating integration tests
+   never has to name an emulator to ask a backend-neutral question.
+   Lowest priority of the three, and **probably not its own work**:
+   the honest version of it is F2's autodiscovery deliverable, so
+   this is a note against that feature as much as a request.
+
 ## Horizon — smaller and later
 
 > **Not a feature, and so unnumbered.** This is a holding list of
@@ -521,7 +889,7 @@ this one was asked for, and still waits on its own case.
   backing: clone has no use case at all, export's stands only
   as the U8 draft, and import's U2 loses its scheduled
   delivery with this move. Scheduling it back onto the
-  numbered arc is the acceptance of those use cases. The
+  numbered arc is the pledge of those use cases. The
   designs stay settled ([design/cli.md](../../docs/spec/cli.md); owner,
   2026-07-22):
   `export-drive` / `export-machine` with the decoupled
@@ -555,7 +923,7 @@ this one was asked for, and still waits on its own case.
      would make Reliquary its own answer.
   Demand is uncited today: no use case asks to *run Reliquary on*
   another host — U18 asks to reach another OS as a guest, which is
-  a different axis. Sequencing it is the acceptance of whatever
+  a different axis. Sequencing it is the pledge of whatever
   case does.
 - `fork-blueprint` (a fire-and-forget authoring convenience;
   `new-blueprint` scaffolding lands in milestone 6) —
@@ -581,7 +949,7 @@ this one was asked for, and still waits on its own case.
   sequence at or soon after the second backend (backlog).
 - Media commands beyond `fetch-media` (verify, remove) —
   currently unjustified: no use case demands them; `verify`
-  would stand on the U13 draft if accepted.
+  would stand on the U13 draft if pledged.
 - A `pytest-reliquary` plugin (per AGENTS.md prior art) —
   currently unjustified: adjacent to the U14/U15 drafts at
   best, and test-framework semantics belong to consumers (the

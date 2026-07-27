@@ -104,10 +104,10 @@ feature someone has already decided to build.
   proposed/USE-CASES.md or
   proposed/ARCHITECTURE.md and make the
   argument; if the argument wins, the amendment moves to
-  `accepted/` — the move is the acceptance and the commit is its
+  `pledged/` — the move is the pledge and the commit is its
   record ([README.md](README.md)); only then does work start.
-  Accepted use cases move into root USE-CASES.md when their
-  delivery lands, accepted principles into ARCHITECTURE.md when
+  Pledged use cases move into root USE-CASES.md when their
+  delivery lands, pledged principles into ARCHITECTURE.md when
   the project honors them, anything superseded retiring
   stubless — its number never reused, DECISIONS.md the record. A
   misaligned change that can propose no amendment
@@ -142,13 +142,13 @@ it, argue the amendment, or bring what beats the recorded
 reasoning.
 
 **Compression reaches the process, never the claim.** A principle's
-route runs drafted → accepted → in force, and authority may collapse
+route runs drafted → pledged → in force, and authority may collapse
 it: a principle *already true of the code* may be written straight
 into root [ARCHITECTURE.md](../ARCHITECTURE.md) in one act. What
 authority cannot do is place a false claim there — the root lists
 assert that the code complies today, so **placement is governed by
 truth, not by permission**. An unarmed principle sits under
-`accepted/` however unarguable it is, and an untrue one makes the
+`pledged/` however unarguable it is, and an untrue one makes the
 list lie. Check the shape too: a principle is a rule the project
 holds itself to, not a state it merely happens to be in — and both
 get phrased the same way. "No CI" as a note that no pipeline exists
@@ -174,7 +174,7 @@ Every approved change then lands the same way:
    a wrong one.
 3. **Record it.** Use-case amendments are drafted in
    [proposed/USE-CASES.md](proposed/USE-CASES.md),
-   accepted by being moved out of that file, and move into
+   pledged by being moved out of that file, and move into
    [USE-CASES.md](../USE-CASES.md) when delivered,
    keeping their numbers; settled decisions go to their
    [docs/spec/](../docs/spec/) specs; user-facing contracts to

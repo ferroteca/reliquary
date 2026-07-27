@@ -14,8 +14,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > few forward-looking edges named and pointed at `planning/`.
 > Proposed architecture lives in
 > [planning/proposed/ARCHITECTURE.md](planning/proposed/ARCHITECTURE.md)
-> and accepted-but-undelivered architecture in
-> [planning/accepted/ARCHITECTURE.md](planning/accepted/ARCHITECTURE.md),
+> and pledged-but-undelivered architecture in
+> [planning/pledged/ARCHITECTURE.md](planning/pledged/ARCHITECTURE.md),
 > under the same global P-numbering, with no placeholder here;
 > amendments are argued like interface changes and recorded in
 > [planning/DECISIONS.md](planning/DECISIONS.md).
@@ -361,7 +361,7 @@ differently under the new wording — is mere documentation work.
   the queues (D39). These are one category because they are the
   documents that **bind other work**. The door is open: anyone
   may argue for any change, and the argument is welcome. What is
-  refused is *arrival* — a change landing with no accepted
+  refused is *arrival* — a change landing with no pledged
   proposal behind it is rejected by citing this principle,
   whatever its technical merit; the missing argument is the whole
   reason, the rejection needs no other, and it is a rejection for
@@ -379,7 +379,7 @@ differently under the new wording — is mere documentation work.
   landing with it — compressed in time, never reduced in content.
 
   Approval is sometimes granted **in advance**, on trust in the
-  claim that qualifies it: work implementing an accepted decision,
+  claim that qualifies it: work implementing a pledged decision,
   and housekeeping (D38). That is standing approval, not an
   absence of governance — a false claim means an unapproved change
   landed. (Prose: "The norms are part of the

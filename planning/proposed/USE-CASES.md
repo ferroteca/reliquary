@@ -6,11 +6,11 @@ SPDX-License-Identifier: BSD-3-Clause
 # Use-case proposals
 
 > **Status:** the staging ground for changes to the
-> use-case list. **Nothing here is accepted, and nothing is worked
+> use-case list. **Nothing here is pledged, and nothing is worked
 > from here.** A proposal is argued under the
 > [interface-change rule](../INTERFACES.md#the-rule),
-> and **the move is the acceptance**: it goes to
-> [accepted/USE-CASES.md](../accepted/USE-CASES.md), and the commit
+> and **the move is the pledge**: it goes to
+> [pledged/USE-CASES.md](../pledged/USE-CASES.md), and the commit
 > that moves it is the record. It reaches the current list —
 > [USE-CASES.md](../../USE-CASES.md), which holds only the use cases
 > the code meets today — when its delivery lands, a second move
@@ -27,7 +27,7 @@ force while proposals churn here.
 A use case in force is never changed in nature. A *proposed*
 one is different: until it enters force it may be reshaped
 freely here — its number stays, and work already scheduled
-against it (an accepted proposal) is re-checked in the same
+against it (a pledged proposal) is re-checked in the same
 edit. For the standing list, three moves exist, and they are
 the only three:
 
@@ -41,7 +41,7 @@ the only three:
   edit is a clarification, it is not one — it is a supersession
   and is argued like any other proposal.
 - **Add.** A new use case, drafted here, argued under the
-  interface-change rule, accepted, and moved to
+  interface-change rule, pledged, and moved to
   root USE-CASES.md when its delivery lands.
 - **Retire.** A use case leaves force: **retired** without
   replacement, or **superseded** by one or more successors that
@@ -55,11 +55,11 @@ Proposed and in-force use cases share one global namespace: a
 proposal drafted here takes the next free U-number, keeps it
 for life, and moves to root USE-CASES.md under that number
 when its delivery lands. The move to
-accepted/USE-CASES.md is the acceptance — the argument wins, the
-commit that moves it is the record, and the accepted proposal is
+pledged/USE-CASES.md is the pledge — the argument wins, the
+commit that moves it is the record, and the pledged proposal is
 citable from there; delivery is what makes it current. The
 door swings both ways: a settled use case whose delivery
-becomes unscheduled moves back to accepted/USE-CASES.md and lives
+becomes unscheduled moves back to pledged/USE-CASES.md and lives
 only there until delivered. Numbers are never reused: a declined
 proposal's number is retired with it (the decline recorded in
 [DECISIONS.md](../DECISIONS.md), the guard against re-litigating),
@@ -80,7 +80,7 @@ the land-coherently rule (INTERFACES.md). The death is
 recorded in DECISIONS.md with its reason, so it is not
 re-proposed blindly. Nothing downstream may keep citing a
 use case that never entered force. The sweep is findable by
-construction: every accepted item cites the use case or
+construction: every pledged item cites the use case or
 principle that demands it (the traceability rule in the planning docs'
 preamble), so the dead proposal's U-number is the search key.
 
@@ -91,20 +91,20 @@ supersede / clarify), the use cases it touches, and its state:
 **tracked** (a change expected but not yet drafted — no number
 claimed) and **drafted** (full use-case text, number claimed).
 Those are the two states this file holds. Beyond them a use case
-is **accepted** — moved to
-[accepted/USE-CASES.md](../accepted/USE-CASES.md), the move itself
+is **pledged** — moved to
+[pledged/USE-CASES.md](../pledged/USE-CASES.md), the move itself
 the record — and then **delivered**, moved again to the current
-list; a chunk whose demanded work has already landed is accepted
+list; a chunk whose demanded work has already landed is pledged
 and delivered in one act. A proposal may die at any point before
 delivery (recorded in DECISIONS.md and removed, triggering the
 sweep above).
 
 Delivery moves it **automatically** (D34): whoever lands the work
 that fully meets a use case promotes it in the same change — into
-the current list, out of the accepted file, recorded in
+the current list, out of the pledged file, recorded in
 DECISIONS.md — not on a separate sign-off. Full delivery is the
-trigger: a use case whose work has partly landed stays accepted
-rather than current (milestone 8 accepted U5, but its canonical
+trigger: a use case whose work has partly landed stays pledged
+rather than current (milestone 8 pledged U5, but its canonical
 scenario waits on the GUI era, F5). A clarification claims no number of
 its own — it attaches to the use case it sharpens — and skips the
 argument entirely: it is simply delivered, applied in place to the
@@ -133,8 +133,8 @@ targets (U1), import sources (U2), and guest-agent vendors
 (U3), never as run substrates. The seam and the second backend
 left the numbered arc for the backlog on this very lack, the
 same day this draft was written (formerly milestones 10–11;
-D33). Accepting U7 is scheduling that pair back onto the arc,
-the citing item the acceptance record; on acceptance the
+D33). Pledging U7 is scheduling that pair back onto the arc,
+the citing item the pledge record; on pledging the
 the backend-adapter design and both returning features
 cite U7.
 
@@ -158,10 +158,10 @@ gap: the export family — machine mobility, demoted from
 milestone 12 to Horizon for this very lack — hangs from half a
 sentence inside U1; the durable-exit concern deserves its own
 case (separation: U1 stays the easy-install journey, U2 the
-import journey, U8 the export journey). On acceptance, U1
+import journey, U8 the export journey). On pledge, U1
 gains a cross-reference clarification pointing at U8 (its
 nature — ending in a usable, exportable machine — is
-untouched); accepting U8 is scheduling the mobility work's
+untouched); pledging U8 is scheduling the mobility work's
 export half back onto the arc, the citing item the record.
 
 > - **U8 — Keep what was built.** Sometimes the product is the
@@ -206,7 +206,7 @@ languages until a second binding earns scheduling on its own.
 names install-testing ("os-autoinst-style, where the install
 is the thing under test") but no numbered case owns it — and
 it is the use that makes agentless operation permanently
-essential rather than a bootstrap convenience. On acceptance,
+essential rather than a bootstrap convenience. On pledge,
 the arc's prose cites U10, as do the agentless-permanence
 statements.
 
@@ -255,7 +255,7 @@ the decomposition sweep). U4 bundled the sharing journey with
 the residency rule; the residency rule is already the
 artifact-residency split's automation half — U17 numbers it so
 decisions can cite it directly, and the split's prose
-condenses to cite U16/U17 on acceptance. When both are
+condenses to cite U16/U17 on pledge. When both are
 delivered, U4 retires to a stub naming them.
 
 > - **U16 — Share a precise test VM through version control.**
@@ -294,7 +294,7 @@ the project does not have: a modern-guest platform workflow
 (Linux), a way in for the code and out for the results, and
 realistically a native guest agent for a tight loop. So it is
 not a near-term schedule request. What makes it worth numbering
-now is what it would *demand* if accepted: it is the first case
+now is what it would *demand* if pledged: it is the first case
 that would put in-force weight behind the backlogged guest-agent
 work (D33 demoted it for lack of exactly this), behind the
 deferred in-band file operations, and behind **P16** and
@@ -329,9 +329,9 @@ run's own driver (P5); following a run from a process that did
 not start it is the separable capability U19 names. The pillar
 left the numbered arc for the backlog the day this was drafted
 (D35), on the same ground D33 used for the backend pillars — a
-settled design with no in-force or accepted use case. Accepting
+settled design with no in-force or pledged use case. Pledging
 U19 is scheduling the async work back onto the arc, the citing
-item the acceptance record; on acceptance the planning
+item the pledge record; on pledging the planning
 "Asynchronous runs (backlog)" section and the returning
 milestone cite U19.
 
@@ -353,13 +353,13 @@ applied; each must pass the clarification test (no past
 citation reads differently under the new wording).
 
 - **U1 — condense to the journey** (recorded 2026-07-23;
-  contingent on U8 and U11–U13 being accepted). Tighten U1 to
+  contingent on U8 and U11–U13 being pledged). Tighten U1 to
   the composed journey it uniquely owns — one short, terse
   command from a clean home to a usable machine,
   easy-is-the-requirement included — citing U11 (find and
   seed), U13 (media), U12 (the install), and U8 (the export
   exit) for the capabilities it composes. Until those are
-  accepted, U1's full text stays: every clause is load-bearing
+  pledged, U1's full text stays: every clause is load-bearing
   demand.
 - **U2 — condense** (recorded 2026-07-23). Trim the import
   doctrine detail — never-copy, snapshot consent, and the
@@ -371,7 +371,7 @@ citation reads differently under the new wording).
 ### Tracked
 
 - **Break U5 into finer pieces** — tracked (recorded
-  2026-07-23, the decomposition sweep; U5 itself is accepted
+  2026-07-23, the decomposition sweep; U5 itself is pledged
   above, awaiting delivery). Candidate cuts: the
   seed-and-customize journey; parameterization's two bindings
   (in-blueprint values vs externally defined); secret custody
@@ -380,7 +380,7 @@ citation reads differently under the new wording).
 - **Break U6 into finer use cases** — tracked (recorded
   2026-07-23; previously an expectation noted inside U6
   itself). Candidate cuts per the recorder design
-  ([planning/accepted/design/recorder.md](../accepted/design/recorder.md)): record
+  ([planning/pledged/design/recorder.md](../pledged/design/recorder.md)): record
   a task once into a draft script; extend a tailored script by
   round-trip re-recording; refresh assets for a changed
   screen. Left undrafted by the decomposition sweep: the

@@ -3,19 +3,19 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Accepted use cases — awaiting delivery
+# Pledged use cases — awaiting delivery
 
-> **Status:** use cases the project has **accepted** but does not
+> **Status:** use cases the project has **pledged** but does not
 > yet meet. Work may be done from here; nothing here is a claim
 > about the code.
 >
 > Three locations hold three states. A use case is drafted in
 > [proposed/USE-CASES.md](../proposed/USE-CASES.md), moves here when
-> it is accepted, and moves to root
+> it is pledged, and moves to root
 > [USE-CASES.md](../../USE-CASES.md) when the code actually meets
 > it. The root list is implemented-only — every entry there is met
 > today, which is why it lives at the repository root — so
-> acceptance alone can never put an entry in it. All three share
+> pledge alone can never put an entry in it. All three share
 > one global U-namespace; numbers are permanent, never reused, and
 > no placeholder is left behind by either move.
 >
@@ -25,11 +25,11 @@ SPDX-License-Identifier: BSD-3-Clause
 > move in [DECISIONS.md](../DECISIONS.md) — rather than holding it for
 > a separate sign-off. *Full* delivery is the trigger: a use case
 > whose work has partly landed stays here, since the root list is an
-> implementation claim (milestone 8 accepted U5, but its canonical
+> implementation claim (milestone 8 pledged U5, but its canonical
 > scenario waits on the GUI era, F5).
 >
 > A use case in force is clarified, retired, or superseded — never
-> changed in nature. One accepted here may still be reshaped, its
+> changed in nature. One pledged here may still be reshaped, its
 > number intact, with work already scheduled against it re-checked
 > in the same edit. A proposal that dies at any point is recorded in
 > [DECISIONS.md](../DECISIONS.md) and removed, triggering the planning
@@ -37,13 +37,13 @@ SPDX-License-Identifier: BSD-3-Clause
 > [proposed/USE-CASES.md](../proposed/USE-CASES.md); its U-number is
 > the search key.
 
-**U1 — Install a sandbox VM from the CLI, easily** — accepted;
+**U1 — Install a sandbox VM from the CLI, easily** — pledged;
 moved from the current list 2026-07-23 (owner: the current
 list is implemented-only). The install journey is delivered
 end to end — the north-star command works from a clean home —
 but the export clause is unimplemented Horizon work (machine
 mobility), so U1 as written is not met. The delivered
-substance is separately drafted as chunks U11–U13: accepting
+substance is separately drafted as chunks U11–U13: pledging
 those already-delivered chunks seats it in the current list at
 once, and the pending U1 condensation completes the story when
 export schedules. Text verbatim as adopted:
@@ -66,7 +66,7 @@ export schedules. Text verbatim as adopted:
 adopted; unscheduled since machine mobility's demotion to
 Horizon (2026-07-23) took `import-vm` off the numbered arc,
 and nothing of it is implemented. Rescheduling import-bearing
-work is its re-acceptance. Text verbatim as adopted:
+work is its re-pledging. Text verbatim as adopted:
 
 > - **U2 — Import an existing VM as a blueprint.** A user has
 >   created a VM natively — in VMware, say — and wants to capture
@@ -93,7 +93,7 @@ work is its re-acceptance. Text verbatim as adopted:
 >   rewritten). The import flow's job is to present these choices,
 >   not bury them.
 
-**U3 — Automated testing of something in a VM** — accepted;
+**U3 — Automated testing of something in a VM** — pledged;
 moved from the current list 2026-07-23 (owner:
 implemented-only). The programmatic loop itself runs
 agentlessly on QEMU/DOS today, but the first-class demands —
@@ -137,13 +137,13 @@ and it waits here until made. Text verbatim as adopted:
 >   be the very driver that would provide that communication.
 >   Often nothing durable remains: the run record is the product.
 
-**U5 — Custom installation** — accepted; moved back from the
+**U5 — Custom installation** — pledged; moved back from the
 current list 2026-07-23 (owner: an in-force use case whose
 delivery is unscheduled is a real problem — proposed is the
 honest state). Its canonical scenario — a customized Windows
 install — waits on the unscheduled GUI era (F5); the
 parameterization machinery lands at milestone 8 — the
-scheduled, U5-citing work that constitutes its acceptance,
+scheduled, U5-citing work that constitutes its pledge,
 while the unscheduled scenario is why it is not current. U5
 lives only
 here while undelivered — the shared U-namespace keeps every
@@ -170,7 +170,7 @@ the delivery is real. Text verbatim as adopted:
 >   name as "testuser", while "paul" is a value its owner would
 >   never check in.
 
-**U6 — Author a script by doing the task once** — accepted in
+**U6 — Author a script by doing the task once** — pledged in
 residue only; moved back from the current list 2026-07-23
 (owner, confirming the delivery-gate flag): the recorder —
 U6's whole delivery — sits unscheduled in proposed/FEATURES.md's Horizon,

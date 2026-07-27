@@ -51,7 +51,7 @@ CLI–API parity.
 
 Scripts are authored documents: Reliquary reads but never rewrites
 them — with one named exception: the authoring recorder's opt-in
-fragment apply (U6; [recorder.md](../../planning/accepted/design/recorder.md)) inserts a captured
+fragment apply (U6; [recorder.md](../../planning/pledged/design/recorder.md)) inserts a captured
 fragment at its playback anchor
 and touches no other byte. They belong in version control beside
 the machine blueprints (media components and all) on which they

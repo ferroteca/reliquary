@@ -70,7 +70,7 @@ is worse than no audit, because the record is trusted.
   each target mentions the amending number.
 - **No entry appears in both a standing list and its proposals
   doc** (D23's no-stub rule).
-- **Every design document's subject has accepted demand** — the
+- **Every design document's subject has pledged demand** — the
   2026-07-24 audit found three designs for pillars D33 demoted for
   lack of it. (F7 is this check as a feature.)
 

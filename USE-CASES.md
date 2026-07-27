@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > and the specifications ([docs/spec/](docs/spec/)) it forms the
 > project's **vision** — the standing statement of what Reliquary
 > is and is for. Interface decisions are weighed against this list
-> and the accepted proposals under the interface-change rule
+> and the pledged proposals under the interface-change rule
 > ([planning/INTERFACES.md](planning/INTERFACES.md)); proposed
 > changes are tracked in
 > [planning/proposed/USE-CASES.md](planning/proposed/USE-CASES.md) and
@@ -30,8 +30,8 @@ interface changes arrive as proposed amendments to it (see the
 drafted and tracked in
 [planning/proposed/USE-CASES.md](planning/proposed/USE-CASES.md), and
 moved here when delivered — the move to
-[planning/accepted/USE-CASES.md](planning/accepted/USE-CASES.md) is
-acceptance; delivery makes it current.
+[planning/pledged/USE-CASES.md](planning/pledged/USE-CASES.md) is
+the pledge; delivery makes it current.
 
 This list is an implementation claim: every use case here is
 met by the code as it stands today, in full. A use case with

@@ -12,21 +12,32 @@ standing without reading a word of it.
 ## The one vocabulary
 
 **A use case, a principle and a task carry the same lifecycle**
-(owner, 2026-07-24): each is *proposed*, *accepted*, *completed*, or
+(owner, 2026-07-24): each is *proposed*, *pledged*, *completed*, or
 *rejected*. One vocabulary runs through the whole planning
 machinery — the same four words classify demand, rules and work
 alike — and the directories below are that vocabulary made
 physical.
 
-- `proposed/` — argued but not accepted. **Nothing is worked from
+- `proposed/` — argued but not pledged. **Nothing is worked from
   here.**
-- `accepted/` — approved, and not yet delivered.
+- `pledged/` — owed by the project, and not yet delivered.
+
+**Neither shelf is named after an act** (D44, owner, 2026-07-27),
+and the second one used to be: it was `accepted/` until the
+approval words gave out. Both gates need one — admitting a document
+to `proposed/` is an approval too, and "agreed", "approved" and
+"accepted" are what come to mind at either — so a shelf named for
+an act claims words the other gate still has to borrow. Both names
+now state what the item *is*: **proposed**, argued and binding
+nothing; **pledged**, owed by the project with no date attached.
+Approval words belong to the gates, and either gate may use any of
+them.
 
 **The two directories hold the same three filenames** —
 `USE-CASES.md`, `ARCHITECTURE.md`, `FEATURES.md` — because they hold
 the same three artifacts in two different states. That is the whole
 of what the directories mean: a thing in `proposed/` moves to
-`accepted/`, and the commit that moves it is the record.
+`pledged/`, and the commit that moves it is the record.
 
 **The planning root holds what does not move.** The map, the rule,
 the record, and the queue are machinery rather than proposals, and
@@ -34,32 +45,36 @@ none of them has a lifecycle state to be in:
 
 - [README.md](README.md) — this map.
 - [INTERFACES.md](INTERFACES.md) — the vetting rule. It governs
-  `proposed/` at least as much as `accepted/`; it is the test a
+  `proposed/` at least as much as `pledged/`; it is the test a
   proposal is judged by, not a thing that was proposed.
 - [DECISIONS.md](DECISIONS.md) — the adjudication record, which cuts
   across every state by design: open questions not yet adjudicated,
-  decisions that accepted something, decisions that **refused** it
+  decisions that pledged something, decisions that **refused** it
   (TASKS.md's Rejected section is a thin index into this file), and
   a retired list binding nothing at all.
 - [TASKS.md](TASKS.md) — the queue, and **everything in it is
-  already accepted**, so there is nothing to promote and no order to
-  work it in. Its state is the one `accepted/` names; the directory
-  is not its home because `proposed/` and `accepted/` hold *demand
+  already pledged**, so there is nothing to promote and no order to
+  work it in. Its state is the one `pledged/` names; the directory
+  is not its home because `proposed/` and `pledged/` hold *demand
   and capability* — use cases, principles, and the features that
   deliver them — and a task is none of those. That kind distinction
   is the distinguisher, not size alone.
 
 One exception cuts the other way: work that only makes sense as part
-of one accepted feature lives **with that feature**, under
-`accepted/FEATURES.md`, because it is meaningless apart from it.
+of one pledged feature lives **with that feature**, under
+`pledged/FEATURES.md`, because it is meaningless apart from it.
 Only free-standing work goes in the queue.
 
 **There is no roadmap, deliberately** (D42). A roadmap classifies by
 *when* where everything here classifies by *state*, and promises an
-order nothing commits to. `accepted/` says the direction is agreed
-and nothing more; the absence of order in [TASKS.md](TASKS.md) holds
-equally for accepted features, the only binding order running inside
-a feature.
+order nothing commits to. `pledged/` says the project will do it and
+says nothing whatever about when — a commitment without a date,
+which is why it coexists with keeping no roadmap; the absence of
+order in [TASKS.md](TASKS.md) holds equally for pledged features,
+the only binding order running inside a feature. The commitment is
+what lets the shelf be **wrong**: an item nobody intends to deliver
+is withdrawn to `proposed/` or rejected outright, never left sitting
+as a pledge nobody means.
 
 **Features carry F-numbers and a size bound** (D42). The number is a
 handle for what depends on a feature, running in one sequence across
@@ -68,12 +83,12 @@ both directories, recording order of issue and never priority; it
 rather than a promise. Designs take no number — a design serves one
 feature and is identified by its path. A feature must fit in one
 sprint, which here runs in minutes to hours; the bound bites at
-acceptance, so entries in `proposed/FEATURES.md` are each many
-sprints and cutting one up is part of accepting it.
+the pledge, so entries in `proposed/FEATURES.md` are each many
+sprints and cutting one up is part of pledging it.
 
 References between items are written in the dependent item and point
 at the prerequisite's handle. They are **not a delivery order**, and
-they run down the lifecycle or sideways, never up: an accepted item
+they run down the lifecycle or sideways, never up: a pledged item
 that cannot be completed without something still only proposed is a
 flaw to fix rather than a reference to record.
 
@@ -85,21 +100,21 @@ the P-numbered architectural principles, every principle honored
 by the code. Together with the specifications
 ([docs/spec/](../docs/spec/)) they are the project's **vision**:
 the standing statement of what Reliquary is and is for. What sits
-under `proposed/` and `accepted/` here is vision that has not
+under `proposed/` and `pledged/` here is vision that has not
 arrived yet.
 
 Each is mirrored by name in **both** directories, because use cases
-and principles have **three** states, not two: drafted → accepted →
-in force. Acceptance and delivery are different events, and the gap
+and principles have **three** states, not two: drafted → pledged →
+in force. Pledging and delivery are different events, and the gap
 between them is real — the root lists are implementation claims, so
-accepting a use case can never put it there. Three locations, three
+pledging a use case can never put it there. Three locations, three
 states, and the file an entry sits in says which it is. This is also
-what arms a principle: below the root list it is accepted vision and
+what arms a principle: below the root list it is pledged vision and
 a shortfall is unbuilt work; at the root list the project asserts
 the code honors it, and a divergence becomes a bug.
 
 **Design sits with what it serves.** A design for one feature lives
-beside that feature — `proposed/design/` or `accepted/design/` — so
+beside that feature — `proposed/design/` or `pledged/design/` — so
 the design and the demand it answers move together, and a design for
 a proposal that dies is swept with it. `design/` at this level holds
 only open design problems belonging to no single feature; the
@@ -119,16 +134,16 @@ them, and `docs/spec/` refers to them.
 | Location | Holds |
 |---|---|
 | [`proposed/USE-CASES.md`](proposed/USE-CASES.md) | Drafted use cases, numbering from the same global U-sequence as the root list |
-| [`proposed/ARCHITECTURE.md`](proposed/ARCHITECTURE.md) | Proposed architecture: drafted principles under the global P-numbering, and model changes argued before acceptance |
-| [`proposed/FEATURES.md`](proposed/FEATURES.md) | Large unbuilt capabilities (F-numbered) — each many sprints of work, design settled and intact, awaiting the use case that schedules it; cut to sprint size only on acceptance |
-| [`accepted/USE-CASES.md`](accepted/USE-CASES.md) | Accepted use cases the code does not yet meet |
-| [`accepted/ARCHITECTURE.md`](accepted/ARCHITECTURE.md) | Accepted architecture the code does not yet honor — accepted vision, not yet armed |
-| [`accepted/FEATURES.md`](accepted/FEATURES.md) | Accepted-but-unbuilt capability (F-numbered), each within one sprint and carrying the work items that deliver it |
+| [`proposed/ARCHITECTURE.md`](proposed/ARCHITECTURE.md) | Proposed architecture: drafted principles under the global P-numbering, and model changes argued before pledging |
+| [`proposed/FEATURES.md`](proposed/FEATURES.md) | Large unbuilt capabilities (F-numbered) — each many sprints of work, design settled and intact, awaiting the use case that schedules it; cut to sprint size only on pledging |
+| [`pledged/USE-CASES.md`](pledged/USE-CASES.md) | Pledged use cases the code does not yet meet |
+| [`pledged/ARCHITECTURE.md`](pledged/ARCHITECTURE.md) | Pledged architecture the code does not yet honor — pledged vision, not yet armed |
+| [`pledged/FEATURES.md`](pledged/FEATURES.md) | Pledged-but-unbuilt capability (F-numbered), each within one sprint and carrying the work items that deliver it |
 | [`INTERFACES.md`](INTERFACES.md) | *(root)* The interface-change rule every interface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The interfaces" |
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
-| [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already accepted, in no particular order |
+| [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, in no particular order |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `backend-adapter.md`, `landmarks.md` |
-| [`accepted/design/`](accepted/design/) | Design for accepted features — `recorder.md` (F1, U6) |
+| [`pledged/design/`](pledged/design/) | Design for pledged features — `recorder.md` (F1, U6) |
 | [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
 
 Not here, deliberately: the normative specs of shipped interfaces
@@ -148,7 +163,7 @@ widening D39's two):
    outside: a bug hit, a question asked, a wish stated.
 2. **The `proposed/` directory** — the same idea argued in the
    project's own vocabulary, as a drafted use case, principle or
-   feature. Nothing is worked from here until it is accepted.
+   feature. Nothing is worked from here until it is pledged.
 3. **[TASKS.md](TASKS.md)** — small, **pre-approved** work. Entering
    it is approving it, so it needs no citation and no decision, and
    there is no order to work it in.
@@ -158,8 +173,8 @@ The issue tracker is the one open door: anyone may file there, and
 entry grants nothing. Everything in this directory is the project
 speaking in its own voice, so the **same gate governs all three
 acts** — entering a document in `proposed/`, promoting it to
-`accepted/`, and entering work in [TASKS.md](TASKS.md). Only what
-each act grants differs: a live argument, an acceptance, an
+`pledged/`, and entering work in [TASKS.md](TASKS.md). Only what
+each act grants differs: a live argument, a pledge, an
 approval. Authority is a role rather than a person; today it is the
 owner alone, and the group may be widened whenever he chooses.
 
@@ -172,8 +187,8 @@ entry only; anyone may pick up what is already there.
 
 **A task has no proposed state under `planning/`.** Both lanes run
 the same lifecycle, housed differently: demand and capability are
-proposed in `proposed/` and accepted in `accepted/`, while a task is
-proposed in the **issue tracker** and accepted in
+proposed in `proposed/` and pledged in `pledged/`, while a task is
+proposed in the **issue tracker** and pledged in
 [TASKS.md](TASKS.md) — there being no argued middle stage for work
 too small to need the argument. So the tracker is the only queue a
 proposed task has, and an outside contributor needs no write access
@@ -200,7 +215,7 @@ having passed through a queue.**
 queue: small cleanups and small reported defects — tiny in scope
 *and* crystal clear they are a problem — are approved as a class, in
 advance, and are too small to be worth writing down at all. A
-qualifying item is accepted on sight and needs no entry anywhere;
+qualifying item is approved on sight and needs no entry anywhere;
 whoever lands the work invokes the bucket by naming it in the
 commit, and the commit is the record.
 
@@ -213,15 +228,15 @@ doubt escalates: if it has to be argued in, it does not belong in.
 (A defect against a *standing* principle is neither — the principle
 is already its own demand, so it needs no approval, only fixing.)
 
-## How an idea is accepted
+## How an idea is pledged
 
 **The move is the act.** Promoting a document — or an entry within
-one — from `proposed/` to `accepted/`, or from `proposed/` to the
-root standing list, *is* the acceptance, and the commit that does it
+one — from `proposed/` to `pledged/`, or from `proposed/` to the
+root standing list, *is* the pledge, and the commit that does it
 is the record. There is no separate register to keep in step, and
-nothing is accepted by being cited somewhere.
+nothing is pledged by being cited somewhere.
 
-Every accepted item cites what demands it: a use case (its U-number,
+Every pledged item cites what demands it: a use case (its U-number,
 in force at the root or still drafted under `proposed/`) or a
 architectural principle (its P-number), which drives work just as well.
 When a proposal dies, the sweep — the removal rule in

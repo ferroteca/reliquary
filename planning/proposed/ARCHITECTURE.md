@@ -7,11 +7,11 @@ SPDX-License-Identifier: BSD-3-Clause
 
 > **Status:** the staging ground for changes to the architecture —
 > new principles, model changes, retirements — argued here before
-> anything is accepted. **Nothing here is accepted, and nothing is worked
+> anything is pledged. **Nothing here is pledged, and nothing is worked
 > from here.** The lifecycle mirrors the use-case one
 > ([proposed/USE-CASES.md](USE-CASES.md)) and runs across three
-> locations: drafted here, then **accepted** — moved to
-> [accepted/ARCHITECTURE.md](../accepted/ARCHITECTURE.md), the move
+> locations: drafted here, then **pledged** — moved to
+> [pledged/ARCHITECTURE.md](../pledged/ARCHITECTURE.md), the move
 > itself the record — then in force, moved again into root
 > [ARCHITECTURE.md](../../ARCHITECTURE.md), which sits at the
 > repository root because it describes current reality: the shipped
@@ -25,8 +25,8 @@ SPDX-License-Identifier: BSD-3-Clause
 > reshaped freely here (its number stays; work already scheduled
 > against it is re-checked in the same edit). The second move is
 > **automatic on full delivery** (D34), and full delivery, not
-> acceptance, is its trigger: a partly-honored principle stays in
-> the accepted file, since the standing list is an implementation
+> pledge, is its trigger: a partly-honored principle stays in
+> the pledged file, since the standing list is an implementation
 > claim. A dead proposal is recorded in
 > [DECISIONS.md](../DECISIONS.md) and triggers the same
 > planning-doc sweep, its P-number the search key.
@@ -67,7 +67,7 @@ WHAT IT DOES NOT ASSERT, or it will over-read on first citation:
 ALREADY HONORED IN ONE PLACE, WHICH IS THE ARGUMENT FOR IT: the
 U6 recorder's first work item exists for exactly this reason —
 "backend display-window input is invisible to Reliquary"
-(TASKS.md; planning/accepted/design/recorder.md), so the recorder gets a
+(TASKS.md; planning/pledged/design/recorder.md), so the recorder gets a
 Reliquary-owned console viewer rather than recording a person
 typing into QEMU's own window. That is P16 reasoning, applied
 before P16 was stated, and it is what a real principle looks
@@ -89,12 +89,12 @@ is served today only out of band (a vvfat `hostdir` on QEMU;
 nothing at all on a backend without one). Under P16 that is a
 violation on its face.
 
-WHAT ACCEPTANCE WOULD COST, stated plainly so it is priced
+WHAT PLEDGING WOULD COST, stated plainly so it is priced
 before it is granted: the Horizon in-band file operations stop
 being unjustified deferral and become demanded work — a roadmap
-item citing P16, which under D23 is this proposal's acceptance.
+item citing P16, which under D23 is this proposal's pledge.
 They are currently sequenced against the second backend, which
-left the numbered arc the same day (D33), so acceptance would
+left the numbered arc the same day (D33), so pledge would
 also be the argument for scheduling them independently of it.
 D5 is not retired by this: its drops (the `results` header,
 `stage`/`collect`, record custody) stand on their own reasoning,
@@ -116,7 +116,7 @@ OPEN FOR ADJUDICATION:
    already compliant or is the first thing to fix.
 4. **"Foreseeable."** A principle that binds on foresight needs
    its own test, or it becomes unfalsifiable — probably "a use
-   case in force or accepted", which keeps it inside the
+   case in force or pledged", which keeps it inside the
    existing lifecycle.
 
 Statement (candidate; the reach question above may narrow it):
@@ -125,12 +125,12 @@ Statement (candidate; the reach question above may narrow it):
 >   Every interaction a use case depends on goes through
 >   Reliquary — its CLI, its API, its scripts. Out-of-band
 >   access to a machine's host state stays possible and stays
->   unmediated, but no goal the project has accepted may
+>   unmediated, but no goal the project has pledged may
 >   *require* it: a use case that must reach around Reliquary
 >   to be met names a capability gap, and the gap is what gets
 >   fixed. Handing a machine off is not a breach — export ends
 >   Reliquary's ownership on purpose. (Normative home: TBD on
->   acceptance.)
+>   pledge.)
 
 **P17 — Guest files are named in the guest's terms** — drafted
 (add, 2026-07-23; the owner's proposal, verbatim: *"When a
@@ -139,7 +139,7 @@ user, the guest files are referenced in terms of the guest OS,
 not the host OS."*). Adjudication pending. It pairs with
 **P16** above and is deliberately separate: P16 says the
 in-band route must exist, P17 says what its addresses look
-like. Either can be accepted without the other.
+like. Either can be pledged without the other.
 
 WHAT IT ASSERTS: a file action names its target the way the
 guest's own user would — `C:\DOS\FOO.TXT` on DOS,
@@ -162,7 +162,7 @@ roughed shape D5 recorded as **`<drive-key>:<path>` addressing**
 (`list-files` / `get-files` / `put-files`). That shape is the
 host-flavored one this principle would refuse: `hdd0:` is a
 blueprint drive key, not anything the guest ever says. So P17's
-first act, on acceptance, is to reopen that address form before
+first act, on pledge, is to reopen that address form before
 it is implemented — cheap now, expensive after (P9's window,
 D25's calendar). D5 explicitly left the details to "that
 milestone's own round"; this would be an input to it.
@@ -211,7 +211,7 @@ Statement (candidate; question 1 may add a clause):
 >   assignment — never from inspecting a guest (P10). Where the
 >   declared facts leave an address ambiguous, the call fails
 >   closed naming the ambiguity (P11). (Normative home: TBD on
->   acceptance.)
+>   pledge.)
 
 **P18 — Mechanism, not content** — drafted (add, 2026-07-24, the
 exec-run round; D36). Reliquary ships no standardized authored
@@ -240,7 +240,7 @@ consuming project owns both.
 >   project's to build. Reliquary attaches no meaning to what
 >   runs through its mechanisms; computation and interpretation
 >   live on the caller's side of the seam (G2). (Normative home:
->   TBD on acceptance.)
+>   TBD on pledge.)
 
 ### Tracked
 
