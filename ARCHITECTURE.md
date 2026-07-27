@@ -480,7 +480,7 @@ machine — installing the OS (U1) and bringing the guest to the
 point where an agent exists inside it — and for testing
 installations themselves, os-autoinst-style, where the install is the
 thing under test and the screen is the assertion surface. Once a
-guest holds an agent, that agent is the better work plane (U3);
+guest holds an agent, that agent is the better work plane;
 agentless remains the permanent fallback for guests that can
 never cooperate. Reliquary consumes native guest agents and
 never builds its own: agents may not exist for some operating
@@ -496,7 +496,7 @@ scenarios — seeded by the codex (U1, U5). The other side of the
 coin: for automation, scripts, blueprints, and landmark assets
 are source code artifacts — they belong to the consuming
 project, live in its source control, and never
-live in Reliquary's home (U3, U4). The codex is *never* used for machine
+live in Reliquary's home (U14, U4). The codex is *never* used for machine
 automation — that would be a trap: a blueprint changing outside
 the project's source control breaks the project. For automation
 the library is at most a place to copy a first draft from; the

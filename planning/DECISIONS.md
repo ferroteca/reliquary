@@ -174,6 +174,93 @@ is waiting on an answer today.
 
 ## Decided
 
+- D51 — U3 RETIRES, SUPERSEDED BY U14 — DECIDED (owner,
+  2026-07-27, the last of the TASKS.md adjudications). Supports
+  P8; **completes D36**, which settled the supersession, and
+  **closes D37's one deferral**. This is U3's death record, which
+  the lifecycle requires; its full text survives in git history
+  and its number is retired with it, never reused.
+  U3 COULD NOT STAY WHERE IT WAS, which the task's take-or-refuse
+  framing obscures. U3's own note recorded that the demands
+  gating its delivery were milestone 8's and 9's and that **both
+  had landed** — so refusing the supersession would not have left
+  it parked in `pledged/`; it would have made U3 a pledged use
+  case whose work is delivered, due for promotion under D34 as
+  split by D48. Retire or promote: there was no third state, and
+  it had been sitting in the wrong one since 2026-07-24.
+  U14 CARRIES EVERYTHING, CHECKED CLAUSE BY CLAUSE. Start a
+  machine, inject, execute, observe, iterate, close down; driven
+  programmatically through a native binding or the CLI;
+  computation and result interpretation on the caller's side of
+  the seam; the canonical journey using Reliquary twice — build
+  the rig, then automate inside it; granular results and
+  selective re-run as first-class demands rather than
+  conveniences. D36 had already corrected the one substantive
+  divergence: U3 said the run record is the product, which
+  conflated Reliquary's evidence with the caller's work-product,
+  and U14 says the *result* is.
+  THE ONE CLAUSE U14 DOES NOT CARRY, AND WHY IT COSTS NOTHING.
+  U3 stated a *preference* for a native guest-side agent — QGA,
+  VMware Tools, Guest Additions — as the better plane, with
+  agentless the permanent fallback. U14 says nothing about
+  agents. That preference is **P3, in force**: *"once a native
+  agent exists inside it, that agent is the better work plane.
+  Reliquary consumes native guest agents and never builds its
+  own."* So it survives as a principle rather than as a demand,
+  which is exactly the distinction D33 relied on when it demoted
+  the guest-agent plane for lack of demand. Nothing is lost; one
+  statement moves from the demand side to the supply side, where
+  it was always doing its work.
+  THE SWEEP — THIRTEEN CITATIONS, four of them in documents that
+  bind. Repointed to U14: root USE-CASES.md (**U4's own text**,
+  which named U3's loop), ARCHITECTURE.md's residency prose,
+  asset-resolution.md, script-properties.md, script-spec.md,
+  blueprint-guide.md, guest-communication.md's permanence
+  sentence, proposed/ARCHITECTURE.md (P16's collision argument),
+  proposed/USE-CASES.md (U18's distinctness note). Repointed to
+  **P3** where the citation was for the agent preference and U14
+  would have been a resolvable reference that misleads:
+  guest-communication.md's better-work-plane line. **Dropped
+  entirely** in ARCHITECTURE.md's P3 prose, where the sentence is
+  P3's own statement and citing a use case for it was always
+  redundant. Repointing a citation from a superseded number to
+  its successor is a clarification under P23 — no rule changes,
+  and no past decision reads differently — which is what makes
+  this legal inside normative specs.
+  TWO CITATIONS GOT *STRONGER*, worth recording because a sweep
+  is usually assumed to be loss. The guest-agent feature's *"no
+  use case demands it"* now stands on a successor that states no
+  preference at all, where before it had to argue that U3's
+  preference was not a requirement. And U7's gap — hypervisors
+  appearing in the list only as export targets, import sources
+  and agent vendors — loses one of its three non-substrate roles
+  outright.
+  DECISIONS.md's OWN MENTIONS STAND AS WRITTEN (D50): the entries
+  below argued about U3 when U3 was live, and the record keeps
+  its own moment. This entry is the resolution every one of them
+  resolves through.
+  A DEFECT FIXED IN THE SAME PASS, found by the sweep and fixed
+  under D43's in-scope clause. blueprint-guide.md documented
+  **`runs/` as a real directory** — in its cache-layout diagram,
+  as *"the one part written for you"*, and in five more places
+  including *"copy out any record worth keeping"* — plus a link
+  to a spec anchor that no longer exists. D36 deleted run records
+  entirely; the suite's own guarantee is that a run creates no
+  `runs/` directory. It is the same stale paragraph D47 corrected
+  in ARCHITECTURE.md's cross-cutting prose, surviving in the
+  user-facing guide, and the U3 citation sat inside the worst of
+  it — a minimal sweep would have left a repointed citation
+  inside a false statement. Rewritten to the return model, with
+  `screenshots/` replacing `runs/` in the diagram.
+  FOLDED: this entry; pledged/USE-CASES.md (U3 removed, no stub —
+  D23); USE-CASES.md, ARCHITECTURE.md, asset-resolution.md,
+  script-properties.md, script-spec.md, guest-communication.md,
+  proposed/ARCHITECTURE.md, proposed/USE-CASES.md,
+  proposed/FEATURES.md (citations swept); blueprint-guide.md (the
+  run-records surface corrected); TASKS.md (the adjudication
+  struck — and the Governance—adjudications group with it, having
+  emptied). No CHANGELOG line: nothing release-facing moved.
+
 - D50 — THE 2026-07-26 RESTRUCTURE'S UNNUMBERED ACTS, ISSUED —
   DECIDED (owner, 2026-07-27, the fourth TASKS.md adjudication).
   Supports P8, P23; **amends D23** (pledge is the move) and pays

@@ -1901,7 +1901,7 @@ asynchronous-runs backlog with the rest of persistence (proposed/FEATURES.md
 "Asynchronous runs", D35/D36); it returns if that work
 schedules.
 
-U3's unit-test loop is served without it: per-run test selection
+U14's unit-test loop is served without it: per-run test selection
 travels as ordinary script properties (`--property` / the
 `properties=` mapping, interpolated by property references);
 granular results are a caller-authored artifact (JUnit XML, TAP)

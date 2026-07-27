@@ -67,28 +67,11 @@ and live with the decision record, under
 
 ## Pledged
 
-Grouped by kind, because the actor and the gate differ: an
-adjudication is the owner's alone, an audit is mechanical, a defect
-needs no pledge because the norm it violates already is one.
-(A fourth group, the restructures, left for
-[Completed](#completed) on 2026-07-27 — it had finished.)
-
-### Governance — adjudications
-
-Owner-only: each settles a question the record is waiting on.
-None depends on the others.
-
-- **Take or refuse U3's supersession.** D36 settled that U14
-  supersedes U3 alone; U14 is now delivered and promoted (D37).
-  Retiring U3 is the lifecycle's Retire clause — an owner
-  adjudication, not a step of that delivery — so it waits, with a
-  note saying so, in
-  [pledged/USE-CASES.md](pledged/USE-CASES.md) (**pointer
-  corrected 2026-07-27**: the entry said USE-CASE-PROPOSALS.md,
-  which no longer exists). The move sharpened the question rather
-  than settling it — U3 is *pledged*, so what waits is a use case
-  the project still owes being superseded by one it has already
-  delivered.
+Grouped by kind, because the actor and the gate differ: an audit
+is mechanical, a defect needs no pledge because the norm it
+violates already is one. (Two further groups left for
+[Completed](#completed) on 2026-07-27 — the restructures, and
+then the adjudications, both having finished.)
 
 ### Governance — audits
 
@@ -320,6 +303,38 @@ pruned, which is itself a pledged task above.
 its commit and its CHANGELOG line, so it leaves this file by
 deletion the moment it is done. Parking one here is the ceremony
 this file already refuses for work that arrives done.
+
+### The adjudications — all five settled 2026-07-27
+
+The **Governance — adjudications** group is gone, having emptied.
+Five entries, five decisions, in one sitting:
+
+- **U9 and the U11–U13 trio enter force** — D46. Delivered work
+  had been citing unpledged demand; scope widened from the
+  entry's two to four, all four being in the same state.
+- **P5, P14, P17 and P18 armed** — D47, which left
+  [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md) empty. Two
+  were missed automatic promotions rather than adjudications at
+  all.
+- **The gap-is-a-bug rule and the two promotion bars** — D48. A
+  rule cited by name in three decisions and defined in none of
+  them; and D34's single bar, which had always been two.
+- **The restructure's unnumbered acts** — D50, which found the
+  debt was twice what the entry recorded: seven flagged, one
+  paid, P23 among the missing.
+- **U3 retires, superseded by U14** — D51, with its thirteen-
+  citation sweep.
+
+**What the five had in common is worth keeping.** Four of them
+turned out to be **larger than their entry said** — the record
+consistently under-reported its own debt, because each entry was
+written from the previous summary rather than from the source.
+And three found the same failure: **reasoning that existed only
+in a commit message** (P24 in D49, six acts in D50) or in a
+delivered decision leaning on demand nobody had pledged (D46).
+None of these were disagreements to settle; they were things the
+project had already decided and failed to write down where the
+decision binds.
 
 ### The gate audit — 2026-07-27
 

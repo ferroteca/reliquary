@@ -188,7 +188,7 @@ own (ARCHITECTURE.md P3, the control-plane arc): agents may
 not exist for some operating systems, but writing one would be a
 whole project unto itself, outside Reliquary's scope. Guests
 without a native agent — DOS-era systems above all — are served
-by the agentless control planes permanently, U3's loop included.
+by the agentless control planes permanently, U14's loop included.
 
 The host side is a client module inside Reliquary, never another
 long-running host agent: the backend adapter owns the carrier
@@ -208,7 +208,7 @@ where they earn their keep, behind the same capability seam.
 Agentless operation is how a guest reaches its agent in the
 first place: the OS — and with it the OS's own agent package —
 is installed through the agentless workflow, and then the agent
-is the better work plane (U3). A control plane reports the
+is the better work plane (P3). A control plane reports the
 capabilities its agent actually advertises; limitations are
 explicit capabilities or result states, never optimistic claims.
 

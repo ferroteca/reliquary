@@ -74,7 +74,7 @@ number they superseded.
   a Reliquary home to make them run. The machine is somewhat expensive to build, so
   the developer keeps it for the duration of the work cycle
   rather than tossing it eagerly; day to day, the tests run
-  inside it through U3's loop — the same tool that built the rig
+  inside it through U14's loop — the same tool that built the rig
   automates the testing in it. When truly finished, the developer
   disposes of the large VM and reclaims the disk space.
 

@@ -83,11 +83,13 @@ mediates nor records it", and in-band `list-files` /
 that by asking *"what use case cannot be met without it?"* and
 answering *"none"*. P16 CHANGES THE QUESTION — from whether the
 goal is reachable to whether it is reachable THROUGH RELIQUARY —
-and on the new question D5's own answer inverts: U3's
+and on the new question D5's own answer inverts: U14's
 inject-execute-observe loop is a known use case whose file half
 is served today only out of band (a vvfat `hostdir` on QEMU;
 nothing at all on a backend without one). Under P16 that is a
-violation on its face.
+violation on its face. **The citation strengthened when U3
+retired** (D51): the loop it names is now a use case *in force*,
+not a pledged one.
 
 WHAT PLEDGING WOULD COST, stated plainly so it is priced
 before it is granted: the Horizon in-band file operations stop

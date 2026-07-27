@@ -95,50 +95,6 @@ work is its re-pledging. Text verbatim as adopted:
 >   rewritten). The import flow's job is to present these choices,
 >   not bury them.
 
-**U3 — Automated testing of something in a VM** — pledged;
-moved from the current list 2026-07-23 (owner:
-implemented-only). The programmatic loop itself runs
-agentlessly on QEMU/DOS today, but the first-class demands —
-granular results, selective re-run — ride milestone 8's
-properties and milestone 9's exec-run mechanics (in-band file
-retrieval, machine variables, the return-not-store run model —
-D36).
-The preferred guest-agent plane left the numbered arc for the
-backlog 2026-07-23 (D33) — a preference this case states, not
-a demand it makes: the loop runs agentlessly today, and the
-demands that gate delivery are 8's and 9's. U14 supersedes it
-**alone** (U15 closed 2026-07-24, D36 — its demands are U14's own
-loop). **Both gating milestones have now landed** (milestone 9,
-2026-07-24) and U14 moved to the current list with them (D37), so
-U3's supersession is due: retiring it is an owner adjudication
-under the lifecycle's Retire clause, not a step of that delivery,
-and it waits here until made. Text verbatim as adopted:
-
-> - **U3 — Automated testing of something in a VM.** An agent — a
->   test harness, a CI driver, an AI coding agent — starts a
->   machine, injects a program, executes it, and observes the
->   result; possibly iterates (adjust, re-inject, observe again);
->   finally closes the VM. The loop is driven programmatically,
->   through a native binding or the CLI; computation and result
->   interpretation stay on the agent's side of the seam, and
->   Reliquary stays ignorant of who builds on it. The canonical
->   journey uses Reliquary twice: first to define and build the
->   test VM (U4), then again to automate the testing inside it.
->   Concretely: a unit-test suite runs in the guest while the
->   host-side automator captures detailed per-test results,
->   possibly updates a test object, and re-runs a specific test or
->   the entire suite — a tight edit-and-rerun loop, so granular
->   results and selective re-run are first-class demands, not
->   conveniences. This case is
->   probably best served by a native guest-side agent (QGA, VMware
->   Tools, Guest Additions, Hyper-V's integration services) — fast
->   injection, execution, and observation as a structured control
->   plane — while agentless operation remains the permanent
->   fallback for
->   guests that cannot cooperate, because the thing under test may
->   be the very driver that would provide that communication.
->   Often nothing durable remains: the run record is the product.
-
 **U5 — Custom installation** — pledged; moved back from the
 current list 2026-07-23 (owner: an in-force use case whose
 delivery is unscheduled is a real problem — proposed is the

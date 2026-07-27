@@ -143,7 +143,7 @@ document owns the operator-side mechanics:
   `set-property` rule.
 - **Environment** — `RELIQUARY_PROPERTY_<KEY>` supplies a
   standing value for the process: the injection path for CI
-  harnesses and other automation (U3, U4), sitting below the
+  harnesses and other automation (U14, U4), sitting below the
   blueprint — an ambient variable never overrides a designed
   value. The spelling uppercases the key
   and maps `.`, `-`, and `_` all to `_`:

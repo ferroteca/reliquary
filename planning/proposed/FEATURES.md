@@ -143,10 +143,14 @@ backends from the same blueprint (minus a pinned backend field).
 > **Dropped from the numbered arc to the backlog** (owner,
 > 2026-07-23): the former Milestone 12 — numbered 13 until the
 > same-day renumber that followed machine mobility's demotion —
-> not yet scheduled. No use case demands it: U3's first-class
+> not yet scheduled. No use case demands it: the first-class
 > demands (granular results, selective re-run) are met by
-> milestones 8–9, and the guest-agent plane is that case's
-> stated *preference*, not its requirement — its loop runs
+> milestones 8–9, and the guest-agent plane was only ever a
+> *preference* stated by U3, not a requirement — U3 has since
+> retired (D51) and **U14, which supersedes it, states no such
+> preference at all**, so the argument is stronger than when it
+> was written. What carries the preference now is **P3**, a
+> principle rather than a demand. Its loop runs
 > agentlessly on QEMU/DOS today. P3 governs how a native agent
 > is consumed if this lands; it does not demand that it land.
 

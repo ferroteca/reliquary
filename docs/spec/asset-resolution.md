@@ -42,7 +42,7 @@ the selected source is the sole source.
   like `.git`/`.venv` are pruned) and is the **sole** source: no
   home, no codex, no seeding. Strictly project-scoped resolution,
   so nothing outside source control can reach an automated run
-  (U3, U4). The codex is never a resolution tier for automation —
+  (U14, U4). The codex is never a resolution tier for automation —
   at most a place to copy a first draft from, the copy committed.
 
 The **embedding API has no default source**: a bare call that

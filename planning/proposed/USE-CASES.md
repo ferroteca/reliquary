@@ -133,8 +133,11 @@ drafted (add, 2026-07-23). The gap: the backend-adapter
 pillar — the adapter seam, the second backend, and the GUI
 era's remaining backends — has no use-case demand; VirtualBox,
 VMware, and Hyper-V appear in the current list only as export
-targets (U1), import sources (U2), and guest-agent vendors
-(U3), never as run substrates. The seam and the second backend
+targets (U1), import sources (U2), and — until U3 retired
+(D51) — guest-agent vendors, never as run substrates. The
+retirement widens the gap rather than closing it: one of the
+three non-substrate roles is now gone, and no successor
+mentions a hypervisor at all. The seam and the second backend
 left the numbered arc for the backlog on this very lack, the
 same day this draft was written (formerly milestones 10–11;
 D33). Pledging U7 is scheduling that pair back onto the arc,
@@ -234,7 +237,7 @@ credential-store code has a Linux path its Windows developer
 cannot execute). The gap: every case in the list treats the
 guest as the subject or the product; none treats it as **the
 missing platform** a developer needs in order to test their own
-work. It is distinct from U3 (something is tested *in* a VM,
+work. It is distinct from U14 (something is tested *in* a VM,
 platform incidental) and from U16 (a rig shared between
 developers): here the guest's *identity as a different OS* is
 the entire point, and the "somebody else's machine" it replaces

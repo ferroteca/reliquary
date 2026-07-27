@@ -123,8 +123,8 @@ Two rules carry the whole model:
 │                            as a `vm` section
 ├── media/                   per-machine materialized images, by
 │                            media name
-├── runs/                    append-only run records (the event
-│                            stream, transcripts, screenshots)
+├── screenshots/             where the `screenshot` verb and an
+│                            automatic failure capture land
 └── <backend>/               the backend's own files (e.g. qemu/)
 ```
 
@@ -138,29 +138,28 @@ Two rules carry the whole model:
   describes one machine: its identity, blueprint, lifecycle
   phase, and resolved configuration, at the root of the
   machine's directory — which holds everything Reliquary
-  materialized for it: state, per-machine media images, run
-  records, backend files. The machine **is** this directory;
+  materialized for it: state, per-machine media images,
+  screenshots, backend files. The machine **is** this directory;
   nothing about a machine lives outside `cache/`, because a machine
-  lives and dies as one thing. Reliquary writes all of it; the one
-  part written *for you* is `runs/` — the machine's run records
-  (the event stream, transcripts, screenshots), which the world
-  reads in place and copies out to keep (see below). Everything
-  else you never need to touch.
+  lives and dies as one thing. Reliquary writes all of it and you
+  never need to touch any of it: **a run stores nothing here**. It
+  returns its output to whoever drove it — live progress as it
+  goes, the result at the end — so there is no record in the
+  machine to read in place or copy out.
 
 The split reflects what Reliquary machines are for: **ephemeral
 work**. A Reliquary machine is a disposable rig — created to run a
 scripted OS install or an automated task, recreated freely, and
 deleted when done. The blueprint makes rebuilding cheap; the
 entire cached materialization is safe to throw away, because
-everything in it — run records excepted — regenerates from the
-blueprint (its media and archive components) and its scripts. The
-records are evidence of runs, delivered live to whoever drove them
-and retained until the machine goes; they are the one thing in the
-cache no re-run reproduces. The machine is never the product —
-often the run record is (U3): the point was to run some tests,
-and the record is copied out as plain files when it should
-outlive the machine
-([the record contract](spec/script-spec.md#failure-runs-and-transcripts)).
+everything in it regenerates from the blueprint (its media and
+archive components) and its scripts. Nothing is excepted: a run
+keeps no record here to lose. The machine is never the product —
+**the result is** (U14): the point was to run some tests, and what
+you get back is what the run returned, plus whatever file you
+asked Reliquary to hand over, both already on your side of the
+seam by the time the machine is disposable
+([the run's output](spec/script-spec.md#the-runs-output-and-failure)).
 When the durable thing is bigger, `export` it — either a media
 image (a disk image taken out of the machine) or the entire
 machine, handed to a hypervisor built for long-lived machines.
@@ -172,10 +171,9 @@ each carrying its own media and archive components — and scripts
 are small, shareable, and worth versioning. The [user properties
 file](spec/script-properties.md)
 is also durable but personal and normally not shared or committed.
-Everything under `cache/` is Reliquary's and disposable — and, run
-records excepted, reconstructible: the records are evidence, kept
-for the machine's life and never regenerable, so copy out any
-record that should outlive its machine. There is no dropping of
+Everything under `cache/` is Reliquary's, disposable, and
+reconstructible without exception — a run leaves nothing there
+that a rebuild could fail to reproduce. There is no dropping of
 pre-created files into cache directories; inputs enter machines
 through the blueprint — a drive names a
 [`media`](blueprint-reference.md#drives) component, and the
@@ -337,8 +335,9 @@ The state is fully resolved:
   `backend-id`, the resolved blueprint digest, and the blueprint's
   resolved source path — plus the
   machine's bookkeeping: its blueprint's name, creation time, and
-  lifecycle phase. (Script outcomes live in run records — there
-  is no `installed` flag.)
+  lifecycle phase. (A script's outcome is what its run returned to
+  the caller — there is no `installed` flag, and nothing about the
+  run is kept here.)
 
 The blueprint from the [first example](#a-first-example)
 produces, on a host where QEMU was selected:
@@ -461,8 +460,7 @@ rlq recreate-machine --blueprint msdos
 ```
 
 `destroy` deletes the machine entirely — its directory (state,
-drive images, run records: copy out any record worth keeping
-first) and the backend's machine — and never
+drive images, screenshots) and the backend's machine — and never
 touches the blueprint; `create` makes a fresh machine from the
 blueprint whenever one is wanted again. `recreate` is exactly
 `destroy` + `create` as one command, reusing the same id. Drives
