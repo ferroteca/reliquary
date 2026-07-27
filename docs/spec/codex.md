@@ -6,9 +6,14 @@ SPDX-License-Identifier: BSD-3-Clause
 # The codex
 
 > **Status:** the seeding core — the packaged tree, copy-out on
-> first reference, and the never-overwrite rule — is implemented.
-> The index, provenance columns, `search-`, and `seed-` are still
-> planned; details may change before first release.
+> first reference, and the never-overwrite rule — is implemented,
+> and so are `seed-blueprint` / `seed-script`, `search-blueprints`,
+> and the provenance column that search reports. The index ships
+> for **blueprint names and descriptions only**: script and media
+> entries and the relationship data described below are still
+> planned, and nothing reads them, so the codex derives media from
+> the blueprints that declare them. Details may change before
+> first release.
 
 The codex is Reliquary's built-in seed content: a shipped
 collection of blueprints (their media, source, and archive
@@ -55,15 +60,23 @@ The codex carries an index mapping every codex artifact to
 its `description` and relationships (which scripts a blueprint
 references; its media travel inside it). User-owned files
 are indexed by reading the same optional fields from the file.
-`search` queries both.
+`search` queries both. Today the index carries blueprint names
+and descriptions and nothing else (see the banner); a media name
+is read from the blueprint that declares it, which is where media
+live (D30).
 
-Listings report provenance by name:
+Listings report provenance by name, in a `PROVENANCE` column
+whose value is one of three words — never blank, so a machine
+consumer of the `--json` form can switch on it:
 
-| CODEX | meaning |
+| PROVENANCE | meaning |
 |---|---|
 | `yes` | a codex entry not yet extracted into your home |
 | `seeded` | a user file whose name also exists in the codex |
-| (blank) | a purely user-authored file |
+| `user` | a purely user-authored file, with no codex entry |
+
+Under `--assets <dir>` the codex is not a tier at all, so every
+match is `user`.
 
 ## Extraction
 

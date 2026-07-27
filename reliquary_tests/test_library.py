@@ -11,6 +11,7 @@ separate media definition to copy out, and no ``seed_media`` verb
 import importlib
 import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -30,6 +31,9 @@ OPENBSD_BLUEPRINT = "openbsd"
 OPENBSD_MEDIA = "openbsd-installer"
 OPENBSD_SCRIPT = "openbsd-install"
 EXT = ".rlqb"
+_CODEX_SPEC = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(reliquary.__file__))),
+    "docs", "spec", "codex.md")
 
 
 class _HomeTest(unittest.TestCase):
@@ -195,6 +199,94 @@ class CodexMediaTests(unittest.TestCase):
             media.sha256,
             "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102"
             "cf8a5130449f")
+
+
+class CodexSpecConformanceTests(_HomeTest):
+    """The codex against docs/spec/codex.md.
+
+    P24's inventory pass over the codex. Its checkable claims are
+    the index (a set the spec scopes and the tree fills) and the
+    provenance vocabulary (a closed table the `--json` form of
+    `search-blueprints` emits). The tests above assert each
+    provenance value one at a time, which is the pattern P24
+    names: they would all still pass if the spec said something
+    else entirely, because none of them reads it.
+
+    The banner was the gate, and it was wrong: it called
+    `search-`, `seed-` and the provenance column "still planned"
+    while all three shipped, so by the banner-is-the-marker rule
+    those sections were not claims and nothing could be tested
+    against them. Corrected 2026-07-27, which is what let the
+    provenance divergence below become visible: the spec's table
+    was headed `CODEX` and gave a **blank** third value where the
+    code emits the word `user`, so a consumer switching on the
+    field would have matched nothing.
+    """
+
+    @staticmethod
+    def _codex_root():
+        return os.path.join(os.path.dirname(reliquary.__file__), "codex")
+
+    @classmethod
+    def _index(cls):
+        with open(os.path.join(cls._codex_root(), "codex.json"),
+                  encoding="utf-8") as handle:
+            return jsonc.loads(handle.read())
+
+    @staticmethod
+    def _specified_provenance():
+        """The words the spec's provenance table admits."""
+        with open(_CODEX_SPEC, encoding="utf-8") as handle:
+            text = handle.read()
+        start = text.index("| PROVENANCE | meaning |")
+        words = set()
+        for line in text[start:].splitlines()[2:]:
+            if not line.startswith("|"):
+                break
+            words.update(re.findall(r"`([^`]+)`", line.split("|")[1]))
+        return words
+
+    def test_every_codex_blueprint_is_indexed(self):
+        # The reverse of test_builtin_blueprint_index_names_existing_files:
+        # that one catches an index entry with no file, this one a file
+        # with no entry, which `--builtin` listings would skip silently.
+        root = os.path.join(self._codex_root(), "blueprints")
+        shipped = {name[:-len(EXT)] for name in os.listdir(root)
+                   if name.endswith(EXT)}
+        self.assertEqual(
+            sorted(shipped - set(self._index()["blueprints"])), [],
+            "these codex blueprints ship with no codex.json entry; "
+            "list_builtin_blueprints reads that index, so an unindexed "
+            "blueprint is invisible wherever the fallback scan is not "
+            "reached.")
+
+    def test_the_index_carries_only_the_blocks_that_ship(self):
+        # Trimmed 2026-07-27: a `media` block listing 2 of the 4 media
+        # the codex blueprints declare, read by nothing. Media are
+        # components inside a blueprint (D30) and are derived from it.
+        self.assertEqual(
+            sorted(self._index()), ["blueprints", "version"],
+            "codex.json carries a block the code does not read. The "
+            "banner scopes the index to blueprint names and "
+            "descriptions; widening it means widening that first.")
+
+    @unittest.skipUnless(os.path.isfile(_CODEX_SPEC),
+                         "the codex spec is source-tree only")
+    def test_the_provenance_vocabulary_is_the_specified_one(self):
+        seed_blueprint(BLUEPRINT, context=self.home, only=True)
+        bp_dir = os.path.join(self.home, "blueprints")
+        with open(os.path.join(bp_dir, "mine.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump([{"type": "machine", "name": "mine",
+                        "platform": "dos", "drives": {"cdrom0": None}}],
+                      handle)
+        emitted = {row["provenance"]
+                   for row in search_blueprints("", context=self.home)}
+        self.assertEqual(
+            emitted, self._specified_provenance(),
+            "the provenance words search reports are not the ones "
+            "docs/spec/codex.md tabulates. The column is part of the "
+            "--json return, so its vocabulary is a machine contract.")
 
 
 class BuiltinCodexTests(unittest.TestCase):

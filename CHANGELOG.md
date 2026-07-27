@@ -45,6 +45,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The codex spec's status banner called `search-`, `seed-` and the
+  provenance column "still planned" while all three shipped. That
+  is not a cosmetic slip: by the banner-is-the-marker rule a
+  disclaimed document is not claiming to be true, so those sections
+  could not be tested against anything — the same failure that hid
+  six divergences in the CLI spec, inverted. The banner now says
+  what ships, and scopes the index honestly: blueprint names and
+  descriptions, nothing else.
+
+  Correcting it made a real divergence visible immediately. The
+  provenance table was headed `CODEX` and gave a **blank** third
+  value; `search-blueprints` prints a `PROVENANCE` column whose
+  third value is the word `user`. A machine consumer of the
+  `--json` form, switching on a blank field, would have matched
+  nothing. The spec now carries the shipped vocabulary — `yes` /
+  `seeded` / `user`, never blank — and a test derives the three
+  words from that table and exercises all three paths, so neither
+  can move alone. The pre-existing tests asserted each value
+  individually and would have passed whatever the spec said, which
+  is precisely the gap P24 names.
+
+  `codex.json` also carried a `media` block that nothing read,
+  listing two of the four media the codex blueprints declare —
+  media are components inside a blueprint (D30) and are derived
+  from it, so the block was stale by construction. It is gone, and
+  a test pins the index to the blocks that actually ship. A second
+  test catches a codex blueprint shipping with no index entry,
+  which `list_builtin_blueprints` would otherwise skip silently —
+  the existing test only checked the other direction.
+
 - `screen.read` was declared event vocabulary that nothing emitted.
   It had a constant, a rendering arm, and a line in the script
   spec's minimum vocabulary saying it was "emitted by the `screen`
