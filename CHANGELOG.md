@@ -13,6 +13,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Reserved node names are now actually reserved. The script spec has
+  always said they "cannot name phases or property keys" — twice, in
+  the grammar rules and in **S5** — and nothing enforced it, so
+  `phase enter { … }` and `property text press` both parsed. The
+  lexer treats a word as a keyword only where a node may start, which
+  is deliberate and unchanged; what was missing is validation
+  refusing those words as author-chosen identifiers. Both now fail as
+  static errors citing S5. **The closed vocabularies stay
+  contextual** (D53): a phase may still be named `cdrom0` or `esc`,
+  and `press enter` still names the key — syntax words are reserved,
+  domain vocabularies are not.
+
 - The CLI specification described five commands that do not exist —
   `clone-machine`, `export-machine`, `export-drive`, `search-media`
   and `search-scripts`, in present tense with worked example

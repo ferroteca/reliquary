@@ -36,6 +36,26 @@ _MEDIA_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*$")
 # terminator; strings and regexes end at their closing delimiter.
 _DELIMITERS = " \t{}#"
 
+# The node names: every header, declaration and verb. They live here
+# rather than with the parser because two layers need the same list
+# and neither may import the other -- the lexer recognizes them as
+# keywords in node-name position, and validation refuses them as
+# identifiers everywhere (S5).
+#
+# The two jobs are separate on purpose. A word is a keyword only
+# where a node name may start, so `enter` is a verb at the head of a
+# line and an ordinary key name after `press`; the closed
+# vocabularies are validation's, not the grammar's (script-spec.md,
+# "Grammar"). What the grammar cannot express is the *reservation* --
+# that `phase enter` names no phase -- because a rejected identifier
+# there would surface as "unexpected token" instead of a named rule.
+KEYWORDS = (
+    "description", "platform", "machine", "entry", "timeout", "deadline",
+    "property", "http", "content", "phase", "wait", "on", "always",
+    "goto", "finish", "enter", "type", "press", "select", "screenshot",
+    "insert", "eject", "set-boot", "set", "start", "stop",
+)
+
 
 class ScriptParseError(StaticError):
     """A script syntax or static-validation error with a source line.

@@ -23,20 +23,8 @@ from lark.exceptions import UnexpectedInput, VisitError
 from lark.lexer import Lexer
 
 from .script_nodes import (
-    Interpolation, ScriptParseError, StringLiteral, tokenize)
+    KEYWORDS, Interpolation, ScriptParseError, StringLiteral, tokenize)
 from .script_validation import validate
-
-# Node names, reserved everywhere a script-internal name may appear
-# (S5). Recognized as keywords only in node-name position: `enter`
-# is a verb at the start of a line and a key name after `press`
-# (script-spec.md, "Grammar" -- closed vocabularies are checked by
-# validation, not the grammar).
-KEYWORDS = (
-    "description", "platform", "machine", "entry", "timeout", "deadline",
-    "property", "http", "content", "phase", "wait", "on", "always",
-    "goto", "finish", "enter", "type", "press", "select", "screenshot",
-    "insert", "eject", "set-boot", "set", "start", "stop",
-)
 
 # Each node's allowed modifiers. The transformer reports anything
 # else naming the node and what it accepts. Observation nodes list

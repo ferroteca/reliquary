@@ -46,6 +46,39 @@ class ScriptShapeTests(_ValidationCase):
             _HEAD + "entry a\nphase a {\n    finish\n}\n"
             "phase a {\n    finish\n}\n", "duplicate phase: a", "S5")
 
+    def test_a_phase_may_not_be_named_a_node_name(self):
+        # script-spec.md, "Grammar": reserved node names cannot name
+        # phases. The lexer makes a word a keyword only where a node
+        # may start, so these parse cleanly and validation is what
+        # refuses them.
+        for word in ("enter", "timeout", "phase", "goto", "set-boot"):
+            with self.subTest(name=word):
+                self.rejects(
+                    _HEAD + f"entry {word}\nphase {word} {{\n"
+                    "    finish\n}\n",
+                    f"a phase may not be a reserved node name: {word}",
+                    "S5")
+
+    def test_a_property_key_may_not_be_a_node_name(self):
+        self.rejects(
+            _HEAD + 'property text press\nwait "x"\n',
+            "a property key may not be a reserved node name: press",
+            "S5")
+
+    def test_the_closed_vocabularies_stay_contextual(self):
+        # D53 refused reserving key names and drive slots globally:
+        # syntax words are reserved, domain vocabularies are not, which
+        # is the line Java and C# draw. So a phase may still be named
+        # for a key or a slot, and `press enter` still means the key.
+        for source in (
+            _HEAD + "entry cdrom0\nphase cdrom0 {\n    finish\n}\n",
+            _HEAD + "entry esc\nphase esc {\n    finish\n}\n",
+            _HEAD + "press enter\n",
+            _HEAD + "screenshot end\n",
+        ):
+            with self.subTest(source=source):
+                parse_script(source)
+
     def test_transfers_are_invalid_in_a_linear_script(self):
         self.rejects(_HEAD + 'wait "x"\nfinish\n',
                      "finish is invalid in a linear script", "S10")

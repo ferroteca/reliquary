@@ -37,8 +37,25 @@ This module works structurally over the tree, so it imports no
 node type; that keeps the parser free to import it.
 """
 
-from .script_nodes import ScriptParseError
+from .script_nodes import KEYWORDS, ScriptParseError
 from .script_timing import parse_duration
+
+_RESERVED = frozenset(KEYWORDS)
+
+
+def _not_reserved(name, what, line, column):
+    """Refuse a node name used as an author-chosen identifier (S5).
+
+    script-spec.md, "Grammar": reserved node names cannot name
+    phases or property keys. The lexer treats these words as
+    keywords only where a node may start, so `phase enter` parses
+    cleanly and would otherwise declare a phase whose name collides
+    with a verb -- readable by neither a person nor `goto`.
+    """
+    if name in _RESERVED:
+        raise ScriptParseError(
+            line, f"{what} may not be a reserved node name: {name} (S5)",
+            column)
 
 # The observable channels, each with the condition kind it takes
 # and its closed value set. The screen is the default channel and
@@ -79,6 +96,7 @@ def _properties(script):
     """Property names are unique and outside reserved namespaces."""
     seen = {}
     for prop in script.properties:
+        _not_reserved(prop.key, "a property key", prop.line, prop.column)
         _property_key(prop.key, prop.line, prop.column)
         if prop.key in seen:
             raise ScriptParseError(
@@ -454,6 +472,7 @@ def _phased(script):
     """Validate a phased script and every phase in it."""
     phases = {}
     for phase in script.phases:
+        _not_reserved(phase.name, "a phase", phase.line, phase.column)
         if phase.name in phases:
             raise ScriptParseError(
                 phase.line, f"duplicate phase: {phase.name} (S5)",

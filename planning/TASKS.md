@@ -280,36 +280,6 @@ code has the bug, so the norm is already the demand.
   only what has no id today. The spec says one namespace, which
   points at the first.
 
-- **Reserved node names are not reserved** (found 2026-07-27 by
-  D53, walking task [08]).
-  [script-spec.md](../docs/spec/script-spec.md) requires it twice —
-  the Grammar section's *"reserved node names (headers,
-  declarations, and verbs) cannot name phases or property keys"*,
-  and **S5**'s *"reserved node names are not identifiers"*. The
-  code enforces neither. Verified by parsing:
-
-  ```
-  phase enter { ... }      parses
-  phase cdrom0 { ... }     parses
-  ```
-
-  The cause is in the lexer: a word becomes a keyword token only
-  when it **leads a line** (`script_parser.py`, `_convert` —
-  `_KEYWORD_TERMINALS.get(...) if leading else "NAME"`), and no
-  validation rule reserves anything afterwards. So the
-  implementation is pure contextual keywording where the spec asks
-  for the mixed line — syntax words reserved, domain vocabularies
-  contextual.
-  **The spec is right and the code has the bug** (D53 refused the
-  opposite change, so the spec stands as written). The fix belongs
-  in validation rather than the grammar, which is where the spec
-  says closed vocabularies are checked.
-  Ride-along, and probably why nobody noticed: the comment above
-  `KEYWORDS` in `script_parser.py` states the reservation as
-  though it were enforced — *"reserved everywhere a
-  script-internal name may appear (S5)"*. It describes the intent
-  correctly and the behaviour not at all.
-
 ### Small items
 
 Small, obvious, just haven't met the bar for scheduling (the
