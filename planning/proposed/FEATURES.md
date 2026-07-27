@@ -1331,21 +1331,32 @@ before the work does.
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.
-- In-band file operations against a stopped machine's drives —
-  the deferred half of the dropped run-collection model (owner,
-  2026-07-22). Rough shape, its own design round before it
-  lands: the CLI/API triple `list-files` / `get-files` /
-  `put-files` (twins `list_files` / `get_files` / `put_files`),
-  addressing `<drive-key>:<path>`; `size`/`base` images reached
-  through the adapter's at-rest filesystem access, `hostdir`
-  directories directly; capability-honest per call — a drive
-  whose filesystem the adapter cannot read fails by name;
-  `media` drives excluded; directories recursive; no record
-  custody — files land where the caller says (details such as
+- In-band **directory** operations against a stopped machine's
+  drives — what is left of the deferred half of the dropped
+  run-collection model (owner, 2026-07-22), **narrowed and
+  partly overtaken 2026-07-27**: single-file exchange is no
+  longer deferred, `put-file` / `get-file` having landed at
+  milestone 9. What remains is listing and whole-tree transfer:
+  `list-files` / `get-files` / `put-files` (twins `list_files` /
+  `get_files` / `put_files`).
+  **Its recorded addressing is now illegal and must be
+  redesigned, not resumed.** The `<drive-key>:<path>` shape D5
+  roughed is the host-flavoured form **P17 refuses** — armed
+  D47, and `hdd0:` is a blueprint key no guest ever says. The
+  shipped verbs address in guest terms (`A:\JOB.BAT`), and
+  whatever these grow must match; F15's text says reopening this
+  is no longer optional.
+  The rest of the rough shape stands: images reached through the
+  adapter's at-rest filesystem access, directory-source media
+  directly; capability-honest per call — a drive whose
+  filesystem the adapter cannot read fails by name; `media`
+  drives excluded; directories recursive; no record custody —
+  files land where the caller says (details such as
   `get-files`' destination default are that round's to settle).
   Value concentrates where out-of-band access thins — non-QEMU
-  backends (no `hostdir`) and non-FAT guest filesystems — so
-  sequence at or soon after the second backend (backlog).
+  backends, which have no vvfat equivalent, and non-FAT guest
+  filesystems — so sequence at or soon after the second backend
+  (backlog).
 - Media commands beyond `fetch-media` (verify, remove) —
   **split by D46** (2026-07-27), which put U13 in force:
   `verify` now stands on a use case in force ("verifies it is

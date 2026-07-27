@@ -210,37 +210,26 @@ code has the bug, so the norm is already the demand.
   sat under Small items since before the option was specified
   away — renaming it would reinstate it.)
 
-- **`hostdir` survives in `planning/`, and one item still
-  specifies an address form P17 refuses** (found 2026-07-27 by
-  the demand-citation sweep). The earlier `hostdir` pass swept
-  `docs/` and `reliquary/` and **struck its own task believing it
-  done** — the grep behind it never covered `planning/`, so six
-  mentions of a drive type milestone 7 retired were never seen.
-  This entry is that task, re-filed with the scope it actually
-  had. The lesson is the cheaper finding: *a sweep is only as
-  wide as the grep behind it*, and striking a task on a partial
-  search is how a defect comes back.
-  Three of the six are the substance:
-  - **The in-band Horizon item** ([proposed/FEATURES.md](proposed/FEATURES.md))
-    is wrong three ways at once. It specifies
-    `<drive-key>:<path>` addressing — **the form P17 refuses**,
-    which F15's own text already says reopening is "no longer
-    optional"; it says `hostdir` directories; and it calls the
-    family deferred when `put-file` / `get-file` shipped at
-    milestone 9. Only the *directory* half is still deferred.
-  - **P16's open question 3** ([proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md))
-    asks whether a `hostdir` drive is "in-band by declaration or
-    the canonical instance of the violation" — about a construct
-    that no longer exists. D47 recorded that the question had
-    dissolved and the text was never updated, so a live
-    adjudication carries a question nobody can answer. **Editing
-    it changes what is being adjudicated**, so this one is the
-    owner's, not a sweep's.
-  - The remaining three (`design/guest-communication.md`,
-    `proposed/ARCHITECTURE.md`'s D5 summary,
-    `proposed/USE-CASES.md`'s U18 note) read as history and may
-    well stand — sorting which is the work, exactly as in the
-    `docs/` pass.
+- **P16's open question 3 asks about a construct that retired**
+  (left 2026-07-27 by the `hostdir` sweep, which fixed the other
+  five mentions and stopped here on purpose).
+  [proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md) asks
+  whether *"a `hostdir` drive is in-band by declaration, or the
+  canonical instance of the violation"*, and calls the answer
+  decisive: *"it decides whether QEMU/DOS is already compliant or
+  is the first thing to fix."* Milestone 7 retired that drive
+  type — a host directory is now a media whose `location` is a
+  directory — so the question cannot be answered as written, and
+  the thing it was meant to decide is still undecided.
+  **This is the owner's, not a sweep's**: rewording an open
+  adjudication's questions changes what is being adjudicated, and
+  this one is load-bearing. D47 recorded the question as
+  dissolved without touching the text, which is how it survived.
+  Whoever takes it should also read the correction the same sweep
+  made just above it — **milestone 9 narrowed P16's strongest
+  example**, since single-file in-band exchange now ships and the
+  violation P16 named has shrunk to listing, whole-tree transfer,
+  and backends with no vvfat equivalent.
 
 - **Diagnostics carry no stable identifier** (found 2026-07-27 by
   D55, checking what the error-id bullet was actually deferring).

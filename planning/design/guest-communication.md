@@ -104,9 +104,10 @@ combines:
 - VGA text-memory inspection for textual output and completion
   detection;
 - QMP `screendump` as an independent diagnostic capability; and
-- vvfat as the QEMU adapter's `hostdir` mechanism — a host
-  directory as a writable guest FAT drive, proven for DOS-era
-  write patterns.
+- vvfat for files — a host directory presented as a writable
+  guest FAT drive, proven for DOS-era write patterns. It is what
+  a directory-source media attaches through: a media whose
+  `location` is a directory, with `materialize: use`.
 
 It has no guest prerequisite and remains the DOS default and
 fallback. It is not accurately modeled as a stream: output is a

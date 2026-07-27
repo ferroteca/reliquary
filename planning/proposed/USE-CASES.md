@@ -253,8 +253,8 @@ that would put in-force weight behind the backlogged guest-agent
 work (D33 demoted it for lack of exactly this), behind the
 deferred in-band file operations, and behind **P16** and
 **P17** — a developer driving a Linux guest from Windows cannot
-reach around Reliquary to a `hostdir`, and would name that
-guest's files in the guest's own terms. Reliquary self-hosting
+reach around Reliquary into the guest's own filesystem, and
+would name that guest's files in the guest's own terms. Reliquary self-hosting
 its own cross-platform tests is the motivating instance; the
 case is general.
 

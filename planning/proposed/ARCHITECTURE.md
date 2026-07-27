@@ -85,11 +85,23 @@ answering *"none"*. P16 CHANGES THE QUESTION — from whether the
 goal is reachable to whether it is reachable THROUGH RELIQUARY —
 and on the new question D5's own answer inverts: U14's
 inject-execute-observe loop is a known use case whose file half
-is served today only out of band (a vvfat `hostdir` on QEMU;
-nothing at all on a backend without one). Under P16 that is a
-violation on its face. **The citation strengthened when U3
-retired** (D51): the loop it names is now a use case *in force*,
-not a pledged one.
+was, when this was written, served only out of band. Under P16
+that was a violation on its face.
+
+**MILESTONE 9 MOVED THIS GROUND, and the correction is recorded
+rather than absorbed** (2026-07-27, the `hostdir` sweep) because
+it weakens P16's own strongest example. Single-file in-band
+exchange **now ships**: `put-file` / `get-file`, addressed in
+guest terms, over a directory-source drive. So U14's file half
+is no longer out-of-band-only, and the violation P16 named has
+narrowed to what is still deferred — **listing and whole-tree
+transfer**, plus every backend with no vvfat equivalent, where
+the out-of-band route remains the only one. Whether a narrower
+violation still carries P16 is exactly what its adjudication has
+to weigh, and it should weigh the current fact rather than the
+one that was true in July. **The citation strengthened in the
+other direction when U3 retired** (D51): the loop it names is
+now a use case *in force*, not a pledged one.
 
 WHAT PLEDGING WOULD COST, stated plainly so it is priced
 before it is granted: the Horizon in-band file operations stop
