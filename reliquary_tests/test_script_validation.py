@@ -269,6 +269,55 @@ class ObservationChannelTests(_ValidationCase):
             [("screen", "text"), ("screen", "regex"), ("machine", "state")])
 
 
+class WatchPatternTests(_ValidationCase):
+    """S13: a watch pattern is non-empty, and a regex compiles.
+
+    The rule was specified when the surface was adopted and
+    enforced by nothing until the spec-inventory comparison found
+    it (`test_script_spec_conformance`). Each case below parsed
+    cleanly before that: an empty pattern made a `wait` a no-op
+    that passed on its first sample, and a malformed regex reached
+    `re.search` in the sample loop, where it raised `re.error` —
+    exit 1, a fault outside the taxonomy, for a defect the script
+    text alone shows.
+    """
+
+    def test_an_empty_string_condition_is_not_a_pattern(self):
+        self.rejects(_HEAD + 'wait ""\n',
+                     "an empty watch pattern matches every screen", "S13")
+
+    def test_an_empty_regex_condition_is_not_a_pattern(self):
+        self.rejects(_HEAD + "wait //\n",
+                     "an empty watch pattern matches every screen", "S13")
+
+    def test_a_malformed_regex_is_refused_before_the_run(self):
+        error = self.rejects(_HEAD + "wait /a(b/\n",
+                             "the regex does not compile", "S13")
+        self.assertIn("Python's re syntax", error.message)
+        self.assertEqual(error.line, 2)
+
+    def test_handler_conditions_carry_the_rule_too(self):
+        self.rejects(
+            _HEAD + 'wait {\n    on /x[/ {\n        press enter\n    }\n'
+            '    on "y" {\n        press enter\n    }\n}\n',
+            "the regex does not compile", "S13")
+        self.rejects(
+            _HEAD + "entry a\nphase a {\n"
+            '    always "" {\n        finish\n    }\n}\n',
+            "an empty watch pattern", "S13")
+
+    def test_an_interpolation_alone_is_a_pattern(self):
+        # `${key}` is text the run binds, so the authored pattern
+        # is not empty even though it carries no literal character.
+        script = parse_script(
+            _HEAD + 'property text target\nwait "${target}"\n')
+        self.assertEqual(script.statements[0].condition.kind, "text")
+
+    def test_a_machine_state_carries_no_pattern_rule(self):
+        script = parse_script(_HEAD + "wait machine=stopped\n")
+        self.assertEqual(script.statements[0].condition.value, "stopped")
+
+
 class HttpValidationTests(_ValidationCase):
     """Milestone 5 HTTP declarations are statically checkable."""
 

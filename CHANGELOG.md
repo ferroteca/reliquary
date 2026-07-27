@@ -30,6 +30,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   refuses: volume layout is readable from the drive images on the
   host, and the mapping may grow that way (D56).
 
+- Watch patterns are now checked before the run, as **S13** has
+  always required — "watch patterns are non-empty and regexes
+  compile" — and nothing enforced. `wait /a(b/` parsed cleanly and
+  then raised `re.error` from the sample loop, exiting `1` for a
+  fault outside the taxonomy, from a defect visible in the script
+  text alone; `wait ""` and `wait //` parsed into an observation
+  matching every screen, so the wait passed on its first sample
+  and waited for nothing. Both are static errors citing S13, the
+  regex one naming the compile error and the dialect (Python's
+  `re`, which the spec names as the language's contract). A
+  pattern that is only a property reference — `wait "${target}"` —
+  is not empty: it is text the run binds.
+
+  It was found by asking the spec rather than the code. The
+  scripting language now carries the inventory comparisons the CLI
+  got with its command list: the S-ids the spec defines against
+  the S-ids diagnostics cite, the node vocabulary against the
+  lexer's keywords, each node's modifier signature against the
+  parser's, and the error classes and exit codes against
+  `errors.exit_code`. S13 was the one difference; the other three
+  agreed. This is P24's second interface — every enumerated
+  interface is to carry tests checking it *against its
+  specification*, which is what catches a requirement the spec
+  states and the code never implemented.
+
 - Reserved node names are now actually reserved. The script spec has
   always said they "cannot name phases or property keys" — twice, in
   the grammar rules and in **S5** — and nothing enforced it, so

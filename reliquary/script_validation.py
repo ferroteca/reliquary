@@ -23,19 +23,24 @@ name the offending construct and cite its rule:
 - **S12** — a phased script whose transition graph can cycle
   declares a header ``deadline``, the backstop that bounds the
   run.
+- **S13** — a watch pattern is non-empty, and a regex compiles;
 - **S14** — every ``press`` key belongs to the language's closed
   portable vocabulary.
 
 The remaining rules belong to the layers around this one: S1, S2,
 and S4 are the lexer's and the parser's — the timing placement
-matrix is a node signature — and S6, S13, and the remaining S14
-vocabularies arrive with their owning features. The timing *model*
-itself, which resolves the durations this module checks, is
-:mod:`reliquary.script_timing`.
+matrix is a node signature — and the remaining S14 vocabularies
+arrive with their owning features. S6 is split: the ``default=``
+derivation half is checked here, and the ``${key}`` references
+authored inside statement strings are still bound rather than
+validated. The timing *model* itself, which resolves the durations
+this module checks, is :mod:`reliquary.script_timing`.
 
 This module works structurally over the tree, so it imports no
 node type; that keeps the parser free to import it.
 """
+
+import re
 
 from .script_nodes import KEYWORDS, ScriptParseError
 from .script_timing import parse_duration
@@ -629,6 +634,7 @@ def _condition(node, what):
     # condition beside the string it was written next to.
     for condition in node.conditions:
         _channel(condition)
+        _pattern(condition)
     if len(node.conditions) > 1:
         extra = node.conditions[1]
         raise ScriptParseError(
@@ -666,6 +672,45 @@ def _channel(condition):
             condition.line,
             f"{condition.channel} observes the state "
             f"{' or '.join(values)} (S7)", condition.column)
+
+
+# -- watch patterns (S13) ----------------------------------------
+
+def _pattern(condition):
+    """A watch pattern is non-empty and a regex compiles (S13).
+
+    Both halves are the same failure worn differently: a pattern
+    that cannot say what it is waiting for. An empty one matches
+    every screen, so the ``wait`` around it observes nothing and
+    passes on the first sample; a malformed regex cannot be matched
+    at all, and left here it would surface mid-run as an
+    ``re.error`` — a fault outside the taxonomy, from a defect the
+    script text alone shows.
+
+    The dialect is Python's ``re``, which script-spec.md names as
+    the language's contract rather than an implementation detail
+    ("Regexes"), so compiling it here is the check the spec asks
+    for and not an accident of the host.
+    """
+    if condition.kind == "text":
+        empty = condition.value.spelling == ""
+    elif condition.kind == "regex":
+        empty = condition.value == ""
+    else:
+        return                          # a state word, not a pattern
+    if empty:
+        raise ScriptParseError(
+            condition.line,
+            "an empty watch pattern matches every screen: write what "
+            "the screen shows (S13)", condition.column)
+    if condition.kind == "regex":
+        try:
+            re.compile(condition.value)
+        except re.error as error:
+            raise ScriptParseError(
+                condition.line,
+                f"the regex does not compile: {error}; the dialect is "
+                "Python's re syntax (S13)", condition.column) from None
 
 
 # -- terminating statements (S11) --------------------------------
