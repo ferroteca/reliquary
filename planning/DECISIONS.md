@@ -3630,6 +3630,18 @@ is waiting on an answer today.
     imports: container-determined semantics rule (hits [04] — a construct's
     lifetime should be recoverable from its own text), reserve future
     keyword space now, naming freeze is free before v1 and never after
+    [The audit ran 2026-07-27 and all three imports are closed.
+    *Reserve future keyword space* is answered by D53, which chose
+    contextual keywording — there is no keyword space to reserve.
+    The other two converge on one finding: `phase` spells both a
+    sequential and a reactive construct, so `timeout=` on it names
+    two different clocks, and the freeze-is-free clock prices the
+    fix. Filed as F21 in proposed/FEATURES.md, a proposal rather
+    than a task because the shape is open — one candidate is that
+    the right answer is no change. TASKS.md's Language section is
+    deleted with it: nothing in it was work any more, and the
+    catalogue README took the standing guidance about which
+    questions are tradeoffs rather than bugs.]
 - D10 — GUIDING-PRINCIPLES GAP QUEUE (planning/INTERFACES.md necessity/sufficiency panel,
   adversarially walked per use case; evidence in workflow journal
   wf_92864b8e-623) — verdict: the five primary interfaces are necessary and

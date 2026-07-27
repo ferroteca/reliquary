@@ -1016,6 +1016,89 @@ legitimate outcome.
 [docs/spec/cli.md](../../docs/spec/cli.md) documents neither
 spelling today, so nothing has to be unsaid first.
 
+## F21 — One spelling, two phase kinds
+
+> **Entered 2026-07-27** by the spec audit against the AHK/Python
+> failure catalogs, the last of the script-language residuals. It
+> is a proposal rather than a task **because the shape is open**,
+> which is the same ground that moved F18–F20 out of the queue —
+> the argument, not the surface, being what keeps something out of
+> a queue of pre-approved work. Serves language goal **G6** (one
+> concept, one spelling) and no use case. The owner offered it a
+> task entry; it comes here because nobody has yet proposed what
+> the fix *is*.
+
+**A sequential phase and a reactive phase are different constructs
+sharing one keyword**, and `timeout=` on them names two different
+clocks. script-spec.md says both halves plainly:
+
+> "A sequential phase is procedural, a reactive phase is
+> declarative, and **both are spelled `phase`**."
+
+and the clock table carries them as separate entries — an
+observation `timeout` starting when its observation arms, a
+**reactive interval** starting at phase entry *and again each time
+dispatch resumes after a handler action*. So a reader meeting
+`phase watchful timeout=5m {` cannot tell which clock that is
+without scanning the body for whether it holds statements or
+handlers.
+
+**WHAT MAKES THIS NEW EVIDENCE** rather than a re-raise of a
+settled tradeoff — the spec has already weighed the hybrid and
+kept it deliberately ("the hybrid is not hidden; it is the
+point"), so it deserves better than an opinion. Two things:
+
+1. **The spec describes this defect twice, and fixes it once.**
+   The bullet immediately above the one quoted reads: *"`on` is a
+   case in a branching `wait`, `always` a standing rule in a
+   reactive phase — one shape, two named lifetimes, **which the
+   keyword split resolved**."* The project met this exact problem,
+   named it in these words, and split the keyword — for the
+   handlers, and not for the containers that give them their
+   lifetimes.
+2. **An outside study named the pattern independently.** The
+   AHK/Python failure catalogs' sharpest import was a
+   container-determined-semantics rule: *a construct's lifetime
+   should be recoverable from its own text*. It was recorded as
+   hitting the old example [04] — which is the `on`/`always` split.
+   The audit's finding is that it hits `phase` too, and that the
+   earlier weighing did not have this argument in front of it.
+
+**THE PRICE IS ON A CLOCK**, which is the audit's second live
+import: *a naming freeze is free before v1 and never after*. Today
+the change is nearly free — **no shipped script uses a reactive
+phase**, `always` appearing only in
+[03-timing-spellings-and-scope](design/../design/script-examples/),
+and there is no backward compatibility to honour before 1.0 (P9).
+After 1.0 it is unavailable. That asymmetry is the argument for
+settling it now rather than when someone is annoyed by it.
+
+**DECIDE FIRST — the shape, which is why this is not a task.**
+Three candidates, none costed, and the third is a real answer
+rather than a placeholder:
+
+- **A second keyword.** The direct analogue of the `on`/`always`
+  split. Costs a word in a vocabulary G6 wants small, and the
+  candidates are unexplored — `watch`, `monitor`, `rules`, none
+  yet weighed against the existing verbs or against the
+  reserved-identifier list.
+- **A marker on the phase.** Keep one keyword and make the kind
+  explicit at the head, so the text still says which clock it
+  declares without a second construct. Cheaper on vocabulary,
+  wordier at every use.
+- **Neither — improve the reporting instead.** `check-script`
+  already resolves and prints the timing plan naming each clock
+  and the scope that supplied it, which is the same remedy the
+  language accepted for its sibling problem: an observation's
+  effective bound is *also* not locally readable, and that was
+  settled as tooling's job rather than syntax's. If it was right
+  there, the burden is on showing why it is wrong here.
+
+The third candidate is why this needs an argument rather than a
+work item: it may be that the honest answer is no change at all,
+and the finding's value was in forcing the question while the
+answer is still free.
+
 ## Horizon — smaller and later
 
 > **Not a feature, and so unnumbered.** This is a holding list of

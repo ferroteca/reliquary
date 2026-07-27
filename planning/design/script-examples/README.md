@@ -27,6 +27,18 @@ Each file ends with an open question. Resolving one should update
 the spec first, then **delete the example** — numbers are not
 reused, and the argument survives in the D-number that settled it.
 
+**Not every open question is a problem to fix.** [03] and [07]
+document *tradeoffs* — the boundary tax on guest-text escaping,
+and the consequences of placement-equals-scope — where a fix
+mostly relocates the mush rather than removing it. Several are the
+procedural–declarative seam showing through the syntax. Read
+"Primary language goals" (G1–G7) and "The procedural–declarative
+seam" in [script-spec.md](../../../docs/spec/script-spec.md)
+before proposing a fix, and judge it against the goals it costs
+rather than in isolation. Two of these questions have already
+resolved as *no change*: [08]'s reservation half (D53) and 06's
+`@`-versus-`$` half (D54).
+
 **These files parse, and a test says so**
 (`test_documented_examples.ScriptExampleTests`, added 2026-07-27
 with 03's repair). Deliberately illegal lines are commented, so an
