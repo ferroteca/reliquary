@@ -155,33 +155,56 @@ code has the bug, so the norm is already the demand.
   violation P16 named has shrunk to listing, whole-tree transfer,
   and backends with no vvfat equivalent.
 
-- **Diagnostics carry no stable identifier** (found 2026-07-27 by
-  D55, checking what the error-id bullet was actually deferring).
-  [script-spec.md](../docs/spec/script-spec.md) requires it of
-  *every* diagnostic: "**every diagnostic carries a stable dotted
-  identifier naming its rule** (`obs.two-channels` style);
-  identifiers share one namespace across the classes, and the full
-  id index is deferred to beta."
-  The scheme does not exist. `obs.two-channels` appears nowhere
-  outside that sentence. What ships instead:
-  - **static rules** carry `(S5)`-style ids — 44 of them — which
-    are neither dotted nor namespaced, and cover only the
-    S-numbered restrictions;
-  - **parse errors** (43 raise sites across `script_nodes.py` and
-    `script_parser.py`) carry no id;
-  - **preflight and runtime errors** carry none either — including
-    the media-reference rejection added the same day.
-  So one class has a *different* scheme and the rest have none,
-  where the spec asks for one namespace across all of them.
-  **The index is not the gap.** Deferring the id *index* to beta
-  is fine and stays where the spec says it; what is unmet is the
-  requirement that the identifiers exist at all, which is a
-  today-rule and not a beta one. Sequencing follows from that: ids
-  first, index at beta over whatever they turned out to be.
-  Worth settling on the way in: whether `S5` becomes a dotted id
-  under the one namespace, or stays and the dotted scheme covers
-  only what has no id today. The spec says one namespace, which
-  points at the first.
+- **Diagnostics carry no stable identifier — the second pass**
+  (found 2026-07-27 by D55; the scheme and the static rules landed
+  2026-07-27, this is what they left).
+  [script-spec.md](../docs/spec/script-spec.md) requires an id of
+  *every* diagnostic; 52 now exist and the rest do not.
+
+  **The scheme is settled — do not reopen it.** The entry's
+  original question was whether `S5` becomes a dotted id or the
+  dotted scheme covers only what has none. It was a false choice:
+  an S-number names a **rule** and an id names one **diagnostic**
+  under it, S7 being one restriction with six ways to break it. So
+  they are different granularities rather than rival schemes, no
+  renaming happened, a message carries the id alone, and
+  script-spec.md's rule list carries the mapping. `RULE_OF`
+  (`script_nodes.py`) is the same mapping in code, held to the
+  spec by test. The prefix is the subject — `obs.`, `flow.`,
+  `name.`, `prop.`, `wait.`, `handler.`, `time.`, `key.`,
+  `node.`, `http.` — never the error class, the namespace being
+  shared across classes.
+  The argument that settled it came from the conformance corpus,
+  which was written against the S-numbers first and could not tell
+  `obs.missing-condition` from `obs.unknown-channel`.
+
+  **What remains, measured.** Raise sites carrying no id:
+
+  | module | tier | without an id |
+  |---|---|---|
+  | `script_nodes.py` | lexical | 19 |
+  | `script_parser.py` | grammar / typing | 23 |
+  | `script_timing.py` | static | 1 |
+  | `binding.py` | preflight | 7 |
+  | `resolve.py` | preflight | 10 |
+  | `script_runner.py` | runtime | 12 |
+
+  `script_validation.py` is complete (50 of 50).
+
+  The lexical and grammar tiers are the ones a script author meets
+  first and are the obvious next slice; they also need prefixes
+  the vocabulary does not have yet (`lex.`, `syn.`), which is the
+  only design left in this.
+
+  **The corpus is the meter, not a guess.**
+  `reliquary_tests/fixtures/conformance/script/` marks each
+  unidentified case `# id: none` and asserts it in both
+  directions, so the count falls as ids land and cannot drift
+  quietly. Four fixtures carry it today, down from six.
+
+  **The index is still not the gap.** Deferring the id *index* to
+  beta stays where the spec says it; generating it is cheap now
+  that ids are a field rather than message text.
 
 ### Small items
 
