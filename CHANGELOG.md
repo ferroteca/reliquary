@@ -45,6 +45,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `rlq run-script --help` now explains the command rather than
+  restating its name. It covers what LABEL resolves against, where
+  the machine comes from and when one is created, what happens
+  before the first guest input, the `machine`-header state rules,
+  and the fact that a failed run leaves the machine standing for
+  inspection because nothing is torn down implicitly. An exit-code
+  table follows. `--display` had no help text at all and now says
+  that input through the backend's own window is invisible to
+  reliquary.
+
 - **The lexer and the grammar carry identifiers too** — the second
   pass over D55, and the last that the script text alone can
   reach. 82 ids now cover everything decided before a machine is

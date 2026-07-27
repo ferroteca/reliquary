@@ -374,12 +374,54 @@ def main(argv=None):
     command = subcommands.add_parser(
         "run-script",
         help="run a labeled .rlqs script against a machine, streaming "
-             "its progress and returning its output")
+             "its progress and returning its output",
+        # RawDescriptionHelpFormatter keeps these line breaks and adds
+        # none, so the wrapping is written here rather than left to
+        # argparse -- which would otherwise reflow the paragraphs into
+        # single unreadable lines.
+        description=(
+            "Run a .rlqs script against a machine, streaming its\n"
+            "progress and returning its output.\n"
+            "\n"
+            "LABEL is a name in the blueprint's `scripts` map, or a\n"
+            "script's filename stem. The machine comes from --machine,\n"
+            "or from --blueprint when that blueprint has exactly one\n"
+            "machine; with --blueprint and no machine yet, one is\n"
+            "created.\n"
+            "\n"
+            "Before the first guest input the script is checked from\n"
+            "its text, the media and drives it names are resolved, and\n"
+            "its declared properties are bound -- so a run never gets\n"
+            "halfway before discovering a later statement is\n"
+            "impossible. The machine is then brought to the state the\n"
+            "script's `machine` header expects: a stopped machine is\n"
+            "started when the script expects `running`, and a running\n"
+            "one is refused when it expects `stopped`.\n"
+            "\n"
+            "The machine is left wherever the last executed statement\n"
+            "put it, on success and on failure alike -- nothing is torn\n"
+            "down implicitly, so a failed run can be inspected. The run\n"
+            "stores nothing: its output is the event stream, live on\n"
+            "stderr and gone when the run ends. Use --progress jsonl to\n"
+            "keep it."),
+        epilog=(
+            "exit codes:\n"
+            "  0  the script finished\n"
+            "  2  the script is not legal (checked from its text)\n"
+            "  3  preflight refused it (the machine, media, or "
+            "properties)\n"
+            "  4  the run failed (a clock expired, or a step could "
+            "not be taken)\n"
+            "  5  the run was cancelled at a boundary (Ctrl-C)"),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     _add_selectors(command)
     _add_property_inputs(command)
     _add_progress(command)
     command.add_argument("label", help="script label or stem")
-    command.add_argument("--display", action="store_true")
+    command.add_argument(
+        "--display", action="store_true",
+        help="show the backend's own display window while the script "
+             "runs (input through it is invisible to reliquary)")
 
     # check-script
     command = subcommands.add_parser(

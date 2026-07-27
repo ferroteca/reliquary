@@ -279,13 +279,8 @@ need no entry at all once someone picks them up.
   is unspecified in the meantime — what changes is whether the
   code is free to diverge from them.
 
-- CLI help: run-script's text says little more than "runs a
-  script on a machine". Not an interface change — it changes no
-  rule, and pretty output is uncontracted — so it is housekeeping
-  the moment someone picks it up; it keeps its line only because
-  writing the replacement is authoring rather than a one-word fix.
-
 - README, blueprints and machines: give several clear examples
   to illustrate the concepts — e.g. a 1 MB MS-DOS blueprint;
   QEMU machine #0; QEMU machine #1; QEMU machine #3 with a
   specific floppy image mounted; QEMU machine #4 with 16 MB of
+  memory and a specific cdrom mounted
