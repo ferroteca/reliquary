@@ -2122,7 +2122,8 @@ is waiting on an answer today.
   the user-facing docs land in the removal commit.
 
 - D29 — PARTLY-OVERRULED ENTRIES ARE ANNOTATED, NEVER REWRITTEN
-  — DECIDED (owner, 2026-07-23). A convention for this record
+  — DECIDED (owner, 2026-07-23). Supports P23 — retrofitted
+  2026-07-27. A convention for this record
   itself, settled on its first instance rather than after the
   second. D27 corrected one clause of D26 — the claim that the
   character class was "the whole closure, and the only test
@@ -2652,7 +2653,8 @@ is waiting on an answer today.
   D22 left them; this entry and D22 are normative meanwhile.
 
 - D23 — USE-CASE LIFECYCLE: THE CURRENT LIST + THE PROPOSALS DOC —
-  DECIDED (owner, 2026-07-23). The use-case surface
+  DECIDED (owner, 2026-07-23). Supports P8, P23 — retrofitted
+  2026-07-27. The use-case surface
   splits in two: planning/USE-CASES.md is the CURRENT STATE —
   every numbered use case in force — and the new
   planning/USE-CASE-PROPOSALS.md tracks proposed changes (new
@@ -3030,7 +3032,8 @@ is waiting on an answer today.
 
 - D21 — CODEX NAMING: A LAUNCHING POINT, NEVER A VERSION LIBRARY —
   DECIDED (owner, 2026-07-23, closing the open point from the
-  generic-blueprint walkthrough): no versioned items in the
+  generic-blueprint walkthrough). Supports U11; P11 — retrofitted
+  2026-07-27. No versioned items in the
   codex — generic `openbsd`, generic `freedos`; "the codex is a
   launching point for real blueprints only" (owner). Entries
   are named for the system; the version lives inside the file
@@ -3068,7 +3071,8 @@ is waiting on an answer today.
 - D20 — THE DECLARED DERIVATION RANK (HOST-DERIVED DEFAULTS LANDED) —
   DECIDED (owner, 2026-07-23, same-day follow-up settling the
   forks the source-model governance entry below left pending;
-  supersedes that entry's closed-@host-token sketch). The use
+  supersedes that entry's closed-@host-token sketch). Supports
+  U5; P13, P14 — retrofitted 2026-07-27. The use
   case: a guest user created at install time defaults from the
   host — login name, descriptive full name — overridable by any
   explicit source. THE SHAPE: the chain's tail is DERIVATION →
@@ -3139,7 +3143,8 @@ is waiting on an answer today.
 
 - D19 — PROPERTY SOURCE MODEL: THE ORDER IS CLOSED, THE SEAMS ARE
   NAMED; BESPOKE IMPLEMENTATION — DECIDED (owner, 2026-07-23,
-  the source-model governance round). The owner probed the
+  the source-model governance round). Supports P7, P13, P21 —
+  retrofitted 2026-07-27. The owner probed the
   chain's extensibility — injectable custom providers, end-user
   control of the layer hierarchy — and the round adjudicated
   with the Spring lens (the owner's ten-plus Spring years:
@@ -3214,6 +3219,7 @@ is waiting on an answer today.
 
 - D18 — BLUEPRINT FORMAT: JSONC AFFIRMED + THE COMPUTATIONAL-GROWTH
   RULE — DECIDED (owner, 2026-07-23, the format-review round).
+  Supports U4, U5; G2 — retrofitted 2026-07-27.
   The owner re-opened "blueprints are authored source, not data —
   is JSON right?" and separately flagged computational/
   programmatic expansion as a likely growth area. Both resolved
@@ -3284,7 +3290,8 @@ is waiting on an answer today.
   constructs).
 
 - D16 — BLUEPRINT `name` FIELD REINSTATED — DECIDED (owner, 2026-07-22),
-  reversing the 2026-07-21 drop. `name` returns as an optional
+  reversing the 2026-07-21 drop. Supports U11 — retrofitted
+  2026-07-27. `name` returns as an optional
   human-readable display name for the blueprint, distinct from the
   file-stem identity: the stem stays the one selection key
   (`--blueprint <stem>`) and a machine's id stays `<stem>-<n>`, so
@@ -3308,7 +3315,8 @@ is waiting on an answer today.
   `freedos-1.4-plain.rlqb` `name` stays valid.
 
 - D15 — MILESTONE 6 DECIDE-FIRST ROUND — DECIDED (owner, 2026-07-22):
-  the three "Decide first" questions ROADMAP milestone 6 gated its
+  Supports U1; P8 — retrofitted 2026-07-27.
+  The three "Decide first" questions ROADMAP milestone 6 gated its
   implementation on. Interface triage (planning/INTERFACES.md): the
   state ops and the blueprint format are world-facing interfaces;
   Q1 confirms already-specced, use-case-aligned behavior (U1's
@@ -3365,7 +3373,8 @@ is waiting on an answer today.
   machine-blueprint.schema.json.
 
 - D14 — MILESTONE INJECTION: LOCAL HTTP SERVER FOR INSTALLER ANSWER
-  FILES — DECIDED (owner, 2026-07-22). A new ROADMAP milestone 5
+  FILES — DECIDED (owner, 2026-07-22). Supports U1, U4, U5; G1 —
+  retrofitted 2026-07-27. A new ROADMAP milestone 5
   lands Packer's ephemeral local HTTP server for Kickstart /
   preseed / AutoYaST / `unattend.xml` and kin
   (docs/spec/http-serve.md). Former milestones 5–12 renumber
@@ -3390,7 +3399,7 @@ is waiting on an answer today.
 
 - D13 — PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
   2026-07-22), following the no-JSON-in-scripts round that made it
-  possible. The grammar lives in Reliquary/script_grammar.lark,
+  possible. Supports P21 — retrofitted 2026-07-27. The grammar lives in Reliquary/script_grammar.lark,
   mirroring script-spec.md's normative EBNF; Reliquary's own
   tokenizer feeds it through a custom lark lexer. Evidence from
   three probes:
@@ -3427,7 +3436,8 @@ is waiting on an answer today.
     "over the parse tree rather than encoded in the CFG" is what
     protects the diagnostics, not an implementation detail
 
-- D12 — NO JSON IN SCRIPTS — DECIDED (owner, 2026-07-22): a script
+- D12 — NO JSON IN SCRIPTS — DECIDED (owner, 2026-07-22).
+  Supports U6; G7 — retrofitted 2026-07-27. A script
   carries no embedded assets. The `media <label> { ... }` block
   and the `landmark <name> { ... }` block are both deleted;
   media definitions (`.rlqm`) and landmark declarations (`.rlql`
@@ -3491,7 +3501,8 @@ is waiting on an answer today.
     embedded-install targeting; the recorder emits its draft as
     script plus asset files, one mode instead of two
 
-- D11 — THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED;
+- D11 — THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED.
+  Supports U6; G2, G3, G7 — retrofitted 2026-07-27.
   docs/spec/script-spec.md is the source of truth (full typed
   EBNF included) and planning/design/script-examples/design-install.rlqs
   the reference script. Realigning the implementation is ROADMAP
@@ -3725,7 +3736,8 @@ is waiting on an answer today.
     questions are tradeoffs rather than bugs.]
 - D10 — GUIDING-PRINCIPLES GAP QUEUE (planning/INTERFACES.md necessity/sufficiency panel,
   adversarially walked per use case; evidence in workflow journal
-  wf_92864b8e-623) — verdict: the five primary interfaces are necessary and
+  wf_92864b8e-623). Supports U1, U2, U4, U5, U6, U14; G2, G3 —
+  retrofitted 2026-07-27. Verdict: the five primary interfaces are necessary and
   minimal; every gap below is a spec lagging the principles, and this queue
   is the realignment pass's work list:
   - CLI programmatic contract (U3 via CLI; the whole unbound-language path
@@ -3921,7 +3933,8 @@ is waiting on an answer today.
 - D9 — BLUEPRINT-SPEC GAP QUEUE (owner-requested review, 2026-07-21: the media
   and blueprint specs walked against planning/INTERFACES.md / planning/USE-CASES.md; the
   media spec tracks the principles closely — the gaps cluster in the
-  blueprint spec: machine-blueprint.md + -reference.md + -cookbook.md):
+  blueprint spec: machine-blueprint.md + -reference.md + -cookbook.md).
+  Supports U2 — retrofitted 2026-07-27:
   1. RESOLVED (owner, 2026-07-21, design round) — run records vs
      disposability, settled as the CUSTODY MODEL: disposable and
      reconstructible are distinct properties — everything under cache/
@@ -4057,7 +4070,8 @@ is waiting on an answer today.
   parity doctrine, the selection failure modes, run-record custody,
   import's consent points, and the no-prompt/--detach discipline are
   sound — the gaps cluster in vocabulary collisions, cross-surface
-  naming drift, and the machine-readable query contract):
+  naming drift, and the machine-readable query contract).
+  Supports U1, U14; P6, P7 — retrofitted 2026-07-27:
   1. RESOLVED (owner, 2026-07-21, design round — all six forks on
      the recommendations): the `run` collision dissolves through
      item 2's alignment — guest execution renames to
@@ -4292,7 +4306,8 @@ is waiting on an answer today.
   planning/USE-CASES.md, the CLI design, and Python practice; verdict:
   the twin-name identity rule, the --json twin's-return rule, pull-only
   handles, and the named-omission discipline are sound — the gaps were
-  unnamed conventions and unnamed twins):
+  unnamed conventions and unnamed twins). Supports U14; P6, P7 —
+  retrofitted 2026-07-27:
   1. RESOLVED (owner, 2026-07-21): the async starters are a NAMED
      convention — start_script / start_fetch are the blocking twins'
      starters, presenting on the CLI as --detach on the blocking
@@ -4466,7 +4481,9 @@ is waiting on an answer today.
   left standing in the guiding-principles queue above once the
   blueprint-spec, CLI, API, and property queues closed — itemized for
   design rounds, in leverage order; everything else open is
-  deliberately parked in ROADMAP "Decisions still needed"):
+  deliberately parked in ROADMAP "Decisions still needed").
+  Supports U1, U5, U6, U14; P6, P7; G2 — retrofitted 2026-07-27,
+  the union across its five items:
   1. RESOLVED (owner, 2026-07-22, design round — all five forks on
      the recommendations): THE OUTPUT DISCIPLINE — the result is
      stdout, everything else is stderr: a result-bearing command's
@@ -4727,7 +4744,10 @@ is waiting on an answer today.
   settled through "what use case cannot be met without it?" —
   answer: none; the mechanism was custody and ergonomics, never
   capability; U6 verified untouched — console capture in, authored
-  files out). DROPPED wholesale: the `results` header,
+  files out). Supports U14 — retrofitted 2026-07-27; the entry
+  argues from U3, which D51 retired into U14, and the "U6
+  verified untouched" note is a check that nothing broke, not a
+  demand. DROPPED wholesale: the `results` header,
   `stage`/`collect` (S15 and the language's only host paths die
   with them — example 05's two-worlds question dissolves: strings
   are guest text only), the CLI pair stage-files/collect-files,
@@ -4777,7 +4797,8 @@ is waiting on an answer today.
   annotated SUPERSEDED IN PART above
 - D4 — THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner, 2026-07-21,
   the docker-comparison round; all three forks on the
-  recommendations). The docker model largely CONFIRMS the design
+  recommendations). Supports U1, U4, U5, U14; P13 — retrofitted
+  2026-07-27. The docker model largely CONFIRMS the design
   (marker-file + host credential store = credential helpers;
   stdin secret entry = docker secret create -; secrets as a
   separate channel with different physics = the build-arg-leak
@@ -5046,7 +5067,8 @@ is waiting on an answer today.
      injection, and sits inside platform environment-block size
      limits; per-key RELIQUARY_PROPERTY_<KEY> stands
 - D3 — JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
-  design round; all three forks settled on the recommendations):
+  design round; all three forks settled on the recommendations).
+  Supports U4; P9 — retrofitted 2026-07-27:
   - planning/design/machine-blueprint.schema.json +
     media-definition.schema.json AUTHORED (draft 2020-12,
     self-contained, strict JSON, REUSE.toml-covered; spec examples
@@ -5072,7 +5094,11 @@ is waiting on an answer today.
     (milestone 3 item 6); media/item name, script-label, and
     input-name grammars stay open with the asset-spec work (the
     schemas say non-empty string)
-- D1 — RESOLVED (owner, 2026-07-21): the built-in library is named THE
+- D1 — RESOLVED (owner, 2026-07-21). Supports (none) — a
+  vocabulary decision; no use case or principle demands what a
+  thing is called, and the naming class is outside the
+  traceability rule's reach (retrofitted 2026-07-27). The
+  built-in library is named THE
   CODEX (was "change 'builtin library' concept to 'template
   library' ??"; "canon" was weighed and rejected — codex is the
   artifact, a bound volume copied from, where canon is the

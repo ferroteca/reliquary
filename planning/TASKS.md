@@ -86,45 +86,19 @@ restructures'.)
 
 ### Governance — audits
 
-Unscheduled. Problems in the planning machinery
-itself, found while landing milestone 9 and while asking where the
-roadmap's bulk belongs (2026-07-24). (They once said they would
-move to planning/BACKLOG.md "when that split lands"; it landed as
-[proposed/FEATURES.md](proposed/FEATURES.md) instead, and these
-stay here — they are work, not capability.)
-The former "Planning docs" section is folded in here: its two
-sweeps are the same class as everything else below (owner,
-2026-07-24 — *something exists in the planning machinery without
-the demand that justifies it*), and splitting the class across two
-sections was itself part of the problem.
+*(Emptied and struck on 2026-07-27, as the restructures and the
+adjudications were before it. The supports retrofit was the last
+one standing and it is done: every live entry in
+[DECISIONS.md](DECISIONS.md) now names the use cases, principles
+or goals it supports — 54 of 56, the two exceptions being the
+retired D2 and D17, which bind nothing and which the file's own
+practice already exempted. The third audit had left on the same
+day into [F7](proposed/FEATURES.md).*
 
-**The class, stated once.** The traceability rule says every
-roadmap item, design document, and decision names the U-number (in
-force or proposed) or P-number that demands it. A violation takes
-one of three shapes, and each has its own remedy: work that cites
-*no* demand (find it or delete the work); work that cites
-*unpledged* demand as though it were pledged (pledge it, or
-mark the citation conditional); and a design written for demand
-that was never pledged at all (the D33 pattern — the design
-outran its justification). The audits below are the standing way
-to find them, not a one-off.
-
-
-- **Retrofit supports onto DECISIONS.md entries** (owner,
-  2026-07-23; audited 2026-07-24). Each names the use cases (U),
-  principles (P), or goals (G) it supports; new entries carry
-  supports from the start. Audit result: **22 entries lack one** —
-  D1–D21 as the original task said, minus D22 (done, pulled
-  forward by the milestone-7 governing-input audit), **plus D29**,
-  which the original range missed. Correct the scope when picking
-  it up.
-
-*(The third audit — "Audit design documents against pledged
-demand" — left here on 2026-07-27. It was in two lifecycle states
-at once: pledged by sitting in this file, and proposed as
-[F7](proposed/FEATURES.md), which D43 created from this file's
-legacy Proposed section without removing the twin. The proposal
-was kept and its findings folded into F7.)*
+*The class it audited for is not struck with it — the
+traceability rule stands, and new entries carry supports from the
+start. What retires is the standing backlog of entries written
+before the rule existed.)*
 
 ### Defects
 
