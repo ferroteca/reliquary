@@ -1162,7 +1162,11 @@ activation (the phase deadline's scope), a span per observation
   time), and timeout;
 - handler fires, and each action's start and completion — input
   deliveries, `insert` / `eject` / `set-boot`, `start` / `stop`,
-  `screenshot`;
+  `screenshot`. An `insert` names the media it actually mounted,
+  so a `$property` argument reports the **resolved** name and not
+  the property's: the two sigils are equally definite on the
+  page — `@` fixed, `$` deferred to the run — and the stream is
+  where that difference becomes visible;
 - transfer progress only where an honest total exists — media
   fetch bytes, `select` traversal
   steps — never invented denominators: renderers show phases and

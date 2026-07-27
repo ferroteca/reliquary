@@ -15,6 +15,7 @@ from unittest import mock
 
 from qemu.qmp import ConnectError
 
+from reliquary import events as _events
 from reliquary.binding import BoundProperties
 from reliquary.errors import RunCancelled
 from reliquary.script_parser import parse_script
@@ -589,6 +590,26 @@ class MachineOperationTests(_RuntimeCase):
                 "plain-0", "cdrom0", "freedos-livecd",
                 context="/tmp/home",
                 events=engine.events, cancelled=engine._cancelled)
+
+    def test_insert_from_a_property_reports_the_resolved_media(self):
+        # A `$` insert defers the choice to run time, so the page
+        # cannot say which media it is. The stream can, and does:
+        # the action names the resolved item, spelled `@`, so a
+        # reader of the run sees exactly what was mounted.
+        stream = _events.EventStream()
+        engine = self.engine(
+            "property media supplemental\n"
+            "insert floppy1 $supplemental\n",
+            bindings=BoundProperties({"supplemental": "win98-cd"},
+                                     {"supplemental": "flag"}),
+            events=stream)
+        with mock.patch("reliquary.script_runner._machines"):
+            self.run_linear(engine)
+        actions = [event for event in stream.events
+                   if event["kind"] == _events.ACTION_START
+                   and event.get("verb") == "insert"]
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["detail"], "floppy1 @win98-cd")
 
     def test_insert_from_a_property_is_not_bound_yet(self):
         engine = self.engine(

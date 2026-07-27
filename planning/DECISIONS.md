@@ -178,6 +178,55 @@ is waiting on an answer today.
 
 ## Decided
 
+- D54 — `@` VERSUS `$` IS INHERENT AND OBSERVABLE; EXAMPLE 06
+  CLOSES — DECIDED (owner, 2026-07-27). Supports P5, P8, G6.
+  The last open question in
+  [06-media-label-vs-item](design/script-examples/) is settled and
+  the example is deleted, the catalogue holding open problems
+  only.
+  THE QUESTION. `insert` takes its media through either sigil —
+  `insert cdrom0 @freedos-livecd` or `insert floppy1
+  $supplemental-disk` — and the two look equally definite on the
+  page while meaning different things: `@` names a specific item,
+  `$` defers the choice to the run. A reader must recall the
+  property declaration to know which insert is fixed.
+  SETTLED AS THE EXAMPLE ITSELF GUESSED: **inherent, and already
+  observable.** Deferral is what a property is *for*, so the page
+  cannot say which media a `$` insert will mount without deleting
+  the feature. What the example asked for instead — something
+  naming the resolved item at insert time — turned out to exist:
+  the runtime resolves the binding before building the action's
+  detail, so `insert floppy1 $supplemental` emits
+  `insert floppy1 @win98-cd`, the resolved name spelled with the
+  definite sigil. The observability half was closed by milestone
+  9's event stream without anyone noticing it answered this.
+  PROMOTED TO NORMATIVE BEFORE DELETING, which is why this carries
+  a number rather than being housekeeping. The behaviour shipped
+  but **no norm required it**, so it was free to change and the
+  example could not be closed against it. script-spec.md's run
+  event stream now states it: an `insert` names the media it
+  actually mounted, a `$` argument reporting the resolved name and
+  not the property's. Same shape as D50's format-stability
+  promotion — existing behaviour becoming a rule the
+  implementation answers to (P5: the stream is where a run's
+  difference becomes visible, and no surface reports what it does
+  not carry).
+  A COVERAGE GAP CLOSED WITH IT. Nothing tested this. The suite
+  had a test for an *unbound* `$` insert failing, and none for a
+  bound one reporting its resolved name — so the behaviour the
+  spec now requires was resting on one unexamined line. It has a
+  test.
+  THE EXAMPLE'S OTHER TWO QUESTIONS were closed earlier: the
+  label/item split died with embedded media blocks (2026-07-22),
+  and rejecting an `@`-reference the namespace does not define
+  landed 2026-07-27 as the preflight defect it had always been
+  rather than the language task it was filed as.
+  FOLDED: this entry; script-spec.md ("The run event stream", the
+  action bullet); design/script-examples/ (06 deleted, README's
+  table and its resolved-examples note); test_script_runner.py
+  (the resolved-name test). CHANGELOG: none — the behaviour is
+  unchanged, only its standing.
+
 - D53 — BARE WORDS STAY POSITION-TYPED; TASK [08] IS REFUSED —
   DECIDED (owner, 2026-07-27, walking the script-language
   residuals). Supports P8, P23, G6. The task proposed reserving

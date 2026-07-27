@@ -20,7 +20,6 @@ the implementation caught up (milestone 4).
 | file | residual problem |
 |---|---|
 | [03-timing-spellings-and-scope.rlqs](03-timing-spellings-and-scope.rlqs) | `timeout 30s` vs `timeout=5m`; non-local defaults; the stable split; reset asymmetry |
-| [06-media-label-vs-item.rlqs](06-media-label-vs-item.rlqs) | the media label named a file while `@` referenced an item — resolved 2026-07-22 by deleting embedded media blocks; the `@` vs `$` definiteness half stands |
 | [07-regex-escaping-regimes.rlqs](07-regex-escaping-regimes.rlqs) | the same screen text escapes differently in `"..."` and `/.../` |
 | [08-bare-word-namespaces.rlqs](08-bare-word-namespaces.rlqs) | `screenshot installed` creates, `goto finished` must exist — identical shape, opposite failure. The reservation half was settled 2026-07-27 (D53) and the file narrowed to this |
 
@@ -29,6 +28,13 @@ the spec first, then **delete the example** — numbers are not
 reused, and the argument survives in the D-number that settled it.
 
 ## Why resolved examples are not kept here
+
+06 left 2026-07-27 (D54), the last of its three questions closed:
+the label/item split died with embedded media blocks, the unknown
+`@`-reference became a preflight rejection, and the `@`-versus-`$`
+definiteness point resolved as inherent-but-observable — properties
+exist to defer a choice, and the stream names the media an `insert`
+actually mounted.
 
 Examples 01, 02, 04, 05 and 09 were resolved and kept as
 "regression notes" until 2026-07-26, when the claim was tested and
