@@ -13,6 +13,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The CLI specification described five commands that do not exist —
+  `clone-machine`, `export-machine`, `export-drive`, `search-media`
+  and `search-scripts`, in present tense with worked example
+  output — and omitted five that do: `add-media`, `prune-media`,
+  `put-file`, `get-file` and `get-machine-var`. Anyone following the
+  spec for the first five got `invalid choice`. The unbuilt commands
+  are gone from it (their designs stay settled under
+  planning/proposed/FEATURES.md), the five real ones are specified,
+  and a test now checks both directions so the inventory cannot
+  drift again. `clean-archives` went with them, having been removed
+  from the code when the single media cache landed.
+
 - Two diagnostics named `hostdir`, a drive field that retired with
   the composed blueprint model. Trying to `insert-media --file` a
   directory now says the directory reaches a guest as "a declared

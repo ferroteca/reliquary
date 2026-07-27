@@ -5,10 +5,22 @@ SPDX-License-Identifier: BSD-3-Clause
 
 # CLI
 
-> **Status:** working document for brainstorming the command-line
-> structure; expected to be short-lived. Settled decisions live in
-> [the design directory](.) ("The CLI" and the milestones);
-> concepts introduced here are documented durably in
+> **Status:** normative. This is the specification of the CLI —
+> one of the four primary interfaces (root ARCHITECTURE.md, "The
+> interfaces") — and the implementation answers to it: where this
+> document and the code disagree, the code has the bug unless the
+> document is changed first through the interface-change rule
+> ([planning/INTERFACES.md](../../planning/INTERFACES.md)).
+>
+> **Every command here exists.** Commands that do not are not
+> documented here at all, however settled their design: unbuilt
+> capability lives in
+> [planning/proposed/FEATURES.md](../../planning/proposed/FEATURES.md).
+> A test enforces both directions (`ClaimedCommandTests`), because
+> until 2026-07-27 this document specified five commands the CLI
+> did not have and omitted five it did.
+>
+> Concepts introduced here are documented durably in
 > [codex.md](codex.md) (the codex,
 > `seed`, naming conventions, provenance) and the
 > [blueprint field reference](../blueprint-reference.md)
@@ -520,77 +532,6 @@ rlq recreate-machine --machine freedos-0
 # destroys freedos-0, creates new freedos-0 from its blueprint
 ```
 
-### Cloning
-
-```
-rlq clone-machine (--blueprint <name> | --machine <id>)
-```
-
-Duplicates a stopped machine under the next free
-`<blueprint>-<n>` id. The clone retains the
-source's resolved blueprint snapshot and copies the source's
-writable drive images:
-
-```powershell
-rlq stop-machine --blueprint freedos
-rlq clone-machine --blueprint freedos
-# → cloned machine freedos-1
-```
-
-### Exporting
-
-```
-rlq export-drive <key> <destination> (--blueprint <name> | --machine <id>)
-rlq export-machine --to <exporter> [<destination>]
-    (--blueprint <name> | --machine <id>)
-```
-
-Takes a durable artifact out of an ephemeral machine — two
-capabilities, two commands, twins `export_drive` /
-`export_machine`. Both require a stopped machine and are
-stream-bearing (disk copies are long): transfer events render
-under `--progress`, the terminal event is the result, and
-`--json` is rejected naming `--progress jsonl`. The exported
-artifact is independent and permanently outside Reliquary's
-purview; the machine itself is untouched.
-
-**`export-drive`** takes one drive out as a standalone image
-file. `<destination>` is required — nothing is guessed about
-filename or format. The image lands in the drive's native
-format, or raw when the destination extension says so
-(`.img` / `.raw`); any other conversion is declined — a
-cross-backend want is `export-machine`'s job. An exported
-installed disk, plus a hand-written `media` with a `local` source,
-is a payload other blueprints can `difference` or `copy` against.
-
-```powershell
-rlq export-drive hdd0 D:\exports\dos-disk.qcow2 -b freedos
-rlq export-drive hdd0 D:\exports\dos-disk.img -b freedos
-```
-
-**`export-machine`** creates and registers a native VM with a
-management platform built for keeping machines. `--to` names an
-**exporter** — `virtualbox`, `vmware`, `hyperv`, `libvirt` — a
-vocabulary of its own, probed on the host and deliberately
-decoupled from the backend list (libvirt is the QEMU-ecosystem
-answer; no same-named backend needs to exist). The target is
-presented, never defaulted: on a tty an absent `--to` prompts
-listing the exporters available on this host; noninteractively
-it is an error; `export_machine`'s `to=` is required under
-parity. The exporter builds the native VM from the machine's
-resolved blueprint shape — capability-checked against the target
-like `create-machine` — with drive content converted through the
-adapters' raw interchange; `media`-referenced drives and
-state-inserted media materialize as payload copies inside the
-export's native location, so the exported VM stands alone
-(Reliquary's cache is disposable and never referenced).
-`<destination>` defaults to the target's native machine
-location.
-
-```powershell
-rlq export-machine --to virtualbox -b freedos
-```
-
 ### Listing machines
 
 ```
@@ -790,6 +731,54 @@ rlq set-boot-order cdrom0 hdd0 -b freedos
 rlq start-machine -b freedos
 ```
 
+### In-band file exchange
+
+```
+rlq put-file <source> <destination> (--blueprint <name> | --machine <id>)
+rlq get-file <source> <destination> (--blueprint <name> | --machine <id>)
+```
+
+Twins `put_file` / `get_file`. The guest-side path is written
+**the way the guest names it** — `A:\TEST.EXE` on DOS, that
+system's separators and roots, never an image file or a staging
+directory (**P17**). The drive letter resolves from the machine's
+declared platform and Reliquary's own drive assignment, never by
+inspecting a guest (**P10**).
+
+Both are **stopped-only**, and the addressed drive must be a
+directory-source drive: the backend snapshots that directory when
+it attaches, so a change made while the machine runs would be
+invisible to the guest and a guest write is not flushed until it
+stops. A non-directory target, or a drive letter the declared
+facts do not map, is a preflight error naming the gap (**P11**),
+raised before anything is transferred.
+
+The in-band **directory** operations — listing, and whole-tree
+put/get — are unbuilt
+([planning/proposed/FEATURES.md](../../planning/proposed/FEATURES.md)
+"Horizon").
+
+```powershell
+rlq put-file .\JOB.BAT "A:\JOB.BAT" --machine freedos-0
+rlq get-file "A:\RESULT.TXT" .\result.txt --machine freedos-0
+```
+
+### Reading a machine variable
+
+```
+rlq get-machine-var <key> (--blueprint <name> | --machine <id>)
+```
+
+Twin `get_machine_var`. Reads one machine variable — the script
+`set` verb's channel back to the host — from the machine's state.
+It works while the run is still going or long after it ends, and
+from any process, which is what makes it a readiness poll: a
+consumer's own ready script `set`s a variable as its last step
+and the driving program polls for it. Variables are cleared at
+each `start`, so a value always reports the current boot. There
+is no `set-machine-var` command: writing is the script verb's,
+and the host side only reads.
+
 ### The machine directory
 
 ```
@@ -850,24 +839,15 @@ bracket returns if the async work schedules.
 
 ## Scripts
 
-### Listing and searching scripts
+### Listing scripts
 
 ```
 rlq list-scripts
-rlq search-scripts <term>...
 ```
 
-`list-scripts` shows everything in `scripts/`. `search-scripts`
-queries the codex index and user scripts, matching terms against
-filename and the script's `description` header (scripts have no
-name field; the filename is the name):
-
-```powershell
-$ rlq search-scripts freedos
-SCRIPT                        DESCRIPTION                              CODEX
-freedos-install     Unattended FreeDOS 1.4 plain install     seeded
-freedos-verify      Boot the installed disk and verify       yes
-```
+`list-scripts` shows everything in `scripts/`. Searching scripts
+is unbuilt — the codex index it would query is itself planned
+([codex.md](codex.md)).
 
 ### Running scripts
 
@@ -997,11 +977,10 @@ is located (a `url`+mirrors, a `local` path, or a member of an
 it. They are components inside a blueprint `.rlqb`, not files of
 their own; the codex seeds them inside the blueprints that use them.
 
-### Listing and searching media
+### Listing media
 
 ```
 rlq list-media
-rlq search-media <term>...
 ```
 
 `list-media` shows the media names resolvable from the active
@@ -1013,32 +992,21 @@ and its cache state; a media declared identically in several
 files is one media and takes one row naming all of them
 (identity-dedup shown, not contradicted). The anonymous inline
 blank is never listed: it belongs to no namespace and nothing
-can reference it (D30).
-`search-media` queries the codex index and user media, matching
-terms against the media `name`s (the identifiers machine drives
-reference — semantic, not display metadata) and `description`.
-Multiple terms are ANDed:
+can reference it (D30). `--verbose` adds the description and
+source URL.
 
-```powershell
-$ rlq search-media freedos
-MEDIA                   DESCRIPTION                              CODEX
-freedos-livecd      The FreeDOS 1.4 LiveCD installer ISO     seeded
-freedos-bonus       The FreeDOS 1.4 BonusCD package ISO      yes
-
-$ rlq search-media win98
-MEDIA                   DESCRIPTION                              CODEX
-win98se                 Windows 98 SE OEM installation ISO       yes
-```
-
-`--verbose` adds the description and source URL.
+Searching media is unbuilt, like searching scripts: it would
+query the codex index, which is planned ([codex.md](codex.md)).
+`search-blueprints` is the one search that ships.
 
 ### Fetching and cleaning
 
 ```
 rlq fetch-media <media_name>
     [--progress <mode>] [--on-mismatch (fail | refetch)]
-rlq clean-archives
 rlq clean-media
+rlq prune-media [--dry-run]
+rlq add-media <name> <file>
 ```
 
 `fetch-media` resolves a media by name and downloads, extracts,
@@ -1065,19 +1033,33 @@ would be its own named growth if real use demands one).
 rlq fetch-media freedos-livecd
 ```
 
-`clean-archives` reclaims cached source archives under
-`cache/archives/`. `clean-media` reclaims fetched payload files
-under `cache/media/` that Reliquary can re-fetch. Nothing
-irreplaceable — `local` source files, sourceless payloads — is
-cleanable. (There is no `delete-media`: media are components inside
+`clean-media` reclaims cached payload files under `cache/media/`
+that Reliquary can re-fetch — blunt with no argument, targeted at
+one media when named — skipping any payload a running machine has
+attached. `prune-media` is the narrower cut: it drops only the
+payloads outside the **attachment closure**, a container going
+once its children are cached, and `--dry-run` reports what it
+would reclaim without touching anything. Nothing irreplaceable —
+`local` files, sourceless payloads — is reclaimable by either.
+
+`add-media <name> <file>` is the supply half of authoring: it
+computes the file's sha256 and writes `blueprints/<name>.rlqb`
+declaring a media of that name located at that path. It **copies
+nothing** and refuses to overwrite an existing blueprint — the
+file stays where it is, and the declaration is what pins it
+(D41). This is how a pinned-but-unlocated codex media gets a
+local payload without hand-placing anything in the cache.
+
+(There is no `delete-media`: media are components inside
 a `.rlqb`, so removing one means editing the blueprint. The
 command existed as a pure failure until D30 deleted it — the
 noun in every media verb is the media, never its owning file,
 and file lifecycle is the blueprint verbs' job.)
 
 ```powershell
-rlq clean-archives
 rlq clean-media
+rlq prune-media --dry-run
+rlq add-media win98se D:\images\win98se.iso
 ```
 
 ---

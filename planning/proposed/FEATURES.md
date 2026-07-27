@@ -1115,8 +1115,10 @@ answer is still free.
   as the U8 draft, and import's U2 loses its scheduled
   delivery with this move. Scheduling it back onto the
   numbered arc is the pledge of those use cases. The
-  designs stay settled ([design/cli.md](../../docs/spec/cli.md); owner,
-  2026-07-22):
+  designs stay settled (owner, 2026-07-22) and their worked text
+  is at `git show cf56a0c:docs/spec/cli.md`, the last commit
+  before the CLI spec was made normative and the unbuilt commands
+  removed from it (2026-07-27 — a spec states what exists):
   `export-drive` / `export-machine` with the decoupled
   exporter vocabulary, `import-vm` with its consent points,
   `clone-machine` as the machine snapshot; the `import-vm`

@@ -6,6 +6,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,74 @@ import importlib
 
 home = importlib.import_module("reliquary.home")
 from reliquary import cli
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CLI_SPEC = os.path.join(_REPO_ROOT, "docs", "spec", "cli.md")
+_COMMAND_WORD = re.compile(r"[a-z][a-z-]+")
+
+
+def _specified_commands(text):
+    """Every command word the CLI spec writes after ``rlq``.
+
+    Synopses and worked examples share one shape — a line starting
+    ``rlq``, then the command — so both are read. An alternation
+    (``rlq (seed-blueprint | seed-script) <name>``) contributes each
+    branch. Anything that is not a bare lowercase word (a flag, a
+    placeholder, a shell fragment) is not a command.
+    """
+    found = set()
+    for line in text.splitlines():
+        line = line.strip().lstrip("$ ").strip()
+        if not line.startswith("rlq "):
+            continue
+        rest = line[4:].strip()
+        if rest.startswith("("):
+            inner = rest[1:rest.index(")")] if ")" in rest else ""
+            found.update(part.strip() for part in inner.split("|")
+                         if _COMMAND_WORD.fullmatch(part.strip()))
+            continue
+        words = rest.split()
+        if words and _COMMAND_WORD.fullmatch(words[0]):
+            found.add(words[0])
+    return found
+
+
+@unittest.skipUnless(os.path.isfile(_CLI_SPEC),
+                     "the CLI spec is source-tree only")
+class ClaimedCommandTests(unittest.TestCase):
+    """The CLI spec and the CLI carry the same command inventory.
+
+    P24 asks that every interface be tested against its
+    specification, and the CLI's inventory is the part of that a
+    machine can check. It is not hypothetical: on 2026-07-27 this
+    check found five commands specified and absent
+    (`clone-machine`, `export-machine`, `export-drive`,
+    `search-media`, `search-scripts`, plus the already-filed
+    `clean-archives`) and five present and unspecified
+    (`add-media`, `prune-media`, `put-file`, `get-file`,
+    `get-machine-var`) — one of which a careful hand audit the same
+    day had missed.
+    """
+
+    def _spec(self):
+        with open(_CLI_SPEC, encoding="utf-8") as handle:
+            return _specified_commands(handle.read())
+
+    def test_the_spec_documents_no_command_that_does_not_exist(self):
+        absent = sorted(self._spec() - set(cli._COMMANDS))
+        self.assertEqual(
+            absent, [],
+            "docs/spec/cli.md specifies commands the CLI does not "
+            f"have: {absent}. A spec states what exists; unbuilt "
+            "capability belongs in planning/proposed/FEATURES.md.")
+
+    def test_every_command_is_documented(self):
+        undocumented = sorted(set(cli._COMMANDS) - self._spec())
+        self.assertEqual(
+            undocumented, [],
+            "these commands ship undocumented in docs/spec/cli.md: "
+            f"{undocumented}. The CLI is a primary interface and the "
+            "spec is what it answers to.")
 
 
 class CliEmptyListingTests(unittest.TestCase):

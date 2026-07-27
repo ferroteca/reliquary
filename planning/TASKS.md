@@ -174,6 +174,34 @@ code has the bug, so the norm is already the demand.
   under D48 a named gap against an armed principle is a defect,
   not a proposal.
 
+  **The CLI half is done (2026-07-27), and it paid immediately.**
+  `ClaimedCommandTests` compares the command words
+  `docs/spec/cli.md` writes after `rlq` against `cli._COMMANDS`,
+  both directions. Writing it found the spec specifying **five
+  commands that did not exist** — `clone-machine`,
+  `export-machine`, `export-drive`, `search-media`,
+  `search-scripts`, in present tense with worked example
+  output — and **five that shipped undocumented**, one of which
+  (`get-machine-var`) a careful hand sweep the same day had
+  missed. The root cause was one line: cli.md's banner still
+  called it *"a working document for brainstorming"*, so by the
+  banner-is-the-marker rule it had never claimed to be true.
+  **What that suggests for the remaining interfaces**: look for
+  the cheap inventory comparison first — the thing where a spec
+  enumerates and the code enumerates, and a set difference is the
+  whole test. It is not the deep conformance the blueprint corpus
+  achieves, but it caught six divergences in one sitting and it
+  generalizes without a design round. Candidates: the S-id list
+  against the diagnostics that cite them; the error classes and
+  exit codes against `errors.exit_code`; the script language's
+  verb table against the grammar's node names.
+  **Check the banner first, wherever this goes next.** cli.md
+  could not be made true while it disclaimed being a spec, and
+  the sweep found one more marker wrong in the same way:
+  `asset-resolution.md` **has no status banner at all**, so its
+  standing is undeclared — the same rule broken a different way,
+  and unfixed.
+
 - **The DOS drive-letter map assumes one volume per hard disk
   and does not say so** (filed 2026-07-27 by D47, the hour P17
   armed). P17 requires that where the declared facts leave an
@@ -281,35 +309,6 @@ code has the bug, so the norm is already the demand.
   though it were enforced — *"reserved everywhere a
   script-internal name may appear (S5)"*. It describes the intent
   correctly and the behaviour not at all.
-
-- **The CLI spec and the CLI have drifted apart in both
-  directions** (found 2026-07-27, checking one stale command
-  reference and sweeping the rest). Five divergences, same class
-  as `--qemu` above and larger.
-  **Specified but gone**: `clean-archives`, in
-  [docs/spec/cli.md](../docs/spec/cli.md) three times — the
-  synopsis, the prose, and a worked example — reclaiming
-  `cache/archives/`, which retired with it when the single media
-  cache landed (CHANGELOG, "One media cache, wholly
-  regenerable"). Neither the command nor the directory exists.
-  **Present but unspecified**: `prune-media`, `add-media`,
-  `put-file`, `get-file` — all four declared in `cli.py` and
-  absent from the spec entirely.
-  **The last two are the sharpest.** They are milestone 9's
-  in-band file exchange, the capability **P17** was armed over
-  (D47) — so the CLI spec does not declare the commands whose
-  addressing an armed principle governs. It also explains why
-  D47 gave P17 its normative home in `script-spec.md` and
-  `api.md` rather than here.
-  **This is evidence for the P24 defect above**, not a separate
-  worry: four commands with no specification are four commands no
-  conformance test could check even if one existed.
-  Direction matters for the fix. The `clean-archives` half is a
-  stale spec describing a deliberate removal, so the spec is
-  simply wrong and is corrected. The four missing commands are
-  live world-facing surface with no norm — writing that norm is
-  authoring, and whatever it states about `put-file`/`get-file`
-  must match what P17 already binds.
 
 ### Small items
 
