@@ -57,19 +57,25 @@ KEYWORDS = (
 )
 
 
-#: Every **statically** decided diagnostic id, and the S-numbered
-#: rule it enforces.
+#: Every id the script parser stack raises, and the S-numbered rule
+#: it enforces.
 #:
 #: Ids are finer than the rules — S7 is one restriction and
 #: ``obs.two-channels`` is one of six diagnostics under it — so this
-#: is many-to-one by design. It maps the static tier alone, and by
-#: construction rather than omission: an S-number names a syntactic
-#: restriction, so a preflight or runtime id — ``media.unknown``,
-#: ``machine.slot-not-declared`` — has no S-number to map to and
-#: belongs here only if one were invented for it. It lives here rather than only in
-#: docs/spec/script-spec.md because a consumer switching on an id
-#: needs the rule without parsing prose; the spec's rule list
-#: carries the same mapping and a test holds the two together.
+#: is many-to-one by design.
+#:
+#: Its scope is this module, the grammar transformer and validation,
+#: and nothing beyond. An S-number names a syntactic restriction, so
+#: an id raised elsewhere — ``media.unknown`` from resolution,
+#: ``machine.slot-not-declared`` from preflight — has none to map to
+#: and no entry here. Within the stack, an id no S-number covers maps
+#: to ``None`` rather than being left out, so the map answers for
+#: every id it can be asked about.
+#:
+#: It lives here rather than only in docs/spec/script-spec.md because
+#: a consumer switching on an id needs the rule without parsing
+#: prose; the spec's rule list carries the same mapping and a test
+#: holds the two together.
 RULE_OF = {
     "node.duplicate-modifier": "S4",
     "node.modifier-not-allowed": "S2",
@@ -141,9 +147,15 @@ RULE_OF.update({
     "prop.unknown-kind": "S5",
 })
 
-#: Ids for static rules the S-numbers do not cover. The http
-#: declaration's rules are static and legality-tier like the rest;
-#: they simply predate the S-numbering and have no entry in it.
+#: Ids this stack raises that no S-number covers, mapped to None.
+#:
+#: Two reasons an id lands here. The http declaration's rules are
+#: static and legality-tier like the rest and simply predate the
+#: S-numbering. The last two are not legality rules at all: a
+#: source that is not text and a script file that is not there,
+#: which the parser reports because it is the layer that looked.
+#: Either way a consumer asking what rule an id enforces gets a
+#: truthful None rather than an S-number invented to fill the map.
 RULE_OF.update({
     "http.port-not-a-number": None,
     "http.indent-not-a-mode": None,
@@ -169,6 +181,8 @@ RULE_OF.update({
     "http.port-out-of-range": None,
     "http.port-range-inverted": None,
     "http.reference-in-path": None,
+    "value.not-a-string": None,
+    "script.unknown": None,
 })
 
 
@@ -509,7 +523,8 @@ def parse_nodes(source, path="<script>"):
     twice on one node (S4). Node names are not interpreted here.
     """
     if not isinstance(source, str):
-        raise StaticError("script source must be text")
+        raise StaticError("script source must be text",
+            rule_id="value.not-a-string")
     source = source.lstrip(chr(0xFEFF))
     lines = source.splitlines()
     try:

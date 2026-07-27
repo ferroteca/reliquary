@@ -58,7 +58,8 @@ def _find_qemu_tool(binary):
             if os.path.isfile(candidate):
                 return candidate
         raise PreflightError(
-            f"{binary} not found under {variable}={qemu_home}")
+            f"{binary} not found under {variable}={qemu_home}",
+            rule_id="machine.backend-not-found")
     found = shutil.which(binary)
     if found:
         return found
@@ -68,7 +69,8 @@ def _find_qemu_tool(binary):
             return candidate
     raise PreflightError(
         f"{binary} not found: install QEMU, add it to PATH, or set "
-        "RELIQUARY_QEMU_HOME to its install directory")
+        "RELIQUARY_QEMU_HOME to its install directory",
+        rule_id="machine.backend-not-found")
 
 
 def find_qemu():
@@ -90,26 +92,31 @@ def create_hdd_image(filename, capacity):
     Returns the absolute path of the created image.
     """
     if not isinstance(filename, str) or not filename.strip():
-        raise StaticError("filename must be a non-empty path")
+        raise StaticError("filename must be a non-empty path",
+            rule_id="value.not-a-string")
     path = os.path.abspath(filename)
     if not path.lower().endswith(".qcow2"):
         raise StaticError(
-            f"hdd image filename must end with .qcow2: {filename}")
+            f"hdd image filename must end with .qcow2: {filename}",
+            rule_id="image.wrong-extension")
     if isinstance(capacity, bool) or not isinstance(capacity, (int, str)):
         raise StaticError(
             "capacity must be a qemu-img size string or positive "
-            "integer MiB value")
+            "integer MiB value", rule_id="value.not-a-size")
     if isinstance(capacity, int):
         if capacity <= 0:
             raise StaticError(
-                "capacity must be a positive integer MiB value")
+                "capacity must be a positive integer MiB value",
+                rule_id="value.not-a-size")
         size = f"{capacity}M"
     else:
         size = capacity.strip()
         if not size:
-            raise StaticError("capacity must be a non-empty size")
+            raise StaticError("capacity must be a non-empty size",
+                rule_id="value.not-a-size")
     if os.path.exists(path):
-        raise PreflightError(f"image already exists: {path}")
+        raise PreflightError(f"image already exists: {path}",
+            rule_id="image.already-exists")
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -126,7 +133,8 @@ def create_hdd_image(filename, capacity):
         detail = (completed.stderr or completed.stdout or "").strip()
         raise RunFailure(
             f"qemu-img failed creating {path}"
-            + (f": {detail}" if detail else ""))
+            + (f": {detail}" if detail else ""),
+            rule_id="image.creation-failed")
     return path
 
 
@@ -138,7 +146,8 @@ def _run_qemu_img(args, action, target):
         detail = (completed.stderr or completed.stdout or "").strip()
         raise RunFailure(
             f"qemu-img failed {action} {target}"
-            + (f": {detail}" if detail else ""))
+            + (f": {detail}" if detail else ""),
+            rule_id="image.operation-failed")
     return completed
 
 
@@ -160,9 +169,11 @@ def create_difference_image(filename, base):
     path = os.path.abspath(os.fspath(filename))
     if not path.lower().endswith(".qcow2"):
         raise StaticError(
-            f"difference image filename must end with .qcow2: {filename}")
+            f"difference image filename must end with .qcow2: {filename}",
+            rule_id="image.wrong-extension")
     if os.path.exists(path):
-        raise PreflightError(f"image already exists: {path}")
+        raise PreflightError(f"image already exists: {path}",
+            rule_id="image.already-exists")
     base = os.path.abspath(os.fspath(base))
     base_format = probe_image_format(base)
     parent = os.path.dirname(path)
@@ -187,9 +198,11 @@ def create_duplicate_image(filename, base):
     path = os.path.abspath(os.fspath(filename))
     if not path.lower().endswith(".qcow2"):
         raise StaticError(
-            f"duplicate image filename must end with .qcow2: {filename}")
+            f"duplicate image filename must end with .qcow2: {filename}",
+            rule_id="image.wrong-extension")
     if os.path.exists(path):
-        raise PreflightError(f"image already exists: {path}")
+        raise PreflightError(f"image already exists: {path}",
+            rule_id="image.already-exists")
     base = os.path.abspath(os.fspath(base))
     parent = os.path.dirname(path)
     if parent:
@@ -290,14 +303,17 @@ def resolve_vm(port=None, home=None):
     if port is None:
         if not state:
             raise PreflightError(
-                "no active reliquary VM is recorded; run: reliquary start")
+                "no active reliquary VM is recorded; run: reliquary start",
+                rule_id="machine.no-active-vm")
         return state["port"], state["name"], state["uuid"]
     if not 1 <= port <= 65535:
-        raise StaticError(f"QMP port must be between 1 and 65535: {port}")
+        raise StaticError(f"QMP port must be between 1 and 65535: {port}",
+            rule_id="value.not-a-port")
     if not state or state["port"] != port:
         raise PreflightError(
             f"QMP port {port} is not the recorded reliquary VM; "
-            "start it with reliquary or omit --port to use the active VM")
+            "start it with reliquary or omit --port to use the active VM",
+            rule_id="machine.port-not-recorded")
     return port, state["name"], state["uuid"]
 
 
@@ -314,7 +330,8 @@ def verify_vm(qmp, port, expected_name, expected_uuid):
         raise PreflightError(
             "QMP identity mismatch; the unrelated VM was not modified\n"
             f"  expected: {expected_name} on 127.0.0.1:{port}\n"
-            f"  found:    {actual_name or '<unnamed QMP server>'}")
+            f"  found:    {actual_name or '<unnamed QMP server>'}",
+            rule_id="machine.identity-mismatch")
     reply = qmp.cmd("query-uuid")
     actual_uuid = reply.get("UUID") if isinstance(reply, dict) else None
     if (not isinstance(actual_uuid, str)
@@ -324,7 +341,8 @@ def verify_vm(qmp, port, expected_name, expected_uuid):
             f"  expected: {expected_name} ({expected_uuid}) "
             f"on 127.0.0.1:{port}\n"
             f"  found:    {actual_name} "
-            f"({actual_uuid or '<no uuid>'})")
+            f"({actual_uuid or '<no uuid>'})",
+            rule_id="machine.identity-mismatch")
 
 
 @contextlib.contextmanager
@@ -346,7 +364,8 @@ def qmp_session(port=None, home=None):
             raise PreflightError(
                 "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {expected_name} on "
-                f"127.0.0.1:{actual_port}") from error
+                f"127.0.0.1:{actual_port}",
+                rule_id="machine.vm-unreachable") from error
 
 
 def available_port():
@@ -378,7 +397,7 @@ def _startup_error(proc, stderr_log, port, automatic, detail, args):
     if stderr:
         message += f"\n  QEMU error: {stderr}"
     message += f"\n  command line: {subprocess.list2cmdline(args)}"
-    return RunFailure(message)
+    return RunFailure(message, rule_id="machine.backend-failed-to-start")
 
 
 def _terminate_started_process(proc):
@@ -408,12 +427,14 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     automatic_port = port is None
     port = available_port() if automatic_port else port
     if not 1 <= port <= 65535:
-        raise StaticError(f"QMP port must be between 1 and 65535: {port}")
+        raise StaticError(f"QMP port must be between 1 and 65535: {port}",
+            rule_id="value.not-a-port")
     if port_in_use(port):
         selection = "automatically selected" if automatic_port else "explicit"
         raise PreflightError(
             f"QMP port 127.0.0.1:{port} is already in use "
-            f"({selection}); choose another --port or stop its owner")
+            f"({selection}); choose another --port or stop its owner",
+            rule_id="machine.port-in-use")
     if current_vm:
         try:
             with Qmp(current_vm["port"]) as old_qmp:
@@ -426,7 +447,8 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                 "a reliquary VM is already active\n"
                 f"  name: {current_vm['name']}\n"
                 f"  QMP port: 127.0.0.1:{current_vm['port']}\n"
-                "stop it before starting another VM for this machine")
+                "stop it before starting another VM for this machine",
+                rule_id="machine.vm-already-active")
     # The readable -name repeats across homes (same-numbered machines
     # of one blueprint); the per-start uuid is what makes this exact
     # QEMU instance verifiable.
@@ -490,7 +512,8 @@ def stop(vm):
     if not vm:
         # A machine caught with no recorded VM identity — treat as
         # already gone so the caller reconciles it to a resting phase.
-        raise PreflightError("no recorded reliquary VM to stop")
+        raise PreflightError("no recorded reliquary VM to stop",
+            rule_id="machine.no-active-vm")
     port = vm["port"]
     expected_name = vm["name"]
     expected_uuid = vm["uuid"]
@@ -504,7 +527,8 @@ def stop(vm):
     except (OSError, ConnectError):
         raise PreflightError(
             "the recorded reliquary VM is no longer reachable\n"
-            f"  expected: {expected_name} on 127.0.0.1:{port}")
+            f"  expected: {expected_name} on 127.0.0.1:{port}",
+            rule_id="machine.vm-unreachable")
     deadline = time.monotonic() + 15
     while True:
         try:
@@ -514,6 +538,7 @@ def stop(vm):
         if time.monotonic() > deadline:
             raise RunFailure(
                 "QEMU is still holding the QMP port 15s after quit; "
-                "a following start() on the same port would collide")
+                "a following start() on the same port would collide",
+                rule_id="machine.port-not-released")
         time.sleep(0.5)
     print("rlq: VM stopped", file=sys.stderr)

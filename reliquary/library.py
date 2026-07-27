@@ -158,7 +158,8 @@ def _blueprint_entries(source):
         if name in entries:
             raise StaticError(
                 f"two blueprint assets both resolve to the name "
-                f"{name!r}:\n  {entries[name][0]}\n  {path}")
+                f"{name!r}:\n  {entries[name][0]}\n  {path}",
+                rule_id="name.asset-collision")
         entries[name] = (path, meta)
     return entries
 
@@ -207,7 +208,8 @@ def locate_blueprint(name, context=None):
     if path is None:
         raise PreflightError(
             f"blueprint not found: {name}\n"
-            f"expected under {source.describe('blueprint')}")
+            f"expected under {source.describe('blueprint')}",
+            rule_id="blueprint.unknown")
     return path
 
 
@@ -371,5 +373,6 @@ def locate_script(stem, context=None):
     if path is None:
         raise PreflightError(
             f"script not found: {stem}.rlqs\n"
-            f"expected under {source.describe('script')}")
+            f"expected under {source.describe('script')}",
+            rule_id="script.unknown")
     return path

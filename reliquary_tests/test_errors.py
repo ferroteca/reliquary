@@ -268,6 +268,106 @@ class DeliberateRaisesStayInTheHierarchyTests(unittest.TestCase):
         self.assertEqual(wrong, [], "\n".join(wrong))
 
 
+class EveryDiagnosticNamesItsRuleTests(unittest.TestCase):
+    """`script-spec.md` requires an id of every diagnostic (D55).
+
+    The requirement had been read as the script surface's, because the
+    error classes were read as tiers of a script run. D58 generalized
+    the classes and the requirement travelled with them, which took the
+    population from 30 to 288. It reads zero now, and this is what
+    keeps it there: the next diagnostic added without an id fails here
+    rather than being noticed later by a measurement.
+
+    The corpora assert that the *right* id fires for a given input;
+    this asserts only that one exists, which is the part a corpus
+    cannot cover for surfaces it has no fixtures for.
+    """
+
+    #: Classes that name no rule, and why.
+    #:
+    #: `InternalError` is a fault — no user input reaches it, so there
+    #: is no rule a caller could act on. `RunCancelled` is not an error
+    #: at all but an outcome. `_PropertyUnbound` is a private signal the
+    #: statement dispatcher always catches and restates. A bare
+    #: `NotImplementedError` is the abstract-method idiom, an invariant
+    #: the language enforces rather than a report to anyone.
+    EXEMPT = {"InternalError", "RunCancelled", "_PropertyUnbound",
+              "NotImplementedError"}
+
+    #: Helpers that *return* a diagnostic for a caller to raise. The id
+    #: lives at the construction, so the raise site has none to give —
+    #: which is why a sweep over `raise` statements alone would miss
+    #: them, and did until this test was written.
+    RETURNING = {"_startup_error", "_unbound_failure", "_chaining_failure",
+                 "_unbound", "_diagnose", "_error", "_expired"}
+
+    def test_every_deliberate_raise_names_a_rule(self):
+        bare = []
+        root = os.path.dirname(os.path.abspath(reliquary.__file__))
+        for folder, _dirs, names in os.walk(root):
+            for name in sorted(names):
+                if not name.endswith(".py"):
+                    continue
+                path = os.path.join(folder, name)
+                with open(path, encoding="utf-8") as handle:
+                    tree = ast.parse(handle.read(), filename=path)
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Raise) or node.exc is None:
+                        continue
+                    if not isinstance(node.exc, ast.Call):
+                        continue    # `raise` of a name built elsewhere
+                    func = node.exc.func
+                    label = (getattr(func, "id", None)
+                             or getattr(func, "attr", None))
+                    if label is None or label in self.EXEMPT:
+                        continue
+                    if label in self.RETURNING:
+                        continue
+                    if any(k.arg == "rule_id" for k in node.exc.keywords):
+                        continue
+                    bare.append(
+                        f"{os.path.relpath(path, root)}:{node.lineno}: "
+                        f"raise {label}")
+        self.assertEqual(
+            bare, [], "\n".join(
+                ["these diagnostics name no rule. Give each a rule_id "
+                 "whose prefix is its subject, reusing an id where the "
+                 "rule already has one:"] + bare))
+
+    def test_the_returning_helpers_name_a_rule_where_they_build_it(self):
+        """The exemption above is narrow, and asserted in both directions.
+
+        A helper that returns a diagnostic is exempt at the raise site
+        precisely because the id belongs at the construction. If one
+        stopped setting an id there, the exemption would hide it.
+        """
+        root = os.path.dirname(os.path.abspath(reliquary.__file__))
+        found = {}
+        for folder, _dirs, names in os.walk(root):
+            for name in sorted(names):
+                if not name.endswith(".py"):
+                    continue
+                path = os.path.join(folder, name)
+                with open(path, encoding="utf-8") as handle:
+                    tree = ast.parse(handle.read(), filename=path)
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.FunctionDef):
+                        continue
+                    if node.name not in self.RETURNING:
+                        continue
+                    named = False
+                    for inner in ast.walk(node):
+                        if (isinstance(inner, ast.keyword)
+                                and inner.arg == "rule_id"):
+                            named = True
+                    found.setdefault(node.name, False)
+                    found[node.name] = found[node.name] or named
+        self.assertEqual(
+            sorted(name for name, named in found.items() if not named), [],
+            "these helpers build a diagnostic and set no rule_id, while "
+            "their raise sites are exempt on the grounds that they do.")
+
+
 class GeneralizedClassesTests(unittest.TestCase):
     """The four classes describe every surface, not only a run (D58)."""
 

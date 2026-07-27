@@ -803,7 +803,8 @@ def parse_script(source, path="<script>"):
     observation channels, control flow.
     """
     if not isinstance(source, str):
-        raise StaticError("script source must be text")
+        raise StaticError("script source must be text",
+            rule_id="value.not-a-string")
     source = source.lstrip(chr(0xFEFF))
     base_dir = None
     if path != "<script>":
@@ -833,7 +834,8 @@ def load_script(path):
         with open(path, encoding="utf-8") as handle:
             return parse_script(handle.read(), path=path)
     except FileNotFoundError:
-        raise PreflightError(f"Script not found: {path}") from None
+        raise PreflightError(f"Script not found: {path}",
+            rule_id="script.unknown") from None
 
 
 def _diagnose(error, source, path):

@@ -130,7 +130,8 @@ def _approve_refetch(name, actual, expected, on_mismatch, source, context):
             return
     raise RunFailure(
         explanation
-        + "\ndelete it, or pre-approve with on_mismatch='refetch'")
+        + "\ndelete it, or pre-approve with on_mismatch='refetch'",
+        rule_id="media.hash-mismatch")
 
 
 def _content_length(response):
@@ -216,7 +217,8 @@ def _verify(path, expected, describe, name=None, events=None,
     actual = _sha256(path, cancelled)
     if actual != expected:
         raise RunFailure(
-            f"{describe} at {path} has SHA-256 {actual}, expected {expected}")
+            f"{describe} at {path} has SHA-256 {actual}, expected {expected}",
+            rule_id="media.hash-mismatch")
     if events is not None:
         events.emit(_events.VERIFY_END, name=name or describe,
                     algorithm="sha256",
@@ -244,7 +246,8 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
                                 source=_describe(option),
                                 operation="attempt", error=str(error))
         raise RunFailure(
-            f"every location for {name!r} failed:\n  " + "\n  ".join(errors))
+            f"every location for {name!r} failed:\n  " + "\n  ".join(errors),
+            rule_id="media.all-locations-failed")
 
     if isinstance(plan, resolve.LocalFile):
         # A local payload is used in place, so it has to still be
@@ -256,7 +259,8 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
             raise PreflightError(
                 f"media {name!r} is declared at {plan.path}, but nothing "
                 "is there.\nRestore the file, or edit the blueprint that "
-                "declares it to name where it lives now")
+                "declares it to name where it lives now",
+                rule_id="media.file-missing")
         _verify(plan.path, plan.sha256, f"local file for {name!r}",
                 name, events, cancelled)
         return plan.path
@@ -351,7 +355,7 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail",
     if on_mismatch not in _MISMATCH_POLICIES:
         raise StaticError(
             f"on_mismatch must be one of {_MISMATCH_POLICIES}, "
-            f"got: {on_mismatch!r}")
+            f"got: {on_mismatch!r}", rule_id="value.not-in-vocabulary")
     plan = resolve.resolve_media_plan(media, namespace, properties)
     if plan is None:
         return None

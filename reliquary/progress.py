@@ -47,7 +47,7 @@ def resolve_mode(progress, *, stream=None):
     if progress not in MODES:
         raise StaticError(
             f"--progress must be one of {', '.join(MODES)}, "
-            f"got: {progress!r}")
+            f"got: {progress!r}", rule_id="progress.unknown-mode")
     if progress != "auto":
         return progress
     handle = stream if stream is not None else sys.stderr

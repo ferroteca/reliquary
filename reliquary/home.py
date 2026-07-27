@@ -84,7 +84,8 @@ def assets_mode(context=None):
     if mode is None or mode is _UNSET:
         raise StaticError(
             "no asset source configured: pass assets=<dir> to name "
-            "the project's asset root (the CLI defaults to the home)")
+            "the project's asset root (the CLI defaults to the home)",
+            rule_id="assets.not-configured")
     return mode
 
 

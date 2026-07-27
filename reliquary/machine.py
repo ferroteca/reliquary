@@ -25,7 +25,8 @@ def validate_screenshot_name(name):
             or os.path.basename(name) != name
             or "/" in name or "\\" in name):
         raise StaticError(
-            "screenshot name must be a non-empty filename, not a path")
+            "screenshot name must be a non-empty filename, not a path",
+            rule_id="value.not-a-filename")
     return name
 
 
@@ -58,7 +59,8 @@ def screenshot(name="screen", port=None, home=None, directory=None):
             image.save(png)
     except OSError as error:
         raise RunFailure(
-            f"unexpected screendump format in {ppm}: {error}") from error
+            f"unexpected screendump format in {ppm}: {error}",
+            rule_id="screen.screendump-unreadable") from error
     os.remove(ppm)
     print(f"rlq: saved {png}", file=sys.stderr)
 
@@ -117,7 +119,8 @@ def char_keys(character):
         return [character]
     if character.isupper():
         return ["shift", character.lower()]
-    raise StaticError(f"no key mapping for {character!r}")
+    raise StaticError(f"no key mapping for {character!r}",
+        rule_id="key.no-mapping")
 
 
 def _normalize(text):
@@ -154,13 +157,15 @@ def _match_menu_row(rows, item, exclude=()):
     if matches:
         listed = ", ".join(repr(rows[row].strip()) for row in matches)
         raise RunFailure(
-            f"menu item {item!r} matches multiple rows: {listed}")
+            f"menu item {item!r} matches multiple rows: {listed}",
+            rule_id="screen.menu-ambiguous")
     excluded = [row for row, folded in enumerate(folded_rows)
                 if target in folded and not allowed(folded)]
     if excluded:
         listed = ", ".join(repr(rows[row].strip()) for row in excluded)
         raise RunFailure(
-            f"menu item {item!r} only matches excluded rows: {listed}")
+            f"menu item {item!r} only matches excluded rows: {listed}",
+            rule_id="screen.menu-excluded")
     candidates = {folded: text.strip()
                   for folded, text in zip(folded_rows, rows)
                   if text.strip() and allowed(folded)}
@@ -169,7 +174,8 @@ def _match_menu_row(rows, item, exclude=()):
     hint = ("; closest rows: "
             + ", ".join(repr(candidates[text]) for text in close)
             if close else "")
-    raise RunFailure(f"menu item {item!r} is not on screen{hint}")
+    raise RunFailure(f"menu item {item!r} is not on screen{hint}",
+        rule_id="screen.menu-absent")
 
 
 def _animation_cells(samples):
@@ -309,7 +315,8 @@ class _DisplayConsole:
         Returns the selected row's text as displayed at selection.
         """
         if not _normalize(item):
-            raise StaticError("menu item text must be non-empty")
+            raise StaticError("menu item text must be non-empty",
+                rule_id="value.not-a-string")
         deadline = time.monotonic() + timeout
         mask, rows, attributes = self._menu_baseline(deadline)
         target_row = _match_menu_row(rows, item, exclude)
@@ -327,14 +334,15 @@ class _DisplayConsole:
         if current is None:
             raise RunFailure(
                 "no menu highlight responded to cursor keys; cannot "
-                f"select {item!r}")
+                f"select {item!r}", rule_id="screen.menu-no-highlight")
         stalled = 0
         while True:
             while current != target_row:
                 if time.monotonic() >= deadline:
                     raise RunFailure(
                         f"menu highlight never reached {item!r} within "
-                        f"{timeout}s; is it a selectable menu item?")
+                        f"{timeout}s; is it a selectable menu item?",
+                        rule_id="screen.menu-unreachable")
                 key = "down" if current < target_row else "up"
                 self.send_keys([[key]])
                 responded, moved_rows, attributes, moved, attribute = (
@@ -366,7 +374,8 @@ class _DisplayConsole:
                         if stalled >= 2:
                             raise RunFailure(
                                 "menu highlight stopped responding "
-                                f"before reaching {item!r}")
+                                f"before reaching {item!r}",
+                                rule_id="screen.menu-stalled")
                 try:
                     target_row = _match_menu_row(rows, item, exclude)
                 except RunFailure:
@@ -383,7 +392,8 @@ class _DisplayConsole:
             if time.monotonic() >= deadline:
                 raise RunFailure(
                     f"menu highlight never reached {item!r} within "
-                    f"{timeout}s; is it a selectable menu item?")
+                    f"{timeout}s; is it a selectable menu item?",
+                    rule_id="screen.menu-unreachable")
             # The highlight is not on the target after all — a redraw
             # was still in flight, or the menu moved its own cursor.
             # Relocate the bar and steer again.
@@ -547,7 +557,7 @@ class Machine:
                 time.sleep(2)
         raise RunFailure(
             f"timed out after {timeout}s waiting for screen to match: "
-            f"{pattern}")
+            f"{pattern}", rule_id="screen.no-match")
 
 
 def send_keys(combos, port=None, delay=0.06, home=None):

@@ -24,7 +24,8 @@ def new_blueprint(name, *, platform="dos", context=None):
     from .home import blueprints_dir
     path = os.path.join(blueprints_dir(context), f"{name}.rlqb")
     if os.path.exists(path):
-        raise PreflightError(f"blueprint already exists: {path}")
+        raise PreflightError(f"blueprint already exists: {path}",
+            rule_id="blueprint.already-exists")
 
     data = [
         {
@@ -68,13 +69,15 @@ def add_media(name, path, *, context=None):
 
     source = os.path.abspath(os.fspath(path))
     if not os.path.isfile(source):
-        raise PreflightError(f"no such file: {source}")
+        raise PreflightError(f"no such file: {source}",
+            rule_id="media.file-missing")
 
     destination = os.path.join(blueprints_dir(context), f"{name}.rlqb")
     if os.path.exists(destination):
         raise PreflightError(
             f"blueprint already exists: {destination}\n"
-            f"edit it to declare {name!r}, or choose another name")
+            f"edit it to declare {name!r}, or choose another name",
+            rule_id="blueprint.already-exists")
 
     # Forward slashes read the same on every host and need no JSON
     # escaping; the locator's drive-letter exemption accepts 'D:/…'.
@@ -113,7 +116,8 @@ def delete_blueprint(name, *, context=None):
             f"blueprint {name!r} still has "
             f"{len(machines)} machine(s):\n"
             f"  {ids}\n"
-            "destroy them first, then delete the blueprint")
+            "destroy them first, then delete the blueprint",
+            rule_id="blueprint.has-machines")
 
     path = None
     for extension in (".rlqb", ".json"):
@@ -125,6 +129,7 @@ def delete_blueprint(name, *, context=None):
     if path is None:
         raise PreflightError(
             f"blueprint not found: {name}.rlqb\n"
-            f"expected under {blueprints_dir(context)}")
+            f"expected under {blueprints_dir(context)}",
+            rule_id="blueprint.unknown")
     os.remove(path)
     return path

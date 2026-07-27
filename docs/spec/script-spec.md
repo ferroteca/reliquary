@@ -1932,16 +1932,24 @@ the surface, because the namespace is shared across both: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
 `node.`, `http.`, `media.`, `machine.`, `platform.`, `progress.`,
 `store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`, `drive.`,
-`blueprint.`.
+`blueprint.`, `image.`, `screen.`, `script.`, `assets.`.
 
-The last five arrived with the blueprint document, and they are the
-blueprint model's own nouns rather than names invented for the
-occasion (`docs/spec/blueprint-model.md`): `ref.` for the `${…}`
-grammar, `value.` for what a field's value has to be, `field.` for
-the document's field vocabulary, `drive.` for drive keys, slots and
-the boot order, and `blueprint.` for the document as a whole. That
-document's name-charter and media-semantics rules took `name.` and
-`media.` instead, being the same rules already named elsewhere.
+Every subject past the script language's own is a noun the rest of
+the model already uses, rather than a name invented for the
+occasion. From the blueprint document
+(`docs/spec/blueprint-model.md`): `ref.` for the `${…}` grammar,
+`value.` for what a field's value has to be, `field.` for the
+document's field vocabulary, `drive.` for drive keys, slots and the
+boot order, `blueprint.` for the document as a whole. From the rest
+of the system: `image.` for a materialized disk image, `screen.` for
+what the guest displays, `script.` for a script file, `assets.` for
+the asset source, `machine.` for a machine and its phases, `media.`
+for a media and its payload, `platform.`, `progress.`, `store.`.
+
+Two families the blueprint document could have taken new subjects
+for took existing ones instead: its name-charter rules are `name.`
+and its media semantics are `media.`, those being the same rules
+already named elsewhere.
 
 **This list is closed and enforced.** A diagnostic whose subject
 is not on it does not get a new prefix invented for it in passing;
@@ -1974,16 +1982,22 @@ script conformance corpus
 refusing to let a fixture claim an id that is absent, or omit one
 that has arrived.
 
-**Other surfaces are not covered yet**, and the requirement above
-reaches them. Generalizing the error classes generalized this
-sentence with them: a malformed blueprint is a STATIC ERROR like a
-malformed script, so it owes an id on the same terms. The
-blueprint document parser, the machine verbs, the VM lifecycle and
-the properties file together hold some 245 diagnostics that carry
-none, tracked as a defect rather than left to be noticed. Nothing
-about the scheme changes for them — the prefix is still the
-subject — but the blueprint surface will want subjects of its own,
-and choosing them is that work rather than this sentence's.
+**Every surface is covered.** Generalizing the error classes
+generalized this requirement with them: a malformed blueprint is
+a STATIC ERROR like a malformed script, so it owes an id on the
+same terms — as do the machine verbs, the VM lifecycle, the guest
+console, the properties file and the credential store. All of
+them have one. Three assertions hold it there rather than a
+measurement having to be repeated: every deliberate raise in the
+package carries an id, every id's subject is one this list names,
+and both conformance corpora check that the id a fixture declares
+is the id that fires.
+
+What no surface but this one has is a **located** diagnostic. A
+script diagnostic cites a line and column, or the statement it
+came from; a blueprint diagnostic cites a field breadcrumb and no
+position, because the document parser walks an already-parsed
+object. That is a gap in the diagnostics, not in the ids.
 
 The grammar's own rejections are the coarsest ids in the scheme:
 `syn.unexpected-token` and `syn.unexpected-end` name a token, not

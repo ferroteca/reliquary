@@ -178,6 +178,7 @@ def index_by_name(files, name_of, kind):
         if existing is not None:
             raise PreflightError(
                 f"two {kind} assets both resolve to the name "
-                f"{effective!r}:\n  {existing}\n  {path}")
+                f"{effective!r}:\n  {existing}\n  {path}",
+                rule_id="name.asset-collision")
         index[effective] = path
     return index

@@ -33,7 +33,8 @@ class AgentlessGuestExec:
                     return
                 time.sleep(2)
         raise RunFailure(
-            f"timed out after {timeout}s waiting for a DOS prompt")
+            f"timed out after {timeout}s waiting for a DOS prompt",
+            rule_id="screen.no-match")
 
     def execute(self, command: str, timeout: float = 120):
         """Type a DOS command, wait for the prompt, and return its output.
@@ -56,7 +57,7 @@ class AgentlessGuestExec:
                 time.sleep(2)
         raise RunFailure(
             f"timed out after {timeout}s waiting for command to finish: "
-            f"{command}")
+            f"{command}", rule_id="screen.no-match")
 
 
 def _command_output(rows, command):

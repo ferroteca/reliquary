@@ -108,94 +108,29 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **Diagnostics carry no stable identifier — the surfaces left**
-  (filed 2026-07-27 by finishing the script surface; D55's
-  requirement, D58's reach. Second pass: properties, credentials, the
-  CLI. Third pass: the blueprint document, and its corpus now
-  asserting the ids.)
-  [script-spec.md](../docs/spec/script-spec.md) requires an id of
-  *every* diagnostic.
+*(Emptied and struck on 2026-07-27, the last of the five groups. The
+standing identifier defect was the final entry: `script-spec.md`
+requires an id of every diagnostic, and every diagnostic has one —
+284 ids across 26 subjects, all 26 listed in the spec's prefix list
+and held there by test.
 
-  **This is D58's consequence, not a new demand.** The four error
-  classes used to be read as tiers of a script run, so the id
-  requirement was read as the script surface's too. D58 made the
-  classes describe every surface and the requirement travelled with
-  them: a malformed blueprint is a STATIC ERROR exactly as a
-  malformed script is, so it owes an id on the same terms.
+It closed in four passes, each measuring the next: the script surface
+(82 static, then 43 preflight and runtime), the properties file and
+CLI (40, where the reuse rule first paid off), the blueprint document
+(97, its subjects argued rather than guessed), and the rest (108,
+subjects all reused). The population went from 30 to 288 in between,
+because D58 generalized the error classes and the id requirement
+travelled with them — one ratification turning a script-surface job
+into a whole-system one.
 
-  **Measured, not estimated.** Diagnostics carrying no id:
-
-  | module | what it diagnoses | without an id |
-  |---|---|---|
-  | `machines.py` | the machine verbs | 44 |
-  | `lifecycle.py` | the VM's own lifecycle | 26 |
-  | `machine.py` | the guest console | 12 |
-  | `blueprint.py` | blueprint file authoring | 5 |
-  | `acquire.py` | fetch, verify, extract | 5 |
-  | `platform_dos.py` | DOS addressing | 5 |
-  | the remaining 7 | library, assets, progress, home, … | 11 |
-
-  108 across 13 modules, from 205 across 14 and 245 across 17 before
-  that. The count is a one-command measurement — walk every `raise`
-  and look for a `rule_id` keyword — so it is re-derived rather than
-  trusted.
-
-  **Nothing left needs a subject argued.** That was the blueprint
-  document's question and it is answered; what remains is machine
-  operations, the VM lifecycle, the guest console and small
-  helpers, all of which fall under subjects that already exist —
-  `machine.`, `media.`, `drive.`, `value.`, `name.`, `platform.`.
-  Expect heavy reuse rather than new prefixes, and check for the rule
-  before minting an id: `machines.py`'s 44 are the phase and
-  materialization rules, several of which the script runner and the
-  CLI have already named.
-
-  **The subject list is closed and enforced**, which is what keeps
-  that honest: `test_script_corpus.py` holds the code's subjects and
-  the spec's prefix list to each other in both directions, so a new
-  subject is an edit to the spec rather than a local decision. All 22
-  current subjects are listed there.
-
-  **One rule keeps one id across surfaces** — asserted, not
-  described. `machine.not-running` is raised from five places, and
-  `machine.no-selector`, `machine.no-vm-identity` and
-  `field.unknown` from four each. The reuse also shows up in the
-  corpus: `ref.not-allowed-here` rejects nine fixtures from three
-  raise sites, because refusing a reference in a closed or
-  identity position is one rule wherever the position is.
-
-  **Both corpora assert the id now.** The blueprint corpus could not
-  until its diagnostics had them, and its README said so — headers
-  were "documentation, not assertions" and a fixture failing for the
-  wrong reason was a false pass only a reviewer could catch. All 47
-  invalid fixtures now declare an id and the harness compares it.
-  What the blueprint corpus still cannot assert is that an id serves
-  the rule the fixture *means* to exercise: the script corpus checks
-  that through `# rule:` and the S-numbering, and blueprint rules
-  have no numbering to check against. That is a real remaining
-  difference, not an oversight.
-
-  **A located diagnostic is the other half, and only the blueprint
-  surface lacks it.** `ScriptParseError` carries line and column;
-  the runner's `_Located` cites a statement. A blueprint diagnostic
-  carries neither, and `jsonc.loads` hanging `lineno`/`colno` on a
-  raised `StaticError` as plain attributes is the stopgap that
-  proves the need rather than meeting it. `document.py` walks a
-  parsed object with a `where` breadcrumb and no line, so a real
-  location means carrying position through the parse — the larger
-  half of that module's work, untouched by the ids, and worth its own
-  entry when it is picked up.
-
-  **What is already true** (do not redo it): `rule_id` lives on
-  `ReliquaryError`, so every class has the field and nothing needs
-  a new one; the spec's prefix list carries all 22 current subjects;
-  and `RULE_OF` maps the static script tier alone by construction,
-  S-numbers naming syntactic restrictions only, so a non-script id
-  absent from it is correct rather than missing.
-
-  **The index is still not the gap.** Deferring the id *index* to
-  beta stays where the spec says it; generating it is cheap now
-  that ids are a field rather than message text.
+Three guards keep it closed rather than a measurement having to be
+repeated: every deliberate raise carries an id, every id's subject is
+one the spec lists, and both corpora assert that the declared id is
+the one that fires. What is *not* closed is a **located** blueprint
+diagnostic — `document.py` walks a parsed object with a `where`
+breadcrumb and no line, so position has to be threaded through the
+parse. That is its own work, untouched by the ids, and wants its own
+entry when someone picks it up.)*
 
 ### Small items
 

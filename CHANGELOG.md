@@ -191,6 +191,48 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Every diagnostic Reliquary can raise now names the rule it
+  enforces.** `script-spec.md` requires a stable identifier of *every*
+  diagnostic; the count is zero remaining, from 288. 284 ids across 26
+  subjects, all 26 declared in the spec's prefix list.
+
+  The last pass covered 108 across 13 modules — the machine verbs, the
+  VM lifecycle, the guest console, DOS addressing, media acquisition,
+  blueprint authoring and the small helpers. No subject needed
+  arguing: `machine.`, `drive.`, `media.`, `value.`, `name.` and
+  `blueprint.` already existed, and four more model nouns joined for
+  things that had none — `image.` for a materialized disk image,
+  `screen.` for what the guest displays, `script.` for a script file,
+  `assets.` for the asset source. Reuse ran deep: `value.not-a-string`
+  answers from nine places, `value.not-an-object` from seven,
+  `blueprint.unknown`, `machine.not-running` and `value.not-a-size`
+  from five each, `media.file-missing` and `machine.must-be-stopped`
+  from four. A rule keeps one id however many layers can notice it.
+
+  **Three assertions keep it closed, so the measurement need not be
+  repeated.** Every deliberate raise in the package carries an id —
+  405 raise sites inspected, with a narrow, documented exemption for
+  faults, private signals and abstract-method stubs. Every id's
+  subject is one the spec lists, checked in both directions. And both
+  conformance corpora verify that the id a fixture declares is the one
+  that fires.
+
+  Writing the first of those found what a `raise`-statement sweep
+  structurally cannot: **six diagnostics are *returned* by a helper**
+  for a caller to raise, so their raise sites carry no keyword at all.
+  Those helpers are exempt at the raise site and asserted at the
+  construction instead, which is the only place an id can live for
+  them. One had been missed on that account and now carries
+  `machine.backend-failed-to-start`.
+
+  It also surfaced a seam in `RULE_OF`, the id-to-S-rule map: it was
+  scanned by module, on the assumption that three modules *are* the
+  static tier, and `script_parser.py` raises one preflight diagnostic
+  too. The map now covers every id the parser stack raises, with
+  `None` where no S-number applies — which the `http.` family already
+  did for rules predating the numbering — and its docstring says so
+  instead of overstating the scope.
+
 - **Every blueprint diagnostic carries a stable identifier, and the
   blueprint conformance corpus asserts it.** `document.py`'s 97 rules
   now name themselves — 73 distinct ids — leaving 108 across 13

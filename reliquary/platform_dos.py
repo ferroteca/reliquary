@@ -14,7 +14,8 @@ def program_name(path):
     """Return the DOS command name for a supported executable path."""
     name = os.path.basename(path)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,8}\.[Ee][Xx][Ee]", name):
-        raise StaticError(f"guest executable needs a DOS 8.3 name: {name}")
+        raise StaticError(f"guest executable needs a DOS 8.3 name: {name}",
+            rule_id="name.not-dos-8-3")
     return name
 
 
@@ -134,18 +135,22 @@ def split_address(address):
     matches them, and the vvfat staging directory is where they land).
     """
     if not isinstance(address, str) or not address.strip():
-        raise StaticError("a guest file address is required")
+        raise StaticError("a guest file address is required",
+            rule_id="drive.address-empty")
     match = _ADDRESS.match(address.strip())
     if match is None:
         raise StaticError(
             f"{address!r} is not a DOS path: write it as the guest "
-            r"does, drive-letter first (C:\DOS\FOO.TXT)")
+            r"does, drive-letter first (C:\DOS\FOO.TXT)",
+            rule_id="drive.address-malformed")
     letter, remainder = match.group(1).upper(), match.group(2)
     segments = [part for part in re.split(r"[\\/]+", remainder) if part]
     if not segments:
         raise StaticError(
-            f"{address!r} names a drive but no file")
+            f"{address!r} names a drive but no file",
+            rule_id="drive.address-has-no-file")
     if any(part in (".", "..") for part in segments):
         raise StaticError(
-            f"{address!r} may not contain . or .. segments")
+            f"{address!r} may not contain . or .. segments",
+            rule_id="drive.address-has-dot-segments")
     return letter, segments
