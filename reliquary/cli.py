@@ -8,6 +8,7 @@ import importlib.metadata
 import json
 import os
 import sys
+import traceback
 
 try:
     _version = importlib.metadata.version("reliquary")
@@ -26,7 +27,8 @@ from .library import (list_blueprints, list_builtin_blueprints,
                       locate_script, search_blueprints, seed_blueprint,
                       seed_script)
 from . import blueprint as blueprint_mod
-from .errors import ReliquaryError, UNEXPECTED, exit_code
+from .errors import (PreflightError, ReliquaryError, StaticError, UNEXPECTED,
+                     exit_code)
 from .machines import (apply_blueprint, create_machine, destroy_machine,
                        eject_media, get_file, get_machine_dir,
                        get_machine_var, insert_media,
@@ -155,7 +157,7 @@ def _require_machine_selector(arguments):
     """
     if not getattr(arguments, "blueprint", None) and not getattr(
             arguments, "machine", None):
-        raise ValueError(
+        raise StaticError(
             "select a machine with --blueprint or --machine")
     return resolve_machine(
         machine=getattr(arguments, "machine", None),
@@ -178,13 +180,13 @@ def _interaction_target(arguments):
         machine_id = _require_machine_selector(arguments)
         state = load_machine_state(machine_id)
         if state.get("phase") != "running":
-            raise ValueError(
+            raise PreflightError(
                 f"machine {machine_id} is not running "
                 f"(phase: {state.get('phase')})")
         machine_home = machine_dir_path(machine_id)
         vm = read_vm_state(home=machine_home)
         if vm is None:
-            raise ValueError(
+            raise PreflightError(
                 f"machine {machine_id} is running but has no recorded "
                 "VM identity")
         return vm["port"], machine_home
@@ -233,11 +235,11 @@ def _explicit_properties(arguments):
     for pair in pairs:
         key, sep, value = pair.partition("=")
         if not sep:
-            raise ValueError(
+            raise StaticError(
                 f"--property expects KEY=VALUE, got: {pair!r}")
         key = key.strip()
         if key in explicit:
-            raise ValueError(f"--property {key} given more than once")
+            raise StaticError(f"--property {key} given more than once")
         explicit[key] = value
     return explicit
 
@@ -270,7 +272,7 @@ def _narrate(message):
 def _reject_stream_json(arguments, command):
     """Stream-bearing commands reject ``--json`` (they are event streams)."""
     if getattr(arguments, "json", False):
-        raise ValueError(
+        raise StaticError(
             f"{command} is a stream, not a document; use "
             "--progress jsonl for machine-readable output")
 
@@ -663,36 +665,54 @@ def main(argv=None):
     # codex). The embedding API has no such default — it must name one.
     set_assets(getattr(arguments, "assets", None) or HOME_ASSETS)
     try:
-        return _dispatch(arguments)
+        try:
+            return _dispatch(arguments)
+        except (ConnectError, ConnectionError) as error:
+            # An unreachable QMP socket is a machine rule, not a fault:
+            # the command is legal and the VM is not there. Converted
+            # rather than reported here, so the exit code comes from
+            # the taxonomy like every other one.
+            target = (f"127.0.0.1:{arguments.port}"
+                      if getattr(arguments, "port", None)
+                      else "the active VM")
+            raise PreflightError(
+                f"cannot reach QMP on {target}: {error}\n"
+                "  is the VM running? "
+                "(rlq start-machine --blueprint NAME)") from error
     except ReliquaryError as error:
         # The taxonomy is the exit codes: STATIC ERROR 2, PREFLIGHT
-        # ERROR 3, RUN FAILURE 4, cancelled 5, everything else 1
+        # ERROR 3, RUN FAILURE 4, cancelled 5, an InternalError 1
         # (reliquary/errors.py). A run's own failure report already
         # reached the stream, so only the one-line diagnostic is
         # repeated here.
         print(f"rlq: {error}", file=sys.stderr)
         return exit_code(error)
-    except (ConnectError, ConnectionError) as error:
-        target = (f"127.0.0.1:{arguments.port}"
-                  if getattr(arguments, "port", None)
-                  else "the active VM")
-        print(f"rlq: cannot reach QMP on {target}: {error}\n"
-              "  is the VM running? "
-              "(rlq start-machine --blueprint NAME)",
-              file=sys.stderr)
-        return UNEXPECTED
     except KeyboardInterrupt:
         print("rlq: interrupted", file=sys.stderr)
         return 5
-    except (RuntimeError, TimeoutError, FileNotFoundError,
-            NotImplementedError, ValueError, OSError, KeyError) as error:
+    except OSError as error:
+        # The host refused something reliquary asked for correctly — a
+        # permission, a full disk, a path that vanished under it. Not a
+        # mistake the caller can restate and not an invariant of ours,
+        # so it exits 1 wearing the host's own words.
         print(f"rlq: {error}", file=sys.stderr)
+        return UNEXPECTED
+    except Exception:
+        # Exit 1 is contracted for a fault, so main() stays total and
+        # returns it rather than letting the exception escape. What
+        # changed is the *report*: the old clause named seven builtins
+        # and printed one tidy line, which is how an ordinary mistake
+        # raised as a `ValueError` came to look like a crash. Those are
+        # all classes in the hierarchy now (D58), so anything reaching
+        # here is a genuine bug and gets a traceback — a miss is meant
+        # to be loud, not absorbed.
+        traceback.print_exc()
         return UNEXPECTED
 
 
 def _create(arguments):
     if getattr(arguments, "machine", None):
-        raise ValueError(
+        raise StaticError(
             "create-machine allocates the machine number; "
             "do not pass --machine")
     machine_id = create_machine(
@@ -739,7 +759,7 @@ def _script(arguments):
     blueprint_name = getattr(arguments, "blueprint", None)
     machine_selector = getattr(arguments, "machine", None)
     if not blueprint_name and not machine_selector:
-        raise ValueError(
+        raise StaticError(
             "run-script requires --blueprint or --machine")
     run_script(
         arguments.label,
@@ -1006,7 +1026,7 @@ def _read_secret_value(key):
         if value.endswith("\r"):
             value = value[:-1]
     if not value:
-        raise ValueError(f"no value supplied for the secret {key!r}")
+        raise PreflightError(f"no value supplied for the secret {key!r}")
     return value
 
 
@@ -1025,7 +1045,7 @@ def _get_property(arguments):
 def _set_property(arguments):
     if arguments.secret:
         if arguments.value is not None:
-            raise ValueError(
+            raise StaticError(
                 "set-property --secret takes no value argument: "
                 "process listings and shell history are not "
                 "credential stores; it prompts on a terminal and "
@@ -1033,7 +1053,7 @@ def _set_property(arguments):
         value = _read_secret_value(arguments.key)
     else:
         if arguments.value is None:
-            raise ValueError(
+            raise StaticError(
                 "set-property needs a value (or --secret)")
         value = arguments.value
     set_property(arguments.key, value, secret=arguments.secret,
@@ -1237,7 +1257,7 @@ def _dispatch(arguments):
                 timeout=timeout or 120)
         else:
             if platform != "dos":
-                raise NotImplementedError("exec requires platform='dos'")
+                raise PreflightError("exec requires platform='dos'")
             rows = AgentlessGuestExec(Machine(port, machine_home)).execute(
                 arguments.dos_command, timeout or 120)
         rows = list(rows or ())

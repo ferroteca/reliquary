@@ -13,6 +13,7 @@ import time
 from PIL import Image
 from qemu.qmp import ExecuteError
 
+from .errors import RunFailure, StaticError
 from .home import effective_home
 from .lifecycle import qmp_session
 
@@ -23,7 +24,7 @@ def validate_screenshot_name(name):
     if (not isinstance(name, str) or not name or name in (".", "..")
             or os.path.basename(name) != name
             or "/" in name or "\\" in name):
-        raise ValueError(
+        raise StaticError(
             "screenshot name must be a non-empty filename, not a path")
     return name
 
@@ -56,7 +57,7 @@ def screenshot(name="screen", port=None, home=None, directory=None):
         with Image.open(ppm) as image:
             image.save(png)
     except OSError as error:
-        raise ValueError(
+        raise RunFailure(
             f"unexpected screendump format in {ppm}: {error}") from error
     os.remove(ppm)
     print(f"rlq: saved {png}", file=sys.stderr)
@@ -116,7 +117,7 @@ def char_keys(character):
         return [character]
     if character.isupper():
         return ["shift", character.lower()]
-    raise ValueError(f"no key mapping for {character!r}")
+    raise StaticError(f"no key mapping for {character!r}")
 
 
 def _normalize(text):
@@ -152,13 +153,13 @@ def _match_menu_row(rows, item, exclude=()):
         return matches[0]
     if matches:
         listed = ", ".join(repr(rows[row].strip()) for row in matches)
-        raise ValueError(
+        raise RunFailure(
             f"menu item {item!r} matches multiple rows: {listed}")
     excluded = [row for row, folded in enumerate(folded_rows)
                 if target in folded and not allowed(folded)]
     if excluded:
         listed = ", ".join(repr(rows[row].strip()) for row in excluded)
-        raise ValueError(
+        raise RunFailure(
             f"menu item {item!r} only matches excluded rows: {listed}")
     candidates = {folded: text.strip()
                   for folded, text in zip(folded_rows, rows)
@@ -168,7 +169,7 @@ def _match_menu_row(rows, item, exclude=()):
     hint = ("; closest rows: "
             + ", ".join(repr(candidates[text]) for text in close)
             if close else "")
-    raise ValueError(f"menu item {item!r} is not on screen{hint}")
+    raise RunFailure(f"menu item {item!r} is not on screen{hint}")
 
 
 def _animation_cells(samples):
@@ -308,7 +309,7 @@ class _DisplayConsole:
         Returns the selected row's text as displayed at selection.
         """
         if not _normalize(item):
-            raise ValueError("menu item text must be non-empty")
+            raise StaticError("menu item text must be non-empty")
         deadline = time.monotonic() + timeout
         mask, rows, attributes = self._menu_baseline(deadline)
         target_row = _match_menu_row(rows, item, exclude)
@@ -324,14 +325,14 @@ class _DisplayConsole:
                 highlight = attribute
                 break
         if current is None:
-            raise RuntimeError(
+            raise RunFailure(
                 "no menu highlight responded to cursor keys; cannot "
                 f"select {item!r}")
         stalled = 0
         while True:
             while current != target_row:
                 if time.monotonic() >= deadline:
-                    raise TimeoutError(
+                    raise RunFailure(
                         f"menu highlight never reached {item!r} within "
                         f"{timeout}s; is it a selectable menu item?")
                 key = "down" if current < target_row else "up"
@@ -363,12 +364,12 @@ class _DisplayConsole:
                     else:
                         stalled += 1
                         if stalled >= 2:
-                            raise RuntimeError(
+                            raise RunFailure(
                                 "menu highlight stopped responding "
                                 f"before reaching {item!r}")
                 try:
                     target_row = _match_menu_row(rows, item, exclude)
-                except ValueError:
+                except RunFailure:
                     # Menus like the FreeDOS language chooser rewrite
                     # every row as the highlight moves; the target
                     # keeps its row from the screen where it was last
@@ -380,7 +381,7 @@ class _DisplayConsole:
                 rows = fresh_rows
                 break
             if time.monotonic() >= deadline:
-                raise TimeoutError(
+                raise RunFailure(
                     f"menu highlight never reached {item!r} within "
                     f"{timeout}s; is it a selectable menu item?")
             # The highlight is not on the target after all — a redraw
@@ -391,7 +392,7 @@ class _DisplayConsole:
             attributes = fresh
             try:
                 target_row = _match_menu_row(fresh_rows, item, exclude)
-            except ValueError:
+            except RunFailure:
                 pass
             if len(candidates) == 1:
                 current = candidates[0]
@@ -544,7 +545,7 @@ class Machine:
                 if re.search(pattern, screen):
                     return screen
                 time.sleep(2)
-        raise TimeoutError(
+        raise RunFailure(
             f"timed out after {timeout}s waiting for screen to match: "
             f"{pattern}")
 

@@ -108,51 +108,6 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **Ordinary user errors exit 1, the code reserved for
-  Reliquary's own faults** (found 2026-07-27 while starting D55's
-  preflight pass, which this blocks).
-  [script-spec.md](../docs/spec/script-spec.md) and
-  `reliquary/errors.py` agree that exit `1` "is precisely an error
-  outside the taxonomy" — a fault, not a user mistake — with `2`
-  for legality errors and `3` for machine rules. The taxonomy is
-  implemented and correct; **only the script surface uses it.**
-
-  Measured, not reasoned. Five ordinary mistakes, five exit 1s:
-
-  | what the user did | exit | should be |
-  |---|---|---|
-  | named a media that does not exist | 1 | 3 |
-  | named a blueprint that does not exist | 1 | 3 |
-  | named a machine that does not exist | 1 | 3 |
-  | named a script label that does not exist | 1 | 3 |
-  | wrote malformed blueprint JSON | 1 | 2 |
-
-  **242 raise sites sit outside the taxonomy** — plain
-  `ValueError`, `KeyError`, `RuntimeError`, `FileNotFoundError` —
-  concentrated in `document.py` (97, the whole blueprint
-  validation surface), `machines.py` (47), `lifecycle.py` (29),
-  `cli.py` and `machine.py` (12 each), `resolve.py` (10). Not all
-  are user-reachable: an internal invariant check is a fault and
-  `ValueError` is right for it. Deciding which is which is the
-  work, and it is a judgement per site rather than a sweep.
-
-  **Why it matters beyond tidiness.** Exit codes are one of the
-  four contracted machine surfaces, and U9 — automate from a
-  language without a binding — rests on them: a CLI-driving
-  program cannot today tell "you made a typo" from "Reliquary
-  crashed". P7 is the same argument from the principle side.
-
-  **It blocks D55's third pass**, which is why it was found. Most
-  of the 30 remaining diagnostics raise untyped exceptions, and a
-  `rule_id` on a `ValueError` means nothing when the error is not
-  in the taxonomy at all. Typing comes first, ids follow.
-
-  Worth settling on the way in: whether the blueprint parser's
-  diagnostics become `StaticError` (exit 2, matching the script
-  parser — the conformance corpus asserts `ValueError` today and
-  would move with them), and whether `cli.py`'s own raises are
-  user-facing at all.
-
 - **Diagnostics carry no stable identifier — the second pass**
   (found 2026-07-27 by D55; the scheme and the static rules landed
   2026-07-27, this is what they left).
@@ -197,13 +152,31 @@ code has the bug, so the norm is already the demand.
   `script_timing.py`'s single site is static and simply was not on
   the earlier pass's path; it is a one-line fix whenever.
 
-  **Blocked, mostly.** Of the 30, only `binding.py`'s 7 and
-  `script_runner.py`'s preflight and cancellation errors are in
-  the error taxonomy at all; the rest raise plain `ValueError` /
-  `KeyError` / `RuntimeError`, and an id on an error outside the
-  taxonomy names a rule for something the CLI reports as a crash.
-  The exit-code defect above is the prerequisite, and was found
-  starting this pass.
+  **No longer blocked** (2026-07-27, D58). The prerequisite is
+  delivered: the four error classes now describe every surface, and
+  all four modules above carry **zero** builtin raises — every
+  diagnostic in them is in the taxonomy, so an id on one names a
+  rule for something the CLI reports as an error rather than as a
+  crash. What this entry said here — that only `binding.py`'s 7
+  were typed and the rest raised plain `ValueError` / `KeyError` /
+  `RuntimeError` — is no longer true of the code.
+
+  **The first move is a place to put an id, not the typing.** That
+  is what doing the prerequisite revealed: `rule_id` is a field on
+  `ScriptParseError` alone, and the taxonomy classes have none. So
+  the 30 sites now have a class and nowhere to carry an identifier,
+  and the pass opens by giving the preflight tier a
+  located-and-identified error of its own — the shape
+  `ScriptParseError` already has for the static tier, which is why
+  the 82 static ids were cheap. Whether the runtime tier wants the
+  same or reuses `ScriptRuntimeError`'s location is the second
+  question.
+
+  The blueprint surface wants the same thing and has no more than a
+  stopgap: `jsonc.loads` hangs a malformed document's line and
+  column on the raised `StaticError` as plain attributes, which
+  works and is not a scheme. A located blueprint diagnostic belongs
+  in this pass.
 
   **The prefix design is done too** — `lex.` for what the
   tokenizer rejects, `syn.` for line, block and document shape,

@@ -16,6 +16,7 @@ import re
 from importlib import resources
 
 from . import assets, document, jsonc
+from .errors import PreflightError, StaticError
 from .home import blueprints_dir, scripts_dir
 
 
@@ -78,7 +79,7 @@ def list_builtin_blueprints():
         for name in sorted(blueprints.keys()):
             yield name
         return
-    except (FileNotFoundError, ValueError):
+    except (FileNotFoundError, StaticError):
         pass
 
     # Fallback to directory scan
@@ -108,7 +109,7 @@ def list_builtin_media():
         try:
             doc = document.parse_document(
                 jsonc.loads(entry.read_text(encoding="utf-8")))
-        except (ValueError, KeyError, UnicodeDecodeError):
+        except (StaticError, UnicodeDecodeError):
             continue
         names.update(doc.media)
     for name in sorted(names):
@@ -127,7 +128,7 @@ def _blueprint_meta(path):
     try:
         with open(path, encoding="utf-8") as handle:
             raw = jsonc.loads(handle.read())
-    except (OSError, ValueError, UnicodeDecodeError):
+    except (OSError, StaticError, UnicodeDecodeError):
         raw = None
     machine = next(_machine_objects(raw), None)
     if not path.endswith(".rlqb") and machine is None:
@@ -155,7 +156,7 @@ def _blueprint_entries(source):
             continue
         name = meta["name"] or assets.stem(path)
         if name in entries:
-            raise ValueError(
+            raise StaticError(
                 f"two blueprint assets both resolve to the name "
                 f"{name!r}:\n  {entries[name][0]}\n  {path}")
         entries[name] = (path, meta)
@@ -196,15 +197,15 @@ def locate_blueprint(name, context=None):
     stem. Home mode falls back to reading the codex file directly (no
     copy) so a read-only ``check-script`` never writes; dir mode
     (``--assets``) is the sole source. Seeding on first reference is
-    ``create_machine``'s job. Raises ``FileNotFoundError`` when nothing
-    resolves.
+    ``create_machine``'s job. Raises :class:`PreflightError` when
+    nothing resolves.
     """
     source = assets.source_for(context)
     path = _blueprint_index(source).get(name)
     if path is None and source.seeds:
         path = _codex_blueprint_path(name)
     if path is None:
-        raise FileNotFoundError(
+        raise PreflightError(
             f"blueprint not found: {name}\n"
             f"expected under {source.describe('blueprint')}")
     return path
@@ -299,7 +300,7 @@ def seed_blueprint(name, context=None, *, only=False):
     try:
         text = source.read_text(encoding="utf-8")
         data = jsonc.loads(text)
-    except (ValueError, UnicodeDecodeError):
+    except (StaticError, UnicodeDecodeError):
         # A malformed builtin still copies out; loading it reports
         # the real parse error against the user's file.
         data = []
@@ -358,8 +359,8 @@ def locate_script(stem, context=None):
 
     Resolves from the active asset source; home mode falls back to the
     codex file directly (no copy), dir mode is the sole source. Raises
-    ``FileNotFoundError`` when nothing resolves — ``check-script`` uses
-    this so a check never writes.
+    :class:`PreflightError` when nothing resolves — ``check-script``
+    uses this so a check never writes.
     """
     source = assets.source_for(context)
     path = _script_index(source).get(stem)
@@ -368,7 +369,7 @@ def locate_script(stem, context=None):
         if candidate.is_file():
             path = os.fspath(candidate)
     if path is None:
-        raise FileNotFoundError(
+        raise PreflightError(
             f"script not found: {stem}.rlqs\n"
             f"expected under {source.describe('script')}")
     return path

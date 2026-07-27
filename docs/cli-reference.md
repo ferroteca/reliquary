@@ -66,11 +66,23 @@ under `NO_COLOR`.
 | code | meaning |
 |---|---|
 | `0` | success |
-| `1` | an unexpected fault — an error outside the taxonomy |
-| `2` | STATIC ERROR — a legality rule, from the script text alone |
-| `3` | PREFLIGHT ERROR — a machine rule, before the first input |
-| `4` | RUN FAILURE — the run's dynamic semantics failed |
+| `1` | a fault — Reliquary's own, never a mistake of yours |
+| `2` | STATIC ERROR — your input is illegal on its face |
+| `3` | PREFLIGHT ERROR — your input is legal; the world does not satisfy it |
+| `4` | RUN FAILURE — the operation started and failed |
 | `5` | cancelled — Ctrl-C ended the run at an event boundary |
+
+**These are not the script surface's codes alone.** `2`, `3` and `4`
+were named for a script run's tiers and mean the same on every
+command: a malformed blueprint is `2`, naming a machine that does not
+exist is `3`, a media fetch that fails halfway is `4`. A capability
+this build has not implemented is `3` — the request is legal and the
+world, which includes what this build implements, does not satisfy
+it.
+
+`1` never means you got something wrong. It is Reliquary detecting a
+broken invariant of its own, or an outright bug, and a bug prints a
+traceback with it.
 
 Cancelled is deliberately neither success nor failure. Ctrl-C on a
 foreground run requests a stop; the run ends at the next event

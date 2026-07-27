@@ -24,8 +24,8 @@ import zipfile
 from urllib.request import urlopen
 
 from . import events as _events, resolve
-from .errors import PreflightError
-from .errors import RunCancelled
+from .errors import (InternalError, PreflightError, RunCancelled,
+                     RunFailure, StaticError)
 from .home import media_cache_dir
 
 _CHUNK = 1024 * 1024
@@ -128,7 +128,7 @@ def _approve_refetch(name, actual, expected, on_mismatch, source, context):
             answer = ""
         if answer.strip().lower() in ("y", "yes"):
             return
-    raise RuntimeError(
+    raise RunFailure(
         explanation
         + "\ndelete it, or pre-approve with on_mismatch='refetch'")
 
@@ -215,7 +215,7 @@ def _verify(path, expected, describe, name=None, events=None,
     started = time.monotonic()
     actual = _sha256(path, cancelled)
     if actual != expected:
-        raise RuntimeError(
+        raise RunFailure(
             f"{describe} at {path} has SHA-256 {actual}, expected {expected}")
     if events is not None:
         events.emit(_events.VERIFY_END, name=name or describe,
@@ -235,7 +235,7 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
             try:
                 return _run(option, name, extension, context, on_mismatch,
                             events, cancelled)
-            except (OSError, RuntimeError) as error:
+            except (OSError, RunFailure) as error:
                 # Each mirror attempt is its own event: a fallback that
                 # succeeded should not hide the one that did not.
                 errors.append(f"{_describe(option)}: {error}")
@@ -243,7 +243,7 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
                     events.emit(_events.TRANSFER_END, name=name,
                                 source=_describe(option),
                                 operation="attempt", error=str(error))
-        raise RuntimeError(
+        raise RunFailure(
             f"every location for {name!r} failed:\n  " + "\n  ".join(errors))
 
     if isinstance(plan, resolve.LocalFile):
@@ -285,7 +285,7 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
                 events, cancelled)
         return destination
 
-    raise TypeError(f"unknown plan step: {plan!r}")
+    raise InternalError(f"unknown plan step: {plan!r}")
 
 
 def _cache_hit(destination, name, expected, on_mismatch, source, context,
@@ -349,7 +349,7 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail",
     leaves the transfer uninterruptible, as before.
     """
     if on_mismatch not in _MISMATCH_POLICIES:
-        raise ValueError(
+        raise StaticError(
             f"on_mismatch must be one of {_MISMATCH_POLICIES}, "
             f"got: {on_mismatch!r}")
     plan = resolve.resolve_media_plan(media, namespace, properties)

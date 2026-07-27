@@ -11,10 +11,16 @@ runner, with DOS as the default and currently only complete platform
 workflow:
 
 - `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `errors.py` owns the
-  error taxonomy — `ReliquaryError` the root every deliberate error subclasses, with the run surface's
+  error taxonomy — `ReliquaryError` the root every deliberate error subclasses, with
   `StaticError` (exit 2) / `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5, a sibling of `RunFailure`,
-  never a subclass) and the `exit_code` / `outcome` mapping both the CLI and the terminal event read; exit `1` is
-  precisely a fault outside the taxonomy, `events.py` owns the run event stream — the `Event` envelope
+  never a subclass) and the `exit_code` / `outcome` mapping both the CLI and the terminal event read. **Those four
+  describe every surface, not a script run** (D58): what decides one never mentions a script — settled by the
+  authored input alone, the world not satisfying that input, the work itself failing — so a malformed blueprint is
+  a `StaticError` and a machine that does not exist is a `PreflightError`. Exit `1` is a fault and never a caller's
+  mistake, with two populations: a deliberate `InternalError` (an invariant reliquary caught in its own state) and
+  an accident that never was a `ReliquaryError`. **A deliberate raise is never a bare builtin** — `test_errors.py`
+  walks every `raise` in the package and fails on one, because `except ReliquaryError` is contracted as the
+  catch-all. `events.py` owns the run event stream — the `Event` envelope
   (`seq` / `time` / `elapsed` / `kind` plus the kind's own fields, flattened at serialization), the `EventStream`
   that records and renders as it goes (redacting every string through the run's secret set, ticking a live display
   without recording the tick), and `note()`, the emit-or-say-it-on-stderr helper media movement uses so a fetch

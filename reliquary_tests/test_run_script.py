@@ -11,6 +11,7 @@ import unittest
 from unittest import mock
 
 from reliquary import cli
+from reliquary.errors import PreflightError, StaticError
 from reliquary.events import RUN_END, RUN_START
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (
@@ -33,12 +34,12 @@ class ResolveScriptStemTests(unittest.TestCase):
             "my-script")
 
     def test_rejects_path_components(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             _resolve_script_stem("../escape", {})
         self.assertIn("bare name", str(caught.exception))
 
     def test_rejects_rlqs_suffix(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             _resolve_script_stem("install.rlqs", {})
         self.assertIn(".rlqs", str(caught.exception))
 
@@ -285,7 +286,7 @@ class RunScriptWiringTests(unittest.TestCase):
                 mock.patch(
                     "reliquary.script_runner.seed_script",
                     return_value=False):
-            with self.assertRaises(FileNotFoundError) as caught:
+            with self.assertRaises(PreflightError) as caught:
                 run_script(
                     "install", blueprint="plain", context=self.home)
         self.assertIn("install-script.rlqs", str(caught.exception))
@@ -382,7 +383,7 @@ class RunScriptWiringTests(unittest.TestCase):
             result = cli.main([
                 "--home", self.home, "run-script", "install",
             ])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 2)
         self.assertIn("--blueprint or --machine", stderr.getvalue())
 
     def test_cli_script_rejects_json(self):
@@ -392,7 +393,7 @@ class RunScriptWiringTests(unittest.TestCase):
                 "--home", self.home, "--blueprint", "plain",
                 "run-script", "install", "--json",
             ])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 2)
         self.assertIn("--progress jsonl", stderr.getvalue())
 
     def test_cli_script_forwards_display_and_progress(self):

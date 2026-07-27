@@ -28,6 +28,7 @@ this same seam.
 
 import os
 
+from .errors import PreflightError
 from .home import (HOME_ASSETS, assets_mode, blueprints_dir,
                    scripts_dir)
 
@@ -175,7 +176,7 @@ def index_by_name(files, name_of, kind):
         effective = name_of(path) or stem(path)
         existing = index.get(effective)
         if existing is not None:
-            raise ValueError(
+            raise PreflightError(
                 f"two {kind} assets both resolve to the name "
                 f"{effective!r}:\n  {existing}\n  {path}")
         index[effective] = path

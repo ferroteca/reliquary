@@ -5,6 +5,8 @@
 import os
 import re
 
+from .errors import StaticError
+
 _ADDRESS = re.compile(r"([A-Za-z]):[\\/]?(.*)\Z", re.DOTALL)
 
 
@@ -12,7 +14,7 @@ def program_name(path):
     """Return the DOS command name for a supported executable path."""
     name = os.path.basename(path)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,8}\.[Ee][Xx][Ee]", name):
-        raise ValueError(f"guest executable needs a DOS 8.3 name: {name}")
+        raise StaticError(f"guest executable needs a DOS 8.3 name: {name}")
     return name
 
 
@@ -96,18 +98,18 @@ def split_address(address):
     matches them, and the vvfat staging directory is where they land).
     """
     if not isinstance(address, str) or not address.strip():
-        raise ValueError("a guest file address is required")
+        raise StaticError("a guest file address is required")
     match = _ADDRESS.match(address.strip())
     if match is None:
-        raise ValueError(
+        raise StaticError(
             f"{address!r} is not a DOS path: write it as the guest "
             r"does, drive-letter first (C:\DOS\FOO.TXT)")
     letter, remainder = match.group(1).upper(), match.group(2)
     segments = [part for part in re.split(r"[\\/]+", remainder) if part]
     if not segments:
-        raise ValueError(
+        raise StaticError(
             f"{address!r} names a drive but no file")
     if any(part in (".", "..") for part in segments):
-        raise ValueError(
+        raise StaticError(
             f"{address!r} may not contain . or .. segments")
     return letter, segments

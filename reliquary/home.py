@@ -6,6 +6,8 @@ import os
 import subprocess
 import sys
 
+from .errors import StaticError
+
 
 _home = os.environ.get("RELIQUARY_HOME")
 _home_announced = False
@@ -80,7 +82,7 @@ def assets_mode(context=None):
     if mode is None:
         mode = _assets
     if mode is None or mode is _UNSET:
-        raise RuntimeError(
+        raise StaticError(
             "no asset source configured: pass assets=<dir> to name "
             "the project's asset root (the CLI defaults to the home)")
     return mode

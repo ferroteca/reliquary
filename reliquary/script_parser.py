@@ -22,6 +22,7 @@ from lark import Lark, Token as LarkToken, Transformer
 from lark.exceptions import UnexpectedInput, VisitError
 from lark.lexer import Lexer
 
+from .errors import PreflightError, StaticError
 from .script_nodes import (
     KEYWORDS, Interpolation, ScriptParseError, StringLiteral, tokenize)
 from .script_validation import validate
@@ -554,13 +555,12 @@ class _Builder(Transformer):
                            _column(children[0]))
 
     def _content_file(self, literal, line, column):
-        try:
-            spelling = literal.text
-        except ValueError:
+        if literal.interpolated:
             raise ScriptParseError(
                 line, "from path may not contain property references",
                 column,
                 rule_id="http.from-reference")
+        spelling = literal.text
         if spelling == "" or os.path.isabs(spelling) \
                 or spelling.startswith(("/", "\\")):
             raise ScriptParseError(
@@ -803,7 +803,7 @@ def parse_script(source, path="<script>"):
     observation channels, control flow.
     """
     if not isinstance(source, str):
-        raise TypeError("script source must be text")
+        raise StaticError("script source must be text")
     source = source.lstrip(chr(0xFEFF))
     base_dir = None
     if path != "<script>":
@@ -833,7 +833,7 @@ def load_script(path):
         with open(path, encoding="utf-8") as handle:
             return parse_script(handle.read(), path=path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"Script not found: {path}") from None
+        raise PreflightError(f"Script not found: {path}") from None
 
 
 def _diagnose(error, source, path):

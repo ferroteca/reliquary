@@ -27,6 +27,7 @@ from reliquary import interaction as interaction_module
 from reliquary import interaction_agentless as agentless_module
 from reliquary import lifecycle as lifecycle_module
 from reliquary import machine as machine_module
+from reliquary.errors import InternalError, PreflightError, RunFailure, StaticError
 from reliquary import platform_dos as platform_dos_module
 
 
@@ -99,7 +100,7 @@ class HomeTests(unittest.TestCase):
     def test_invalid_vm_state_is_rejected(self):
         self._write_state({"vm": {"port": True, "name": "reliquary-test"}})
 
-        with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
+        with self.assertRaisesRegex(InternalError, "invalid reliquary VM state"):
             lifecycle_module.read_vm_state()
 
     def test_vm_state_without_uuid_is_rejected(self):
@@ -108,11 +109,11 @@ class HomeTests(unittest.TestCase):
         self._write_state({"vm": {"port": 54321, "name": "reliquary-test",
                                   "pid": 1234}})
 
-        with self.assertRaisesRegex(RuntimeError, "invalid reliquary VM state"):
+        with self.assertRaisesRegex(InternalError, "invalid reliquary VM state"):
             lifecycle_module.read_vm_state()
 
     def test_resolve_vm_rejects_unrecorded_explicit_port(self):
-        with self.assertRaisesRegex(RuntimeError, "not the recorded"):
+        with self.assertRaisesRegex(PreflightError, "not the recorded"):
             lifecycle_module.resolve_vm(54321)
 
 class InputAndScreenTests(unittest.TestCase):
@@ -124,7 +125,7 @@ class InputAndScreenTests(unittest.TestCase):
         self.assertEqual(machine_module.char_keys(" "), ["spc"])
 
     def test_unmapped_character_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "no key mapping"):
+        with self.assertRaisesRegex(StaticError, "no key mapping"):
             machine_module.char_keys("\N{SNOWMAN}")
 
     def test_send_text_builds_qcode_combinations(self):
@@ -193,7 +194,7 @@ class InputAndScreenTests(unittest.TestCase):
                     machine_module, "vga_text", return_value=[""]), \
                 mock.patch.object(machine_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
-            with self.assertRaisesRegex(TimeoutError, "FreeDOS"):
+            with self.assertRaisesRegex(RunFailure, "FreeDOS"):
                 machine_module.Machine().wait_text("FreeDOS", timeout=0)
 
 
@@ -413,7 +414,7 @@ class CursorMenuTests(unittest.TestCase):
     def test_missing_item_is_rejected_before_any_keypress(self):
         menu = _FakeMenu(["Boot from system harddisk"])
 
-        with self.assertRaisesRegex(ValueError, "not on screen"):
+        with self.assertRaisesRegex(RunFailure, "not on screen"):
             self._select(menu, "Boot from floppy")
 
         self.assertEqual(menu.cursor, 0)
@@ -536,7 +537,7 @@ class CursorMenuTests(unittest.TestCase):
         menu = _FakeMenu(["Plain DOS system, with sources",
                           "Full installation with sources"])
 
-        with self.assertRaisesRegex(ValueError, "excluded rows"):
+        with self.assertRaisesRegex(RunFailure, "excluded rows"):
             self._select(menu, "Plain DOS system",
                          exclude=["sources"])
 
@@ -546,7 +547,7 @@ class CursorMenuTests(unittest.TestCase):
         menu = _FakeMenu(["Install to harddisk",
                           "Install using Floppy Edition"])
 
-        with self.assertRaisesRegex(ValueError, "multiple rows"):
+        with self.assertRaisesRegex(RunFailure, "multiple rows"):
             self._select(menu, "Install")
 
         self.assertIsNone(menu.selected)
@@ -554,7 +555,7 @@ class CursorMenuTests(unittest.TestCase):
     def test_unresponsive_menu_raises(self):
         menu = _FakeMenu(["First item", "Second item"], stuck=True)
 
-        with self.assertRaisesRegex(RuntimeError,
+        with self.assertRaisesRegex(RunFailure,
                                     "no menu highlight responded"):
             self._select(menu, "Second item")
 
@@ -563,7 +564,7 @@ class CursorMenuTests(unittest.TestCase):
     def test_unselectable_row_raises_when_the_cursor_cannot_reach_it(self):
         menu = _FakeMenu(["First item", "Second item"])
 
-        with self.assertRaisesRegex(RuntimeError, "stopped responding"):
+        with self.assertRaisesRegex(RunFailure, "stopped responding"):
             self._select(menu, "Welcome menu")
 
         self.assertIsNone(menu.selected)
@@ -588,7 +589,7 @@ class BootToDosTests(unittest.TestCase):
         with mock.patch.object(machine_module, "qmp_session") as connection, \
                 mock.patch.object(agentless_module.time, "sleep"):
             connection.return_value.__enter__.return_value = mock.Mock()
-            with self.assertRaisesRegex(TimeoutError, "DOS prompt"):
+            with self.assertRaisesRegex(RunFailure, "DOS prompt"):
                 agentless_module.AgentlessGuestExec(
                     machine_module.Machine()).wait_ready(timeout=0)
 
@@ -653,7 +654,7 @@ class ScreenshotTests(unittest.TestCase):
         with mock.patch.object(machine_module, "qmp_session") as connection:
             for name in invalid_names:
                 with self.subTest(name=name):
-                    with self.assertRaisesRegex(ValueError, "not a path"):
+                    with self.assertRaisesRegex(StaticError, "not a path"):
                         reliquary.screenshot(name)
 
         connection.assert_not_called()

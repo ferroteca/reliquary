@@ -31,6 +31,7 @@ import warnings
 from importlib import resources
 
 from reliquary import document, jsonc
+from reliquary.errors import StaticError
 
 try:
     import jsonschema
@@ -87,7 +88,7 @@ class BlueprintCorpusTests(unittest.TestCase):
         self.assertTrue(paths, "no invalid blueprint fixtures found")
         for path in paths:
             with self.subTest(fixture=os.path.basename(path)):
-                with self.assertRaises((ValueError, KeyError, TypeError)):
+                with self.assertRaises(StaticError):
                     _parse(path)
 
     def test_resolution_fixtures_parse_clean(self):

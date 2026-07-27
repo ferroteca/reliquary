@@ -31,7 +31,8 @@ from urllib.parse import urlsplit
 from qemu.qmp import ConnectError
 
 from .binding import bind_properties, console_asker, describe_sources
-from .errors import PreflightError, RunCancelled, RunFailure
+from .errors import (PreflightError, ReliquaryError, RunCancelled,
+                     RunFailure, StaticError)
 from .library import locate_script, seed_blueprint, seed_script
 from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
                       validate_screenshot_name)
@@ -92,6 +93,11 @@ def _resolve_key(spelling):
 
     A chord's non-modifier member may be a single printable
     character (``ctrl+c``); a bare key name may not.
+
+    An unknown name is a STATIC ERROR carrying its own message: the
+    CLI's `press` calls this directly (no script, no line number), so
+    a bare ``KeyError`` here reported an ordinary typo as reliquary's
+    own fault. A run re-raises it against the statement's line.
     """
     parts = spelling.split("+")
     resolved = []
@@ -102,7 +108,7 @@ def _resolve_key(spelling):
         if len(parts) > 1 and len(part) == 1:
             resolved.extend(char_keys(part))
             continue
-        raise KeyError(part)
+        raise StaticError(f"{part!r} is not a portable key name")
     return resolved
 
 
@@ -191,7 +197,7 @@ class _HttpService:
             self._thread.start()
             return
         detail = f": {last_error}" if last_error is not None else ""
-        raise RuntimeError(
+        raise RunFailure(
             f"no free HTTP port in range {self._port_min}-"
             f"{self._port_max}{detail}")
 
@@ -240,7 +246,18 @@ class _HttpService:
 
 
 class _PropertyUnbound(Exception):
-    """A ``${key}`` reference reached the runtime unbound."""
+    """A ``${key}`` reference reached the runtime unbound.
+
+    The one deliberate raise outside the hierarchy, and deliberately
+    so. It is a private signal rather than an error: every raise is
+    caught by the statement dispatcher, which restates it as a located
+    ``ScriptRuntimeError``, so no caller ever sees this class. Making
+    it a ``ReliquaryError`` would give it an exit code and a tidy
+    one-line report — which is what it would get if it ever escaped,
+    and an escape is a bug in the dispatcher that should show a
+    traceback instead. So the rule that every deliberate *error* is in
+    the hierarchy holds; this is not one.
+    """
 
     def __init__(self, key):
         super().__init__(key)
@@ -477,7 +494,7 @@ class _ScriptEngine:
             state = _machines.load_machine_state(
                 self._machine_id, self._context)
             return state.get("phase", "-")
-        except FileNotFoundError:
+        except PreflightError:
             return "-"
 
     def _report_final(self):
@@ -514,8 +531,7 @@ class _ScriptEngine:
             self._report_final()
             self._terminal(exc)
             raise
-        except (ScriptRuntimeError, TimeoutError, RuntimeError,
-                ValueError) as exc:
+        except ReliquaryError as exc:
             self._report_final()
             if isinstance(exc, ScriptRuntimeError) and exc.path is None:
                 exc.path = self._script_path
@@ -747,7 +763,7 @@ class _ScriptEngine:
         try:
             _machines.set_machine_var(
                 self._machine_id, key, value, context=self._context)
-        except (RuntimeError, ValueError) as exc:
+        except ReliquaryError as exc:
             raise self._error(str(exc), statement) from exc
         self._completed(statement, "set")
 
@@ -931,9 +947,9 @@ class _ScriptEngine:
             # later insert/eject and `start`.
             self._mark_stopped()
             return self._sampled(_Sample((), True))
-        except RuntimeError as error:
-            # lifecycle.qmp_session wraps connect failures as
-            # RuntimeError after clearing vm.json; that sample is
+        except PreflightError as error:
+            # lifecycle.qmp_session wraps connect failures as a
+            # PREFLIGHT ERROR after clearing vm.json; that sample is
             # the stopped observation (task 5 / AGENTS).
             if "no longer reachable" not in str(error):
                 raise
@@ -962,7 +978,7 @@ class _ScriptEngine:
         self._port = None
         try:
             _machines.mark_stopped(self._machine_id, context=self._context)
-        except FileNotFoundError:
+        except PreflightError:
             pass
 
     def _requires_running(self, statement):
@@ -1030,10 +1046,8 @@ class _ScriptEngine:
         for spelling in keys:
             try:
                 combos.append(_resolve_key(spelling))
-            except KeyError as unknown:
-                raise self._error(
-                    f"{unknown.args[0]!r} is not a portable key name",
-                    statement) from None
+            except StaticError as unknown:
+                raise self._error(str(unknown), statement) from None
         self._requires_running(statement)
         with self._console() as console:
             console.send_keys(combos)
@@ -1107,7 +1121,9 @@ class _ScriptEngine:
         try:
             operation(self._machine_id, *arguments, context=self._context,
                       **options)
-        except (RuntimeError, ValueError) as exc:
+        except RunCancelled:
+            raise
+        except ReliquaryError as exc:
             raise self._error(str(exc), statement) from exc
 
     def _start(self, statement):
@@ -1145,7 +1161,7 @@ class _ScriptEngine:
         service = self._http_service_factory(responses, port_min, port_max)
         try:
             service.start()
-        except RuntimeError as exc:
+        except RunFailure as exc:
             raise self._error(str(exc), statement) from exc
         self._http = service
         self._bindings.update({
@@ -1297,7 +1313,7 @@ def execute_script(script, *, machine_id, context=None, display=False,
         try:
             phase = _machines.load_machine_state(
                 machine_id, context).get("phase", "-")
-        except FileNotFoundError:
+        except PreflightError:
             phase = "-"
         return "-", phase
 
@@ -1372,7 +1388,7 @@ def _existing_machine(*, machine=None, blueprint=None, context=None):
     same-named machine from another project is never adopted.
     """
     if machine is None and blueprint is None:
-        raise ValueError(
+        raise StaticError(
             "select a machine with --blueprint or --machine")
     if machine is not None:
         return _machines.resolve_machine(
@@ -1401,13 +1417,13 @@ def _blueprint_component(blueprint, context):
 def _resolve_script_stem(label, scripts_map):
     """Map a label through the blueprint scripts map, else use bare stem."""
     if not isinstance(label, str) or not label.strip():
-        raise ValueError("script label must be a non-empty string")
+        raise StaticError("script label must be a non-empty string")
     label = label.strip()
     if label in (".", "..") or "/" in label or "\\" in label:
-        raise ValueError(
+        raise StaticError(
             f"script label must be a bare name, got: {label!r}")
     if label.lower().endswith(".rlqs"):
-        raise ValueError(
+        raise StaticError(
             f"script label must omit the .rlqs suffix, got: {label!r}")
     if isinstance(scripts_map, dict) and label in scripts_map:
         return scripts_map[label]
@@ -1443,7 +1459,7 @@ def _blueprint_parameters(state, context):
     from .document import load_document
     try:
         document = load_document(source)
-    except (OSError, ValueError):
+    except (OSError, StaticError, PreflightError):
         return {}
     name = state.get("blueprint")
     component = document.machines.get(name)

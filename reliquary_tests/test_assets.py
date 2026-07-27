@@ -14,6 +14,7 @@ from reliquary import Context, HOME_ASSETS
 from reliquary.assets import (DirSource, HomeSource, KIND_EXTENSIONS,
                               index_by_name, source_for, stem)
 from reliquary.document import parse_document
+from reliquary.errors import PreflightError, StaticError
 from reliquary.library import (list_blueprints, locate_blueprint,
                                search_blueprints)
 from reliquary.machines import create_machine, resolve_machine
@@ -145,7 +146,7 @@ class AssetModeTests(unittest.TestCase):
 
     def test_unconfigured_source_refuses(self):
         """A bare embedding call with no source named fails closed."""
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(StaticError):
             source_for(Context(home=os.path.join(self.root, "home")))
 
     def test_bare_string_context_is_home_mode(self):
@@ -195,7 +196,7 @@ class IndexByNameTests(unittest.TestCase):
         self.assertEqual(set(index), {"identity"})
 
     def test_duplicate_effective_name_raises(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PreflightError):
             index_by_name(
                 ["/a/x.rlqb", "/b/y.rlqb"], lambda _p: "dup", "blueprint")
 
@@ -232,7 +233,7 @@ class DirSourceResolutionTests(unittest.TestCase):
         self.assertTrue(
             locate_blueprint("identity", context=self.ctx()).endswith(
                 "file.rlqb"))
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             locate_blueprint("file", context=self.ctx())
 
     def test_duplicate_effective_name_is_error(self):
@@ -240,7 +241,7 @@ class DirSourceResolutionTests(unittest.TestCase):
                {"type": "machine", "platform": "dos", "name": "dup"})
         _write(os.path.join(self.root, "two.rlqb"),
                {"type": "machine", "platform": "dos", "name": "dup"})
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             list_blueprints(self.ctx())
 
     def test_rlqb_by_extension_but_json_needs_platform(self):
@@ -252,7 +253,7 @@ class DirSourceResolutionTests(unittest.TestCase):
 
     def test_dir_mode_is_hermetic_no_codex(self):
         """A codex name never resolves in dir mode; search shows no codex."""
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             locate_blueprint("freedos", context=self.ctx())
         self.assertEqual(search_blueprints("", context=self.ctx()), [])
 
@@ -264,7 +265,7 @@ class DirSourceResolutionTests(unittest.TestCase):
         self.assertEqual(resolved.name, "proj-media")
 
     def test_media_missing_in_dir_mode_does_not_seed(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(PreflightError):
             resolve_media("freedos-livecd", load_namespace(self.ctx()))
 
 
@@ -306,11 +307,11 @@ class BlueprintNameIdentityTests(unittest.TestCase):
         self.assertIn("freedos", doc.machines)
 
     def test_name_with_spaces_is_rejected(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document({"type": "machine", "platform": "dos", "name": "Not An Id"}, stem="h")
 
     def test_all_digit_name_is_rejected(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document({"type": "machine", "platform": "dos", "name": "12"}, stem="h")
 
 

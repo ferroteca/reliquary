@@ -17,8 +17,8 @@ from .library import (list_blueprints, list_scripts, search_blueprints,
                      seed_blueprint, seed_script)
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .errors import (PreflightError, ReliquaryError, RunCancelled,
-                     RunFailure, StaticError)
+from .errors import (InternalError, PreflightError, ReliquaryError,
+                     RunCancelled, RunFailure, StaticError)
 from .events import Event, EventStream
 from .machines import (apply_blueprint, create, create_machine,
                        destroy_machine, eject_media, get_file,
@@ -61,6 +61,7 @@ __all__ = [
     "ScriptRuntimeError",
     "BoundProperties",
     "CredentialError",
+    "InternalError",
     "PreflightError",
     "PropertiesError",
     "PropertyBindingError",

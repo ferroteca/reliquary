@@ -6,6 +6,7 @@ import os
 import unittest
 
 import reliquary
+from reliquary.errors import InternalError
 from reliquary.script_nodes import (Interpolation, ScriptParseError,
                                     parse_nodes, tokenize)
 
@@ -41,7 +42,7 @@ class TokenizerTests(unittest.TestCase):
         self.assertEqual(literal.keys, ("supplemental.disk",))
         self.assertEqual(literal.parts,
                          ("disk ", Interpolation("supplemental.disk"), " in"))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InternalError):
             literal.text
 
     def test_a_lone_dollar_sign_is_literal_text(self):

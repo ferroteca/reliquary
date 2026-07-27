@@ -105,11 +105,22 @@ SPDX-License-Identifier: BSD-3-Clause
   it subclasses the root, never `RunFailure` — cancellation is
   an outcome, neither success nor failure): the run surface's
   exit codes and exceptions are one mapping under parity (script
-  spec "Error classes and exit codes"). Deliberate errors
-  outside the run surface subclass the root directly until the
-  general programmatic-contract work names finer classes —
-  growth is additive, never a break. Exit `1` — Reliquary's own
-  unexpected fault — is precisely an error outside the taxonomy.
+  spec "Error classes and exit codes"). **The four are not the
+  run surface's alone** (D58, 2026-07-27): they generalize
+  unchanged to every interface, because what decides them —
+  settled by the authored input alone, the world not satisfying
+  that input, the work itself failing — never mentions a script.
+  A malformed blueprint raises `StaticError`; naming a machine
+  that does not exist raises `PreflightError`; so does a
+  capability this build declares but has not implemented. Growth
+  is still additive, never a break.
+  Exit `1` — Reliquary's own fault, never a caller's
+  mistake — is precisely an error outside those four, and has two
+  populations: a deliberate `InternalError`, an invariant
+  Reliquary detected in its own state, and a genuine accident
+  that never was a `ReliquaryError`. A deliberate raise always
+  lands in the hierarchy, which is what keeps
+  `except ReliquaryError` the catch-all promised above.
   Other bindings spell the same classes natively.
 - **Async starters — sync is async plus attach** (owner,
   2026-07-21; backlogged 2026-07-24, D35/D36 — no use case,

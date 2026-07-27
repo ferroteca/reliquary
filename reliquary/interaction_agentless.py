@@ -6,6 +6,7 @@ import re
 import sys
 import time
 
+from .errors import RunFailure
 from .machine import Machine, _DisplayConsole
 
 
@@ -31,7 +32,7 @@ class AgentlessGuestExec:
                           file=sys.stderr)
                     return
                 time.sleep(2)
-        raise TimeoutError(
+        raise RunFailure(
             f"timed out after {timeout}s waiting for a DOS prompt")
 
     def execute(self, command: str, timeout: float = 120):
@@ -53,7 +54,7 @@ class AgentlessGuestExec:
                 if rows and _PROMPT_RE.match(rows[-1]):
                     return _command_output(rows, command)
                 time.sleep(2)
-        raise TimeoutError(
+        raise RunFailure(
             f"timed out after {timeout}s waiting for command to finish: "
             f"{command}")
 

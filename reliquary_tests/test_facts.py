@@ -7,6 +7,7 @@ import re
 import unittest
 from unittest import mock
 from reliquary import facts
+from reliquary.errors import InternalError
 
 _SPEC = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -85,7 +86,7 @@ class FactCatalogTests(unittest.TestCase):
         self.assertFalse(facts.is_fact("rlqhost"))
 
     def test_an_unknown_rlq_key_raises(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(InternalError):
             facts.resolve("rlq.host.nonesuch")
 
     def test_username_is_login_normalized(self):

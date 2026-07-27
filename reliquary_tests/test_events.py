@@ -9,6 +9,7 @@ import re
 import unittest
 
 from reliquary import events, progress
+from reliquary.errors import StaticError
 
 _PACKAGE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -195,7 +196,7 @@ class ResolveModeTests(unittest.TestCase):
             progress.resolve_mode("auto", stream=io.StringIO()), "plain")
 
     def test_an_unknown_mode_is_refused(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             progress.resolve_mode("fancy")
         self.assertIn("auto, pretty, plain, jsonl", str(caught.exception))
 

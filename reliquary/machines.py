@@ -12,7 +12,8 @@ from datetime import datetime, timezone
 
 from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
-from .errors import PreflightError
+from .errors import (InternalError, PreflightError, ReliquaryError,
+                     StaticError)
 from .home import machines_cache_dir
 from .library import seed_blueprint
 from .lifecycle import (create_difference_image, create_duplicate_image,
@@ -104,7 +105,7 @@ def _resolve_control_planes(machine):
                if plane not in _IMPLEMENTED_CONTROL_PLANES]
     if missing:
         names = ", ".join(repr(plane) for plane in missing)
-        raise NotImplementedError(
+        raise PreflightError(
             f"control-planes names {names}; only 'agentless-display' "
             "is wired so far (the adapter seam owns the other planes)")
     return planes
@@ -268,7 +269,7 @@ def _drive_common(key, drive):
     if drive.medium != "floppy":
         controller = drive.controller or "ide"
         if controller != "ide":
-            raise NotImplementedError(
+            raise PreflightError(
                 f"drive {key!r} declares controller {controller!r}; "
                 "only ide is wired on QEMU so far (the adapter seam "
                 "owns richer controller topology)")
@@ -299,7 +300,7 @@ def _materialize_drive(key, drive, media_root, namespace, context,
         return entry
     mode = media.materialize
     if drive.medium == "cdrom" and mode != "use":
-        raise ValueError(
+        raise StaticError(
             f"drives.{key}: a cdrom is read-only, so its media must "
             f"'use' (attach), not '{mode}'")
     entry["media"] = media.name
@@ -323,7 +324,7 @@ def _materialize_drive(key, drive, media_root, namespace, context,
             create_difference_image(dest, base_payload)
         entry["path"] = dest
     else:
-        raise ValueError(f"unknown materialize mode {mode!r} for {key}")
+        raise InternalError(f"unknown materialize mode {mode!r} for {key}")
     return entry
 
 
@@ -345,7 +346,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
     generated machine id.
     """
     if not isinstance(blueprint_name, str) or not blueprint_name:
-        raise ValueError("create requires a non-empty blueprint_name")
+        raise StaticError("create requires a non-empty blueprint_name")
 
     created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with _blueprint_alloc_lock(blueprint_name, context):
@@ -354,7 +355,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
         else:
             machine_id = machine_id_for(blueprint_name, number)
             if os.path.exists(machine_dir_path(machine_id, context)):
-                raise RuntimeError(
+                raise PreflightError(
                     f"machine {machine_id} already exists")
         media_root = _machine_media_dir(machine_id, context)
         os.makedirs(media_root)
@@ -479,7 +480,7 @@ def create_machine(name, *, context=None, number=None, properties=None,
         seed_blueprint(name, context=context)
     namespace = load_namespace(context)
     if name not in namespace.machines:
-        raise FileNotFoundError(
+        raise PreflightError(
             f"no machine blueprint named {name!r} in the resolution source")
     machine = namespace.machines[name]
     source = namespace.origin.get(("machine", name))
@@ -506,7 +507,7 @@ def recreate_machine(*, machine=None, blueprint=None, context=None,
         machine=machine, blueprint=blueprint, context=context)
     parsed = split_machine_id(machine_id)
     if parsed is None:
-        raise ValueError(f"cannot parse machine id {machine_id!r}")
+        raise StaticError(f"cannot parse machine id {machine_id!r}")
     blueprint_name, number = parsed
     destroy_machine(machine_id, context)
     return create_machine(
@@ -570,7 +571,7 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context,
                 entry["size"] = media.size
             new_drives[key] = entry
         else:
-            raise RuntimeError(
+            raise PreflightError(
                 f"drive {key} changes an already-materialized image; "
                 "apply cannot regenerate drives — recreate the machine "
                 "instead")
@@ -607,13 +608,13 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase != "ready":
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} must be stopped to apply "
                 f"(phase: {phase})")
         blueprint_name = state["blueprint"]
         namespace = load_namespace(context)
         if blueprint_name not in namespace.machines:
-            raise FileNotFoundError(
+            raise PreflightError(
                 f"no machine blueprint named {blueprint_name!r} to apply")
         parsed = namespace.machines[blueprint_name]
         path = namespace.origin.get(("machine", blueprint_name))
@@ -669,7 +670,7 @@ def load_machine_state(machine_id, context=None):
     """Read and return the machine's ``machine.json``."""
     path = _state_path(machine_id, context)
     if not os.path.exists(path):
-        raise FileNotFoundError(
+        raise PreflightError(
             f"machine state not found: {path}")
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
@@ -701,7 +702,7 @@ def list_machines(context=None, blueprint=None):
         with open(path, encoding="utf-8") as handle:
             state = json.load(handle)
         if state.get("id") != entry:
-            raise RuntimeError(
+            raise InternalError(
                 f"machine id mismatch: directory {entry!r} "
                 f"contains id {state.get('id')!r}")
         if blueprint is not None and state.get("blueprint") != blueprint:
@@ -720,10 +721,10 @@ def resolve_machine(*, machine=None, blueprint=None, context=None):
     - ``--machine NAME-N``: the full machine id, exactly
     """
     if machine is None and blueprint is None:
-        raise ValueError(
+        raise StaticError(
             "select a machine with --blueprint or --machine")
     if machine is not None and blueprint is not None:
-        raise ValueError(
+        raise StaticError(
             "--blueprint and --machine are mutually exclusive; "
             "pass --machine <id> or --blueprint <name>")
     if machine is not None:
@@ -734,16 +735,16 @@ def resolve_machine(*, machine=None, blueprint=None, context=None):
 def _resolve_by_id(selector, context):
     """Resolve a full machine id — exact match only."""
     if not isinstance(selector, str) or not selector:
-        raise ValueError(
+        raise StaticError(
             f"machine id must be a non-empty string, got: {selector!r}")
     if selector.isdigit():
-        raise ValueError(
+        raise StaticError(
             f"machine id must be the full <blueprint>-<n> form, "
             f"got: {selector!r}")
     for state in list_machines(context):
         if state["id"] == selector:
             return selector
-    raise ValueError(f"no machine {selector!r}")
+    raise PreflightError(f"no machine {selector!r}")
 
 
 def machines_for_blueprint(name, context=None):
@@ -762,7 +763,7 @@ def machines_for_blueprint(name, context=None):
     matches = list_machines(context, blueprint=name)
     try:
         resolved = os.path.abspath(locate_blueprint(name, context=context))
-    except FileNotFoundError:
+    except PreflightError:
         resolved = None
     scoped = []
     for state in matches:
@@ -777,7 +778,7 @@ def machines_for_blueprint(name, context=None):
 def _resolve_by_blueprint(name, context):
     matches = machines_for_blueprint(name, context)
     if not matches:
-        raise ValueError(
+        raise PreflightError(
             f"no machine exists for blueprint {name!r}\n"
             f"create one: rlq create-machine --blueprint {name}")
     if len(matches) > 1:
@@ -787,7 +788,7 @@ def _resolve_by_blueprint(name, context):
         ]
         for state in matches:
             lines.append(f"  {state['id']}  ({state.get('phase', '?')})")
-        raise ValueError("\n".join(lines))
+        raise PreflightError("\n".join(lines))
     return matches[0]["id"]
 
 
@@ -846,7 +847,7 @@ def _complete_stop(machine_id, context=None):
     vm = state.get("vm")
     try:
         stop_owned_qemu(vm)
-    except RuntimeError:
+    except ReliquaryError:
         if load_machine_state(machine_id, context).get("vm") is None:
             _write_phase(machine_id, "ready", context)
         else:
@@ -872,18 +873,18 @@ def _reconcile_phase(machine_id, context=None):
     machine_home = machine_dir_path(machine_id, context)
     if phase == "creating":
         shutil.rmtree(machine_home, ignore_errors=True)
-        raise RuntimeError(
+        raise PreflightError(
             f"machine {machine_id} was interrupted during creation and "
             "has been rolled back; create it again with create-machine")
     if phase == "destroying":
         shutil.rmtree(machine_home, ignore_errors=True)
-        raise RuntimeError(
+        raise PreflightError(
             f"machine {machine_id} was interrupted during destruction "
             "and has now been removed")
     if phase == "stopping":
         _complete_stop(machine_id, context)
         return load_machine_state(machine_id, context)
-    raise RuntimeError(
+    raise InternalError(
         f"machine {machine_id} is in an unrecognized phase {phase!r}")
 
 
@@ -901,10 +902,10 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase == "running":
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} is already running")
         if phase != "ready":
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} cannot start "
                 f"(phase: {phase})")
 
@@ -986,7 +987,7 @@ def stop_machine(machine_id, context=None):
             # A reconciled interrupted stop already returned it here.
             return
         if phase != "running":
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} is not running "
                 f"(phase: {phase})")
         _write_phase(machine_id, "stopping", context, bump=True)
@@ -1000,11 +1001,11 @@ def _removable_drive(state, slot):
     """Return the mutable state entry for a removable drive slot."""
     drive = state.get("drives", {}).get(slot)
     if drive is None:
-        raise ValueError(
+        raise PreflightError(
             f"machine {state['id']} declares no "
             f"drive {slot}")
     if drive.get("medium") not in _REMOVABLE_MEDIA:
-        raise ValueError(
+        raise PreflightError(
             f"{slot} is not a removable drive slot")
     return drive
 
@@ -1021,7 +1022,7 @@ def _change_media_live(machine_id, slot, path, context):
     machine_home = machine_dir_path(machine_id, context)
     vm = read_vm_state(machine_home)
     if vm is None:
-        raise RuntimeError(
+        raise PreflightError(
             f"machine {machine_id} is running but has no recorded VM "
             "identity")
     with Machine(port=vm["port"], home=machine_home).qmp() as qmp:
@@ -1086,12 +1087,12 @@ def _anonymous_local(file):
     """
     path = os.path.abspath(os.fspath(file))
     if os.path.isdir(path):
-        raise ValueError(
+        raise StaticError(
             f"{path} is a directory; --file mounts an image file. A "
             "directory reaches a guest as a declared media whose "
             "location is that directory, which is stopped-only")
     if not os.path.isfile(path):
-        raise FileNotFoundError(f"no such image file: {path}")
+        raise PreflightError(f"no such image file: {path}")
     return path
 
 
@@ -1114,7 +1115,7 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
     later ``insert``/``eject`` or ``apply``.
     """
     if (media is None) == (file is None):
-        raise ValueError(
+        raise StaticError(
             "insert-media takes a media name or --file <path>, "
             "not both and not neither")
     with _machine_lock(machine_id, context):
@@ -1168,23 +1169,23 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase != "ready":
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} must be stopped "
                 f"to change boot order (phase: {phase})")
         drives = state.get("drives", {})
         if not isinstance(boot_keys, (list, tuple)) or not boot_keys:
-            raise ValueError("boot order requires at least one drive key")
+            raise StaticError("boot order requires at least one drive key")
         normalized = []
         seen = set()
         for index, key in enumerate(boot_keys):
             if not isinstance(key, str) or not key:
-                raise ValueError(
+                raise StaticError(
                     f"boot[{index}] must be a non-empty drive key")
             if key not in drives:
-                raise ValueError(
+                raise PreflightError(
                     f"boot[{index}] references undeclared drive {key}")
             if key in seen:
-                raise ValueError(f"boot contains duplicate drive {key}")
+                raise StaticError(f"boot contains duplicate drive {key}")
             seen.add(key)
             normalized.append(key)
         state["boot"] = normalized
@@ -1229,13 +1230,13 @@ def check_variable_key(key):
     names can never collide with one the project later introduces.
     """
     if not isinstance(key, str) or not key:
-        raise ValueError("a machine-variable key is required")
+        raise StaticError("a machine-variable key is required")
     if not _VARIABLE_KEY.match(key):
-        raise ValueError(
+        raise StaticError(
             f"invalid machine-variable key {key!r}: letter-initial, "
             "then letters, digits, dot, dash, or underscore")
     if key.split(".", 1)[0].lower() in _RESERVED_VARIABLE:
-        raise ValueError(
+        raise StaticError(
             f"the {key.split('.', 1)[0]!r} namespace is reserved: {key!r}")
     return key
 
@@ -1250,7 +1251,7 @@ def set_machine_var(machine_id, key, value, *, context=None):
     """
     check_variable_key(key)
     if not isinstance(value, str):
-        raise ValueError(
+        raise StaticError(
             f"a machine variable holds text; {key!r} got "
             f"{type(value).__name__}")
     with _machine_lock(machine_id, context):
@@ -1302,7 +1303,7 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
     state = load_machine_state(machine_id, context)
     platform = state.get("platform")
     if platform != "dos":
-        raise NotImplementedError(
+        raise PreflightError(
             f"exec is not implemented for platform {platform!r}; DOS "
             "is the delivered workflow")
     phase = state.get("phase")
@@ -1331,7 +1332,7 @@ def _addressing(platform):
     than borrowing DOS assumptions.
     """
     if platform != "dos":
-        raise NotImplementedError(
+        raise PreflightError(
             f"in-band file exchange is not implemented for platform "
             f"{platform!r}; DOS is the delivered workflow")
     from . import platform_dos
@@ -1410,7 +1411,7 @@ def put_file(source, destination, *, machine=None, blueprint=None,
         machine=machine, blueprint=blueprint, context=context)
     origin = os.path.abspath(os.fspath(source))
     if not os.path.isfile(origin):
-        raise FileNotFoundError(f"no such file: {origin}")
+        raise PreflightError(f"no such file: {origin}")
     with _machine_lock(machine_id, context):
         target = _host_path(machine_id, destination, context)
         os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
@@ -1433,7 +1434,7 @@ def get_file(source, destination, *, machine=None, blueprint=None,
     with _machine_lock(machine_id, context):
         origin = _host_path(machine_id, source, context)
         if not os.path.isfile(origin):
-            raise FileNotFoundError(
+            raise PreflightError(
                 f"the guest has no file at {source}")
         os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
         shutil.copyfile(origin, target)
@@ -1454,11 +1455,11 @@ def destroy_machine(machine_id, context=None):
         state = load_machine_state(machine_id, context)
         phase = state.get("phase")
         if phase == "running":
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} is running; "
                 "stop it before destroying")
         if phase not in ("ready", "destroying", "creating"):
-            raise RuntimeError(
+            raise PreflightError(
                 f"machine {machine_id} cannot be destroyed "
                 f"(phase: {phase})")
         if phase == "ready":

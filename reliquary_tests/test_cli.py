@@ -390,7 +390,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with contextlib.redirect_stderr(stderr):
             result = cli.main(["--home", self.home, "fetch-media",
                                "x", "--json"])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 2)
         self.assertIn("jsonl", stderr.getvalue())
 
     def test_json_flag_before_command(self):
@@ -596,7 +596,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--home", self.home,
                 "delete-blueprint", "plain",
             ])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 3)
         self.assertIn("still has 1 machine(s)", stderr.getvalue())
         self.assertIn("plain-0", stderr.getvalue())
 
@@ -714,7 +714,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--blueprint", "plain",
                 "--machine", "plain-1",
             ])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 2)
         self.assertIn("mutually exclusive", stderr.getvalue())
 
     def test_list_scripts_default_lists_shared_dir(self):
@@ -791,7 +791,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             result = cli.main(["--home", self.home, "start-machine"])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 2)
         self.assertIn("--blueprint", stderr.getvalue())
 
     def test_type_sends_without_enter(self):
@@ -1010,7 +1010,7 @@ class CliProgressTests(unittest.TestCase):
         with contextlib.redirect_stderr(err):
             code = cli.main(["--home", self.home, "fetch-media", "livecd",
                              "--json"])
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 2)
         self.assertIn("--progress jsonl", err.getvalue())
 
     def test_an_unknown_mode_is_refused_by_the_parser(self):

@@ -14,6 +14,7 @@ import tempfile
 import unittest
 
 from reliquary import media
+from reliquary.errors import PreflightError
 from reliquary.home import HOME_ASSETS, Context
 
 
@@ -197,14 +198,14 @@ class AddMediaTests(unittest.TestCase):
         ctx = self._ctx()
         payload = self._payload(ctx)
         blueprint.add_media("win98-cd", payload, context=ctx)
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(PreflightError):
             blueprint.add_media("win98-cd", payload, context=ctx)
 
     def test_a_missing_file_fails_before_writing_anything(self):
         from reliquary import blueprint
         from reliquary.home import blueprints_dir
         ctx = self._ctx()
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             blueprint.add_media("win98-cd", os.path.join(ctx.home, "nope"),
                                 context=ctx)
         self.assertFalse(os.path.exists(

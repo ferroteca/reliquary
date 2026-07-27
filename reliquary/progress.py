@@ -23,6 +23,7 @@ import os
 import sys
 
 from . import events as _events
+from .errors import StaticError
 
 MODES = ("auto", "pretty", "plain", "jsonl")
 
@@ -44,7 +45,7 @@ def resolve_mode(progress, *, stream=None):
     if progress is None:
         progress = "auto"
     if progress not in MODES:
-        raise ValueError(
+        raise StaticError(
             f"--progress must be one of {', '.join(MODES)}, "
             f"got: {progress!r}")
     if progress != "auto":

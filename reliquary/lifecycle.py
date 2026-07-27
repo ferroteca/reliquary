@@ -15,6 +15,8 @@ import uuid
 
 from qemu.qmp import ConnectError, QMPClient
 
+from .errors import (InternalError, PreflightError, ReliquaryError,
+                     RunFailure, StaticError)
 from .home import effective_home
 
 
@@ -55,7 +57,7 @@ def _find_qemu_tool(binary):
             candidate = os.path.join(directory, binary)
             if os.path.isfile(candidate):
                 return candidate
-        raise FileNotFoundError(
+        raise PreflightError(
             f"{binary} not found under {variable}={qemu_home}")
     found = shutil.which(binary)
     if found:
@@ -64,7 +66,7 @@ def _find_qemu_tool(binary):
         candidate = os.path.join(directory, binary)
         if os.path.isfile(candidate):
             return candidate
-    raise FileNotFoundError(
+    raise PreflightError(
         f"{binary} not found: install QEMU, add it to PATH, or set "
         "RELIQUARY_QEMU_HOME to its install directory")
 
@@ -88,26 +90,26 @@ def create_hdd_image(filename, capacity):
     Returns the absolute path of the created image.
     """
     if not isinstance(filename, str) or not filename.strip():
-        raise ValueError("filename must be a non-empty path")
+        raise StaticError("filename must be a non-empty path")
     path = os.path.abspath(filename)
     if not path.lower().endswith(".qcow2"):
-        raise ValueError(
+        raise StaticError(
             f"hdd image filename must end with .qcow2: {filename}")
     if isinstance(capacity, bool) or not isinstance(capacity, (int, str)):
-        raise TypeError(
+        raise StaticError(
             "capacity must be a qemu-img size string or positive "
             "integer MiB value")
     if isinstance(capacity, int):
         if capacity <= 0:
-            raise ValueError(
+            raise StaticError(
                 "capacity must be a positive integer MiB value")
         size = f"{capacity}M"
     else:
         size = capacity.strip()
         if not size:
-            raise ValueError("capacity must be a non-empty size")
+            raise StaticError("capacity must be a non-empty size")
     if os.path.exists(path):
-        raise FileExistsError(f"image already exists: {path}")
+        raise PreflightError(f"image already exists: {path}")
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -122,7 +124,7 @@ def create_hdd_image(filename, capacity):
         command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()
-        raise RuntimeError(
+        raise RunFailure(
             f"qemu-img failed creating {path}"
             + (f": {detail}" if detail else ""))
     return path
@@ -134,7 +136,7 @@ def _run_qemu_img(args, action, target):
         check=False)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()
-        raise RuntimeError(
+        raise RunFailure(
             f"qemu-img failed {action} {target}"
             + (f": {detail}" if detail else ""))
     return completed
@@ -157,10 +159,10 @@ def create_difference_image(filename, base):
     """
     path = os.path.abspath(os.fspath(filename))
     if not path.lower().endswith(".qcow2"):
-        raise ValueError(
+        raise StaticError(
             f"difference image filename must end with .qcow2: {filename}")
     if os.path.exists(path):
-        raise FileExistsError(f"image already exists: {path}")
+        raise PreflightError(f"image already exists: {path}")
     base = os.path.abspath(os.fspath(base))
     base_format = probe_image_format(base)
     parent = os.path.dirname(path)
@@ -184,10 +186,10 @@ def create_duplicate_image(filename, base):
     """
     path = os.path.abspath(os.fspath(filename))
     if not path.lower().endswith(".qcow2"):
-        raise ValueError(
+        raise StaticError(
             f"duplicate image filename must end with .qcow2: {filename}")
     if os.path.exists(path):
-        raise FileExistsError(f"image already exists: {path}")
+        raise PreflightError(f"image already exists: {path}")
     base = os.path.abspath(os.fspath(base))
     parent = os.path.dirname(path)
     if parent:
@@ -257,7 +259,7 @@ def read_vm_state(home=None):
     except FileNotFoundError:
         return None
     except (ValueError, json.JSONDecodeError) as error:
-        raise RuntimeError(
+        raise InternalError(
             f"invalid reliquary machine state file: {path}: {error}"
         ) from error
     vm = document.get("vm") if isinstance(document, dict) else None
@@ -267,14 +269,19 @@ def read_vm_state(home=None):
         port = vm["port"]
         name = vm["name"]
         vm_uuid = vm["uuid"]
-        if (not isinstance(port, int) or isinstance(port, bool)
-                or not 1 <= port <= 65535
-                or not isinstance(name, str) or not name
-                or not isinstance(vm_uuid, str) or not vm_uuid):
-            raise ValueError("invalid port, name, or uuid")
-    except (KeyError, TypeError, ValueError) as error:
-        raise RuntimeError(
+    except (KeyError, TypeError) as error:
+        raise InternalError(
             f"invalid reliquary VM state in {path}: {error}") from error
+    # Checked outside the try: a bare `raise ValueError` caught by the
+    # clause above read as a signal rather than an error, and the
+    # hierarchy has no room for a deliberate raise that is neither.
+    if (not isinstance(port, int) or isinstance(port, bool)
+            or not 1 <= port <= 65535
+            or not isinstance(name, str) or not name
+            or not isinstance(vm_uuid, str) or not vm_uuid):
+        raise InternalError(
+            f"invalid reliquary VM state in {path}: "
+            "invalid port, name, or uuid")
     return vm
 
 
@@ -282,13 +289,13 @@ def resolve_vm(port=None, home=None):
     state = read_vm_state(home)
     if port is None:
         if not state:
-            raise RuntimeError(
+            raise PreflightError(
                 "no active reliquary VM is recorded; run: reliquary start")
         return state["port"], state["name"], state["uuid"]
     if not 1 <= port <= 65535:
-        raise ValueError(f"QMP port must be between 1 and 65535: {port}")
+        raise StaticError(f"QMP port must be between 1 and 65535: {port}")
     if not state or state["port"] != port:
-        raise RuntimeError(
+        raise PreflightError(
             f"QMP port {port} is not the recorded reliquary VM; "
             "start it with reliquary or omit --port to use the active VM")
     return port, state["name"], state["uuid"]
@@ -304,7 +311,7 @@ def verify_vm(qmp, port, expected_name, expected_uuid):
     reply = qmp.cmd("query-name")
     actual_name = reply.get("name") if isinstance(reply, dict) else None
     if actual_name != expected_name:
-        raise RuntimeError(
+        raise PreflightError(
             "QMP identity mismatch; the unrelated VM was not modified\n"
             f"  expected: {expected_name} on 127.0.0.1:{port}\n"
             f"  found:    {actual_name or '<unnamed QMP server>'}")
@@ -312,7 +319,7 @@ def verify_vm(qmp, port, expected_name, expected_uuid):
     actual_uuid = reply.get("UUID") if isinstance(reply, dict) else None
     if (not isinstance(actual_uuid, str)
             or actual_uuid.casefold() != expected_uuid.casefold()):
-        raise RuntimeError(
+        raise PreflightError(
             "QMP identity mismatch; the unrelated VM was not modified\n"
             f"  expected: {expected_name} ({expected_uuid}) "
             f"on 127.0.0.1:{port}\n"
@@ -336,7 +343,7 @@ def qmp_session(port=None, home=None):
             # machine state, so it does not clear it here — the caller
             # (a lifecycle operation, or ``mark_stopped``) reconciles
             # the phase and the ``vm`` section on the next operation.
-            raise RuntimeError(
+            raise PreflightError(
                 "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {expected_name} on "
                 f"127.0.0.1:{actual_port}") from error
@@ -371,7 +378,7 @@ def _startup_error(proc, stderr_log, port, automatic, detail, args):
     if stderr:
         message += f"\n  QEMU error: {stderr}"
     message += f"\n  command line: {subprocess.list2cmdline(args)}"
-    return RuntimeError(message)
+    return RunFailure(message)
 
 
 def _terminate_started_process(proc):
@@ -401,10 +408,10 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     automatic_port = port is None
     port = available_port() if automatic_port else port
     if not 1 <= port <= 65535:
-        raise ValueError(f"QMP port must be between 1 and 65535: {port}")
+        raise StaticError(f"QMP port must be between 1 and 65535: {port}")
     if port_in_use(port):
         selection = "automatically selected" if automatic_port else "explicit"
-        raise RuntimeError(
+        raise PreflightError(
             f"QMP port 127.0.0.1:{port} is already in use "
             f"({selection}); choose another --port or stop its owner")
     if current_vm:
@@ -415,7 +422,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         except (OSError, ConnectError):
             pass  # stale identity; the caller overwrites it
         else:
-            raise RuntimeError(
+            raise PreflightError(
                 "a reliquary VM is already active\n"
                 f"  name: {current_vm['name']}\n"
                 f"  QMP port: 127.0.0.1:{current_vm['port']}\n"
@@ -461,7 +468,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                     "QEMU did not come up; QMP was unreachable after 15s",
                     command)
             time.sleep(0.5)
-        except RuntimeError:
+        except ReliquaryError:
             _terminate_started_process(proc)
             raise
     print(f"rlq: QEMU started: {vm_name} (QMP on 127.0.0.1:{port})",
@@ -483,7 +490,7 @@ def stop(vm):
     if not vm:
         # A machine caught with no recorded VM identity — treat as
         # already gone so the caller reconciles it to a resting phase.
-        raise RuntimeError("no recorded reliquary VM to stop")
+        raise PreflightError("no recorded reliquary VM to stop")
     port = vm["port"]
     expected_name = vm["name"]
     expected_uuid = vm["uuid"]
@@ -495,7 +502,7 @@ def stop(vm):
             except Exception:
                 pass
     except (OSError, ConnectError):
-        raise RuntimeError(
+        raise PreflightError(
             "the recorded reliquary VM is no longer reachable\n"
             f"  expected: {expected_name} on 127.0.0.1:{port}")
     deadline = time.monotonic() + 15
@@ -505,7 +512,7 @@ def stop(vm):
         except (OSError, ConnectError):
             break
         if time.monotonic() > deadline:
-            raise RuntimeError(
+            raise RunFailure(
                 "QEMU is still holding the QMP port 15s after quit; "
                 "a following start() on the same port would collide")
         time.sleep(0.5)

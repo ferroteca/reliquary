@@ -16,7 +16,7 @@ import unittest
 from unittest import mock
 
 from reliquary import platform_dos
-from reliquary.errors import PreflightError
+from reliquary.errors import PreflightError, RunFailure, StaticError
 from reliquary.interaction_agentless import _command_output
 from reliquary.machines import exec as machines_exec
 from reliquary.machines import (apply_blueprint, create_machine,
@@ -186,7 +186,7 @@ class MaterializationTests(_HomeCase):
     def test_cdrom_rejects_a_new_media(self):
         self._write("bad", {"platform": "dos", "drives": {"cdrom0": "blank"}},
                    media=[_BLANK])
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             create_machine("bad", context=self.home)
         self.assertIn("cdrom", str(caught.exception))
 
@@ -196,7 +196,7 @@ class MaterializationTests(_HomeCase):
                                                 "controller": "scsi"}}},
                    media=[_BLANK])
         with mock.patch("reliquary.machines.create_hdd_image"):
-            with self.assertRaises(NotImplementedError) as caught:
+            with self.assertRaises(PreflightError) as caught:
                 create_machine("scsi", context=self.home)
         self.assertIn("scsi", str(caught.exception))
 
@@ -209,7 +209,7 @@ class MaterializationTests(_HomeCase):
                                                "guest-agent"]},
                    media=[_BLANK])
         with mock.patch("reliquary.machines.create_hdd_image") as image:
-            with self.assertRaises(NotImplementedError) as caught:
+            with self.assertRaises(PreflightError) as caught:
                 create_machine("vnc", context=self.home)
         self.assertIn("'vnc'", str(caught.exception))
         self.assertIn("'guest-agent'", str(caught.exception))
@@ -335,7 +335,7 @@ class MaterializationTests(_HomeCase):
         self.assertLess(floppy_idx, hdd_idx)
 
     def test_missing_state_raises_filenotfound(self):
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             load_machine_state("nonexistent", context=self.home)
 
     def test_machine_id_numbered_and_reused(self):
@@ -351,7 +351,7 @@ class MaterializationTests(_HomeCase):
                          "plain-1")
 
     def test_create_machine_unknown_name_errors(self):
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             create_machine("no-such", context=self.home)
 
 
@@ -396,14 +396,14 @@ class LifecycleTests(_HomeCase):
             resolve_machine(blueprint="freedos", context=self.home), machine_id)
 
     def test_resolve_by_blueprint_none_suggests_create(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve_machine(blueprint="missing", context=self.home)
         self.assertIn("no machine exists", str(caught.exception))
 
     def test_resolve_by_blueprint_ambiguous(self):
         self._ready("freedos")
         self._ready("freedos")
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve_machine(blueprint="freedos", context=self.home)
         self.assertIn("has 2 machines", str(caught.exception))
 
@@ -411,12 +411,12 @@ class LifecycleTests(_HomeCase):
         machine_id = self._ready("freedos")
         self.assertEqual(
             resolve_machine(machine=machine_id, context=self.home), machine_id)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             resolve_machine(blueprint="freedos", machine=machine_id,
                             context=self.home)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             resolve_machine(machine="0", context=self.home)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PreflightError):
             resolve_machine(machine="freedos-", context=self.home)
 
     def test_start_launches_qemu_and_sets_running(self):
@@ -446,7 +446,7 @@ class LifecycleTests(_HomeCase):
     def test_start_rejects_already_running(self):
         machine_id = self._ready()
         self._force(machine_id, "running")
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             start_machine(machine_id, context=self.home)
         self.assertIn("already running", str(caught.exception))
 
@@ -466,8 +466,8 @@ class LifecycleTests(_HomeCase):
         machine_id = self._ready()
         self._force(machine_id, "running", vm=True)
         with mock.patch("reliquary.machines.stop_owned_qemu",
-                        side_effect=RuntimeError("QMP identity mismatch")):
-            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+                        side_effect=PreflightError("QMP identity mismatch")):
+            with self.assertRaisesRegex(PreflightError, "identity mismatch"):
                 stop_machine(machine_id, context=self.home)
         state = self._state(machine_id)
         self.assertEqual(state["phase"], "running")
@@ -477,8 +477,8 @@ class LifecycleTests(_HomeCase):
         machine_id = self._ready()
         self._force(machine_id, "running")
         with mock.patch("reliquary.machines.stop_owned_qemu",
-                        side_effect=RuntimeError("no longer reachable")):
-            with self.assertRaisesRegex(RuntimeError, "no longer reachable"):
+                        side_effect=PreflightError("no longer reachable")):
+            with self.assertRaisesRegex(PreflightError, "no longer reachable"):
                 stop_machine(machine_id, context=self.home)
         self.assertEqual(self._state(machine_id)["phase"], "ready")
 
@@ -508,7 +508,7 @@ class LifecycleTests(_HomeCase):
     def test_destroy_rejects_running(self):
         machine_id = self._ready()
         self._force(machine_id, "running")
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             destroy_machine(machine_id, context=self.home)
         self.assertIn("stop it before destroying", str(caught.exception))
 
@@ -539,7 +539,7 @@ class LifecycleTests(_HomeCase):
     def test_interrupted_create_rolled_back(self):
         machine_id = self._ready()
         self._force(machine_id, "creating")
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             self._start(machine_id)
         self.assertIn("rolled back", str(caught.exception))
         self.assertFalse(os.path.exists(machine_dir_path(machine_id, self.home)))
@@ -547,7 +547,7 @@ class LifecycleTests(_HomeCase):
     def test_interrupted_destroy_completes(self):
         machine_id = self._ready()
         self._force(machine_id, "destroying")
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             self._start(machine_id)
         self.assertIn("removed", str(caught.exception))
 
@@ -555,8 +555,8 @@ class LifecycleTests(_HomeCase):
         self._write("doomed", {"platform": "dos", "drives": {"hdd0": "blank"}},
                    media=[_BLANK])
         with mock.patch("reliquary.machines.create_hdd_image",
-                        side_effect=RuntimeError("disk full")):
-            with self.assertRaises(RuntimeError):
+                        side_effect=RunFailure("disk full")):
+            with self.assertRaises(RunFailure):
                 create_machine("doomed", context=self.home)
         self.assertEqual(
             list_machines(context=self.home, blueprint="doomed"), [])
@@ -607,7 +607,7 @@ class LifecycleTests(_HomeCase):
         self._write("sz", {"platform": "dos", "drives": {"hdd0": "blank"}},
                    media=[{"name": "blank", "materialize": "new",
                            "size": "50M"}])
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             apply_blueprint(machine=machine_id, context=self.home)
         self.assertIn("recreate", str(caught.exception))
 
@@ -655,7 +655,7 @@ class LifecycleTests(_HomeCase):
                            "drives": {"hdd0": "blank"},
                            "control-planes": ["serial-console"]},
                    media=[_BLANK])
-        with self.assertRaises(NotImplementedError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             apply_blueprint(machine=machine_id, context=self.home)
         self.assertIn("'serial-console'", str(caught.exception))
         # Refused before the drives are reconciled, so the dropped
@@ -667,7 +667,7 @@ class LifecycleTests(_HomeCase):
     def test_apply_requires_stopped(self):
         machine_id = self._ready()
         self._force(machine_id, "running")
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             apply_blueprint(machine=machine_id, context=self.home)
         self.assertIn("must be stopped", str(caught.exception))
 
@@ -717,12 +717,12 @@ class MediaInsertionTests(_HomeCase):
     def test_set_boot_order_rejects_running(self):
         machine_id = self._installer()
         self._force(machine_id, "running")
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(PreflightError):
             set_boot_order(machine_id, ["cdrom0"], context=self.home)
 
     def test_set_boot_order_rejects_undeclared(self):
         machine_id = self._installer()
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             set_boot_order(machine_id, ["floppy0"], context=self.home)
         self.assertIn("undeclared drive floppy0", str(caught.exception))
 
@@ -747,13 +747,13 @@ class MediaInsertionTests(_HomeCase):
         self.assertIn(self.iso_path, cdrom_arg[0])
 
     def test_insert_rejects_undeclared_slot(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             insert_media(self._installer(), "floppy0", "freedos-livecd",
                          context=self.home)
         self.assertIn("declares no drive floppy0", str(caught.exception))
 
     def test_insert_rejects_non_removable(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             insert_media(self._installer(), "hdd0", "freedos-livecd",
                          context=self.home)
         self.assertIn("not a removable drive slot", str(caught.exception))
@@ -867,26 +867,26 @@ class AnonymousImageTests(_HomeCase):
 
     def test_naming_both_a_media_and_a_file_is_refused(self):
         machine_id, image = self._rig()
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             insert_media(machine_id, "floppy0", "blank", file=image,
                          context=self.home)
         self.assertIn("not both and not neither", str(caught.exception))
 
     def test_naming_neither_is_refused(self):
         machine_id, _image = self._rig()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             insert_media(machine_id, "floppy0", context=self.home)
 
     def test_a_missing_image_fails_closed(self):
         machine_id, _image = self._rig()
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             insert_media(machine_id, "floppy0",
                          file=os.path.join(self.home, "absent.img"),
                          context=self.home)
 
     def test_a_directory_names_the_gap(self):
         machine_id, _image = self._rig()
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             insert_media(machine_id, "floppy0", file=self.home,
                          context=self.home)
         self.assertIn("location is that directory",
@@ -1025,13 +1025,13 @@ class MachineVariableTests(_HomeCase):
         machine_id = self._rig()
         for key in ("rlq.ready", "reliquary", "9lives", ""):
             with self.subTest(key=key):
-                with self.assertRaises(ValueError):
+                with self.assertRaises(StaticError):
                     set_machine_var(machine_id, key, "x",
                                     context=self.home)
 
     def test_a_variable_holds_text(self):
         machine_id = self._rig()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             set_machine_var(machine_id, "count", 3, context=self.home)
 
 
@@ -1174,21 +1174,21 @@ class InBandFileTests(_HomeCase):
 
     def test_an_address_may_not_escape_its_drive(self):
         machine_id, _exchange = self._rig()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             get_file(r"A:\..\..\secret.txt",
                      os.path.join(self.home, "x"),
                      machine=machine_id, context=self.home)
 
     def test_a_host_path_is_not_a_guest_address(self):
         machine_id, _exchange = self._rig()
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             get_file("/etc/passwd", os.path.join(self.home, "x"),
                      machine=machine_id, context=self.home)
         self.assertIn("is not a DOS path", str(caught.exception))
 
     def test_a_missing_guest_file_fails_closed(self):
         machine_id, _exchange = self._rig()
-        with self.assertRaises(FileNotFoundError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             get_file(r"A:\ABSENT.TXT", os.path.join(self.home, "x"),
                      machine=machine_id, context=self.home)
         self.assertIn(r"A:\ABSENT.TXT", str(caught.exception))
@@ -1252,12 +1252,12 @@ class DosAddressingTests(unittest.TestCase):
                          ("A", ["BAR.TXT"]))
 
     def test_a_drive_with_no_file_is_not_an_address(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             platform_dos.split_address("A:\\")
 
     def test_a_non_dos_platform_fails_closed(self):
         from reliquary.machines import _addressing
-        with self.assertRaises(NotImplementedError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             _addressing("openbsd")
         self.assertIn("openbsd", str(caught.exception))
 

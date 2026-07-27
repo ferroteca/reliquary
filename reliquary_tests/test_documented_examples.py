@@ -22,6 +22,7 @@ import warnings
 from importlib import resources
 
 from reliquary import document, jsonc, script_parser
+from reliquary.errors import StaticError
 
 try:
     import jsonschema
@@ -68,7 +69,7 @@ def _blocks(path):
     for index, block in enumerate(_FENCE.findall(text)):
         try:
             value = jsonc.loads(block)
-        except ValueError:
+        except StaticError:
             # Prose fences carrying an elided fragment (…) are
             # illustrations, not documents.
             continue

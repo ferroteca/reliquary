@@ -191,6 +191,69 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Ordinary mistakes no longer exit `1`, the code reserved for
+  Reliquary's own faults.** Five measured cases, five wrong codes:
+  naming a media, blueprint, machine or script label that does not
+  exist all exited `1` instead of `3`, and malformed blueprint JSON
+  exited `1` instead of `2`. The taxonomy was implemented and
+  correct the whole time — only the script surface used it, so 242
+  raise sites across 19 modules were plain `ValueError`, `KeyError`,
+  `RuntimeError` and `FileNotFoundError`, and the CLI had a clause
+  naming seven builtins that turned every one of them into a tidy
+  one-line exit `1`. A CLI-driving program could not tell "you made
+  a typo" from "Reliquary crashed", which U9 rests on being able to
+  do and P7 argues from the principle side.
+
+  Every site is now typed, and the four classes are stated to
+  describe **every surface** rather than a script run (D58). That is
+  a ratification, not a change of direction: milestone 9's in-band
+  file exchange already raised `PreflightError` from nine one-shot
+  command paths, and *machine X is not running* was raised in three
+  places as three different classes — exit 1, exit 1 and exit 3 for
+  one condition. What decides a class never mentioned a script: is
+  it settled by the authored input alone (STATIC ERROR), does the
+  world satisfy that input (PREFLIGHT ERROR), did the work itself
+  fail (RUN FAILURE). A capability this build declares but has not
+  wired is the third of those — exit 3 rather than a crash, which is
+  what capability honesty asks for.
+
+  Exit `1` keeps its meaning and gains a class. `InternalError` is a
+  deliberate fault — an invariant Reliquary detected in its own
+  state — and subclasses the root so that `except ReliquaryError`
+  stays the catch-all the API documents; it falls through to `1`
+  alongside a genuine accident that never was a `ReliquaryError`.
+  Unfit home state splits by reachability: an interrupted
+  `create-machine` or a foreign VM on the port is a world condition
+  with a recovery instruction (`3`), while a corrupt state file or an
+  unrecognized phase is reachable only through a bug and stays a
+  fault.
+
+  Also fixed on the way through, each an ordinary mistake reported
+  as a crash: `rlq press <typo>` raised a bare `KeyError` from a
+  helper the CLI calls directly; an unreachable QMP socket reported
+  `1` where the VM simply is not running (`3`); five bare
+  `TimeoutError` raises meant a guest that never responded exited
+  `1`, the builtin being reserved for a handle's `wait(timeout=)`
+  expiry, where nothing has failed; two helpers *returned* a
+  `RuntimeError` for a caller to raise, which no `raise`-site sweep
+  would have found; and a malformed properties file and an
+  unreachable credential store both said in their own docstrings
+  that they sat outside the four classes, so both exited `1` for
+  what are plainly a legality error and a machine rule.
+
+  The rule is asserted structurally rather than reviewed: a test
+  walks all 393 `raise` statements in the package and fails on a
+  forbidden builtin, so the catch-all promise cannot erode. The
+  CLI's seven-builtin clause is deleted — it would absorb a missed
+  site and print it as a tidy `1` — and what reaches the remaining
+  catch-all now prints a traceback and still returns `1`, because a
+  fault should be loud rather than tidy. Roughly a hundred tests
+  moved from builtin exception types to taxonomy classes in the same
+  change, which is also how they came to assert the contract instead
+  of an implementation accident; the blueprint conformance corpus's
+  three-way `(ValueError, KeyError, TypeError)` collapsed to
+  `StaticError` alone.
+
 - `--qemu` is gone from the CLI's flag-arity table. The spec says
   the old global `--qemu`, `--platform` and `--port` "are removed",
   and no subparser has defined `--qemu` for some time, but the

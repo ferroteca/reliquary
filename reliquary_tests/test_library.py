@@ -19,6 +19,7 @@ from unittest import mock
 
 import reliquary
 from reliquary import document, jsonc
+from reliquary.errors import PreflightError
 from reliquary.library import (list_builtin_blueprints, search_blueprints,
                                seed_blueprint, seed_script)
 from reliquary.machines import create_machine, load_machine_state
@@ -149,7 +150,7 @@ class FirstReferenceTest(_HomeTest):
         self.assertIn(MEDIA, load_namespace(self.home).media)
 
     def test_resolve_media_unknown_name_errors(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(PreflightError):
             resolve_media("no-such-media", load_namespace(self.home))
 
     def test_create_machine_seeds_and_honors_edits(self):
@@ -172,7 +173,7 @@ class FirstReferenceTest(_HomeTest):
             load_machine_state(second_id, context=self.home)["memory"], 64)
 
     def test_create_machine_unknown_name_errors(self):
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             create_machine("no-such-blueprint", context=self.home)
 
 

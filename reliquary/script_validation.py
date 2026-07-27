@@ -334,12 +334,11 @@ def _ports(http):
 
 
 def _plain(literal, what, line, column):
-    try:
-        return literal.text
-    except ValueError:
+    if literal.interpolated:
         raise ScriptParseError(
             line, f"{what} may not contain property references", column,
             rule_id="http.reference-in-path")
+    return literal.text
 
 
 def _forbid_http_refs(script):

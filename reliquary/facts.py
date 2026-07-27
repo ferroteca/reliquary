@@ -22,6 +22,8 @@ import getpass
 import os
 import re
 
+from .errors import InternalError
+
 _ENV_PREFIX = "rlq.env."
 
 def _host_username():
@@ -109,4 +111,4 @@ def resolve(key):
         return _CATALOG[key]()
     if key.startswith(_ENV_PREFIX):
         return _host_env(key[len(_ENV_PREFIX):])
-    raise KeyError(key)
+    raise InternalError(key)

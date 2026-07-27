@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
 from . import assets, document
+from .errors import InternalError, PreflightError
 
 # Container reading is roster-gated by format: zip this milestone.
 # ISO9660 and its [BOOT] El Torito virtual paths are the recorded
@@ -59,7 +60,7 @@ def build_namespace(paths):
                 if name in bucket:
                     if bucket[name] == spec:
                         continue  # identity-dedup: the same spec twice
-                    raise ValueError(
+                    raise PreflightError(
                         f"two different {kind} specs are both named "
                         f"{name!r}:\n  {origin[(kind, name)]}\n  {path}\n"
                         "identical specs may coexist; differing ones must "
@@ -67,7 +68,7 @@ def build_namespace(paths):
                 folded = {existing.lower(): existing for existing in bucket}
                 if name.lower() in folded:
                     other = folded[name.lower()]
-                    raise ValueError(
+                    raise PreflightError(
                         f"{kind} names {name!r} and {other!r} differ only by "
                         f"case:\n  {origin[(kind, other)]}\n  {path}\n"
                         "names match exactly but the media cache is "
@@ -95,7 +96,7 @@ def resolve_media(name, namespace):
     try:
         return namespace.media[name]
     except KeyError:
-        raise KeyError(f"no media named {name!r}")
+        raise PreflightError(f"no media named {name!r}")
 
 
 # --- fetch plan ------------------------------------------------------
@@ -135,7 +136,7 @@ class Alternatives:
 
 def _unbound_failure(where, keys):
     names = ", ".join("${" + key + "}" for key in sorted(keys))
-    return RuntimeError(
+    return PreflightError(
         f"{where} needs {names}, and no property supplies it; bind it with "
         "--property, a blueprint parameter, the environment, the properties "
         "file, or (on a terminal) interactively")
@@ -160,7 +161,7 @@ def _render_deferred(deferred, properties, where):
 
 
 def _chaining_failure(where, key, value):
-    return RuntimeError(
+    return PreflightError(
         f"{where}: the property ${{{key}}} resolved to {value!r}, which is "
         "itself a reference; a location binds once and does not chain")
 
@@ -173,7 +174,7 @@ def _location_from_value(value, where):
     """
     location = document.location_from_string(value, where)
     if location.kind not in ("url", "local"):
-        raise RuntimeError(
+        raise PreflightError(
             f"{where}: the bound location {value!r} is a "
             f"{location.kind} reference; a location must resolve to a "
             "path or URL, not to another media or property")
@@ -195,7 +196,7 @@ def _container_format(plan, parent):
     extension = os.path.splitext(source)[1].lstrip(".").lower()
     if extension not in _CONTAINER_FORMATS:
         supported = ", ".join(sorted(_CONTAINER_FORMATS))
-        raise ValueError(
+        raise PreflightError(
             f"media {parent!r} is read as a container but its format "
             f"{extension or 'unknown'!r} is not supported (supported: "
             f"{supported})")
@@ -223,21 +224,21 @@ def _rung_plan(rung, media, namespace, seen, properties):
                           media, namespace, seen, properties)
     if rung.kind == "parent":
         return _parent_plan(rung, media, namespace, seen, properties)
-    raise ValueError(f"unresolvable location kind {rung.kind!r}")
+    raise InternalError(f"unresolvable location kind {rung.kind!r}")
 
 
 def _parent_plan(rung, media, namespace, seen, properties):
     name = rung.parent
     if name in seen:
         cycle = " -> ".join(seen + (name,))
-        raise ValueError(f"containment cycle: {cycle}")
+        raise PreflightError(f"containment cycle: {cycle}")
     parent = namespace.media.get(name)
     if parent is None:
-        raise KeyError(
+        raise PreflightError(
             f"no media named {name!r} for {media.name!r} to come from")
     inner = _media_plan(parent, namespace, seen + (name,), properties)
     if inner is None:
-        raise ValueError(
+        raise PreflightError(
             f"media {name!r} is a blank and has no bytes for {media.name!r} "
             "to come from")
     if rung.path is None:
@@ -269,7 +270,7 @@ def _media_plan(media, namespace, seen=(), properties=None):
                   for rung in media.location)
     if any(isinstance(plan, Download) for plan in plans) \
             and _hash_of(media, properties) is None:
-        raise ValueError(
+        raise PreflightError(
             f"media {media.name!r} has a remote location and must carry a "
             "sha256: the hash is what verifies the payload is the exact "
             "build the scripts target")

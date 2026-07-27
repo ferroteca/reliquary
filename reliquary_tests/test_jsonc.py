@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
 
-import json
 import unittest
 from reliquary import jsonc
+from reliquary.errors import StaticError
 
 
 class TestJSONC(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestJSONC(unittest.TestCase):
 
     def test_multiline_block_comments_preserve_error_lines(self):
         content = '{\n/* first\nsecond */\n"missing":\n}\n'
-        with self.assertRaises(json.JSONDecodeError) as caught:
+        with self.assertRaises(StaticError) as caught:
             jsonc.loads(content)
         self.assertEqual(caught.exception.lineno, 5)
 

@@ -23,7 +23,7 @@ import types
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple
 
-from .errors import StaticError
+from .errors import InternalError, StaticError
 
 _DURATION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:ms|s|m|h)$")
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
@@ -253,7 +253,9 @@ class StringLiteral:
     def text(self):
         """The plain text of an uninterpolated literal."""
         if self.interpolated:
-            raise ValueError("string carries a property reference")
+            # A guard, not a question: `interpolated` is the question,
+            # and every caller asks it first. Reaching here is a bug.
+            raise InternalError("string carries a property reference")
         return "".join(self.parts)
 
     @property
@@ -500,7 +502,7 @@ def parse_nodes(source, path="<script>"):
     twice on one node (S4). Node names are not interpreted here.
     """
     if not isinstance(source, str):
-        raise TypeError("script source must be text")
+        raise StaticError("script source must be text")
     source = source.lstrip(chr(0xFEFF))
     lines = source.splitlines()
     try:

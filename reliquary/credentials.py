@@ -25,17 +25,19 @@ store fails closed naming what it could not reach.
 
 import os
 
-from .errors import ReliquaryError
+from .errors import PreflightError
 
 _SERVICE_PREFIX = "reliquary"
 
 _provider = None
 
-class CredentialError(ReliquaryError):
+class CredentialError(PreflightError):
     """The credential store could not be reached or used.
 
-    Deliberate, but outside the run surface's four classes, so it
-    subclasses the root directly (docs/spec/api.md).
+    A PREFLIGHT ERROR (exit 3): the request is legal and the world —
+    here the host's credential store — does not satisfy it. It
+    subclassed the root directly while the four classes were read as
+    tiers of a script run (D58 generalized them).
     """
 
 def scope_for(path):

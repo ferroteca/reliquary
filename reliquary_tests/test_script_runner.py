@@ -17,7 +17,7 @@ from qemu.qmp import ConnectError
 
 from reliquary import events as _events
 from reliquary.binding import BoundProperties
-from reliquary.errors import RunCancelled
+from reliquary.errors import PreflightError, RunCancelled, StaticError
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (_preflight_machine_rules,
                                      ScriptPreflightError,
@@ -173,11 +173,11 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(_resolve_key("ctrl+c"), ["ctrl", "c"])
 
     def test_a_bare_character_is_not_a_key_name(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(StaticError):
             _resolve_key("c")
 
     def test_an_unknown_name_is_not_passed_through(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(StaticError):
             _resolve_key("oem_3")
 
 
@@ -255,14 +255,14 @@ class ObservationTests(_RuntimeCase):
         self.assertIsNone(engine._port)
 
     def test_an_unreachable_vm_runtime_error_is_stopped(self):
-        # Production path: qmp_session wraps ConnectError as
-        # RuntimeError after removing vm.json. That must still
+        # Production path: qmp_session wraps ConnectError as a
+        # PREFLIGHT ERROR after removing vm.json. That must still
         # count as the stopped sample (not escape the wait).
         engine = self.engine("wait machine=stopped\n")
 
         @contextlib.contextmanager
         def unreachable():
-            raise RuntimeError(
+            raise PreflightError(
                 "the recorded reliquary VM is no longer reachable\n"
                 "  expected: reliquary-plain-0 on 127.0.0.1:5555\n"
                 "  stale VM state was removed")
@@ -281,13 +281,13 @@ class ObservationTests(_RuntimeCase):
 
         @contextlib.contextmanager
         def mismatch():
-            raise RuntimeError(
+            raise PreflightError(
                 "QMP identity mismatch; the unrelated VM was "
                 "not modified")
             yield  # pragma: no cover
 
         engine._console = mismatch
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             self.run_linear(engine)
         self.assertIn("identity mismatch", str(caught.exception))
         self.assertEqual(engine._port, 5555)
@@ -658,7 +658,7 @@ class MachineOperationTests(_RuntimeCase):
         engine = self.engine("insert cdrom0 @freedos-livecd\n")
         with mock.patch(
                 "reliquary.script_runner._machines") as machines:
-            machines.insert_media.side_effect = ValueError(
+            machines.insert_media.side_effect = PreflightError(
                 "machine plain-0 declares no drive cdrom0")
             with self.assertRaises(ScriptRuntimeError) as caught:
                 self.run_linear(engine)

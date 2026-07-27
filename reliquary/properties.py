@@ -25,17 +25,20 @@ import re
 import tempfile
 
 from . import credentials
-from .errors import ReliquaryError
+from .errors import StaticError
 
 _SEGMENT = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 _RESERVED = ("rlq", "reliquary")
 _SECRET_TOKEN = "@secret"
 
-class PropertiesError(ReliquaryError):
+class PropertiesError(StaticError):
     """A malformed properties file, key, or value.
 
-    Deliberate, but outside the run surface's four classes, so it
-    subclasses the root directly (docs/spec/api.md).
+    A STATIC ERROR (exit 2): the file's own text settles every one of
+    these, and the caller wrote the text. It subclassed the root
+    directly while the four classes were read as tiers of a script
+    run; D58 generalized them to every surface, and a properties file
+    is authored input like any other.
     """
 
 def secret_marker():

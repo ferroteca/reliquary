@@ -16,6 +16,7 @@ import unittest
 import warnings
 
 from reliquary import document
+from reliquary.errors import StaticError
 from reliquary.document import parse_document
 
 SHA = "a" * 64
@@ -110,7 +111,7 @@ class RootShapeTests(unittest.TestCase):
         self.assertEqual(doc.machines, {})
 
     def test_machine_vocabulary_without_a_type_says_did_you_mean(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             parse_document({"name": "rig", "platform": "dos"})
         self.assertIn("did you mean", str(caught.exception).lower())
         self.assertIn("machine", str(caught.exception))
@@ -123,14 +124,14 @@ class RootShapeTests(unittest.TestCase):
         self.assertEqual(media.location[0].local, "payload.iso")
 
     def test_retired_section_names_itself(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             parse_document({"machines": [{"name": "m", "platform": "dos"}]})
         self.assertIn("retired", str(caught.exception))
 
     def test_retired_spec_type_names_itself(self):
         for retired in ("source", "archive"):
             with self.subTest(type=retired):
-                with self.assertRaises(ValueError) as caught:
+                with self.assertRaises(StaticError) as caught:
                     parse_document([{"type": retired, "name": "x"}])
                 self.assertIn("retired", str(caught.exception))
 
@@ -170,12 +171,12 @@ class IdentityTests(unittest.TestCase):
         self.assertIn("FD 1.4 (final).zip", message)
 
     def test_in_file_duplicates_are_refused_even_when_identical(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document([{"name": "x", "location": "p.iso"},
                             {"name": "x", "location": "p.iso"}])
 
     def test_names_collide_case_insensitively(self):
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             parse_document([{"name": "FDBOOT", "location": "a.img"},
                             {"name": "fdboot", "location": "b.img"}])
         self.assertIn("case", str(caught.exception))
@@ -300,7 +301,7 @@ class ReferenceTests(unittest.TestCase):
         `${mem:-512M}` is built entirely from legal characters, so only
         the production can refuse it — and it must say why.
         """
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(StaticError) as caught:
             parse_document([{"type": "machine", "name": "rig",
                              "platform": "dos", "memory": "${mem:-512M}"}])
         self.assertIn("qualifier", str(caught.exception))
@@ -310,12 +311,12 @@ class ReferenceTests(unittest.TestCase):
             with self.subTest(field=field):
                 spec = {"type": "machine", "name": "rig", "platform": "dos"}
                 spec[field] = value
-                with self.assertRaises(ValueError) as caught:
+                with self.assertRaises(StaticError) as caught:
                     parse_document([spec])
                 self.assertIn("closed vocabulary", str(caught.exception))
 
     def test_identity_refuses_references(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document([{"name": "${what}", "location": "p.iso"}])
 
 
@@ -330,21 +331,21 @@ class MediaFieldTests(unittest.TestCase):
         self.assertEqual(doc.media["iso"].materialize, "use")
 
     def test_a_blank_takes_no_location(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document([{"name": "x", "materialize": "new",
                              "size": "20M", "location": "p.img"}])
 
     def test_a_payload_mode_needs_a_location(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document([{"name": "x", "materialize": "use"}])
 
     def test_state_only_field_rejected(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document([{"type": "machine", "name": "rig",
                              "platform": "dos", "id": "rig-0"}])
 
     def test_hdd_null_rejected(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(StaticError):
             parse_document([{"type": "machine", "name": "rig",
                              "platform": "dos", "drives": {"hdd0": None}}])
 

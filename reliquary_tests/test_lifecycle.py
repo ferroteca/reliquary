@@ -24,6 +24,7 @@ except ModuleNotFoundError:
 
 import reliquary
 from reliquary import lifecycle as lifecycle_module
+from reliquary.errors import PreflightError, RunFailure, StaticError
 
 
 class _FakeProcess:
@@ -125,7 +126,7 @@ class LifecycleTests(unittest.TestCase):
     def test_launch_rejects_explicit_occupied_port_before_launch(self):
         with mock.patch.object(lifecycle_module, "port_in_use",
                                return_value=True):
-            with self.assertRaisesRegex(RuntimeError, "explicit"):
+            with self.assertRaisesRegex(PreflightError, "explicit"):
                 lifecycle_module.launch_owned_qemu(
                     ["qemu", "-name", "reliquary-machine"],
                     vm_name="reliquary-machine", port=54321)
@@ -143,7 +144,7 @@ class LifecycleTests(unittest.TestCase):
                 mock.patch.object(lifecycle_module, "Qmp", _FakeQmp), \
                 mock.patch.object(lifecycle_module.subprocess, "Popen",
                                   return_value=proc):
-            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+            with self.assertRaisesRegex(PreflightError, "identity mismatch"):
                 lifecycle_module.launch_owned_qemu(
                     ["qemu", "-name", "reliquary-machine"],
                     vm_name="reliquary-machine")
@@ -157,7 +158,7 @@ class LifecycleTests(unittest.TestCase):
         _FakeQmp.name = "unrelated-vm"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
-            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+            with self.assertRaisesRegex(PreflightError, "identity mismatch"):
                 lifecycle_module.stop(vm)
 
         self.assertEqual(_FakeQmp.commands, ["query-name"])
@@ -172,7 +173,7 @@ class LifecycleTests(unittest.TestCase):
         _FakeQmp.vm_uuid = "22222222-2222-2222-2222-222222222222"
 
         with mock.patch.object(lifecycle_module, "Qmp", _FakeQmp):
-            with self.assertRaisesRegex(RuntimeError, "identity mismatch"):
+            with self.assertRaisesRegex(PreflightError, "identity mismatch"):
                 lifecycle_module.stop(vm)
 
         self.assertNotIn("quit", _FakeQmp.commands)
@@ -250,7 +251,7 @@ class CreateHddImageTests(unittest.TestCase):
         self.assertEqual(run.call_args.args[0][-1], "512M")
 
     def test_rejects_non_qcow2_filename(self):
-        with self.assertRaisesRegex(ValueError, r"\.qcow2"):
+        with self.assertRaisesRegex(StaticError, r"\.qcow2"):
             reliquary.create_hdd_image(
                 os.path.join(self.root, "hdd.img"), "1G")
 
@@ -259,17 +260,17 @@ class CreateHddImageTests(unittest.TestCase):
         with open(filename, "wb") as handle:
             handle.write(b"x")
 
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(PreflightError):
             reliquary.create_hdd_image(filename, "1G")
 
     def test_rejects_non_positive_mib_capacity(self):
         filename = os.path.join(self.root, "hdd.qcow2")
-        with self.assertRaisesRegex(ValueError, "positive"):
+        with self.assertRaisesRegex(StaticError, "positive"):
             reliquary.create_hdd_image(filename, 0)
 
     def test_surfaces_qemu_img_failure(self):
         filename = os.path.join(self.root, "hdd.qcow2")
-        with self.assertRaisesRegex(RuntimeError, "qemu-img failed"):
+        with self.assertRaisesRegex(RunFailure, "qemu-img failed"):
             self._run_create(filename, "1G", returncode=1,
                              stderr="boom")
 

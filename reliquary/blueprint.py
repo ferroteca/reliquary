@@ -11,18 +11,20 @@ already on disk, and removing a machineless blueprint.
 import json
 import os
 
+from .errors import PreflightError
+
 
 def new_blueprint(name, *, platform="dos", context=None):
     """Scaffold a minimal composed ``blueprints/<name>.rlqb``.
 
     Writes a one-machine composed blueprint with a blank hard disk, so
     new machines don't begin from a blank editor. Returns the path;
-    raises ``FileExistsError`` if the blueprint already exists.
+    raises :class:`PreflightError` if the blueprint already exists.
     """
     from .home import blueprints_dir
     path = os.path.join(blueprints_dir(context), f"{name}.rlqb")
     if os.path.exists(path):
-        raise FileExistsError(f"blueprint already exists: {path}")
+        raise PreflightError(f"blueprint already exists: {path}")
 
     data = [
         {
@@ -56,9 +58,9 @@ def add_media(name, path, *, context=None):
     The result is an ordinary ``blueprints/<name>.rlqb`` the user owns
     and can edit, not a cache entry (D41).
 
-    Raises ``FileNotFoundError`` if the file is not there, and
-    ``FileExistsError`` if the blueprint already exists — an existing
-    declaration is edited, never silently rewritten.
+    Raises :class:`PreflightError` if the file is not there, and again
+    if the blueprint already exists — an existing declaration is
+    edited, never silently rewritten.
     """
     from . import document
     from .acquire import _sha256
@@ -66,11 +68,11 @@ def add_media(name, path, *, context=None):
 
     source = os.path.abspath(os.fspath(path))
     if not os.path.isfile(source):
-        raise FileNotFoundError(f"no such file: {source}")
+        raise PreflightError(f"no such file: {source}")
 
     destination = os.path.join(blueprints_dir(context), f"{name}.rlqb")
     if os.path.exists(destination):
-        raise FileExistsError(
+        raise PreflightError(
             f"blueprint already exists: {destination}\n"
             f"edit it to declare {name!r}, or choose another name")
 
@@ -107,7 +109,7 @@ def delete_blueprint(name, *, context=None):
     machines = list_machines(context, blueprint=name)
     if machines:
         ids = ", ".join(machine["id"] for machine in machines)
-        raise RuntimeError(
+        raise PreflightError(
             f"blueprint {name!r} still has "
             f"{len(machines)} machine(s):\n"
             f"  {ids}\n"
@@ -121,7 +123,7 @@ def delete_blueprint(name, *, context=None):
             path = candidate
             break
     if path is None:
-        raise FileNotFoundError(
+        raise PreflightError(
             f"blueprint not found: {name}.rlqb\n"
             f"expected under {blueprints_dir(context)}")
     os.remove(path)

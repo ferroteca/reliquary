@@ -1874,7 +1874,8 @@ process — taking the same identifiers under CLI–API parity.
 ### Error classes and exit codes
 
 Every failure this surface can produce belongs to one of three
-classes, matching the enforcement tiers:
+classes, matching the enforcement tiers — which are not this
+surface's alone, as the generalization below sets out:
 
 | class | tier | exit code |
 |---|---|---|
@@ -1882,8 +1883,8 @@ classes, matching the enforcement tiers:
 | PREFLIGHT ERROR | machine rules | 3 |
 | RUN FAILURE | dynamic semantics | 4 |
 
-`0` is success; `1` is reserved for Reliquary's own unexpected
-faults; `5` is a cancelled run — a deliberate `run cancel` (API
+`0` is success; `1` is reserved for Reliquary's own faults; `5` is
+a cancelled run — a deliberate `run cancel` (API
 `cancel()`) that ended the run at an event boundary with a
 `cancelled` terminal event, neither success nor RUN FAILURE. The
 classes are the CLI's exit codes and the API's
@@ -1891,7 +1892,31 @@ exception taxonomy — one mapping, under parity: Python spells it
 `StaticError` / `PreflightError` / `RunFailure` / `RunCancelled`
 under the `ReliquaryError` root every deliberate Reliquary error
 subclasses (docs/spec/api.md), and exit `1` is precisely
-an error outside the taxonomy. Every diagnostic
+an error outside those four.
+
+**The classes are not this surface's alone** (D58). They are named
+for a run's enforcement tiers and hold unchanged on every
+interface, because the questions that decide them never mention a
+script: is it settled by the authored input alone, does the world
+satisfy that input, did the work itself fail. So a malformed
+blueprint is a STATIC ERROR exactly as a malformed script is,
+naming a machine that does not exist is a PREFLIGHT ERROR exactly
+as an undeclared drive slot is, and a failed image transfer is a
+RUN FAILURE with no run in sight. A capability Reliquary declares
+but has not implemented is a PREFLIGHT ERROR: the request is
+legal, and the world — which includes what this build
+implements — does not satisfy it.
+
+Exit `1` therefore means a **fault**, never a user's mistake, and
+has two populations that are both Reliquary's own: a deliberate
+`InternalError` (Python), which is an invariant Reliquary detected
+in its own state and carries no user input to correct, and a
+genuine accident that never was a `ReliquaryError`. A deliberate
+raise always lands in the hierarchy, so `except ReliquaryError`
+stays the catch-all it is documented to be; a bare builtin is left
+to the invariants the language itself enforces.
+
+Every diagnostic
 carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
 across the classes, and the full id index is deferred to beta.

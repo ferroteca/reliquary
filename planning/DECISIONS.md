@@ -178,6 +178,76 @@ is waiting on an answer today.
 
 ## Decided
 
+- D58 — THE FOUR ERROR CLASSES DESCRIBE EVERY SURFACE, NOT A
+  SCRIPT RUN — DECIDED (owner, 2026-07-27, ratifying what
+  milestone 9 had already built). Supports U9, U14; P6, P7, P11.
+  `StaticError` / `PreflightError` / `RunFailure` / `RunCancelled`
+  were named for a *run's* enforcement tiers, and
+  [errors.py](../reliquary/errors.py) said as much: a deliberate
+  error with no run-surface class subclassed the root and exited
+  `1` "until the general programmatic-contract work names finer
+  classes". They now hold on every interface, unchanged.
+  **THE CODE HAD ALREADY GENERALIZED THEM**, which is what made
+  this a ratification rather than a proposal. Milestone 9's in-band
+  file exchange raises `PreflightError` at nine sites in
+  `machines.py` for one-shot commands that are not runs at all, and
+  `acquire.py` does the same for a media fetch. The clinching
+  exhibit was one sentence — *machine X is not running* — raised in
+  three places as `ValueError`, `RuntimeError` and `PreflightError`:
+  exit 1, exit 1 and exit 3 for one condition.
+  **WHAT DECIDES A CLASS NEVER MENTIONED A SCRIPT.** Three
+  questions in order: is it settled by the authored input alone, does
+  the world satisfy that input, did the work itself fail. The spec's
+  own tier definitions already read that way — machine rules
+  "need something beyond the text in scope: the media namespace,
+  the filesystem, a machine or blueprint" — so the generalization
+  is the existing wording with *the script text* widened to *the
+  authored input*, not a new idea.
+  **THE ASSET LIBRARY IS THE WORLD, NOT AUTHORED INPUT.** That is
+  the line the four "named a thing that does not exist" cases turn
+  on: a command's arguments and the document being loaded are
+  authored input, while what the source happens to declare is world
+  state. So `fetch-media typo` is a PREFLIGHT ERROR (exit 3) rather
+  than a legality error, which is what the defect's table said.
+  **A CAPABILITY GAP IS A PREFLIGHT ERROR** (owner). A control
+  plane or controller a blueprint legally names and this build has
+  not wired is exit 3, not a crash: the world includes what this
+  build implements. A fifth class was considered — a retry fixes a
+  wrong-state failure and never fixes an unwired backend — and
+  refused as a class whose whole population is three sites that all
+  want to disappear. P11 gets what it wants either way: the gap is
+  named.
+  **EXIT 1 IS A FAULT, WITH TWO POPULATIONS** (owner, correcting
+  the draft). Leaving fault sites as bare builtins would have
+  broken the root's own promise that `except ReliquaryError` is the
+  catch-all — a hand-written `raise RuntimeError` is unmistakably
+  deliberate. So faults get a class, `InternalError`, which
+  subclasses the root and falls through to `1`; the other
+  population is a genuine accident that never was a
+  `ReliquaryError`. Unfit home state splits by **reachability**
+  (owner): an interrupted create or a foreign VM on the port is a
+  world condition carrying a recovery instruction (exit 3), while a
+  corrupt state file or an unrecognized phase is only reachable
+  through a bug and stays a fault.
+  **NO COMPATIBILITY SHIM** (owner). The classes do not also
+  subclass their builtin counterparts. Dual inheritance would have
+  kept `except ValueError` working and left 100-odd tests
+  untouched, at the cost of promising a contract the project never
+  intended and leaving the tests asserting an implementation
+  accident. The tests moved instead.
+  **THE RULE IS ASSERTED STRUCTURALLY, NOT REVIEWED.**
+  `test_errors.py` walks every `raise` in the package (393 of them)
+  and fails on a forbidden builtin, so the catch-all promise cannot
+  quietly erode. The one permitted builtin is an argument-less
+  `NotImplementedError` — the abstract-method idiom, an invariant
+  the language enforces rather than a report to a caller. The CLI's
+  own clause naming seven builtins is deleted for the same reason:
+  it would absorb a missed site and print it as a tidy exit 1,
+  which is the bug itself.
+  Retires the standing question of what non-run surfaces raise.
+  Unblocks the diagnostic-id pass, whose remaining 30 sites needed
+  a taxonomy before an id on them could mean anything.
+
 - D57 — P16 IS PLEDGED; THE TEST IS WHAT A CONSUMER MUST DO —
   DECIDED (owner, 2026-07-27, adjudicating the four questions the
   2026-07-23 draft left open). Supports U14, U20; P11.

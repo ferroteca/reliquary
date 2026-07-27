@@ -28,6 +28,7 @@ import os
 import shutil
 
 from .acquire import fetch_media as _acquire_fetch
+from .errors import PreflightError
 from .home import media_cache_dir
 from .resolve import load_namespace, resolve_media
 
@@ -90,7 +91,7 @@ def _attached_media(context=None):
     for machine in list_machines(context):
         try:
             state = load_machine_state(machine["id"], context)
-        except (OSError, ValueError):
+        except (OSError, PreflightError):
             continue
         running = state.get("phase") == "running"
         for drive in state.get("drives", {}).values():

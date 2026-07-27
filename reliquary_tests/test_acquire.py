@@ -133,7 +133,7 @@ class AcquireTests(unittest.TestCase):
         doc = parse_document([
             {"name": "x", "location": {"url": "https://example/a.iso"}}])
         ns = resolve.namespace_of(doc)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PreflightError):
             acquire.fetch_media(ns.media["x"], ns, context=Context(cache="."))
 
     def test_extraction_caches_the_child_and_not_a_local_container(self):

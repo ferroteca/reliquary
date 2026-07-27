@@ -548,8 +548,11 @@ rlq get-file "A:\RESULT.TXT" .\out\result.txt --machine rig-0
 `--progress` selects the live rendering: `pretty` for a person,
 `plain` for a log, `jsonl` for a program (stdout carries the event
 stream and nothing else, the last line being the outcome). Exit codes
-carry the outcome too — `2` a static error, `3` preflight, `4` a run
-failure, `5` cancelled, `1` an unexpected fault.
+carry the outcome too, and they are the same on every command rather
+than a script run's alone — `2` your input is illegal on its face,
+`3` it is legal and the world does not satisfy it, `4` the operation
+started and failed, `5` cancelled, `1` a fault of Reliquary's own and
+never a mistake of yours.
 
 ### Keyboard and command input
 

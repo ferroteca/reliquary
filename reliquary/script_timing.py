@@ -29,6 +29,8 @@ no node type.
 from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple
 
+from .errors import StaticError
+
 # The built-in observation bound, when nothing else supplies one.
 DEFAULT_TIMEOUT = "60s"
 _UNITS = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0}
@@ -44,7 +46,7 @@ def parse_duration(spelling):
     try:
         return float(spelling[:-len(unit)]) * _UNITS[unit]
     except (KeyError, ValueError):
-        raise ValueError(f"not a duration: {spelling!r}") from None
+        raise StaticError(f"not a duration: {spelling!r}") from None
 
 
 @dataclass(frozen=True)

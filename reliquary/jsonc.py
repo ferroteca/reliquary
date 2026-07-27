@@ -9,8 +9,17 @@ Comments are replaced by spaces to preserve line and column numbers.
 import json
 import re
 
+from .errors import StaticError
+
 def loads(s):
-    """Load JSONC string."""
+    """Load JSONC string.
+
+    A document that does not parse is a STATIC ERROR: the text alone
+    settles it, and the caller wrote the text. ``JSONDecodeError``
+    would otherwise escape as a bare ``ValueError`` and report as
+    reliquary's own fault (exit 1) rather than the author's mistake.
+    Its message carries the line and column, so it is kept verbatim.
+    """
     # 1. Replace comments with spaces of the same length
     # This keeps line/column numbers exact for the JSON parser if it reports them.
     # Note: we must be careful not to replace comments inside strings.
@@ -59,7 +68,18 @@ def loads(s):
             
     s = trailing_comma_pattern.sub(replace_comma, s)
     
-    return json.loads(s)
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError as error:
+        failure = StaticError(str(error))
+        # Comment stripping preserves line and column on purpose, so
+        # the position survives the class change rather than being
+        # readable only out of the message. A properly located
+        # blueprint diagnostic — line, column and a rule id, as
+        # ScriptParseError already carries — is the id pass's business.
+        failure.lineno = error.lineno
+        failure.colno = error.colno
+        raise failure from error
 
 def load(fp):
     """Load JSONC from a file-like object."""

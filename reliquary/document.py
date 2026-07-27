@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import Mapping, Optional, Tuple, Union
 
 from . import jsonc
+from .errors import PreflightError, StaticError
 
 _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
@@ -208,17 +209,17 @@ def _reference(body, where):
     the whole test on its own (D27).
     """
     if not body:
-        raise ValueError(
+        raise StaticError(
             f"{where}: empty reference '${{}}' — name a property key or a "
             "qualified target")
     if "\\" in body:
         # The Windows author's first guess. Name the rule, not the class.
-        raise ValueError(
+        raise StaticError(
             f"{where}: '${{{body}}}' uses a backslash — a containment path "
             "is '/'-separated always, following the container formats' own "
             "convention")
     if not _REFERENCE_BODY.fullmatch(body):
-        raise ValueError(
+        raise StaticError(
             f"{where}: malformed reference '${{{body}}}' — a reference body "
             "is a property key or '<qualifier>:<name>[/<path>]', and carries "
             "no operators")
@@ -227,23 +228,23 @@ def _reference(body, where):
 
     qualifier, _, rest = body.partition(":")
     if not qualifier:
-        raise ValueError(
+        raise StaticError(
             f"{where}: malformed reference '${{{body}}}' — nothing before "
             "the qualifier separator")
     if qualifier != qualifier.lower():
-        raise ValueError(
+        raise StaticError(
             f"{where}: reference qualifier {qualifier!r} must be lowercase")
     if qualifier in _RESERVED_QUALIFIERS:
         if qualifier == "property":
-            raise ValueError(
+            raise StaticError(
                 f"{where}: the 'property:' qualifier is reserved — write the "
                 f"bare form '${{{rest}}}' instead")
-        raise ValueError(
+        raise StaticError(
             f"{where}: the {qualifier!r} qualifier is reserved and not "
             "implemented")
     if qualifier not in _KNOWN_QUALIFIERS:
         known = ", ".join(sorted(_KNOWN_QUALIFIERS))
-        raise ValueError(
+        raise StaticError(
             f"{where}: unknown reference qualifier {qualifier!r} "
             f"(known: {known})")
     return _media_reference(rest, body, where)
@@ -251,12 +252,12 @@ def _reference(body, where):
 
 def _property_reference(body, where):
     if body == "media":
-        raise ValueError(
+        raise StaticError(
             f"{where}: '${{media}}' is not a property — did you mean "
             "'${media:<name>}'?")
     for segment in body.split("."):
         if not _PROPERTY_KEY.fullmatch(segment):
-            raise ValueError(
+            raise StaticError(
                 f"{where}: malformed property key '{body}' — segments start "
                 "with a letter and hold letters, digits, '.', '_', '-'")
     return Reference(qualifier=None, target=body)
@@ -265,11 +266,11 @@ def _property_reference(body, where):
 def _media_reference(rest, body, where):
     name, slash, path = rest.partition("/")
     if not name:
-        raise ValueError(
+        raise StaticError(
             f"{where}: malformed reference '${{{body}}}' — the media "
             "qualifier takes a name")
     if not _MEDIA_NAME.fullmatch(name):
-        raise ValueError(
+        raise StaticError(
             f"{where}: {name!r} is not a media name (letters, digits, "
             "'.', '_', '-', starting with a letter or digit)")
     if not slash:
@@ -281,23 +282,23 @@ def _media_reference(rest, body, where):
 def _containment_path(path, where):
     """Normalize a containment path suffix, refusing every escape."""
     if not path:
-        raise ValueError(
+        raise StaticError(
             f"{where}: the containment separator '/' is followed by no "
             "path")
     if path.startswith("/"):
-        raise ValueError(
+        raise StaticError(
             f"{where}: '{path}' is an absolute path — a containment path is "
             "relative to its parent")
     if path.endswith("/"):
-        raise ValueError(f"{where}: containment path {path!r} has a trailing "
+        raise StaticError(f"{where}: containment path {path!r} has a trailing "
                          "'/'")
     segments = path.split("/")
     for segment in segments:
         if not segment:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: containment path {path!r} has an empty segment")
         if segment in (".", ".."):
-            raise ValueError(
+            raise StaticError(
                 f"{where}: containment path {path!r} escapes its parent "
                 f"with {segment!r}")
     return "/".join(segments)
@@ -321,12 +322,12 @@ def _scan(text, where):
         if text.startswith("${", index):
             close = text.find("}", index)
             if close < 0:
-                raise ValueError(
+                raise StaticError(
                     f"{where}: unterminated reference — '${{' with no "
                     "closing brace")
             body = text[index + 2:close]
             if body.strip() != body or " " in body or "\t" in body:
-                raise ValueError(
+                raise StaticError(
                     f"{where}: whitespace inside '${{{body}}}'")
             spans.append("".join(literal))
             literal = []
@@ -349,11 +350,11 @@ def _text(value, where, *, closed=False, allowed=None):
     is the vocabulary, checked once no reference can be involved.
     """
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(
+        raise StaticError(
             f"{where} must be a non-empty string, got: {value!r}")
     spans, references = _scan(value, where)
     if references and closed:
-        raise ValueError(
+        raise StaticError(
             f"{where} is a closed vocabulary and takes no reference: "
             f"{value!r} — its values are fixed so editors can complete "
             "them and the published schema can check them")
@@ -361,7 +362,7 @@ def _text(value, where, *, closed=False, allowed=None):
         return Deferred(text=value, references=references)
     resolved = "".join(span for span in spans if span is not None)
     if allowed is not None and resolved not in allowed:
-        raise ValueError(
+        raise StaticError(
             f"{where} must be one of {', '.join(sorted(allowed))}, "
             f"got: {resolved!r}")
     return resolved
@@ -370,10 +371,10 @@ def _text(value, where, *, closed=False, allowed=None):
 def _plain(value, where):
     """An authored string that may never carry a reference (identity)."""
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(
+        raise StaticError(
             f"{where} must be a non-empty string, got: {value!r}")
     if "${" in value.replace("\\${", ""):
-        raise ValueError(
+        raise StaticError(
             f"{where} takes no reference: {value!r} — identity and the "
             "authored graph stay static, so a name can never depend on a "
             "resolved value")
@@ -385,7 +386,7 @@ def _plain(value, where):
 def _media_name(value, where="name"):
     _plain(value, where)
     if not _MEDIA_NAME.fullmatch(value):
-        raise ValueError(
+        raise StaticError(
             f"{where} must be letters, digits, '.', '_' or '-', starting "
             f"with a letter or digit, got: {value!r}")
     return value
@@ -395,7 +396,7 @@ def _machine_name(value, where="name"):
     """A machine name is also an id segment (``<name>-<n>``)."""
     _media_name(value, where)
     if value.isdigit():
-        raise ValueError(
+        raise StaticError(
             f"{where} must not be all digits: a machine name becomes its "
             f"id segment '<name>-<n>', got: {value!r}")
     return value
@@ -440,14 +441,14 @@ def _derive_name(location, where):
         elif first.kind == "parent" and first.path:
             stem, source = _stem(first.path), first.path
     if not stem:
-        raise ValueError(
+        raise StaticError(
             f"{where} has no filename to derive a name from; give it an "
             "explicit name")
     if _MEDIA_NAME.fullmatch(stem):
         return stem
     repaired = _repair(stem)
     if not repaired or not _MEDIA_NAME.fullmatch(repaired):
-        raise ValueError(
+        raise StaticError(
             f"{where}: the name derived from {source!r} cannot be repaired "
             "into a usable name; give it an explicit name")
     warnings.warn(
@@ -464,7 +465,7 @@ def _sha256(value, where):
     if isinstance(checked, Deferred):
         return checked
     if not _SHA256.fullmatch(checked):
-        raise ValueError(
+        raise StaticError(
             f"{where} must be a hex SHA-256 (64 hex chars), got: {value!r}")
     return checked.lower()
 
@@ -474,10 +475,10 @@ def _size(value, where):
     if isinstance(checked, Deferred):
         return checked
     if not isinstance(checked, str):
-        raise ValueError(f"{where} must be a size string, got: {value!r}")
+        raise StaticError(f"{where} must be a size string, got: {value!r}")
     match = _SIZE.fullmatch(checked)
     if not match:
-        raise ValueError(
+        raise StaticError(
             f"{where} must be a positive integer followed by K, M, G, or T, "
             f"got: {value!r}")
     return f"{int(match.group(1))}{match.group(2).upper()}"
@@ -489,17 +490,17 @@ def _memory(value):
         if isinstance(checked, Deferred):
             return checked
     if isinstance(value, bool):
-        raise ValueError(
+        raise StaticError(
             "memory must be a positive integer MiB value or size string")
     if isinstance(value, int):
         if value <= 0:
-            raise ValueError("memory must be a positive integer MiB value")
+            raise StaticError("memory must be a positive integer MiB value")
         return value
     size = _size(value, "memory")
     match = _SIZE.fullmatch(size)
     byte_count = int(match.group(1)) * _UNIT_BYTES[match.group(2)]
     if byte_count % _MIB:
-        raise ValueError(
+        raise StaticError(
             f"memory must resolve to a whole MiB value, got: {value!r}")
     return byte_count // _MIB
 
@@ -510,13 +511,13 @@ def _cpus(value):
         if isinstance(checked, Deferred):
             return checked
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise ValueError(f"cpus must be a positive integer, got: {value!r}")
+        raise StaticError(f"cpus must be a positive integer, got: {value!r}")
     return value
 
 
 def _flag(value, where):
     if not isinstance(value, bool):
-        raise ValueError(f"{where} must be true or false, got: {value!r}")
+        raise StaticError(f"{where} must be true or false, got: {value!r}")
     return value
 
 
@@ -541,7 +542,7 @@ def _location_string(value, where):
     qualified = [ref for ref in references if ref.qualifier is not None]
     if qualified:
         if len(references) != 1 or [s for s in spans if s]:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: a '${{{qualified[0].qualifier}:…}}' reference is "
                 "whole-value only — it names a location, it does not build "
                 "one by interpolation")
@@ -566,7 +567,7 @@ def _location_scheme(value, where):
     if len(scheme) == 1:
         # The drive-letter exemption: C:/isos/x.iso is a path.
         return Location(kind="local", local=value)
-    raise ValueError(
+    raise StaticError(
         f"{where}: unrecognized location scheme {scheme + ':'!r} in "
         f"{value!r} — write a bare path, an http(s) URL, or the object form")
 
@@ -577,15 +578,15 @@ _LOCATION_OBJECT_FORMS = ("url", "local", "parent", "property")
 def _location_object(value, where, register):
     unknown = set(value) - set(_LOCATION_OBJECT_FORMS) - {"path"}
     if unknown:
-        raise ValueError(f"unknown location field: {where}.{sorted(unknown)[0]}")
+        raise StaticError(f"unknown location field: {where}.{sorted(unknown)[0]}")
     forms = [name for name in _LOCATION_OBJECT_FORMS if name in value]
     if len(forms) != 1:
         allowed = ", ".join(_LOCATION_OBJECT_FORMS)
-        raise ValueError(
+        raise StaticError(
             f"{where} must declare exactly one of {allowed}")
     form = forms[0]
     if form != "parent" and "path" in value:
-        raise ValueError(
+        raise StaticError(
             f"{where}.path belongs to the parent form, not {form!r}")
     if form == "url":
         return Location(kind="url", url=_text(value["url"], f"{where}.url"))
@@ -603,7 +604,7 @@ def _location_object(value, where, register):
         inline = _media(parent, register, where=f"{where}.parent")
         parent_name = inline.name
         if parent_name is None:
-            raise ValueError(
+            raise StaticError(
                 f"{where}.parent must be a named media: an inline parent is "
                 "a container to descend into, so it needs an identity")
     else:
@@ -619,13 +620,13 @@ def _location(value, where, register):
     """Parse a media's ``location``: one rung, or a mirror list."""
     if isinstance(value, list):
         if not value:
-            raise ValueError(
+            raise StaticError(
                 f"{where} must not be an empty list — a mirror list holds "
                 "the locations to try in order")
         rungs = []
         for index, entry in enumerate(value):
             if isinstance(entry, list):
-                raise ValueError(
+                raise StaticError(
                     f"{where}[{index}] must not be a nested list — a mirror "
                     "list is flat")
             rungs.extend(_location(entry, f"{where}[{index}]", register))
@@ -634,7 +635,7 @@ def _location(value, where, register):
         return (_location_string(value, where),)
     if isinstance(value, collections.abc.Mapping):
         return (_location_object(value, where, register),)
-    raise ValueError(
+    raise StaticError(
         f"{where} must be a location string, a location object, or a list "
         f"of them, got: {value!r}")
 
@@ -652,11 +653,11 @@ _MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "drives",
 def _unknown_media_field(unknown, where):
     bad = sorted(unknown)[0]
     if bad in _MACHINE_VOCABULARY:
-        raise ValueError(
+        raise StaticError(
             f"unknown media field: {where}.{bad} — {bad!r} is machine "
             "vocabulary; did you mean to declare \"type\": \"machine\"? "
             "(type defaults to media)")
-    raise ValueError(f"unknown media field: {where}.{bad}")
+    raise StaticError(f"unknown media field: {where}.{bad}")
 
 
 def _media(value, register, *, where="media", path=None, allow_anonymous=False):
@@ -668,12 +669,12 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
     if isinstance(value, str) and path is None:
         value = {"location": value}
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError(f"{where} must be an object, got: {value!r}")
+        raise StaticError(f"{where} must be an object, got: {value!r}")
     fields = _CHILD_FIELDS if path is not None else _MEDIA_FIELDS
     unknown = set(value) - fields
     if unknown:
         if path is not None and "location" in unknown:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: a children entry takes a path, not a location — "
                 "its location is its parent plus that path")
         _unknown_media_field(unknown, where)
@@ -696,16 +697,16 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
         materialize = "new" if size is not None and not location else "use"
     if materialize == "new":
         if location:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: a 'new' blank takes a size, not a location")
         if size is None:
-            raise ValueError(f"{where}: a 'new' blank requires a size")
+            raise StaticError(f"{where}: a 'new' blank requires a size")
     else:
         if not location:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: a '{materialize}' media requires a location")
         if size is not None:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: a '{materialize}' media takes a location, not a "
                 "size")
 
@@ -736,7 +737,7 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
         register("media", name, media)
     if "children" in value:
         if name is None:
-            raise ValueError(
+            raise StaticError(
                 f"{where}: a container with children needs a name for them "
                 "to hang from")
         _children(value["children"], name, register, where)
@@ -746,17 +747,17 @@ def _media(value, register, *, where="media", path=None, allow_anonymous=False):
 def _children(value, parent, register, where):
     """Desugar a ``children`` batch into child-declares-parent specs."""
     if not isinstance(value, list):
-        raise ValueError(f"{where}.children must be an array")
+        raise StaticError(f"{where}.children must be an array")
     for index, entry in enumerate(value):
         site = f"{where}.children[{index}]"
         if isinstance(entry, str):
             entry = {"path": entry}
         if not isinstance(entry, collections.abc.Mapping):
-            raise ValueError(
+            raise StaticError(
                 f"{site} must be a path string or a media object, "
                 f"got: {entry!r}")
         if "path" not in entry:
-            raise ValueError(f"{site} requires a path")
+            raise StaticError(f"{site} requires a path")
         location = Location(
             kind="parent", parent=parent,
             path=_containment_path(
@@ -770,16 +771,16 @@ def _check_type_echo(value, expected, where):
         return
     declared = _plain(value["type"], f"{where}.type")
     if declared in _RETIRED_TYPES:
-        raise ValueError(
+        raise StaticError(
             f"{where}: the {declared!r} spec type is retired — a source is "
             "now a media's location, and an archive is a media other media "
             "name as their parent")
     if declared not in _SPEC_TYPES:
         allowed = ", ".join(sorted(_SPEC_TYPES))
-        raise ValueError(
+        raise StaticError(
             f"{where}.type must be one of {allowed}, got: {declared!r}")
     if declared != expected:
-        raise ValueError(
+        raise StaticError(
             f"{where}.type says {declared!r} but this position is a "
             f"{expected}")
 
@@ -797,20 +798,20 @@ _DRIVE_FIELDS = {"media", "controller", "enabled"}
 
 def _drive_key(value):
     if not isinstance(value, str):
-        raise ValueError(f"drive keys must be strings, got: {value!r}")
+        raise StaticError(f"drive keys must be strings, got: {value!r}")
     if "${" in value:
-        raise ValueError(
+        raise StaticError(
             f"drive key {value!r} takes no reference: an object key is "
             "authored graph, and the graph stays static")
     match = _DRIVE_KEY.fullmatch(value)
     if not match:
-        raise ValueError(
+        raise StaticError(
             f"invalid drive key {value!r}: expected floppy[0..1], "
             "hdd[0..3], or cdrom[0..3]")
     medium = match.group(1)
     slot = int(match.group(2) or 0)
     if slot >= _SLOT_LIMITS[medium]:
-        raise ValueError(
+        raise StaticError(
             f"invalid drive key {value!r}: {medium} slots run from "
             f"0 to {_SLOT_LIMITS[medium] - 1}")
     return medium, slot, f"{medium}{slot}"
@@ -818,7 +819,7 @@ def _drive_key(value):
 
 def _controller(value, key, medium):
     if medium == "floppy":
-        raise ValueError(
+        raise StaticError(
             f"drives.{key}.controller is invalid: floppies take no "
             "controller key")
     return _text(value, f"drives.{key}.controller", closed=True,
@@ -828,7 +829,7 @@ def _controller(value, key, medium):
 def _drive(value, key, medium, slot, register):
     if value is None:
         if medium == "hdd":
-            raise ValueError(
+            raise StaticError(
                 f"drives.{key} cannot be null: only removable drives "
                 "(floppy, cdrom) may be declared empty")
         return MachineDrive(key=key, medium=medium, slot=slot)
@@ -836,7 +837,7 @@ def _drive(value, key, medium, slot, register):
         return MachineDrive(key=key, medium=medium, slot=slot,
                             media=_media_name(value, f"drives.{key}"))
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError(
+        raise StaticError(
             f"drives.{key} must be a media name, null, a drive object, or "
             "an inline media")
     if set(value) - _DRIVE_FIELDS:
@@ -847,7 +848,7 @@ def _drive(value, key, medium, slot, register):
         return MachineDrive(key=key, medium=medium, slot=slot,
                             media=inline.name, inline=inline)
     if "media" not in value:
-        raise ValueError(
+        raise StaticError(
             f"drives.{key} must name a media (or be null for an empty "
             "removable slot)")
     controller = (_controller(value["controller"], key, medium)
@@ -861,12 +862,12 @@ def _drive(value, key, medium, slot, register):
 
 def _drives(value, register):
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError("drives must be an object")
+        raise StaticError("drives must be an object")
     normalized, claimed = {}, {}
     for authored_key, declaration in value.items():
         medium, slot, key = _drive_key(authored_key)
         if key in claimed:
-            raise ValueError(
+            raise StaticError(
                 f"drive key clash: {claimed[key]!r} and {authored_key!r} "
                 f"both mean {key}")
         claimed[key] = authored_key
@@ -888,16 +889,16 @@ def _default_boot(drives):
 
 def _boot(value, drives):
     if not isinstance(value, list):
-        raise ValueError("boot must be an array of drive keys")
+        raise StaticError("boot must be an array of drive keys")
     normalized, seen = [], set()
     for index, authored_key in enumerate(value):
         _, _, key = _drive_key(authored_key)
         if key not in drives:
-            raise ValueError(f"boot[{index}] references undeclared drive {key}")
+            raise StaticError(f"boot[{index}] references undeclared drive {key}")
         if not drives[key].enabled:
-            raise ValueError(f"boot[{index}] references disabled drive {key}")
+            raise StaticError(f"boot[{index}] references disabled drive {key}")
         if key in seen:
-            raise ValueError(f"boot contains duplicate drive {key}")
+            raise StaticError(f"boot contains duplicate drive {key}")
         seen.add(key)
         normalized.append(key)
     return tuple(normalized)
@@ -905,14 +906,14 @@ def _boot(value, drives):
 
 def _scripts(value):
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError("scripts must be an object")
+        raise StaticError("scripts must be an object")
     normalized = {}
     for label, script in value.items():
         label = _plain(label, "scripts label")
         script = _plain(script, f"scripts.{label}")
         if (script in (".", "..") or "/" in script or "\\" in script
                 or script.lower().endswith(".rlqs")):
-            raise ValueError(
+            raise StaticError(
                 f"scripts.{label} must be the file stem under scripts/, "
                 f"got: {script!r}")
         normalized[label] = script
@@ -921,13 +922,13 @@ def _scripts(value):
 
 def _control_planes(value):
     if not isinstance(value, list):
-        raise ValueError("control-planes must be an array of strings")
+        raise StaticError("control-planes must be an array of strings")
     normalized, seen = [], set()
     for index, entry in enumerate(value):
         plane = _text(entry, f"control-planes[{index}]", closed=True,
                       allowed=_CONTROL_PLANES)
         if plane in seen:
-            raise ValueError(f"control-planes contains duplicate {plane!r}")
+            raise StaticError(f"control-planes contains duplicate {plane!r}")
         seen.add(plane)
         normalized.append(plane)
     return tuple(normalized)
@@ -935,16 +936,16 @@ def _control_planes(value):
 
 def _backend_settings(value):
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError("backend-settings must be an object")
+        raise StaticError("backend-settings must be an object")
     normalized = {}
     for backend_name, section in value.items():
         if backend_name not in _BACKENDS:
             allowed = ", ".join(sorted(_BACKENDS))
-            raise ValueError(
+            raise StaticError(
                 f"backend-settings names unknown backend {backend_name!r}; "
                 f"expected one of {allowed}")
         if not isinstance(section, collections.abc.Mapping):
-            raise ValueError(
+            raise StaticError(
                 f"backend-settings.{backend_name} must be an object")
         normalized[backend_name] = types.MappingProxyType(dict(section))
     return types.MappingProxyType(normalized)
@@ -952,7 +953,7 @@ def _backend_settings(value):
 
 def _parameters(value):
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError("parameters must be an object")
+        raise StaticError("parameters must be an object")
     normalized = {}
     for key, binding in value.items():
         key = _plain(key, "parameters key")
@@ -960,14 +961,14 @@ def _parameters(value):
             normalized[key] = _text(binding, f"parameters.{key}")
         elif isinstance(binding, collections.abc.Mapping):
             if set(binding) != {"property"}:
-                raise ValueError(
+                raise StaticError(
                     f"parameters.{key} must be a string or a "
                     '{"property": "<key>"} redirect')
             normalized[key] = types.MappingProxyType(
                 {"property": _plain(
                     binding["property"], f"parameters.{key}.property")})
         else:
-            raise ValueError(
+            raise StaticError(
                 f"parameters.{key} must be a string or a "
                 '{"property": "<key>"} redirect')
     return types.MappingProxyType(normalized)
@@ -975,20 +976,20 @@ def _parameters(value):
 
 def _machine(value, register, *, where="machine"):
     if not isinstance(value, collections.abc.Mapping):
-        raise ValueError(f"{where} must be a JSON object")
+        raise StaticError(f"{where} must be a JSON object")
     unknown = set(value) - _MACHINE_FIELDS
     if unknown:
         bad = sorted(unknown)[0]
         if bad in _STATE_ONLY:
-            raise ValueError(
+            raise StaticError(
                 f"{bad} is a state-only field and is not valid in a blueprint")
-        raise ValueError(f"unknown machine field: {bad}")
+        raise StaticError(f"unknown machine field: {bad}")
     if "platform" not in value:
-        raise KeyError("platform is required")
+        raise StaticError("platform is required")
     platform = _text(value["platform"], "platform", closed=True,
                      allowed=_PLATFORMS)
     if "name" not in value:
-        raise ValueError(f"{where} requires a name")
+        raise StaticError(f"{where} requires a name")
     name = _machine_name(value["name"], "name")
     drives = _drives(value["drives"], register) if "drives" in value \
         else types.MappingProxyType({})
@@ -1024,13 +1025,13 @@ def _spec_type(value, where):
         return "media"
     declared = _plain(value["type"], f"{where}.type")
     if declared in _RETIRED_TYPES:
-        raise ValueError(
+        raise StaticError(
             f"{where}: the {declared!r} spec type is retired — a source is "
             "now a media's location, and an archive is a media that other "
             "media name as their parent")
     if declared not in _SPEC_TYPES:
         allowed = ", ".join(sorted(_SPEC_TYPES))
-        raise ValueError(
+        raise StaticError(
             f"{where}.type must be one of {allowed}, got: {declared!r}")
     return declared
 
@@ -1051,7 +1052,7 @@ def parse_document(value, *, stem=None):
     if isinstance(value, collections.abc.Mapping):
         sections = set(value) & _RETIRED_SECTIONS
         if sections and "type" not in value:
-            raise ValueError(
+            raise StaticError(
                 f"the plural {sorted(sections)[0]!r} section is retired: a "
                 "blueprint root is an array of specs (a lone spec object is "
                 "the array of one)")
@@ -1059,7 +1060,7 @@ def parse_document(value, *, stem=None):
     elif isinstance(value, list):
         entries = value
     else:
-        raise ValueError(
+        raise StaticError(
             "a blueprint must be an array of specs or a lone spec object, "
             f"got {type(value).__name__}")
 
@@ -1068,11 +1069,11 @@ def parse_document(value, *, stem=None):
     def register(kind, name, spec):
         bucket = buckets[kind]
         if name in bucket:
-            raise ValueError(
+            raise StaticError(
                 f"duplicate {kind} name {name!r} in one document")
         folded = {existing.lower() for existing in bucket}
         if name.lower() in folded:
-            raise ValueError(
+            raise StaticError(
                 f"{kind} name {name!r} collides case-insensitively with "
                 "another in this document: names match exactly but the "
                 "media cache is name-keyed on filesystems that do not")
@@ -1096,7 +1097,7 @@ def _bare_string_spec(entry, where, register):
     """A bare-string root element: a media located by that string."""
     media = _media({"location": entry}, register, where=where)
     if any(rung.is_remote for rung in media.location) and media.sha256 is None:
-        raise ValueError(
+        raise StaticError(
             f"{where}: a bare remote location has nowhere to carry its "
             f"sha256 — write the object form: "
             f'{{"location": {entry!r}, "sha256": "…"}}')
@@ -1106,7 +1107,7 @@ def load_document(path):
     """Load and parse one ``.rlqb`` document."""
     path = os.path.abspath(os.fspath(path))
     if not os.path.exists(path):
-        raise FileNotFoundError(f"blueprint not found: {path}")
+        raise PreflightError(f"blueprint not found: {path}")
     with open(path, "r", encoding="utf-8") as handle:
         value = jsonc.load(handle)
     return parse_document(value)

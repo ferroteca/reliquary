@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 from reliquary.blueprint import delete_blueprint, new_blueprint
+from reliquary.errors import PreflightError
 from reliquary.document import parse_document
 
 
@@ -41,7 +42,7 @@ class NewBlueprintTests(BlueprintFileTestCase):
 
     def test_already_exists_raises(self):
         new_blueprint("test-bp", context=self.home)
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(PreflightError):
             new_blueprint("test-bp", context=self.home)
 
 
@@ -62,7 +63,7 @@ class DeleteBlueprintTests(BlueprintFileTestCase):
         self.assertFalse(os.path.exists(path))
 
     def test_missing_raises(self):
-        with self.assertRaises(FileNotFoundError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             delete_blueprint("missing", context=self.home)
         self.assertIn("blueprint not found", str(caught.exception))
 
@@ -75,7 +76,7 @@ class DeleteBlueprintTests(BlueprintFileTestCase):
                   "w", encoding="utf-8") as handle:
             json.dump({"id": "plain-0", "blueprint": "plain",
                        "phase": "ready"}, handle)
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             delete_blueprint("plain", context=self.home)
         message = str(caught.exception)
         self.assertIn("still has 1 machine(s)", message)
@@ -84,7 +85,7 @@ class DeleteBlueprintTests(BlueprintFileTestCase):
             os.path.join(self.home, "blueprints", "plain.rlqb")))
 
     def test_does_not_delete_codex(self):
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(PreflightError):
             delete_blueprint("freedos", context=self.home)
 
 

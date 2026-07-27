@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 from reliquary import resolve
+from reliquary.errors import PreflightError
 from reliquary.document import parse_document
 from reliquary.resolve import Alternatives, Download, Extract, LocalFile
 
@@ -57,7 +58,7 @@ class BuildNamespaceTests(unittest.TestCase):
             b = self._write(
                 root, "b.rlqb",
                 '[{"name": "x", "materialize": "new", "size": "2M"}]')
-            with self.assertRaises(ValueError) as caught:
+            with self.assertRaises(PreflightError) as caught:
                 resolve.build_namespace([a, b])
             message = str(caught.exception)
             self.assertIn("x", message)
@@ -70,7 +71,7 @@ class BuildNamespaceTests(unittest.TestCase):
                                             ' "location": "a.img"}]')
             b = self._write(root, "b.rlqb", '[{"name": "fdboot",'
                                             ' "location": "b.img"}]')
-            with self.assertRaises(ValueError) as caught:
+            with self.assertRaises(PreflightError) as caught:
                 resolve.build_namespace([a, b])
             self.assertIn("case", str(caught.exception))
 
@@ -125,20 +126,20 @@ class FetchPlanTests(unittest.TestCase):
 
     def test_missing_parent_names_both_media(self):
         ns = self._ns([{"name": "x", "location": "${media:gone/a.img}"}])
-        with self.assertRaises(KeyError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(ns.media["x"], ns)
         self.assertIn("gone", str(caught.exception))
 
     def test_containment_cycle_is_named(self):
         ns = self._ns([{"name": "loop", "location": "${media:loop/p.img}"}])
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(ns.media["loop"], ns)
         self.assertIn("cycle", str(caught.exception))
 
     def test_remote_without_a_hash_fails_at_resolution(self):
         """Parse cannot know: a referenced rung may resolve to a URL."""
         ns = self._ns([{"name": "iso", "location": "https://x.test/p.iso"}])
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(ns.media["iso"], ns)
         self.assertIn("sha256", str(caught.exception))
 
@@ -146,7 +147,7 @@ class FetchPlanTests(unittest.TestCase):
         ns = self._ns([
             {"name": "disk", "location": "disk.img"},
             {"name": "inside", "location": "${media:disk/p.txt}"}])
-        with self.assertRaises(ValueError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(ns.media["inside"], ns)
         message = str(caught.exception)
         self.assertIn("img", message)
@@ -155,7 +156,7 @@ class FetchPlanTests(unittest.TestCase):
     def test_property_location_fails_closed_naming_properties(self):
         """Never a milestone number: name the channel it waits on."""
         ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(ns.media["win"], ns)
         message = str(caught.exception)
         self.assertIn("propert", message)
@@ -197,7 +198,7 @@ class LocationBindingTests(unittest.TestCase):
 
     def test_an_unbound_key_names_the_media_and_the_key(self):
         ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(ns.media["win"], ns, {})
         message = str(caught.exception)
         self.assertIn("win", message)
@@ -205,14 +206,14 @@ class LocationBindingTests(unittest.TestCase):
 
     def test_a_value_that_is_itself_a_reference_fails_closed(self):
         ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(
                 ns.media["win"], ns, {"windows.iso": "${other}"})
         self.assertIn("chain", str(caught.exception))
 
     def test_a_value_naming_another_media_is_refused(self):
         ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(PreflightError) as caught:
             resolve.resolve_media_plan(
                 ns.media["win"], ns, {"windows.iso": "${media:other}"})
         self.assertIn("chain", str(caught.exception))
