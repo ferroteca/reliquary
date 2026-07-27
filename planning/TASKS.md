@@ -78,27 +78,6 @@ needs no pledge because the norm it violates already is one.
 Owner-only: each settles a question the record is waiting on.
 None depends on the others.
 
-- **Pledge and promote U9 and U12 — delivered work is standing on
-  unpledged demand.** Milestone 9's own text cites "live feedback
-  for a watched install (U12, P5)", and the roadmap's "The run and its
-  output" cites "an automating program reads machine-readable
-  events as they happen and takes the result (U9, U14)" — both
-  flatly, not conditionally. Both use cases are **drafted, never
-  pledged**, and both describe behavior that now ships
-  (`--progress` and the jsonl event stream). Under D23 scheduling
-  milestone 9 pledged them and the record never moved; under D34
-  their delivery should then have promoted them to USE-CASES.md
-  beside U14 and U20. Missed by D37's promotion pass, which
-  checked only the two use cases the milestone named as its own.
-  This is the sharpest instance of the class: the standing list is
-  an implementation claim, so it is currently *incomplete* rather
-  than merely untidy.
-  Distinguish from the legitimate citations the same audit found —
-  U7, U8, U13, U18 and U19 are all named conditionally by backlog
-  work ("would stand on the U13 draft if pledged", "U7 is what
-  schedules this work back onto the arc"), which is the rule
-  working, not failing.
-
 - **Promote the principles reality has already caught up with.**
   WHY IT MATTERS, and it is not bookkeeping: **promotion is what
   arms a principle** (owner, 2026-07-24). Before it, an entry is

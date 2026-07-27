@@ -116,7 +116,11 @@ Two 2026-07-23 sweeps. The mapping sweep (U7–U10) closes
 named coverage gaps — roadmap work standing on demand no use
 case writes down. The decomposition sweep (U11–U17) executes
 the owner's directive: break the dense cases into much
-smaller chunks where possible — the calibrating example
+smaller chunks where possible. **U9 and the U11–U13 chunk trio
+left in force** (D46, 2026-07-27): all four were delivered
+already, so the pledge and the promotion ran as one act and no
+stub stays behind — which is why both sweep ranges now read
+with holes in them. The calibrating example
 (owner): "a user at the keyboard should be able to easily
 find a codex blueprint, for example for freedos or openbsd,
 with minimal effort, and seed it into their library." People
@@ -177,30 +181,6 @@ export half back onto the arc, the citing item the record.
 >   Reliquary machine stays disposable precisely because the
 >   durable exit exists.
 
-**U9 — Automate from a language without a binding** — drafted
-(add, 2026-07-23). The gap: the multi-language binding
-expectation and the CLI-as-universal-binding role shape real
-decisions (pull-only handles, no callbacks, the four machine
-surfaces) yet hang from one clause inside U3. Alternative
-weighed: leave this as INTERFACES doctrine only — drafted
-anyway because the parity invariant deserves demand-side
-backing the interface-change rule can weigh against. On
-adoption, the CLI programmatic contract and parity items cite
-U9. Owner direction (2026-07-23): addressed as a use case
-only, NO roadmap item — the CLI fallback carries unbound
-languages until a second binding earns scheduling on its own.
-
-> - **U9 — Automate from a language without a binding.** A
->   consuming project's harness is Java, C#, Go, or shell — no
->   Python, no native Reliquary binding. It still gets
->   everything through the CLI: every capability invocable,
->   observable, and parseable from a program — results on
->   stdout, diagnostics on stderr, exit codes by class,
->   machine-readable output as timely as the pretty rendering,
->   and no hidden prompt ever hanging a pipeline. A native
->   binding, where one exists for the language, is the same
->   surface with types; nothing is CLI-only or binding-only.
-
 **U10 — The install is the thing under test** — drafted (add,
 2026-07-23). The gap: the control-plane arc's prose already
 names install-testing ("os-autoinst-style, where the install
@@ -220,35 +200,6 @@ statements.
 >   ones under test. The same script observes a changed
 >   installer honestly, failing with the screen it actually
 >   saw.
-
-**U11 + U12 + U13 — chunk U1** — drafted (add, 2026-07-23,
-the decomposition sweep). U1 bundles three separately
-demandable capabilities with its journey; the chunks are
-additive — U1 itself stays as the composed one-command
-journey, condensed by the pending clarification below to cite
-them. Each chunk is what a decision would actually cite:
-discovery work cites U11, script-runtime work U12,
-acquisition work U13.
-
-> - **U11 — Find and seed a codex blueprint, easily.** A user
->   at the keyboard wants a starting point — freedos,
->   openbsd — and finds it with minimal effort: search or list
->   the codex, read a description, seed the blueprint (its
->   media and scripts included) into their own library as
->   ordinary files they own from then on.
-
-> - **U12 — An unattended install, end to end.** From standard
->   vendor media, a script drives the installer the whole way —
->   menus, partitioning, reboots, media swaps — with no hand on
->   the keyboard, ending in a usable machine. A run this long
->   shows where it is and what it is waiting for while it goes.
-
-> - **U13 — Media fetches and verifies itself.** A blueprint
->   names its media and pins it by hash; Reliquary acquires
->   it — download, extract, cache — and verifies it is exactly
->   the build the scripts target. The user never hand-places a
->   file in Reliquary's caches, and a wrong or changed payload
->   fails closed by name.
 
 **U16 + U17 — split U4** — drafted (supersede U4, 2026-07-23,
 the decomposition sweep). U4 bundled the sharing journey with
@@ -353,14 +304,15 @@ applied; each must pass the clarification test (no past
 citation reads differently under the new wording).
 
 - **U1 — condense to the journey** (recorded 2026-07-23;
-  contingent on U8 and U11–U13 being pledged). Tighten U1 to
-  the composed journey it uniquely owns — one short, terse
-  command from a clean home to a usable machine,
+  **contingent on U8 alone** since D46, 2026-07-27). Tighten
+  U1 to the composed journey it uniquely owns — one short,
+  terse command from a clean home to a usable machine,
   easy-is-the-requirement included — citing U11 (find and
   seed), U13 (media), U12 (the install), and U8 (the export
-  exit) for the capabilities it composes. Until those are
-  pledged, U1's full text stays: every clause is load-bearing
-  demand.
+  exit) for the capabilities it composes. Three of the four
+  are now in force; U8 is the last, and until it is pledged
+  U1's export clause stays load-bearing text rather than a
+  citation.
 - **U2 — condense** (recorded 2026-07-23). Trim the import
   doctrine detail — never-copy, snapshot consent, and the
   duplicate/difference choice are settled in the dissolved roadmap's import

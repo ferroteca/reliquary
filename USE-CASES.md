@@ -78,6 +78,37 @@ number they superseded.
   automates the testing in it. When truly finished, the developer
   disposes of the large VM and reclaims the disk space.
 
+- **U9 — Automate from a language without a binding.** A
+  consuming project's harness is Java, C#, Go, or shell — no
+  Python, no native Reliquary binding. It still gets
+  everything through the CLI: every capability invocable,
+  observable, and parseable from a program — results on
+  stdout, diagnostics on stderr, exit codes by class,
+  machine-readable output as timely as the pretty rendering,
+  and no hidden prompt ever hanging a pipeline. A native
+  binding, where one exists for the language, is the same
+  surface with types; nothing is CLI-only or binding-only.
+
+- **U11 — Find and seed a codex blueprint, easily.** A user
+  at the keyboard wants a starting point — freedos,
+  openbsd — and finds it with minimal effort: search or list
+  the codex, read a description, seed the blueprint (its
+  media and scripts included) into their own library as
+  ordinary files they own from then on.
+
+- **U12 — An unattended install, end to end.** From standard
+  vendor media, a script drives the installer the whole way —
+  menus, partitioning, reboots, media swaps — with no hand on
+  the keyboard, ending in a usable machine. A run this long
+  shows where it is and what it is waiting for while it goes.
+
+- **U13 — Media fetches and verifies itself.** A blueprint
+  names its media and pins it by hash; Reliquary acquires
+  it — download, extract, cache — and verifies it is exactly
+  the build the scripts target. The user never hand-places a
+  file in Reliquary's caches, and a wrong or changed payload
+  fails closed by name.
+
 - **U14 — Drive a machine from a program.** An agent — a test
   harness, a CI driver, an AI coding agent — drives a machine
   from its own code, through a native binding or the CLI: it

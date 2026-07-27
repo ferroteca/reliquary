@@ -51,7 +51,7 @@ is worse than no audit, because the record is trusted.
   automating, or every retirement reads as a dangling citation.
 - **Entry-definition formats.** Use cases are defined in at least
   five forms across the three files (bulleted, unbulleted,
-  blockquote-nested, and combined headers such as `U11 + U12 + U13`).
+  blockquote-nested, and combined headers such as `U16 + U17`).
   For `proposed/` this is appropriate looseness — a sketch is not a
   record — so the check belongs to the **in-force lists only**,
   where precision is the point.

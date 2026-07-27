@@ -170,6 +170,95 @@ is waiting on an answer today.
 
 ## Decided
 
+- D46 — U9 AND THE U11–U13 CHUNK TRIO ARE PLEDGED AND IN FORCE —
+  DECIDED (owner, 2026-07-27, the first TASKS.md adjudication).
+  Supports P6, P7, P8; applies D23's pledged-and-delivered-in-one-act
+  clause and D34's promotion-on-delivery rule. Four use cases move
+  from [proposed/USE-CASES.md](proposed/USE-CASES.md) **straight to
+  root [USE-CASES.md](../USE-CASES.md)**, never touching
+  `pledged/`, no stub behind either move (D23).
+  WHY ONE ACT AND NOT TWO. All four were delivered before they were
+  pledged, which is the state D23 names: "a chunk whose demanded
+  work already landed is accepted and delivered in one act." So
+  there was never a pledged-awaiting-delivery interval to record.
+  THE DEFECT THIS CLOSES. Delivered work was citing unpledged
+  demand as though it were pledged — D36 cites U12 twice and
+  flatly ("live feedback for a watched install (U12)"; "U12 wants
+  live progress"), in the decision that deleted run persistence.
+  D37's promotion pass missed it, checking only the two use cases
+  milestone 9 named as its own. The standing list was therefore
+  *incomplete* rather than untidy: it is an implementation claim,
+  and four things the code does were absent from it.
+  SCOPE WIDENED FROM THE TASK'S TWO TO FOUR (owner). The task
+  named U9 and U12. U11 and U13 stand in the identical state —
+  drafted, delivered, unpledged — and U12 sat under the combined
+  heading "U11 + U12 + U13 — chunk U1", which moving U12 alone
+  would have left half-rewritten. Taking the trio whole dissolves
+  the heading cleanly and seats U1's delivered substance in the
+  current list, which is what that split was for.
+  U9 — DELIVERED, AND STILL WORTH ITS NUMBER. Verified clause by
+  clause against the code: `--json` on every command (`_add_home`),
+  jsonl owning stdout while human modes leave it empty, exit codes
+  by class through `errors.exit_code`, the jsonl renderer streaming
+  as it goes. Its sharpest clause — *no hidden prompt ever hanging
+  a pipeline* — is structural rather than incidental:
+  `binding.console_asker()` returns no asker unless stdin **and**
+  stderr are both ttys, and the binder then fails closed naming the
+  key. Acquisition's one `input()` (`on_mismatch="prompt"`) is
+  API-only, never passed by the CLI, and EOF-safe.
+  THE OVERLAP WITH P6/P7, STATED SO IT IS NOT MISREAD LATER. U9
+  was drafted in July because "the parity invariant deserves
+  demand-side backing the interface-change rule can weigh against";
+  P6 (one semantic surface) and P7 (the binding constraint) have
+  been armed at root ARCHITECTURE.md since. The gap is narrower
+  than it was, not closed: P6/P7 are rules the project imposes on
+  itself, U9 is the journey a change can be **rejected by naming**,
+  and P8 triages against both lists. Its evidence shifted too — the
+  roadmap citation the task quoted ("(U9, U14)") died with
+  ROADMAP.md in the 2026-07-26 restructure, so U9 promotes on
+  substance rather than on a live bad citation.
+  U9 HAD NO OTHER ROUTE IN. D23's directive of 2026-07-23 gave it
+  "NO roadmap item" deliberately, and acceptance-is-scheduling
+  pledges a use case through the item that cites it — so no
+  scheduling act could ever have reached U9. Direct adjudication
+  was the only door open to it, which is why it sat undisturbed
+  while every use case with a milestone behind it moved.
+  U12's MEDIA-SWAP CLAUSE — PROMOTED AS WRITTEN (owner). The
+  shipped `freedos-install.rlqs` drives menus, partitioning and the
+  reboot cycle unattended to a `C:\>` prompt, and `--progress`
+  supplies "shows where it is and what it is waiting for"; what no
+  install exercises is a *mid-install* media swap. The clause is
+  read as illustrative of the installer journey rather than a
+  checklist of required steps, and the capability itself is
+  delivered and byte-verified — D37's U20 spike ran live
+  insert/eject on QEMU/DOS. The alternative considered and
+  declined was a clarification trimming the clause.
+  U11 AND U13 — VERIFIED, NOT ASSUMED. U11: `search_blueprints`
+  matches name, description and platform and reports provenance;
+  `seed_blueprint` copies the blueprint out with the scripts it
+  references, never overwriting, and media travel *inside* the
+  composed blueprint since milestone 7 — so "its media and scripts
+  included" is satisfied by construction. U13: `acquire.py`
+  sha256-verifies every download, extraction and local file into
+  the one name-keyed cache, and a mismatch fails closed naming the
+  media and both digests; there is no verb that hand-places a file
+  in the cache, which is D30's and D41's ground.
+  ONE CONSEQUENCE OUTSIDE THE FOUR. Horizon's `verify` command
+  loses its lack-of-demand objection, U13 now being in force; this
+  pledges nothing — what is left is whether a standalone verb earns
+  its place beside the verification `fetch-media` already does.
+  `remove` still has no demand at all.
+  FOLDED: this entry; USE-CASES.md (all four added in number
+  order); proposed/USE-CASES.md (all four removed, the Drafted
+  preamble's sweep ranges noted as holed, U1's condensation now
+  contingent on U8 alone); pledged/USE-CASES.md (U1's note — its
+  substance is seated, its export clause is why it stays);
+  pledged/FEATURES.md (F17's U12 citation loses its conditional);
+  proposed/FEATURES.md (F18's U13 citation likewise, F8's evidence
+  line, the Horizon media-commands item split); TASKS.md (the
+  adjudication struck — D45: a task leaves that file by deletion).
+  No CHANGELOG line: nothing release-facing moved.
+
 - D45 — THE HOUSEKEEPING BOUNDARY IS HOUSEKEEPING'S ALONE; A SMALL
   INTERFACE CHANGE MAY BE A TASK — DECIDED (owner, 2026-07-27).
   Supports P8, P23; **completes D43** by supplying the negative

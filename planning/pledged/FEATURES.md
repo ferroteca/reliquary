@@ -86,7 +86,8 @@ nothing unpledged.
 > scripting language, which is no bar to being a task (D45); what
 > puts it here is the seven-item breakdown below, a bisection rig
 > among them. Serves
-> **U14** and **U20** in force and the **U12** draft — a script
+> **U14**, **U20** and **U12** — all three in force since D46,
+> which retires this citation's conditional half — a script
 > that cannot reliably land a keystroke serves none of them — on
 > language goals **G1** and **G5**. Raised by milestone 9's FreeDOS
 > install failure (owner, 2026-07-24); the design was settled in

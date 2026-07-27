@@ -444,7 +444,9 @@ real violation of every one:
   D29 sat outside the range the existing task assumed*;
 * no *delivered* work cites *unpledged* demand — *U9 and U12*,
   the sharpest defect of the set, and the one a linter would
-  have caught the day milestone 9 landed;
+  have caught the day milestone 9 landed (closed by hand three
+  days later, D46 — which is the argument, not a
+  counter-argument: three days is what an unaided grep costs);
 * every design document's subject has pledged demand — *three
   designs exist for pillars D33 demoted for lack of it*;
 * every cited identifier resolves — *U15 is cited 6 times and
@@ -915,7 +917,7 @@ and its inverse.
 > moved the ground under them once, which is an argument to finish
 > rather than work to pick up. Serves **U4** in force
 > (a repository refers precisely to media it cannot distribute) and
-> the **U13** draft (media fetches and verifies itself).
+> **U13** (media fetches and verifies itself), in force since D46.
 
 **They are one feature because they share a scaffolder.** D41
 settled that `add-media` is the local half already — compute the
@@ -1086,8 +1088,13 @@ spelling today, so nothing has to be unsaid first.
   backends (no `hostdir`) and non-FAT guest filesystems — so
   sequence at or soon after the second backend (backlog).
 - Media commands beyond `fetch-media` (verify, remove) —
-  currently unjustified: no use case demands them; `verify`
-  would stand on the U13 draft if pledged.
+  **split by D46** (2026-07-27), which put U13 in force:
+  `verify` now stands on a use case in force ("verifies it is
+  exactly the build the scripts target"), so the
+  lack-of-demand objection to it is gone and what is left is
+  whether a standalone verb earns its place beside the
+  verification `fetch-media` already does. `remove` still has
+  no demand whatever — it stays unjustified.
 - A `pytest-reliquary` plugin (per AGENTS.md prior art) —
   currently unjustified: adjacent to the U14/U15 drafts at
   best, and test-framework semantics belong to consumers (the

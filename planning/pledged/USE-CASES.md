@@ -42,11 +42,13 @@ moved from the current list 2026-07-23 (owner: the current
 list is implemented-only). The install journey is delivered
 end to end — the north-star command works from a clean home —
 but the export clause is unimplemented Horizon work (machine
-mobility), so U1 as written is not met. The delivered
-substance is separately drafted as chunks U11–U13: pledging
-those already-delivered chunks seats it in the current list at
-once, and the pending U1 condensation completes the story when
-export schedules. Text verbatim as adopted:
+mobility), so U1 as written is not met. **The delivered
+substance is now seated in the current list** as U11, U12 and
+U13 (D46, 2026-07-27), which is what that split was for; U1
+stays here for its export clause alone, and the pending
+condensation — contingent on U8, the last of the four it would
+cite — completes the story when export schedules. Text
+verbatim as adopted:
 
 > - **U1 — Install a sandbox VM from the CLI, easily.** A user
 >   says, in effect, "I'd like to install FreeBSD" — and ends with
