@@ -1,6 +1,6 @@
 # invalid: no unbalanced blocks
 # rule: S1
-# id: none
+# id: syn.unexpected-end
 # spec: Syntactic restrictions
 
 platform dos

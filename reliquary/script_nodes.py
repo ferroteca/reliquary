@@ -107,10 +107,50 @@ RULE_OF = {
     "key.not-portable": "S14",
 }
 
+#: The lexical and structural tiers. S1 is "syntax is well formed:
+#: no unknown node names, no unbalanced blocks", which the lexer and
+#: the grammar enforce between them, so these are its diagnostics.
+#: ``lex.`` is what the tokenizer rejects while reading characters;
+#: ``syn.`` is line, block and document shape.
+RULE_OF.update({
+    "lex.unclosed-reference": "S1",
+    "lex.invalid-reference": "S1",
+    "lex.unterminated-string": "S1",
+    "lex.unterminated-regex": "S1",
+    "lex.unterminated-content": "S1",
+    "lex.invalid-token": "S1",
+    "lex.invalid-duration": "S1",
+    "lex.spaced-modifier": "S1",
+    "lex.modifier-missing-value": "S1",
+    "syn.brace-not-alone": "S1",
+    "syn.unmatched-close": "S1",
+    "syn.unclosed-block": "S1",
+    "syn.open-brace-position": "S1",
+    "syn.expected-node-name": "S1",
+    "syn.argument-after-modifier": "S1",
+    "syn.unexpected-token": "S1",
+    "syn.unexpected-end": "S1",
+    "syn.duplicate-header": "S3",
+    "node.modifier-not-a-duration": "S2",
+    "node.modifier-not-a-string": "S2",
+    "prop.unknown-kind": "S5",
+})
+
 #: Ids for static rules the S-numbers do not cover. The http
 #: declaration's rules are static and legality-tier like the rest;
 #: they simply predate the S-numbering and have no entry in it.
 RULE_OF.update({
+    "http.port-not-a-number": None,
+    "http.indent-not-a-mode": None,
+    "http.content-two-bodies": None,
+    "http.content-no-body": None,
+    "http.indent-on-file-body": None,
+    "http.from-reference": None,
+    "http.from-not-relative": None,
+    "http.from-traversal": None,
+    "http.from-missing": None,
+    "http.from-unreadable": None,
+    "http.duplicate-declaration": None,
     "http.no-content": None,
     "http.duplicate-content-name": None,
     "http.duplicate-content-path": None,
@@ -147,9 +187,10 @@ class ScriptParseError(StaticError):
     diagnostics under it. The spec's rule list carries the mapping,
     and a test holds the two together.
 
-    ``rule_id`` is None only where an id has not been assigned yet
-    (parse, preflight and runtime diagnostics, still to come); the
-    script conformance corpus measures how many of those remain.
+    ``rule_id`` is None only where an id has not been assigned yet.
+    The lexical, grammar and static tiers all carry one; preflight
+    and runtime do not, and the script conformance corpus measures
+    what remains rather than estimating it.
     """
 
     def __init__(self, line, message, column=1, rule_id=None):
@@ -311,11 +352,13 @@ def _scan_string(text, start, number):
             if closing < 0:
                 raise ScriptParseError(
                     number, "unclosed property reference: expected '}'",
-                    index + 1)
+                    index + 1,
+                    rule_id="lex.unclosed-reference")
             key = text[index + 2:closing]
             if not _NAME.fullmatch(key):
                 raise ScriptParseError(
-                    number, f"invalid property reference: {key!r}", index + 1)
+                    number, f"invalid property reference: {key!r}", index + 1,
+                    rule_id="lex.invalid-reference")
             if chunk:
                 parts.append("".join(chunk))
                 chunk = []
@@ -324,7 +367,8 @@ def _scan_string(text, start, number):
             continue
         chunk.append(char)
         index += 1
-    raise ScriptParseError(number, "unterminated string", start + 1)
+    raise ScriptParseError(number, "unterminated string", start + 1,
+    rule_id="lex.unterminated-string")
 
 
 def _scan_regex(text, start, number):
@@ -349,7 +393,8 @@ def _scan_regex(text, start, number):
             continue
         pattern.append(char)
         index += 1
-    raise ScriptParseError(number, "unterminated regex", start + 1)
+    raise ScriptParseError(number, "unterminated regex", start + 1,
+    rule_id="lex.unterminated-regex")
 
 
 def _scan_word(text, start, stop_at_equals):
@@ -384,7 +429,8 @@ def _scan_value(text, start, number, bare_number=False):
         if not (_MEDIA_NAME if char == "@" else _NAME).fullmatch(name):
             what = "media reference" if char == "@" else "property reference"
             raise ScriptParseError(
-                number, f"invalid {what}: {text[start:end]!r}", start + 1)
+                number, f"invalid {what}: {text[start:end]!r}", start + 1,
+                rule_id="lex.invalid-token")
         return Token(kind, text[start:end], name, number, start + 1), end
     word, end = _scan_word(text, start, False)
     if char.isdigit() or char == ".":
@@ -394,7 +440,8 @@ def _scan_value(text, start, number, bare_number=False):
             raise ScriptParseError(
                 number,
                 f"invalid duration: {word!r} (durations carry a unit: "
-                "ms, s, m, or h)", start + 1)
+                "ms, s, m, or h)", start + 1,
+                rule_id="lex.invalid-duration")
         return Token("duration", word, word, number, start + 1), end
     return Token("word", word, word, number, start + 1), end
 
@@ -422,14 +469,16 @@ def tokenize(text, number):
         if char == "=":
             raise ScriptParseError(
                 number, "modifiers are written name=value with no spaces "
-                "around '='", index + 1)
+                "around '='", index + 1,
+                rule_id="lex.spaced-modifier")
         if char.isalpha():
             name, end = _scan_word(text, index, True)
             if text[end:end + 1] == "=":
                 if end + 1 >= len(text) or text[end + 1] in _DELIMITERS:
                     raise ScriptParseError(
                         number, f"modifier {name!r} requires a value with no "
-                        "spaces around '='", index + 1)
+                        "spaces around '='", index + 1,
+                        rule_id="lex.modifier-missing-value")
                 value, end = _scan_value(
                     text, end + 1, number,
                     bare_number=name in ("port-min", "port-max"))
@@ -477,9 +526,11 @@ def _parse(lines):
             if len(tokens) > 1:
                 raise ScriptParseError(
                     number, "a closing brace stands alone on its line",
-                    tokens[1].column)
+                    tokens[1].column,
+                    rule_id="syn.brace-not-alone")
             if not stack:
-                raise ScriptParseError(number, "unmatched '}'", first.column)
+                raise ScriptParseError(number, "unmatched '}'", first.column,
+    rule_id="syn.unmatched-close")
             node, children, _ = stack.pop()
             finished = Node(node.name, node.arguments, node.modifiers,
                             tuple(children), node.line, node.column)
@@ -488,7 +539,8 @@ def _parse(lines):
         if first.kind != "word":
             raise ScriptParseError(
                 number, f"expected a node name, found {first.text!r}",
-                first.column)
+                first.column,
+                rule_id="syn.expected-node-name")
         node, opens = _node(tokens, number)
         if not opens:
             (stack[-1][1] if stack else roots).append(node)
@@ -500,7 +552,8 @@ def _parse(lines):
         node = stack[-1][0]
         raise ScriptParseError(
             stack[-1][2], f"unclosed block opened by {node.name!r}",
-            node.column)
+            node.column,
+            rule_id="syn.unclosed-block")
     return tuple(roots)
 
 
@@ -513,7 +566,8 @@ def _skip_content_body(lines, start, opener_line):
     for index in range(start, len(lines)):
         if lines[index].strip() == '"""':
             return index + 1
-    raise ScriptParseError(opener_line, "unterminated content body")
+    raise ScriptParseError(opener_line, "unterminated content body",
+    rule_id="lex.unterminated-content")
 
 
 def _node(tokens, number):
@@ -527,24 +581,28 @@ def _node(tokens, number):
             if position != len(tokens) - 1:
                 raise ScriptParseError(
                     number, "a block opens at the end of its line",
-                    token.column)
+                    token.column,
+                    rule_id="syn.open-brace-position")
             opens = True
             continue
         if token.kind == "close":
             raise ScriptParseError(
                 number, "a closing brace stands alone on its line",
-                token.column)
+                token.column,
+                rule_id="syn.brace-not-alone")
         if token.kind == "modifier":
             modifier = token.value
             if modifier.name in modifiers:
                 raise ScriptParseError(
                     number, f"duplicate modifier: {modifier.name}",
-                    token.column)
+                    token.column,
+                    rule_id="node.duplicate-modifier")
             modifiers[modifier.name] = modifier
             continue
         if modifiers:
             raise ScriptParseError(
-                number, "arguments precede modifiers", token.column)
+                number, "arguments precede modifiers", token.column,
+                rule_id="syn.argument-after-modifier")
         arguments.append(token)
     return Node(name, tuple(arguments), _freeze(modifiers), None, number,
                 tokens[0].column), opens

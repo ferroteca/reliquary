@@ -156,25 +156,41 @@ code has the bug, so the norm is already the demand.
 
   | module | tier | without an id |
   |---|---|---|
-  | `script_nodes.py` | lexical | 19 |
-  | `script_parser.py` | grammar / typing | 23 |
-  | `script_timing.py` | static | 1 |
   | `binding.py` | preflight | 7 |
   | `resolve.py` | preflight | 10 |
   | `script_runner.py` | runtime | 12 |
+  | `script_timing.py` | static | 1 |
 
-  `script_validation.py` is complete (50 of 50).
+  Everything decided from the script text alone is done — the
+  lexer, the grammar, the node signatures and the static rules,
+  82 ids across `script_nodes.py`, `script_parser.py` and
+  `script_validation.py`. What is left is the two tiers that need
+  more than the text in scope, which is also why no parse fixture
+  can reach them: they belong to the corpus's
+  `invalid-at-preflight/` bucket, and giving them ids is what lets
+  that bucket assert a reason rather than only "parses clean".
 
-  The lexical and grammar tiers are the ones a script author meets
-  first and are the obvious next slice; they also need prefixes
-  the vocabulary does not have yet (`lex.`, `syn.`), which is the
-  only design left in this.
+  `script_timing.py`'s single site is static and simply was not on
+  the earlier pass's path; it is a one-line fix whenever.
+
+  **The prefix design is done too** — `lex.` for what the
+  tokenizer rejects, `syn.` for line, block and document shape,
+  with the typing layer reusing `node.`, `prop.` and `http.`. A
+  preflight tier will want its own; nothing else is open.
 
   **The corpus is the meter, not a guess.**
   `reliquary_tests/fixtures/conformance/script/` marks each
   unidentified case `# id: none` and asserts it in both
-  directions, so the count falls as ids land and cannot drift
-  quietly. Four fixtures carry it today, down from six.
+  directions. **It reads zero today**, down from six: every one of
+  the 39 invalid fixtures names the diagnostic that rejects it.
+
+  **One defect surfaced and is asserted rather than filed.**
+  A branching `wait` carrying a condition is rejected by the
+  *grammar*, so it reports `syn.unexpected-token` and the
+  `wait.branching-condition` arm in `script_validation` is
+  unreachable — the trade `script_grammar.lark` warns about in its
+  own header. The fixture carries `# caught-by: S1`, asserted in
+  both directions, so whichever fix lands retires the marker.
 
   **The index is still not the gap.** Deferring the id *index* to
   beta stays where the spec says it; generating it is cheap now

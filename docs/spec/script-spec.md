@@ -634,23 +634,31 @@ the CFG. Each has a stable id; diagnostics cite them:
 
 - **S1** — syntax is well formed: no unknown node names, no
   unbalanced blocks.
-  *No ids yet* — the lexer and grammar reject these; see the
-  coverage note under [Error classes](#error-classes-and-exit-codes).
+  Ids: the lexer's — `lex.unterminated-string`,
+  `lex.unterminated-regex`, `lex.unterminated-content`,
+  `lex.unclosed-reference`, `lex.invalid-reference`,
+  `lex.invalid-token`, `lex.invalid-duration`,
+  `lex.spaced-modifier`, `lex.modifier-missing-value` — and the
+  shape layer's: `syn.brace-not-alone`, `syn.unmatched-close`,
+  `syn.unclosed-block`, `syn.open-brace-position`,
+  `syn.expected-node-name`, `syn.argument-after-modifier`, plus
+  `syn.unexpected-token` and `syn.unexpected-end`, which are the
+  grammar's own rejections and name a token rather than a rule.
 
 - **S2** — every argument, modifier, and block fits its node's
   signature, including each timing modifier's placement per the
   [placement matrix](#timing).
-  Ids: `node.modifier-not-allowed`, `node.timing-placement`.
+  Ids: `node.modifier-not-allowed`, `node.timing-placement`,
+  `node.modifier-not-a-duration`, `node.modifier-not-a-string`.
 
 - **S3** — each header appears at most once; `entry` appears
   exactly in phased scripts.
-  Ids: `flow.entry-in-linear`, `flow.entry-missing`. The
-  header-cardinality half has no id yet.
+  Ids: `flow.entry-in-linear`, `flow.entry-missing`,
+  `syn.duplicate-header`.
 
 - **S4** — no node carries the same modifier name twice; a
   repeat is an error, never a last-wins override.
-  *No id yet* for the header form; the node form is
-  `node.duplicate-modifier`.
+  Id: `node.duplicate-modifier`.
 
 - **S5** — names are valid and unique in their namespaces:
   reserved node names are not identifiers, property keys are
@@ -662,7 +670,7 @@ the CFG. Each has a stable id; diagnostics cite them:
   `name.duplicate-property`, `name.property-is-a-kind`,
   `name.property-reserved-namespace`,
   `name.variable-reserved-namespace`, `time.non-positive`,
-  `prop.secret-default`, `prop.dead-default`.
+  `prop.secret-default`, `prop.dead-default`, `prop.unknown-kind`.
 
 - **S6** — every `$` reference names a declared property or a
   Reliquary-owned run property in a reserved namespace made
@@ -1903,12 +1911,20 @@ An id is a **contract**: it is what a consumer switches on, so it
 is stable where the message text is not. The message wording,
 like every human rendering, is uncontracted and free to improve.
 
-Coverage today is the static rules above — the validation layer
-and the node signatures. Lexical, preflight and runtime
-diagnostics do not carry ids yet, and the script conformance
-corpus (`reliquary_tests/fixtures/conformance/script/`) records
-how many remain by refusing to let a fixture claim an id that is
-absent, or omit one that has arrived.
+Coverage today is everything decided from the script text alone —
+the lexer, the grammar, the node signatures and the static rules.
+Preflight and runtime diagnostics do not carry ids yet, and the
+script conformance corpus
+(`reliquary_tests/fixtures/conformance/script/`) records what
+remains by refusing to let a fixture claim an id that is absent,
+or omit one that has arrived.
+
+The grammar's own rejections are the coarsest ids in the scheme:
+`syn.unexpected-token` and `syn.unexpected-end` name a token, not
+a rule, because that is all a parser knows. That is the cost this
+spec accepts by keeping the S-rules above the CFG, and it is
+visible where it bites — a construct the grammar refuses cannot
+carry the id of the rule it violates.
 
 ## The run's output and failure
 

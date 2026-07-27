@@ -21,19 +21,25 @@ S-numbers, which was weaker in a way worth recording: an S-number
 names a *rule* and several diagnostics live under each, so
 asserting one could not tell six different failures apart.
 
-Writing the corpus measured how far the ids reach. Four of the 39
-invalid fixtures still cannot name one and carry `# id: none`:
-the two lexical/grammar rejections, the header-cardinality
-diagnostic, and the branching-wait shape the grammar catches
-before validation. Those are D55's remainder, measured rather
-than estimated.
+Writing the corpus measured how far the ids reach, and drove them
+further: it opened with four fixtures carrying `# id: none` and
+now has none — every one of the 39 names the diagnostic that
+rejects it. What remains unidentified is the preflight and
+runtime tiers, which no parse fixture can reach.
 
-Every marker is asserted in **both** directions. A fixture
-naming an id must be rejected by exactly that id; a fixture
-saying `none` must be rejected by a diagnostic that still has
-none — so the day an id lands, this suite fails until the header
-is updated. An exemption cannot outlive the gap it records, which
-is the difference between naming a gap and quietly keeping one.
+One fixture carries `# caught-by:` instead. `s8-branching-with-a-
+condition` exercises S8 and is rejected by the *grammar*, so its
+id is `syn.unexpected-token` and the S8 arm in validation is
+unreachable. That is a defect the corpus found and now asserts
+rather than describes.
+
+Every marker is asserted in **both** directions. A fixture naming
+an id must be rejected by exactly that id; one saying `none` must
+be rejected by a diagnostic that still has none; one claiming a
+layer catches it early must still be caught early. So the day the
+gap closes, this suite fails until the marker goes. An exemption
+cannot outlive what it records, which is the difference between
+naming a gap and quietly keeping one.
 """
 
 import glob
@@ -52,6 +58,7 @@ _SPEC = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "docs", "spec", "script-spec.md")
 _DOTTED = re.compile(r"`([a-z]+\.[a-z-]+)`")
+_CAUGHT_BY = re.compile(r"^# caught-by: (S\d+)", re.M)
 
 
 def _fixtures(bucket):
@@ -123,8 +130,44 @@ class InvalidCorpusTests(unittest.TestCase):
                         "is a false pass: it would keep passing after "
                         "the rule it claims to exercise stopped working.")
 
-    def test_every_declared_id_is_listed_under_its_rule_in_the_spec(self):
-        """The id and the S-number it serves are one mapping.
+    def test_the_id_serves_the_rule_the_fixture_exercises(self):
+        """The rule a fixture exercises is the rule its id enforces.
+
+        `# rule:` is what the script violates; `# id:` is what
+        rejected it. They normally agree, and where they do not the
+        fixture says so with `# caught-by:` — a layer caught the
+        script before the rule's own diagnostic could. That is a
+        real defect, not a labelling convenience, so the marker is
+        asserted in both directions and retires itself when the
+        layers are fixed.
+        """
+        for path in _fixtures("invalid"):
+            text = _header(path)
+            declared, rule = _ID.search(text).group(1), \
+                _RULE.search(text).group(1)
+            caught = _CAUGHT_BY.search(text)
+            with self.subTest(fixture=os.path.basename(path)):
+                serves = RULE_OF.get(declared)
+                if caught:
+                    self.assertNotEqual(
+                        serves, rule,
+                        f"this fixture says {rule} cannot catch it and "
+                        f"{declared} now serves {rule}. Delete the "
+                        "`# caught-by:` line — it records a defect, "
+                        "and the defect is fixed.")
+                    self.assertEqual(serves, caught.group(1))
+                else:
+                    self.assertEqual(
+                        serves, rule,
+                        f"{declared} enforces {serves}, and this "
+                        f"fixture exercises {rule}. Either the id is "
+                        "filed under the wrong rule, or a layer is "
+                        "catching this before the rule can — which "
+                        "is a `# caught-by:` finding, not a mismatch "
+                        "to shrug at.")
+
+    def test_every_declared_id_is_listed_in_the_spec(self):
+        """Every id the corpus names appears in the spec's rule list.
 
         Ids are finer than the S-rules — S7 is one restriction and
         `obs.two-channels` is one of six diagnostics under it — so
@@ -134,22 +177,17 @@ class InvalidCorpusTests(unittest.TestCase):
         """
         with open(_SPEC, encoding="utf-8") as handle:
             spec = handle.read()
+        start = spec.index("- **S1** —")
+        end = spec.index("\nThe grammar is line-oriented", start)
+        listed = set(_DOTTED.findall(spec[start:end]))
         for path in _fixtures("invalid"):
-            text = _header(path)
-            declared = _ID.search(text).group(1)
-            if declared == "none":
-                continue
-            rule = _RULE.search(text).group(1)
-            start = spec.index(f"- **{rule}** —")
-            end = spec.index("\n- **", start + 1) if f"\n- **" in \
-                spec[start + 1:] else len(spec)
-            with self.subTest(id=declared, rule=rule):
+            declared = _ID.search(_header(path)).group(1)
+            with self.subTest(id=declared):
                 self.assertIn(
-                    f"`{declared}`", spec[start:end],
-                    f"{declared} is not listed under {rule} in "
-                    "docs/spec/script-spec.md. An id names one "
-                    "diagnostic of one rule, and the rule list is "
-                    "where a reader crosses between them.")
+                    declared, listed,
+                    f"{declared} rejects a corpus fixture and appears "
+                    "in no S-rule's id list in "
+                    "docs/spec/script-spec.md.")
 
     def test_the_spec_lists_no_id_the_code_does_not_raise(self):
         """The reverse: a listed id that nothing raises is fiction."""
@@ -165,7 +203,7 @@ class InvalidCorpusTests(unittest.TestCase):
                      "script_nodes.py"):
             with open(os.path.join(package, "reliquary", name),
                       encoding="utf-8") as handle:
-                raised.update(re.findall(r'rule_id="([^"]+)"',
+                raised.update(re.findall(r'rule_id\s*=\s*"([^"]+)"',
                                          handle.read()))
         self.assertEqual(
             sorted(listed - raised), [],
@@ -189,7 +227,7 @@ class InvalidCorpusTests(unittest.TestCase):
                      "script_nodes.py"):
             with open(os.path.join(package, name),
                       encoding="utf-8") as handle:
-                raised.update(re.findall(r'rule_id="([^"]+)"',
+                raised.update(re.findall(r'rule_id\s*=\s*"([^"]+)"',
                                          handle.read()))
         self.assertEqual(sorted(raised), sorted(RULE_OF))
 
@@ -204,7 +242,7 @@ class InvalidCorpusTests(unittest.TestCase):
             os.path.basename(path) for path in _fixtures("invalid")
             if _ID.search(_header(path)).group(1) == "none")
         self.assertEqual(
-            len(unidentified), 4,
+            len(unidentified), 0,
             f"the unidentified fixtures are now {unidentified}. Update "
             "this count and the tally in the corpus README together — "
             "the README states it as evidence for D55.")

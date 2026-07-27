@@ -1,6 +1,6 @@
 # invalid: no unknown node names
 # rule: S1
-# id: none
+# id: syn.unexpected-token
 # spec: Syntactic restrictions
 
 platform dos

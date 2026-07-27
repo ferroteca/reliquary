@@ -45,6 +45,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The lexer and the grammar carry identifiers too** — the second
+  pass over D55, and the last that the script text alone can
+  reach. 82 ids now cover everything decided before a machine is
+  in scope: the tokenizer (`lex.unterminated-string`,
+  `lex.invalid-duration`, …), line and block shape (`syn.`), the
+  node signatures, and the static rules.
+
+  Two prefixes were added, as the entry predicted: `lex.` for what
+  the tokenizer rejects while reading characters, `syn.` for
+  shape. The grammar's own rejections are the coarsest in the
+  scheme and deliberately so — `syn.unexpected-token` names a
+  token, never a rule, because that is all a parser knows. The
+  spec now says as much where it explains why the S-rules sit
+  above the CFG.
+
+  **The corpus's unidentified count is zero**, down from six when
+  it was written: all 39 invalid fixtures name the diagnostic that
+  rejects them. What has no id is preflight and runtime — 30 sites
+  that no parse fixture can reach, which is the same reason they
+  are the corpus's `invalid-at-preflight/` bucket.
+
+  **A defect the corpus found is now asserted rather than
+  described.** A branching `wait` carrying a condition is rejected
+  by the grammar, so it reports `syn.unexpected-token` and the
+  `wait.branching-condition` arm in `script_validation` is
+  unreachable — the exact trade `script_grammar.lark` warns about
+  in its own header. The fixture carries a `# caught-by:` marker
+  asserted in both directions, so whichever fix lands retires it.
+
 - **Diagnostics carry stable dotted identifiers**, which
   `script-spec.md` has required of *every* one since the surface
   was adopted while none existed. 52 ids across the static rules

@@ -177,12 +177,16 @@ class NodeShapeTests(unittest.TestCase):
         self.assertIn("expected a node name", str(caught.exception))
 
     def test_diagnostics_render_with_a_caret(self):
+        # The rendering ends with the diagnostic's id in parentheses,
+        # which is where the S-numbers used to sit: it is the stable
+        # handle a consumer switches on, where the wording is not.
         with self.assertRaises(ScriptParseError) as caught:
             parse_nodes("start\nwait 30\n", path="x.rlqs")
         self.assertEqual(
             str(caught.exception),
             "x.rlqs:2:6: error: invalid duration: '30' (durations carry a "
-            "unit: ms, s, m, or h)\n2 | wait 30\n         ^")
+            "unit: ms, s, m, or h) (lex.invalid-duration)"
+            "\n2 | wait 30\n         ^")
 
 
 class NoJsonInScriptsTests(unittest.TestCase):

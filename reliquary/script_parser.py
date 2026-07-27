@@ -321,7 +321,8 @@ def _modifiers(node, items):
                 rule_id="node.modifier-not-allowed")
         if name in _DURATION_MODIFIERS and value.type != "DURATION":
             raise ScriptParseError(
-                line, f"{name} must be a duration", column)
+                line, f"{name} must be a duration", column,
+                rule_id="node.modifier-not-a-duration")
         found[name] = value
     return found
 
@@ -364,7 +365,8 @@ def _collect_content_body(lines, start, opener_line):
         if lines[index].strip() == '"""':
             return "\n".join(body), index + 1
         body.append(lines[index])
-    raise ScriptParseError(opener_line, "unterminated content body")
+    raise ScriptParseError(opener_line, "unterminated content body",
+    rule_id="lex.unterminated-content")
 
 
 def _content_literal(text, indent, line, column):
@@ -392,13 +394,15 @@ def _content_template(text, line, column):
             if closing < 0:
                 raise ScriptParseError(
                     line, "unclosed property reference in content body",
-                    column)
+                    column,
+                    rule_id="lex.unclosed-reference")
             key = text[index + 2:closing]
             if not _PROPERTY_REF.fullmatch(key):
                 raise ScriptParseError(
                     line,
                     f"invalid property reference in content body: {key!r}",
-                    column)
+                    column,
+                    rule_id="lex.invalid-reference")
             if chunk:
                 parts.append("".join(chunk))
                 chunk = []
@@ -457,7 +461,8 @@ class _Builder(Transformer):
                 continue
             if value.type != "STRING":
                 raise ScriptParseError(
-                    line, "default must be a string", column)
+                    line, "default must be a string", column,
+                    rule_id="node.modifier-not-a-string")
             defaults.append(value.reliquary.value)
         modifiers = _modifiers(
             "property_def", [item for item in items if item[0] != "default"])
@@ -467,13 +472,15 @@ class _Builder(Transformer):
             if kind not in _PROPERTY_KINDS:
                 raise ScriptParseError(
                     line, f"unknown property kind: {kind!r} (expected "
-                    f"{', '.join(_PROPERTY_KINDS)})", words[0].column)
+                    f"{', '.join(_PROPERTY_KINDS)})", words[0].column,
+                    rule_id="prop.unknown-kind")
         else:
             kind, key = "text", str(words[0])
         prompt = modifiers.get("prompt")
         if prompt is not None and prompt.type != "STRING":
             raise ScriptParseError(line, "prompt must be a string",
-                                   words[0].column)
+                                   words[0].column,
+                                   rule_id="node.modifier-not-a-string")
         return Property(key, kind,
                         prompt.reliquary.value if prompt else None,
                         tuple(defaults), line, words[0].column)
@@ -485,7 +492,8 @@ class _Builder(Transformer):
             if token.type != "NAME" or not str(token).isdigit():
                 raise ScriptParseError(
                     token.line, f"{name} must be a decimal TCP port",
-                    token.column)
+                    token.column,
+                    rule_id="http.port-not-a-number")
         return Http(
             tuple(c for c in children if isinstance(c, HttpContent)),
             str(modifiers["port-min"]) if "port-min" in modifiers else None,
@@ -504,29 +512,34 @@ class _Builder(Transformer):
                                                           "literal"):
                 raise ScriptParseError(
                     value.line,
-                    "indent must be dedent or literal", value.column)
+                    "indent must be dedent or literal", value.column,
+                    rule_id="http.indent-not-a-mode")
             indent = str(value)
         text = next((c for c in children if isinstance(c, LarkToken)
                      and c.type == "CONTENT_TEXT"), None)
         source = modifiers.get("from")
         if source is not None and source.type != "STRING":
             raise ScriptParseError(
-                source.line, "from must be a string", source.column)
+                source.line, "from must be a string", source.column,
+                rule_id="node.modifier-not-a-string")
         if source is not None and text is not None:
             raise ScriptParseError(
                 source.line,
                 "content may not combine from= with a triple-quoted body",
-                source.column)
+                source.column,
+                rule_id="http.content-two-bodies")
         if source is None and text is None:
             raise ScriptParseError(
                 _line(children[0]),
                 "content requires a triple-quoted body or from=",
-                _column(children[0]))
+                _column(children[0]),
+                rule_id="http.content-no-body")
         if source is not None and "indent" in modifiers:
             raise ScriptParseError(
                 modifiers["indent"].line,
                 "indent applies only to triple-quoted content bodies",
-                modifiers["indent"].column)
+                modifiers["indent"].column,
+                rule_id="http.indent-on-file-body")
         if source is not None:
             source_path, body = self._content_file(
                 source.reliquary.value, _line(children[0]),
@@ -546,17 +559,20 @@ class _Builder(Transformer):
         except ValueError:
             raise ScriptParseError(
                 line, "from path may not contain property references",
-                column)
+                column,
+                rule_id="http.from-reference")
         if spelling == "" or os.path.isabs(spelling) \
                 or spelling.startswith(("/", "\\")):
             raise ScriptParseError(
                 line, "from path must be relative to the script file",
-                column)
+                column,
+                rule_id="http.from-not-relative")
         segments = re.split(r"[\\/]+", spelling)
         if any(segment in (".", "..") for segment in segments):
             raise ScriptParseError(
                 line, "from path may not contain . or .. segments",
-                column)
+                column,
+                rule_id="http.from-traversal")
         base_dir = self.base_dir or os.getcwd()
         source_path = os.path.abspath(os.path.join(base_dir, spelling))
         try:
@@ -565,12 +581,14 @@ class _Builder(Transformer):
         except FileNotFoundError:
             raise ScriptParseError(
                 line, f"content source file not found: {source_path}",
-                column) from None
+                column,
+                rule_id="http.from-missing") from None
         except OSError as error:
             raise ScriptParseError(
                 line,
                 f"content source file cannot be read: {source_path}: "
-                f"{error}", column) from None
+                f"{error}", column,
+                rule_id="http.from-unreadable") from None
         return source_path, _content_template(
             text.rstrip("\r\n") + "\n" if text else "", line, column)
 
@@ -674,7 +692,8 @@ class _Builder(Transformer):
         line = _line(children[0])
         if exclude is not None and exclude.type != "STRING":
             raise ScriptParseError(line, "exclude must be a string",
-                                   children[0].column)
+                                   children[0].column,
+                                   rule_id="node.modifier-not-a-string")
         return Statement(
             "select", (children[1].reliquary.value,),
             exclude=exclude.reliquary.value if exclude else None, line=line,
@@ -743,7 +762,8 @@ class _Builder(Transformer):
             elif isinstance(child, Http):
                 if http is not None:
                     raise ScriptParseError(
-                        child.line, "http may appear only once")
+                        child.line, "http may appear only once",
+                        rule_id="http.duplicate-declaration")
                 http = child
             elif isinstance(child, tuple) and child[0] in ("linear",
                                                            "phased"):
@@ -755,7 +775,8 @@ class _Builder(Transformer):
                 name, value, line = child
                 if name in headers:
                     raise ScriptParseError(
-                        line, f"{name} may appear only once in the header")
+                        line, f"{name} may appear only once in the header",
+                        rule_id="syn.duplicate-header")
                 headers[name] = value
                 lines[name] = line
         return Script(
@@ -816,17 +837,28 @@ def load_script(path):
 
 
 def _diagnose(error, source, path):
-    """Turn a lark parse error into a reliquary diagnostic."""
+    """Turn a lark parse error into a reliquary diagnostic.
+
+    These are the grammar's own rejections, so they carry the
+    coarsest ids in the scheme: the grammar knows a token is
+    unexpected, never which rule the author was reaching for. That
+    is the trade script-spec.md makes deliberately by keeping the
+    S-rules above the CFG — a named rule where validation can
+    reach, an unexpected token where only the parser can.
+    """
     token = getattr(error, "token", None)
     line = getattr(error, "line", 0) or 0
     column = getattr(error, "column", 1) or 1
     if token is not None and token.type == "$END":
         message = "unexpected end of script"
+        rule_id = "syn.unexpected-end"
     elif token is not None:
         spelling = str(token)
         message = f"{spelling!r} is not valid here"
+        rule_id = "syn.unexpected-token"
     else:
         message = "unexpected input"
-    failure = ScriptParseError(line, message, column)
+        rule_id = "syn.unexpected-token"
+    failure = ScriptParseError(line, message, column, rule_id=rule_id)
     failure._set_context(path, source.splitlines())
     return failure

@@ -67,34 +67,30 @@ defect left open, answered by trying the coarse version first.
 
 ## What the corpus measured on the way
 
-Four of the 39 invalid fixtures cannot name their rule. Each
-carries `# id: none`, and the harness asserts the marker in
-**both** directions — a fixture naming an id must be rejected by
-exactly that id, a fixture saying `none` must be rejected by a
-diagnostic that still has none — so a marker cannot outlive the
-gap it records.
+It opened with four fixtures that could not name their rule and
+now has none: all 39 name the diagnostic that rejects them. The
+corpus was written first and the ids followed, which is the order
+that made them right — see below.
 
-Three are [D55](../../../../planning/DECISIONS.md)'s remainder,
-measured rather than estimated. script-spec.md requires that
-**every** diagnostic carry a stable dotted identifier; the two
-lexical/grammar rejections (`s1-*`) and the header-cardinality
-diagnostic (`s3-duplicate-header`) carry none. The static rules
-and the node signatures gained theirs on 2026-07-27; the lexer,
-preflight and runtime have not. The count is asserted, so it
-moves down as ids land and a move upward means one was lost.
+One fixture carries `# caught-by:` instead, and it records a
+defect the corpus found. `s8-branching-with-a-condition` —
+`wait "x" { … }` — exercises S8 and is rejected by the
+**grammar**, so its id is `syn.unexpected-token` and the
+`wait.branching-condition` arm in `script_validation` is
+unreachable. `script_grammar.lark`'s own header says the
+S-numbered rules stay above it *"where a diagnostic can cite its
+id — encoding them here would trade named errors for 'unexpected
+token'"*; this clause is the trade it warns about. Two defensible
+fixes (loosen the production so validation sees it, or accept the
+parse error and delete the dead arm); the spec calling S8 a rule
+"the grammar cannot carry" points at the first. The marker is
+asserted in both directions, so it retires itself when either
+lands.
 
-The fourth is a different finding, filed here because the corpus
-is what found it. `s8-branching-with-a-condition` — `wait "x" { … }` —
-is rejected by the **grammar**, with `'{' is not valid here`, and
-`script_validation._statement` carries a `wait.branching-condition`
-arm for the same case that is therefore unreachable. The grammar's
-own header says the S-numbered rules stay above it *"where a
-diagnostic can cite its id — encoding them here would trade named
-errors for 'unexpected token'"*, which is precisely the trade this
-clause makes. Two defensible fixes (loosen the production so
-validation sees it, or accept the parse error and delete the dead
-arm); the spec calling S8 a rule "the grammar cannot carry" points
-at the first.
+What has no id at all is the preflight and runtime tiers — 30
+raise sites across `binding`, `resolve`, `script_runner` and
+`script_timing` — which no parse fixture can reach, and which the
+`invalid-at-preflight/` bucket exists to hold when they do.
 
 ## Fixture headers
 
@@ -106,10 +102,19 @@ at the first.
 ```
 
 `# id:` is the assertion — the diagnostic that must reject the
-fixture. `# rule:` is the S-number that id serves, checked against
-the spec's own rule list so the two cannot drift. `# id: none`
-marks a diagnostic with no identifier yet, and is asserted to stay
-true.
+fixture. `# rule:` is what the script violates, and the two must
+agree: the id has to serve that rule, checked against the spec's
+own list so neither can drift.
+
+Two markers record a gap instead, and both are asserted in the
+direction that retires them:
+
+- `# id: none` — the diagnostic has no identifier yet. None
+  remain; the marker stays because preflight and runtime fixtures
+  will need it.
+- `# caught-by: S<n>` — a layer rejects the script before the
+  rule's own diagnostic can, so the id serves a *different* rule
+  than the fixture exercises. One fixture has it.
 
 ## What this corpus deliberately does not cover
 

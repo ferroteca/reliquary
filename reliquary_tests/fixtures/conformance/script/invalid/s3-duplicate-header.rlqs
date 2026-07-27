@@ -1,6 +1,6 @@
 # invalid: each header appears at most once
 # rule: S3
-# id: none
+# id: syn.duplicate-header
 # spec: Syntactic restrictions
 
 platform dos
