@@ -23,8 +23,15 @@
 # the label is gone with them. A definition is an authored `.rlqm`
 # file whose stem is its own name and carries no item meaning; `@`
 # names an item, and there is no second spelling to confuse it
-# with. The remaining half — warning when an `@`-reference matches
-# no known item — stays open in planning/TASKS.md.
+# with. The remaining half — rejecting an `@`-reference that
+# matches no known item — was implemented 2026-07-27, in the
+# preflight beside the slot check that guards the same statement's
+# other argument. It was never a language change: script-spec.md's
+# preflight list had always required it.
+#
+# (The rest of this file's framing is stale — it describes media as
+# authored `.rlqm` files, which retired with milestone 7 — and is
+# queued for the same pass that decides what the file is now for.)
 
 description "Media references name items, not files"
 platform    dos

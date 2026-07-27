@@ -13,6 +13,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A script inserting a media the active source does not define now
+  fails at preflight instead of part-way through the run. The script
+  spec has always required it — preflight rejects "media references
+  (`@name`) naming no media the namespace defines" — and nothing
+  implemented it, so `insert cdrom0 @typo` started the machine, ran
+  as far as that statement, and failed there, possibly after guest
+  input. It is now a preflight error (exit 3) raised before the
+  machine starts, naming the media and offering the closest declared
+  names. `check-script` reports it too. A `$property` media argument
+  is unchecked, as it must be: it resolves at binding, not before.
+  The slot is still reported first when one statement gets both
+  wrong, in the order the author wrote them.
+
 - A blueprint asking for a control plane Reliquary has not built now
   fails closed naming it. The blueprint model's `control-planes`
   vocabulary is four planes and only `agentless-display` is wired, so

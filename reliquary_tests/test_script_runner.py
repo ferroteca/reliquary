@@ -18,7 +18,8 @@ from qemu.qmp import ConnectError
 from reliquary.binding import BoundProperties
 from reliquary.errors import RunCancelled
 from reliquary.script_parser import parse_script
-from reliquary.script_runner import (ScriptPreflightError,
+from reliquary.script_runner import (_preflight_machine_rules,
+                                     ScriptPreflightError,
                                      ScriptRuntimeError, _normalize_row,
                                      _resolve_key, _cancel_on_interrupt,
                                      _HttpResponse,
@@ -1010,6 +1011,16 @@ class ExecutePreflightTests(unittest.TestCase):
         self.home = self.workdir.name
         self.machine_id = "plain-0"
 
+    def _write_media(self, *names):
+        """Declare media in the home so `@name` preflights."""
+        blueprints = os.path.join(self.home, "blueprints")
+        os.makedirs(blueprints, exist_ok=True)
+        with open(os.path.join(blueprints, "lib.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump([{"type": "media", "name": name,
+                        "location": {"local": f"/{name}.iso"}}
+                       for name in names], handle)
+
     def _write_state(self, phase="ready", drives=None):
         root = os.path.join(self.home, "cache", "machines",
                             self.machine_id)
@@ -1044,6 +1055,48 @@ class ExecutePreflightTests(unittest.TestCase):
                            context=self.home)
         self.assertIn("declares no drive cdrom0", str(caught.exception))
         self.assertIn("line 3", str(caught.exception))
+
+    def test_an_unknown_media_reference_fails_before_execution(self):
+        # script-spec.md, "Validation and preflight": preflight
+        # rejects "media references (@name) naming no media the
+        # namespace defines".
+        self._write_media("freedos-livecd")
+        self._write_state(drives={
+            "cdrom0": {"medium": "cdrom", "slot": 0},
+        })
+        script = parse_script(
+            _HEAD + "machine stopped\ninsert cdrom0 @freedos-livecdd\n")
+        with self.assertRaises(ScriptPreflightError) as caught:
+            execute_script(script, machine_id=self.machine_id,
+                           context=self.home)
+        message = str(caught.exception)
+        self.assertIn("no media named 'freedos-livecdd'", message)
+        self.assertIn("did you mean 'freedos-livecd'", message)
+        self.assertIn("line 3", message)
+
+    def test_a_property_media_reference_is_not_preflighted(self):
+        # $name defers to binding by design, so it cannot be
+        # checked here and must not be rejected.
+        self._write_state(drives={
+            "cdrom0": {"medium": "cdrom", "slot": 0},
+        })
+        script = parse_script(
+            _HEAD + "machine stopped\nproperty media disk\n"
+            "insert cdrom0 $disk\n")
+        state = {"id": self.machine_id, "phase": "ready",
+                 "drives": {"cdrom0": {"medium": "cdrom", "slot": 0}}}
+        _preflight_machine_rules(script, state, "<script>", self.home)
+
+    def test_the_slot_is_reported_before_the_media(self):
+        # Both wrong on one statement: the author reads the slot
+        # first, so the slot error is the one raised.
+        self._write_state()
+        script = parse_script(
+            _HEAD + "machine stopped\ninsert cdrom0 @nonesuch\n")
+        with self.assertRaises(ScriptPreflightError) as caught:
+            execute_script(script, machine_id=self.machine_id,
+                           context=self.home)
+        self.assertIn("declares no drive cdrom0", str(caught.exception))
 
     def test_preflight_descends_into_handler_bodies(self):
         self._write_state()
@@ -1086,6 +1139,7 @@ class ExecutePreflightTests(unittest.TestCase):
         self.assertIn("expects a stopped machine", str(caught.exception))
 
     def test_a_stopped_script_starts_the_machine_itself(self):
+        self._write_media("freedos-livecd")
         self._write_state(drives={
             "cdrom0": {"medium": "cdrom", "slot": 0, "media": None,
                        "path": None},

@@ -287,7 +287,7 @@ code has the bug, so the norm is already the demand.
 
 The **script-language residuals** stay here rather than becoming a
 feature (D45): they change the scripting language, which is no bar
-to being a task, and on size they are one item and a ride-along.
+to being a task, and on size they are now a ride-along alone.
 **No use case asks for them**, said plainly rather than papered
 over — they serve language goal **G6**, one small vocabulary and
 one spelling — and the catalogue behind them is
@@ -304,9 +304,14 @@ reserved, domain vocabularies contextual. Walking it found a
 defect in the other direction, entered under
 [Defects](#defects): the code reserves nothing at all.)*
 
-- **[06]'s remaining half** — warn when an `@`-reference matches
-  no known item. The label/item split itself is gone with the
-  media block (DECISIONS.md, no JSON in scripts)
+*(**[06]'s remaining half was never a language task** — struck
+2026-07-27 by doing it. "Warn when an `@`-reference matches no
+known item" was already required by script-spec.md's preflight
+list and simply unimplemented, so it was a defect against a
+shipped spec, not a change to the language. The spec also settled
+warn-versus-error, which the entry had left open: preflight
+**rejects**.)*
+
 - riding along with whatever touches it next: **[03] does not
   currently parse** — its `on` handler bodies end without a
   terminal. It is a live example, so it should be valid where it is

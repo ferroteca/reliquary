@@ -1212,21 +1212,39 @@ def _walk(script):
 _REMOVABLE_MEDIA = frozenset({"floppy", "cdrom"})
 
 
-def _preflight_media_slots(script, machine_state, script_path):
-    """Fail before any guest input when a script names an
-    undeclared slot or boot drive.
+def _no_such_media(name, namespace):
+    """The diagnostic for a media reference the namespace lacks."""
+    close = difflib.get_close_matches(name, namespace.media, n=3,
+                                      cutoff=0.6)
+    hint = ("; did you mean " + ", ".join(repr(other) for other in close)
+            if close else "")
+    return f"no media named {name!r} in the active source{hint}"
+
+
+def _preflight_machine_rules(script, machine_state, script_path,
+                             context=None):
+    """Fail before any guest input when a script names something the
+    machine or the namespace does not define.
+
+    Two of the machine rules preflight owes (script-spec.md,
+    "Validation and preflight"): a media reference naming no media
+    the namespace defines, and an undeclared slot or boot drive.
 
     ``insert``/``eject``/``set-boot`` never create or remove a drive
     — the blueprint alone defines machine topology — so every named
     slot must exist in the machine's state.  ``insert``/``eject``
     further require a floppy or cdrom slot.
+
+    A ``$property`` media argument resolves at binding, not here, so
+    only a literal ``@name`` is checked. The namespace is loaded
+    lazily: a script inserting nothing by name never pays for it.
+    The slot is checked before the media on the same statement, in
+    the order the author wrote them.
     """
     drives = machine_state.get("drives", {})
+    namespace = None
     for statement in _walk(script):
-        if statement.verb == "insert":
-            slots = (statement.arguments[0],)
-            removable_only = True
-        elif statement.verb == "eject":
+        if statement.verb in ("insert", "eject"):
             slots = (statement.arguments[0],)
             removable_only = True
         elif statement.verb == "set-boot":
@@ -1246,6 +1264,17 @@ def _preflight_media_slots(script, machine_state, script_path):
                     f"{slot} is not a removable drive slot "
                     "(insert/eject are floppy and cdrom only)",
                     statement=statement, path=script_path)
+        if statement.verb != "insert":
+            continue
+        kind, name = statement.arguments[1]
+        if kind != "media":
+            continue
+        if namespace is None:
+            namespace = load_namespace(context)
+        if name not in namespace.media:
+            raise ScriptPreflightError(
+                _no_such_media(name, namespace),
+                statement=statement, path=script_path)
 
 
 def execute_script(script, *, machine_id, context=None, display=False,
@@ -1272,9 +1301,9 @@ def execute_script(script, *, machine_id, context=None, display=False,
             phase = "-"
         return "-", phase
 
-    _preflight_media_slots(
+    _preflight_machine_rules(
         script, _machines.load_machine_state(machine_id, context),
-        script_path)
+        script_path, context)
     engine = _ScriptEngine(
         script, machine_id, context,
         _machines.machine_dir_path(machine_id, context),
@@ -1546,9 +1575,9 @@ def check_script(name, *, blueprint=None, machine=None, context=None,
     script_path = locate_script(stem, context=context)
     script = load_script(script_path)
     if machine_id is not None:
-        _preflight_media_slots(
+        _preflight_machine_rules(
             script, _machines.load_machine_state(machine_id, context),
-            script_path)
+            script_path, context)
     property_sources = describe_sources(
         script, parameters=parameters, explicit=properties,
         properties_file=properties_file, context=context)
