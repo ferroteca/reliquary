@@ -45,6 +45,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Media and the property facts now carry spec-derived tests, and —
+  for the first time in this sweep — **found nothing wrong**. The
+  `materialize` modes the media spec tabulates are exactly the four
+  the parser accepts, and each parses under the table's own "needs"
+  column; the `rlq.*` facts the properties spec bullets are exactly
+  what `is_fact` admits, with `rlq.host.hostname` correctly named a
+  parked candidate rather than a shipped one and the `rlq.env.*`
+  family resolved by prefix rather than enumerated. The property
+  source order was checked by hand against the spec's numbered list
+  and matches: the cascade nests the environment and file tiers
+  inside the parameter tier so a redirect can substitute the lookup
+  key, which reads like a reordering and is not one.
+
+  Both tests are drift guards rather than fixes, which is what a
+  passing inventory is for. Named rather than skipped quietly
+  (P24's clause): the media *field* vocabulary stays uncompared.
+  Seven of its eleven fields have their own section in the media
+  spec and the other four are specified in prose in the blueprint
+  model, so comparing against the union would mean hardcoding which
+  four live elsewhere — an exemption of exactly the kind the
+  principle warns about.
+
 - `asset-resolution.md` had no status banner at all, and had drifted
   in six places behind its absence. It was the one document in
   `docs/spec/` breaking the rule that directory itself states —
