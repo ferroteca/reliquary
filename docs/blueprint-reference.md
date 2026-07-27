@@ -548,12 +548,18 @@ backend half and leaves the driver half to you. A declared
 controller the machine's backend cannot provide is a capability
 error naming both.
 
-One ordering caveat: slot order is authoritative *within* a
-controller type. When a machine mixes controller types, the
-guest's firmware decides how the controllers themselves enumerate,
-and Reliquary cannot promise a global disk order across types —
-prefer one controller type per machine when drive lettering
-matters (as it does under DOS).
+One ordering caveat, for when a second controller type is wired:
+slot order is authoritative *within* a type, and across types the
+guest's firmware decides how the controllers themselves enumerate.
+On such a machine no disk letter is a declared fact, so `put-file`
+and `get-file` refuse every disk address rather than guess one
+(floppies keep `A:` and `B:`, which nothing can shift). Prefer one
+controller type per machine when drive lettering matters, as it
+does under DOS. The constraint is recorded with the work that
+would make it reachable — F2's device growth in
+[planning/proposed/FEATURES.md](../planning/proposed/FEATURES.md) —
+rather than stated here as a rule, because today it describes a
+machine that cannot be built.
 
 #### `enabled` — optional · boolean · default `true`
 
@@ -586,18 +592,27 @@ or a `copy` of a payload (converting when needed), uses the
 backend's preferred dynamically-allocated format; a `difference`
 media uses the backend-native differencing format:
 
-| backend      | image format |
-|--------------|--------------|
-| `qemu`       | qcow2 (v3)   |
-| `virtualbox` | VDI          |
-| `vmware`     | VMDK         |
-| `hyperv`     | VHDX         |
+| backend | image format | |
+|--------------|--------------|---|
+| `qemu`       | qcow2 (v3)   | built |
+| `virtualbox` | VDI          | not wired — F3 |
+| `vmware`     | VMDK         | not wired — F2 |
+| `hyperv`     | VHDX         | not wired — F2 |
 
-Because Reliquary owns image creation and naming, every
-blueprint is format-portable by construction: the right format
-arrives on whatever backend is assigned, and `recreate` onto a
-different backend regenerates the images in the new backend's
-format.
+**Only `qemu` is built.** The other three rows are the intended
+mapping, recorded with the work that would deliver it
+([planning/proposed/FEATURES.md](../planning/proposed/FEATURES.md)),
+not a promise this version keeps: a blueprint naming an unwired
+backend is refused at `create-machine` naming the gap, rather than
+quietly getting QEMU's format and QEMU's lifecycle.
+
+Because Reliquary owns image creation and naming, a blueprint is
+format-portable *by construction* rather than by luck — the format
+is never written down anywhere for a backend change to contradict,
+and `recreate` onto a different backend regenerates the images in
+the new backend's format. What that buys is available the day a
+second backend is; the construction is what makes it cheap then,
+and it is worth stating now for the same reason the table is.
 
 A `use` media attaches the payload file itself — or its `location`
 directory, served as vvfat — with no per-machine image. Its format

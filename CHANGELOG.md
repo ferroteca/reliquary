@@ -191,6 +191,54 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A blueprint naming an unbuilt backend is refused instead of
+  silently getting QEMU.** `"backend": "virtualbox"` was accepted,
+  recorded, and then ignored: `create-machine` materialized a
+  **qcow2** image and `start-machine` would have launched QEMU, so a
+  machine's recorded backend and its actual one disagreed with nobody
+  told. `create-machine` and `apply-blueprint` now fail closed naming
+  the gap — exit `3`, before any image work — exactly as an unwired
+  control plane or a non-`ide` controller already did. Capability
+  honesty (P11) asks Reliquary to name a gap rather than work around
+  one, and this was the third unbuilt capability of the three not
+  doing it.
+
+  The field reference's backend/format table promised VDI for that
+  same declaration, which made the document right and the code wrong.
+  The table now marks which of its four rows is built and which are
+  intent, recorded against the features that would deliver them.
+
+  Found while disposing of a documentation entry, which is the part
+  worth recording: the entry asked whether two orphaned rules in the
+  descriptive field reference should be promoted to a normative spec.
+  Neither should, and for the same reason — both describe capability
+  that does not exist, and a spec states what exists. But the two were
+  not otherwise alike. The `controller` ordering caveat was correctly
+  gated, so it was only ever prose about an unreachable machine; the
+  backend/format table was not gated at all, so it was prose the code
+  actively contradicted. A rule about unbuilt capability belongs with
+  the work that would build it, so both constraints moved to the
+  proposed features that own them rather than into a spec or out of
+  existence.
+
+- **`put-file` and `get-file` refuse every disk address on a machine
+  that mixes controller types**, rather than answering from slot order
+  alone. Slot order is authoritative only *within* a controller type;
+  across types the guest's firmware decides how the controllers
+  themselves enumerate, so not even the first disk is a declared fact,
+  and P17 requires failing closed where the declared facts leave an
+  address ambiguous. Floppies are unaffected — DOS gives them `A:` and
+  `B:` whatever the disks do.
+
+  No machine can reach this today, because a non-`ide` controller is
+  refused at creation, and the guard is asserted by test anyway. That
+  is the point of it: the invariant belongs to
+  `platform_dos.drive_letters`, and leaving it to a capability gate
+  three modules away means the day a second controller type is wired,
+  the mapping quietly starts answering a question it has no fact for.
+  Volume count was the only documented reason a letter could be
+  unfixed; this is the second, and it is now in the same docstring.
+
 - **Every diagnostic the script surface can raise now carries a
   stable identifier.** `script-spec.md` requires one of *every*
   diagnostic; the static tier had 82 and the preflight and runtime

@@ -91,6 +91,35 @@ def _default_control_planes(platform):
 # is the subset that exists.
 _IMPLEMENTED_CONTROL_PLANES = ("agentless-display",)
 
+# Likewise for backends. The blueprint model's vocabulary is qemu,
+# virtualbox, vmware and hyperv; one adapter exists (F2 owns the seam,
+# F3 the second backend).
+_IMPLEMENTED_BACKENDS = ("qemu",)
+
+
+def _resolve_backend(machine):
+    """The machine's backend, defaulted and checked.
+
+    A blueprint naming a backend Reliquary has not built fails closed
+    naming it, exactly as an unwired control plane or controller does
+    (P11). It used to be recorded and then ignored, which was the
+    worst of the three outcomes: `backend: virtualbox` materialized a
+    **qcow2** image and would have launched QEMU, so a machine's
+    recorded backend and its actual one disagreed with nobody told.
+    The field reference's backend/format table promised VDI for that
+    same declaration, so the document and the code contradicted each
+    other and the code was the one in the wrong.
+    """
+    backend = machine.backend or "qemu"
+    if backend not in _IMPLEMENTED_BACKENDS:
+        raise PreflightError(
+            f"backend {backend!r} is not wired; only 'qemu' is built so "
+            "far (the adapter seam owns the others). Its image format, "
+            "lifecycle and control planes would all be QEMU's, which is "
+            "not what this blueprint asks for",
+            rule_id="machine.backend-not-wired")
+    return backend
+
 
 def _resolve_control_planes(machine):
     """The machine's control-plane policy, defaulted and checked.
@@ -387,6 +416,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
                          properties=None, events=None):
     # Checked before anything is materialized, so a refusal costs no
     # image work.
+    backend = _resolve_backend(machine)
     control_planes = _resolve_control_planes(machine)
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
@@ -402,7 +432,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         memory = _PLATFORM_MEMORY.get(machine.platform, 16)
     resolved = {
         "platform": machine.platform,
-        "backend": machine.backend or "qemu",
+        "backend": backend,
         "memory": memory,
         "cpus": machine.cpus if machine.cpus is not None else 1,
         "boot": list(machine.boot),
@@ -620,6 +650,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         path = namespace.origin.get(("machine", blueprint_name))
         # Checked before the drives are reconciled, so a refused apply
         # leaves the machine as it was.
+        _resolve_backend(parsed)
         control_planes = _resolve_control_planes(parsed)
 
         bound = _bind_location_properties(

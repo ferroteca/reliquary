@@ -200,6 +200,47 @@ class MaterializationTests(_HomeCase):
                 create_machine("scsi", context=self.home)
         self.assertIn("scsi", str(caught.exception))
 
+    def test_unwired_backend_fails_closed(self):
+        """The third unbuilt capability, treated like the other two.
+
+        It used to be recorded and ignored: `backend: virtualbox`
+        materialized a qcow2 image and would have launched QEMU, so
+        the machine's recorded backend and its real one disagreed with
+        nobody told. The field reference promised VDI for that same
+        declaration, which made the document right and the code wrong.
+        """
+        for backend in ("virtualbox", "vmware", "hyperv"):
+            with self.subTest(backend=backend):
+                self._write(backend, {"platform": "dos",
+                                      "backend": backend,
+                                      "drives": {"hdd0": "blank"}},
+                            media=[_BLANK])
+                with mock.patch(
+                        "reliquary.machines.create_hdd_image") as image:
+                    with self.assertRaises(PreflightError) as caught:
+                        create_machine(backend, context=self.home)
+                self.assertIn(repr(backend), str(caught.exception))
+                # Refused before any image work, like the other gates.
+                image.assert_not_called()
+                self.assertFalse(os.path.exists(
+                    machine_dir_path(f"{backend}-0", self.home)))
+
+    def test_the_default_backend_is_qemu_and_is_recorded(self):
+        # The gate must not refuse what it is meant to allow, whether
+        # the blueprint names qemu or leaves it out.
+        for declared in ("qemu", None):
+            with self.subTest(backend=declared):
+                spec = {"platform": "dos", "drives": {"hdd0": "blank"}}
+                if declared is not None:
+                    spec["backend"] = declared
+                name = f"be-{declared or 'default'}"
+                self._write(name, spec, media=[_BLANK])
+                with mock.patch("reliquary.machines.create_hdd_image"):
+                    machine_id = create_machine(name, context=self.home)
+                self.assertEqual(
+                    load_machine_state(machine_id, self.home)["backend"],
+                    "qemu")
+
     def test_unimplemented_control_plane_fails_closed(self):
         # A wired plane in the list excuses nothing: the policy is
         # every plane Reliquary may use, so each has to exist.
@@ -1196,6 +1237,38 @@ class InBandFileTests(_HomeCase):
 
 class DosAddressingTests(unittest.TestCase):
     """The letter map comes from declared facts alone (P10/P17)."""
+
+    def test_mixed_controller_types_unfix_every_disk_letter(self):
+        """The second thing that unfixes a letter, after volume count.
+
+        Slot order is authoritative only within a controller type;
+        across types the guest's firmware decides how the controllers
+        enumerate, so even the *first* disk is not a declared fact.
+        Unreachable today — only `ide` is wired — which is exactly why
+        it is asserted here rather than left to the capability gate.
+        """
+        drives = {
+            "floppy0": {"medium": "floppy", "slot": 0},
+            "hdd0": {"medium": "hdd", "slot": 0, "controller": "ide"},
+            "hdd1": {"medium": "hdd", "slot": 1, "controller": "scsi"},
+        }
+        self.assertEqual(platform_dos.drive_letters(drives),
+                         {"A": "floppy0"})
+        # Both disks, named as undetermined rather than absent.
+        self.assertEqual(platform_dos.undetermined_letters(drives),
+                         ["hdd0", "hdd1"])
+
+    def test_one_controller_type_still_fixes_the_first_disk(self):
+        # The guard must not fire on the single-type machines that
+        # actually exist, floppies carrying no controller field.
+        drives = {
+            "floppy0": {"medium": "floppy", "slot": 0},
+            "hdd0": {"medium": "hdd", "slot": 0, "controller": "ide"},
+            "hdd1": {"medium": "hdd", "slot": 1, "controller": "ide"},
+        }
+        self.assertEqual(platform_dos.drive_letters(drives),
+                         {"A": "floppy0", "C": "hdd0"})
+
 
     def test_only_the_determined_letters_are_mapped(self):
         # Floppies always, and the first hard disk. Everything after

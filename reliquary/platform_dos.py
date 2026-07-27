@@ -18,6 +18,19 @@ def program_name(path):
     return name
 
 
+def _mixes_controller_types(drives):
+    """Whether the machine's disks span more than one controller type.
+
+    Only the disks are asked. A floppy sits on the floppy controller
+    by construction and carries no `controller` field, so it is
+    neither a type in this count nor affected by the answer.
+    """
+    types = {drive.get("controller", "ide")
+             for drive in drives.values()
+             if drive.get("medium") != "floppy"}
+    return len(types) > 1
+
+
 def drive_letters(drives):
     """Map DOS drive letters to drive keys, from declared facts alone.
 
@@ -41,6 +54,14 @@ def drive_letters(drives):
     address a determined drive — for in-band exchange, a floppy or
     the first hard disk.
 
+    **Volume count is one of two things that unfix a letter; the
+    other is mixed controller types.** Slot order is authoritative
+    only within a type, and across types the guest's firmware decides
+    how the controllers themselves enumerate — so on such a machine
+    even the *first* disk is not a declared fact, and no disk letter
+    is returned. The floppies still are: DOS gives them ``A:`` and
+    ``B:`` whatever the disks do.
+
     **This is unimplemented, not impossible.** Volume layout can be
     read from the drive image on the host — the partition table, and
     past it whatever volume manager a guest layered on — which is no
@@ -62,6 +83,21 @@ def drive_letters(drives):
                             if drive.get("medium") == "floppy"):
         if slot in (0, 1):
             letters[chr(ord("A") + slot)] = key
+    if _mixes_controller_types(drives):
+        # Slot order is authoritative only *within* a controller type.
+        # Across types the guest's firmware decides how the controllers
+        # themselves enumerate, so which disk is C: is not a declared
+        # fact and no disk letter is returned rather than guessing one
+        # (P17). The floppies above survive: DOS gives them A: and B:
+        # whatever the disks do, so their letters are never in doubt.
+        #
+        # Unreachable today — `machines._drive_common` refuses any
+        # controller but `ide`, so every machine that exists is
+        # single-type. The guard is here anyway because the invariant
+        # is this function's own: depending on a gate three modules
+        # away means the day a second type is wired, this mapping
+        # quietly starts answering a question it has no fact for.
+        return letters
     hdds = sorted((drive.get("slot", 0), key)
                   for key, drive in drives.items()
                   if drive.get("medium") == "hdd")

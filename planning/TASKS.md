@@ -179,30 +179,20 @@ code has the bug, so the norm is already the demand.
 
 ### Small items
 
-Small, obvious, just haven't met the bar for scheduling (the
-section formerly named Wishlist, then Backlog). Parked non-GitHub
-issues land here. Most would qualify as housekeeping (D38) and
-need no entry at all once someone picks them up.
+*(Emptied and struck on 2026-07-27, as the audits, the restructures
+and the adjudications were before it. The two orphaned blueprint
+rules were the last entry standing, and taking them found the reason
+they resisted promotion: both described capability that does not
+exist. The `controller` caveat was correctly gated — no machine can
+mix controller types — and its constraint now sits with F2's device
+growth, plus a guard in `platform_dos.drive_letters` asserted by
+test so the invariant is local rather than borrowed from a gate three
+modules away. The backend/format table was **not** gated: a blueprint
+naming `virtualbox` was accepted and materialized qcow2, which made
+the document right and the code wrong, so an unwired backend is now
+refused like an unwired controller (P11) and the table's three
+unbuilt rows are intent recorded against F2 and F3.*
 
-- **Two blueprint rules that need arguing, not relocating** (left
-  behind 2026-07-27 when the other orphaned norms were promoted).
-  Both live only in the descriptive field reference, and both read
-  as **commitments** rather than restatements — which is the line
-  the audit warned about: relocating a rule unchanged passes P23's
-  clarify test, and asserting a new one does not.
-  - **`controller`'s ordering caveat**: *"slot order is
-    authoritative only within a controller type; across mixed
-    types the guest's firmware decides and Reliquary cannot
-    promise a global disk order."* That constrains what Reliquary
-    may promise about guest disk order, which is a claim, not a
-    restatement — and it is a **second source of the drive-letter
-    ambiguity** filed against P17 above, which names only the
-    multi-volume case. Whoever takes either should read both.
-  - **The backend→format table** (qcow2 / VDI / VMDK / VHDX)
-    behind "format-portable by construction". Binding four
-    backends to four formats is a commitment about three backends
-    that do not exist yet.
-  Neither is urgent: they are stated in a descriptive document
-  today and would be stated in a normative one after, so nothing
-  is unspecified in the meantime — what changes is whether the
-  code is free to diverge from them.
+*Neither was promoted, which was the entry's own question: a rule
+about unbuilt capability belongs with the work that would build it,
+not in a spec that states what exists.)*

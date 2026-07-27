@@ -125,7 +125,13 @@ Deliverables:
 
 1. Lifecycle through `VBoxManage`, with machine files kept inside
    `cache/machines/<id>/` and VDI/differencing materialization
-   of the drive triad.
+   of the drive triad. **VDI is the committed format for this
+   backend** — the field reference's backend/format table said so
+   before any of it existed, and until 2026-07-27 the code
+   contradicted it by materializing qcow2 for a blueprint that
+   declared `virtualbox`. `create-machine` now refuses an unwired
+   backend outright (P11), so the table is intent recorded here
+   rather than a promise the shipped code breaks.
 2. The agentless display control plane: `controlvm
    keyboardputscancode` input and `screenshotpng` capture, with
    pixel-level text recognition for fixed-font text modes behind
@@ -261,6 +267,21 @@ Decide first:
   multi-device controllers (additive change); and how Hyper-V
   generations surface (a backend setting vs. inferred from
   declared capabilities).
+  **A second controller type unfixes every disk letter**, which
+  is the one constraint this bullet carries rather than merely
+  lists. Slot order is authoritative only within a type; across
+  types the guest's firmware decides how the controllers
+  themselves enumerate, so not even the first disk is a declared
+  fact and P17 requires refusing the address instead of guessing.
+  `platform_dos.drive_letters` already refuses across types, and
+  that guard is asserted by test though no machine can reach it
+  today — so wiring a second type does not silently start
+  answering a question there is no fact for. What it *does* need
+  is the reverse: a way to say which disk is first when the facts
+  do determine it, or DOS machines lose in-band file exchange the
+  moment they gain a controller type. That is the design this
+  bullet owes, and it was left behind in the field reference as
+  prose until 2026-07-27.
 - The Hyper-V agentless screen strategy: whether WMI
   thumbnail/keyboard automation is good enough for installer
   scripting, or Hyper-V machines require the serial/agent
