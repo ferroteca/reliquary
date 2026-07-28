@@ -158,9 +158,12 @@ transport itself is sourced externally — an existing tool
 (Kermit-style serial file transfer is the candidate) → another
 alternative → worst-case a dedicated project — never built here.
 vvfat stays the built-in agentless fallback (P2). Demand is the
-swap/reboot cost; scheduling it may sharpen P3 from "guest agents"
-to "transport agents, host or guest"
-([PRINCIPLE-PROPOSALS.md](../../planning/proposed/ARCHITECTURE.md)).
+swap/reboot cost. **P3 already carries the rule**, sharpened the
+both-sides way it was tracked for (D68,
+[ARCHITECTURE.md](../../ARCHITECTURE.md)): its never-build clause
+covers a host-side agent as much as a guest one, so scheduling
+this work settles which transport is sourced, never whether
+Reliquary may write one.
 
 ### Guest agents
 
@@ -184,15 +187,17 @@ whole project unto itself, outside Reliquary's scope).
 Reliquary consumes the guest agents that already exist —
 [QGA](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html),
 VirtualBox Guest Additions, VMware Tools, Hyper-V integration
-services — and never builds or ships a guest-side agent of its
-own (ARCHITECTURE.md P3, the control-plane arc): agents may
-not exist for some operating systems, but writing one would be a
-whole project unto itself, outside Reliquary's scope. Guests
+services — and never builds or ships an agent of its own,
+guest-side or host-side (ARCHITECTURE.md P3, the control-plane
+arc): agents may not exist for some operating systems, but
+writing one would be a whole project unto itself, outside
+Reliquary's scope. Guests
 without a native agent — DOS-era systems above all — are served
 by the agentless control planes permanently, U14's loop included.
 
 The host side is a client module inside Reliquary, never another
-long-running host agent: the backend adapter owns the carrier
+long-running host agent — that is where P3's line falls, on the
+agent rather than the side: the backend adapter owns the carrier
 endpoint and Reliquary owns the VM lifecycle. The QGA client
 depends on QEMU's published guest-agent protocol — the wire
 contract — never on one particular guest implementation, and its

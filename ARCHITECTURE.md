@@ -287,8 +287,11 @@ differently under the new wording — is mere documentation work.
   the fallback, forever. (AGENTS.md "Agentless operation".)
 - **P3 — The control-plane arc.** Agentless operation prepares
   a guest; once a native agent exists inside it, that agent is
-  the better work plane. Reliquary consumes native guest
-  agents and never builds its own. (Prose below.)
+  the better work plane. Reliquary consumes the agents that
+  already exist and builds none of its own, guest-side or
+  host-side: what it builds is the client that speaks to one
+  and the seam that selects it, never a transport. (Prose
+  below; D36, D68.)
 - **P4 — The artifact-residency split.** The home serves human
   CLI convenience; automation artifacts are source code in the
   consuming project's tree and never live in the home; the codex
@@ -565,7 +568,15 @@ agentless remains the permanent fallback for guests that can
 never cooperate. Reliquary consumes native guest agents and
 never builds its own: agents may not exist for some operating
 systems, but writing one would be a whole project unto itself,
-outside Reliquary's scope.
+outside Reliquary's scope. The same logic binds the host end
+(D36, D68): a transport faster than the agentless one needs
+cooperation at both ends, and Reliquary supplies neither — only
+the file-transfer seam (P17's addressing, P11's selection), the
+transport itself sourced externally, an existing tool before a
+dedicated project. The line is the agent, not the side: a
+client module inside Reliquary speaking a protocol the guest
+already runs is Reliquary, and a second long-running process is
+the thing it will not build.
 
 Alongside it runs an artifact-residency split (P4). Assets in
 the

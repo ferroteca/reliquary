@@ -188,6 +188,83 @@ is waiting on an answer today.
 
 ## Decided
 
+- D68 — P3 SHARPENS TO BOTH SIDES; THE LINE IS THE AGENT, NOT THE
+  SIDE — DECIDED (owner, 2026-07-28) and armed the same day, which
+  empties [proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md).
+  Supports P2, P8, P11, P23; folds D36's ruling into the principle
+  that has to carry it.
+
+  THE AMENDMENT. P3's never-build clause read *"Reliquary consumes
+  native guest agents and never builds its own"*. It now reads
+  *"consumes the agents that already exist and builds none of its
+  own, guest-side or host-side: what it builds is the client that
+  speaks to one and the seam that selects it, never a transport."*
+
+  WHY NOW, WITH THE TRACKED TRIGGER UNMET. The entry said to fold
+  *"if the fast-transport work schedules"*, and it has not — that
+  work is still backlog. Folding anyway, because the trigger was
+  guarding the wrong thing: it read as a rule waiting on a
+  decision, and the decision was already made. D36 ruled fast
+  transport *"outside Reliquary's scope entirely, host and guest
+  sides alike"* on 2026-07-24, so since that day the project has
+  held a rule its own standing list did not state — recorded in a
+  decision entry and a design document's backlog note, and nowhere
+  a reader of the principles would meet it. A principle that
+  understates what the project has committed to is a gap in the
+  vision, not a pledge waiting on a date. What the trigger rightly
+  refused was churning P3 for a hypothetical; that hypothetical
+  resolved two rounds ago.
+
+  THE LINE IS THE AGENT, NOT THE SIDE — the substantive finding,
+  and why the tracked entry's own shorthand could not be adopted
+  verbatim. It said Reliquary *"builds neither side"*, which read
+  literally forbids the QGA host client that F4 and
+  [design/guest-communication.md](design/guest-communication.md)
+  both plan: *"The host side is a client module inside Reliquary,
+  never another long-running host agent."* A client module **is**
+  Reliquary; a second long-running process, on either side of the
+  seam, is the thing it will not build. So the clause names the
+  agent, which keeps the client legal, and names the seam, which
+  states what Reliquary does supply rather than leaving it to
+  inference — P17's addressing and P11's selection, with the
+  transport sourced externally.
+
+  D36's LITERAL SPELLING IS NOT ADOPTED. It offered *"transport
+  agents, host or guest"*, and transport is the wrong genus: QGA
+  is a work plane before it is a transport, and P3's first clause
+  is about exactly that. The rule generalizes over agents, and
+  transport is one of the things an agent carries.
+
+  ARMED RATHER THAN PLEDGED, AND WHY THE SHELF IS NOT A STOP. P3
+  is already in force, so
+  [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md) is not a
+  destination for it: that shelf holds principles the code does
+  not yet honor, and this one it honors today. Nothing in the
+  package is an agent of Reliquary's making on either side — the
+  codex ships blueprints and `.rlqs` scripts and no guest artifact
+  at all. **No residue is filed**, D48's condition being met
+  vacuously, which is the honest report rather than a claim the
+  clause is well tested: it forbids building something, and the
+  project has not built it.
+
+  THIS ENTRY EXISTS BECAUSE AMENDING IS NOT PROMOTING. D63 exempts
+  the lifecycle acts — proposing, pledging, arming, delivering —
+  whose record is the commit that performs them. Changing what a
+  standing principle *requires* is none of those: it is a norm
+  change, gated under P23 and argued under P8, and D59 is its
+  shape.
+
+  FOLDED: this entry; [ARCHITECTURE.md](../ARCHITECTURE.md) (P3's
+  entry, and the control-plane-arc paragraph in the cross-cutting
+  prose); [proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md)
+  (the Tracked entry struck with its heading — done work leaves by
+  deletion, D52, and nothing is parked in its place);
+  [design/guest-communication.md](design/guest-communication.md)
+  (the external-transport note cites the sharpened P3 instead of
+  proposing the sharpening, the consume-only sentence covers both
+  sides, and the host-client paragraph names where the line
+  falls). No CHANGELOG line: nothing release-facing moved.
+
 - D67 — THE SEAM EXTRACTION'S RULINGS: A GENERIC VM IDENTITY, NO
   PORT ABOVE THE SEAM, AND STUBS THAT CLAIM NOTHING — DECIDED
   (owner, 2026-07-28). Supports U7, U1; P7, P11, P12. F2's

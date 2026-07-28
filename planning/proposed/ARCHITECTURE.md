@@ -43,16 +43,3 @@ being the pledge, and D62 delivered the two operations it named
 and moved it to the standing list, where it now binds. No stub is
 left behind at either step — one global P-namespace, and the file
 an entry sits in says its state.)*
-
-### Tracked
-
-- **Sharpen P3 from "guest agents" to "transport agents"** —
-  tracked (recorded 2026-07-24, the exec-run round; D36). P3
-  today says Reliquary consumes native guest agents and never
-  builds its own; the fast file-transport thread found the same
-  logic binds the *host* side of a transport agent — Reliquary
-  builds neither side, sourcing the transport externally (an
-  existing tool, then a dedicated project) and providing only the
-  control-plane seam. Fold into P3's wording if the fast-transport
-  work schedules.
-
