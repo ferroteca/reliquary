@@ -38,11 +38,21 @@ _CODEX_SPEC = os.path.join(
 
 
 class _HomeTest(unittest.TestCase):
+    """A scratch home with the codex behind it.
+
+    Autoseeding is on here because these are the codex's own tests —
+    seeding, first reference, provenance. It is the CLI's default and
+    not the library's, so a test that wants it says so (home.py).
+    """
+
     def setUp(self):
         home_mod = importlib.import_module("reliquary.home")
-        saved = home_mod._home
-        self.addCleanup(setattr, home_mod, "_home", saved)
-        home_mod._home = None
+        saved = dict(home_mod._globals)
+        self.addCleanup(home_mod._globals.update, saved)
+        for name in home_mod.DIRECTORIES:
+            home_mod._globals[name] = None
+        self.addCleanup(home_mod.set_autoseed, home_mod._autoseed)
+        home_mod.set_autoseed(True)
         self._temp = tempfile.TemporaryDirectory()
         self.addCleanup(self._temp.cleanup)
         self.home = self._temp.name

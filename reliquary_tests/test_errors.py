@@ -103,7 +103,7 @@ class CliExitCodeTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(stderr):
             code = cli.main([
-                "--home", self.home, "--blueprint", "plain",
+                "--home-dir", self.home, "--blueprint", "plain",
                 "run-script", "install",
             ])
         return code, stderr.getvalue()
@@ -165,7 +165,7 @@ class OrdinaryMistakesAreNotFaultsTests(unittest.TestCase):
         err = io.StringIO()
         with contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(err):
-            code = cli.main(["--home", self.home, *argv])
+            code = cli.main(["--home-dir", self.home, *argv])
         return code, err.getvalue()
 
     def test_a_media_that_does_not_exist_is_preflight(self):
@@ -299,7 +299,8 @@ class EveryDiagnosticNamesItsRuleTests(unittest.TestCase):
     #: which is why a sweep over `raise` statements alone would miss
     #: them, and did until this test was written.
     RETURNING = {"_startup_error", "_unbound_failure", "_chaining_failure",
-                 "_unbound", "_diagnose", "_error", "_expired"}
+                 "_unbound", "_diagnose", "_error", "_expired",
+                 "_unassigned"}
 
     def test_every_deliberate_raise_names_a_rule(self):
         bare = []

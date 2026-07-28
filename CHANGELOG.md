@@ -11,7 +11,102 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- **Every working directory is placeable.** Reliquary has six —
+  `home`, `blueprints`, `scripts`, `cache`, `media`, `machines` —
+  and all six are now specifiable through the CLI and the embedding
+  API alike, where only `home` and `cache` were before. The other
+  four were computed (`<home>/blueprints`, `<cache>/machines`, and
+  so on) and unreachable, so a caller wanting machines on a fast
+  disk and media on a big one had no way to say so. Each starts
+  unassigned and the rest **derive**: `home` gives default
+  locations to `blueprints`/`scripts`/`cache`, and `cache`
+  — assigned or derived — gives them to `media`/`machines`.
+  Derivation reaches only what is still unassigned. Normative:
+  `docs/spec/asset-resolution.md` "The working directories".
+
+  **The flags are renamed, and there are no aliases.** `--home`
+  becomes `--home-dir` and `--cache` becomes `--cache-dir`, joined
+  by `--blueprints-dir`, `--scripts-dir`, `--media-dir` and
+  `--machines-dir` — one spelling for all six rather than two
+  bare names beside four new suffixed ones. The API twins move
+  with them: `set_home()` → `set_home_dir()`, `set_cache()` →
+  `set_cache_dir()`, plus `set_blueprints_dir()`,
+  `set_scripts_dir()`, `set_media_dir()`, `set_machines_dir()`;
+  `media_cache_dir()` → `media_dir()` and `machines_cache_dir()`
+  → `machines_dir()`; `home()` → `home_dir()`.
+
+  **`RELIQUARY_HOME` is now `RELIQUARY_HOME_DIR`**, and four new
+  variables join it — `RELIQUARY_BLUEPRINTS_DIR`,
+  `RELIQUARY_SCRIPTS_DIR`, `RELIQUARY_MEDIA_DIR`,
+  `RELIQUARY_MACHINES_DIR` — beside the unchanged
+  `RELIQUARY_CACHE_DIR`. The rule is mechanical: `RELIQUARY_` plus
+  the flag's own name. **An existing `RELIQUARY_HOME` stops being
+  read and is not warned about** (no backward compatibility before
+  1.0); rename it.
+
+- **`Context` is now a plain record of the six directories** plus
+  `autoseed`, with all resolution moved to `home.py`'s module
+  functions. Its keywords are the flag names — `Context(home_dir=,
+  blueprints_dir=, scripts_dir=, cache_dir=, media_dir=,
+  machines_dir=, autoseed=)` — so the twin surface matches one for
+  one, and six nullable strings bind cleanly from C or Java where
+  six keyword arguments would not (P7). A bare-string `context=`
+  is still shorthand for the home. `Context.home_dir` is now the
+  slot rather than `Context.home`, and the `home_dir()` /
+  `cache_dir()` methods are gone — call the module functions.
+
+- **Unassigned is a fail-closed error on every surface.** A
+  directory with no value when resolution needs it raises
+  `StaticError` (`dir.unassigned`) naming that directory and the
+  ways to supply it. The error fires at first use rather than at
+  `Context` construction, so a context may be built before it is
+  filled and the diagnostic names what was actually wanted rather
+  than the root of a cascade nobody asked about. The CLI assigns
+  the default home whenever neither a flag nor the environment
+  named one, so one assignment reaches all six and the error is
+  unreachable at the keyboard — a property of that default rather
+  than an exemption from the rule. The embedding API assigns
+  nothing, and there the error is reachable; that is the safety of
+  the design.
+
+- **`P12` is amended, and `P4`'s codex clause with it.** Six
+  independently placeable roots make "the home" the name of one of
+  them rather than a container, so home containment becomes what
+  its safety content always was: Reliquary writes only where it was
+  told to, and never beside the module or into a source tree. P4's
+  "the codex never feeds automation" becomes a default rather than
+  an absolute, since autoseeding is now switchable on both
+  surfaces. Both amendments are recorded in `planning/DECISIONS.md`
+  with the interface-change triage behind them.
+
 ### Removed
+
+- **`--assets` is retired**, along with `assets=`, `set_assets()`,
+  `HOME_ASSETS`, and the `HomeSource`/`DirSource` split behind
+  them. It existed to name a project asset root because
+  `blueprints` and `scripts` could not be named directly, and now
+  they can: `--blueprints-dir <dir> --scripts-dir <dir>` says where,
+  and one `DirectorySource` reads each kind from its own directory.
+
+  The hermeticity the same flag also declared is now its own axis,
+  **`--autoseed` / `--no-autoseed`** (API `autoseed=`): whether a
+  name the directories do not hold may come from the built-in
+  codex. It is **on at the CLI** and **off in the embedding API**,
+  so a person still finds `freedos` on a fresh install and a
+  library call still never picks up the codex unasked. Two axes
+  where there was one knob, so a project tree may keep the codex
+  behind it and a home may refuse it.
+
+  Two consequences worth stating. Autoseeding now follows the
+  *surface* rather than the directory, so `rlq --blueprints-dir
+  ./project` in CI does seed unless `--no-autoseed` is passed —
+  where `--assets ./project` never did. And `seed-blueprint` /
+  `seed-script` now write into the assigned `blueprints` /
+  `scripts` directory wherever it is, rather than always the home:
+  seeding a first draft straight into the project tree you commit
+  is now the ordinary way to do it.
 
 - `import-vm` is gone from the CLI. It was a registered command
   whose entire body was `raise NotImplementedError`, while the CLI

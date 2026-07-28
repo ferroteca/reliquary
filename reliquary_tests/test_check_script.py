@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 
 import reliquary
+from reliquary import Context
 from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import check_script
@@ -46,10 +47,18 @@ class FormatPlanTests(unittest.TestCase):
 class CheckScriptTests(unittest.TestCase):
     """check_script parses, validates, and returns the timing plan."""
 
+    def _codex_context(self, home):
+        """A home with the codex behind it, as the CLI would have it.
+
+        Autoseeding is the CLI's default and never the library's, so
+        a test reading a codex script asks for it (home.py).
+        """
+        return Context(home_dir=home, autoseed=True)
+
     def test_a_bare_name_reads_a_builtin_without_writing(self):
         with tempfile.TemporaryDirectory() as home:
             result = check_script(
-                "freedos-install", context=home)
+                "freedos-install", context=self._codex_context(home))
             self.assertEqual(result.plan.run_deadline.spelling, "45m")
             self.assertFalse(os.path.isdir(
                 os.path.join(home, "scripts")))
@@ -70,7 +79,8 @@ class CheckScriptTests(unittest.TestCase):
     def test_a_blueprint_label_resolves_without_creating_a_machine(self):
         with tempfile.TemporaryDirectory() as home:
             result = check_script(
-                "install", blueprint="freedos", context=home)
+                "install", blueprint="freedos",
+                context=self._codex_context(home))
             self.assertIn("freedos-install", result.script_path)
             self.assertFalse(os.path.isdir(
                 os.path.join(home, "cache")))

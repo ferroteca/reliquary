@@ -77,7 +77,7 @@ class LifecycleTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.home = self.tempdir.name
-        reliquary.set_home(self.home)
+        reliquary.set_home_dir(self.home)
         _FakeQmp.commands = []
         _FakeQmp.name = "reliquary-machine"
         _FakeQmp.vm_uuid = "00000000-0000-0000-0000-000000000000"

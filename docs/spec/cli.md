@@ -1063,7 +1063,7 @@ ordinary or vice versa — require `unset-property` first.
 ## Flags and options
 
 ```
-rlq <command> [args...] [--home <path>] [--blueprint <name>]
+rlq <command> [args...] [--home-dir <path>] [--blueprint <name>]
     [--machine <id>] [--timeout <duration>] [--json]
 ```
 
@@ -1074,11 +1074,17 @@ flag may appear before or after the command word —
 `rlq --blueprint freedos run-script install` are
 identical. Synopses canonically show flags after the command.
 
-Three flags are accepted by every command, mirroring the API's
-shared keywords: `--home` (overrides the Reliquary home; default
-`Documents/reliquary`), `--assets <dir>` (a hermetic project asset
-root as the sole source; its absence is home mode — the home's
-canonical folders plus codex seeding), and `--json` (below).
+Eight flags are accepted by every command, mirroring the API's
+shared keywords. Six place Reliquary's working directories —
+`--home-dir`, `--blueprints-dir`, `--scripts-dir`, `--cache-dir`,
+`--media-dir`, `--machines-dir` — each also settable by
+`RELIQUARY_<NAME>_DIR` in the environment; what none of them names
+derives, and a bare invocation places all six under the default home
+(`Documents/reliquary`). `--no-autoseed` (and its default-stating
+twin `--autoseed`) decides whether a name the directories do not
+hold may come from the built-in codex. `--json` is below. The full
+model is
+[asset-resolution.md](asset-resolution.md#the-working-directories).
 
 `--blueprint <name>` and `--machine <id>` are the machine
 selectors, mutually exclusive. On machine-scoped commands

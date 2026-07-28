@@ -325,11 +325,12 @@ were declined — anonymous means *absent*, not *private*.
 
 ## Resolution
 
-Resolution reads **every `.rlqb` in the active source** — the
-whole home in home mode, the whole project root under
-`--assets` — into one catalog, then binds every reference by
-name. The residency split is unchanged: home mode seeds from the
-codex on a miss, `--assets` is the sole hermetic source (P4).
+Resolution reads **every `.rlqb` in the blueprints directory**,
+walked recursively — the home's folder by default, a project's own
+tree where `--blueprints-dir` says so — into one catalog, then binds
+every reference by name. The residency split is unchanged in
+substance: a miss falls back to the codex while autoseeding is on
+(the CLI), and never in the embedding API (P4).
 
 Resolution is **order-independent** and forward references are
 legal. Containment cycles and a self-parent fail closed naming
@@ -642,8 +643,8 @@ The **preflight identity check before any fetch** stands on its
 own — hashing the cached file against the media's pin, which
 catches both a version bump and a cross-project name collision
 without needing to know which it found. The on-mismatch message
-names both causes and points at `--cache`, the flag that
-isolates one project's cache from another's.
+names both causes and points at `--media-dir`, the flag that
+isolates one project's media cache from another's.
 
 **Content addressing was weighed and declined twice.** An opaque
 hash-named cache cuts against "the cache is not an interface",

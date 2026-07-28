@@ -14,7 +14,7 @@ from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
 from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError)
-from .home import machines_cache_dir
+from .home import machines_dir
 from .library import seed_blueprint
 from .lifecycle import (create_difference_image, create_duplicate_image,
                         create_hdd_image, find_qemu, launch_owned_qemu,
@@ -163,7 +163,7 @@ def _blueprint_digest(resolved, drives):
 
 def machine_dir_path(machine_id, context=None):
     """Return the machine's cache directory path."""
-    return os.path.join(machines_cache_dir(context), machine_id)
+    return os.path.join(machines_dir(context), machine_id)
 
 
 def _machine_media_dir(machine_id, context=None):
@@ -215,7 +215,7 @@ def split_machine_id(machine_id):
 
 
 def _locks_dir(context=None):
-    return os.path.join(machines_cache_dir(context), ".locks")
+    return os.path.join(machines_dir(context), ".locks")
 
 
 def _lock_file(handle):
@@ -507,9 +507,10 @@ def create_machine(name, *, context=None, number=None, properties=None,
     location references, before materialization.
     """
     from .assets import source_for
-    # Home mode seeds the blueprint (and the media/scripts it carries)
-    # from the codex on first reference (idempotent, never overwriting);
-    # dir mode (``--assets``) is hermetic and seeds nothing.
+    # With autoseeding on, the blueprint (and the scripts it carries)
+    # copies out of the codex on first reference — idempotent, never
+    # overwriting. With it off nothing is seeded and the blueprints
+    # directory is the sole source.
     if source_for(context).seeds:
         seed_blueprint(name, context=context)
     namespace = load_namespace(context)
@@ -730,7 +731,7 @@ def list_machines(context=None, blueprint=None):
     Ordered by blueprint name, then ascending machine number.  When
     ``blueprint`` is set, only machines of that blueprint are returned.
     """
-    root = machines_cache_dir(context)
+    root = machines_dir(context)
     if not os.path.isdir(root):
         return []
     machines = []

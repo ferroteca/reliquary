@@ -62,8 +62,8 @@ def _properties_path(context=None, properties_file=None):
         properties_file = os.environ.get("RELIQUARY_PROPERTIES") or None
     if properties_file is not None:
         return os.path.abspath(properties_file)
-    from .home import _ctx
-    return os.path.join(_ctx(context).home_dir(), "user.properties")
+    from .home import home_dir
+    return os.path.join(home_dir(context), "user.properties")
 
 def check_key(key):
     """Validate a property key, returning it.

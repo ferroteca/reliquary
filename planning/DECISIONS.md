@@ -178,6 +178,116 @@ is waiting on an answer today.
 
 ## Decided
 
+- D59 — EVERY WORKING DIRECTORY IS PLACEABLE; P12 AND P4 AMENDED —
+  DECIDED (owner, 2026-07-27) and delivered the same day, which
+  retires F22's number. Supports U17 (pledged), U14, U4; P4, P6,
+  P7, P11, P12. Reliquary's six working directories — `home`,
+  `blueprints`, `scripts`, `cache`, `media`, `machines` — are all
+  specifiable through the CLI and the embedding API. Only two were:
+  the other four joined a literal onto the home or the cache, so a
+  caller who wanted machines on a fast disk and media on a big one
+  had no way to say so.
+
+  **EVERYTHING STARTS UNASSIGNED AND DEFAULTS DERIVE.** Assigning
+  `home` gives default locations to `blueprints`/`scripts`/`cache`;
+  assigning `cache` — explicitly *or* by that derivation — gives
+  them to `media`/`machines`. The cascade is the shape the code
+  already had; what changed is that each step is interceptable.
+  Derivation reaches only what is still unassigned, so `cache`
+  alone conjures no home. Unassigned at first use is a fail-closed
+  `StaticError` (`dir.unassigned`) naming the directory wanted —
+  **at first use, not at `Context` construction**, so a context may
+  be built before it is filled and the diagnostic names what was
+  asked for rather than the root of a cascade nobody put a question
+  about.
+
+  **THE RULE IS ONE RULE; ONLY THE DEFAULTING DIFFERS.** The CLI
+  assigns the default home whenever neither a flag nor the
+  environment named one — *whenever unassigned*, not only when
+  nothing at all was given, which is what keeps `rlq --cache-dir
+  D:\c list-machines` working. One home assignment reaches all six,
+  so the error is unreachable at the keyboard. **That is a property
+  of the default, not an exemption**: an exemption would have to be
+  re-argued if the default ever changed, and a property would not.
+  The API assigns nothing, and there the error is reachable; that
+  is the whole safety of the design, and it generalizes the decided
+  no-default-source rule for assets rather than inventing one.
+
+  **THE NAMING: ONE SPELLING FOR ALL SIX.** `--home-dir`,
+  `--blueprints-dir`, `--scripts-dir`, `--cache-dir`,
+  `--media-dir`, `--machines-dir`, with API twins `set_*_dir()` and
+  `Context` keywords of the same names; `media_cache_dir` /
+  `machines_cache_dir` lose the infix, `home()` becomes
+  `home_dir()`. **WEIGHED AND DECLINED: keeping `--home` and
+  `--cache` bare** beside four suffixed newcomers — two spellings
+  for one concept, and the bare pair reads as a different kind of
+  thing than its four siblings. Environment variables follow
+  mechanically, `RELIQUARY_` plus the flag's own name, which
+  renames `RELIQUARY_HOME` to `RELIQUARY_HOME_DIR` and leaves
+  `RELIQUARY_CACHE_DIR` untouched; the set was closed against
+  accretion, not against decision (the 2026-07-27 invocation-knob
+  sweep), and this is the decision. They are honoured **at the CLI
+  only** — a library must not acquire a directory from the
+  developer's shell — so nothing is read at import.
+
+  **`--assets` IS RETIRED, AND WITH IT ONE KNOB ANSWERING TWO
+  QUESTIONS.** It existed to name a project asset root because
+  `blueprints` and `scripts` could not be named directly; now they
+  can. It also declared hermeticity, and that is now its own axis:
+  `--autoseed` / `--no-autoseed` (API `autoseed=`), **on at the
+  CLI, off in the embedding API**. `assets.py` collapses to one
+  `DirectorySource` reading each kind's own directory, since both
+  former sources already walked recursively by extension in the
+  same helper and differed only in which directory and whether they
+  seeded. **WEIGHED AND DECLINED: derivation carrying hermeticity**
+  — a home-derived directory seeding and an explicitly assigned one
+  never doing so, which reproduces both former modes with no new
+  knob and keeps P4 absolute; rejected because it makes seeding a
+  silent consequence of an unrelated choice, and leaves no way to
+  ask for a codex draft in a project or refuse one at home. **AND:
+  keeping `--assets` as a two-slot alias** — cheaper at the
+  keyboard for a project holding both kinds in one tree, which now
+  costs two flags, but it is the second mechanism answering a
+  question the directory flags already answer.
+
+  **THE COST, PRICED BEFORE IT WAS TAKEN.** Autoseeding now follows
+  the *surface* rather than the directory, so `rlq --blueprints-dir
+  ./project` in CI seeds where `--assets ./project` did not. **That
+  amends P4**, whose codex clause read *never feeds automation*:
+  it now reads as a default rather than an absolute, with
+  `--no-autoseed` the CLI's way to have the old guarantee and the
+  API keeping it unasked. **And it amends P12**, which claimed all
+  persistent state lives under the home with the cache separable —
+  a containment claim with one carve-out that six placeable roots
+  make untrue. P12 becomes what its safety content always was:
+  Reliquary writes only where it was told to, never beside the
+  module and never into a source tree. **P8 routes both through the
+  interface-change rule**, and the triage is easy: no numbered use
+  case is cost, U17 is directly served, and U14/U4 keep their
+  guarantee at the API where it matters most.
+
+  Two smaller consequences, stated so they are decisions rather
+  than accidents. `Context` becomes a **plain record** — six
+  nullable paths plus `autoseed`, no methods — which answers P7's
+  question about six keyword arguments from C or Java, and frees
+  `cache_dir` to be the resolver it reads as. And seeding **on
+  request** (`seed-blueprint` / `seed-script`) targets the assigned
+  directory wherever it is rather than always the home: it is an
+  explicit act naming the codex as its source, which is the use the
+  codex is for, so it is not what autoseed governs.
+
+  Folded: [home.py](../reliquary/home.py) (the model),
+  [assets.py](../reliquary/assets.py) (one source),
+  [cli.py](../reliquary/cli.py) (`_configure_directories`),
+  root [ARCHITECTURE.md](../ARCHITECTURE.md) (P4, P12),
+  [docs/spec/asset-resolution.md](../docs/spec/asset-resolution.md)
+  (normative: "The working directories"),
+  [docs/spec/cli.md](../docs/spec/cli.md),
+  [docs/spec/api.md](../docs/spec/api.md), AGENTS.md, README.md,
+  and the CHANGELOG's unreleased section. The purge sweep
+  (`test_old_surface_purge.py`) now forbids every retired spelling
+  tree-wide, since there are no aliases before 1.0.
+
 - D58 — THE FOUR ERROR CLASSES DESCRIBE EVERY SURFACE, NOT A
   SCRIPT RUN — DECIDED (owner, 2026-07-27, ratifying what
   milestone 9 had already built). Supports U9, U14; P6, P7, P11.

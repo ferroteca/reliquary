@@ -118,10 +118,8 @@ class CliEmptyListingTests(unittest.TestCase):
     """list-* report absence, not a bare header."""
 
     def setUp(self):
-        saved = home._home
-        self.addCleanup(setattr, home, "_home", saved)
-        saved_cache = home._cache
-        self.addCleanup(setattr, home, "_cache", saved_cache)
+        saved = dict(home._globals)
+        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -130,23 +128,23 @@ class CliEmptyListingTests(unittest.TestCase):
         """An empty machine list says so instead of a headerless table."""
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "list-machines"])
+            result = cli.main(["--home-dir", self.home, "list-machines"])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
         self.assertNotIn("BLUEPRINT", output)
         self.assertIn("no machines", output)
 
     def test_flag_position_independence(self):
-        """Flags like --home work before or after the command."""
+        """Flags like --home-dir work before or after the command."""
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["list-machines", "--home", self.home])
+            result = cli.main(["list-machines", "--home-dir", self.home])
         self.assertEqual(result, 0)
         self.assertIn("no machines", stdout.getvalue())
 
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "list-machines"])
+            result = cli.main(["--home-dir", self.home, "list-machines"])
         self.assertEqual(result, 0)
         self.assertIn("no machines", stdout.getvalue())
 
@@ -164,7 +162,7 @@ class CliEmptyListingTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-machines",
+                "--home-dir", self.home, "list-machines",
                 "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
@@ -177,7 +175,7 @@ class CliEmptyListingTests(unittest.TestCase):
         """An empty blueprints directory says so, not silently nothing."""
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "list-blueprints"])
+            result = cli.main(["--home-dir", self.home, "list-blueprints"])
         self.assertEqual(result, 0)
         self.assertIn("no blueprints", stdout.getvalue())
 
@@ -185,7 +183,7 @@ class CliEmptyListingTests(unittest.TestCase):
         """An empty scripts directory says so, not a bare header."""
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "list-scripts"])
+            result = cli.main(["--home-dir", self.home, "list-scripts"])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
         self.assertNotIn("NAME", output)
@@ -195,7 +193,7 @@ class CliEmptyListingTests(unittest.TestCase):
         with mock.patch("reliquary.cli.screen_text",
                         return_value=["hello"]) as screen, \
                 contextlib.redirect_stdout(io.StringIO()) as stdout:
-            result = cli.main(["screen", "--home", self.home])
+            result = cli.main(["screen", "--home-dir", self.home])
         self.assertEqual(result, 0)
         screen.assert_called_once_with(None, home=None)
         self.assertEqual(stdout.getvalue(), "hello\n")
@@ -206,18 +204,18 @@ class CliReorderArgvTests(unittest.TestCase):
 
     def test_moves_leading_home(self):
         self.assertEqual(
-            cli._reorder_argv(["--home", "/tmp", "list-machines"]),
-            ["list-machines", "--home", "/tmp"])
+            cli._reorder_argv(["--home-dir", "/tmp", "list-machines"]),
+            ["list-machines", "--home-dir", "/tmp"])
 
     def test_preserves_command_first(self):
         self.assertEqual(
-            cli._reorder_argv(["list-machines", "--home", "/tmp"]),
-            ["list-machines", "--home", "/tmp"])
+            cli._reorder_argv(["list-machines", "--home-dir", "/tmp"]),
+            ["list-machines", "--home-dir", "/tmp"])
 
     def test_equals_form(self):
         self.assertEqual(
-            cli._reorder_argv(["--home=/tmp", "list-machines"]),
-            ["list-machines", "--home=/tmp"])
+            cli._reorder_argv(["--home-dir=/tmp", "list-machines"]),
+            ["list-machines", "--home-dir=/tmp"])
 
     def test_an_unknown_flag_with_a_value_still_finds_the_command(self):
         # `--qemu` was removed by the spec and lingered in the arity
@@ -236,8 +234,8 @@ class CliReorderArgvTests(unittest.TestCase):
         # misspelling must still be reported as the invalid choice
         # it is rather than scanned past.
         self.assertEqual(
-            cli._reorder_argv(["list-machnes", "--home", "/tmp"]),
-            ["list-machnes", "--home", "/tmp"])
+            cli._reorder_argv(["list-machnes", "--home-dir", "/tmp"]),
+            ["list-machnes", "--home-dir", "/tmp"])
 
     def test_removed_globals_are_not_in_the_arity_table(self):
         # docs/spec/cli.md: the old global --qemu, --platform and
@@ -285,10 +283,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
     """create-machine / start-machine / stop-machine / destroy-machine."""
 
     def setUp(self):
-        saved = home._home
-        self.addCleanup(setattr, home, "_home", saved)
-        saved_cache = home._cache
-        self.addCleanup(setattr, home, "_cache", saved_cache)
+        saved = dict(home._globals)
+        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -307,7 +303,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
@@ -319,7 +315,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "--blueprint", "plain",
                 "create-machine",
             ])
@@ -329,11 +325,11 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_get_machine_dir(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
-            cli.main(["--home", self.home, "create-machine",
+            cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "get-machine-dir",
+            result = cli.main(["--home-dir", self.home, "get-machine-dir",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
         self.assertIn("plain-0", stdout.getvalue())
@@ -341,12 +337,12 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_recreate_machine(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
-            cli.main(["--home", self.home, "create-machine",
+            cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         stdout = io.StringIO()
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "recreate-machine",
+            result = cli.main(["--home-dir", self.home, "recreate-machine",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
         self.assertEqual(stdout.getvalue().strip(), "plain-0")
@@ -355,7 +351,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home] + args + ["--json"])
+            result = cli.main(["--home-dir", self.home] + args + ["--json"])
         return result, stdout.getvalue().strip()
 
     def test_json_create_returns_id_scalar(self):
@@ -388,7 +384,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_json_rejected_on_stream_command(self):
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
-            result = cli.main(["--home", self.home, "fetch-media",
+            result = cli.main(["--home-dir", self.home, "fetch-media",
                                "x", "--json"])
         self.assertEqual(result, 2)
         self.assertIn("jsonl", stderr.getvalue())
@@ -397,19 +393,19 @@ class CliMachineLifecycleTests(unittest.TestCase):
         # --json before the command word must reorder correctly.
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            rc = cli.main(["--home", self.home, "--json", "list-machines"])
+            rc = cli.main(["--home-dir", self.home, "--json", "list-machines"])
         self.assertEqual(rc, 0)
         self.assertIsInstance(json.loads(stdout.getvalue()), list)
 
     def test_apply_blueprint(self):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
-            cli.main(["--home", self.home, "create-machine",
+            cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         stdout = io.StringIO()
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "apply-blueprint",
+            result = cli.main(["--home-dir", self.home, "apply-blueprint",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
         self.assertEqual(stdout.getvalue().strip(), "plain-0")
@@ -419,14 +415,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-machines",
+                "--home-dir", self.home, "list-machines",
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
@@ -437,7 +433,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_search_blueprints(self):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "search-blueprints",
+            result = cli.main(["--home-dir", self.home, "search-blueprints",
                                "freedos"])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
@@ -447,7 +443,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_seed_blueprint_only_flag(self):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "seed-blueprint",
+            result = cli.main(["--home-dir", self.home, "seed-blueprint",
                                "freedos", "--only"])
         self.assertEqual(result, 0)
         self.assertTrue(os.path.isfile(os.path.join(
@@ -458,7 +454,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-blueprints",
+                "--home-dir", self.home, "list-blueprints",
                 "--builtin",
             ])
         self.assertEqual(result, 0)
@@ -474,7 +470,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-blueprints",
+                "--home-dir", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
@@ -492,7 +488,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", empty_home.name, "list-blueprints",
+                "--home-dir", empty_home.name, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
@@ -512,7 +508,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-blueprints",
+                "--home-dir", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         self.assertIn(nested_path, stdout.getvalue())
@@ -528,7 +524,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-blueprints",
+                "--home-dir", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         self.assertNotIn("cache", stdout.getvalue())
@@ -549,7 +545,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-blueprints",
+                "--home-dir", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
@@ -565,7 +561,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-blueprints",
+                "--home-dir", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
         self.assertNotIn("notes", stdout.getvalue())
@@ -574,7 +570,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "delete-blueprint", "plain",
             ])
         self.assertEqual(result, 0)
@@ -586,14 +582,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "delete-blueprint", "plain",
             ])
         self.assertEqual(result, 3)
@@ -609,7 +605,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                  "location": {"local": "/x.iso"}}], handle)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home", self.home, "list-media"])
+            result = cli.main(["--home-dir", self.home, "list-media"])
         self.assertEqual(result, 0)
         # The namespace lists every media component in the source.
         self.assertIn("livecd", stdout.getvalue())
@@ -617,7 +613,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-media", "--builtin",
+                "--home-dir", self.home, "list-media", "--builtin",
             ])
         self.assertEqual(result, 0)
         self.assertIn("freedos-livecd", stdout.getvalue())
@@ -626,27 +622,28 @@ class CliMachineLifecycleTests(unittest.TestCase):
         """--blueprint start/stop resolve the sole machine.
 
         The process-global home is pointed elsewhere before each call:
-        a global --home must overwrite it via set_home() before
-        dispatch, not leave a stale global in place — a dropped
-        --home must never let stop target a machine in another home
-        (the identity name alone cannot tell same-numbered machines
-        of two homes apart). The CLI drives the process-global home
-        only (never a per-call context= override), so the guarantee
-        now rests on set_home() actually having run.
+        a global --home-dir must overwrite it via set_home_dir()
+        before dispatch, not leave a stale global in place — a
+        dropped --home-dir must never let stop target a machine in
+        another home (the identity name alone cannot tell
+        same-numbered machines of two homes apart). The CLI drives
+        the process-global assignments only (never a per-call
+        context= override), so the guarantee now rests on
+        set_home_dir() actually having run.
         """
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
         decoy = os.path.join(self.home, "elsewhere")
-        home._home = decoy
+        home.set_home_dir(decoy)
         with mock.patch("reliquary.cli.start_machine") as start, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "start-machine",
                 "--blueprint", "plain",
             ])
@@ -654,13 +651,13 @@ class CliMachineLifecycleTests(unittest.TestCase):
         start.assert_called_once()
         self.assertNotIn("home", start.call_args.kwargs)
         self.assertNotIn("context", start.call_args.kwargs)
-        self.assertEqual(home._home, self.home)
+        self.assertEqual(home.home_dir(), self.home)
 
-        home._home = decoy
+        home.set_home_dir(decoy)
         with mock.patch("reliquary.cli.stop_machine") as stop, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "stop-machine",
                 "--blueprint", "plain",
             ])
@@ -668,7 +665,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         stop.assert_called_once()
         self.assertNotIn("home", stop.call_args.kwargs)
         self.assertNotIn("context", stop.call_args.kwargs)
-        self.assertEqual(home._home, self.home)
+        self.assertEqual(home.home_dir(), self.home)
 
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""
@@ -676,7 +673,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
             cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
@@ -684,7 +681,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.cli.destroy_machine") as destroy, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "destroy-machine",
                 "--machine", machine_id,
             ])
@@ -696,12 +693,12 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
             cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "create-machine",
                 "--blueprint", "plain",
             ])
@@ -709,7 +706,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with contextlib.redirect_stderr(stderr), \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "destroy-machine",
                 "--blueprint", "plain",
                 "--machine", "plain-1",
@@ -732,7 +729,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home, "list-scripts",
+                "--home-dir", self.home, "list-scripts",
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
@@ -773,7 +770,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "list-scripts",
                 "--blueprint", "cust",
             ])
@@ -790,7 +787,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         """The legacy root-home start path is gone: a selector is required."""
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
-            result = cli.main(["--home", self.home, "start-machine"])
+            result = cli.main(["--home-dir", self.home, "start-machine"])
         self.assertEqual(result, 2)
         self.assertIn("--blueprint", stderr.getvalue())
 
@@ -826,7 +823,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(io.StringIO()):
-            cli.main(["--home", self.home, "create-machine",
+            cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         state_path = os.path.join(
             self.home, "cache", "machines", "plain-0", "machine.json")
@@ -840,7 +837,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with mock.patch("reliquary.cli.screen_text",
                         return_value=["ok"]) as screen, \
                 contextlib.redirect_stdout(io.StringIO()):
-            result = cli.main(["--home", self.home, "screen",
+            result = cli.main(["--home-dir", self.home, "screen",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
         port, kwargs = screen.call_args.args[0], screen.call_args.kwargs
@@ -852,11 +849,11 @@ class CliMachineLifecycleTests(unittest.TestCase):
                         return_value=[]) as clean, \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(
-                cli.main(["clean-media", "--home", self.home]), 0)
+                cli.main(["clean-media", "--home-dir", self.home]), 0)
             clean.assert_called_once_with(None)
             clean.reset_mock()
             self.assertEqual(
-                cli.main(["clean-media", "livecd", "--home", self.home]), 0)
+                cli.main(["clean-media", "livecd", "--home-dir", self.home]), 0)
             clean.assert_called_once_with("livecd")
 
     def test_prune_media_dry_run_reports_without_pruning(self):
@@ -864,7 +861,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                         return_value=["husk"]) as prune, \
                 contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(
-                cli.main(["prune-media", "--dry-run", "--home", self.home]),
+                cli.main(["prune-media", "--dry-run", "--home-dir", self.home]),
                 0)
         prune.assert_called_once_with(dry_run=True)
         self.assertIn("husk", out.getvalue())
@@ -876,7 +873,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(
                 cli.main(["add-media", "win", payload,
-                          "--home", self.home]), 0)
+                          "--home-dir", self.home]), 0)
         written = out.getvalue().strip()
         self.assertTrue(written.endswith("win.rlqb"))
         self.assertTrue(os.path.isfile(written))
@@ -888,10 +885,8 @@ class CliExecRunTests(unittest.TestCase):
     """The exec-run commands: machine variables and file exchange."""
 
     def setUp(self):
-        saved = home._home
-        self.addCleanup(setattr, home, "_home", saved)
-        saved_cache = home._cache
-        self.addCleanup(setattr, home, "_cache", saved_cache)
+        saved = dict(home._globals)
+        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -913,14 +908,14 @@ class CliExecRunTests(unittest.TestCase):
         with mock.patch("reliquary.machines.create_hdd_image"), \
                 contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(io.StringIO()):
-            cli.main(["--home", self.home, "create-machine",
+            cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "rig"])
 
     def _run(self, args):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), \
                 contextlib.redirect_stderr(err):
-            code = cli.main(["--home", self.home] + args)
+            code = cli.main(["--home-dir", self.home] + args)
         return code, out.getvalue(), err.getvalue()
 
     def test_get_machine_var_reads_what_a_script_set(self):
@@ -991,8 +986,8 @@ class CliProgressTests(unittest.TestCase):
     """--progress selects the rendering; jsonl owns stdout alone."""
 
     def setUp(self):
-        saved = home._home
-        self.addCleanup(setattr, home, "_home", saved)
+        saved = dict(home._globals)
+        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -1000,7 +995,7 @@ class CliProgressTests(unittest.TestCase):
     def test_fetch_media_forwards_the_mode(self):
         with mock.patch("reliquary.cli.fetch_media") as fetch, \
                 contextlib.redirect_stdout(io.StringIO()):
-            code = cli.main(["--home", self.home, "fetch-media", "livecd",
+            code = cli.main(["--home-dir", self.home, "fetch-media", "livecd",
                              "--progress", "jsonl"])
         self.assertEqual(code, 0)
         fetch.assert_called_once_with("livecd", progress="jsonl")
@@ -1008,7 +1003,7 @@ class CliProgressTests(unittest.TestCase):
     def test_fetch_media_rejects_json(self):
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
-            code = cli.main(["--home", self.home, "fetch-media", "livecd",
+            code = cli.main(["--home-dir", self.home, "fetch-media", "livecd",
                              "--json"])
         self.assertEqual(code, 2)
         self.assertIn("--progress jsonl", err.getvalue())
@@ -1016,7 +1011,7 @@ class CliProgressTests(unittest.TestCase):
     def test_an_unknown_mode_is_refused_by_the_parser(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
-                cli.main(["--home", self.home, "fetch-media", "x",
+                cli.main(["--home-dir", self.home, "fetch-media", "x",
                           "--progress", "fancy"])
 
 

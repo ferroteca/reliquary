@@ -37,6 +37,18 @@ _OLD_API_NAMES = (
     "ExpectBranch",
     "State",
     "EmbeddedMedia",
+    # The two-directory model and the asset-root knob, retired when
+    # all six working directories became placeable. `set_home` and
+    # `set_cache` are the old spellings of `set_home_dir` /
+    # `set_cache_dir`; `set_assets` / `HOME_ASSETS` answered
+    # placement and hermeticity with one word, and are now the
+    # directory flags and `autoseed` respectively.
+    "set_home",
+    "set_cache",
+    "set_assets",
+    "HOME_ASSETS",
+    "media_cache_dir",
+    "machines_cache_dir",
 )
 
 # Live-tree paths scanned for superseded spellings.
@@ -103,6 +115,19 @@ _FORBIDDEN = (
      re.compile(r"(?m)^\s*boot\s+[a-zA-Z_]")),
     ("old key token",
      re.compile(r"<enter>|<esc>|<ret>|<tab>|<space>")),
+    # The pre-F22 directory surface. Each pattern excludes the new
+    # spelling that contains it, so `--home-dir` and `set_home_dir`
+    # read clean while `--home` and `set_home` do not.
+    ("old --home flag", re.compile(r"--home(?!-dir)\b")),
+    ("old --cache flag", re.compile(r"--cache(?!-dir)\b")),
+    ("retired --assets flag", re.compile(r"--assets\b")),
+    ("old set_home", re.compile(r"\bset_home(?!_dir)\b")),
+    ("old set_cache", re.compile(r"\bset_cache(?!_dir)\b")),
+    ("retired set_assets", re.compile(r"\bset_assets\b")),
+    ("retired HOME_ASSETS", re.compile(r"\bHOME_ASSETS\b")),
+    ("old media_cache_dir", re.compile(r"\bmedia_cache_dir\b")),
+    ("old machines_cache_dir", re.compile(r"\bmachines_cache_dir\b")),
+    ("old RELIQUARY_HOME", re.compile(r"\bRELIQUARY_HOME(?!_DIR)\b")),
 )
 
 

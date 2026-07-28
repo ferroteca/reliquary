@@ -21,7 +21,10 @@ from .interaction_agentless import AgentlessGuestExec
 from .lifecycle import read_vm_state
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .home import HOME_ASSETS, set_assets, set_cache, set_home
+from .home import (DIRECTORIES, adopt_environment, default_home_dir,
+                   home_dir, is_assigned, set_autoseed,
+                   set_blueprints_dir, set_cache_dir, set_home_dir,
+                   set_machines_dir, set_media_dir, set_scripts_dir)
 from .library import (list_blueprints, list_builtin_blueprints,
                       list_builtin_media, list_scripts, locate_blueprint,
                       locate_script, search_blueprints, seed_blueprint,
@@ -51,7 +54,7 @@ from .script_parser import load_script
 
 
 # Command words recognised when rewriting leading flags so that
-# ``rlq --home X list-machines`` and ``rlq list-machines --home X``
+# ``rlq --home-dir X list-machines`` and ``rlq list-machines --home-dir X``
 # are identical without a parent-parser SUPPRESS twin.
 _COMMANDS = frozenset({
     "create-machine", "start-machine", "stop-machine",
@@ -73,9 +76,14 @@ _COMMANDS = frozenset({
 # Arity of every flag that may appear before the command word.
 # Unknown leading tokens are left in place for argparse to reject.
 _FLAG_ARITY = {
-    "--home": 1,
-    "--cache": 1,
-    "--assets": 1,
+    "--home-dir": 1,
+    "--blueprints-dir": 1,
+    "--scripts-dir": 1,
+    "--cache-dir": 1,
+    "--media-dir": 1,
+    "--machines-dir": 1,
+    "--autoseed": 0,
+    "--no-autoseed": 0,
     "--blueprint": 1,
     "--machine": 1,
     "--port": 1,
@@ -151,9 +159,9 @@ def _reorder_argv(argv):
 def _require_machine_selector(arguments):
     """Return a resolved machine id from selectors.
 
-    Relies on the process-global home/cache (set from --home/--cache
-    in main() before dispatch) rather than threading arguments.home
-    through — the CLI only ever drives the global default.
+    Relies on the process-global directory assignments (made from the
+    ``--*-dir`` flags in main() before dispatch) rather than threading
+    them through — the CLI only ever drives the globals.
     """
     if not getattr(arguments, "blueprint", None) and not getattr(
             arguments, "machine", None):
@@ -196,18 +204,78 @@ def _interaction_target(arguments):
     return getattr(arguments, "port", None), None
 
 
+# Every command takes the six directory flags, mirroring the API's
+# shared keywords. Each names one working directory; the ones left
+# unnamed derive (home.py), so `--home-dir` alone still places all
+# six and a bare invocation places them under the default home.
+_DIRECTORY_HELP = {
+    "home": "reliquary home directory "
+            "(default: Documents/reliquary)",
+    "blueprints": "machine blueprints (default: <home>/blueprints)",
+    "scripts": "automation scripts (default: <home>/scripts)",
+    "cache": "regenerable cache root (default: <home>/cache)",
+    "media": "cached media payloads (default: <cache>/media)",
+    "machines": "machine materializations (default: <cache>/machines)",
+}
+
+
 def _add_home(parser):
-    parser.add_argument("--home", default=None,
-                        help="reliquary home directory")
-    parser.add_argument("--cache", default=None,
-                        help="cache directory (default: <home>/cache)")
+    for name in DIRECTORIES:
+        parser.add_argument(
+            "--%s-dir" % name, default=None, metavar="PATH",
+            dest="%s_dir" % name, help=_DIRECTORY_HELP[name])
+    # Autoseeding is on at the CLI, so the switch that carries weight
+    # is the one that turns it off — `--autoseed` is here to say the
+    # default out loud, and to let a script state its assumption.
     parser.add_argument(
-        "--assets", default=None,
-        help="project asset root (sole source; default: the home)")
+        "--autoseed", dest="autoseed", action="store_true", default=None,
+        help="copy a missing blueprint or script out of the built-in "
+             "codex (the default)")
+    parser.add_argument(
+        "--no-autoseed", dest="autoseed", action="store_false",
+        help="never fall back to the codex; the blueprints and scripts "
+             "directories are the sole sources")
     parser.add_argument(
         "--json", action="store_true",
         help="print the command's result as one JSON document")
     return parser
+
+
+_SETTERS = {
+    "home": set_home_dir,
+    "blueprints": set_blueprints_dir,
+    "scripts": set_scripts_dir,
+    "cache": set_cache_dir,
+    "media": set_media_dir,
+    "machines": set_machines_dir,
+}
+
+
+def _configure_directories(arguments):
+    """Apply this invocation's directory assignments to the globals.
+
+    The order is the precedence: flags, then the environment for what
+    no flag named, then the default home for what neither did. That
+    last step is what makes the fail-closed error unreachable at the
+    keyboard — one home assignment reaches all six through derivation
+    — and it happens whenever the home is still unassigned, not only
+    when nothing at all was given, so ``rlq --cache-dir D:\\c
+    list-machines`` keeps working with an explicit cache over a
+    defaulted home.
+
+    Honouring the environment and autoseeding are CLI behaviours, not
+    the library's: a program embedding Reliquary gets neither unless
+    it asks (home.py).
+    """
+    for name, setter in _SETTERS.items():
+        value = getattr(arguments, "%s_dir" % name, None)
+        if value:
+            setter(value)
+    adopt_environment()
+    if not is_assigned("home"):
+        set_home_dir(default_home_dir())
+        _narrate(f"using reliquary home: {home_dir()}")
+    set_autoseed(getattr(arguments, "autoseed", None) is not False)
 
 
 def _add_properties_file(parser):
@@ -663,14 +731,7 @@ def main(argv=None):
     command.add_argument("--port", type=int, default=None)
 
     arguments = parser.parse_args(argv)
-    if arguments.home:
-        set_home(arguments.home)
-    if getattr(arguments, "cache", None):
-        set_cache(arguments.cache)
-    # The CLI always names an asset source: --assets selects a hermetic
-    # project root, its absence selects home mode (canonical folders +
-    # codex). The embedding API has no such default — it must name one.
-    set_assets(getattr(arguments, "assets", None) or HOME_ASSETS)
+    _configure_directories(arguments)
     try:
         try:
             return _dispatch(arguments)

@@ -13,7 +13,7 @@ from unittest import mock
 from reliquary import acquire, resolve
 from reliquary.document import parse_document
 from reliquary.errors import PreflightError, RunCancelled
-from reliquary.home import Context, media_cache_dir
+from reliquary.home import Context, media_dir
 
 
 def _sha(data):
@@ -51,7 +51,7 @@ class AcquireTests(unittest.TestCase):
                                   "sha256": payload_sha}]}]}])
             ns = resolve.namespace_of(doc)
             cache = os.path.join(root, "cache")
-            ctx = Context(cache=cache)
+            ctx = Context(cache_dir=cache)
 
             path = acquire.fetch_media(ns.media["payload"], ns, context=ctx)
             self.assertEqual(_read(path), payload)
@@ -72,7 +72,7 @@ class AcquireTests(unittest.TestCase):
             {"name": "blank", "materialize": "new", "size": "1M"}])
         ns = resolve.namespace_of(doc)
         self.assertIsNone(
-            acquire.fetch_media(ns.media["blank"], ns, context=Context(cache=".")))
+            acquire.fetch_media(ns.media["blank"], ns, context=Context(cache_dir=".")))
 
     def test_local_use_media_attaches_in_place(self):
         with tempfile.TemporaryDirectory() as root:
@@ -83,7 +83,7 @@ class AcquireTests(unittest.TestCase):
                 {"name": "win", "location": {"local": iso}}])
             ns = resolve.namespace_of(doc)
             path = acquire.fetch_media(
-                ns.media["win"], ns, context=Context(cache=os.path.join(root, "c")))
+                ns.media["win"], ns, context=Context(cache_dir=os.path.join(root, "c")))
             self.assertEqual(path, iso)  # used in place, not copied to cache
 
     def test_a_missing_local_payload_names_the_media_and_the_path(self):
@@ -96,7 +96,7 @@ class AcquireTests(unittest.TestCase):
             ns = resolve.namespace_of(doc)
             with self.assertRaises(PreflightError) as caught:
                 acquire.fetch_media(ns.media["win98-cd"], ns,
-                                    context=Context(cache=root))
+                                    context=Context(cache_dir=root))
             message = str(caught.exception)
             self.assertIn("win98-cd", message)
             self.assertIn(gone, message)
@@ -110,7 +110,7 @@ class AcquireTests(unittest.TestCase):
             ns = resolve.namespace_of(doc)
             with self.assertRaises(PreflightError):
                 acquire.fetch_media(ns.media["floppy"], ns,
-                                    context=Context(cache=root))
+                                    context=Context(cache_dir=root))
 
     def test_a_directory_source_is_not_treated_as_missing(self):
         """A directory location is legal — it attaches as vvfat."""
@@ -122,7 +122,7 @@ class AcquireTests(unittest.TestCase):
             ns = resolve.namespace_of(doc)
             self.assertEqual(
                 acquire.fetch_media(ns.media["exchange"], ns,
-                                    context=Context(cache=root)),
+                                    context=Context(cache_dir=root)),
                 staging)
 
     def test_remote_without_hash_fails_before_network(self):
@@ -134,7 +134,7 @@ class AcquireTests(unittest.TestCase):
             {"name": "x", "location": {"url": "https://example/a.iso"}}])
         ns = resolve.namespace_of(doc)
         with self.assertRaises(PreflightError):
-            acquire.fetch_media(ns.media["x"], ns, context=Context(cache="."))
+            acquire.fetch_media(ns.media["x"], ns, context=Context(cache_dir="."))
 
     def test_extraction_caches_the_child_and_not_a_local_container(self):
         """The derived payload is cached under its own name.
@@ -154,12 +154,12 @@ class AcquireTests(unittest.TestCase):
                 "children": [{"path": "inner/p.img", "name": "p",
                               "sha256": _sha(payload)}]}])
             ns = resolve.namespace_of(doc)
-            ctx = Context(cache=os.path.join(root, "cache"))
+            ctx = Context(cache_dir=os.path.join(root, "cache"))
             cached = acquire.fetch_media(ns.media["p"], ns, context=ctx)
 
             self.assertEqual(_read(cached), payload)
             self.assertEqual(
-                sorted(os.listdir(media_cache_dir(ctx))), ["p.img"])
+                sorted(os.listdir(media_dir(ctx))), ["p.img"])
 
 
 class _CancelAfter:
@@ -237,7 +237,7 @@ class CancellationTests(unittest.TestCase):
             cancelled.set()
             with self.assertRaises(RunCancelled):
                 acquire.fetch_media(
-                    ns.media["p"], ns, context=Context(cache=root),
+                    ns.media["p"], ns, context=Context(cache_dir=root),
                     cancelled=cancelled)
 
     def test_a_cancelled_run_stops_an_extraction(self):
@@ -248,7 +248,7 @@ class CancellationTests(unittest.TestCase):
             cancelled.set()
             with self.assertRaises(RunCancelled):
                 acquire.fetch_media(
-                    ns.media["p"], ns, context=Context(cache=cache),
+                    ns.media["p"], ns, context=Context(cache_dir=cache),
                     cancelled=cancelled)
             # Nothing half-extracted is ever presented as the payload:
             # the destination only appears on the atomic replace.
@@ -275,7 +275,7 @@ class CancellationTests(unittest.TestCase):
             with self.assertRaises(RunCancelled):
                 acquire.fetch_media(
                     ns.media["p"], ns,
-                    context=Context(cache=os.path.join(root, "cache")),
+                    context=Context(cache_dir=os.path.join(root, "cache")),
                     cancelled=cancelled)
             self.assertGreater(cancelled.checks, 1)
 
@@ -302,7 +302,7 @@ class CancellationTests(unittest.TestCase):
             ns, payload = self._extract_case(root)
             path = acquire.fetch_media(
                 ns.media["p"], ns,
-                context=Context(cache=os.path.join(root, "cache")),
+                context=Context(cache_dir=os.path.join(root, "cache")),
                 cancelled=threading.Event())
             self.assertEqual(_read(path), payload)
 

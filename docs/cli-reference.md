@@ -16,16 +16,28 @@ appear before or after the command word.
 
 ## Global options
 
-- `--home <path>` - Override the Reliquary home directory
-- `--cache <path>` - Override the cache directory (default:
+Six flags place Reliquary's working directories. Each is also
+settable as `RELIQUARY_<NAME>_DIR` in the environment, an explicit
+flag winning; what none of them names derives from what does.
+
+- `--home-dir <path>` - The Reliquary home (default:
+  `Documents/reliquary`, falling back to `~/reliquary`)
+- `--blueprints-dir <path>` - Where blueprints (media included)
+  resolve from and seed to, walked recursively by extension
+  (default: `<home>/blueprints`)
+- `--scripts-dir <path>` - Where scripts resolve from and seed to,
+  walked recursively (default: `<home>/scripts`)
+- `--cache-dir <path>` - The regenerable cache root (default:
   `<home>/cache`)
-- `--assets <dir>` - Resolve authored assets (blueprints, media
-  included, and scripts) solely from
-  this project root, walked recursively by extension — no home, no
-  codex, no seeding. Its absence is home mode: the home's canonical
-  `blueprints/` / `scripts/` folders, seeding missing names from the
-  built-in codex. Use `--assets` for reproducible, project-scoped
-  automation
+- `--media-dir <path>` - Cached media payloads (default:
+  `<cache>/media`)
+- `--machines-dir <path>` - Machine materializations (default:
+  `<cache>/machines`)
+- `--no-autoseed` - Never fall back to the built-in codex; the
+  directories above are the sole sources. Use it with
+  `--blueprints-dir` / `--scripts-dir` for reproducible,
+  project-scoped automation. `--autoseed` states the CLI default
+  out loud
 - `--blueprint <name>` - Select a blueprint's sole machine, or
   name the blueprint for `create-machine` / `list-*`
 - `--machine <id>` - Select a machine by full id

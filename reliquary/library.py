@@ -3,11 +3,17 @@
 """The built-in library: copy-out seeding of shipped artifacts.
 
 The library is a seed, not a resolution tier (docs/spec/codex.md).
-Blueprints, media definitions, and scripts ship inside the package
-under ``reliquary/codex/``; referencing one that does not yet
-exist in the home copies it out as an ordinary user-owned file. A
-file already present in the home is never overwritten — deleting a
-copy is how it is refreshed.
+Blueprints and scripts ship inside the package under
+``reliquary/codex/``; referencing one that does not yet exist copies
+it out into the ``blueprints`` / ``scripts`` directory as an
+ordinary user-owned file. A file already present there is never
+overwritten — deleting a copy is how it is refreshed.
+
+Copy-out happens on a resolution miss only while autoseeding is on
+(``home.autoseed`` — the CLI, unless told otherwise), and on request
+at any time through ``seed_blueprint`` / ``seed_script``. Both write
+to the assigned directory wherever it is, so seeding a first draft
+straight into a project tree is now the ordinary way to do it.
 """
 
 import collections.abc
@@ -171,11 +177,10 @@ def _blueprint_index(source):
 
 
 def list_blueprints(context=None):
-    """Return sorted ``[{name, path}]`` for the active source.
+    """Return sorted ``[{name, path}]`` for the blueprints directory.
 
-    Home mode lists the home's canonical ``blueprints/`` folder; dir
-    mode (``--assets``) lists the project root. Unseeded codex entries
-    are not listed — ``search_blueprints`` surfaces those.
+    Unseeded codex entries are not listed — ``search_blueprints``
+    surfaces those.
     """
     source = assets.source_for(context)
     return [{"name": name, "path": path}
@@ -195,11 +200,11 @@ def locate_blueprint(name, context=None):
     """Resolve a blueprint by identity without seeding.
 
     Identity is the file's ``name`` field when declared, else its
-    stem. Home mode falls back to reading the codex file directly (no
-    copy) so a read-only ``check-script`` never writes; dir mode
-    (``--assets``) is the sole source. Seeding on first reference is
-    ``create_machine``'s job. Raises :class:`PreflightError` when
-    nothing resolves.
+    stem. With autoseeding on, a miss falls back to reading the codex
+    file directly (no copy) so a read-only ``check-script`` never
+    writes; with it off the directory is the sole source. Copying a
+    codex file out on first reference is ``create_machine``'s job.
+    Raises :class:`PreflightError` when nothing resolves.
     """
     source = assets.source_for(context)
     path = _blueprint_index(source).get(name)
@@ -225,15 +230,15 @@ def _codex_blueprint_rows():
 
 
 def search_blueprints(term, context=None):
-    """Search the active asset source (and codex) with provenance.
+    """Search the blueprints directory (and codex) with provenance.
 
     Each match is a dict: ``name`` (the identity — the selection key),
-    ``description``, ``platform``, ``provenance``, and ``path``. In
-    home mode provenance is ``yes`` (codex, not seeded), ``seeded``
-    (codex copied into the home), or ``user`` (home-authored, no
-    codex), and ``path`` is the home file (``None`` for an unseeded
-    codex entry). In dir mode the codex is not a tier: every match is
-    ``user`` with its project path. The term matches case-insensitively
+    ``description``, ``platform``, ``provenance``, and ``path``. With
+    autoseeding on, provenance is ``yes`` (codex, not seeded),
+    ``seeded`` (codex copied out), or ``user`` (authored, no codex),
+    and ``path`` is the copied-out file (``None`` for an unseeded
+    codex entry). With it off the codex is not a tier: every match is
+    ``user`` with its own path. The term matches case-insensitively
     against name, description, and platform; empty matches everything.
     Results are ordered by name.
     """
@@ -272,14 +277,19 @@ def search_blueprints(term, context=None):
 
 
 def seed_blueprint(name, context=None, *, only=False):
-    """Seed ``blueprints/<name>.rlqb`` from the built-in library.
+    """Seed ``<blueprints>/<name>.rlqb`` from the built-in library.
 
-    A home blueprint of that name already exists, or no builtin
+    A blueprint of that name already exists there, or no builtin
     does: nothing happens. Otherwise the blueprint is copied out
-    along with the media definitions and scripts it references
-    (each obeying the never-overwrite rule), and True is returned.
-    ``only=True`` copies just the single blueprint file, not its
-    closure.
+    along with the scripts it references (each obeying the
+    never-overwrite rule), and True is returned. ``only=True`` copies
+    just the single blueprint file, not its closure.
+
+    The target is the assigned ``blueprints`` directory, project tree
+    or home alike. Seeding is an explicit act, so it is not what
+    autoseeding governs: a caller that asked for a first draft has
+    named the codex as its source, which is exactly the use the codex
+    is for — copy it, then commit the copy.
     """
     source = _builtins_root() / "blueprints" / f"{name}.rlqb"
     if not source.is_file():
@@ -320,7 +330,7 @@ def seed_blueprint(name, context=None, *, only=False):
 
 
 def seed_script(stem, context=None, *, only=False):
-    """Seed ``scripts/<stem>.rlqs`` from the built-in library.
+    """Seed ``<scripts>/<stem>.rlqs`` from the built-in library.
 
     Returns whether the script file was copied out. Scripts have no
     seed closure of their own now — the media a script's ``insert``
@@ -345,11 +355,9 @@ def _script_index(source):
 
 
 def list_scripts(context=None):
-    """Return sorted ``[{name, path}]`` scripts for the active source.
+    """Return sorted ``[{name, path}]`` for the scripts directory.
 
-    Home mode lists the home's canonical ``scripts/`` folder; dir mode
-    (``--assets``) lists the project root. Unseeded codex scripts are
-    not listed.
+    Unseeded codex scripts are not listed.
     """
     source = assets.source_for(context)
     return [{"name": stem, "path": path}
@@ -359,10 +367,11 @@ def list_scripts(context=None):
 def locate_script(stem, context=None):
     """Return an existing ``.rlqs`` path without seeding.
 
-    Resolves from the active asset source; home mode falls back to the
-    codex file directly (no copy), dir mode is the sole source. Raises
-    :class:`PreflightError` when nothing resolves — ``check-script``
-    uses this so a check never writes.
+    Resolves from the scripts directory; with autoseeding on, a miss
+    falls back to the codex file directly (no copy), with it off the
+    directory is the sole source. Raises :class:`PreflightError` when
+    nothing resolves — ``check-script`` uses this so a check never
+    writes.
     """
     source = assets.source_for(context)
     path = _script_index(source).get(stem)

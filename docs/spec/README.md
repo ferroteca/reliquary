@@ -67,7 +67,7 @@ first; relocating the file is tidiness, not the act.
 | [blueprint-model.md](blueprint-model.md) | The composed blueprint model — structure, identity, the location grammar, the reference closure |
 | [media-spec.md](media-spec.md) | Media: acquisition, verification, and the cache |
 | [script-properties.md](script-properties.md) | Properties, secret storage, and the binding pipeline |
-| [asset-resolution.md](asset-resolution.md) | Where authored assets resolve from, and the home layout |
+| [asset-resolution.md](asset-resolution.md) | Where authored assets resolve from, and the six placeable working directories |
 | [instance-model.md](instance-model.md) | Machines: the state document, ownership, locking, recovery |
 | [codex.md](codex.md) | The shipped seed content and its index |
 | [http-serve.md](http-serve.md) | The local answer-file server |

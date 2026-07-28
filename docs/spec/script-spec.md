@@ -24,11 +24,11 @@ SPDX-License-Identifier: BSD-3-Clause
 A Reliquary script automates a guest: it watches observable guest
 and machine state, supplies input, swaps media, and moves files
 across the VM seam. Scripts are authored assets — `.rlqs` files,
-identified by extension. In home mode (the CLI default) they
-resolve from the home's canonical `scripts/` folder, seeding from
-the codex on first reference; under `--assets <dir>` they are
-discovered anywhere in that project root, which is the sole source
-(docs/spec/asset-resolution.md).
+identified by extension. They resolve from the `scripts` directory,
+walked recursively, which defaults to `<home>/scripts` and is
+placeable with `--scripts-dir`; a miss falls back to the built-in
+codex while autoseeding is on — the CLI default, and never the
+embedding API's (docs/spec/asset-resolution.md).
 One `<name>.rlqs` file per script; a run selects its machine with
 `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:
@@ -1932,7 +1932,7 @@ the surface, because the namespace is shared across both: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
 `node.`, `http.`, `media.`, `machine.`, `platform.`, `progress.`,
 `store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`, `drive.`,
-`blueprint.`, `image.`, `screen.`, `script.`, `assets.`.
+`blueprint.`, `image.`, `screen.`, `script.`, `dir.`.
 
 Every subject past the script language's own is a noun the rest of
 the model already uses, rather than a name invented for the
@@ -1942,9 +1942,10 @@ occasion. From the blueprint document
 document's field vocabulary, `drive.` for drive keys, slots and the
 boot order, `blueprint.` for the document as a whole. From the rest
 of the system: `image.` for a materialized disk image, `screen.` for
-what the guest displays, `script.` for a script file, `assets.` for
-the asset source, `machine.` for a machine and its phases, `media.`
-for a media and its payload, `platform.`, `progress.`, `store.`.
+what the guest displays, `script.` for a script file, `dir.` for one
+of the six working directories, `machine.` for a machine and its
+phases, `media.` for a media and its payload, `platform.`,
+`progress.`, `store.`.
 
 Two families the blueprint document could have taken new subjects
 for took existing ones instead: its name-charter rules are `name.`

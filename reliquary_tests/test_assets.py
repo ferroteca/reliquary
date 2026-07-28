@@ -10,9 +10,9 @@ import unittest
 
 import re
 
-from reliquary import Context, HOME_ASSETS
-from reliquary.assets import (DirSource, HomeSource, KIND_EXTENSIONS,
-                              index_by_name, source_for, stem)
+from reliquary import Context
+from reliquary.assets import (KIND_EXTENSIONS, index_by_name,
+                              source_for, stem)
 from reliquary.document import parse_document
 from reliquary.errors import PreflightError, StaticError
 from reliquary.library import (list_blueprints, locate_blueprint,
@@ -130,56 +130,81 @@ class SpecConformanceTests(unittest.TestCase):
             "contract, so the diagram is the contract's text.")
 
 
-class AssetModeTests(unittest.TestCase):
-    """How the effective source is selected per invocation."""
+class AssetSourceTests(unittest.TestCase):
+    """Where each kind resolves from, and whether the codex backs it.
+
+    Two axes now, where the asset-root knob answered both at once.
+    The
+    directory decides *where* a name resolves; autoseed decides
+    whether a miss may fall back to the shipped codex. Neither
+    implies the other, which is what lets a project tree keep the
+    codex and a home refuse it.
+    """
 
     def setUp(self):
-        # Isolate from the process-global asset mode a CLI run may have
-        # left set, so an unconfigured source genuinely refuses.
         self.home_mod = importlib.import_module("reliquary.home")
-        saved = self.home_mod._assets
-        self.addCleanup(setattr, self.home_mod, "_assets", saved)
-        self.home_mod._assets = self.home_mod._UNSET
+        saved = dict(self.home_mod._globals)
+        self.addCleanup(self.home_mod._globals.update, saved)
+        for name in self.home_mod.DIRECTORIES:
+            self.home_mod._globals[name] = None
+        self.addCleanup(self.home_mod.set_autoseed,
+                        self.home_mod._autoseed)
+        self.home_mod.set_autoseed(False)
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.root = self._tmp.name
 
-    def test_unconfigured_source_refuses(self):
-        """A bare embedding call with no source named fails closed."""
+    def test_an_unassigned_directory_refuses_at_use(self):
+        """A bare embedding call with nothing assigned fails closed.
+
+        Building the source never raises — the directories resolve
+        lazily — so the refusal lands where the resolution is, naming
+        the directory it wanted.
+        """
+        source = source_for(Context())
         with self.assertRaises(StaticError):
-            source_for(Context(home=os.path.join(self.root, "home")))
+            source.candidate_files("blueprint")
 
-    def test_bare_string_context_is_home_mode(self):
-        source = source_for(os.path.join(self.root, "home"))
-        self.assertIsInstance(source, HomeSource)
-        self.assertTrue(source.seeds)
+    def test_each_kind_reads_its_own_directory(self):
+        blueprints = os.path.join(self.root, "bp")
+        scripts = os.path.join(self.root, "sc")
+        source = source_for(Context(blueprints_dir=blueprints,
+                                    scripts_dir=scripts))
+        self.assertEqual(source.describe("blueprint"),
+                         os.path.abspath(blueprints))
+        self.assertEqual(source.describe("script"),
+                         os.path.abspath(scripts))
 
-    def test_explicit_dir_is_dir_mode_and_hermetic(self):
+    def test_a_bare_home_string_derives_both(self):
+        home = os.path.join(self.root, "home")
+        source = source_for(home)
+        self.assertEqual(source.describe("blueprint"),
+                         os.path.join(os.path.abspath(home), "blueprints"))
+        self.assertEqual(source.describe("script"),
+                         os.path.join(os.path.abspath(home), "scripts"))
+
+    def test_seeding_follows_autoseed_not_the_directory(self):
         proj = os.path.join(self.root, "proj")
-        os.makedirs(proj)
-        source = source_for(Context(home="h", assets=proj))
-        self.assertIsInstance(source, DirSource)
-        self.assertFalse(source.seeds)
-        self.assertEqual(source.root, os.path.abspath(proj))
+        self.assertFalse(source_for(Context(blueprints_dir=proj)).seeds)
+        self.assertTrue(
+            source_for(Context(blueprints_dir=proj, autoseed=True)).seeds)
+        self.home_mod.set_autoseed(True)
+        self.assertTrue(source_for(Context(blueprints_dir=proj)).seeds)
+        self.assertFalse(
+            source_for(Context(blueprints_dir=proj, autoseed=False)).seeds)
 
-    def test_global_home_mode_applies(self):
-        self.home_mod.set_assets(HOME_ASSETS)
-        self.assertIsInstance(source_for(Context(home="h")), HomeSource)
-
-    def test_global_dir_mode_applies(self):
+    def test_the_global_assignment_applies(self):
         proj = os.path.join(self.root, "proj")
-        os.makedirs(proj)
-        self.home_mod.set_assets(proj)
-        source = source_for(Context(home="h"))
-        self.assertIsInstance(source, DirSource)
-        self.assertEqual(source.root, os.path.abspath(proj))
+        self.home_mod.set_blueprints_dir(proj)
+        self.assertEqual(source_for(Context()).describe("blueprint"),
+                         os.path.abspath(proj))
 
-    def test_per_call_assets_win_over_global(self):
-        self.home_mod.set_assets(HOME_ASSETS)
-        proj = os.path.join(self.root, "proj")
-        os.makedirs(proj)
-        self.assertIsInstance(
-            source_for(Context(home="h", assets=proj)), DirSource)
+    def test_a_per_call_directory_wins_over_the_global(self):
+        self.home_mod.set_blueprints_dir(os.path.join(self.root, "g"))
+        scoped = os.path.join(self.root, "s")
+        self.assertEqual(
+            source_for(Context(blueprints_dir=scoped)).describe("blueprint"),
+            os.path.abspath(scoped))
 
 
 class IndexByNameTests(unittest.TestCase):
@@ -215,7 +240,8 @@ class DirSourceResolutionTests(unittest.TestCase):
         os.makedirs(self.root)
 
     def ctx(self):
-        return Context(home=self.home, assets=self.root)
+        return Context(home_dir=self.home, blueprints_dir=self.root,
+                       scripts_dir=self.root, autoseed=False)
 
     def test_walks_recursively_skipping_dotdirs(self):
         _write(os.path.join(self.root, "a.rlqb"),
@@ -284,7 +310,8 @@ class SelectionScopingTests(unittest.TestCase):
                     "drives": {"cdrom0": None}})
 
     def _ctx(self, root):
-        return Context(home=self.home, assets=root)
+        return Context(home_dir=self.home, blueprints_dir=root,
+                       scripts_dir=root, autoseed=False)
 
     def test_projects_do_not_adopt_each_others_machines(self):
         id_a = create_machine("shared", context=self._ctx(self.a))

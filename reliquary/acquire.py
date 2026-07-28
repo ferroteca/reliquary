@@ -26,7 +26,7 @@ from urllib.request import urlopen
 from . import events as _events, resolve
 from .errors import (InternalError, PreflightError, RunCancelled,
                      RunFailure, StaticError)
-from .home import media_cache_dir
+from .home import media_dir
 
 _CHUNK = 1024 * 1024
 _MISMATCH_POLICIES = ("fail", "prompt", "refetch")
@@ -110,7 +110,7 @@ def _explain_mismatch(name, expected, actual, source):
             + (f" for {source}" if source else "")
             + ".\nEither the payload changed upstream, or another "
             "project caches a different media under this name — "
-            "isolate them with --cache")
+            "isolate them with --media-dir")
 
 
 def _approve_refetch(name, actual, expected, on_mismatch, source, context):
@@ -265,7 +265,7 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
                 name, events, cancelled)
         return plan.path
 
-    destination = os.path.join(media_cache_dir(context),
+    destination = os.path.join(media_dir(context),
                                _cached_name(name, extension))
 
     if isinstance(plan, resolve.Download):

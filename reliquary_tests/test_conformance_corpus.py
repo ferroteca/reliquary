@@ -309,7 +309,9 @@ class MachineStateSchemaTests(unittest.TestCase):
                 handle.write('[{"type": "machine", "name": "state-bp", '
                              '"platform": "dos", '
                              '"drives": {"cdrom0": null}}]')
-            context = Context(home=os.path.join(tmp, "home"), assets=root)
+            context = Context(home_dir=os.path.join(tmp, "home"),
+                              blueprints_dir=root,
+                              scripts_dir=root, autoseed=False)
             machine_id = create_machine("state-bp", context=context)
             state = load_machine_state(machine_id, context)
             jsonschema.validate(state, schema)

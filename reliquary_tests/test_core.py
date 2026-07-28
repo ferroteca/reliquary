@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Installed unit tests for agentless helpers and guest program runs."""
 
+import importlib
 import json
 import os
 import sys
@@ -33,13 +34,17 @@ from reliquary import platform_dos as platform_dos_module
 
 class HomeTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = reliquary.home()
+        # Save the assignments, not the resolved value: with nothing
+        # assigned there is no resolved value to save, and restoring
+        # one would leave a home behind for the next test.
+        home_mod = importlib.import_module("reliquary.home")
+        saved = dict(home_mod._globals)
+        self.addCleanup(home_mod._globals.update, saved)
+        for name in home_mod.DIRECTORIES:
+            home_mod._globals[name] = None
         self.tempdir = tempfile.TemporaryDirectory()
-        reliquary.set_home(self.tempdir.name)
-
-    def tearDown(self):
-        reliquary.set_home(self.previous_home)
-        self.tempdir.cleanup()
+        self.addCleanup(self.tempdir.cleanup)
+        reliquary.set_home_dir(self.tempdir.name)
 
     def test_planned_layout_paths_are_contained_by_configured_home(self):
         root = self.tempdir.name
@@ -49,9 +54,9 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(reliquary.scripts_dir(),
                          os.path.join(root, "scripts"))
         self.assertEqual(reliquary.cache_dir(), cache)
-        self.assertEqual(reliquary.media_cache_dir(),
+        self.assertEqual(reliquary.media_dir(),
                          os.path.join(cache, "media"))
-        self.assertEqual(reliquary.machines_cache_dir(),
+        self.assertEqual(reliquary.machines_dir(),
                          os.path.join(cache, "machines"))
 
     def test_planned_layout_paths_honor_explicit_home(self):
@@ -64,9 +69,9 @@ class HomeTests(unittest.TestCase):
         self.assertEqual(reliquary.scripts_dir(context=root),
                          os.path.join(root, "scripts"))
         self.assertEqual(reliquary.cache_dir(context=root), cache)
-        self.assertEqual(reliquary.media_cache_dir(context=root),
+        self.assertEqual(reliquary.media_dir(context=root),
                          os.path.join(cache, "media"))
-        self.assertEqual(reliquary.machines_cache_dir(context=root),
+        self.assertEqual(reliquary.machines_dir(context=root),
                          os.path.join(cache, "machines"))
 
     def test_documents_dir_is_public_and_absolute_or_none(self):
@@ -639,13 +644,17 @@ class RunCommandTests(unittest.TestCase):
 
 class ScreenshotTests(unittest.TestCase):
     def setUp(self):
-        self.previous_home = reliquary.home()
+        # Save the assignments, not the resolved value: with nothing
+        # assigned there is no resolved value to save, and restoring
+        # one would leave a home behind for the next test.
+        home_mod = importlib.import_module("reliquary.home")
+        saved = dict(home_mod._globals)
+        self.addCleanup(home_mod._globals.update, saved)
+        for name in home_mod.DIRECTORIES:
+            home_mod._globals[name] = None
         self.tempdir = tempfile.TemporaryDirectory()
-        reliquary.set_home(self.tempdir.name)
-
-    def tearDown(self):
-        reliquary.set_home(self.previous_home)
-        self.tempdir.cleanup()
+        self.addCleanup(self.tempdir.cleanup)
+        reliquary.set_home_dir(self.tempdir.name)
 
     def test_screenshot_rejects_names_that_are_paths(self):
         invalid_names = ("", ".", "..", "../outside", "..\\outside",

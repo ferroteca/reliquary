@@ -316,7 +316,7 @@ class RunScriptWiringTests(unittest.TestCase):
                     )) as run, \
                 contextlib.redirect_stdout(stdout):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "--blueprint", "plain",
                 "run-script", "install",
             ])
@@ -350,7 +350,7 @@ class RunScriptWiringTests(unittest.TestCase):
                 contextlib.redirect_stdout(out), \
                 contextlib.redirect_stderr(err):
             code = cli.main([
-                "--home", self.home, "--blueprint", "plain",
+                "--home-dir", self.home, "--blueprint", "plain",
                 "run-script", "install", "--progress", "jsonl",
             ])
         self.assertEqual(code, 0)
@@ -381,7 +381,7 @@ class RunScriptWiringTests(unittest.TestCase):
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             result = cli.main([
-                "--home", self.home, "run-script", "install",
+                "--home-dir", self.home, "run-script", "install",
             ])
         self.assertEqual(result, 2)
         self.assertIn("--blueprint or --machine", stderr.getvalue())
@@ -390,7 +390,7 @@ class RunScriptWiringTests(unittest.TestCase):
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             result = cli.main([
-                "--home", self.home, "--blueprint", "plain",
+                "--home-dir", self.home, "--blueprint", "plain",
                 "run-script", "install", "--json",
             ])
         self.assertEqual(result, 2)
@@ -405,7 +405,7 @@ class RunScriptWiringTests(unittest.TestCase):
                 )) as run, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
-                "--home", self.home,
+                "--home-dir", self.home,
                 "--blueprint", "plain",
                 "run-script", "install",
                 "--display", "--progress", "jsonl",

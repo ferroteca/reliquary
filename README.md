@@ -206,7 +206,8 @@ rlq check-script install --blueprint freedos
 ```
 
 Vendor media is cached and verified against pinned SHA-256 hashes on every use, under `cache/media/`
-(`Documents\reliquary` by default; override with `--home` or the `RELIQUARY_HOME` environment variable).
+(`Documents\reliquary` by default; override the payload cache with `--media-dir`, or move everything
+at once with `--home-dir` or the `RELIQUARY_HOME_DIR` environment variable).
 
 A run **returns its output** and stores nothing: it streams its progress live — `--progress pretty` for a person,
 `--progress jsonl` for a program — and the stream is gone when the run ends. Redirect it if you want to keep it. When a
@@ -312,17 +313,28 @@ Reliquary searches for QEMU in this order:
 
 `--qemu PATH` and the Python `qemu=` argument can select a specific binary.
 
-## The Reliquary home directory
+## Where Reliquary keeps things
 
-Reliquary keeps its persistent state in one visible home directory. The default is `reliquary/` under your Documents
-folder (the Windows known Documents folder — including when redirected, e.g. into OneDrive — `~/Documents` on macOS, and
-`xdg-user-dir DOCUMENTS` on Linux/BSD). When no Documents folder can be determined, it falls back to `~/reliquary`.
+Reliquary has **six working directories**, and you can put each one wherever you like — machines on a fast disk, media on
+a big one, blueprints in your project's repository. Name any of them and the rest follow:
 
-Choose a different home with any of these methods:
+| Directory | Flag | Environment | Where it lands if you say nothing |
+|---|---|---|---|
+| home | `--home-dir` | `RELIQUARY_HOME_DIR` | `Documents/reliquary` |
+| blueprints | `--blueprints-dir` | `RELIQUARY_BLUEPRINTS_DIR` | `<home>/blueprints` |
+| scripts | `--scripts-dir` | `RELIQUARY_SCRIPTS_DIR` | `<home>/scripts` |
+| cache | `--cache-dir` | `RELIQUARY_CACHE_DIR` | `<home>/cache` |
+| media | `--media-dir` | `RELIQUARY_MEDIA_DIR` | `<cache>/media` |
+| machines | `--machines-dir` | `RELIQUARY_MACHINES_DIR` | `<cache>/machines` |
 
-1. The `--home <reliquary_home>` command-line option
-2. The `RELIQUARY_HOME` environment variable
-3. The Python `reliquary.set_home()` function
+The home's own default is `reliquary/` under your Documents folder (the Windows known Documents folder — including when
+redirected, e.g. into OneDrive — `~/Documents` on macOS, and `xdg-user-dir DOCUMENTS` on Linux/BSD). When no Documents
+folder can be determined, it falls back to `~/reliquary`.
+
+A flag beats the environment, and both beat the default. Assigning the cache moves media and machines with it unless you
+have placed those too, so `--cache-dir D:\reliquary-cache` is enough to keep the bulk off a synced Documents folder. From
+Python the twins are `reliquary.set_home_dir()`, `set_cache_dir()`, `set_blueprints_dir()`, and so on — or a
+`reliquary.Context(...)` to scope a single call.
 
 The platform Documents lookup itself is available as
 `reliquary.documents_dir()`, returning the folder path or `None` when it cannot be determined, for callers that want to
@@ -335,8 +347,8 @@ Documents/reliquary/
 ├── blueprints/           composed blueprints you author (<name>.rlqb) —
 │                         a machine plus its media/source/archive components
 ├── scripts/              automation scripts (<name>.rlqs)
-└── cache/                regenerable; resolves independently (--cache /
-    │                     RELIQUARY_CACHE_DIR) and can live elsewhere
+└── cache/                regenerable; resolves independently
+    │                     (--cache-dir) and can live elsewhere
     ├── media/            cached, hash-verified media payloads
     └── machines/<id>/    each materialized machine — its own directory
                           with machine.json (the state; while running its
@@ -348,20 +360,29 @@ Documents/reliquary/
                           output to whoever started it
 ```
 
-A machine is wholly its `cache/machines/<id>/` directory — there is no
-root-home machine model. Everything under `cache/` is regenerable. The
-selected home is printed to standard error the first time it is used.
+A machine is wholly its machines-directory entry — there is no
+root-home machine model. Everything under the cache is regenerable. When
+you have not named a home, the one Reliquary picked is printed to
+standard error.
 
-Authored assets (blueprints — with their media/source/archive
-components — and scripts) resolve in one of two modes. By default —
-**home mode** — Reliquary reads the home's `blueprints/` / `scripts/`
-folders and seeds any name it does not find from the built-in codex;
-this is the convenient path for interactive use. Point `--assets <dir>`
-at a project directory instead
-and Reliquary resolves **solely** from that tree (walked recursively by
-file extension): no home, no codex, no seeding. That is the mode for
-automation — assets are your project's source-controlled files, so a run
-is reproducible and never picks up whatever happens to be in your home.
+Blueprints (with their media/source/archive components) and scripts are
+read from the `blueprints` and `scripts` directories above, each walked
+recursively by file extension. A name those directories do not hold is
+taken from the **built-in codex** — convenient interactively, and the
+reason `freedos` works on a fresh install. For automation, point the
+directories at your project and turn that fallback off:
+
+```powershell
+rlq --blueprints-dir .\vm --scripts-dir .\vm --no-autoseed run-script install --blueprint freedos
+```
+
+Now your source-controlled files are the only source, so a run is
+reproducible and never picks up whatever happens to be in your home.
+Seeding on request still works wherever you point it —
+`rlq --blueprints-dir .\vm seed-blueprint freedos` copies a first draft
+into your project, and you commit it. The embedding API is stricter
+still: it assigns no directory and never autoseeds, so a library call
+fails closed rather than reading a developer's home.
 A machine records which blueprint file it was built from, so a
 `--blueprint <name>` selection only ever picks a machine built from the
 blueprint the current invocation resolves — two projects that share a
@@ -471,10 +492,10 @@ The two selectors are mutually exclusive. Machines live under
 any machine of it still exists.
 
 ```powershell
-rlq create-machine --home $scratch --blueprint plain
-rlq start-machine --home $scratch --blueprint plain --display
-rlq stop-machine --home $scratch --blueprint plain
-rlq list-machines --home $scratch
+rlq create-machine --home-dir $scratch --blueprint plain
+rlq start-machine --home-dir $scratch --blueprint plain --display
+rlq stop-machine --home-dir $scratch --blueprint plain
+rlq list-machines --home-dir $scratch
 ```
 
 ### Media catalog
@@ -707,7 +728,7 @@ Install QEMU and put `qemu-system-i386` on `PATH`, set
 
 Guest-console commands find the running VM through the `vm` section of
 the machine's `cache/machines/<id>/machine.json`. Ensure every command
-uses the same `--home` / `RELIQUARY_HOME` and the same machine
+uses the same `--home-dir` / `RELIQUARY_HOME_DIR` and the same machine
 selector, and that `rlq start-machine` completed successfully.
 
 ### The VM identity does not match

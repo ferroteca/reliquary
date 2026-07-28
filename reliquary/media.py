@@ -29,7 +29,7 @@ import shutil
 
 from .acquire import fetch_media as _acquire_fetch
 from .errors import PreflightError
-from .home import media_cache_dir
+from .home import media_dir
 from .resolve import load_namespace, resolve_media
 
 
@@ -77,7 +77,7 @@ def _cached_files(context=None):
     the name; a file dropped in by hand is identified the same way and
     is reclaimable like any other.
     """
-    root = media_cache_dir(context)
+    root = media_dir(context)
     if not os.path.isdir(root):
         return {}
     return {os.path.splitext(item.name)[0]: item.path

@@ -261,12 +261,13 @@ out of the
 [codex](spec/codex.md) (implicitly on first
 reference, or explicitly with `seed-blueprint`), synthesized from a native
 VM by `import`, or scaffolded by the future `init` command.
-Seeding — implicit or explicit — is a home-mode (human-CLI) half
-of the artifact-residency split (ARCHITECTURE.md P4): it
-happens only when no `--assets` root is named. Automation runs
-project-scoped under `--assets <dir>`, where the dir is the sole
-source and the codex is never a resolution tier — a project seeds
-a copy once and commits it. Create a machine and run it:
+Implicit seeding is the human-CLI half of the artifact-residency
+split (ARCHITECTURE.md P4): it happens while autoseeding is on,
+which is the CLI's default and never the embedding API's. Automation
+runs project-scoped — `--blueprints-dir <dir> --no-autoseed`, where
+the directory is the sole source and the codex is not a resolution
+tier — and a project seeds a copy once with `seed-blueprint` and
+commits it. Create a machine and run it:
 
 ```powershell
 rlq create-machine --blueprint msdos

@@ -16,45 +16,51 @@ spec, this reference has the bug.
 Reliquary attaches no meaning to guest output; interpreting
 results belongs to the caller.
 
-## Home, cache, and Context
+## The working directories and Context
 
-- `set_home(path)` - Set the process-global Reliquary home
-  (overrides `RELIQUARY_HOME`).
-- `set_cache(path)` - Set the process-global cache root (overrides
-  `RELIQUARY_CACHE_DIR`); defaults to `<home>/cache`.
-- `home()` - Return the effective home (`RELIQUARY_HOME`,
-  `set_home()`, or the platform default under Documents).
+Reliquary has six working directories — `home`, `blueprints`,
+`scripts`, `cache`, `media`, `machines` — and every one is
+placeable. Each starts **unassigned**; the rest derive from what is
+assigned, and a directory with no value when resolution needs it
+raises `StaticError` naming it.
+
+- `set_home_dir(path)` - Assign the home; `blueprints`, `scripts`
+  and `cache` derive under it.
+- `set_cache_dir(path)` - Assign the cache root, explicitly or over
+  the derived one; `media` and `machines` derive under it.
+- `set_blueprints_dir(path)` / `set_scripts_dir(path)` /
+  `set_media_dir(path)` / `set_machines_dir(path)` - Assign a leaf
+  directly. Assigning one leaves its siblings where the rest of the
+  resolution puts them.
+- `set_autoseed(enabled)` - Turn codex fallback on or off. **Off in
+  the embedding API**, on at the CLI.
+- `default_home_dir()` - The value the CLI assigns when nothing
+  named a home: `Documents/reliquary`, falling back to
+  `~/reliquary`. Computed, never assigned by the library.
 - `documents_dir()` - Resolve the user's platform Documents
   folder, or `None` when it cannot be determined.
-- `Context(home=None, cache=None, assets=None)` - An explicit
-  (home, cache, asset-source) triple scoping one call or a group of
-  calls, independent of the process-global default. Every function
-  below that resolves a path under the home accepts a `context=`
-  parameter: omit it (the common case) to use the process-global
-  default; pass a bare string as shorthand for
-  `Context(home=that_string)` (cache still follows the global
-  default, and it selects home mode); pass a `Context` instance to
-  pin home, cache, and asset source explicitly, safe to vary per
-  call within one process. The CLI only ever drives the
-  process-global default via `--home`/`--cache`/`--assets` — scoped
-  `Context` objects are an embedding-API-only capability.
-- `assets=` selects where authored assets (blueprints, media
-  included, plus scripts) resolve from: a directory path is a
-  hermetic project root walked recursively by extension (the sole
-  source — no home, no codex, no seeding), and `HOME_ASSETS` is
-  home mode (the home's canonical folders plus codex seeding). The
-  embedding API has **no default source**: a call that resolves an
-  asset by name with none configured (no `assets=` and no
-  `set_assets`) raises, so automation never silently reads home
-  assets or the current directory. `set_assets(HOME_ASSETS)` /
-  `set_assets(dir)` set the process-global; the CLI sets it from
-  `--assets` (home mode when absent).
-- Path helpers, each accepting `context=None`: `blueprints_dir`,
-  `scripts_dir`, `cache_dir`, `media_cache_dir`, and
-  `machines_cache_dir`.
+- `Context(home_dir=None, blueprints_dir=None, scripts_dir=None,
+  cache_dir=None, media_dir=None, machines_dir=None,
+  autoseed=None)` - A plain record scoping one call or a group of
+  calls, independent of the process-global assignments. Every
+  function below that resolves a working directory accepts a
+  `context=`: omit it (the common case) to use the globals; pass a
+  bare string as shorthand for `Context(home_dir=that_string)`;
+  pass a `Context` to pin whatever slots it fills, per call, safe to
+  vary within one process. Unfilled slots fall through to the
+  globals and then to derivation. The CLI only ever drives the
+  globals from its flags — scoped `Context` objects are an
+  embedding-API-only capability.
+- Resolvers, each accepting `context=None`: `home_dir`,
+  `blueprints_dir`, `scripts_dir`, `cache_dir`, `media_dir`,
+  `machines_dir`, and `autoseed`.
 
-All state lives under the home, except the regenerable cache,
-which lives under the (independently resolvable) cache root.
+**The embedding API assigns nothing.** A call that resolves a name
+with no directory assigned raises rather than reading the
+developer's home or a stray current directory, and autoseeding is
+off, so the built-in codex never feeds an automated run unasked. The
+environment (`RELIQUARY_HOME_DIR` and its five siblings) is honoured
+by the CLI and never by the library, for the same reason.
 
 ## Cached machines (the blueprint lifecycle)
 

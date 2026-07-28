@@ -1460,12 +1460,11 @@ def _resolve_script_stem(label, scripts_map):
 
 
 def _ensure_script_path(stem, context=None):
-    """Resolve ``stem`` through the asset source, seeding in home mode.
+    """Resolve ``stem``, copying it out of the codex if autoseeding.
 
-    Home mode seeds the script (and its media closure) from the codex
-    on first reference; dir mode (``--assets``) is the sole source and
-    seeds nothing. Resolution and its diagnostics come from
-    ``locate_script``.
+    With autoseeding on the script copies out of the codex on first
+    reference; with it off the scripts directory is the sole source.
+    Resolution and its diagnostics come from ``locate_script``.
     """
     from .assets import source_for
     if source_for(context).seeds:

@@ -75,7 +75,7 @@ consumer of the `--json` form can switch on it:
 | `seeded` | a user file whose name also exists in the codex |
 | `user` | a purely user-authored file, with no codex entry |
 
-Under `--assets <dir>` the codex is not a tier at all, so every
+Under `--no-autoseed` the codex is not a tier at all, so every
 match is `user`.
 
 ## Extraction

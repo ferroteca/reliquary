@@ -15,7 +15,7 @@ import unittest
 
 from reliquary import media
 from reliquary.errors import PreflightError
-from reliquary.home import HOME_ASSETS, Context
+from reliquary.home import Context
 
 
 def _home_with_media(home, media_entries):
@@ -23,8 +23,8 @@ def _home_with_media(home, media_entries):
     os.makedirs(bpdir, exist_ok=True)
     with open(os.path.join(bpdir, "lib.rlqb"), "w", encoding="utf-8") as h:
         json.dump(list(media_entries), h)
-    return Context(home=home, cache=os.path.join(home, "cache"),
-                   assets=HOME_ASSETS)
+    return Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
+                   autoseed=True)
 
 
 class MediaModuleTests(unittest.TestCase):
@@ -53,10 +53,10 @@ class MediaModuleTests(unittest.TestCase):
 
     def test_clean_media_reclaims_the_one_cache(self):
         with tempfile.TemporaryDirectory() as home:
-            ctx = Context(home=home, cache=os.path.join(home, "cache"),
-                          assets=HOME_ASSETS)
-            from reliquary.home import media_cache_dir
-            cache = media_cache_dir(ctx)
+            ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
+                          autoseed=True)
+            from reliquary.home import media_dir
+            cache = media_dir(ctx)
             os.makedirs(cache, exist_ok=True)
             for name in ("junk.iso", "husk.zip"):
                 with open(os.path.join(cache, name), "wb") as handle:
@@ -67,11 +67,11 @@ class MediaModuleTests(unittest.TestCase):
 
     def test_clean_media_targets_just_the_named_payload(self):
         """Naming one leaves the rest of the cache alone."""
-        from reliquary.home import media_cache_dir
+        from reliquary.home import media_dir
         with tempfile.TemporaryDirectory() as home:
-            ctx = Context(home=home, cache=os.path.join(home, "cache"),
-                          assets=HOME_ASSETS)
-            cache = media_cache_dir(ctx)
+            ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
+                          autoseed=True)
+            cache = media_dir(ctx)
             os.makedirs(cache, exist_ok=True)
             for name in ("win.iso", "husk.zip"):
                 with open(os.path.join(cache, name), "wb") as handle:
@@ -85,7 +85,7 @@ class PruneTests(unittest.TestCase):
     """The attachment closure: what a scope still needs cached."""
 
     def _home(self, specs, cached=()):
-        from reliquary.home import media_cache_dir
+        from reliquary.home import media_dir
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         home = tmp.name
@@ -94,9 +94,9 @@ class PruneTests(unittest.TestCase):
         with open(os.path.join(bpdir, "lib.rlqb"), "w",
                   encoding="utf-8") as handle:
             json.dump(specs, handle)
-        ctx = Context(home=home, cache=os.path.join(home, "cache"),
-                      assets=HOME_ASSETS)
-        cache = media_cache_dir(ctx)
+        ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
+                      autoseed=True)
+        cache = media_dir(ctx)
         os.makedirs(cache, exist_ok=True)
         for filename in cached:
             with open(os.path.join(cache, filename), "wb") as handle:
@@ -147,11 +147,11 @@ class AddMediaTests(unittest.TestCase):
     def _ctx(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        return Context(home=tmp.name, cache=os.path.join(tmp.name, "cache"),
-                       assets=HOME_ASSETS)
+        return Context(home_dir=tmp.name, cache_dir=os.path.join(tmp.name, "cache"),
+                       autoseed=True)
 
     def _payload(self, ctx, body=b"ISO"):
-        path = os.path.join(ctx.home, "win98.iso")
+        path = os.path.join(ctx.home_dir, "win98.iso")
         with open(path, "wb") as handle:
             handle.write(body)
         return path
@@ -173,14 +173,14 @@ class AddMediaTests(unittest.TestCase):
 
     def test_the_file_stays_put_and_the_cache_is_untouched(self):
         from reliquary import blueprint
-        from reliquary.home import media_cache_dir
+        from reliquary.home import media_dir
         ctx = self._ctx()
         payload = self._payload(ctx)
 
         blueprint.add_media("win98-cd", payload, context=ctx)
 
         self.assertTrue(os.path.exists(payload))
-        self.assertFalse(os.path.isdir(media_cache_dir(ctx)))
+        self.assertFalse(os.path.isdir(media_dir(ctx)))
 
     def test_the_declaration_resolves_and_fetches_in_place(self):
         """The whole point: the media now works, unpinned from a cache."""
@@ -206,7 +206,7 @@ class AddMediaTests(unittest.TestCase):
         from reliquary.home import blueprints_dir
         ctx = self._ctx()
         with self.assertRaises(PreflightError):
-            blueprint.add_media("win98-cd", os.path.join(ctx.home, "nope"),
+            blueprint.add_media("win98-cd", os.path.join(ctx.home_dir, "nope"),
                                 context=ctx)
         self.assertFalse(os.path.exists(
             os.path.join(blueprints_dir(ctx), "win98-cd.rlqb")))

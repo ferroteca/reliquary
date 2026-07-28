@@ -3,13 +3,13 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: BSD-3-Clause
 -->
 
-# Authored-asset resolution and the home
+# Authored-asset resolution and the working directories
 
-> **Status:** normative. The two modes, the extension-and-name
-> identity rule, the recorded blueprint source, and the home
-> layout are implemented and are what the code answers to; the
-> home layout is a world-facing contract, so changes to it follow
-> the interface-change rule
+> **Status:** normative. The six placeable directories, the autoseed
+> axis, the extension-and-name identity rule, the recorded blueprint
+> source, and the default layout are implemented and are what the
+> code answers to; the layout is a world-facing contract, so changes
+> to it follow the interface-change rule
 > ([INTERFACES.md](../../planning/INTERFACES.md)). Two things
 > below are **reserved**, named so they are not mistaken for
 > today's behaviour: the `ObjectSource` fileless third source, and
@@ -51,45 +51,52 @@ files of one kind resolving to the same effective name within a
 source are an error. A script carries no `name` field, so it is
 always stem-identified.
 
-## Two modes, one knob
+## Two axes: where a kind lives, and whether the codex backs it
 
-Resolution has two modes, selected per invocation by one knob —
-`--assets` (API `assets=`). There is no shadow and no fallback:
-the selected source is the sole source.
+Assets resolve from a **directory per kind** — blueprints from the
+`blueprints` directory, scripts from the `scripts` one. Both are
+placeable, on the same six-slot model as every other working
+directory ([the working directories](#the-working-directories)
+below), so "where do my assets live" is not a question with its own
+knob. Each directory is walked **recursively** by extension — a
+project lays its files out however it likes, and dot-directories
+like `.git`/`.venv` are pruned — and it is the **sole** file source
+for its kind. There is no shadow and no fallback between
+directories.
 
-- **Home mode** — the CLI default, when `--assets` is absent.
-  Resolves from the home's canonical `blueprints/` and `scripts/`
-  folders and seeds a missing name from the built-in
-  codex on first reference. Home assets are a convenience for
-  human CLI interaction — one shared place a person reuses across
-  scenarios (U1, U5). There is no home `media/` folder: media ride
-  inside the blueprints that declare them.
-- **Dir mode** — `--assets <dir>`, and the embedding API's only
-  file-backed source short of naming the home marker explicitly
-  (below). The directory is walked recursively by extension (a
-  project lays its files out however it likes; dot-directories
-  like `.git`/`.venv` are pruned) and is the **sole** source: no
-  home, no codex, no seeding. Strictly project-scoped resolution,
-  so nothing outside source control can reach an automated run
-  (U14, U4). The codex is never a resolution tier for automation —
-  at most a place to copy a first draft from, the copy committed.
+Whether a miss may fall back to the shipped codex is the separate
+**autoseed** axis: `--autoseed` / `--no-autoseed`, API `autoseed=`.
 
-The **embedding API has no default source**: a bare call that
-resolves a name with nothing configured fails closed, so
-automation never silently picks up user (home) assets — or a
-stray current directory, which is arbitrary for a programmatic
-caller and is not an asset default anywhere. Home mode is
-reachable only through the explicit home marker the CLI sets by
-default; it is never the API's default. The API source is
-polymorphic: a directory, or a set of JSON-imported objects
-supplied in memory with no files at all (self-identifying by
+- **On** — the CLI default. A name the directory does not hold is
+  read from, or copied out of, the built-in codex, so a person
+  meeting Reliquary for the first time finds `freedos` already
+  there (U1, U5). Copy-out never overwrites.
+- **Off** — the embedding API default. The directories are the sole
+  sources and a missing name fails closed, so nothing outside
+  source control reaches the run (U14, U4).
+
+Neither axis implies the other. A project tree may keep the codex
+behind it and a home may refuse it. The single asset-root knob that
+once answered both questions at once — naming a project root *and*
+declaring hermeticity by the same word — is retired: placement is
+what the directory flags say, and hermeticity is what autoseed says.
+
+The **embedding API assigns nothing**: a bare call that resolves a
+name with no directory assigned fails closed, naming the directory
+it wanted, so automation never silently picks up user (home) assets
+— or a stray current directory, which is arbitrary for a
+programmatic caller and is not an asset default anywhere. The API
+source is polymorphic: a directory, or a set of JSON-imported
+objects supplied in memory with no files at all (self-identifying by
 `name` — the fileless third source, landing just after the file
 modes).
 
-The home remains Reliquary's own ground regardless of mode:
-machines materialize into the home cache, downloads and payloads
-use the home caches, and the personal user-properties file stays
-home-side (a license key never enters the repo — U5).
+**Seeding on request is not what autoseed governs.** `seed-blueprint`
+and `seed-script` write into the assigned `blueprints` / `scripts`
+directory wherever it is, project tree or home alike, whatever
+autoseed says: a caller asking for a first draft has named the codex
+as its source, which is the use the codex is for — copy it, then
+commit the copy.
 
 ## Two completing rules
 
@@ -104,12 +111,54 @@ name alone).
 **Reliquary reads by extension and writes by convention**: U6's
 recorder ([recorder.md](../../planning/pledged/design/recorder.md)) emits its drafts — the
 script, its landmark declarations, and their variant renderings —
-into the asset root the session ran with, as new source files their
-author commits. Nothing else writes an authored asset: a script
-carries no definitions to install, so an ordinary run leaves the
-asset root untouched and a CI tree clean.
+into the directories the session ran with, as new source files their
+author commits. Nothing else writes an authored asset unasked: a
+script carries no definitions to install, so an ordinary run with
+autoseeding off leaves those directories untouched and a CI tree
+clean.
 
-## The home layout
+## The working directories
+
+Reliquary has **six**, and every one of them is placeable — through
+the CLI and the embedding API alike. Each starts unassigned; values
+arrive by assignment, and the defaults below are *derived* rather
+than pre-set.
+
+| Directory | Flag | Environment | Derives as |
+|---|---|---|---|
+| home | `--home-dir` | `RELIQUARY_HOME_DIR` | — |
+| blueprints | `--blueprints-dir` | `RELIQUARY_BLUEPRINTS_DIR` | `<home>/blueprints` |
+| scripts | `--scripts-dir` | `RELIQUARY_SCRIPTS_DIR` | `<home>/scripts` |
+| cache | `--cache-dir` | `RELIQUARY_CACHE_DIR` | `<home>/cache` |
+| media | `--media-dir` | `RELIQUARY_MEDIA_DIR` | `<cache>/media` |
+| machines | `--machines-dir` | `RELIQUARY_MACHINES_DIR` | `<cache>/machines` |
+
+Derivation reaches only what is still unassigned, so assigning
+`cache` alone conjures no home and assigning `machines` alone leaves
+`media` where the rest of the resolution puts it. A directory with
+no value when resolution needs it is a **fail-closed error naming
+that directory**, raised at first use rather than at `Context`
+construction.
+
+The surfaces differ only in whether an assignment is made for the
+caller. The **CLI** assigns `home` its default —
+`Documents/reliquary`, falling back to `~/reliquary` — whenever
+neither a flag nor the environment named one, so one assignment
+reaches all six and the error is unreachable at the keyboard. That
+is a property of the default, not an exemption from the rule. The
+**embedding API** assigns nothing, and there the error is reachable;
+that is the safety of the design. Honouring the environment is
+likewise the CLI's behaviour and never the library's.
+
+The home is one of the six, no longer a container for the rest
+([ARCHITECTURE.md](../../ARCHITECTURE.md) P12). It remains
+Reliquary's own ground for what has nowhere else to go: the personal
+user-properties file stays home-side, so a license key never enters
+the repo (U5).
+
+### The default layout
+
+With only the home assigned, the six land like this:
 
 ```text
 <reliquary_home>/
@@ -130,18 +179,21 @@ asset root untouched and a CI tree clean.
                          to the caller (D36)
 ```
 
-A `landmarks/` folder joins this layout with landmark support and
-is reserved until then (see the banner); the recorder's drafts
-above land in the asset root the session ran with, which under
-`--assets` is the project tree rather than the home.
+Each of those five paths is only where the directory *derives* to;
+any of them may be assigned elsewhere, and `media`/`machines` follow
+an assigned `cache` rather than the home. A `landmarks/` folder
+joins this layout with landmark support and is reserved until then
+(see the banner); the recorder's drafts above land in the
+`blueprints` / `scripts` directories the session ran with, which for
+a project is its own tree rather than the home.
 
-Everything under `cache/` is Reliquary's and disposable. Nothing is
+Everything under the cache is Reliquary's and disposable. Nothing is
 ever hand-placed there; pre-existing content enters a machine
 through the blueprint — `media` references, and starting-point
 images (`base`) that machine drives are differenced from, or copies
 of. The machine directory's own structure and ownership model are
 in [instance-model.md](instance-model.md).
 
-The home layout is a world-facing contract
+The working-directory layout is a world-facing contract
 ([INTERFACES.md](../../planning/INTERFACES.md)): changes to it follow
 the interface-change rule.

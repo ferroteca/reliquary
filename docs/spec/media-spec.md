@@ -28,13 +28,14 @@ retires). A machine's drive names a media by name — or carries one
 written in place — and the media owns everything about the payload:
 where it comes from, how it is verified, and how it materializes.
 
-Resolution reads the whole source: every `.rlqb` in the active
-source is parsed into one `(name, type)` catalog, and references
-bind by name. In home mode (the CLI default) that is the whole home,
-seeding from the codex on a miss; under `--assets <dir>` it is the
-whole project root — the sole hermetic source, where neither home
-specs nor the codex behind them reach an automated run (the
-artifact-residency split, ARCHITECTURE.md P4).
+Resolution reads the whole source: every `.rlqb` in the blueprints
+directory, walked recursively, is parsed into one `(name, type)`
+catalog, and references bind by name. That directory is the home's
+`blueprints/` folder by default and a project's own tree where
+`--blueprints-dir` says so; a miss falls back to the codex only
+while autoseeding is on — the CLI's default and never the embedding
+API's, so nothing outside a project's source control reaches an
+automated run (the artifact-residency split, ARCHITECTURE.md P4).
 
 ```text
 <asset root>/…/freedos.rlqb        the machine and the media it draws on
@@ -377,8 +378,8 @@ location, changed bytes — and a **cross-project name collision** —
 two different media sharing one name across a common cache — with
 equal reliability; a colliding payload is never silently accepted.
 What it cannot do is say which of the two it found, so the mismatch
-message names both possibilities and points at `--cache`, the flag
-that isolates one project's cache from another's.
+message names both possibilities and points at `--media-dir`, the
+flag that isolates one project's media cache from another's.
 
 ## Sharing
 

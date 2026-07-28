@@ -27,13 +27,14 @@ workflow:
   outside a run is still honest; `progress.py` owns the renderings — `resolve_mode` (`auto` by stderr tty),
   `describe` (the one human line per event both human modes share), and the `pretty` / `plain` / `jsonl` renderers,
   with the output discipline enforced there: human modes render everything to stderr and leave stdout empty, `jsonl`
-  owns stdout alone; `home.py` owns home and
-  cache resolution, layout, and containment, plus the `Context` type every path-resolving function accepts (now also
-  carrying the authored-asset selection — `HOME_ASSETS`/`set_assets`), `assets.py` owns authored-asset residency: the
-  resolution source seam (`HomeSource` = the home's canonical folders + codex seeding, the CLI default; `DirSource` =
-  a `--assets <dir>` project root walked recursively by extension as the sole hermetic source), `source_for`, and the
-  name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API names its
-  source or fails closed (no home/CWD default), and an `ObjectSource` of JSON-imported objects is the planned third
+  owns stdout alone; `home.py` owns the six placeable working
+  directories — assignment, the derivation cascade, the fail-closed unassigned error, the codex-autoseed axis, and the
+  `Context` record every path-resolving function accepts; `assets.py` owns authored-asset residency: one resolution
+  source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, its `seeds`
+  following autoseed), `source_for`, and the
+  name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API assigns no
+  directory and never autoseeds, so it fails closed rather than reading a home or CWD, and an `ObjectSource` of
+  JSON-imported objects is the planned third
   source, `document.py` is the `.rlqb` parser (normative spec: `docs/spec/blueprint-model.md`) —
   `parse_document` / `load_document` build a `Document` of `machines` / `media` from a root array of specs (a lone
   spec object is sugar for the array of one; `type` defaults to `media`, so an untyped object is a media and the
@@ -235,7 +236,7 @@ workflow:
 - `planning/INTERFACES.md` is the interface-change rule: how every interface-changing decision is weighed. The
   interface inventory it scopes over (CLI, embedding API, scripting language, and machine blueprints — media,
   source, and archive are components inside the blueprint — plus the script properties, recorded outputs, and
-  the home layout) lives in root `ARCHITECTURE.md` "The interfaces", where the housekeeping lookup answers by
+  the working-directory layout) lives in root `ARCHITECTURE.md` "The interfaces", where the housekeeping lookup answers by
   checklist. The use cases, the architectural principles, and the specs are together the project's **vision** —
   the standing statement of what Reliquary is and is for. The numbered use cases — the decision
   surface that rule weighs against — live in root `USE-CASES.md` (implemented-only: every use case there is
@@ -324,7 +325,7 @@ proper are defined no earlier than 1.0.
 The CLI, the embedding API, the scripting language, and the machine blueprint (media, source, and archive
 components included) are
 Reliquary's primary interfaces to the world; the script properties, the run's returned output (the live
-event stream, `--json` documents, exit codes — persistence dropped with D36), and the home layout are
+event stream, `--json` documents, exit codes — persistence dropped with D36), and the working-directory layout are
 world-facing contracts alongside them. Any decision that
 changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
 numbered use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
@@ -365,38 +366,51 @@ The current transport is:
 Never make a feature depend on guest cooperation. A future guest-agent transport may be optional, but agentless behavior
 must remain the default and fallback.
 
-### Home-directory containment
+### Placeable working directories, and what containment now means
 
-All persistent state belongs under the Reliquary home (`Documents/reliquary` by default, falling back to `~/reliquary`
-when no Documents folder can be determined; overridden by `RELIQUARY_HOME`, `--home`, or `set_home()`). The
-regenerable cache root defaults to `<home>/cache` but resolves independently — overridden by `RELIQUARY_CACHE_DIR`,
-`--cache`, or `set_cache()` — so it can live outside the home entirely (e.g. off OneDrive-synced storage). Seeding
-(`seed-blueprint` / `seed-script`; there is no `seed-media`) always targets `<home>/blueprints` /
-`<home>/scripts`, never the cache root. Every function that resolves a path under the home or cache accepts a
-`context=` parameter (`home.py`'s `Context`, exported from the package root): omit it (the common case) to use the
-process-global default; pass a bare string as shorthand for `Context(home=that_string)`; pass a `Context(home=...,
-cache=...)` instance to pin both independently and safely per call within one process. The CLI only ever drives the
-process-global default via `--home`/`--cache` — scoped `Context` objects are an embedding-API-only capability.
-`lifecycle.py`'s and `machine.py`'s own `home=` parameters are a different, narrower concept — an already-resolved
-plain directory (sometimes a machine's own cache subdirectory standing in for one), not a `Context`; they were
-deliberately left alone. Never write beside the module or into the source repository during normal use.
+**Six working directories, every one placeable** (`home.py`; normative:
+docs/spec/asset-resolution.md "The working directories"): `home`, `blueprints`, `scripts`, `cache`, `media`,
+`machines`. Each starts **unassigned**; a value arrives by `set_<name>_dir()`, the CLI's `--<name>-dir` flag, or
+`RELIQUARY_<NAME>_DIR`, and the rest **derive** — `home` gives default locations to `blueprints`/`scripts`/`cache`,
+and `cache` (assigned or derived) gives them to `media`/`machines`. Derivation reaches only what is still unassigned,
+so `cache` alone conjures no home and `machines` alone leaves `media` where the rest of the resolution puts it.
+**Unassigned is a fail-closed `StaticError` (`dir.unassigned`) naming the directory**, raised at first use rather than
+at `Context` construction, so the diagnostic names what was actually needed and a context may be built before it is
+filled.
 
-Authored-asset residency is a separate axis from the home (docs/spec/asset-resolution.md; `assets.py`). Blueprints
-(their media, source, and archive components included) and scripts resolve in one of two modes, carried on
-`Context.assets` / the `set_assets` global:
-**home mode** (`HOME_ASSETS` — the CLI default when `--assets` is absent) reads the home's canonical `blueprints/` /
-`scripts/` folders and seeds from the codex on a miss; **dir mode** (`--assets <dir>`, API `assets=<dir>`)
-walks that project root recursively by extension as the sole hermetic source — no home, no codex, no seeding. The
-root **replaces** the home (there is no shadow and no fallback; `--assets-only` never existed here). The embedding API
-has **no default source**: a bare `Context`/`None` that resolves a name with nothing configured fails closed, so
-automation never picks up home assets or a stray CWD (CWD is not an asset default). A bare-string `context=` is the
-home-mode shorthand. An asset's identity is its declared `name` (id-safe) else its filename stem; within-source
-effective-name collisions are errors. Selection scoping: `--blueprint <name>` matches only machines whose recorded
-`blueprint-source` equals this invocation's resolution (a sourceless machine matches by name alone). Seeding
-(`seed-blueprint` / `seed-script`) is a home operation and still targets `<home>/blueprints` etc.,
-never a project root or the cache.
+The surfaces differ only in whether an assignment is made for the caller. **The CLI** assigns `home` its default
+(`Documents/reliquary`, falling back to `~/reliquary`) whenever neither a flag nor the environment named one, so one
+assignment reaches all six and the error is unreachable at the keyboard — **a property of that default, not an
+exemption from the rule**, which is what keeps it true if the default ever changes. **The embedding API** assigns
+nothing, and there the error is reachable; that is the whole safety of the design. Honouring the environment
+(`adopt_environment()`) is likewise the CLI's step and never the library's.
 
-Home layout. A machine is wholly its cache materialization — there is
+`Context` is a **plain record** of the six optional paths plus `autoseed` — no methods, all resolution in `home.py`'s
+module functions — because six nullable strings bind cleanly from C or Java where six keyword arguments would not
+(P7). Every function resolving a working directory accepts `context=`: omit it for the globals, pass a bare string as
+shorthand for `Context(home_dir=...)`, or pass a `Context` to pin whatever slots it fills per call, unfilled slots
+falling through to the globals and then to derivation. The CLI only ever drives the globals — scoped `Context` objects
+are an embedding-API-only capability. `lifecycle.py`'s and `machine.py`'s own `home=` parameters are a different,
+narrower concept — an already-resolved plain directory (sometimes a machine's own materialization directory standing
+in for one), not a `Context`; they were deliberately left alone.
+
+**Containment is no longer topology.** With six independent roots, "under the home" is not a claim Reliquary can make;
+what P12 now requires is that Reliquary **writes only where it was told to** — never beside the module and never into
+a source repository during normal use.
+
+**Autoseeding is its own axis** (`home.autoseed` / `Context(autoseed=)`; `--autoseed` / `--no-autoseed`), replacing
+the retired asset-root knob that answered placement and hermeticity with one word. On at the CLI, **off in the
+embedding API**: a resolution miss falls back to the built-in codex only when something asked for it, so automation
+never picks up the codex, a developer's home, or a stray CWD. `assets.py` is correspondingly one source
+(`DirectorySource`) reading each kind's own directory, walked recursively by extension, with `seeds` a live property
+rather than a per-source constant. An asset's identity is its declared `name` (id-safe) else its filename stem;
+within-source effective-name collisions are errors. Selection scoping: `--blueprint <name>` matches only machines
+whose recorded `blueprint-source` equals this invocation's resolution (a sourceless machine matches by name alone).
+**Seeding on request is not what autoseed governs**: `seed-blueprint` / `seed-script` (there is no `seed-media`) write
+into the assigned `blueprints` / `scripts` directory wherever it is, project tree or home alike — copy a first draft,
+commit the copy.
+
+Default layout, with only the home assigned. A machine is wholly its materialization directory — there is
 no root-home machine model (the legacy root-home machine surface — a
 root-level `drives/`, a root `machine.json`, a root `vm.json` — was
 absorbed and deleted; the per-machine `machine.json` below is the new,
@@ -404,9 +418,9 @@ unrelated cache state file):
 
 - `blueprints/` — composed blueprints, media components included (`blueprints_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
-- `cache/media/` — every cached payload (`media_cache_dir`), keyed by media name, under the cache root; each
+- `cache/media/` — every cached payload (`media_dir`), keyed by media name, under the cache root; each
   file is named `<media-name>.<ext>`, which is the whole of its identity — no sidecar record (D41)
-- `cache/machines/<name>-<n>/` — machine materializations (`machines_cache_dir`;
+- `cache/machines/<name>-<n>/` — machine materializations (`machines_dir`;
   parent via `cache_dir`), under the cache root, each with `machine.json` (the
   resolved state; while running its `vm` section carries the live VM identity,
   port, PID; and a `variables` map holding the machine variables a
@@ -627,7 +641,7 @@ unpacked source package and installed artifact.
 
 Run `git diff --check` before handing work back.
 
-Hands-on tests require QEMU. Use `--home` with a scratch or deliberately reused test home rather than polluting the
+Hands-on tests require QEMU. Use `--home-dir` with a scratch or deliberately reused test home rather than polluting the
 default per-user home.
 
 The FreeDOS install+verify QEMU integration test is opt-in (skipped in the

@@ -2,17 +2,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Authored-asset residency: the resolution source seam.
 
-Authored assets — machine blueprints (``.rlqb``, media included)
-and scripts (``.rlqs``) — resolve through one of two file-backed
-sources, selected per invocation (``home.assets_mode``):
+Authored assets — machine blueprints (``.rlqb``, media included) and
+scripts (``.rlqs``) — resolve from a directory per kind: blueprints
+from the ``blueprints`` directory, scripts from the ``scripts`` one.
+Both are placeable (``home.py``), so where assets live is the same
+question as where anything else Reliquary touches lives, answered by
+the same six-slot model rather than by a residency knob of its own.
+That is what retired the old asset-root knob: it existed to name a
+project root because ``blueprints``/``scripts`` could not be named
+directly, and now they can.
 
-- **home mode** (``HomeSource``) — the CLI default. Resolves from the
-  home's canonical ``blueprints/`` and ``scripts/`` folders and seeds
-  missing names from the built-in codex. A convenience for human CLI
-  interaction.
-- **dir mode** (``DirSource``) — ``--assets <dir>`` / API ``assets=``.
-  A project's own asset root, walked recursively by extension, as the
-  **sole** source: no home, no codex. Hermetic, for automation.
+The hermetic/convenient split it also carried is now its own axis,
+``home.autoseed`` — on at the CLI, off in the embedding API, either
+one overridable. So a directory decides *where* a name resolves and
+autoseed decides whether a miss may fall back to the shipped codex;
+one no longer implies the other.
 
 An asset's identity is its ``name`` field when the authored file
 declares one, else its filename stem; two files of one kind claiming
@@ -29,8 +33,7 @@ this same seam.
 import os
 
 from .errors import PreflightError
-from .home import (HOME_ASSETS, assets_mode, blueprints_dir,
-                   scripts_dir)
+from .home import autoseed, blueprints_dir, scripts_dir
 
 
 # Authored-asset file extensions by kind. ``.json`` is the accepted
@@ -40,9 +43,9 @@ from .home import (HOME_ASSETS, assets_mode, blueprints_dir,
 # docs/spec/asset-resolution.md rather than declared here. ``.rlqm``
 # retired with the composed model — a media is a spec inside a
 # ``.rlqb`` (D30). ``.rlql`` landmarks are unbuilt: nothing requests
-# the kind, and home mode has no ``landmarks/`` folder to resolve one
-# from, so declaring it would only advertise a resolution that
-# cannot happen.
+# the kind, and there is no ``landmarks`` working directory to
+# resolve one from, so declaring it would only advertise a
+# resolution that cannot happen.
 KIND_EXTENSIONS = {
     "blueprint": (".rlqb", ".json"),
     "script": (".rlqs",),
@@ -77,6 +80,7 @@ def _walk_files(root, extensions):
 class AssetSource:
     """Where a resolution looks for authored asset files."""
 
+    #: Whether a miss may fall back to the built-in codex.
     seeds = False
 
     def candidate_files(self, kind):
@@ -97,10 +101,16 @@ class AssetSource:
         raise NotImplementedError
 
 
-class HomeSource(AssetSource):
-    """Resolve from the home's canonical folders; seed from the codex."""
+class DirectorySource(AssetSource):
+    """Resolve each asset kind from its own placeable directory.
 
-    seeds = True
+    One source, because there is one question: which directory holds
+    this kind. Whether that directory came from an explicit
+    ``--blueprints-dir`` or derived from the home makes no difference
+    to how it is read — a project tree and a home folder are both
+    walked recursively by extension, which is what the two former
+    sources already did in the same helper.
+    """
 
     _DIRS = {
         "blueprint": blueprints_dir,
@@ -110,6 +120,11 @@ class HomeSource(AssetSource):
     def __init__(self, context=None):
         self._context = context
         self._cache = {}
+
+    @property
+    def seeds(self):
+        """Autoseeding is a live property, not a fixed one per source."""
+        return autoseed(self._context)
 
     def _dir(self, kind):
         resolver = self._DIRS.get(kind)
@@ -125,42 +140,17 @@ class HomeSource(AssetSource):
         return _walk_files(self._dir("blueprint"), (".rlqb",))
 
     def describe(self, kind):
-        return self._dir(kind) or "the home"
-
-
-class DirSource(AssetSource):
-    """Resolve solely from a project asset root, walked by extension."""
-
-    seeds = False
-
-    def __init__(self, root):
-        self.root = os.path.abspath(root)
-        self._cache = {}
-
-    def candidate_files(self, kind):
-        if kind not in self._cache:
-            self._cache[kind] = _walk_files(
-                self.root, KIND_EXTENSIONS[kind])
-        return self._cache[kind]
-
-    def document_files(self):
-        return _walk_files(self.root, (".rlqb",))
-
-    def describe(self, kind):
-        return self.root
+        return self._dir(kind)
 
 
 def source_for(context=None):
-    """Build the :class:`AssetSource` selected for ``context``.
+    """Build the :class:`AssetSource` for ``context``.
 
-    Reads :func:`reliquary.home.assets_mode`, so a bare embedding-API
-    call with no source configured raises rather than silently
-    resolving against the home or the current directory.
+    The directories resolve lazily, so building a source never
+    raises: an unassigned ``blueprints`` fails when the resolution
+    actually needs it, naming that directory (``home.py``).
     """
-    mode = assets_mode(context)
-    if mode is HOME_ASSETS:
-        return HomeSource(context)
-    return DirSource(mode)
+    return DirectorySource(context)
 
 
 def index_by_name(files, name_of, kind):

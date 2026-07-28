@@ -1141,143 +1141,16 @@ work item: it may be that the honest answer is no change at all,
 and the finding's value was in forcing the question while the
 answer is still free.
 
-## F22 — Every working directory is placeable
-
-> **Entered 2026-07-27** (owner). Serves **U17** (project
-> artifacts work in place — the home is not where automation
-> lives) and **P4**'s residency split; amends **P12**, which is
-> what keeps it out of the task queue whatever its diff turns out
-> to be. Serves no in-force use case on its own.
-
-**All six of Reliquary's working directories become
-specifiable — `home`, `blueprints`, `scripts`, `cache`,
-`machines`, `media` — through the CLI and the embedding API
-alike (P6).** Today only two are: `home` and `cache`. The other
-four are computed and unreachable — `blueprints_dir()` and
-`scripts_dir()` join a literal onto the home, `media_cache_dir()`
-and `machines_cache_dir()` onto the cache — so a caller who wants
-machines on a fast disk and media on a big one has no way to say
-so.
-
-### The resolution model
-
-**Everything starts unassigned.** No directory has a value at
-startup; values arrive by explicit assignment, and defaults are
-*derived* rather than pre-set.
-
-**Derivation cascades, and only into what is still unassigned:**
-
-- assigning **`home`** gives default locations under it to
-  `blueprints`, `scripts` and `cache`;
-- assigning **`cache`** — explicitly, *or* by the derivation
-  above — gives default locations under it to `machines` and
-  `media`.
-
-The cascade is the shape the code already has; what changes is
-that each step becomes interceptable. Assigning `cache` alone
-does not conjure a home, and assigning `machines` alone leaves
-`media` wherever the rest of the resolution puts it.
-
-**Unassigned is a fail-closed error, on every surface.** If any
-of the six still has no value when resolution needs it, the call
-fails naming the directory. This is one rule, not an API rule —
-what differs between the surfaces is only whether a default
-assignment is made on the caller's behalf:
-
-- **CLI (user mode)** assigns `home` its existing default
-  (`Documents/reliquary`, falling back to `~/reliquary`), and the
-  cascade fills the remaining five. The current behaviour is
-  exactly this model with one assignment made for the user, so
-  nothing at the keyboard changes — **and the fail-closed error
-  becomes unreachable**, since one home assignment reaches all
-  six. It is still the same rule; it simply never fires.
-- **API** assigns nothing. Directories acquire values only by
-  assignment or by the cascade an assignment triggers, so an
-  embedding call never silently picks up the developer's home.
-  Here the error is reachable, and it is the whole safety of the
-  design.
-
-- Honouring the REQLIQUARY_HOME env var: this behvaiour can be configured on and off (inteface change).
-  If defaults ON for CLI, OFF for API.  It is never applied if home is explicitly set, and it's applied
-  at the time that the home defaulting decsion is made.  It never overrides any explicit assignment.
-
-That the CLI cannot trip the error is a *property of its default*
-rather than an exemption from the rule — worth stating that way,
-because an exemption would have to be re-argued if the default
-ever changed, and a property does not.
-
-**THE API RULE IS NOT NEW DOCTRINE — IT GENERALIZES A DECIDED
-ONE.** Authored-asset resolution already works this way: *"the
-embedding API has no default source: a bare `Context`/`None` that
-resolves a name with nothing configured fails closed, so
-automation never picks up home assets or a stray CWD"*. That rule
-exists because a library silently reading a developer's home is a
-bug that only shows up on someone else's machine. F22 says the
-same thing about every directory rather than about assets alone,
-which is the argument for it being one coherent model rather than
-six new flags.
-
-### What it costs, stated before it is granted
-
-**P12 must be amended, and that is the real gate.** It reads
-*"all persistent state lives under the Reliquary home (the cache
-separable)"* — a containment claim with one carve-out. Six
-independently placeable directories make "the home" a name for
-one of six rather than a container, and the principle has to say
-what containment now means: probably that Reliquary writes only
-where it was told to and never beside the module or into a source
-tree, which is P12's actual safety content with the topology
-claim removed. **Interface *and* principle change, so P8 routes
-it through the interface-change rule** and the amendment lands
-before the work does.
-
-### Decide first
-
-- **`blueprints` / `scripts` versus `--assets`, which is the
-  sharpest question here.** Two concepts exist today and share
-  these names: where assets **resolve from** (the `assets` axis —
-  a project root that *replaces* the home, hermetic, no codex),
-  and where assets are **seeded to** (`<home>/blueprints`,
-  `<home>/scripts` — always the home, deliberately never a
-  project root). A `--blueprints` flag reads naturally as either.
-  If it means the read source it collides with `--assets` and two
-  mechanisms answer one question; if it means the write target it
-  composes cleanly but the name misleads. **Settle this before
-  anything else**: it decides whether F22 is six placements or
-  four plus a rename.
-- **When exactly does the CLI assign its default home?** Two
-  readings, and they differ in whether this breaks anything.
-  *Always, unless `--home` was given* — then `rlq --cache D:\c
-  list-machines` keeps working as it does today, home defaulting
-  underneath while the explicit cache wins. *Only when nothing at
-  all was specified* — then that same command leaves `home`,
-  `blueprints` and `scripts` unassigned and fails closed, which
-  is a live regression for a flag combination that works now.
-  The first reading is almost certainly meant, and it is what
-  makes the error unreachable at the keyboard; the second would
-  make it reachable in exactly the case a user is least expecting
-  it. Worth writing down because the difference is invisible
-  until someone passes one flag.
-- **Environment variables.** `RELIQUARY_HOME` and
-  `RELIQUARY_CACHE_DIR` exist. Six directories imply six
-  variables, which is a lot of surface for a convenience — or the
-  env layer stays at two and the rest are flags and parameters
-  only. Not obvious either way.
-- **Where the fail-closed error fires.** At `Context`
-  construction (early, but forbids building a context you intend
-  to fill later) or at first resolution (lazier, and the error
-  names the directory actually needed). The second reads better
-  in a diagnostic and is probably right, but it means a context
-  can exist in an unusable state.
-- **Whether `Context` stays one object.** Six optional slots on a
-  positional-friendly constructor is a lot; the binding
-  constraint (**P7**) asks what this looks like from C or Java,
-  where six nullable strings is fine but six *keyword* arguments
-  is not.
-- **Containment checks.** Reliquary currently refuses to write
-  outside the home in some paths. With six roots, what is the
-  refusal? Probably "outside every assigned root", but that needs
-  stating rather than assuming.
+*(F22 — every working directory is placeable — was entered and
+delivered on 2026-07-27, so its number retires unreused. The six
+`--*-dir` flags, the derivation cascade, the fail-closed
+unassigned error, and the `--autoseed` axis that replaced
+`--assets` are recorded in [D59](../DECISIONS.md), which also
+carries the P12 and P4 amendments it required; the model itself
+is normative in
+[docs/spec/asset-resolution.md](../../docs/spec/asset-resolution.md).
+U17 stays pledged: this serves it and does not on its own
+complete it.)*
 
 ## Horizon — smaller and later
 
