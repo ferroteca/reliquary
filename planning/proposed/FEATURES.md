@@ -272,14 +272,36 @@ passes byte-for-byte.
 > honest reading is that the split D42 would force at pledge is
 > also where the demand divides, which is a finding for whoever
 > adjudicates rather than the adjudication itself.
+>
+> **The Hyper-V wire is not missing, only different** (prior-art
+> research, 2026-07-28; not adjudicated). The body below drew the
+> capability-not-one-wire conclusion from an absence. The
+> conclusion holds and sharpens; the premise does not. Hyper-V's
+> VM console is reachable over RDP to the *host* on port 2179,
+> the VM's GUID carried as an `MS-RDPEPS` preconnection blob —
+> host-side, no RDP server in the guest, and serving the console
+> before any OS is installed. So GUI automation on Hyper-V is a
+> **second display carrier** rather than a hole, which is a
+> stronger illustration of the doctrine than an absence was: a
+> capability satisfied two ways is the case the seam exists to
+> serve. The cost is the open part: RFB hands a client a
+> framebuffer, where RDP output is bitmap updates, drawing
+> orders, and codecs, so the realistic path is a vendored native
+> stack (FreeRDP is Apache-2.0 and implements the blob; no usable
+> Python binding exists, and it ships no official Windows
+> binary). **This changes no demand** — a newly available wire is
+> not a use case, and GUI automation still cites nothing. A
+> finding on the same terms as the note above.
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,
 VirtualBox with the extension pack, VMware Workstation — and the
 two remaining adapters: VMware Workstation, then Hyper-V,
-deliberately last. Hyper-V has no VNC (a capability failure,
-never an emulation), so it is the proof that GUI automation
-rides capabilities, not one wire.
+deliberately last. Hyper-V has no VNC — a capability failure,
+never an emulation — which is what makes it the proof that GUI
+automation rides capabilities and not one wire: its console
+answers on a different carrier entirely (the note above), so the
+capability has to be reachable by more than one.
 
 Decide first:
 
@@ -313,7 +335,8 @@ Decide first:
   Reliquary's native machine engine.
   Throughout, os-autoinst is a **concept reference only** — its
   designs are studied and reimplemented, never its code (see
-  AGENTS.md prior art for the licensing boundary).
+  AGENTS.md prior art for the boundary, which is doctrine rather
+  than merely licensing).
 - Blueprint device growth: firmware/boot semantics (BIOS vs
   UEFI) for post-DOS platforms, and when network, display
   adapter, audio, and USB become first-class blueprint fields

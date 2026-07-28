@@ -770,12 +770,24 @@ SUSE's os-autoinst (the engine under openQA) is the closest prior art to Reliqua
 installers by screen matching and key injection over QMP/VNC, with per-operation "consoles" (VNC, serial,
 virtio-terminal, ssh) mirroring Reliquary's control planes, multiple backends (qemu, svirt, bare metal) mirroring the
 adapter seam, command completion over serial via echoed marker strings, per-step screenshot records, and snapshot
-"milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend implementations — Reliquary learns from its
-designs (the input event model, needle area types, console seams), never from its code: it is GPL-2.0-or-later, so no
-code, needles, or test modules may ever be ported or closely translated into this BSD-3-Clause project. Study the
-documentation and the ideas; reimplement from scratch. Deliberate divergences to preserve: VGA text scraping instead of image needles for
-text-mode guests, authored step documents instead of Perl test modules, and a local ephemeral-machine tool instead of
-a testing service (scheduler, workers, and web UI are permanently out of scope).
+"milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend
+implementations — Reliquary learns from its designs (the input event model, needle area types, console seams), never
+from its code. Study the documentation and the ideas; reimplement from scratch. **The bar is doctrine, and it does not
+move with the license.** os-autoinst is GPL-2.0-or-later, which already bars porting code, needles, or test modules
+into this BSD-3-Clause project — but `consoles/VNC.pm`, its RFB client and precisely the file a VNC control plane would
+reach for, is dual-licensed `Artistic-1.0 OR GPL-1.0-or-later`, and copyleft does not reach it. It is off limits
+regardless: a close translation is a port whatever the license permits. Deliberate divergences to preserve: VGA text
+scraping instead of image needles for text-mode guests, authored step documents instead of Perl test modules, and a
+local ephemeral-machine tool instead of a testing service (scheduler, workers, and web UI are permanently out of
+scope).
+
+Keysight's eggPlant Functional is the closer analogue for the display seam specifically: a commercial GUI test tool
+that drives its system under test over VNC **or** RDP, matches screens by image, and carries the click point inside
+the matched image. Its vocabulary lands almost one-to-one on the settled landmark design
+(`planning/proposed/design/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
+deferred selecting region, tolerance to the similarity percent — and that convergence is the useful part: it says the
+asset model is well-trodden rather than novel. Proprietary, so the concept-reference rule applies by default; the
+public documentation is the whole of what is readable.
 
 Espressif's `pytest-embedded-qemu` is useful prior art for a future
 `pytest-reliquary` plugin: host pytest orchestration around a native guest test framework. It is not directly reusable
