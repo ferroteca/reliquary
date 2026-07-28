@@ -64,6 +64,16 @@ wrong test can. Correcting an entry's prose in place is never
 the answer either: an error and its discovery are part of the
 record, and often the most useful part of it (D29).
 
+A LIFECYCLE ACT ALONE EARNS NO ENTRY (D63). Proposing,
+pledging, promoting, delivering: location states the status and
+the commit that moves the item is the record, so delivery
+evidence belongs in that commit's message. Only a ruling made
+in the act's course — a contested clause reading, a scope call,
+a withdrawal — is recorded here, slim, as the ruling rather
+than the promotion around it. The promotion-genre entries below
+predate this rule and stand as written under the spellings
+rule: the record of their moment, not the pattern to follow.
+
 ## Open questions
 
 Questions awaiting adjudication — the front of this record rather
@@ -177,6 +187,60 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D63 — A LIFECYCLE ACT ALONE EARNS NO ENTRY; THE PROMOTION
+  GENRE CLOSES — DECIDED (owner, 2026-07-28). Supports (none) —
+  record discipline, demanded by no numbered entry; what it
+  aligns with is the cross-project governance standard, which
+  carries no local number to cite.
+
+  WHAT STARTED IT (owner): the record is getting large, and *"we
+  need a record of any architecture decisions in what they
+  promoted, but I don't think we need a decision record of the
+  promotion itself. That status is self evident."* The standard
+  already says as much — the move is the act, the commit that
+  does it is the record, and there is no separate register to
+  keep in step — and this record kept one anyway: the promotion
+  genre (D37, D46, D47, D49, D51, D57, and the pledging and
+  arming clauses of D61 and D62) runs roughly 650 lines, about
+  a ninth of the file, written while the machinery was still
+  being invented, restating what location and git history
+  already say.
+
+  THE RULE. Proposing, pledging, promoting, delivering: no
+  entry. Delivery evidence — the clause-by-clause case that a
+  use case is actually met, D46's genre — goes in the moving
+  commit's message, where the act it evidences lives. What
+  still earns an entry is a RULING made in the act's course: a
+  clause read one way with the other reading declined (D46's
+  media-swap clause), a scope widened (D46's two-to-four), a
+  pledge found accidental and withdrawn (D61's whole subject).
+  Record the ruling, slim — the entry says what was adjudicated
+  and never narrates the promotion around it; D61 under this
+  rule is twenty lines, not 150. A decision whose conclusion
+  pledges something is untouched: that entry records an
+  argument, and the pledge is its consequence.
+
+  WHAT THIS DOES NOT DO. Nothing below moves, retires, or is
+  rewritten. The genre's entries stand as written under the
+  spellings rule, and their numbers stay citable (D62 cites
+  D57; D46 applies D34). D34's promotion-on-delivery rule is
+  also untouched: promotion stays automatic, and simply stops
+  being narrated here.
+
+  WEIGHED AND DECLINED: retroactively compressing or archiving
+  the genre. Retirement moves an entry intact and saves
+  nothing, rewriting is forbidden by the record's own
+  discipline, and deletion breaks the permanent-handle
+  guarantee. An archival split — old entries moved whole,
+  numbers intact, to a companion file — is the one compliant
+  shrink, and remains available as its own decision, not taken
+  here.
+
+  FOLDED: the governance standard (the record's discipline and
+  its move-is-the-act clause) and its DECISIONS.md template;
+  this file's preamble. Nothing else in the tree changes: the
+  rule governs entries not yet written.
 
 - D62 — THE IN-BAND FILE FAMILY IS COMPLETE; P16 IS ARMED —
   DECIDED (owner, 2026-07-27, the F23 round; four forks, all on
