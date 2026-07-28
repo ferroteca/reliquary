@@ -430,14 +430,33 @@ differently under the new wording — is mere documentation work.
 - **P18 — Mechanism, not content.** Reliquary provides
   mechanism — machines, drive and file transports, the value
   channels in and out — and never standardized content. No
-  blessed scripts of any kind, no reusable authored library:
-  the codex carries examples to copy a first draft from (P4),
-  and anything reusable is the consuming project's or another
+  blessed scripts of any kind, no library of reusable authored
+  content. What it ships is a library of a different kind, and
+  ships it reachably from the app itself: **a library of
+  examples** — the codex, blueprint and script examples
+  searched and seeded through ordinary commands (U11), read and
+  copied from rather than built on, and the copy is yours from
+  then on (P4). They are meant to **work**, and a codex example
+  that does not is a defect; what they are not is **stable**.
+  The library evolves, and evolves in a *point release* — a
+  script rewritten, a blueprint's disk resized, a pin moved, an
+  entry renamed or dropped — so neither a name nor what it holds
+  is fixed, and no release ever promises otherwise. That holds
+  permanently and on its own: the codex is content rather than
+  interface, so it stays outside whatever compatibility promise
+  the project comes to make. Nothing programmatic may depend on
+  it in place, and none is meant to; the codex is where a
+  consuming project's own assets *start*. Seed the copy, commit
+  it, and the stability is that project's to hold rather than
+  Reliquary's to promise (P4). The codex's *semantics* are an
+  interface and are specified, its *content* is not, and
+  anything reusable is the consuming project's or another
   project's to build. Reliquary attaches no meaning to what
   runs through its mechanisms; computation and interpretation
   live on the caller's side of the seam (G2).
-  (docs/spec/cli.md, docs/spec/script-spec.md; AGENTS.md
-  "The embedding surface"; D36.)
+  (docs/spec/codex.md, docs/spec/cli.md,
+  docs/spec/script-spec.md; AGENTS.md
+  "The embedding surface"; D1, D36.)
 - **P19 — One script, one target.** Each OS version and edition
   gets one install script. Properties and blueprint parameters
   supply that target's run-specific data; they never select a

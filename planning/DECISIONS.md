@@ -2156,7 +2156,16 @@ is waiting on an answer today.
   execution model's severability; fixes a gap against a standing
   promise rather than making a new one, so it is a
   gap-is-a-bug fix (D38's exclusion) whose *seam* is the decided
-  part.
+  part. [Retrofitted 2026-07-28 — Supports U12, U13; P5. The
+  clause above cites no numbered vision, and the severability it
+  names is a *spec* promise rather than a principle
+  (docs/spec/script-spec.md — Ctrl-C "leaves the machine
+  as-is"), so it gave the entry nothing citable. What the fix
+  serves is numbered: U12's long run showing where it is and
+  what it waits on while it goes, U13's media fetching and
+  verifying itself, and P5's rendering being *timely* — a 294 MB
+  download that reports nothing for minutes and swallows Ctrl-C
+  fails all three at once.]
   THE DEFECT. planning/ROADMAP.md ("Cancel ends the run, not the
   machine") already promised that on Ctrl-C "input deliveries are
   atomic, **host transfers abort**". They did not. Cancellation
@@ -5728,7 +5737,22 @@ is waiting on an answer today.
 - D1 — RESOLVED (owner, 2026-07-21). Supports (none) — a
   vocabulary decision; no use case or principle demands what a
   thing is called, and the naming class is outside the
-  traceability rule's reach (retrofitted 2026-07-27). The
+  traceability rule's reach (retrofitted 2026-07-27).
+  [Amended 2026-07-28 — Supports P18. The naming half of that
+  clause stands — no principle demands what a thing is
+  called — but this entry settled more than a name. "Canon" was
+  rejected for naming an abstract authority where "codex" names
+  a bound volume copied from, and that distinction is what P18
+  states in its own words: a library of examples, read and copied
+  from, never one to build on. P18 was clarified the same day to
+  say so about the codex outright — meant to work, never stable,
+  names and content alike free to change in a point release, and
+  there to start a consuming project's own assets rather than to
+  be depended on — which is the principle this entry had none
+  of. A
+  clarification rather than an amendment (P23's first
+  exception): P18 never claimed the codex was stable, so stating
+  that it is not changes the reading of no earlier decision.] The
   built-in library is named THE
   CODEX (was "change 'builtin library' concept to 'template
   library' ??"; "canon" was weighed and rejected — codex is the

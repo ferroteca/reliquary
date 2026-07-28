@@ -29,6 +29,48 @@ That single command extracts the blueprint (its media ride inside
 it) and its scripts from the codex, creates a machine, fetches and
 verifies the installation media, and runs the scripted install.
 
+## A library of examples
+
+The codex is a **library of examples**, and both words carry
+weight. It is a library: a curated collection, shipped with
+Reliquary, that you browse, search and seed from. What it is not
+is a library you build on — its entries are reference material, a
+starting point to copy rather than content to depend on in place.
+They are meant to work — a codex blueprint or script that does
+not is a defect, and the command above is the claim — but nothing
+about it is stable. The library evolves, and evolves in a
+**point release**: `freedos-install` may be rewritten between one
+and the next, the `freedos` blueprint's disk may change size, a
+media pin may move to a newer build, an entry may be renamed or
+dropped altogether. Neither a name nor what it holds is fixed —
+both axes move — and none of it waits for a version bump that
+would announce it. That is the whole of what "not stable" means
+here: the codex you seed from tomorrow is not promised to be the
+one you seeded from today.
+
+Do not read this as the pre-1.0 licence restated. Reliquary
+makes no backward-compatibility promise before 1.0 at all
+([ARCHITECTURE.md](../../ARCHITECTURE.md) P9), but that licence
+is scaffolding and is expected to come down as the project
+matures. This rule is not: whatever promise the project comes to
+make about its interfaces, codex content stays outside it,
+because it is content rather than interface.
+
+What is specified is on this page — the seeding semantics, the
+never-overwrite rule, provenance, the media licensing rule — and
+*that* is the interface; the content it carries is not (root
+[ARCHITECTURE.md](../../ARCHITECTURE.md) P18).
+
+None of which leaves you without stable assets — it locates them
+somewhere else. The never-overwrite rule below is what makes this
+safe rather than merely honest: once you seed a copy it is an
+ordinary file you own, and no codex change ever reaches it. So
+the answer to "how do I depend on a codex script?" is to seed it
+and commit it. From that point the asset is your project's, its
+stability is your project's to hold, and the codex was what it is
+for — the starting point you built it from. This is the same
+answer P4 gives automation, arrived at from the other side.
+
 ## A seed, not a resolution tier
 
 The codex ships inside the Reliquary package as ordinary files

@@ -100,7 +100,17 @@ day into [F7](proposed/FEATURES.md).*
 *The class it audited for is not struck with it — the
 traceability rule stands, and new entries carry supports from the
 start. What retires is the standing backlog of entries written
-before the rule existed.)*
+before the rule existed.*
+
+*Two entries the tally passed on the letter of the clause were
+closed 2026-07-28: **D1** said "Supports (none)" and **D40**
+named a spec promise rather than a numbered one, so both carried
+a supports clause citing no vision. D1 now cites P18 — clarified
+the same day to state what the codex is and is not — and D40
+cites U12, U13 and P5. The audit's own claim is therefore true
+now in a way it was not when written: every live entry names
+numbered vision, the two exceptions still being retired D2 and
+D17.)*
 
 ### Defects
 
