@@ -6,29 +6,28 @@ SPDX-License-Identifier: BSD-3-Clause
 # The backend adapter API
 
 > **Status:** the design doctrine for Reliquary's backend adapter
-> seam (owner, 2026-07-21) — an internal engineering contract,
+> seam (owner, 2026-07-21), **delivered 2026-07-28** as F2 — whose
+> number retires with it. It is an internal engineering contract,
 > deliberately **not** one of the world-facing interfaces
 > (planning/INTERFACES.md names those; the watch that would revisit
-> this is recorded in planning/TASKS.md). This document settles the
-> seam's shape: the layering, the seam inventory, the capability
-> and ownership doctrines, and the non-goals. Method signatures and
-> exact types are deliberately absent: they land at the seam
-> extraction, defined by the working QEMU implementation per that
-> item's own doctrine (planning/pledged/FEATURES.md "The backend
-> adapter seam"). That extraction — the former milestone 10, **F2** —
-> was backlog work from 2026-07-23 for lack of use-case backing
-> (DECISIONS.md D33) and is **pledged as of 2026-07-28**, with its
-> demand **U7** pledged in the same act; this document travelled
-> here with it. The doctrine below stands settled and is unaffected
-> by any of that scheduling — it was settled before the demand was
-> written, which is the D33 pattern it now exits.
+> this is recorded in planning/TASKS.md), which is why it stays here
+> rather than moving to `docs/spec/` on delivery. It travelled from
+> `pledged/design/` when F2 left the shelf: a delivered feature
+> leaves no feature for its design to sit with.
+>
+> The doctrine below — the layering, the seam inventory, the
+> capability and ownership doctrines, the non-goals — was settled
+> before the demand was written (the D33 pattern it exited when U7
+> was pledged) and is unchanged by the extraction. **The signatures
+> are now recorded**, at the end, per this document's own rule that
+> they land with the working code rather than ahead of it.
 
 ## What the adapter API is
 
 One API, four adapters — QEMU, VirtualBox, VMware Workstation,
-Hyper-V ([ARCHITECTURE.md](../../../ARCHITECTURE.md), "The seams"; the
+Hyper-V ([ARCHITECTURE.md](../../ARCHITECTURE.md), "The seams"; the
 per-backend control-plane inventory is in
-[guest-communication.md](../../design/guest-communication.md)). It is the
+[guest-communication.md](guest-communication.md)). It is the
 *provider* contract behind Reliquary's semantic surface, and it is
 none of the things the primary interfaces are:
 
@@ -45,7 +44,8 @@ none of the things the primary interfaces are:
   fails capability preflight by name; nothing is silently
   approximated.
 - **In-repo consumers only, for now.** All four adapters ship with
-  Reliquary. If a third-party adapter story ever becomes real, the
+  Reliquary — one built and three stubs. If a third-party adapter
+  story ever becomes real, the
   seam is elevated into the INTERFACES inventory through the
   interface-change rule — that elevation is the recorded watch,
   not the default.
@@ -244,8 +244,17 @@ scancode input, screenshots and serial redirection; VMware
 Workstation exposes VNC but no comparable scancode surface; and
 Hyper-V has no VNC at all, leaving it with no agentless display
 plane. Order breaks ties among candidates already available and
-capable, so it never substitutes for a capability check
-([FEATURES.md](../FEATURES.md), work item 3).
+capable, so it never substitutes for a capability check.
+
+**What the three stubs claim is nothing.** Their host probe is
+real — knowing whether VirtualBox is installed costs nothing and is
+honest either way — and their capability report is empty, so the
+walk passes over them even where the backend is installed (P11: an
+untested capability is an unclaimed one). A pinned `backend` naming
+one fails preflight by name; the abstract-method
+`NotImplementedError` guards only what assignment can never reach,
+because a reachable gap with a message is a PREFLIGHT ERROR under
+the error taxonomy (D58).
 
 **Backend state stays in the cached materialization.** Each backend
 is instructed to keep its machine files (disk images, `.vbox`,
@@ -268,5 +277,85 @@ The extraction work, stated as movements of working code:
   screen-settling logic → the agentless-display control plane,
   shared across adapters via the text-screen contract.
 
-Signatures, handle types, and the capability-report schema are
-settled in this extraction and recorded here when they land.
+Signatures, handle types, and the capability-report schema were
+settled in this extraction and are recorded below.
+
+## The signatures, as extracted
+
+Recorded here on delivery (2026-07-28), from the working code
+rather than ahead of it. `reliquary/backends.py` holds the
+contract; `reliquary/backend_qemu.py` implements it;
+`reliquary/backend_stubs.py` holds the three that do not.
+
+**The vocabulary.** Three frozen records, all plain data:
+
+- `Availability(backend, available, version, executable, detail)`
+  — what a probe found. `detail` says where it was found, or why
+  it was not; a refusal quotes it.
+- `Capabilities(backend, control_planes, media, controllers,
+  materialize, vvfat)` — the named-vocabulary report, in the
+  blueprint's own words.
+- `Requirements(control_planes, media, controllers, materialize)`
+  — what one whole blueprint asks for, read off the machine at
+  assignment time.
+
+**The contract** (`BackendAdapter`), grouped as the inventory
+above names it:
+
+```text
+discover()                                  -> Availability
+capabilities()                              -> Capabilities
+unmet(requirements)                         -> tuple[str, ...]
+
+image_path(root, stem)                      -> path
+create_image(path, *, mode, size, base)     -> path
+dispose(machine_dir)
+
+start(state, *, machine_dir, backend_dir,
+      display=False, current=None)          -> identity record
+stop(vm)
+session(vm)                                 -> context manager
+```
+
+`unmet()` is the seam's own arithmetic and is shared by every
+adapter: a requirement is judged against a report, and what comes
+back is the text a preflight failure quotes — so a refusal always
+names *which* requirement was refused.
+
+**The identity record** (`backends.identity()`) is the ownership
+doctrine as data: `{backend, backend-id, token, endpoint, pid?}`.
+The machine model persists it verbatim into `machine.json`'s `vm`
+section, atomically with the phase, and reads only its generic
+core; the endpoint's shape belongs to the adapter, which validates
+it when it opens a session.
+
+**The carriers** hang off the session, so a control plane composes
+them without ever learning the endpoint behind them:
+
+```text
+session.backend                             -> the adapter's name
+session.send_keys(combos, delay=0.06)
+session.text_screen()                       -> (rows, attribute rows)
+session.screenshot(path)                    -> path
+session.change_medium(drive_key, path=None)
+session.native()                            -> the backend-scoped hatch
+```
+
+The key vocabulary crossing this seam is the portable key-name set
+the display console speaks; QEMU's qcode names *are* that set
+today, so its mapping is the identity, and a backend naming keys
+differently translates in its own adapter.
+
+**Two things the extraction deliberately left out.** Raw
+interchange is in the inventory above but has no caller: it lands
+with the exporter family that needs it, which is unbuilt. And the
+**vvfat** capability is reported but not judged at assignment: a
+directory-source media's realized shape is only knowable after
+resolution, so the QEMU adapter judges it where the drive is
+rendered. Both are named rather than hidden (P11).
+
+**The test seam** is `backends._set_adapter(name, instance)`,
+mirroring `credentials._set_provider`: the suite drives the machine
+model against a double (`reliquary_tests/fake_backend.py`) rather
+than a hypervisor, so no unit test probes or launches a real
+backend.

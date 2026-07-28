@@ -8,6 +8,7 @@ separate media definition to copy out, and no ``seed_media`` verb
 (DECISIONS.md D30).
 """
 
+import contextlib
 import importlib
 import json
 import os
@@ -24,6 +25,7 @@ from reliquary.library import (list_builtin_blueprints, search_blueprints,
                                seed_blueprint, seed_script)
 from reliquary.machines import create_machine, load_machine_state
 from reliquary.resolve import load_namespace, resolve_media
+from reliquary_tests import fake_backend
 
 BLUEPRINT = "freedos"
 MEDIA = "freedos-livecd"
@@ -56,6 +58,9 @@ class _HomeTest(unittest.TestCase):
         self._temp = tempfile.TemporaryDirectory()
         self.addCleanup(self._temp.cleanup)
         self.home = self._temp.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
 
     def _path(self, *parts):
         return os.path.join(self.home, *parts)
@@ -164,19 +169,18 @@ class FirstReferenceTest(_HomeTest):
             resolve_media("no-such-media", load_namespace(self.home))
 
     def test_create_machine_seeds_and_honors_edits(self):
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create_machine(BLUEPRINT, context=self.home)
-            blueprint_path = os.path.join(
-                self.home, "blueprints", f"{BLUEPRINT}{EXT}")
-            self.assertTrue(os.path.isfile(blueprint_path))
-            with open(blueprint_path, encoding="utf-8") as handle:
-                data = jsonc.load(handle)
-            machine = next(spec for spec in data
-                           if spec.get("type") == "machine")
-            machine["memory"] = 64
-            with open(blueprint_path, "w", encoding="utf-8") as handle:
-                json.dump(data, handle)
-            second_id = create_machine(BLUEPRINT, context=self.home)
+        machine_id = create_machine(BLUEPRINT, context=self.home)
+        blueprint_path = os.path.join(
+            self.home, "blueprints", f"{BLUEPRINT}{EXT}")
+        self.assertTrue(os.path.isfile(blueprint_path))
+        with open(blueprint_path, encoding="utf-8") as handle:
+            data = jsonc.load(handle)
+        machine = next(spec for spec in data
+                       if spec.get("type") == "machine")
+        machine["memory"] = 64
+        with open(blueprint_path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        second_id = create_machine(BLUEPRINT, context=self.home)
         self.assertEqual(
             load_machine_state(machine_id, context=self.home)["memory"], 32)
         self.assertEqual(

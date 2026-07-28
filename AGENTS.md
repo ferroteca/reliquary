@@ -96,10 +96,12 @@ workflow:
   (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
   matches codex + home blueprints and reports provenance `yes`/`seeded`/`user`), `machines.py` owns machine materialization under
-  `cache/machines/<blueprint>-<n>/` — where the declared capabilities are checked against the built ones
-  before any image work, so a blueprint naming an unwired drive `controller` or an unbuilt
-  `control-planes` entry (only `agentless-display` exists) raises `NotImplementedError` naming the gap
-  rather than recording a policy nothing can honor (P11) — plus lifecycle (`create` / `start` / `stop` / `destroy` /
+  `cache/machines/<blueprint>-<n>/` — where **backend assignment** happens, before any image work: the
+  blueprint's whole demand (control planes, media kinds, controllers, materialization modes) becomes a
+  `backends.Requirements`, and a declared `backend` pins the choice while an absent one walks the priority
+  order (`backends.PRIORITY`, D66) and takes the first backend both available and capable. A requirement no
+  candidate can honor fails closed naming the backend and the requirement, rather than recording a policy
+  nothing can honor (P11) — plus lifecycle (`create` / `start` / `stop` / `destroy` /
   `recreate_machine` (destroy+create under the same id) / `apply_blueprint` (adopt blueprint edits into a
   stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
   already-materialized media image) / `get_machine_dir` (the out-of-band door) /
@@ -143,11 +145,27 @@ workflow:
   or stopped (persisted for the next start); `set_boot_order` is
   stopped-only (a launch-time firmware order); boot-order keys may name
   any declared drive; all three persist and survive stop/start),
-  `lifecycle.py` owns QMP,
-  QEMU processes, and host-side `qemu-img` helpers,
+  `backends.py` is **the backend adapter seam** — the provider contract behind the semantic surface
+  (design: `planning/design/backend-adapter.md`), deliberately *not* one of the world-facing interfaces:
+  the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the
+  carrier session), the `Availability` / `Capabilities` / `Requirements` vocabulary the report and the demand
+  share, `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
+  per-start `token`, and an adapter-shaped `endpoint`), the registry (`adapter(name)`, `discover()`), and
+  `assign()`. `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
+  `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
+  and boot rendering a machine's state lowers into, the owned launch with its identity verification, `Qmp`,
+  and the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
+  hatch `QemuSession.native()`; `backend_stubs.py` holds the three unbuilt adapters (VirtualBox, VMware
+  Workstation, Hyper-V): their host probe is real, they claim **no capability**, so assignment passes over
+  them even where the backend is installed, and a pinned one fails preflight naming the gap.
+  `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and
+  the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
+  equality-comparable per-cell attribute tokens) and never per adapter.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
-  adapter (prompt-based readiness and command completion), `machine.py` provides platform-neutral QMP interaction
-  and diagnostics — keyboard input, VGA text/attribute scraping, cursor-menu selection, and screenshots,
+  adapter (prompt-based readiness and command completion), `machine.py` is the backend-neutral machine handle:
+  a machine is addressed by its materialization directory, the adapter named in the recorded identity supplies
+  the session (`Machine.session()` / `console()`), and `Machine.qmp()` is the QEMU-scoped escape hatch that
+  refuses any other backend,
   `platform_dos.py` owns DOS provisioning and facades plus the guest-address mapping (`drive_letters` —
   floppies to A:/B: by slot, hard disks C: onward, CD-ROMs after them, from Reliquary's own drive assignment
   and never from a guest; `split_address`). The
@@ -401,7 +419,7 @@ module functions — because six nullable strings bind cleanly from C or Java wh
 (P7). Every function resolving a working directory accepts `context=`: omit it for the globals, pass a bare string as
 shorthand for `Context(home_dir=...)`, or pass a `Context` to pin whatever slots it fills per call, unfilled slots
 falling through to the globals and then to derivation. The CLI only ever drives the globals — scoped `Context` objects
-are an embedding-API-only capability. `lifecycle.py`'s and `machine.py`'s own `home=` parameters are a different,
+are an embedding-API-only capability. `machine.py`'s and the adapters' own `home=` parameters are a different,
 narrower concept — an already-resolved plain directory (sometimes a machine's own materialization directory standing
 in for one), not a `Context`; they were deliberately left alone.
 
@@ -446,29 +464,36 @@ unrelated cache state file):
 
 ### VM ownership
 
-Never send a control command to a QMP server until its identity is verified.
+Never send a control command to a backend object until its identity is verified.
+**No code outside an adapter opens a backend connection**, and every adapter operation
+verifies before it commands.
 
-`launch_owned_qemu()` assigns a readable QEMU name plus a fresh per-start `-uuid`,
-and returns the verified identity `{port, name, uuid, pid}`; `machines.py`
-persists it into the `vm` section of `machine.json`, atomically with `phase`
-(lifecycle no longer owns a state file). Every later connection checks
-`query-name` **and** `query-uuid` against
-that record. The name alone must never authorize a command: same-numbered
-machines of one blueprint in different homes share their readable name, so
-only the uuid identifies the exact QEMU instance this home started.
-Identity mismatches fail closed; in particular, `stop()` must never send
-`quit` to an unrelated VM.
+The identity is generic (`backends.identity()`): the **backend**, that backend's own
+machine identifier (**`backend-id`** — QEMU's readable `-name`, and later a VirtualBox
+machine UUID, a `.vmx` path, a Hyper-V VM Id), a per-start **`token`**, and the
+adapter-shaped **`endpoint`**. The token is not decoration: an addressable endpoint
+outlives its owner (a QMP port is reusable by strangers, and same-numbered machines of
+one blueprint in different homes share their readable name), so the name alone must
+never authorize a command. `machines.py` persists the record the adapter returns into
+the `vm` section of `machine.json`, atomically with `phase`; adapters own no state file.
+Identity mismatches fail closed; in particular, an adapter's `stop()` must never reach
+its backend's quit path with an unverified object.
 
-`Machine.qmp()` is the public raw-monitor seam. It yields the
-identity-verified QMP session, whose `cmd()` and `hmp()` methods remain
-available to callers. Interaction adapters receive a `Machine` and must use
-this seam rather than opening QMP connections directly.
+On QEMU that is `launch_owned_qemu()` assigning the readable `-name` plus a fresh
+per-start `-uuid`, and every later session checking `query-name` **and** `query-uuid`
+against the record. When no port is given it selects an available local one; an explicit
+port must be free. Startup failure and timeout paths must terminate the child so they
+cannot leave an untracked QEMU process.
 
-When `port=None`, `launch_owned_qemu()` selects an available local port. An explicit port must be free. Startup failure and timeout
-paths must terminate the child so they cannot leave an untracked QEMU process.
+`Machine.session()` is the carrier seam every control plane uses, and `Machine.qmp()` is
+the **named native escape hatch** — explicitly backend-scoped, refusing a machine that is
+not QEMU's rather than approximating a monitor it does not have. Interaction adapters
+receive a `Machine` and use these seams rather than opening connections directly.
 
-The CLI resolves the active port from the `vm` section of the machine's `machine.json` (via `read_vm_state`, which
-reads that section); `start_machine()` returns the port for callers to propagate explicitly.
+`machines.read_vm_state(machine_dir)` reads the recorded identity and validates its
+generic core; what the endpoint *is* belongs to the adapter, which validates it when it
+opens a session. Nothing above the seam reads a port — `start_machine()` returns the
+machine id, and the CLI selects a machine by `--blueprint` / `--machine`.
 
 ### DOS boot and scripting
 
@@ -476,7 +501,7 @@ A machine's drives are declared in its blueprint (the field reference,
 `docs/blueprint-reference.md`), each naming a media
 component; per-machine images are materialized into
 `cache/machines/<id>/media/`, named for the media.
-`machine_drive_args()` (`machines.py`) renders them from the machine
+`backend_qemu.drive_args()` renders them from the machine
 state: floppies first (slots 0–1, A: and B:), hard disks next (slots
 0–3, the IDE bus), then cdroms placed on the IDE slots after the hard
 disks; each removable drive carries a stable QMP `id=<key>` so a running
@@ -684,9 +709,22 @@ Lifecycle changes need focused tests, especially for failure paths. Preserve cov
 - occupied explicit ports fail before launch
 - identity mismatch terminates a just-started child
 - identity mismatch never reaches `quit`
-- a name match with a uuid mismatch is an identity mismatch
+- a `backend-id` match with a token mismatch is an identity mismatch
 - a stop refused on identity mismatch leaves the machine phase `running`
 - stale state produces clear diagnostics and cannot target another VM
+
+Adapter-seam guarantees, which the suite exercises against a **double** rather than a
+hypervisor (`reliquary_tests/fake_backend.py`, installed with `backends._set_adapter`) —
+no unit test may probe or launch a real backend:
+
+- a requirement no candidate can honor fails closed naming the backend *and* the
+  requirement, before any image work
+- the priority walk takes the first backend both available and capable, so availability
+  alone never wins and the order never stands in for a capability check
+- a declared `backend` skips the walk, and an unavailable or incapable one fails closed
+- a stub adapter claims no capability even where its backend is installed
+- the machine model hands the adapter a resolved state and gets an identity back: no
+  backend argument is composed above the seam, and no port is read there
 
 Milestone-9 guarantees needing the same care:
 

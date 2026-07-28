@@ -15,7 +15,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > and their implementation details remain open. QEMU-first but
 > backend-neutral: `GuestExec` and the control-plane vocabulary
 > apply to every backend adapter
-> ([backend-adapter.md](../../planning/pledged/design/backend-adapter.md)). Native-agent
+> ([backend-adapter.md](backend-adapter.md)). Native-agent
 > control planes and the VNC plane are both **backlog work**
 > (planning/proposed/FEATURES.md F4 "Guest agent communication" and the GUI
 > era), unscheduled since 2026-07-23 (DECISIONS.md D33). This
@@ -120,7 +120,7 @@ shared fixed-font recognizer** over the captured framebuffer
 carriers, never a per-backend reimplementation. The portable
 snapshot contract — character rows plus opaque,
 equality-comparable per-cell attribute tokens — is in
-[backend-adapter.md](../../planning/pledged/design/backend-adapter.md).
+[backend-adapter.md](backend-adapter.md).
 
 ### VNC
 

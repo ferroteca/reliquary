@@ -347,9 +347,9 @@ def autoseed(context=None):
 def effective_home(explicit):
     """Return the explicit operation home, or the resolved home.
 
-    For the small set of modules (``lifecycle.py``, ``machine.py``)
-    that take an already-resolved plain directory rather than a
-    ``Context`` — sometimes a real reliquary home, sometimes a
+    For the small set of modules (``machine.py``, the backend
+    adapters) that take an already-resolved plain directory rather
+    than a ``Context`` — sometimes a real reliquary home, sometimes a
     machine's own materialization directory standing in for one.
     """
     return os.path.abspath(explicit) if explicit else home_dir()

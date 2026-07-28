@@ -170,10 +170,11 @@ cannot carry.
   order, CPU count, identity), with each adapter rejecting the
   overlap in its own section; and that where a blueprint declares
   no `backend`, sections for exactly one backend narrow the
-  default assignment to it. Both need the adapter seam and a
-  second backend — today `backend` resolves to `qemu` or the
-  declared value, and no section is validated. They arrive with
-  [F2](../../planning/proposed/FEATURES.md).
+  default assignment to it. Both need a second backend to be real:
+  the adapter seam is built and assignment walks the priority
+  order, but the other three adapters claim no capability, so
+  sections are carried through verbatim and none is validated
+  yet.
 
 ### media
 
@@ -675,8 +676,9 @@ the blueprint verbs.
 cache/machines/<id>/
 ├── machine.json    the machine's state: id, blueprint ref, phase,
 │                   resolved config — and, while running, the live
-│                   VM identity (name, uuid, port, pid), written
-│                   atomically with phase so the two cannot disagree
+│                   VM identity (backend, backend-id, token,
+│                   endpoint, pid), written atomically with phase
+│                   so the two cannot disagree
 ├── media/          per-machine materialized images, <media-name>.<ext>
 ├── screenshots/    the `screenshot` verb's captures, and a
 │                   failure's automatic one

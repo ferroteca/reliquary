@@ -67,7 +67,7 @@ def drive_letters(drives):
     read from the drive image on the host — the partition table, and
     past it whatever volume manager a guest layered on — which is no
     more guest inspection than
-    :func:`lifecycle.probe_image_format` is. Growing the mapping that
+    :func:`backend_qemu.probe_image_format` is. Growing the mapping that
     way is open; what stops it is that every layout is its own
     reader, not a rule. The refusal here keeps the gap honest in the
     meantime.

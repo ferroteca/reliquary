@@ -82,9 +82,10 @@ by the CLI and never by the library, for the same reason.
   blueprint's sole machine. No prefix matching and no
   bare-number form.
 - `start_machine(machine_id, *, display=False, context=None)` -
-  Start a machine; the QMP port and VM identity are recorded in
-  the machine's `machine.json` as a `vm` section, written
-  atomically with `phase`. CLI twin: `start-machine`.
+  Start a machine through its assigned backend's adapter and return
+  its id; the verified VM identity is recorded in the machine's
+  `machine.json` as a `vm` section, written atomically with `phase`.
+  CLI twin: `start-machine`.
 - `stop_machine(machine_id, context=None)` - Stop a running machine;
   identity mismatches fail closed. CLI twin: `stop-machine`.
 - `destroy_machine(machine_id, context=None)` - Delete the machine
@@ -110,8 +111,9 @@ by the CLI and never by the library, for the same reason.
   machine's `machine.json`.
 - `machine_dir_path(machine_id, context=None)` - The machine's cache
   directory.
-- `machine_drive_args(machine_id, context=None)` - Render QEMU
-  `-drive` arguments from the machine's state.
+- `read_vm_state(machine_dir)` - The machine's recorded live-VM
+  identity (`backend`, `backend-id`, `token`, `endpoint`), or `None`
+  when it is not running.
 
 Persistent machine-state changes — insert/eject are floppy and cdrom
 slots and work running-or-stopped (a running change is applied live
@@ -350,45 +352,66 @@ the `location` grammar.
 
 ## Guest interaction
 
-`Machine(port=None, home=None, deadline=None)` is the
-platform-neutral interaction handle for a running,
-Reliquary-owned VM. Every operation verifies VM identity before
-sending anything. `Machine.home` is a plain already-resolved
-directory, not a `Context` — typically a specific machine's own
-cache subdirectory, not the Reliquary home itself.
+`Machine(home=None, deadline=None)` is the backend-neutral
+interaction handle for a running, Reliquary-owned machine. `home`
+is the machine's own materialization directory — a plain
+already-resolved path, not a `Context` — and it is the whole
+address: the recorded VM identity lives there, and the adapter it
+names supplies the endpoint and verifies it before anything is
+sent. There is no port to pass.
 
-- `Machine.qmp()` - Context manager yielding the
-  identity-verified QMP session (its `cmd()` and `hmp()` remain
-  available).
+- `Machine.session()` - Context manager yielding the
+  identity-verified backend session (the adapter's carriers).
+- `Machine.console()` - Context manager yielding the agentless
+  display console over one such session.
+- `Machine.qmp()` - Context manager yielding the identity-verified
+  QMP session (its `cmd()` and `hmp()` remain available). The named
+  native escape hatch, and QEMU's alone: a machine on another
+  backend refuses it rather than approximating a monitor it has not
+  got.
 - `Machine.screen_text()` /
   `Machine.wait_text(pattern, timeout=60)` - Read or wait on the
-  80x25 VGA text screen.
+  guest text screen.
 - `Machine.send_keys(combos, delay=0.06)` /
   `Machine.send_text(text, enter=True)` - Keyboard input.
 - `Machine.cursor_menu_select(item, timeout=30, exclude=())` -
   Feedback-driven cursor-menu selection.
-- `Machine.screenshot(name="screen")` - PNG screendump.
+- `Machine.screenshot(name="screen", directory=None)` - Capture the
+  guest framebuffer as a PNG, and return its path.
 
-Module-level equivalents take `port=` / `home=` directly:
-`send_keys`, `send_text`, `screen_text`, `wait_text`,
-`cursor_menu_select`, and `screenshot(name="screen", port=None,
-home=None, directory=None)`.
+Module-level equivalents take `home=` directly: `send_keys`,
+`send_text`, `screen_text`, `wait_text`, `cursor_menu_select`, and
+`screenshot(name="screen", home=None, directory=None)`.
 
 `GuestExec` is the capability protocol —
 `wait_ready(timeout=90)`, `execute(command, timeout=120)` — and
 `AgentlessGuestExec` is the concrete agentless DOS adapter over a
 `Machine`.
 
-## QEMU helpers
+## Backends
 
-- `find_qemu()` / `find_qemu_img()` - Locate the binaries
-  (`RELIQUARY_QEMU_HOME` / `QEMU_HOME`, then PATH, then
-  well-known install locations).
-- `create_hdd_image(filename, capacity)` - Create a sparse qcow2
-  v3 image; capacity is a qemu-img size string (`"2G"`) or a
-  positive integer MiB value.
-- `Qmp(port)` - Synchronous facade over the official `qemu.qmp`
-  client.
+The adapter API is an **internal engineering contract**, not one of
+the world-facing interfaces: no adapter operation is a CLI command
+or an API twin, and consumers reach backends through blueprint
+vocabulary (`backend`, `backend-settings`, `control-planes`, drives
+and controllers) and through the capability failures preflight
+reports. What the package root exposes is the seam's vocabulary,
+for reading rather than driving:
+
+- `adapter(name)` / `discover()` - The adapter for a backend name,
+  and an availability probe of every backend in priority order.
+  Discovery establishes availability only: it never selects a
+  backend and never changes a machine's recorded one.
+- `BACKEND_PRIORITY` - The default assignment order (QEMU,
+  VirtualBox, VMware Workstation, Hyper-V), which breaks ties among
+  backends already available *and* capable.
+- `Availability` / `Capabilities` / `BackendAdapter` - The probe
+  result, the named-vocabulary capability report, and the contract
+  itself.
+
+QEMU's own helpers (`find_qemu`, `create_hdd_image`, `Qmp`, the
+drive rendering) are adapter internals in `reliquary.backend_qemu`
+and are not part of the embedding surface.
 
 `main(argv=None)` is the CLI entry point.
 

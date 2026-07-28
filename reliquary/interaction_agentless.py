@@ -7,7 +7,7 @@ import sys
 import time
 
 from .errors import RunFailure
-from .machine import Machine, _DisplayConsole
+from .machine import Machine
 
 
 _PROMPT_RE = re.compile(r"^[A-Z]:(\\[^>]*)?>$")
@@ -22,8 +22,7 @@ class AgentlessGuestExec:
     def wait_ready(self, timeout: float = 90) -> None:
         """Wait for a DOS prompt."""
         print("rlq: waiting for a DOS prompt...", file=sys.stderr)
-        with self._machine.qmp() as qmp:
-            console = _DisplayConsole(qmp)
+        with self._machine.console() as console:
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 rows = [row for row in console.screen_text() if row]
@@ -46,8 +45,7 @@ class AgentlessGuestExec:
         Reliquary attaches no meaning to any of it (G2); the text is
         the caller's to read.
         """
-        with self._machine.qmp() as qmp:
-            console = _DisplayConsole(qmp)
+        with self._machine.console() as console:
             console.send_text(command)
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:

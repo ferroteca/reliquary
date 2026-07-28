@@ -1,11 +1,24 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: BSD-3-Clause
-"""Ownership-safe QEMU process and QMP lifecycle."""
+"""The QEMU backend adapter: everything that knows QEMU.
+
+The seam was read off this implementation rather than designed ahead
+of one (F2): binary discovery, image creation, configuration
+rendering, owned process launch, monitor sessions, identity
+verification, input injection, screen capture and readback all live
+here, and nothing above the seam names QEMU, qcow2, QMP or a port.
+
+The management interface is QMP — a private tool of this adapter, and
+never a control plane (planning/design/guest-communication.md). It
+reaches the world only through the named native escape hatch,
+``QemuSession.native()``, which is explicitly backend-scoped.
+"""
 
 import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -13,16 +26,20 @@ import sys
 import time
 import uuid
 
-from qemu.qmp import ConnectError, QMPClient
+from PIL import Image
+from qemu.qmp import ConnectError, ExecuteError, QMPClient
 
-from .errors import (InternalError, PreflightError, ReliquaryError,
-                     RunFailure, StaticError)
+from . import backends
+from .backends import Availability, BackendAdapter, Capabilities
+from .errors import (PreflightError, ReliquaryError, RunFailure,
+                     StaticError)
 from .home import effective_home
 
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
 _QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
-_MACHINE_STATE_FILE = "machine.json"
+
+_BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
 
 def _qemu_fallback_dirs():
@@ -250,79 +267,13 @@ class Qmp:
         self.close()
 
 
-def state_path(home=None):
-    """Path to the machine-state file that carries the live-VM section."""
-    return os.path.join(effective_home(home), _MACHINE_STATE_FILE)
-
-
-def read_vm_state(home=None):
-    """Return the recorded live-VM identity for a machine, or ``None``.
-
-    The identity lives in the ``vm`` section of the machine's
-    ``machine.json`` — written by ``machines.py`` atomically with the
-    machine ``phase``. Lifecycle reads it only to verify the QMP
-    session it is about to talk to. A state file with no ``vm`` section
-    (a stopped machine, or a plain reliquary home) reads as ``None``; a
-    malformed section fails closed.
-    """
-    path = state_path(home)
-    try:
-        with open(path, encoding="utf-8") as state_file:
-            document = json.load(state_file)
-    except FileNotFoundError:
-        return None
-    except (ValueError, json.JSONDecodeError) as error:
-        raise InternalError(
-            f"invalid reliquary machine state file: {path}: {error}"
-        ) from error
-    vm = document.get("vm") if isinstance(document, dict) else None
-    if vm is None:
-        return None
-    try:
-        port = vm["port"]
-        name = vm["name"]
-        vm_uuid = vm["uuid"]
-    except (KeyError, TypeError) as error:
-        raise InternalError(
-            f"invalid reliquary VM state in {path}: {error}") from error
-    # Checked outside the try: a bare `raise ValueError` caught by the
-    # clause above read as a signal rather than an error, and the
-    # hierarchy has no room for a deliberate raise that is neither.
-    if (not isinstance(port, int) or isinstance(port, bool)
-            or not 1 <= port <= 65535
-            or not isinstance(name, str) or not name
-            or not isinstance(vm_uuid, str) or not vm_uuid):
-        raise InternalError(
-            f"invalid reliquary VM state in {path}: "
-            "invalid port, name, or uuid")
-    return vm
-
-
-def resolve_vm(port=None, home=None):
-    state = read_vm_state(home)
-    if port is None:
-        if not state:
-            raise PreflightError(
-                "no active reliquary VM is recorded; run: reliquary start",
-                rule_id="machine.no-active-vm")
-        return state["port"], state["name"], state["uuid"]
-    if not 1 <= port <= 65535:
-        raise StaticError(f"QMP port must be between 1 and 65535: {port}",
-            rule_id="value.not-a-port")
-    if not state or state["port"] != port:
-        raise PreflightError(
-            f"QMP port {port} is not the recorded reliquary VM; "
-            "start it with reliquary or omit --port to use the active VM",
-            rule_id="machine.port-not-recorded")
-    return port, state["name"], state["uuid"]
-
-
-def verify_vm(qmp, port, expected_name, expected_uuid):
+def verify_vm(qmp, port, expected_name, expected_token):
     """Fail closed unless the server is the exact VM instance recorded.
 
     The name alone cannot identify a VM: same-numbered machines of
-    two homes share their readable name, so the per-start uuid must
-    match as well before any command may target the server.
+    two homes share their readable name, so the per-start token (the
+    QEMU ``-uuid``) must match as well before any command may target
+    the server.
     """
     reply = qmp.cmd("query-name")
     actual_name = reply.get("name") if isinstance(reply, dict) else None
@@ -335,37 +286,14 @@ def verify_vm(qmp, port, expected_name, expected_uuid):
     reply = qmp.cmd("query-uuid")
     actual_uuid = reply.get("UUID") if isinstance(reply, dict) else None
     if (not isinstance(actual_uuid, str)
-            or actual_uuid.casefold() != expected_uuid.casefold()):
+            or actual_uuid.casefold() != expected_token.casefold()):
         raise PreflightError(
             "QMP identity mismatch; the unrelated VM was not modified\n"
-            f"  expected: {expected_name} ({expected_uuid}) "
+            f"  expected: {expected_name} ({expected_token}) "
             f"on 127.0.0.1:{port}\n"
             f"  found:    {actual_name} "
             f"({actual_uuid or '<no uuid>'})",
             rule_id="machine.identity-mismatch")
-
-
-@contextlib.contextmanager
-def qmp_session(port=None, home=None):
-    """Yield an identity-verified QMP session."""
-    if isinstance(port, Qmp):
-        yield port
-    else:
-        actual_port, expected_name, expected_uuid = resolve_vm(port, home)
-        try:
-            with Qmp(actual_port) as qmp:
-                verify_vm(qmp, actual_port, expected_name, expected_uuid)
-                yield qmp
-        except (OSError, ConnectError) as error:
-            # The recorded VM is gone. Lifecycle no longer owns the
-            # machine state, so it does not clear it here — the caller
-            # (a lifecycle operation, or ``mark_stopped``) reconciles
-            # the phase and the ``vm`` section on the next operation.
-            raise PreflightError(
-                "the recorded reliquary VM is no longer reachable\n"
-                f"  expected: {expected_name} on "
-                f"127.0.0.1:{actual_port}",
-                rule_id="machine.vm-unreachable") from error
 
 
 def available_port():
@@ -409,6 +337,18 @@ def _terminate_started_process(proc):
             proc.kill()
 
 
+def _endpoint_port(vm):
+    """The recorded QMP port of a QEMU VM record, or fail closed."""
+    endpoint = (vm or {}).get("endpoint")
+    port = endpoint.get("port") if isinstance(endpoint, dict) else None
+    if (not isinstance(port, int) or isinstance(port, bool)
+            or not 1 <= port <= 65535):
+        raise PreflightError(
+            f"the recorded QEMU endpoint is not a usable QMP port: "
+            f"{endpoint!r}", rule_id="machine.endpoint-invalid")
+    return port
+
+
 def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                       current_vm=None, log_dir=None):
     """Launch an owned QEMU process and return its verified identity.
@@ -420,9 +360,9 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     a live VM is never orphaned; a stale one is ignored (the caller
     overwrites the recorded identity). ``log_dir`` receives
     ``qemu-stderr.log`` — the machine's backend subdirectory. Returns
-    the identity dict ``{port, name, uuid, pid}``; the caller persists
-    it, atomically with the machine phase. Lifecycle no longer owns any
-    state file.
+    the generic identity record (:func:`backends.identity`) whose
+    endpoint is this QEMU's QMP port; the caller persists it,
+    atomically with the machine phase.
     """
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -433,28 +373,29 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         selection = "automatically selected" if automatic_port else "explicit"
         raise PreflightError(
             f"QMP port 127.0.0.1:{port} is already in use "
-            f"({selection}); choose another --port or stop its owner",
+            f"({selection}); choose another port or stop its owner",
             rule_id="machine.port-in-use")
     if current_vm:
+        current_port = _endpoint_port(current_vm)
         try:
-            with Qmp(current_vm["port"]) as old_qmp:
-                verify_vm(old_qmp, current_vm["port"],
-                          current_vm["name"], current_vm["uuid"])
+            with Qmp(current_port) as old_qmp:
+                verify_vm(old_qmp, current_port,
+                          current_vm["backend-id"], current_vm["token"])
         except (OSError, ConnectError):
             pass  # stale identity; the caller overwrites it
         else:
             raise PreflightError(
                 "a reliquary VM is already active\n"
-                f"  name: {current_vm['name']}\n"
-                f"  QMP port: 127.0.0.1:{current_vm['port']}\n"
+                f"  name: {current_vm['backend-id']}\n"
+                f"  QMP port: 127.0.0.1:{current_port}\n"
                 "stop it before starting another VM for this machine",
                 rule_id="machine.vm-already-active")
     # The readable -name repeats across homes (same-numbered machines
-    # of one blueprint); the per-start uuid is what makes this exact
-    # QEMU instance verifiable.
-    vm_uuid = str(uuid.uuid4())
+    # of one blueprint); the per-start uuid is the token that makes
+    # this exact QEMU instance verifiable.
+    token = str(uuid.uuid4())
     command = list(args)
-    command += ["-uuid", vm_uuid]
+    command += ["-uuid", token]
     command += ["-qmp", f"tcp:127.0.0.1:{port},server,nowait"]
     if not display:
         command += ["-display", "none"]
@@ -475,7 +416,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                 "QEMU exited during startup", command)
         try:
             with Qmp(port) as qmp:
-                verify_vm(qmp, port, vm_name, vm_uuid)
+                verify_vm(qmp, port, vm_name, token)
             if proc.poll() is not None:
                 raise _startup_error(
                     proc, stderr_log, port, automatic_port,
@@ -497,29 +438,30 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
           file=sys.stderr)
     print(f"rlq: command line: {subprocess.list2cmdline(command)}",
           file=sys.stderr)
-    return {"port": port, "name": vm_name, "uuid": vm_uuid, "pid": proc.pid}
+    return backends.identity(
+        "qemu", vm_name, token, {"port": port}, pid=proc.pid)
 
 
 def stop(vm):
     """Power off the identified owned VM (no persistence).
 
-    ``vm`` is the recorded identity dict ``{port, name, uuid, ...}``.
-    The QMP session is identity-verified before ``quit``, so an
-    unrelated VM on the same port is never touched. Fails closed on an
-    identity mismatch or an unreachable VM; the caller reconciles the
-    machine ``phase`` and clears the ``vm`` section.
+    ``vm`` is the recorded identity record. The QMP session is
+    identity-verified before ``quit``, so an unrelated VM on the same
+    port is never touched. Fails closed on an identity mismatch or an
+    unreachable VM; the caller reconciles the machine ``phase`` and
+    clears the ``vm`` section.
     """
     if not vm:
         # A machine caught with no recorded VM identity — treat as
         # already gone so the caller reconciles it to a resting phase.
         raise PreflightError("no recorded reliquary VM to stop",
             rule_id="machine.no-active-vm")
-    port = vm["port"]
-    expected_name = vm["name"]
-    expected_uuid = vm["uuid"]
+    port = _endpoint_port(vm)
+    expected_name = vm["backend-id"]
+    expected_token = vm["token"]
     try:
         with Qmp(port) as qmp:
-            verify_vm(qmp, port, expected_name, expected_uuid)
+            verify_vm(qmp, port, expected_name, expected_token)
             try:
                 qmp.cmd("quit")
             except Exception:
@@ -542,3 +484,312 @@ def stop(vm):
                 rule_id="machine.port-not-released")
         time.sleep(0.5)
     print("rlq: VM stopped", file=sys.stderr)
+
+
+# -- carriers -----------------------------------------------------
+
+def format_options(image):
+    """The QEMU ``format=`` option for an image, by extension.
+
+    ``.img`` / ``.iso`` are pinned to ``format=raw`` (avoiding QEMU's
+    format-probing warning); any other extension is left for QEMU to
+    identify.
+    """
+    extension = os.path.splitext(image)[1].lower()
+    return "format=raw," if extension in (".img", ".iso") else ""
+
+
+def vga_screen(qmp):
+    """Return the 80x25 VGA text screen as (text rows, attribute rows).
+
+    Text rows are right-stripped strings; attribute rows keep the raw
+    VGA attribute byte of all 80 cells. Those bytes are the adapter's
+    contribution to the seam's text-screen contract: opaque,
+    equality-comparable per-cell tokens, promising nothing except
+    that equal tokens mean identically rendered cells.
+    """
+    raw = qmp.hmp("xp /4000bx 0xb8000")
+    data = []
+    for line in raw.splitlines():
+        if not re.match(r"^[0-9a-f]+:", line):
+            continue
+        data.extend(int(token, 16) for token in line.split()[1:])
+    rows = []
+    attributes = []
+    for row in range(25):
+        cells = data[row * 160:(row + 1) * 160]
+        rows.append("".join(
+            chr(byte) if 32 <= byte < 127 else " "
+            for byte in cells[0::2]).rstrip())
+        attributes.append(cells[1::2])
+    return rows, attributes
+
+
+class QemuSession:
+    """The carriers a running QEMU offers, over one verified session.
+
+    A control plane composes these; it never opens a connection of its
+    own and never learns the port behind them.
+    """
+
+    backend = "qemu"
+
+    def __init__(self, qmp):
+        self._qmp = qmp
+
+    def native(self):
+        """The named native escape hatch: this QEMU's QMP session.
+
+        Always explicitly backend-scoped, never generalized — a
+        caller reaching for it has left the portable surface
+        deliberately.
+        """
+        return self._qmp
+
+    def send_keys(self, combos, delay=0.06):
+        """Inject key combinations, each a list of portable key names.
+
+        The seam's key vocabulary is the portable name set the display
+        console speaks; QEMU's qcode names are that set today, so the
+        mapping here is the identity — a backend whose input API names
+        keys differently translates in its own adapter, never in the
+        control plane.
+        """
+        for combo in combos:
+            self._qmp.cmd(
+                "send-key",
+                keys=[{"type": "qcode", "data": key} for key in combo])
+            time.sleep(delay)
+
+    def text_screen(self):
+        """The native text readback: (character rows, attribute rows)."""
+        return vga_screen(self._qmp)
+
+    def screenshot(self, path):
+        """Capture the framebuffer to ``path`` as a PNG.
+
+        QEMU writes PNG directly where its build supports it, and PPM
+        otherwise — converted here, so the carrier's product is a PNG
+        either way.
+        """
+        png = os.fspath(path)
+        try:
+            self._qmp.cmd("screendump", filename=png.replace("\\", "/"),
+                          format="png")
+            return png
+        except ExecuteError:
+            pass
+        ppm = os.path.splitext(png)[0] + ".ppm"
+        self._qmp.cmd("screendump", filename=ppm.replace("\\", "/"))
+        time.sleep(0.3)
+        try:
+            with Image.open(ppm) as image:
+                image.save(png)
+        except OSError as error:
+            raise RunFailure(
+                f"unexpected screendump format in {ppm}: {error}",
+                rule_id="screen.screendump-unreadable") from error
+        os.remove(ppm)
+        return png
+
+    def change_medium(self, drive_key, path=None):
+        """Swap or eject a removable medium on the running machine.
+
+        The drive is addressed by its launch id, which is the state's
+        drive key, so the change the guest sees and the change
+        persisted to the state stay one operation.
+        """
+        if path is None:
+            self._qmp.hmp(f"eject {drive_key}")
+            return
+        target = os.fspath(path).replace("\\", "/")
+        extension = os.path.splitext(target)[1].lower()
+        fmt = " raw" if extension in (".img", ".iso") else ""
+        self._qmp.hmp(f"change {drive_key} {target}{fmt}")
+
+
+class QemuAdapter(BackendAdapter):
+    """QEMU: the delivered backend, and the seam's source."""
+
+    name = "qemu"
+
+    # -- discovery and capability ---------------------------------
+
+    def discover(self):
+        try:
+            executable = find_qemu()
+        except PreflightError as missing:
+            return Availability("qemu", False, detail=str(missing))
+        return Availability("qemu", True, version=_qemu_version(executable),
+                            executable=executable,
+                            detail=f"found at {executable}")
+
+    def capabilities(self):
+        """What QEMU provides today — built, not merely intended.
+
+        Only ``agentless-display`` is listed because only it is built;
+        the VNC, serial-console and guest-agent planes are named in the
+        blueprint vocabulary and unbuilt, so claiming them here would
+        promise what nothing can honor (P11). The same reading governs
+        controllers: the drive renderer wires ``ide`` alone.
+        """
+        return Capabilities(
+            backend="qemu",
+            control_planes=("agentless-display",),
+            media=("floppy", "hdd", "cdrom"),
+            controllers=("ide",),
+            materialize=("new", "difference", "copy", "use"),
+            vvfat=True,
+        )
+
+    # -- materialize and dispose ----------------------------------
+
+    def image_path(self, root, stem):
+        """QEMU's native per-machine image: qcow2, named for its media."""
+        return os.path.join(root, f"{stem}.qcow2")
+
+    def create_image(self, path, *, mode, size=None, base=None):
+        if mode == "new":
+            return create_hdd_image(path, size)
+        if mode == "difference":
+            return create_difference_image(path, base)
+        if mode == "copy":
+            return create_duplicate_image(path, base)
+        raise StaticError(
+            f"the qemu adapter cannot materialize an image for "
+            f"mode {mode!r}", rule_id="image.mode-unsupported")
+
+    # -- start, stop, liveness ------------------------------------
+
+    def start(self, state, *, machine_dir, backend_dir, display=False,
+              current=None):
+        """Render the machine's state into a QEMU command line and launch.
+
+        Reliquary drive vocabulary in, QEMU configuration out: memory,
+        the drive arguments, and the firmware boot order are all
+        rendered here, so no caller ever composes a backend argument.
+        """
+        memory = state.get("memory") or 16
+        vm_name = state.get("backend-id") or f"reliquary-{state['id']}"
+        args = [find_qemu(), "-name", vm_name, "-m", str(memory)]
+        args += drive_args(state.get("drives", {}))
+        boot = _boot_order(state.get("boot", []), state.get("drives", {}))
+        if boot is not None:
+            args += ["-boot", f"order={boot}"]
+        return launch_owned_qemu(
+            args, vm_name=vm_name, display=display, current_vm=current,
+            log_dir=backend_dir)
+
+    def stop(self, vm):
+        return stop(vm)
+
+    @contextlib.contextmanager
+    def session(self, vm):
+        """Yield an identity-verified session over the recorded VM."""
+        port = _endpoint_port(vm)
+        name = vm["backend-id"]
+        token = vm["token"]
+        try:
+            with Qmp(port) as qmp:
+                verify_vm(qmp, port, name, token)
+                yield QemuSession(qmp)
+        except (OSError, ConnectError) as error:
+            # The recorded VM is gone. The adapter owns no state, so
+            # it does not clear it here — the caller (a lifecycle
+            # operation, or ``mark_stopped``) reconciles the phase and
+            # the ``vm`` section on the next operation.
+            raise PreflightError(
+                "the recorded reliquary VM is no longer reachable\n"
+                f"  expected: {name} on 127.0.0.1:{port}",
+                rule_id="machine.vm-unreachable") from error
+
+
+def _qemu_version(executable):
+    """The version string QEMU reports, or ``None`` if it will not say.
+
+    Discovery never fails on this: a binary that cannot be run is a
+    version Reliquary does not know, not an unavailable backend — the
+    launch itself will report what is actually wrong.
+    """
+    try:
+        completed = subprocess.run(
+            [executable, "--version"], capture_output=True, text=True,
+            check=False, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    line = (completed.stdout or "").strip().splitlines()
+    return line[0] if line else None
+
+
+def _boot_order(boot_keys, drives):
+    letters = []
+    for key in boot_keys:
+        drive = drives.get(key)
+        if drive is None:
+            continue
+        letter = _BOOT_LETTER.get(drive["medium"])
+        if letter is not None and letter not in letters:
+            letters.append(letter)
+    return "".join(letters) or None
+
+
+def drive_args(drives):
+    """Build QEMU ``-drive`` arguments from a machine's resolved drives.
+
+    Returns a list of tokens for a QEMU command line (``-drive``
+    alternating with its value), with floppies first, hard disks next,
+    and cdroms placed on the IDE bus after the last hard disk. A drive
+    whose realized path is a host directory renders as vvfat — the
+    one capability only knowable once resolution has run, so it is
+    judged here rather than at assignment.
+    """
+    args = []
+
+    floppies = [(k, v) for k, v in drives.items()
+                if v["medium"] == "floppy"]
+    for key, drive in sorted(floppies, key=lambda kv: kv[1]["slot"]):
+        path = drive["path"]
+        # id=<key> names the drive so a running insert/eject can target
+        # it over QMP (the slot key is the launch id).
+        if path is None:
+            args += ["-drive",
+                     f"if=floppy,index={drive['slot']},id={key}"]
+            continue
+        is_dir = os.path.isdir(path)
+        source = (f"fat:floppy:rw:{path},format=raw,"
+                  if is_dir else path + ",")
+        args += ["-drive",
+                 f"file={source}if=floppy,index={drive['slot']},id={key}"]
+
+    hdds = [(k, v) for k, v in drives.items()
+            if v["medium"] == "hdd"]
+    for _key, drive in sorted(hdds, key=lambda kv: kv[1]["slot"]):
+        path = drive["path"]
+        is_dir = os.path.isdir(path)
+        source = (f"fat:rw:{path},format=raw,"
+                  if is_dir else path + ",")
+        inferred = "" if is_dir else format_options(path)
+        args += ["-drive",
+                 f"file={source}{inferred}if=ide,index={drive['slot']}"]
+
+    cdroms = [(k, v) for k, v in drives.items()
+              if v["medium"] == "cdrom"]
+    if cdroms:
+        next_ide = max(
+            (d["slot"] for k, d in drives.items() if d["medium"] == "hdd"),
+            default=-1,
+        ) + 1
+        for ordinal, (key, drive) in enumerate(
+                sorted(cdroms, key=lambda kv: kv[1]["slot"])):
+            path = drive["path"]
+            index = next_ide + ordinal
+            if path is None:
+                args += ["-drive",
+                         f"media=cdrom,if=ide,index={index},id={key}"]
+                continue
+            inferred = format_options(path)
+            args += ["-drive",
+                     f"file={path},{inferred}media=cdrom,if=ide,"
+                     f"index={index},id={key}"]
+
+    return args

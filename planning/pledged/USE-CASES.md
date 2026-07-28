@@ -87,10 +87,16 @@ that once did — export target (U1), import source (U2), guest-agent
 vendor (U3) — have all since gone, widening the gap rather than
 closing it. The pledge schedules the pair that left the numbered
 arc on that lack: **F2**, the adapter seam, pledged in the same
-act, and **F3**, the second backend, which follows F2 whenever it
-is pledged on its own move — U7's pledge is necessary for both and
-sufficient for neither. The backend-adapter design and both
-features cite U7 from here. Text verbatim as drafted:
+act — and **delivered the same day**, so its number is retired and
+the seam is built — and **F3**, the second backend, which follows
+whenever it is pledged on its own move; U7's pledge was necessary
+for both and sufficient for neither. **U7 stays here**: the seam it
+demanded exists, but the case is met when a machine materializes on
+the hypervisor a host actually provides, and three of the four
+adapters are stubs that claim no capability. What F2 delivered is
+what U7 required, not what U7 asks for. The backend-adapter design
+(now `design/backend-adapter.md`, its feature delivered) and F3
+cite U7 from here. Text verbatim as drafted:
 
 > - **U7 — Materialize on the hypervisor the host provides.** A
 >   blueprint and its scripts are written once; the hosts that

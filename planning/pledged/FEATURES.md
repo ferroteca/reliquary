@@ -42,19 +42,21 @@ round; **U1** left upward, condensed and promoted to the current
 list. D44 wrote the remedy — a pledge nobody means is withdrawn or
 rejected, never left sitting — and this is its first use.
 
-**It refilled on 2026-07-28** (owner), with **F2**, the backend
-adapter seam — **the first feature to arrive here and stay**. F17
-and F23 both arrived by an ordinary decision to build them and
-both left by delivery within a day of it, and F1 was never pledged
-by anyone's decision at all; F2 is the first entry this file has
-held with its delivery still ahead of it. Its demand, **U7**, was
-pledged in the same act ([USE-CASES.md](USE-CASES.md)) and had to
-be: F2 waited five days for it, off the arc since 2026-07-23, and
-pledging a feature ahead of the demand that justifies it is the
-error D61 undid. Tested against
-the size bound and pledged **whole**, so it keeps its number
-(D65) — the extraction is bounded by working code and by a
-regression oracle, not by judgment about how much is enough.
+**It refilled and emptied again on 2026-07-28** (owner), with
+**F2**, the backend adapter seam — pledged in the morning and
+delivered the same day, so it joins F17 and F23 in leaving by the
+ordinary exit rather than becoming the first entry to sit here.
+Its demand, **U7**, was pledged in the same act
+([USE-CASES.md](USE-CASES.md)) and had to be: F2 waited five days
+for it, off the arc since 2026-07-23, and pledging a feature ahead
+of the demand that justifies it is the error D61 undid. **U7 does
+not travel with it**: the seam is what U7 needed built, and the
+case itself is met only when a second adapter can materialize a
+machine on the hypervisor a host actually provides. F2 was tested
+against the size bound and pledged **whole**, so its number
+retires unreused (D65) — the extraction was bounded by working
+code and by a regression oracle, not by judgment about how much is
+enough.
 
 *(F17 — input pacing before guest input — delivered 2026-07-27,
 so its number retires unreused. The `pacing` keyword, the
@@ -88,54 +90,27 @@ of the feature: it moved to the standing list with its residue —
 an image drive has no in-band route — filed as a defect under
 [TASKS.md](../TASKS.md), per D34 and D48.)*
 
-## F2 — The backend adapter seam
+*(F2 — the backend adapter seam — delivered 2026-07-28, the day it
+was pledged, so its number retires unreused. One adapter API now
+carries every backend operation
+([design/backend-adapter.md](../design/backend-adapter.md), which
+travelled out of `pledged/design/` with the delivery and records
+the signatures it said it would): QEMU's half is
+`reliquary/backend_qemu.py` and nothing above the seam names QEMU,
+qcow2, QMP or a port; the agentless display console is
+`reliquary/control_display.py`, reading the portable text-screen
+contract rather than VGA bytes; assignment walks the D66 priority
+order at materialization and takes the first backend both
+available and capable, naming the backend and the requirement when
+none is; VirtualBox, VMware Workstation and Hyper-V ship as stubs
+that probe honestly and claim nothing; and the recorded VM
+identity generalized to `{backend, backend-id, token, endpoint}`.
+The oracle it was pledged against — the FreeDOS install script
+passing unchanged — is the opt-in integration test, which is
+unchanged by the extraction. The round is
+[D67](../DECISIONS.md).*
 
-> **Pledged 2026-07-28** (owner), with its demand **U7**
-> ([USE-CASES.md](USE-CASES.md)) in the same act. Formerly
-> milestone 10, dropped to the backlog 2026-07-23 (D33) because the
-> multi-backend pillar had no use case demanding it; U7 is what
-> closed that gap. Pledged whole — no cut, F2 keeps its number
-> (D65). The seam's doctrine is settled and unchanged by any of
-> this.
-
-Extract the adapter API from the now-complete QEMU implementation
-— the only adapter with a full control plane set — so the seam is
-defined by working code, not speculation. The seam's doctrine is
-pre-settled in
-[design/backend-adapter.md](design/backend-adapter.md)
-(layering, seam inventory, ownership and capability doctrines,
-extraction map); this feature defines the signatures and records
-them there.
-
-**Settled 2026-07-28** (owner; D66), so this feature carries no
-decide-first. The backend priority order for default assignment,
-when a blueprint names no backend, is **QEMU, VirtualBox, VMware
-Workstation, Hyper-V** — ordered by *agentless* scriptability.
-That is the criterion because of when assignment happens:
-materialization, before any guest exists, and the install that
-follows is agentless by definition under P3's arc. A backend's
-agent story is worth nothing at the moment the choice is made.
-The order breaks ties among backends already available *and*
-capable, so it never overrides a capability check (P11).
-
-Work items:
-
-1. The adapter API: lifecycle, media attachment, input, screen
-   access, and control plane endpoints, with honest per-backend
-   capability reporting feeding the existing capability checks
-   (P11).
-2. Backend autodiscovery (binaries on PATH and conventional
-   locations, the Hyper-V service/module) establishing
-   availability only.
-3. Real default assignment from the prioritized availability
-   list, recorded permanently into machine state; a declared
-   `backend` pins the choice and fails closed if unavailable or
-   incapable.
-4. Stub adapters for VirtualBox, VMware Workstation, and Hyper-V
-   raising `NotImplementedError`, mirroring platform handling.
-5. Generalized ownership verification: no adapter sends a control
-   command to a hypervisor object that doesn't match the
-   machine's recorded `backend-id`.
-
-Done when: all QEMU interaction flows through the adapter API and
-the FreeDOS install script passes unchanged.
+***The three stubs are not a second backend.*** U7 stays pledged
+and F3 stays proposed: what is delivered is the seam U7 demanded,
+not the capability, and the order's tail remains intent recorded
+(D66).)*

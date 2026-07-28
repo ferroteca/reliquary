@@ -15,10 +15,6 @@ try:
 except importlib.metadata.PackageNotFoundError:
     _version = "unknown"
 
-from qemu.qmp import ConnectError
-
-from .interaction_agentless import AgentlessGuestExec
-from .lifecycle import read_vm_state
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .home import (DIRECTORIES, adopt_environment, default_home_dir,
@@ -36,8 +32,8 @@ from .machines import (apply_blueprint, create_machine, destroy_machine,
                        eject_media, get_file, get_files, get_machine_dir,
                        get_machine_var, insert_media, list_files,
                        list_machines, load_machine_state, machine_dir_path,
-                       put_file, put_files, recreate_machine, resolve_machine,
-                       set_boot_order, split_machine_id,
+                       put_file, put_files, read_vm_state, recreate_machine,
+                       resolve_machine, set_boot_order, split_machine_id,
                        start_machine, stop_machine)
 # Aliased on import: the twin is named for its command under the
 # identity rule, and the builtin stays reachable here.
@@ -87,7 +83,6 @@ _FLAG_ARITY = {
     "--no-autoseed": 0,
     "--blueprint": 1,
     "--machine": 1,
-    "--port": 1,
     "--platform": 1,
     "--timeout": 1,
     "--display": 0,
@@ -176,33 +171,27 @@ def _require_machine_selector(arguments):
 
 
 def _interaction_target(arguments):
-    """Resolve ``(port, machine directory)`` for a guest-console command.
+    """Resolve the machine directory a guest-console command drives.
 
-    Cached machines are selected with ``--blueprint`` /
-    ``--machine``; bare ``--port`` remains for the root-home path.
-    The directory travels with the port because that is where the
-    machine's recorded VM identity lives: without it the session
-    could not be verified against the machine it claims to be, and
-    every such command would fail closed.
+    The directory is the whole address: it is where the machine's
+    recorded VM identity lives, and the adapter named there supplies
+    the endpoint and verifies it. There is no port to pass — that is
+    QEMU's own detail, on the far side of the adapter seam.
     """
-    if getattr(arguments, "blueprint", None) or getattr(
-            arguments, "machine", None):
-        machine_id = _require_machine_selector(arguments)
-        state = load_machine_state(machine_id)
-        if state.get("phase") != "running":
-            raise PreflightError(
-                f"machine {machine_id} is not running "
-                f"(phase: {state.get('phase')})",
-                rule_id="machine.not-running")
-        machine_home = machine_dir_path(machine_id)
-        vm = read_vm_state(home=machine_home)
-        if vm is None:
-            raise PreflightError(
-                f"machine {machine_id} is running but has no "
-                "recorded VM identity",
-                rule_id="machine.no-vm-identity")
-        return vm["port"], machine_home
-    return getattr(arguments, "port", None), None
+    machine_id = _require_machine_selector(arguments)
+    state = load_machine_state(machine_id)
+    if state.get("phase") != "running":
+        raise PreflightError(
+            f"machine {machine_id} is not running "
+            f"(phase: {state.get('phase')})",
+            rule_id="machine.not-running")
+    machine_home = machine_dir_path(machine_id)
+    if read_vm_state(machine_home) is None:
+        raise PreflightError(
+            f"machine {machine_id} is running but has no "
+            "recorded VM identity",
+            rule_id="machine.no-vm-identity")
+    return machine_home
 
 
 # Every command takes the six directory flags, mirroring the API's
@@ -705,75 +694,62 @@ def main(argv=None):
         "type", help="type text with no trailing Enter")
     _add_selectors(command)
     command.add_argument("text")
-    command.add_argument("--port", type=int, default=None)
 
     command = subcommands.add_parser(
         "enter", help="type a line and press Enter")
     _add_selectors(command)
     command.add_argument("line")
-    command.add_argument("--port", type=int, default=None)
 
     command = subcommands.add_parser(
         "press", help="send portable key names")
     _add_selectors(command)
     command.add_argument("names", nargs="+")
-    command.add_argument("--port", type=int, default=None)
 
     command = subcommands.add_parser(
         "exec", help="enter a command and wait for the prompt")
     _add_selectors(command)
     command.add_argument("dos_command")
-    command.add_argument("--port", type=int, default=None)
     command.add_argument("--timeout", type=int, default=None)
-    command.add_argument("--platform", default=None)
 
     command = subcommands.add_parser(
         "select", help="select a cursor-menu item")
     _add_selectors(command)
     command.add_argument("item")
     command.add_argument("--exclude", action="append", default=[])
-    command.add_argument("--port", type=int, default=None)
     command.add_argument("--timeout", type=int, default=None)
 
     command = subcommands.add_parser(
         "screen", help="print the guest text screen")
     _add_selectors(command)
-    command.add_argument("--port", type=int, default=None)
 
     command = subcommands.add_parser(
         "wait", help="wait until the screen matches a pattern")
     _add_selectors(command)
     command.add_argument("pattern")
-    command.add_argument("--port", type=int, default=None)
     command.add_argument("--timeout", type=int, default=None)
 
     command = subcommands.add_parser(
         "screenshot", help="capture the guest framebuffer")
     _add_selectors(command)
     command.add_argument("name", nargs="?", default="screen")
-    command.add_argument("--port", type=int, default=None)
 
     command = subcommands.add_parser(
         "hmp", help="send a QEMU human-monitor command")
     _add_selectors(command)
     command.add_argument("line")
-    command.add_argument("--port", type=int, default=None)
 
     arguments = parser.parse_args(argv)
     _configure_directories(arguments)
     try:
         try:
             return _dispatch(arguments)
-        except (ConnectError, ConnectionError) as error:
-            # An unreachable QMP socket is a machine rule, not a fault:
-            # the command is legal and the VM is not there. Converted
-            # rather than reported here, so the exit code comes from
-            # the taxonomy like every other one.
-            target = (f"127.0.0.1:{arguments.port}"
-                      if getattr(arguments, "port", None)
-                      else "the active VM")
+        except ConnectionError as error:
+            # An unreachable management endpoint is a machine rule, not
+            # a fault: the command is legal and the VM is not there.
+            # Converted rather than reported here, so the exit code
+            # comes from the taxonomy like every other one.
             raise PreflightError(
-                f"cannot reach QMP on {target}: {error}\n"
+                f"cannot reach the machine's backend: {error}\n"
                 "  is the VM running? "
                 "(rlq start-machine --blueprint NAME)",
                 rule_id="machine.qmp-unreachable") from error
@@ -1299,7 +1275,6 @@ def _set_boot_order(arguments):
 
 
 def _dispatch(arguments):
-    platform = getattr(arguments, "platform", None) or "dos"
     timeout = getattr(arguments, "timeout", None)
 
     if arguments.command == "create-machine":
@@ -1362,9 +1337,9 @@ def _dispatch(arguments):
         return _get_files(arguments)
     if arguments.command == "start-machine":
         machine_id = _require_machine_selector(arguments)
-        started_port = start_machine(
+        started = start_machine(
             machine_id, display=getattr(arguments, "display", False))
-        return _emit(arguments, started_port, lambda: print(started_port))
+        return _emit(arguments, started, lambda: print(started))
     if arguments.command == "stop-machine":
         machine_id = _require_machine_selector(arguments)
         stop_machine(machine_id)
@@ -1381,52 +1356,43 @@ def _dispatch(arguments):
     if arguments.command == "get-machine-dir":
         return _get_machine_dir(arguments)
 
-    port, machine_home = _interaction_target(arguments)
+    machine_home = _interaction_target(arguments)
     if arguments.command == "type":
-        send_text(arguments.text, enter=False, port=port, home=machine_home)
+        send_text(arguments.text, enter=False, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "enter":
-        send_text(arguments.line, enter=True, port=port, home=machine_home)
+        send_text(arguments.line, enter=True, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "press":
         combos = [_resolve_key(name) for name in arguments.names]
-        send_keys(combos, port, home=machine_home)
+        send_keys(combos, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "exec":
-        if getattr(arguments, "machine", None) or getattr(
-                arguments, "blueprint", None):
-            # The twin resolves the selector, the platform, and the
-            # VM identity itself, and returns the command's output.
-            rows = exec_guest(
-                arguments.dos_command,
-                machine=getattr(arguments, "machine", None),
-                blueprint=getattr(arguments, "blueprint", None),
-                timeout=timeout or 120)
-        else:
-            if platform != "dos":
-                raise PreflightError(
-                    "exec requires platform='dos'",
-                    rule_id="platform.verb-not-implemented")
-            rows = AgentlessGuestExec(Machine(port, machine_home)).execute(
-                arguments.dos_command, timeout or 120)
+        # The twin resolves the selector, the platform, and the VM
+        # identity itself, and returns the command's output.
+        rows = exec_guest(
+            arguments.dos_command,
+            machine=getattr(arguments, "machine", None),
+            blueprint=getattr(arguments, "blueprint", None),
+            timeout=timeout or 120)
         rows = list(rows or ())
         return _emit(arguments, rows, lambda: print("\n".join(rows)))
     if arguments.command == "select":
         selected = cursor_menu_select(
             arguments.item, timeout or 30,
-            getattr(arguments, "exclude", []), port, home=machine_home)
+            getattr(arguments, "exclude", []), home=machine_home)
         return _emit(arguments, selected, lambda: print(selected))
     if arguments.command == "screen":
-        rows = screen_text(port, home=machine_home)
+        rows = screen_text(home=machine_home)
         return _emit(arguments, rows, lambda: print("\n".join(rows)))
     if arguments.command == "wait":
-        wait_text(arguments.pattern, timeout or 60, port, home=machine_home)
+        wait_text(arguments.pattern, timeout or 60, home=machine_home)
         return _emit(arguments, {}, lambda: _narrate("matched"))
     if arguments.command == "screenshot":
-        screenshot(arguments.name, port, machine_home)
+        screenshot(arguments.name, machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "hmp":
-        with Machine(port, machine_home).qmp() as qmp:
+        with Machine(machine_home).qmp() as qmp:
             output = qmp.hmp(arguments.line)
         return _emit(arguments, output, lambda: print(output))
     return 0

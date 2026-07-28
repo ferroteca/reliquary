@@ -298,6 +298,7 @@ class MachineStateSchemaTests(unittest.TestCase):
         import tempfile
         from reliquary import Context
         from reliquary.machines import create_machine, load_machine_state
+        from reliquary_tests import fake_backend
         schema = jsonc.loads(
             (resources.files("reliquary") / "schemas"
              / "machine-state.schema.json").read_text(encoding="utf-8"))
@@ -312,14 +313,18 @@ class MachineStateSchemaTests(unittest.TestCase):
             context = Context(home_dir=os.path.join(tmp, "home"),
                               blueprints_dir=root,
                               scripts_dir=root, autoseed=False)
-            machine_id = create_machine("state-bp", context=context)
+            with fake_backend.installed():
+                machine_id = create_machine("state-bp", context=context)
             state = load_machine_state(machine_id, context)
             jsonschema.validate(state, schema)
             # A running machine folds the live-VM identity into the same
             # document as a `vm` section — validate that shape too.
             running = dict(state, phase="running", vm={
-                "port": 5555, "name": f"reliquary-{machine_id}",
-                "uuid": "0" * 32, "pid": 4242})
+                "backend": "qemu",
+                "backend-id": f"reliquary-{machine_id}",
+                "token": "0" * 32,
+                "endpoint": {"port": 5555},
+                "pid": 4242})
             jsonschema.validate(running, schema)
 
 

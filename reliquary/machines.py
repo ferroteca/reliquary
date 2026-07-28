@@ -10,15 +10,13 @@ import re
 import shutil
 from datetime import datetime, timezone
 
+from . import backends
 from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
 from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError)
 from .home import machines_dir
 from .library import seed_blueprint
-from .lifecycle import (create_difference_image, create_duplicate_image,
-                        create_hdd_image, find_qemu, launch_owned_qemu,
-                        read_vm_state, stop as stop_owned_qemu)
 from .resolve import load_namespace, resolve_media
 
 
@@ -57,7 +55,6 @@ def _fetch(media_name, context, *, namespace=None, on_mismatch="fail",
                           events=events, cancelled=cancelled)
 
 
-_BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 _PLATFORM_MEMORY = {
     "dos": 16,
     "openbsd": 512,
@@ -66,79 +63,54 @@ _PLATFORM_MEMORY = {
 }
 
 
-def format_options(image):
-    """The QEMU ``format=`` option for an image, by extension.
-
-    ``.img`` / ``.iso`` are pinned to ``format=raw`` (avoiding QEMU's
-    format-probing warning); any other extension is left for QEMU to
-    identify.
-    """
-    extension = os.path.splitext(image)[1].lower()
-    return "format=raw," if extension in (".img", ".iso") else ""
-
-
 def _default_control_planes(platform):
     """The platform's default control-plane policy.
 
     Every current platform defaults to agentless display — the
     universal, cooperation-free plane (blueprint-reference.md).
-    Richer per-platform defaults arrive with the adapter seam.
+    Richer per-platform defaults arrive with the planes themselves.
     """
     return ["agentless-display"]
 
 
-# The parser accepts the model's whole control-plane vocabulary; this
-# is the subset that exists.
-_IMPLEMENTED_CONTROL_PLANES = ("agentless-display",)
-
-# Likewise for backends. The blueprint model's vocabulary is qemu,
-# virtualbox, vmware and hyperv; one adapter exists (F2 owns the seam,
-# F3 the second backend).
-_IMPLEMENTED_BACKENDS = ("qemu",)
-
-
-def _resolve_backend(machine):
-    """The machine's backend, defaulted and checked.
-
-    A blueprint naming a backend Reliquary has not built fails closed
-    naming it, exactly as an unwired control plane or controller does
-    (P11). It used to be recorded and then ignored, which was the
-    worst of the three outcomes: `backend: virtualbox` materialized a
-    **qcow2** image and would have launched QEMU, so a machine's
-    recorded backend and its actual one disagreed with nobody told.
-    The field reference's backend/format table promised VDI for that
-    same declaration, so the document and the code contradicted each
-    other and the code was the one in the wrong.
-    """
-    backend = machine.backend or "qemu"
-    if backend not in _IMPLEMENTED_BACKENDS:
-        raise PreflightError(
-            f"backend {backend!r} is not wired; only 'qemu' is built so "
-            "far (the adapter seam owns the others). Its image format, "
-            "lifecycle and control planes would all be QEMU's, which is "
-            "not what this blueprint asks for",
-            rule_id="machine.backend-not-wired")
-    return backend
-
-
 def _resolve_control_planes(machine):
-    """The machine's control-plane policy, defaulted and checked.
+    """The machine's control-plane policy, defaulted.
 
-    A blueprint naming a plane Reliquary has not built fails closed
-    naming it, rather than materializing a machine whose recorded
-    policy promises a plane nothing can probe (P11).
+    Whether a plane can be honored is the backend's answer, not this
+    module's: the policy becomes a requirement and the adapter's
+    capability report judges it (P11).
     """
-    planes = (list(machine.control_planes)
-              or _default_control_planes(machine.platform))
-    missing = [plane for plane in planes
-               if plane not in _IMPLEMENTED_CONTROL_PLANES]
-    if missing:
-        names = ", ".join(repr(plane) for plane in missing)
-        raise PreflightError(
-            f"control-planes names {names}; only 'agentless-display' "
-            "is wired so far (the adapter seam owns the other "
-            "planes)", rule_id="machine.control-plane-not-wired")
-    return planes
+    return (list(machine.control_planes)
+            or _default_control_planes(machine.platform))
+
+
+def _requirements(machine, namespace):
+    """What this blueprint asks of a backend, in the seam's vocabulary.
+
+    Read off the whole machine — its control-plane policy, the media
+    kinds and controllers its enabled drives declare, and the
+    materialization mode of every media they name — because a backend
+    is chosen for the machine and never for a drive.
+    """
+    planes = _resolve_control_planes(machine)
+    media = []
+    controllers = []
+    modes = []
+    for _key, drive in sorted(machine.drives.items()):
+        if not drive.enabled:
+            continue
+        if drive.medium not in media:
+            media.append(drive.medium)
+        if drive.medium != "floppy":
+            controller = drive.controller or "ide"
+            if controller not in controllers:
+                controllers.append(controller)
+        item = _drive_media(drive, namespace)
+        if item is not None and item.materialize not in modes:
+            modes.append(item.materialize)
+    return backends.Requirements(
+        control_planes=tuple(planes), media=tuple(media),
+        controllers=tuple(controllers), materialize=tuple(modes))
 
 
 def _blueprint_digest(resolved, drives):
@@ -294,21 +266,18 @@ def _allocate_machine_id(blueprint_name, context=None):
 
 
 def _drive_common(key, drive):
-    """The medium/slot/controller fields common to every drive entry."""
+    """The medium/slot/controller fields common to every drive entry.
+
+    A controller the assigned backend cannot wire was already refused
+    at assignment, by name, against that backend's capability report.
+    """
     entry = {"medium": drive.medium, "slot": drive.slot}
     if drive.medium != "floppy":
-        controller = drive.controller or "ide"
-        if controller != "ide":
-            raise PreflightError(
-                f"drive {key!r} declares controller {controller!r}; "
-                "only ide is wired on QEMU so far (the adapter seam "
-                "owns richer controller topology)",
-                rule_id="machine.controller-not-wired")
-        entry["controller"] = controller
+        entry["controller"] = drive.controller or "ide"
     return entry
 
 
-def _materialize_drive(key, drive, media_root, namespace, context,
+def _materialize_drive(key, drive, adapter, media_root, namespace, context,
                        properties=None, events=None, cancelled=None):
     """Materialize one enabled drive, returning its resolved state entry.
 
@@ -317,10 +286,10 @@ def _materialize_drive(key, drive, media_root, namespace, context,
     ``use`` attaches the fetched payload directly (a directory payload
     renders as vvfat); ``difference``/``copy`` build a per-machine image
     over/of the fetched payload. Per-machine images live under
-    ``media/`` keyed by the media name (``<media-name>.qcow2``), not the
-    slot, so a media moving through a removable slot keeps its own
-    image. The entry records the realized ``path`` plus the media name
-    and mode.
+    ``media/`` keyed by the media name, not the slot, so a media moving
+    through a removable slot keeps its own image; the adapter names the
+    file, since the native image format is its choice. The entry
+    records the realized ``path`` plus the media name and mode.
     """
     entry = _drive_common(key, drive)
     media = _drive_media(drive, namespace)
@@ -337,8 +306,8 @@ def _materialize_drive(key, drive, media_root, namespace, context,
     entry["media"] = media.name
     entry["materialize"] = mode
     if mode == "new":
-        path = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
-        create_hdd_image(path, media.size)
+        path = adapter.image_path(media_root, _image_stem(media, key))
+        adapter.create_image(path, mode="new", size=media.size)
         entry.update(size=media.size, path=path)
     elif mode == "use":
         entry["path"] = _acquire_fetch(
@@ -348,11 +317,8 @@ def _materialize_drive(key, drive, media_root, namespace, context,
         base_payload = _acquire_fetch(
             media, namespace, context, properties=properties, events=events,
             cancelled=cancelled)
-        dest = os.path.join(media_root, f"{_image_stem(media, key)}.qcow2")
-        if mode == "copy":
-            create_duplicate_image(dest, base_payload)
-        else:
-            create_difference_image(dest, base_payload)
+        dest = adapter.image_path(media_root, _image_stem(media, key))
+        adapter.create_image(dest, mode=mode, base=base_payload)
         entry["path"] = dest
     else:
         raise InternalError(f"unknown materialize mode {mode!r} for {key}")
@@ -363,11 +329,13 @@ def create(machine, namespace, *, context=None, blueprint_name="",
            source=None, number=None, properties=None, events=None):
     """Materialize one machine from a parsed composed machine component.
 
-    Creates the machine cache directory under
+    Assigns the backend (a declared one pins the choice; otherwise the
+    priority walk takes the first available and capable one), creates
+    the machine cache directory under
     ``cache/machines/<blueprint>-<n>/``, writes ``machine.json`` with
     the fully resolved configuration and its provenance
     (``blueprint-source``, ``blueprint-digest``, ``backend-id``), and
-    materializes every enabled drive: a per-machine qcow2 under
+    materializes every enabled drive: a per-machine image under
     ``media/`` for ``new``/``difference``/``copy`` media, the fetched
     payload attached in place for ``use``. ``source`` is the absolute
     path of the blueprint file this machine resolved from, recorded for
@@ -418,10 +386,14 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
                          created, media_root, source, context,
                          properties=None, events=None):
-    # Checked before anything is materialized, so a refusal costs no
-    # image work.
-    backend = _resolve_backend(machine)
+    # Assignment happens before anything is materialized, so a machine
+    # nothing on this host can build costs no image work — and the
+    # backend is fixed before the first image is written in its own
+    # native format.
     control_planes = _resolve_control_planes(machine)
+    backend = backends.assign(_requirements(machine, namespace),
+                              declared=machine.backend)
+    adapter = backends.adapter(backend)
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
@@ -429,7 +401,8 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             # entirely (blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
-            key, drive, media_root, namespace, context, properties, events)
+            key, drive, adapter, media_root, namespace, context,
+            properties, events)
 
     memory = machine.memory
     if memory is None:
@@ -567,8 +540,8 @@ def get_machine_dir(*, machine=None, blueprint=None, context=None):
 _OWNED_MODES = ("new", "difference", "copy")
 
 
-def _reconcile_drives(machine, namespace, old_drives, media_root, context,
-                      properties=None, events=None):
+def _reconcile_drives(machine, namespace, old_drives, adapter, media_root,
+                      context, properties=None, events=None):
     """Reconcile a machine's drives to a re-resolved machine component.
 
     Absorbable changes are applied: added, removed, enabled/disabled
@@ -590,8 +563,8 @@ def _reconcile_drives(machine, namespace, old_drives, media_root, context,
             # No reliquary-owned image here: (re)materialize/re-point
             # freely (media re-fetch, empty slot, or a new image).
             new_drives[key] = _materialize_drive(
-                key, drive, media_root, namespace, context, properties,
-                events)
+                key, drive, adapter, media_root, namespace, context,
+                properties, events)
             continue
         # An existing materialized image may only be kept unchanged.
         media = _drive_media(drive, namespace)
@@ -657,24 +630,41 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         parsed = namespace.machines[blueprint_name]
         path = namespace.origin.get(("machine", blueprint_name))
         # Checked before the drives are reconciled, so a refused apply
-        # leaves the machine as it was.
-        _resolve_backend(parsed)
+        # leaves the machine as it was. A machine keeps the backend it
+        # was assigned — its images are in that backend's own format —
+        # so apply judges the new blueprint against that one rather
+        # than re-running assignment; moving backends is `recreate`.
+        backend = state.get("backend") or "qemu"
+        if parsed.backend is not None and parsed.backend != backend:
+            raise PreflightError(
+                f"the blueprint now pins backend {parsed.backend!r} and "
+                f"machine {machine_id} was materialized on {backend!r}; "
+                "apply cannot move a machine between backends — "
+                "recreate it instead",
+                rule_id="machine.backend-changed")
+        adapter = backends.adapter(backend)
         control_planes = _resolve_control_planes(parsed)
+        missing = adapter.unmet(_requirements(parsed, namespace))
+        if missing:
+            raise PreflightError(
+                f"machine {machine_id} is on backend {backend!r}, which "
+                f"cannot provide: {', '.join(missing)}",
+                rule_id="machine.backend-incapable")
 
         bound = _bind_location_properties(
             parsed, namespace, explicit=properties,
             properties_file=properties_file, context=context)
         media_root = _machine_media_dir(machine_id, context)
         new_drives = _reconcile_drives(
-            parsed, namespace, state.get("drives", {}), media_root, context,
-            bound, events)
+            parsed, namespace, state.get("drives", {}), adapter, media_root,
+            context, bound, events)
 
         memory = parsed.memory
         if memory is None:
             memory = _PLATFORM_MEMORY.get(parsed.platform, 16)
         resolved = {
             "platform": parsed.platform,
-            "backend": parsed.backend or "qemu",
+            "backend": backend,
             "memory": memory,
             "cpus": parsed.cpus if parsed.cpus is not None else 1,
             "boot": list(parsed.boot),
@@ -703,6 +693,42 @@ def _write_state(machine_id, state, context=None):
         json.dump(state, handle, indent=2)
         handle.write("\n")
     os.replace(part, path)
+
+
+def read_vm_state(machine_dir):
+    """Return a machine's recorded live-VM identity, or ``None``.
+
+    The identity lives in the ``vm`` section of the machine's own
+    ``machine.json``, written atomically with the ``phase``. Its
+    generic core is the backend, that backend's own machine
+    identifier, the per-start token and the endpoint; what the
+    endpoint *is* belongs to the adapter, which validates it when it
+    opens a session. A state file with no ``vm`` section (a stopped
+    machine) reads as ``None``; a malformed section fails closed.
+    """
+    path = os.path.join(machine_dir, "machine.json")
+    try:
+        with open(path, encoding="utf-8") as state_file:
+            document = json.load(state_file)
+    except FileNotFoundError:
+        return None
+    except (ValueError, json.JSONDecodeError) as error:
+        raise InternalError(
+            f"invalid reliquary machine state file: {path}: {error}"
+        ) from error
+    vm = document.get("vm") if isinstance(document, dict) else None
+    if vm is None:
+        return None
+    fields = (vm.get("backend"), vm.get("backend-id"), vm.get("token"))
+    if (not isinstance(vm, dict)
+            or not all(isinstance(value, str) and value
+                       for value in fields)
+            or not isinstance(vm.get("endpoint"), dict)):
+        raise InternalError(
+            f"invalid reliquary VM state in {path}: a recorded VM names "
+            "its backend, that backend's machine id, a per-start token "
+            "and an endpoint")
+    return vm
 
 
 def load_machine_state(machine_id, context=None):
@@ -837,18 +863,6 @@ def _resolve_by_blueprint(name, context):
     return matches[0]["id"]
 
 
-def _boot_order(boot_keys, drives):
-    letters = []
-    for key in boot_keys:
-        drive = drives.get(key)
-        if drive is None:
-            continue
-        letter = _BOOT_LETTER.get(drive["medium"])
-        if letter is not None and letter not in letters:
-            letters.append(letter)
-    return "".join(letters) or None
-
-
 def _write_phase(machine_id, phase, context=None, *, bump=False):
     """Set a machine's phase, optionally advancing its generation.
 
@@ -882,7 +896,7 @@ def _complete_stop(machine_id, context=None):
     """Power off the owned VM and reconcile phase + VM identity.
 
     On success the machine returns to ``ready`` and its ``vm`` section
-    is cleared, written together. If the lifecycle stop fails closed,
+    is cleared, written together. If the adapter's stop fails closed,
     the phase is reconciled without lying: a machine whose ``vm``
     section is already gone becomes ``ready``, while one still recorded
     (our VM may yet be running — a stuck port or an identity mismatch)
@@ -890,8 +904,9 @@ def _complete_stop(machine_id, context=None):
     """
     state = load_machine_state(machine_id, context)
     vm = state.get("vm")
+    backend = (vm or {}).get("backend") or state.get("backend") or "qemu"
     try:
-        stop_owned_qemu(vm)
+        backends.adapter(backend).stop(vm)
     except ReliquaryError:
         if load_machine_state(machine_id, context).get("vm") is None:
             _write_phase(machine_id, "ready", context)
@@ -937,13 +952,14 @@ def _reconcile_phase(machine_id, context=None):
 
 def start_machine(machine_id, *, display=False, context=None, events=None,
                   cancelled=None):
-    """Start a ready machine and return its QMP port.
+    """Start a ready machine and return its id.
 
     Under the per-machine lock, reconciles any interrupted phase,
-    re-verifies every media hash, launches QEMU under the machine's
-    cache directory, and records phase ``running``. Machine variables
-    are cleared here: a variable reports what *this* boot produced,
-    never what a previous one left behind.
+    re-verifies every media hash, hands the resolved state to the
+    machine's own backend adapter to launch, and records phase
+    ``running`` with the identity the adapter returns. Machine
+    variables are cleared here: a variable reports what *this* boot
+    produced, never what a previous one left behind.
     """
     with _machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
@@ -981,31 +997,32 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
         state.pop("variables", None)
         _write_state(machine_id, state, context)
 
-        memory = state.get("memory")
-        if memory is None:
-            memory = _PLATFORM_MEMORY.get(state.get("platform"), 16)
-        qemu = find_qemu()
+        if state.get("memory") is None:
+            state["memory"] = _PLATFORM_MEMORY.get(state.get("platform"), 16)
+        backend = state.get("backend") or "qemu"
+        adapter = backends.adapter(backend)
+        probe = adapter.discover()
+        if not probe.available:
+            raise PreflightError(
+                f"machine {machine_id} was materialized on backend "
+                f"{backend!r}, which is not available on this host: "
+                f"{probe.detail}", rule_id="machine.backend-unavailable")
         _events.note(events, _events.RUN_PREFLIGHT,
-                     f"using QEMU: {qemu}",
-                     backend=state.get("backend", "qemu"),
-                     executable=qemu,
+                     f"using {backend}: {probe.executable}",
+                     backend=backend,
+                     executable=probe.executable,
                      **{"control-planes": state.get("control-planes") or []})
-        vm_name = f"reliquary-{machine_id}"
-        args = [qemu, "-name", vm_name, "-m", str(memory)]
-        args += machine_drive_args(machine_id, context)
-        boot = _boot_order(state.get("boot", []), drives)
-        if boot is not None:
-            args += ["-boot", f"order={boot}"]
 
-        # QEMU's own artifacts (the captured stderr log) live in the
-        # machine's backend subdirectory; lifecycle returns the VM
-        # identity and machines.py persists it into machine.json
-        # atomically with the running phase, so the two never disagree.
-        backend_dir = _backend_dir(
-            machine_id, state.get("backend", "qemu"), context)
-        vm = launch_owned_qemu(
-            args, vm_name=vm_name, display=display,
-            current_vm=state.get("vm"), log_dir=backend_dir)
+        # The backend's own artifacts (QEMU's captured stderr log) live
+        # in the machine's backend subdirectory; the adapter returns the
+        # verified VM identity and machines.py persists it into
+        # machine.json atomically with the running phase, so the two
+        # never disagree.
+        backend_dir = _backend_dir(machine_id, backend, context)
+        vm = adapter.start(
+            state, machine_dir=machine_dir_path(machine_id, context),
+            backend_dir=backend_dir, display=display,
+            current=state.get("vm"))
         try:
             fresh = load_machine_state(machine_id, context)
             fresh["vm"] = vm
@@ -1016,9 +1033,9 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
             # The VM came up but its identity could not be recorded;
             # stop it rather than orphan an unrecorded process.
             with contextlib.suppress(Exception):
-                stop_owned_qemu(vm)
+                adapter.stop(vm)
             raise
-        return vm["port"]
+        return machine_id
 
 
 def stop_machine(machine_id, context=None):
@@ -1061,28 +1078,21 @@ def _removable_drive(state, slot):
 
 
 def _change_media_live(machine_id, slot, path, context):
-    """Change a removable drive's medium on a running machine over QMP.
+    """Change a removable drive's medium on a running machine.
 
-    The medium is swapped through the machine's identity-verified QMP
-    session (HMP ``eject`` / ``change`` against the drive's launch id,
-    which is the slot key), so the change the guest sees and the change
-    persisted to the state stay one operation.
+    The medium is swapped through the machine's identity-verified
+    backend session, against the drive's launch id (the slot key), so
+    the change the guest sees and the change persisted to the state
+    stay one operation.
     """
     from .machine import Machine
     machine_home = machine_dir_path(machine_id, context)
-    vm = read_vm_state(machine_home)
-    if vm is None:
+    if read_vm_state(machine_home) is None:
         raise PreflightError(
             f"machine {machine_id} is running but has no recorded VM "
             "identity", rule_id="machine.no-vm-identity")
-    with Machine(port=vm["port"], home=machine_home).qmp() as qmp:
-        if path is None:
-            qmp.hmp(f"eject {slot}")
-        else:
-            target = os.fspath(path).replace("\\", "/")
-            extension = os.path.splitext(target)[1].lower()
-            fmt = " raw" if extension in (".img", ".iso") else ""
-            qmp.hmp(f"change {slot} {target}{fmt}")
+    with Machine(machine_home).session() as session:
+        session.change_medium(slot, path)
 
 
 def _medium_size(path):
@@ -1374,13 +1384,12 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
             f"start it first: rlq start-machine --machine "
             f"{machine_id}", rule_id="machine.not-running")
     machine_home = machine_dir_path(machine_id, context)
-    vm = read_vm_state(machine_home)
-    if vm is None:
+    if read_vm_state(machine_home) is None:
         raise PreflightError(
             f"machine {machine_id} is running but has no recorded VM "
             "identity", rule_id="machine.no-vm-identity")
     return AgentlessGuestExec(
-        Machine(vm["port"], machine_home)).execute(command, timeout)
+        Machine(machine_home)).execute(command, timeout)
 
 
 # -- in-band file exchange ---------------------------------------
@@ -1693,8 +1702,14 @@ def destroy_machine(machine_id, context=None):
                 f"(phase: {phase})", rule_id="machine.phase-cannot-destroy")
         if phase == "ready":
             _write_phase(machine_id, "destroying", context, bump=True)
+        machine_home = machine_dir_path(machine_id, context)
+        # The backend disposes of its own machine object first; the
+        # directory is deleted after. For QEMU the directory *is* the
+        # whole materialization, so its adapter has nothing to do.
+        backends.adapter(state.get("backend") or "qemu").dispose(
+            machine_home)
         try:
-            shutil.rmtree(machine_dir_path(machine_id, context))
+            shutil.rmtree(machine_home)
         except OSError:
             # Leave the machine in a retry-able phase.
             if phase == "ready":
@@ -1702,63 +1717,7 @@ def destroy_machine(machine_id, context=None):
             raise
 
 
-def machine_drive_args(machine_id, context=None):
-    """Build QEMU ``-drive`` arguments from a machine's state.
-
-    Returns a list of tokens suitable for a QEMU command line
-    (``-drive`` alternating with its value), with floppies first,
-    hard disks next, and cdroms placed on the IDE bus after the
-    last hard disk.
-    """
-    state = load_machine_state(machine_id, context)
-    drives = state.get("drives", {})
-    args = []
-
-    floppies = [(k, v) for k, v in drives.items()
-                 if v["medium"] == "floppy"]
-    for key, drive in sorted(floppies, key=lambda kv: kv[1]["slot"]):
-        path = drive["path"]
-        # id=<key> names the drive so a running insert/eject can target
-        # it over QMP (the slot key is the launch id).
-        if path is None:
-            args += ["-drive",
-                     f"if=floppy,index={drive['slot']},id={key}"]
-            continue
-        is_dir = os.path.isdir(path)
-        source = (f"fat:floppy:rw:{path},format=raw,"
-                  if is_dir else path + ",")
-        args += ["-drive",
-                 f"file={source}if=floppy,index={drive['slot']},id={key}"]
-
-    hdds = [(k, v) for k, v in drives.items()
-            if v["medium"] == "hdd"]
-    for _key, drive in sorted(hdds, key=lambda kv: kv[1]["slot"]):
-        path = drive["path"]
-        is_dir = os.path.isdir(path)
-        source = (f"fat:rw:{path},format=raw,"
-                  if is_dir else path + ",")
-        inferred = "" if is_dir else format_options(path)
-        args += ["-drive",
-                 f"file={source}{inferred}if=ide,index={drive['slot']}"]
-
-    cdroms = [(k, v) for k, v in drives.items()
-              if v["medium"] == "cdrom"]
-    if cdroms:
-        next_ide = max(
-            (d["slot"] for k, d in drives.items() if d["medium"] == "hdd"),
-            default=-1,
-        ) + 1
-        for ordinal, (key, drive) in enumerate(
-                sorted(cdroms, key=lambda kv: kv[1]["slot"])):
-            path = drive["path"]
-            index = next_ide + ordinal
-            if path is None:
-                args += ["-drive",
-                         f"media=cdrom,if=ide,index={index},id={key}"]
-                continue
-            inferred = format_options(path)
-            args += ["-drive",
-                     f"file={path},{inferred}media=cdrom,if=ide,"
-                     f"index={index},id={key}"]
-
-    return args
+# Rendering a machine's drives into backend configuration used to
+# live here as `machine_drive_args`, and is now the adapter's
+# (`backend_qemu.drive_args`): Reliquary drive vocabulary in, backend
+# configuration out, on the far side of the seam.

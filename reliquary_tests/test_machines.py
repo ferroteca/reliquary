@@ -9,6 +9,7 @@ at a real local ISO (attached in place, no fetch), and blank/differencing
 image creation is mocked.
 """
 
+import contextlib
 import json
 import os
 import tempfile
@@ -24,11 +25,11 @@ from reliquary.machines import (apply_blueprint, create_machine,
                                 get_files, get_machine_dir, get_machine_var,
                                 insert_media, list_files, list_machines,
                                 load_machine_state, machine_dir_path,
-                                machine_drive_args, mark_stopped, put_file,
-                                put_files,
+                                mark_stopped, put_file, put_files,
                                 recreate_machine, resolve_machine,
                                 set_boot_order, set_machine_var,
                                 start_machine, stop_machine)
+from reliquary_tests import fake_backend
 
 _BLANK = {"name": "blank", "materialize": "new", "size": "20M"}
 
@@ -41,6 +42,18 @@ class _HomeCase(unittest.TestCase):
         self.iso_path = os.path.join(self.home, "live.iso")
         with open(self.iso_path, "wb") as handle:
             handle.write(b"ISO-CONTENT")
+        # The machine model is driven against an adapter double: no
+        # hypervisor is probed, no image is written, and nothing is
+        # launched. What QEMU's own adapter does with the same calls
+        # is test_backend_qemu.py's.
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
+
+    def _images(self):
+        """(image name, mode, size) for every image materialized."""
+        return sorted((os.path.basename(path), mode, size)
+                      for path, mode, size, _base in self.backend.images)
 
     def _livecd(self):
         return {"name": "freedos-livecd", "materialize": "use",
@@ -57,23 +70,23 @@ class _HomeCase(unittest.TestCase):
 
     def _create(self, name, machine, media=None):
         self._write(name, machine, media)
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            return create_machine(name, context=self.home)
+        return create_machine(name, context=self.home)
 
     def _state(self, machine_id):
         return load_machine_state(machine_id, self.home)
 
-    def _identity(self, machine_id, port=4444):
-        return {"port": port, "name": f"reliquary-{machine_id}",
-                "uuid": "1" * 32, "pid": 1234}
+    def _identity(self, machine_id):
+        from reliquary import backends
+        return backends.identity(
+            "qemu", f"reliquary-{machine_id}", "1" * 32,
+            {"port": 54321}, pid=1234)
 
     def _force(self, machine_id, phase, *, vm=False):
         state = self._state(machine_id)
         state["phase"] = phase
         if vm:
             # The live-VM identity is folded into machine.json now.
-            state["vm"] = {"port": 54321, "name": f"reliquary-{machine_id}",
-                           "uuid": "1" * 32, "pid": 1234}
+            state["vm"] = self._identity(machine_id)
         path = os.path.join(machine_dir_path(machine_id, self.home),
                             "machine.json")
         with open(path, "w", encoding="utf-8") as handle:
@@ -124,13 +137,12 @@ class MaterializationTests(_HomeCase):
                    media=[_BLANK,
                           {"name": "boot", "materialize": "new",
                            "size": "720K"}])
-        with mock.patch("reliquary.machines.create_hdd_image") as create_hdd:
-            machine_id = create_machine("sized", context=self.home)
-        calls = sorted((os.path.basename(c.args[0]), c.args[1])
-                       for c in create_hdd.call_args_list)
-        # Per-machine images are named for the media, not the slot.
-        self.assertEqual(calls, [("blank.qcow2", "20M"),
-                                 ("boot.qcow2", "720K")])
+        machine_id = create_machine("sized", context=self.home)
+        # Per-machine images are named for the media, not the slot,
+        # and the adapter names the file — the extension is its
+        # native format's, never the machine model's.
+        self.assertEqual(self._images(), [("blank.qcow2", "new", "20M"),
+                                          ("boot.qcow2", "new", "720K")])
         state = self._state(machine_id)
         self.assertEqual(state["drives"]["hdd0"]["size"], "20M")
         self.assertEqual(state["drives"]["hdd0"]["materialize"], "new")
@@ -151,12 +163,11 @@ class MaterializationTests(_HomeCase):
         self._write("based", {"platform": "dos", "drives": {"hdd0": "base"}},
                    media=[{"name": "base", "materialize": "difference",
                            "location": {"local": self.iso_path}}])
-        with mock.patch(
-                "reliquary.machines.create_difference_image") as diff:
-            machine_id = create_machine("based", context=self.home)
-        self.assertEqual(os.path.basename(diff.call_args.args[0]),
-                         "base.qcow2")
-        self.assertEqual(diff.call_args.args[1], self.iso_path)
+        machine_id = create_machine("based", context=self.home)
+        path, mode, _size, base = self.backend.images[0]
+        self.assertEqual(os.path.basename(path), "base.qcow2")
+        self.assertEqual(mode, "difference")
+        self.assertEqual(base, self.iso_path)
         self.assertEqual(self._state(machine_id)["drives"]["hdd0"][
             "materialize"], "difference")
 
@@ -164,14 +175,13 @@ class MaterializationTests(_HomeCase):
         self._write("dup", {"platform": "dos", "drives": {"hdd0": "base"}},
                    media=[{"name": "base", "materialize": "copy",
                            "location": {"local": self.iso_path}}])
-        with mock.patch(
-                "reliquary.machines.create_duplicate_image") as dupe:
-            machine_id = create_machine("dup", context=self.home)
-        dupe.assert_called_once()
+        machine_id = create_machine("dup", context=self.home)
+        self.assertEqual([mode for _p, mode, _s, _b in self.backend.images],
+                         ["copy"])
         self.assertEqual(self._state(machine_id)["drives"]["hdd0"][
             "materialize"], "copy")
 
-    def test_directory_source_media_renders_vvfat(self):
+    def test_directory_source_media_attaches_the_directory(self):
         work = os.path.join(self.home, "work")
         os.makedirs(work)
         machine_id = self._create(
@@ -179,10 +189,10 @@ class MaterializationTests(_HomeCase):
             media=[{"name": "shared", "materialize": "use",
                     "location": {"local": work}}])
         drive = self._state(machine_id)["drives"]["hdd0"]
+        # The state records the host directory itself; rendering it as
+        # a vvfat drive is the adapter's (test_backend_qemu.py).
         self.assertEqual(os.path.normpath(drive["path"]),
                          os.path.normpath(work))
-        values = _drive_values(machine_drive_args(machine_id, self.home))
-        self.assertTrue(any("fat:rw:" in v for v in values))
 
     def test_cdrom_rejects_a_new_media(self):
         self._write("bad", {"platform": "dos", "drives": {"cdrom0": "blank"}},
@@ -191,24 +201,29 @@ class MaterializationTests(_HomeCase):
             create_machine("bad", context=self.home)
         self.assertIn("cdrom", str(caught.exception))
 
-    def test_nonide_controller_fails_closed(self):
+    def test_a_controller_no_backend_wires_fails_closed(self):
+        # Capabilities are reported, never emulated: no available
+        # backend claims a scsi controller, so assignment refuses the
+        # machine naming the requirement rather than quietly wiring it
+        # to ide.
         self._write("scsi", {"platform": "dos",
                             "drives": {"hdd0": {"media": "blank",
                                                 "controller": "scsi"}}},
                    media=[_BLANK])
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            with self.assertRaises(PreflightError) as caught:
-                create_machine("scsi", context=self.home)
-        self.assertIn("scsi", str(caught.exception))
+        with self.assertRaises(PreflightError) as caught:
+            create_machine("scsi", context=self.home)
+        self.assertIn("controller 'scsi'", str(caught.exception))
+        self.assertEqual(self.backend.images, [])
 
-    def test_unwired_backend_fails_closed(self):
-        """The third unbuilt capability, treated like the other two.
+    def test_a_pinned_stub_backend_fails_closed(self):
+        """A pinned backend whose adapter is a stub is refused by name.
 
         It used to be recorded and ignored: `backend: virtualbox`
         materialized a qcow2 image and would have launched QEMU, so
         the machine's recorded backend and its real one disagreed with
-        nobody told. The field reference promised VDI for that same
-        declaration, which made the document right and the code wrong.
+        nobody told. Now the pin skips the priority walk, that adapter
+        alone is asked, and it claims no capability — so the refusal
+        names the backend and what it cannot provide.
         """
         for backend in ("virtualbox", "vmware", "hyperv"):
             with self.subTest(backend=backend):
@@ -216,13 +231,11 @@ class MaterializationTests(_HomeCase):
                                       "backend": backend,
                                       "drives": {"hdd0": "blank"}},
                             media=[_BLANK])
-                with mock.patch(
-                        "reliquary.machines.create_hdd_image") as image:
-                    with self.assertRaises(PreflightError) as caught:
-                        create_machine(backend, context=self.home)
+                with self.assertRaises(PreflightError) as caught:
+                    create_machine(backend, context=self.home)
                 self.assertIn(repr(backend), str(caught.exception))
                 # Refused before any image work, like the other gates.
-                image.assert_not_called()
+                self.assertEqual(self.backend.images, [])
                 self.assertFalse(os.path.exists(
                     machine_dir_path(f"{backend}-0", self.home)))
 
@@ -236,8 +249,7 @@ class MaterializationTests(_HomeCase):
                     spec["backend"] = declared
                 name = f"be-{declared or 'default'}"
                 self._write(name, spec, media=[_BLANK])
-                with mock.patch("reliquary.machines.create_hdd_image"):
-                    machine_id = create_machine(name, context=self.home)
+                machine_id = create_machine(name, context=self.home)
                 self.assertEqual(
                     load_machine_state(machine_id, self.home)["backend"],
                     "qemu")
@@ -250,13 +262,12 @@ class MaterializationTests(_HomeCase):
                             "control-planes": ["agentless-display", "vnc",
                                                "guest-agent"]},
                    media=[_BLANK])
-        with mock.patch("reliquary.machines.create_hdd_image") as image:
-            with self.assertRaises(PreflightError) as caught:
-                create_machine("vnc", context=self.home)
+        with self.assertRaises(PreflightError) as caught:
+            create_machine("vnc", context=self.home)
         self.assertIn("'vnc'", str(caught.exception))
         self.assertIn("'guest-agent'", str(caught.exception))
         # Refused before any image work, and no machine left behind.
-        image.assert_not_called()
+        self.assertEqual(self.backend.images, [])
         self.assertFalse(os.path.exists(
             machine_dir_path("vnc-0", self.home)))
 
@@ -282,33 +293,12 @@ class MaterializationTests(_HomeCase):
     def test_blueprint_source_recorded_and_digest_stable(self):
         self._write("twin", {"platform": "dos", "drives": {"hdd0": "blank"}},
                    media=[_BLANK])
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create_machine("twin", context=self.home)
-            second = create_machine("twin", context=self.home)
+        first = create_machine("twin", context=self.home)
+        second = create_machine("twin", context=self.home)
         s1, s2 = self._state(first), self._state(second)
         self.assertTrue(s1["blueprint-source"].endswith("twin.rlqb"))
         self.assertEqual(s1["blueprint-digest"], s2["blueprint-digest"])
         self.assertNotEqual(first, second)
-
-    def test_drive_args_cdrom_iso_after_hdd(self):
-        def _fake_hdd(path, size):
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "wb") as handle:
-                handle.write(b"qcow2\x00" * 8)
-            return path
-        self._write("bootable", {"platform": "dos",
-                               "drives": {"hdd0": "blank",
-                                          "cdrom0": "freedos-livecd"},
-                               "boot": ["cdrom0", "hdd0"]},
-                   media=[_BLANK, self._livecd()])
-        with mock.patch("reliquary.machines.create_hdd_image",
-                        side_effect=_fake_hdd):
-            machine_id = create_machine("bootable", context=self.home)
-        values = _drive_values(machine_drive_args(machine_id, self.home))
-        cdrom_arg = [v for v in values if "media=cdrom" in v]
-        self.assertEqual(len(cdrom_arg), 1)
-        self.assertIn("format=raw,", cdrom_arg[0])
-        self.assertIn("if=ide,index=1", cdrom_arg[0])
 
     def test_location_property_binds_at_create_and_records_the_path(self):
         # A media located by ${live.iso}, supplied by a blueprint
@@ -320,8 +310,7 @@ class MaterializationTests(_HomeCase):
                       "parameters": {"live.iso": self.iso_path}},
             media=[{"name": "livecd", "materialize": "use",
                     "read-only": True, "location": "${live.iso}"}])
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create_machine("param", context=self.home)
+        machine_id = create_machine("param", context=self.home)
         entry = self._state(machine_id)["drives"]["cdrom0"]
         self.assertEqual(entry["path"], self.iso_path)
         # The recorded location is concrete: no ${...} survives.
@@ -333,10 +322,9 @@ class MaterializationTests(_HomeCase):
                          "drives": {"cdrom0": "livecd"}},
             media=[{"name": "livecd", "materialize": "use",
                     "read-only": True, "location": "${live.iso}"}])
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create_machine(
-                "explicit", context=self.home,
-                properties={"live.iso": self.iso_path})
+        machine_id = create_machine(
+            "explicit", context=self.home,
+            properties={"live.iso": self.iso_path})
         entry = self._state(machine_id)["drives"]["cdrom0"]
         self.assertEqual(entry["path"], self.iso_path)
 
@@ -346,9 +334,8 @@ class MaterializationTests(_HomeCase):
             "needy", {"platform": "dos", "drives": {"cdrom0": "livecd"}},
             media=[{"name": "livecd", "materialize": "use",
                     "read-only": True, "location": "${live.iso}"}])
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            with self.assertRaises(PropertyBindingError):
-                create_machine("needy", context=self.home)
+        with self.assertRaises(PropertyBindingError):
+            create_machine("needy", context=self.home)
         # The failed create left no machine behind.
         machines_root = os.path.join(
             self.home, "cache", "machines")
@@ -356,25 +343,6 @@ class MaterializationTests(_HomeCase):
                     and [n for n in os.listdir(machines_root)
                          if not n.startswith(".")])
         self.assertFalse(leftover)
-
-    def test_drive_args_floppy_before_hdd(self):
-        def _fake_hdd(path, size):
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "wb") as handle:
-                handle.write(b"qcow2\x00" * 8)
-            return path
-        self._write("mixed", {"platform": "dos",
-                            "drives": {"floppy0": "flp", "hdd0": "blank"}},
-                   media=[_BLANK, {"name": "flp", "materialize": "new",
-                                   "size": "1440K"}])
-        with mock.patch("reliquary.machines.create_hdd_image",
-                        side_effect=_fake_hdd):
-            machine_id = create_machine("mixed", context=self.home)
-        values = _drive_values(machine_drive_args(machine_id, self.home))
-        floppy_idx = next(i for i, v in enumerate(values) if "if=floppy" in v)
-        hdd_idx = next(i for i, v in enumerate(values)
-                       if "if=ide,index=0" in v)
-        self.assertLess(floppy_idx, hdd_idx)
 
     def test_missing_state_raises_filenotfound(self):
         with self.assertRaises(PreflightError):
@@ -409,10 +377,7 @@ class LifecycleTests(_HomeCase):
                                     "size": "20M"}])
 
     def _start(self, machine_id):
-        with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)):
-            return start_machine(machine_id, context=self.home)
+        return start_machine(machine_id, context=self.home)
 
     def test_list_and_filter_machines(self):
         first = self._ready("alpha")
@@ -461,29 +426,42 @@ class LifecycleTests(_HomeCase):
         with self.assertRaises(PreflightError):
             resolve_machine(machine="freedos-", context=self.home)
 
-    def test_start_launches_qemu_and_sets_running(self):
+    def test_start_hands_the_state_to_the_adapter_and_sets_running(self):
         machine_id = self._create(
             "bootable", {"platform": "dos",
                          "drives": {"hdd0": "blank", "cdrom0": "freedos-livecd"},
                          "boot": ["cdrom0", "hdd0"]},
             media=[_BLANK, self._livecd()])
-        with mock.patch("reliquary.machines.find_qemu",
-                        return_value="qemu-system-i386"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)) as launch:
-            port = start_machine(machine_id, context=self.home)
-        self.assertEqual(port, 4444)
-        args = launch.call_args.args[0]
-        self.assertEqual(args[0], "qemu-system-i386")
-        self.assertIn("order=dc", args)
-        # QEMU's stderr log lands in the machine's backend subdirectory.
+        started = start_machine(machine_id, context=self.home)
+        self.assertEqual(started, machine_id)
+        # Reliquary vocabulary crosses the seam, never backend
+        # arguments: the adapter is handed the resolved state and the
+        # directories that are its to write in.
+        launch = self.backend.starts[-1]
+        self.assertEqual(launch["state"]["boot"], ["cdrom0", "hdd0"])
+        self.assertEqual(set(launch["state"]["drives"]), {"hdd0", "cdrom0"})
         self.assertEqual(
-            launch.call_args.kwargs["log_dir"],
+            launch["machine_dir"], machine_dir_path(machine_id, self.home))
+        self.assertEqual(
+            launch["backend_dir"],
             os.path.join(machine_dir_path(machine_id, self.home), "qemu"))
         state = self._state(machine_id)
         self.assertEqual(state["phase"], "running")
-        # The live-VM identity is folded into the state, atomic with phase.
-        self.assertEqual(state["vm"]["port"], 4444)
+        # The live-VM identity is folded into the state, atomic with
+        # phase, and it names the backend that owns it.
+        self.assertEqual(state["vm"]["backend"], "qemu")
+        self.assertEqual(state["vm"]["backend-id"], f"reliquary-{machine_id}")
+
+    def test_start_refuses_when_the_recorded_backend_is_absent(self):
+        # A machine carries its backend for life; a host that no
+        # longer has it is told so, and nothing is launched.
+        machine_id = self._ready()
+        self.backend.available = False
+        with self.assertRaises(PreflightError) as caught:
+            start_machine(machine_id, context=self.home)
+        self.assertIn("not available on this host", str(caught.exception))
+        self.assertEqual(self.backend.starts, [])
+        self.assertEqual(self._state(machine_id)["phase"], "ready")
 
     def test_start_rejects_already_running(self):
         machine_id = self._ready()
@@ -495,11 +473,12 @@ class LifecycleTests(_HomeCase):
     def test_stop_returns_phase_to_ready(self):
         machine_id = self._ready()
         self._force(machine_id, "running", vm=True)
-        with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
-            stop_machine(machine_id, context=self.home)
-        # Lifecycle is handed the recorded VM identity, not a home dir.
-        stop_qemu.assert_called_once()
-        self.assertEqual(stop_qemu.call_args.args[0]["port"], 54321)
+        stop_machine(machine_id, context=self.home)
+        # The adapter is handed the recorded VM identity, not a home
+        # dir — the endpoint behind it is the adapter's own business.
+        self.assertEqual(len(self.backend.stops), 1)
+        self.assertEqual(self.backend.stops[0]["backend-id"],
+                         f"reliquary-{machine_id}")
         state = self._state(machine_id)
         self.assertEqual(state["phase"], "ready")
         self.assertNotIn("vm", state)
@@ -507,10 +486,9 @@ class LifecycleTests(_HomeCase):
     def test_stop_keeps_running_on_identity_mismatch(self):
         machine_id = self._ready()
         self._force(machine_id, "running", vm=True)
-        with mock.patch("reliquary.machines.stop_owned_qemu",
-                        side_effect=PreflightError("QMP identity mismatch")):
-            with self.assertRaisesRegex(PreflightError, "identity mismatch"):
-                stop_machine(machine_id, context=self.home)
+        self.backend.stop_error = PreflightError("QMP identity mismatch")
+        with self.assertRaisesRegex(PreflightError, "identity mismatch"):
+            stop_machine(machine_id, context=self.home)
         state = self._state(machine_id)
         self.assertEqual(state["phase"], "running")
         self.assertIn("vm", state)
@@ -518,10 +496,9 @@ class LifecycleTests(_HomeCase):
     def test_stop_reconciles_when_vm_gone(self):
         machine_id = self._ready()
         self._force(machine_id, "running")
-        with mock.patch("reliquary.machines.stop_owned_qemu",
-                        side_effect=PreflightError("no longer reachable")):
-            with self.assertRaisesRegex(PreflightError, "no longer reachable"):
-                stop_machine(machine_id, context=self.home)
+        self.backend.stop_error = PreflightError("no longer reachable")
+        with self.assertRaisesRegex(PreflightError, "no longer reachable"):
+            stop_machine(machine_id, context=self.home)
         self.assertEqual(self._state(machine_id)["phase"], "ready")
 
     def test_destroy_removes_directory(self):
@@ -530,6 +507,15 @@ class LifecycleTests(_HomeCase):
         destroy_machine(machine_id, context=self.home)
         self.assertFalse(os.path.exists(root))
         self.assertEqual(list_machines(context=self.home), [])
+
+    def test_destroy_disposes_of_the_backend_object_first(self):
+        # The directory is the whole materialization only for QEMU;
+        # another backend has its own object to remove, and it goes
+        # before the directory that would otherwise strand it.
+        machine_id = self._ready()
+        root = machine_dir_path(machine_id, self.home)
+        destroy_machine(machine_id, context=self.home)
+        self.assertEqual(self.backend.disposed, [root])
 
     def test_destroy_retries_after_failure(self):
         machine_id = self._ready()
@@ -560,8 +546,7 @@ class LifecycleTests(_HomeCase):
         self._start(machine_id)
         gen1 = self._state(machine_id)["generation"]
         self.assertGreater(gen1, 0)
-        with mock.patch("reliquary.machines.stop_owned_qemu"):
-            stop_machine(machine_id, context=self.home)
+        stop_machine(machine_id, context=self.home)
         self.assertGreater(self._state(machine_id)["generation"], gen1)
 
     def test_operation_takes_a_lock(self):
@@ -573,9 +558,8 @@ class LifecycleTests(_HomeCase):
     def test_interrupted_stop_completed(self):
         machine_id = self._ready()
         self._force(machine_id, "stopping")
-        with mock.patch("reliquary.machines.stop_owned_qemu") as stop_qemu:
-            stop_machine(machine_id, context=self.home)
-        stop_qemu.assert_called_once()
+        stop_machine(machine_id, context=self.home)
+        self.assertEqual(len(self.backend.stops), 1)
         self.assertEqual(self._state(machine_id)["phase"], "ready")
 
     def test_interrupted_create_rolled_back(self):
@@ -596,8 +580,8 @@ class LifecycleTests(_HomeCase):
     def test_failed_materialization_rolls_back(self):
         self._write("doomed", {"platform": "dos", "drives": {"hdd0": "blank"}},
                    media=[_BLANK])
-        with mock.patch("reliquary.machines.create_hdd_image",
-                        side_effect=RunFailure("disk full")):
+        with mock.patch.object(self.backend, "create_image",
+                               side_effect=RunFailure("disk full")):
             with self.assertRaises(RunFailure):
                 create_machine("doomed", context=self.home)
         self.assertEqual(
@@ -612,19 +596,17 @@ class LifecycleTests(_HomeCase):
 
     def test_recreate_reuses_id(self):
         machine_id = self._ready("rc")
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            again = recreate_machine(machine=machine_id, context=self.home)
+        again = recreate_machine(machine=machine_id, context=self.home)
         self.assertEqual(again, machine_id)
 
     def test_recreate_keeps_id_at_gap(self):
         self._write("g", {"platform": "dos", "drives": {"hdd0": "blank"}},
                    media=[_BLANK])
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            create_machine("g", context=self.home)
-            create_machine("g", context=self.home)
-            two = create_machine("g", context=self.home)
-            destroy_machine("g-0", context=self.home)
-            again = recreate_machine(machine=two, context=self.home)
+        create_machine("g", context=self.home)
+        create_machine("g", context=self.home)
+        two = create_machine("g", context=self.home)
+        destroy_machine("g-0", context=self.home)
+        again = recreate_machine(machine=two, context=self.home)
         self.assertEqual(again, "g-2")
 
     def test_apply_absorbs_memory_and_boot(self):
@@ -728,11 +710,6 @@ class MediaInsertionTests(_HomeCase):
         self.assertIsNone(cdrom["media"])
         self.assertIsNone(cdrom["path"])
 
-    def test_empty_cdrom_renders_medium_less_drive(self):
-        args = machine_drive_args(self._installer(), self.home)
-        cdrom_arg = [v for v in _drive_values(args) if "media=cdrom" in v]
-        self.assertEqual(cdrom_arg, ["media=cdrom,if=ide,index=1,id=cdrom0"])
-
     def test_insert_persists_media(self):
         machine_id = self._installer()
         insert_media(machine_id, "cdrom0", "freedos-livecd",
@@ -768,25 +745,22 @@ class MediaInsertionTests(_HomeCase):
             set_boot_order(machine_id, ["floppy0"], context=self.home)
         self.assertIn("undeclared drive floppy0", str(caught.exception))
 
-    def test_hdd_then_cdrom_boot_order(self):
+    def test_boot_order_reaches_the_adapter_as_drive_keys(self):
         machine_id = self._installer()
-        with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)) as launch:
-            start_machine(machine_id, context=self.home)
-        self.assertIn("order=cd", launch.call_args.args[0])
+        start_machine(machine_id, context=self.home)
+        # Drive keys cross the seam; turning them into a firmware
+        # boot order is the adapter's (test_backend_qemu.py).
+        self.assertEqual(
+            self.backend.starts[-1]["state"]["boot"], ["hdd0", "cdrom0"])
 
     def test_inserted_media_survives_start(self):
         machine_id = self._installer()
         insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=self.home)
-        with mock.patch("reliquary.machines.find_qemu", return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)) as launch:
-            start_machine(machine_id, context=self.home)
-        cdrom_arg = [a for a in launch.call_args.args[0] if "media=cdrom" in a]
-        self.assertEqual(len(cdrom_arg), 1)
-        self.assertIn(self.iso_path, cdrom_arg[0])
+        start_machine(machine_id, context=self.home)
+        cdrom = self.backend.starts[-1]["state"]["drives"]["cdrom0"]
+        self.assertEqual(os.path.normpath(cdrom["path"]),
+                         os.path.normpath(self.iso_path))
 
     def test_insert_rejects_undeclared_slot(self):
         with self.assertRaises(PreflightError) as caught:
@@ -821,23 +795,21 @@ class MediaInsertionTests(_HomeCase):
         live.assert_called_once()
         self.assertIsNone(live.call_args.args[2])
 
-    def test_change_media_live_hmp_commands(self):
+    def test_a_live_change_goes_through_the_adapter_session(self):
+        # The swap the guest sees is one operation with the state
+        # change, and it reaches the backend by drive key — never by
+        # a monitor command this module composes itself.
         from reliquary import machines as machines_mod
         machine_id = self._installer()
         self._force(machine_id, "running", vm=True)
-        fake_qmp = mock.MagicMock()
-        session = mock.MagicMock()
-        session.__enter__.return_value = fake_qmp
-        session.__exit__.return_value = False
-        with mock.patch("reliquary.machine.Machine.qmp", return_value=session):
-            machines_mod._change_media_live(
-                machine_id, "cdrom0", self.iso_path, self.home)
-            machines_mod._change_media_live(
-                machine_id, "cdrom0", None, self.home)
-        lines = [c.args[0] for c in fake_qmp.hmp.call_args_list]
-        self.assertTrue(any(line.startswith("change cdrom0 ")
-                            and line.endswith(" raw") for line in lines))
-        self.assertIn("eject cdrom0", lines)
+        machines_mod._change_media_live(
+            machine_id, "cdrom0", self.iso_path, self.home)
+        machines_mod._change_media_live(
+            machine_id, "cdrom0", None, self.home)
+        changes = [change for session in self.backend.sessions
+                   for change in session.media_changes]
+        self.assertEqual(changes,
+                         [("cdrom0", self.iso_path), ("cdrom0", None)])
 
     def test_insert_on_stopped_is_state_only(self):
         machine_id = self._installer()
@@ -897,15 +869,12 @@ class AnonymousImageTests(_HomeCase):
         insert_media(machine_id, "floppy0", file=image, context=self.home)
         with open(image, "wb") as handle:
             handle.write(b"ROUND-2")
-        with mock.patch("reliquary.machines.find_qemu",
-                        return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)) as launch:
-            start_machine(machine_id, context=self.home)
-        # Mutable and unverified: no hash is re-checked, and the
-        # path the consumer just rewrote is what QEMU is handed.
-        floppy = [a for a in launch.call_args.args[0] if "if=floppy" in a]
-        self.assertIn(image.replace("\\", "\\"), floppy[0])
+        start_machine(machine_id, context=self.home)
+        # Mutable and unverified: no hash is re-checked, and the path
+        # the consumer just rewrote is what the adapter is handed.
+        floppy = self.backend.starts[-1]["state"]["drives"]["floppy0"]
+        self.assertEqual(os.path.normpath(floppy["path"]),
+                         os.path.normpath(image))
 
     def test_naming_both_a_media_and_a_file_is_refused(self):
         machine_id, image = self._rig()
@@ -953,11 +922,7 @@ class LiveFloppyGeometryTests(_HomeCase):
         if launched is not None:
             insert_media(machine_id, "floppy0", file=launched,
                          context=self.home)
-        with mock.patch("reliquary.machines.find_qemu",
-                        return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)):
-            start_machine(machine_id, context=self.home)
+        start_machine(machine_id, context=self.home)
         return machine_id
 
     def _image(self, name, size):
@@ -1016,11 +981,7 @@ class LiveFloppyGeometryTests(_HomeCase):
             "rig", {"platform": "dos",
                     "drives": {"hdd0": "blank", "cdrom0": None}},
             media=[_BLANK, self._livecd()])
-        with mock.patch("reliquary.machines.find_qemu",
-                        return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)):
-            start_machine(machine_id, context=self.home)
+        start_machine(machine_id, context=self.home)
         with mock.patch("reliquary.machines._change_media_live"):
             insert_media(machine_id, "cdrom0", "freedos-livecd",
                          context=self.home)
@@ -1054,11 +1015,7 @@ class MachineVariableTests(_HomeCase):
     def test_start_clears_the_variables_of_the_previous_boot(self):
         machine_id = self._rig()
         set_machine_var(machine_id, "ready", "yes", context=self.home)
-        with mock.patch("reliquary.machines.find_qemu",
-                        return_value="qemu"), \
-                mock.patch("reliquary.machines.launch_owned_qemu",
-                           return_value=self._identity(machine_id)):
-            start_machine(machine_id, context=self.home)
+        start_machine(machine_id, context=self.home)
         self.assertIsNone(
             get_machine_var("ready", machine=machine_id,
                             context=self.home))
@@ -1524,10 +1481,6 @@ class DosAddressingTests(unittest.TestCase):
         with self.assertRaises(PreflightError) as caught:
             _addressing("openbsd")
         self.assertIn("openbsd", str(caught.exception))
-
-
-def _drive_values(args):
-    return [args[i + 1] for i, a in enumerate(args) if a == "-drive"]
 
 
 if __name__ == "__main__":

@@ -23,13 +23,30 @@ except ModuleNotFoundError:
     sys.modules["qemu"] = qemu
     sys.modules["qemu.qmp"] = qmp
 
+import contextlib
+
 import reliquary
+from reliquary import backend_qemu as qemu_module
+from reliquary import control_display as display_module
 from reliquary import interaction as interaction_module
 from reliquary import interaction_agentless as agentless_module
-from reliquary import lifecycle as lifecycle_module
 from reliquary import machine as machine_module
+from reliquary import machines as machines_module
 from reliquary.errors import InternalError, PreflightError, RunFailure, StaticError
 from reliquary import platform_dos as platform_dos_module
+from reliquary_tests import fake_backend
+
+
+@contextlib.contextmanager
+def _yielding(value):
+    yield value
+
+
+def _over(console):
+    """Patch `Machine.console` to yield a stub console."""
+    return mock.patch.object(
+        machine_module.Machine, "console",
+        lambda self: _yielding(console))
 
 
 class HomeTests(unittest.TestCase):
@@ -46,6 +63,35 @@ class HomeTests(unittest.TestCase):
         self.addCleanup(self.tempdir.cleanup)
         reliquary.set_home_dir(self.tempdir.name)
 
+    def test_screenshot_rejects_names_that_are_paths(self):
+        invalid_names = ("", ".", "..", "../outside", "..\\outside",
+                         "/outside", "C:\\outside")
+
+        with fake_backend.installed() as adapter:
+            for name in invalid_names:
+                with self.subTest(name=name):
+                    with self.assertRaisesRegex(StaticError, "not a path"):
+                        reliquary.screenshot(name)
+
+        # The name is judged before any session is opened.
+        self.assertEqual(adapter.sessions, [])
+
+    def test_screenshot_lands_under_the_machine_directory(self):
+        # Where the image goes is Reliquary's policy and stays above
+        # the seam; capturing the framebuffer is the adapter's carrier.
+        vm = {"backend": "qemu", "backend-id": "reliquary-plain-0",
+              "token": "0" * 32, "endpoint": {"port": 54321}}
+        expected = os.path.join(
+            self.tempdir.name, "screenshots", "release-smoke.png")
+
+        with fake_backend.installed() as adapter, \
+                mock.patch.object(machines_module, "read_vm_state",
+                                  return_value=vm):
+            written = reliquary.screenshot("release-smoke")
+
+        self.assertEqual(written, expected)
+        self.assertEqual(adapter.sessions[-1].screenshots, [expected])
+        self.assertTrue(os.path.isfile(expected))
     def test_planned_layout_paths_are_contained_by_configured_home(self):
         root = self.tempdir.name
         cache = os.path.join(root, "cache")
@@ -82,123 +128,109 @@ class HomeTests(unittest.TestCase):
 
     def _write_state(self, document):
         # The live-VM identity is folded into machine.json's `vm`
-        # section now; author the machine-state file directly.
+        # section; author the machine-state file directly.
         os.makedirs(self.tempdir.name, exist_ok=True)
-        with open(lifecycle_module.state_path(), "w",
+        with open(os.path.join(self.tempdir.name, "machine.json"), "w",
                   encoding="utf-8") as state:
             json.dump(document, state)
 
+    def _read_vm(self):
+        return machines_module.read_vm_state(self.tempdir.name)
+
     def test_vm_state_round_trip(self):
-        vm = {"port": 54321, "name": "reliquary-test",
-              "uuid": "12345678-1234-1234-1234-123456789012", "pid": 1234}
+        vm = {"backend": "qemu", "backend-id": "reliquary-test-0",
+              "token": "12345678-1234-1234-1234-123456789012",
+              "endpoint": {"port": 54321}, "pid": 1234}
         self._write_state({"id": "reliquary-test-0", "phase": "running",
                            "vm": vm})
 
-        self.assertEqual(lifecycle_module.read_vm_state(), vm)
+        self.assertEqual(self._read_vm(), vm)
 
     def test_no_vm_section_reads_as_none(self):
-        # A stopped machine (or a plain reliquary home) has no `vm`
-        # section — that is not-running, not an error.
+        # A stopped machine has no `vm` section — that is
+        # not-running, not an error.
         self._write_state({"id": "reliquary-test-0", "phase": "ready"})
-        self.assertIsNone(lifecycle_module.read_vm_state())
+        self.assertIsNone(self._read_vm())
 
-    def test_invalid_vm_state_is_rejected(self):
-        self._write_state({"vm": {"port": True, "name": "reliquary-test"}})
+    def test_a_vm_record_naming_no_backend_is_rejected(self):
+        # Which adapter owns the VM is the first thing the record has
+        # to say: without it there is nobody to verify it against.
+        self._write_state({"vm": {"backend-id": "reliquary-test-0",
+                                  "token": "0" * 32,
+                                  "endpoint": {"port": 54321}}})
 
         with self.assertRaisesRegex(InternalError, "invalid reliquary VM state"):
-            lifecycle_module.read_vm_state()
+            self._read_vm()
 
-    def test_vm_state_without_uuid_is_rejected(self):
-        # a name alone cannot identify a VM instance; a `vm` section
-        # predating the per-start uuid is invalid, not grandfathered
-        self._write_state({"vm": {"port": 54321, "name": "reliquary-test",
+    def test_vm_state_without_a_token_is_rejected(self):
+        # a readable name alone cannot identify a VM instance; a `vm`
+        # section without the per-start token is invalid, not
+        # grandfathered
+        self._write_state({"vm": {"backend": "qemu",
+                                  "backend-id": "reliquary-test-0",
+                                  "endpoint": {"port": 54321},
                                   "pid": 1234}})
 
         with self.assertRaisesRegex(InternalError, "invalid reliquary VM state"):
-            lifecycle_module.read_vm_state()
+            self._read_vm()
 
-    def test_resolve_vm_rejects_unrecorded_explicit_port(self):
-        with self.assertRaisesRegex(PreflightError, "not the recorded"):
-            lifecycle_module.resolve_vm(54321)
+    def test_a_machine_with_no_recorded_vm_fails_closed(self):
+        self._write_state({"id": "reliquary-test-0", "phase": "ready"})
+        with self.assertRaisesRegex(PreflightError, "no active reliquary VM"):
+            machine_module.Machine(self.tempdir.name).screen_text()
 
 class InputAndScreenTests(unittest.TestCase):
+    """The display console's own composition, over any adapter."""
+
     def test_character_key_mappings(self):
-        self.assertEqual(machine_module.char_keys("a"), ["a"])
-        self.assertEqual(machine_module.char_keys("A"), ["shift", "a"])
-        self.assertEqual(machine_module.char_keys(":"),
+        self.assertEqual(display_module.char_keys("a"), ["a"])
+        self.assertEqual(display_module.char_keys("A"), ["shift", "a"])
+        self.assertEqual(display_module.char_keys(":"),
                          ["shift", "semicolon"])
-        self.assertEqual(machine_module.char_keys(" "), ["spc"])
+        self.assertEqual(display_module.char_keys(" "), ["spc"])
 
     def test_unmapped_character_is_rejected(self):
         with self.assertRaisesRegex(StaticError, "no key mapping"):
-            machine_module.char_keys("\N{SNOWMAN}")
+            display_module.char_keys("\N{SNOWMAN}")
 
-    def test_send_text_builds_qcode_combinations(self):
-        console = machine_module._DisplayConsole(54321)
+    def test_send_text_builds_key_combinations(self):
+        console = display_module.DisplayConsole(None)
         with mock.patch.object(console, "send_keys") as send_keys:
             console.send_text("A:")
 
         send_keys.assert_called_once_with(
             [["shift", "a"], ["shift", "semicolon"], ["ret"]])
 
-    def test_screen_text_extracts_characters_and_ignores_attributes(self):
-        cells = []
-        for char in "A:\\>" + " " * (80 * 25 - 4):
-            cells.extend((ord(char), 0x07))
-        lines = []
-        for offset in range(0, len(cells), 16):
-            payload = " ".join(f"0x{value:02x}" for value in
-                               cells[offset:offset + 16])
-            lines.append(f"00000000000b{offset:04x}: {payload}")
-        qmp = mock.Mock()
-        qmp.hmp.return_value = "\n".join(lines)
+    def test_the_console_reads_characters_off_the_text_screen(self):
+        session = mock.Mock()
+        session.text_screen.return_value = (
+            ["A:\\>"] + [""] * 24, [[0x07] * 80 for _ in range(25)])
 
-        with mock.patch.object(machine_module, "qmp_session") as connection:
-            connection.return_value.__enter__.return_value = qmp
-            rows = reliquary.screen_text()
+        rows = display_module.DisplayConsole(session).screen_text()
 
         self.assertEqual(len(rows), 25)
         self.assertEqual(rows[0], "A:\\>")
         self.assertTrue(all(row == "" for row in rows[1:]))
-        qmp.hmp.assert_called_once_with("xp /4000bx 0xb8000")
 
-    def test_vga_screen_exposes_attribute_bytes(self):
-        cells = []
-        for index, char in enumerate("A:\\>" + " " * (80 * 25 - 4)):
-            cells.extend((ord(char), 0x70 if index < 4 else 0x07))
-        lines = []
-        for offset in range(0, len(cells), 16):
-            payload = " ".join(f"0x{value:02x}" for value in
-                               cells[offset:offset + 16])
-            lines.append(f"00000000000b{offset:04x}: {payload}")
-        qmp = mock.Mock()
-        qmp.hmp.return_value = "\n".join(lines)
-
-        rows, attributes = machine_module.vga_screen(qmp)
-
-        self.assertEqual(rows[0], "A:\\>")
-        self.assertEqual(attributes[0][:5], [0x70] * 4 + [0x07])
-        self.assertEqual(len(attributes), 25)
-        self.assertTrue(all(len(row) == 80 for row in attributes))
+    def test_the_console_sends_keys_through_the_session(self):
+        session = mock.Mock()
+        display_module.DisplayConsole(session).send_keys([["ret"]])
+        session.send_keys.assert_called_once_with([["ret"]], 0.06)
 
     def test_wait_text_returns_the_matching_screen(self):
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
-                mock.patch.object(
-                    machine_module, "vga_text",
-                    return_value=["Welcome to FreeDOS 1.4 (LiveCD)"]), \
-                mock.patch.object(machine_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
+        console = mock.Mock()
+        console.screen_text.return_value = [
+            "Welcome to FreeDOS 1.4 (LiveCD)"]
+        with _over(console), mock.patch.object(machine_module.time, "sleep"):
             screen = machine_module.Machine().wait_text(
                 r"Welcome to FreeDOS")
 
         self.assertIn("FreeDOS 1.4", screen)
 
     def test_wait_text_times_out_without_a_match(self):
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
-                mock.patch.object(
-                    machine_module, "vga_text", return_value=[""]), \
-                mock.patch.object(machine_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
+        console = mock.Mock()
+        console.screen_text.return_value = [""]
+        with _over(console), mock.patch.object(machine_module.time, "sleep"):
             with self.assertRaisesRegex(RunFailure, "FreeDOS"):
                 machine_module.Machine().wait_text("FreeDOS", timeout=0)
 
@@ -386,14 +418,14 @@ class _BlinkingClockMenu(_FakeMenu):
 
 class CursorMenuTests(unittest.TestCase):
     def _select(self, menu, item, timeout=30, exclude=()):
-        console = machine_module._DisplayConsole(None)
+        console = display_module.DisplayConsole(None)
         console.screen = menu.screen
         console.send_keys = lambda combos, delay=0.06: [
             menu.press(combo[0]) for combo in combos]
         clock = _MenuClock()
-        with mock.patch.object(machine_module.time, "monotonic",
+        with mock.patch.object(display_module.time, "monotonic",
                                clock.monotonic), \
-                mock.patch.object(machine_module.time, "sleep",
+                mock.patch.object(display_module.time, "sleep",
                                   clock.sleep):
             return console.cursor_menu_select(item, timeout, exclude)
 
@@ -514,7 +546,7 @@ class CursorMenuTests(unittest.TestCase):
         before[2] = [0x70] * 80
         after = [[0x1B] * 80 for _ in range(25)]
 
-        self.assertIsNone(machine_module._cursor_row(before, after))
+        self.assertIsNone(display_module._cursor_row(before, after))
 
     def test_a_neighbor_rewritten_by_the_probe_is_still_selected(self):
         # moving off "English" rewrites the list in French, and the
@@ -579,37 +611,47 @@ class BootToDosTests(unittest.TestCase):
     def test_reaches_an_existing_prompt_without_typing(self):
         console = mock.Mock()
         console.screen_text.return_value = ["A:\\>"] + [""] * 24
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
-                mock.patch.object(
-                    agentless_module, "_DisplayConsole",
-                    return_value=console), \
+        with _over(console), \
                 mock.patch.object(agentless_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
             agentless_module.AgentlessGuestExec(
                 machine_module.Machine()).wait_ready()
 
         console.send_text.assert_not_called()
 
     def test_times_out_without_a_prompt(self):
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
+        console = mock.Mock()
+        console.screen_text.return_value = [""] * 25
+        with _over(console), \
                 mock.patch.object(agentless_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = mock.Mock()
             with self.assertRaisesRegex(RunFailure, "DOS prompt"):
                 agentless_module.AgentlessGuestExec(
                     machine_module.Machine()).wait_ready(timeout=0)
 
-
 class InteractionAdapterTests(unittest.TestCase):
-    def test_machine_exposes_an_identity_verified_qmp_session(self):
-        qmp = mock.Mock()
-        machine = machine_module.Machine(54321, "run-home")
-        with mock.patch.object(machine_module, "qmp_session") as connection:
-            connection.return_value.__enter__.return_value = qmp
+    def test_a_machine_session_comes_from_its_recorded_backend(self):
+        vm = {"backend": "qemu", "backend-id": "reliquary-plain-0",
+              "token": "0" * 32, "endpoint": {"port": 54321}}
+        adapter = fake_backend.FakeAdapter()
+        with fake_backend.installed(adapter), \
+                mock.patch.object(machines_module, "read_vm_state",
+                                  return_value=vm) as recorded:
+            with machine_module.Machine("run-home").session() as session:
+                self.assertIs(session, adapter.sessions[-1])
+                self.assertEqual(session.vm, vm)
+        recorded.assert_called_once_with("run-home")
 
-            with machine.qmp() as session:
-                self.assertIs(session, qmp)
-
-        connection.assert_called_once_with(54321, "run-home")
+    def test_the_qmp_seam_is_refused_on_another_backend(self):
+        # The native escape hatch is explicitly backend-scoped: a
+        # machine that is not QEMU's says so rather than offering an
+        # approximation of a QMP monitor.
+        vm = {"backend": "virtualbox", "backend-id": "vbox-uuid",
+              "token": "0" * 32, "endpoint": {}}
+        with fake_backend.installed(name="virtualbox"), \
+                mock.patch.object(machines_module, "read_vm_state",
+                                  return_value=vm):
+            with self.assertRaisesRegex(PreflightError, "no QMP monitor"):
+                with machine_module.Machine("run-home").qmp():
+                    pass
 
     def test_package_exposes_the_protocol_and_agentless_adapter(self):
         self.assertIs(reliquary.GuestExec, interaction_module.GuestExec)
@@ -627,20 +669,14 @@ class InteractionAdapterTests(unittest.TestCase):
 
 class RunCommandTests(unittest.TestCase):
     def test_agentless_adapter_executes_through_display_console(self):
-        qmp = mock.Mock()
         console = mock.Mock()
         console.screen_text.return_value = ["C:\\>"] + [""] * 24
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
-                mock.patch.object(
-                    agentless_module, "_DisplayConsole",
-                    return_value=console), \
+        with _over(console), \
                 mock.patch.object(agentless_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = qmp
             agentless_module.AgentlessGuestExec(
                 machine_module.Machine()).execute("dir")
 
         console.send_text.assert_called_once_with("dir")
-
 
 class ScreenshotTests(unittest.TestCase):
     def setUp(self):
@@ -655,60 +691,6 @@ class ScreenshotTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         reliquary.set_home_dir(self.tempdir.name)
-
-    def test_screenshot_rejects_names_that_are_paths(self):
-        invalid_names = ("", ".", "..", "../outside", "..\\outside",
-                         "/outside", "C:\\outside")
-
-        with mock.patch.object(machine_module, "qmp_session") as connection:
-            for name in invalid_names:
-                with self.subTest(name=name):
-                    with self.assertRaisesRegex(StaticError, "not a path"):
-                        reliquary.screenshot(name)
-
-        connection.assert_not_called()
-
-    def test_screenshot_requests_png_under_home(self):
-        qmp = mock.Mock()
-        expected = os.path.join(
-            self.tempdir.name, "screenshots", "release-smoke.png")
-
-        with mock.patch.object(machine_module, "qmp_session") as connection:
-            connection.return_value.__enter__.return_value = qmp
-            reliquary.screenshot("release-smoke")
-
-        qmp.cmd.assert_called_once_with(
-            "screendump", filename=expected.replace("\\", "/"),
-            format="png")
-
-    def test_screenshot_converts_legacy_ppm_under_home(self):
-        class UnsupportedPngError(Exception):
-            pass
-
-        qmp = mock.Mock()
-        screenshots = os.path.join(self.tempdir.name, "screenshots")
-        ppm = os.path.join(screenshots, "legacy.ppm")
-        png = os.path.join(screenshots, "legacy.png")
-
-        def screendump(command, **arguments):
-            self.assertEqual(command, "screendump")
-            if arguments.get("format") == "png":
-                raise UnsupportedPngError()
-            with open(arguments["filename"], "wb") as image:
-                image.write(b"P6\n1 1\n255\n\x01\x02\x03")
-
-        qmp.cmd.side_effect = screendump
-        with mock.patch.object(machine_module, "qmp_session") as connection, \
-                mock.patch.object(machine_module, "ExecuteError",
-                                  UnsupportedPngError), \
-                mock.patch.object(machine_module.time, "sleep"):
-            connection.return_value.__enter__.return_value = qmp
-            reliquary.screenshot("legacy")
-
-        self.assertFalse(os.path.exists(ppm))
-        with open(png, "rb") as image:
-            self.assertEqual(image.read(8), b"\x89PNG\r\n\x1a\n")
-
 
 if __name__ == "__main__":
     unittest.main()

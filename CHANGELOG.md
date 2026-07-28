@@ -11,7 +11,56 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **The backend adapter seam.** Every backend operation now goes
+  through one adapter API (`reliquary/backends.py`), extracted from
+  the working QEMU implementation rather than designed ahead of one:
+  discovery, a capability report, image materialization, start /
+  stop, and the carrier session a control plane composes. QEMU's
+  half moved wholesale into `reliquary/backend_qemu.py` — nothing
+  above the seam names QEMU, qcow2, QMP or a port — and the
+  agentless display console moved to `reliquary/control_display.py`,
+  where it reads character rows plus opaque, equality-comparable
+  attribute tokens rather than VGA bytes, so the cursor-menu
+  machinery is written once for every backend rather than once per
+  adapter.
+
+- **Backend assignment, autodiscovery, and honest capability
+  refusals.** `create-machine` now probes the host and picks the
+  backend at materialization: a declared `backend` pins the choice,
+  and otherwise Reliquary walks its priority order — **QEMU,
+  VirtualBox, VMware Workstation, Hyper-V**, ranked by *agentless*
+  scriptability — and takes the first backend both available and
+  capable of the whole blueprint. Capabilities are reported, never
+  emulated: an unsupported control plane, drive medium, controller
+  or materialization mode fails preflight naming the backend and the
+  requirement, before any image work. VirtualBox, VMware Workstation
+  and Hyper-V ship as **stub adapters that probe the host honestly
+  and claim no capability**, so the walk passes over them even where
+  the backend is installed — the order's tail is intent recorded,
+  not shipped behavior.
+
 ### Changed
+
+- **The recorded VM identity is generic, and machines carry no
+  port.** A running machine's `vm` section now reads
+  `{backend, backend-id, token, endpoint, pid}` — the backend that
+  owns the VM, that backend's own machine identifier, a per-start
+  token, and an adapter-shaped endpoint (QEMU's is `{port}`) —
+  replacing `{port, name, uuid, pid}`. Old machine states will not
+  load; recreate them. With the endpoint behind the seam,
+  **`start_machine()` returns the machine id** rather than a QMP
+  port, `Machine` is `Machine(home=..., deadline=...)` with no
+  `port=` (likewise `send_keys` / `send_text` / `screen_text` /
+  `wait_text` / `cursor_menu_select` / `screenshot`), and the
+  undocumented `--port` option is gone from the guest-console
+  commands, which select a machine with `--blueprint` / `--machine`
+  like every other command. `machine_drive_args`, `find_qemu`,
+  `find_qemu_img`, `create_hdd_image`, `Qmp` and `stop` leave the
+  embedding surface: they are the QEMU adapter's internals, and the
+  adapter API is an internal engineering contract rather than a
+  world-facing interface.
 
 - **The wheel is the runtime; the source package is the whole
   project.** `reliquary_tests` no longer ships in the wheel — an end

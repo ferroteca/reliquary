@@ -311,7 +311,8 @@ Reliquary searches for QEMU in this order:
 3. The system `PATH`
 4. Common installation directories on Windows, macOS, and Linux
 
-`--qemu PATH` and the Python `qemu=` argument can select a specific binary.
+`RELIQUARY_QEMU_HOME` is how a specific installation is chosen; the
+QEMU adapter probes the rest in the order above.
 
 ## Where Reliquary keeps things
 
@@ -417,14 +418,13 @@ machine of this blueprint already exists — e.g. one installed by
 rlq start-machine --blueprint freedos
 ```
 
-Reliquary chooses an available local QMP port, starts QEMU headless,
-assigns the VM a unique identity, and records it in the machine's
-`machine.json` (as a `vm` section, written while running). Later
-commands find the running VM through the machine selector, so the port
-never needs to be copied by hand. The machine
-stays running until you stop it. Add `--display` for a visible,
-manually interactive QEMU window; `--port PORT` requests a particular
-QMP port (an occupied port is refused).
+Reliquary picks the backend, starts it headless, assigns the VM a
+unique identity, and records it in the machine's `machine.json` (as a
+`vm` section, written while running). Later commands find the running
+VM through the machine selector, so nothing about the connection is
+ever copied by hand — how the backend is reached is its adapter's
+business. The machine stays running until you stop it. Add
+`--display` for a visible, manually interactive window.
 
 ### 3. Reach the DOS prompt
 
@@ -594,9 +594,9 @@ rlq select ITEM [--exclude TEXT]
 ```
 
 Every guest-console command targets a running machine — select it with
-`--blueprint <name>` / `--machine <id>` (as in the [First
-session](#first-session)) or address a QMP port directly with
-`--port <n>`. The examples below omit the selector for brevity.
+`--blueprint <name>` / `--machine <id>`, as in the [First
+session](#first-session). The examples below omit the selector for
+brevity.
 
 `type` sends raw text with no trailing Enter; `enter` types a line and presses Enter. `exec` additionally waits for the
 prompt to return. `press` accepts the script language's portable key names (and `+` chords), such as:
@@ -653,16 +653,16 @@ The CLI is a thin veneer over the embedding API: every command maps
 one-to-one onto a Python call with the same semantics. To run a whole
 script, `reliquary.run_script("install", blueprint="freedos")`
 is the one call. To drive a machine directly, create and start it, then
-attach the interaction adapter to the returned port and the machine's
-directory (so ownership is verified against its recorded identity):
+attach the interaction adapter to the machine's own directory — that is
+where its recorded identity lives, so ownership is verified against it:
 
 ```python
 import reliquary
 
 machine_id = reliquary.create_machine("freedos")
-port = reliquary.start_machine(machine_id)
+reliquary.start_machine(machine_id)
 home = reliquary.machine_dir_path(machine_id)
-machine = reliquary.Machine(port, home=home)
+machine = reliquary.Machine(home)
 guest = reliquary.AgentlessGuestExec(machine)
 
 try:
@@ -728,9 +728,10 @@ for the end-goal design.
 
 ### QEMU cannot be found
 
-Install QEMU and put `qemu-system-i386` on `PATH`, set
-`RELIQUARY_QEMU_HOME` to the QEMU installation directory, or pass
-`--qemu PATH`.
+Install QEMU and put `qemu-system-i386` on `PATH`, or set
+`RELIQUARY_QEMU_HOME` to the QEMU installation directory. With no
+QEMU available, `create-machine` reports every backend it probed and
+why each was passed over.
 
 ### A command cannot find an active VM
 

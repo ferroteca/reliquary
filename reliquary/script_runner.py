@@ -28,14 +28,12 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
-from qemu.qmp import ConnectError
-
 from .binding import bind_properties, console_asker, describe_sources
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      RunFailure, StaticError)
 from .library import locate_script, seed_blueprint, seed_script
-from .machine import (Machine, _DisplayConsole, char_keys, screenshot,
-                      validate_screenshot_name)
+from .control_display import char_keys
+from .machine import Machine, screenshot, validate_screenshot_name
 from .progress import interactive as _interactive, stream_for
 from .resolve import load_namespace
 from .script_parser import load_script
@@ -407,7 +405,7 @@ class _ScriptEngine:
         self._context = context
         self._machine_home = machine_home
         self._script_path = script_path
-        self._port = None
+        self._running = False
         self._display = False
         self._now = clock
         self._sleep = sleep
@@ -607,11 +605,11 @@ class _ScriptEngine:
         it was given, and an automatic capture is not the author's own
         deliberate call.
         """
-        if self._port is None or self._secret_entered:
+        if not self._running or self._secret_entered:
             return None
         name = f"failure-step-{self._step}"
         try:
-            screenshot(name, self._port, self._machine_home)
+            screenshot(name, self._machine_home)
         except Exception:
             # A failure report must never fail; the machine may
             # already be gone.
@@ -658,18 +656,18 @@ class _ScriptEngine:
                     f"script (phase: {phase})",
                     rule_id="machine.phase-cannot-run")
         elif phase == "ready":
-            self._port = _machines.start_machine(
+            _machines.start_machine(
                 self._machine_id, display=display, context=self._context,
                 events=self.events)
+            self._running = True
         elif phase == "running":
-            from .lifecycle import read_vm_state
-            vm = read_vm_state(home=_machines.machine_dir_path(
+            vm = _machines.read_vm_state(_machines.machine_dir_path(
                 self._machine_id, self._context))
             if vm is None:
                 raise self._error(
                     "machine phase is running but no VM identity "
                     "recorded", rule_id="machine.no-vm-identity")
-            self._port = vm["port"]
+            self._running = True
         else:
             raise self._error(
                 f"machine {self._machine_id} cannot execute a script "
@@ -969,7 +967,7 @@ class _ScriptEngine:
 
     def _require_screen(self, observations, node):
         """A screen observation needs a running machine to read."""
-        if self._port is None and any(observation.channel == "screen"
+        if not self._running and any(observation.channel == "screen"
                                       for observation in observations):
             raise self._error(
                 "the machine is not running; the script must start it "
@@ -977,22 +975,22 @@ class _ScriptEngine:
 
     def _read(self):
         """Take one sample of every channel."""
-        if self._port is None:
+        if not self._running:
             return self._sampled(_Sample((), True))
         try:
             with self._console() as console:
                 rows = console.screen_text()
-        except (OSError, ConnectError, ConnectionError):
+        except (OSError, ConnectionError):
             # The QEMU process is gone: the guest powered itself off,
             # so the machine's phase must return to `ready` for any
             # later insert/eject and `start`.
             self._mark_stopped()
             return self._sampled(_Sample((), True))
         except PreflightError as error:
-            # lifecycle.qmp_session wraps connect failures as a
-            # PREFLIGHT ERROR after clearing vm.json; that sample is
+            # The adapter reports an unreachable VM as a PREFLIGHT
+            # ERROR rather than a transport exception; that sample is
             # the stopped observation (task 5 / AGENTS).
-            if "no longer reachable" not in str(error):
+            if error.rule_id != "machine.vm-unreachable":
                 raise
             self._mark_stopped()
             return self._sampled(_Sample((), True))
@@ -1012,18 +1010,18 @@ class _ScriptEngine:
         none is ever held while a statement list runs — QEMU's QMP
         server admits one client at a time.
         """
-        with Machine(self._port, self._machine_home).qmp() as qmp:
-            yield _DisplayConsole(qmp)
+        with Machine(self._machine_home).console() as console:
+            yield console
 
     def _mark_stopped(self):
-        self._port = None
+        self._running = False
         try:
             _machines.mark_stopped(self._machine_id, context=self._context)
         except PreflightError:
             pass
 
     def _requires_running(self, statement):
-        if self._port is None:
+        if not self._running:
             raise self._error(
                 "the machine is not running; the script must start it "
                 "first", statement, rule_id="machine.not-running")
@@ -1124,7 +1122,7 @@ class _ScriptEngine:
         self._requires_running(statement)
         # No run directory exists any more (D36), so an author's
         # screenshot rests with the machine it was taken from.
-        Machine(self._port, self._machine_home).screenshot(name)
+        Machine(self._machine_home).screenshot(name)
         self._completed(statement, "screenshot")
 
     def _insert(self, statement):
@@ -1175,15 +1173,16 @@ class _ScriptEngine:
 
     def _start(self, statement):
         self._action(statement, "start")
-        self._port = _machines.start_machine(
+        _machines.start_machine(
             self._machine_id, display=self._display, context=self._context,
             events=self.events, cancelled=self._cancelled)
+        self._running = True
         self._completed(statement, "start")
 
     def _stop(self, statement):
         self._action(statement, "stop")
         _machines.stop_machine(self._machine_id, context=self._context)
-        self._port = None
+        self._running = False
         self._completed(statement, "stop")
 
     # -- run-scoped HTTP -----------------------------------------

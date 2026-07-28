@@ -16,6 +16,8 @@ import importlib
 
 home = importlib.import_module("reliquary.home")
 from reliquary import cli
+from reliquary import backends
+from reliquary_tests import fake_backend
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SPEC_DIR = os.path.join(_REPO_ROOT, "docs", "spec")
@@ -123,6 +125,9 @@ class CliEmptyListingTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
 
     def test_list_machines_reports_no_machines(self):
         """An empty machine list says so instead of a headerless table."""
@@ -190,13 +195,13 @@ class CliEmptyListingTests(unittest.TestCase):
         self.assertIn("no scripts", output)
 
     def test_screen_accepts_home_after_command(self):
-        with mock.patch("reliquary.cli.screen_text",
-                        return_value=["hello"]) as screen, \
-                contextlib.redirect_stdout(io.StringIO()) as stdout:
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
             result = cli.main(["screen", "--home-dir", self.home])
-        self.assertEqual(result, 0)
-        screen.assert_called_once_with(None, home=None)
-        self.assertEqual(stdout.getvalue(), "hello\n")
+        # Flags still travel either side of the command word; a
+        # guest-console command with no machine selected is refused
+        # for the selector, not for the flag order.
+        self.assertEqual(result, 2)
+        self.assertIn("--blueprint", stderr.getvalue())
 
 
 class CliReorderArgvTests(unittest.TestCase):
@@ -243,9 +248,10 @@ class CliReorderArgvTests(unittest.TestCase):
         # table as live per-command options; --qemu has no subparser
         # anywhere, so its entry named an option that was gone.
         self.assertNotIn("--qemu", cli._FLAG_ARITY)
-        for flag in ("--platform", "--port"):
-            with self.subTest(flag=flag):
-                self.assertIn(flag, cli._FLAG_ARITY)
+        self.assertIn("--platform", cli._FLAG_ARITY)
+        # --port went with the adapter seam: a QMP port is QEMU's own
+        # endpoint detail, and no command takes one any more.
+        self.assertNotIn("--port", cli._FLAG_ARITY)
 
 
 class CliProgNameTests(unittest.TestCase):
@@ -288,6 +294,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
         os.makedirs(os.path.join(self.home, "blueprints"))
         with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
                   "w", encoding="utf-8") as handle:
@@ -298,10 +307,28 @@ class CliMachineLifecycleTests(unittest.TestCase):
                  "materialize": "new", "size": "20M"},
             ], handle)
 
+    def _running_machine(self, name="plain"):
+        """Materialize a machine and record a running VM identity."""
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            cli.main(["--home-dir", self.home, "create-machine",
+                      "--blueprint", name])
+        machine_id = f"{name}-0"
+        state_path = os.path.join(
+            self.home, "cache", "machines", machine_id, "machine.json")
+        with open(state_path, encoding="utf-8") as handle:
+            state = json.load(handle)
+        state["phase"] = "running"
+        state["vm"] = backends.identity(
+            "qemu", f"reliquary-{machine_id}", "1" * 32, {"port": 4321},
+            pid=5)
+        with open(state_path, "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+        return os.path.dirname(state_path)
+
     def test_create_machine(self):
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main([
                 "--home-dir", self.home,
                 "create-machine",
@@ -312,8 +339,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
 
     def test_create_machine_flags_before_command(self):
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main([
                 "--home-dir", self.home,
                 "--blueprint", "plain",
@@ -323,8 +349,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue().strip(), "plain-0")
 
     def test_get_machine_dir(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         stdout = io.StringIO()
@@ -335,13 +360,11 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("plain-0", stdout.getvalue())
 
     def test_recreate_machine(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home-dir", self.home, "recreate-machine",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
@@ -349,8 +372,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
 
     def _json_out(self, args):
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home-dir", self.home] + args + ["--json"])
         return result, stdout.getvalue().strip()
 
@@ -398,13 +420,11 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIsInstance(json.loads(stdout.getvalue()), list)
 
     def test_apply_blueprint(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "plain"])
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home-dir", self.home, "apply-blueprint",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
@@ -412,8 +432,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
 
     def test_list_machines_table(self):
         """list-machines prints blueprint, number, phase, and backend."""
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
                 "--home-dir", self.home,
                 "create-machine",
@@ -579,8 +598,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             os.path.join(self.home, "blueprints", "plain.rlqb")))
 
     def test_delete_blueprint_refuses_while_machines_exist(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
                 "--home-dir", self.home,
                 "create-machine",
@@ -631,8 +649,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         context= override), so the guarantee now rests on
         set_home_dir() actually having run.
         """
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
                 "--home-dir", self.home,
                 "create-machine",
@@ -670,8 +687,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             cli.main([
                 "--home-dir", self.home,
                 "create-machine",
@@ -690,8 +706,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
 
     def test_destroy_rejects_blueprint_and_machine_together(self):
         """--blueprint and --machine are mutually exclusive."""
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
                 "--home-dir", self.home,
                 "create-machine",
@@ -726,8 +741,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 'type "hello"\n'
             )
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main([
                 "--home-dir", self.home, "list-scripts",
             ])
@@ -767,8 +781,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 'type "bye"\n'
             )
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(stdout):
+        with contextlib.redirect_stdout(stdout):
             result = cli.main([
                 "--home-dir", self.home,
                 "list-scripts",
@@ -792,57 +805,47 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("--blueprint", stderr.getvalue())
 
     def test_type_sends_without_enter(self):
+        machine_home = self._running_machine()
         with mock.patch("reliquary.cli.send_text") as send:
-            result = cli.main(["type", "A:", "--port", "1234"])
+            result = cli.main(["--home-dir", self.home, "type", "A:",
+                               "--machine", "plain-0"])
         self.assertEqual(result, 0)
-        send.assert_called_once_with("A:", enter=False, port=1234,
-                                     home=None)
+        send.assert_called_once_with("A:", enter=False, home=machine_home)
 
     def test_enter_sends_with_enter(self):
+        machine_home = self._running_machine()
         with mock.patch("reliquary.cli.send_text") as send:
-            result = cli.main(["enter", "dir", "--port", "1234"])
+            result = cli.main(["--home-dir", self.home, "enter", "dir",
+                               "--machine", "plain-0"])
         self.assertEqual(result, 0)
-        send.assert_called_once_with("dir", enter=True, port=1234,
-                                     home=None)
+        send.assert_called_once_with("dir", enter=True, home=machine_home)
 
     def test_press_translates_portable_keys(self):
+        machine_home = self._running_machine()
         with mock.patch("reliquary.cli.send_keys") as send:
-            result = cli.main(["press", "enter", "ctrl+c",
-                               "--port", "1234"])
+            result = cli.main(["--home-dir", self.home, "press", "enter",
+                               "ctrl+c", "--machine", "plain-0"])
         self.assertEqual(result, 0)
         send.assert_called_once_with(
-            [["ret"], ["ctrl", "c"]], 1234, home=None)
+            [["ret"], ["ctrl", "c"]], home=machine_home)
 
     def test_a_selected_machine_carries_its_directory(self):
-        """The identity check needs the machine's own directory.
+        """The machine's own directory is the whole address.
 
-        Resolving only the port made every guest-console command look
-        for the recorded VM under the reliquary home, find nothing,
-        and refuse as an identity mismatch.
+        It is where the recorded VM identity lives, so without it a
+        guest-console command could not verify the machine it claims
+        to be talking to — and there is no port to pass instead: that
+        is the adapter's, on the far side of the seam.
         """
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()), \
-                contextlib.redirect_stderr(io.StringIO()):
-            cli.main(["--home-dir", self.home, "create-machine",
-                      "--blueprint", "plain"])
-        state_path = os.path.join(
-            self.home, "cache", "machines", "plain-0", "machine.json")
-        with open(state_path, encoding="utf-8") as handle:
-            state = json.load(handle)
-        state["phase"] = "running"
-        state["vm"] = {"port": 4321, "name": "reliquary-plain-0",
-                       "uuid": "1" * 32, "pid": 5}
-        with open(state_path, "w", encoding="utf-8") as handle:
-            json.dump(state, handle)
+        machine_home = self._running_machine()
         with mock.patch("reliquary.cli.screen_text",
                         return_value=["ok"]) as screen, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main(["--home-dir", self.home, "screen",
                                "--machine", "plain-0"])
         self.assertEqual(result, 0)
-        port, kwargs = screen.call_args.args[0], screen.call_args.kwargs
-        self.assertEqual(port, 4321)
-        self.assertTrue(kwargs["home"].endswith("plain-0"))
+        self.assertEqual(screen.call_args.kwargs, {"home": machine_home})
+        self.assertTrue(machine_home.endswith("plain-0"))
 
     def test_clean_media_passes_an_optional_name(self):
         with mock.patch("reliquary.cli.clean_media",
@@ -890,6 +893,9 @@ class CliExecRunTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
         self.exchange = os.path.join(self.home, "exchange")
         os.makedirs(self.exchange)
         os.makedirs(os.path.join(self.home, "blueprints"))
@@ -905,8 +911,7 @@ class CliExecRunTests(unittest.TestCase):
                  "materialize": "use",
                  "location": {"local": self.exchange}},
             ], handle)
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                contextlib.redirect_stdout(io.StringIO()), \
+        with contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(io.StringIO()):
             cli.main(["--home-dir", self.home, "create-machine",
                       "--blueprint", "rig"])
@@ -1037,6 +1042,9 @@ class CliProgressTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
 
     def test_fetch_media_forwards_the_mode(self):
         with mock.patch("reliquary.cli.fetch_media") as fetch, \

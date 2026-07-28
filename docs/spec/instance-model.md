@@ -216,9 +216,18 @@ hand-copied or misplaced machine directory fails closed), the
 source blueprint name, creation time, lifecycle phase, operation
 generation, the resolved blueprint digest, backend ID, and realized
 drive/controller addresses. While running it also carries a `vm`
-section (name, uuid, port, pid) — the live-VM identity, written
-atomically with `phase` so the two can never disagree, and cleared
-when the machine stops. It must never be edited by hand.
+section — the live-VM identity as every backend adapter records it:
+the `backend` that owns the VM, that backend's own machine
+identifier (`backend-id`), a per-start `token`, an adapter-shaped
+`endpoint`, and a `pid` where the backend runs as a process. It is
+written atomically with `phase` so the two can never disagree, and
+cleared when the machine stops. It must never be edited by hand.
+
+Only the backend the record names may interpret its endpoint. A
+same-named VM of another home is never mistaken for this one: the
+identifier alone cannot authorize a command, because an addressable
+endpoint outlives its owner, so the per-start token is checked
+too.
 
 The phase is one of `creating`, `ready`, `running`, `stopping`,
 or `destroying`. Every mutating operation takes an exclusive
@@ -232,9 +241,9 @@ hypervisor operation are one transaction.
 No home-wide limit caps how many machines run at once. The
 per-machine lock and per-start identity model already make
 concurrency safe — each machine is its own cache directory, its
-own backend process, and its own auto-allocated port — so the
-honest ceiling is host resources (memory, free ports), surfaced
-as an ordinary `start` failure. Reliquary invents no cap of its
+own backend object, and its own endpoint — so the honest ceiling
+is host resources (memory, and whatever the backend allocates per
+machine), surfaced as an ordinary `start` failure. Reliquary invents no cap of its
 own.
 
 There is no `installed` boolean. A script's outcome is the output

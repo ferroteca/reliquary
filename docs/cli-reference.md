@@ -43,11 +43,7 @@ flag winning; what none of them names derives from what does.
 - `--machine <id>` - Select a machine by full id
   (`<blueprint>-<n>`), exactly — no prefix matching and no
   bare-number form
-- `--port <n>` - QMP port for direct guest-console interaction
-  (`type` / `enter` / `press` / …) against a running machine by
-  port instead of a selector
 - `--platform <name>` - Guest platform adapter (default: `dos`)
-- `--qemu <path>` - Path to the QEMU binary
 - `--timeout <seconds>` - Default timeout for commands
 - `--json` - Print the command's result as one JSON document on
   stdout: exactly what the command's API twin returns (a void twin
@@ -560,7 +556,9 @@ ordinary `set-property` on that key refuses to write over, naming
 ## Keyboard and command input
 
 Guest-console verbs match the script language. Select a machine with
-`--blueprint` / `--machine`, or pass legacy `--port`.
+`--blueprint` / `--machine`, like every other command: the endpoint
+behind it belongs to the machine's backend adapter, and is never
+addressed directly.
 
 ### `rlq type TEXT`
 

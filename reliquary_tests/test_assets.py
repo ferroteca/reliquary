@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Tests for authored-asset residency: the resolution source seam."""
 
+import contextlib
 import importlib
 import json
 import os
@@ -19,6 +20,7 @@ from reliquary.library import (list_blueprints, locate_blueprint,
                                search_blueprints)
 from reliquary.machines import create_machine, resolve_machine
 from reliquary.resolve import load_namespace, resolve_media
+from reliquary_tests import fake_backend
 
 SHA256 = "1" * 64
 _SPEC = os.path.join(
@@ -301,6 +303,9 @@ class SelectionScopingTests(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
         self.home = os.path.join(self._tmp.name, "home")
         self.a = os.path.join(self._tmp.name, "a")
         self.b = os.path.join(self._tmp.name, "b")

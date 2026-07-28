@@ -13,7 +13,6 @@ import tempfile
 import unittest
 from unittest import mock
 
-from qemu.qmp import ConnectError
 
 from reliquary import events as _events
 from reliquary.binding import BoundProperties
@@ -64,7 +63,11 @@ class _FakeConsole:
     def screen_text(self):
         self.reads += 1
         if self.fail:
-            raise ConnectError("machine is gone", OSError("gone"))
+            # A carrier whose transport died mid-session: the raw
+            # error reaches the runner, which reads it as the stopped
+            # observation. The adapter's own converted diagnostic is
+            # covered by the unreachable-VM test below.
+            raise ConnectionError("machine is gone")
         if not self.screens:
             return []
         if len(self.screens) > 1:
@@ -114,7 +117,7 @@ class _FakeHttpService:
 class _RuntimeCase(unittest.TestCase):
     """Builds engines over a fake console and a controlled clock."""
 
-    def engine(self, source, screens=(), port=5555, fail=False,
+    def engine(self, source, screens=(), running=True, fail=False,
                bindings=None, events=None):
         _FakeHttpService.instances = []
         script = parse_script(_HEAD + source)
@@ -124,7 +127,7 @@ class _RuntimeCase(unittest.TestCase):
             "/tmp/home/cache/machines/plain-0", events=events,
             script_path="demo.rlqs", clock=clock, sleep=clock.sleep,
             http_service_factory=_FakeHttpService, bindings=bindings)
-        engine._port = port
+        engine._running = running
         self.console = _FakeConsole(screens, fail)
         self.clock = clock
 
@@ -148,10 +151,11 @@ class _RuntimeCase(unittest.TestCase):
     def whole_run(self):
         """Drive ``engine.run()`` against an already-running machine."""
         with mock.patch(
-                "reliquary.script_runner._machines") as machines, \
-                mock.patch("reliquary.lifecycle.read_vm_state",
-                           return_value={"port": 5555}):
+                "reliquary.script_runner._machines") as machines:
             machines.load_machine_state.return_value = {"phase": "running"}
+            machines.read_vm_state.return_value = {
+                "backend": "qemu", "backend-id": "reliquary-plain-0",
+                "token": "0" * 32, "endpoint": {"port": 5555}}
             yield machines
 
 
@@ -252,20 +256,20 @@ class ObservationTests(_RuntimeCase):
             self.run_linear(engine)
             machines.mark_stopped.assert_called_once_with(
                 "plain-0", context="/tmp/home")
-        self.assertIsNone(engine._port)
+        self.assertFalse(engine._running)
 
     def test_an_unreachable_vm_runtime_error_is_stopped(self):
-        # Production path: qmp_session wraps ConnectError as a
-        # PREFLIGHT ERROR after removing vm.json. That must still
-        # count as the stopped sample (not escape the wait).
+        # Production path: the adapter reports an unreachable VM as a
+        # PREFLIGHT ERROR naming its rule. That must still count as
+        # the stopped sample (not escape the wait).
         engine = self.engine("wait machine=stopped\n")
 
         @contextlib.contextmanager
         def unreachable():
             raise PreflightError(
                 "the recorded reliquary VM is no longer reachable\n"
-                "  expected: reliquary-plain-0 on 127.0.0.1:5555\n"
-                "  stale VM state was removed")
+                "  expected: reliquary-plain-0 on 127.0.0.1:5555",
+                rule_id="machine.vm-unreachable")
             yield  # pragma: no cover
 
         engine._console = unreachable
@@ -274,7 +278,7 @@ class ObservationTests(_RuntimeCase):
             self.run_linear(engine)
             machines.mark_stopped.assert_called_once_with(
                 "plain-0", context="/tmp/home")
-        self.assertIsNone(engine._port)
+        self.assertFalse(engine._running)
 
     def test_identity_mismatch_is_not_treated_as_stopped(self):
         engine = self.engine("wait machine=stopped\n")
@@ -283,22 +287,22 @@ class ObservationTests(_RuntimeCase):
         def mismatch():
             raise PreflightError(
                 "QMP identity mismatch; the unrelated VM was "
-                "not modified")
+                "not modified", rule_id="machine.identity-mismatch")
             yield  # pragma: no cover
 
         engine._console = mismatch
         with self.assertRaises(PreflightError) as caught:
             self.run_linear(engine)
         self.assertIn("identity mismatch", str(caught.exception))
-        self.assertEqual(engine._port, 5555)
+        self.assertTrue(engine._running)
 
     def test_a_stopped_machine_satisfies_without_a_console(self):
-        engine = self.engine("wait machine=stopped\n", port=None)
+        engine = self.engine("wait machine=stopped\n", running=False)
         self.run_linear(engine)
         self.assertEqual(self.console.reads, 0)
 
     def test_a_screen_observation_needs_a_running_machine(self):
-        engine = self.engine('machine stopped\nwait "x"\n', port=None)
+        engine = self.engine('machine stopped\nwait "x"\n', running=False)
         with self.assertRaises(ScriptRuntimeError) as caught:
             self.run_linear(engine)
         self.assertIn("machine is not running", str(caught.exception))
@@ -723,15 +727,14 @@ class MachineOperationTests(_RuntimeCase):
         self.assertIn("declares no drive", str(caught.exception))
         self.assertIn("line 2", str(caught.exception))
 
-    def test_start_and_stop_bind_and_clear_the_port(self):
-        engine = self.engine("stop\nstart\n", port=5555)
+    def test_start_and_stop_track_whether_the_machine_runs(self):
+        engine = self.engine("stop\nstart\n")
         with mock.patch(
                 "reliquary.script_runner._machines") as machines:
-            machines.start_machine.return_value = 9999
             self.run_linear(engine)
             machines.stop_machine.assert_called_once_with(
                 "plain-0", context="/tmp/home")
-        self.assertEqual(engine._port, 9999)
+        self.assertTrue(engine._running)
 
     def test_a_screenshot_rests_with_its_machine(self):
         # No run directory exists any more (D36): an author's
@@ -740,7 +743,7 @@ class MachineOperationTests(_RuntimeCase):
         with mock.patch("reliquary.script_runner.Machine") as machine:
             self.run_linear(engine)
         machine.assert_called_once_with(
-            5555, "/tmp/home/cache/machines/plain-0")
+            "/tmp/home/cache/machines/plain-0")
         machine.return_value.screenshot.assert_called_once_with(
             "installed")
 

@@ -147,8 +147,8 @@ them, and `docs/spec/` refers to them.
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
 | [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, in no particular order |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `landmarks.md` (F5), `recorder.md` (F1, U6) |
-| [`pledged/design/`](pledged/design/) | Design for pledged features — `backend-adapter.md` (F2, U7). The directory was empty and absent from D61 until 2026-07-28, when F2's pledge brought it back and its design travelled with it |
-| [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
+| [`pledged/design/`](pledged/design/) | Design for pledged features — empty again since 2026-07-28, when F2 delivered and `backend-adapter.md` travelled to `design/`: a delivered feature leaves no feature for its design to sit with |
+| [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `backend-adapter.md` (the adapter seam's doctrine, delivered as F2 and internal by decision, so it does not move to `docs/spec/`), `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
 
 Not here, deliberately: the normative specs of shipped interfaces
 ([`docs/spec/`](../docs/spec/)) and the machine-readable schemas

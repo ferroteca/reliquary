@@ -94,12 +94,20 @@ meaning:
 A machine blueprint names its guest platform and (optionally) its
 backend; neither is ever inferred from an image or a running guest.
 
-QEMU is the delivered backend. The adapter seam that generalizes
-the model is designed
-([planning/pledged/design/backend-adapter.md](planning/pledged/design/backend-adapter.md))
-and unbuilt — extraction from the working QEMU implementation
-waits on demand in
-[planning/proposed/FEATURES.md](planning/proposed/FEATURES.md).
+QEMU is the delivered backend, and **the adapter seam is built**:
+every backend operation goes through one adapter API
+(`reliquary/backends.py`; design:
+[planning/design/backend-adapter.md](planning/design/backend-adapter.md)),
+extracted from the working QEMU implementation rather than
+designed ahead of one. Assignment happens at materialization — a
+declared `backend` pins the choice, and otherwise Reliquary walks
+its priority order (QEMU, VirtualBox, VMware Workstation, Hyper-V;
+DECISIONS.md D66) and takes the first backend both available and
+capable of the whole blueprint. The other three adapters are
+**stubs that claim no capability**, so the walk passes over them
+even where the backend is installed: the order's tail is intent
+recorded, not shipped behavior, and what changes when one is built
+is its capability report.
 
 ## The interfaces
 

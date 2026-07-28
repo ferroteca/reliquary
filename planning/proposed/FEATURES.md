@@ -20,10 +20,15 @@ and each of those was a draft when this paragraph was written.
 
 **F2 left on 2026-07-28**, the first of the five to go, pledged
 together with its demand U7 — which is the shape the paragraph
-above describes working. It settles what a pledged demand does and
+above describes working — and **delivered the same day**, so its
+number retires unreused ([pledged/FEATURES.md](../pledged/FEATURES.md)
+carries the record). It settles what a pledged demand does and
 does not do: F3 and F5 cite U7 as well and both stay here, because
 a pledged use case makes a feature *pledgeable* and pledges
 nothing itself. Each feature is still moved by its own decision.
+And a delivered seam is not the capability the seam serves: the
+adapter API exists now, U7 stays pledged, and F3 below is what
+would meet it.
 
 **F7–F10 never were on the arc.** They are governance and tooling
 proposals moved out of TASKS.md's legacy Proposed section (D43), and
@@ -141,12 +146,12 @@ Deliverables:
 > on the same ground as the seam extraction — no use case demanded
 > the pillar — and **that ground is gone**: U7 is its demand too,
 > and U7 was pledged on 2026-07-28 along with the extraction
-> itself (**F2**, now in
-> [pledged/FEATURES.md](../pledged/FEATURES.md)). What holds F3
-> here is no longer a missing argument but an unmade decision:
-> a pledged demand is necessary for a feature and sufficient for
-> none, and this one is pledged by its own move, after the seam it
-> proves.
+> itself (**F2**, delivered the same day; its number is retired).
+> The seam F3 was waiting behind is built, and its stub adapter is
+> already in the tree claiming nothing. What holds F3 here is no
+> longer a missing argument or a missing seam but an unmade
+> decision: a pledged demand is necessary for a feature and
+> sufficient for none, and this one is pledged by its own move.
 
 The first non-QEMU adapter end to end, proving the adapter API
 against a genuinely different hypervisor. VirtualBox is the
@@ -489,12 +494,14 @@ this item pledged there and proposed here at once and kept the
 proposal:
 
 - Two documents cite no U/P/G at all:
-  [backend-adapter.md](../pledged/design/backend-adapter.md) (230
+  [backend-adapter.md](../design/backend-adapter.md) (230
   lines) and
   [blueprint-cookbook.md](../../docs/blueprint-cookbook.md) (440
   lines, examples — arguably exempt). *The first was fixed on
-  2026-07-28 by its pillar being pledged: it now names U7 and F2,
-  and travelled to `pledged/design/` with them. One finding left.*
+  2026-07-28 by its pillar being pledged: it named U7 and F2 and
+  travelled to `pledged/design/` with them, then back to
+  `design/` the same day when F2 delivered and left no feature for
+  it to sit with. One finding left.*
 - Beyond citation, three designs exist for pillars whose demand was
   never pledged — `backend-adapter.md`,
   [guest-communication.md](../design/guest-communication.md) and

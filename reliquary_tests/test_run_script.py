@@ -18,6 +18,7 @@ from reliquary.script_runner import (
     ScriptRun, _ScriptEngine,
     _existing_machine, _resolve_script_stem, run_script,
 )
+from reliquary_tests import fake_backend
 
 
 class ResolveScriptStemTests(unittest.TestCase):
@@ -49,6 +50,9 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
         blueprints = os.path.join(self.home, "blueprints")
         os.makedirs(blueprints)
         with open(os.path.join(blueprints, "plain.rlqb"), "w",
@@ -68,23 +72,20 @@ class ResolveOrCreateMachineTests(unittest.TestCase):
 
     def test_reuses_sole_machine(self):
         from reliquary.machines import create_machine
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create_machine("plain", context=self.home)
+        first = create_machine("plain", context=self.home)
         second = _existing_machine(blueprint="plain", context=self.home)
         self.assertEqual(first, second)
 
     def test_machine_id_resolves_to_itself(self):
         from reliquary.machines import create_machine
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            machine_id = create_machine("plain", context=self.home)
+        machine_id = create_machine("plain", context=self.home)
         resolved = _existing_machine(machine=machine_id, context=self.home)
         self.assertEqual(resolved, machine_id)
 
     def test_a_specific_machine_id_selects_among_several(self):
         from reliquary.machines import create_machine
-        with mock.patch("reliquary.machines.create_hdd_image"):
-            first = create_machine("plain", context=self.home)
-            second = create_machine("plain", context=self.home)
+        first = create_machine("plain", context=self.home)
+        second = create_machine("plain", context=self.home)
         resolved = _existing_machine(machine="plain-1", context=self.home)
         self.assertEqual(first, "plain-0")
         self.assertEqual(resolved, second)
@@ -98,6 +99,9 @@ class BindingBeforeCreationTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
         os.makedirs(os.path.join(self.home, "blueprints"))
         os.makedirs(os.path.join(self.home, "scripts"))
         with open(os.path.join(self.home, "blueprints", "plain.rlqb"),
@@ -160,10 +164,10 @@ class ReturnedOutputTests(unittest.TestCase):
             machines.load_machine_state.return_value = {
                 "phase": "running"}
             machines.machine_dir_path.return_value = machine_home
-            with mock.patch(
-                    "reliquary.lifecycle.read_vm_state",
-                    return_value={"port": 5555}):
-                engine.run()
+            machines.read_vm_state.return_value = {
+                "backend": "qemu", "backend-id": "reliquary-plain-0",
+                "token": "0" * 32, "endpoint": {"port": 5555}}
+            engine.run()
         return engine, home, machine_home
 
     def test_the_stream_carries_the_run_and_ends_with_its_outcome(self):
@@ -191,6 +195,9 @@ class RunScriptWiringTests(unittest.TestCase):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
         blueprints = os.path.join(self.home, "blueprints")
         scripts = os.path.join(self.home, "scripts")
         os.makedirs(blueprints)
@@ -210,8 +217,7 @@ class RunScriptWiringTests(unittest.TestCase):
             handle.write('wait "ready" timeout=1s\n')
 
     def test_run_script_resolves_label_and_returns_its_output(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")) as execute:
             result = run_script(
@@ -233,8 +239,7 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertIsNotNone(kwargs["events"])
 
     def test_run_script_creates_no_run_directory(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")):
             result = run_script(
@@ -249,8 +254,7 @@ class RunScriptWiringTests(unittest.TestCase):
         with open(os.path.join(scripts, "extra.rlqs"), "w",
                   encoding="utf-8", newline="\n") as handle:
             handle.write("platform dos\n")
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")):
             result = run_script(
@@ -267,8 +271,7 @@ class RunScriptWiringTests(unittest.TestCase):
                 handle.write("platform dos\n")
             return True
 
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.script_runner.seed_script",
                     side_effect=fake_seed) as seed, \
                 mock.patch(
@@ -282,8 +285,7 @@ class RunScriptWiringTests(unittest.TestCase):
     def test_run_script_missing_script_fails(self):
         os.remove(os.path.join(
             self.home, "scripts", "install-script.rlqs"))
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.script_runner.seed_script",
                     return_value=False):
             with self.assertRaises(PreflightError) as caught:
@@ -292,8 +294,7 @@ class RunScriptWiringTests(unittest.TestCase):
         self.assertIn("install-script.rlqs", str(caught.exception))
 
     def test_run_script_forwards_display(self):
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.script_runner.execute_script",
                     return_value=("-", "ready")) as execute:
             run_script(
@@ -304,8 +305,7 @@ class RunScriptWiringTests(unittest.TestCase):
     def test_cli_run_script_invokes_runtime_end_to_end(self):
         """rlq run-script install --blueprint … wires through."""
         stdout = io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch(
+        with mock.patch(
                     "reliquary.cli.run_script",
                     return_value=ScriptRun(
                         machine_id="abcd" * 8,
@@ -344,8 +344,7 @@ class RunScriptWiringTests(unittest.TestCase):
             return "-", "ready"
 
         out, err = io.StringIO(), io.StringIO()
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch("reliquary.script_runner.execute_script",
+        with mock.patch("reliquary.script_runner.execute_script",
                            side_effect=emit), \
                 contextlib.redirect_stdout(out), \
                 contextlib.redirect_stderr(err):
@@ -367,8 +366,7 @@ class RunScriptWiringTests(unittest.TestCase):
             kwargs["events"].emit(RUN_START, script="demo.rlqs")
             return "-", "ready"
 
-        with mock.patch("reliquary.machines.create_hdd_image"), \
-                mock.patch("reliquary.script_runner.execute_script",
+        with mock.patch("reliquary.script_runner.execute_script",
                            side_effect=emit), \
                 contextlib.redirect_stderr(io.StringIO()):
             result = run_script(

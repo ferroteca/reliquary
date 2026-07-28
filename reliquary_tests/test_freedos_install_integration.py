@@ -16,7 +16,7 @@ import os
 import tempfile
 import unittest
 
-from reliquary.lifecycle import find_qemu, find_qemu_img
+from reliquary.backend_qemu import find_qemu, find_qemu_img
 from reliquary.script_runner import run_script
 from reliquary_tests import live_external_effects
 

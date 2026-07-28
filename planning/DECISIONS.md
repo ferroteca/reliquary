@@ -169,7 +169,7 @@ is waiting on an answer today.
   are authored — below; the state schema and its
   public-contract elevation landed with milestone 6)
 - the adapter API becoming world-facing
-  (../design/backend-adapter.md is INTERNAL by decision,
+  (design/backend-adapter.md is INTERNAL by decision,
   owner 2026-07-21 — a real third-party adapter story elevates
   it into the INTERFACES inventory through the interface-change
   rule, never by drift)
@@ -187,6 +187,103 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D67 — THE SEAM EXTRACTION'S RULINGS: A GENERIC VM IDENTITY, NO
+  PORT ABOVE THE SEAM, AND STUBS THAT CLAIM NOTHING — DECIDED
+  (owner, 2026-07-28). Supports U7, U1; P7, P11, P12. F2's
+  delivery is a lifecycle act and is not recorded here (D63); what
+  follows is what had to be adjudicated in its course, the
+  interface changes first, since three of them are world-facing and
+  went through the interface-change rule ([INTERFACES.md](INTERFACES.md)).
+
+  THE RECORDED VM IDENTITY IS GENERIC. A running machine's `vm`
+  section becomes `{backend, backend-id, token, endpoint, pid}`,
+  replacing `{port, name, uuid, pid}`: the backend that owns the
+  VM, that backend's own machine identifier, a per-start token, and
+  an **adapter-shaped** endpoint. This is the ownership doctrine
+  generalized rather than a new one — the token exists for the same
+  reason the per-start uuid did, that an addressable endpoint
+  outlives its owner — and it is the change that makes the doctrine
+  true for a backend whose object is a `.vmx` path or a Hyper-V VM
+  Id. It changes a recorded output (the working-directory layout),
+  so it is an interface change; it aligns with U7 and is therefore
+  an easy approval, landed across the state schema, the instance
+  model, and the blueprint model in the same change. Stale machine
+  states do not load, which is the pre-1.0 default (no migration,
+  no compatibility parsing).
+
+  NO PORT ABOVE THE SEAM, WHICH COSTS THREE SURFACES. A QMP port is
+  QEMU's endpoint and nothing else's, so it may not appear in the
+  semantic surface: `start_machine()` returns the **machine id**
+  rather than a port; `Machine(home=, deadline=)` loses its `port=`
+  (as do the module-level `send_keys` / `send_text` / `screen_text` /
+  `wait_text` / `cursor_menu_select` / `screenshot`), addressing a
+  machine by its materialization directory — where the recorded
+  identity lives, so the handle carries what verification needs and
+  nothing more; and the undocumented `--port` option leaves the
+  guest-console commands, which now select with
+  `--blueprint` / `--machine` like every other command. The CLI
+  spec had already recorded `--port` as belonging to the removed
+  root-home surface, so that last one closes a residue rather than
+  opening an argument. Weighed and declined: keeping `port=` as an
+  optional QEMU-only affordance — it would put backend vocabulary
+  on the neutral surface exactly where P7 says a shape that cannot
+  be expressed for every binding is the wrong shape.
+
+  `machine_drive_args`, `find_qemu`, `find_qemu_img`,
+  `create_hdd_image`, `Qmp` and `stop` LEAVE THE EMBEDDING SURFACE.
+  They are the QEMU adapter's internals, and the adapter API is an
+  internal engineering contract — deliberately not one of the
+  world-facing interfaces (the standing watch above says an
+  elevation happens through the interface-change rule, never by
+  drift). What the package root gains instead is the seam's *own*
+  vocabulary for reading: `adapter`, `discover`,
+  `BACKEND_PRIORITY`, `Availability`, `Capabilities`,
+  `BackendAdapter`.
+
+  A STUB ADAPTER CLAIMS NO CAPABILITY, AND REFUSES BY PREFLIGHT.
+  Two readings, one of P11 and one of D58. **P11**: an untested
+  capability is an unclaimed one, so VirtualBox, VMware Workstation
+  and Hyper-V report *nothing* — their host probe is real and
+  honest, and assignment passes over them even where the backend is
+  installed. That is what keeps D66's order "intent recorded, not
+  shipped behavior" true in code rather than only in prose, and the
+  day an adapter is built what changes is its capability report,
+  not the walk. **D58**: F2's work item 4 said the stubs raise
+  `NotImplementedError`, and the error taxonomy says a capability
+  gap *with a message someone reads* is a PREFLIGHT ERROR — the
+  request is legal and this build does not satisfy it. So a pinned
+  `backend` naming a stub fails preflight naming the backend and
+  the requirement, and the argument-less `NotImplementedError`
+  guards only the operations assignment can never reach (the
+  abstract-method idiom, which is the only form `test_errors.py`
+  permits). The work item's wording bent to the taxonomy rather
+  than the reverse.
+
+  TWO GAPS NAMED RATHER THAN HIDDEN. **Raw interchange** is in the
+  seam inventory and was not extracted: it has no caller until the
+  exporter family is built, and a signature with no implementation
+  behind it would be the speculation this extraction exists to
+  avoid. **vvfat** is reported as a capability but judged where the
+  drive is rendered rather than at assignment, because a
+  directory-source media's realized shape is only knowable after
+  resolution. Both are recorded in
+  [design/backend-adapter.md](design/backend-adapter.md).
+
+  APPLY CANNOT MOVE A MACHINE BETWEEN BACKENDS. A machine keeps the
+  backend it was assigned — its images are in that backend's own
+  format — so `apply-blueprint` judges the new blueprint against
+  the recorded backend and fails closed naming `recreate` when the
+  blueprint now pins a different one. The same shape as a changed
+  `size` on an already-materialized image, and for the same reason:
+  the honest alternative is regeneration, which is `recreate`'s job.
+
+  U7 DOES NOT TRAVEL. The pledged use case is met when a machine
+  materializes on the hypervisor a host provides; what is delivered
+  is the seam that demand required, with one adapter behind it. U7
+  stays pledged and F3 stays proposed — a delivered seam is not a
+  second backend, and saying so is the whole of P11 at this
+  boundary.
 
 - D66 — THE BACKEND PRIORITY ORDER RANKS AGENTLESS SCRIPTABILITY
   — DECIDED (owner, 2026-07-28). Supports U7, U12, U1; P3, P11.

@@ -26,8 +26,10 @@ SPDX-License-Identifier: BSD-3-Clause
 > media-name resolution. Machine materialization realizes each drive's
 > media per its `materialize` mode (`new`/`difference`/`copy`/`use`),
 > resolves defaults into the state, and records the provenance fields
-> (`blueprint-digest`, `blueprint-source`, `backend-id`). Non-`ide`
-> controllers and backend capability checks ride the adapter seam.
+> (`blueprint-digest`, `blueprint-source`, `backend-id`). Backend
+> capability checks run at materialization, against the assigned
+> backend's own report; non-`ide` controllers wait on a backend that
+> offers them.
 > Details may still change before first release.
 
 Exhaustive reference for every field in the machine blueprint format —
@@ -556,10 +558,11 @@ in-band file verbs refuse every disk address rather than guess one
 (floppies keep `A:` and `B:`, which nothing can shift). Prefer one
 controller type per machine when drive lettering matters, as it
 does under DOS. The constraint is recorded with the work that
-would make it reachable — F2's device growth in
+would make it reachable — richer device topology, in
 [planning/proposed/FEATURES.md](../planning/proposed/FEATURES.md) —
 rather than stated here as a rule, because today it describes a
-machine that cannot be built.
+machine that cannot be built: the one built adapter wires `ide`
+alone, and says so by name when a blueprint asks for more.
 
 #### `enabled` — optional · boolean · default `true`
 
@@ -595,16 +598,20 @@ media uses the backend-native differencing format:
 | backend | image format | |
 |--------------|--------------|---|
 | `qemu`       | qcow2 (v3)   | built |
-| `virtualbox` | VDI          | not wired — F3 |
-| `vmware`     | VMDK         | not wired — F2 |
-| `hyperv`     | VHDX         | not wired — F2 |
+| `virtualbox` | VDI          | adapter unbuilt |
+| `vmware`     | VMDK         | adapter unbuilt |
+| `hyperv`     | VHDX         | adapter unbuilt |
 
-**Only `qemu` is built.** The other three rows are the intended
-mapping, recorded with the work that would deliver it
-([planning/proposed/FEATURES.md](../planning/proposed/FEATURES.md)),
-not a promise this version keeps: a blueprint naming an unwired
-backend is refused at `create-machine` naming the gap, rather than
-quietly getting QEMU's format and QEMU's lifecycle.
+**Only `qemu` is built.** The adapter that owns image naming and
+format is the one that materializes them, so the other three rows
+are the intended mapping, recorded with the work that would deliver
+it ([planning/proposed/FEATURES.md](../planning/proposed/FEATURES.md)),
+not a promise this version keeps. Those three adapters probe the
+host honestly and then claim no capability at all, so backend
+assignment passes over them even where the backend is installed,
+and a blueprint that names one is refused at `create-machine`
+naming the backend and the requirement — rather than quietly
+getting QEMU's format and QEMU's lifecycle.
 
 Because Reliquary owns image creation and naming, a blueprint is
 format-portable *by construction* rather than by luck — the format
