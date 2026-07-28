@@ -96,7 +96,7 @@ backend; neither is ever inferred from an image or a running guest.
 
 QEMU is the delivered backend. The adapter seam that generalizes
 the model is designed
-([planning/proposed/design/backend-adapter.md](planning/proposed/design/backend-adapter.md))
+([planning/pledged/design/backend-adapter.md](planning/pledged/design/backend-adapter.md))
 and unbuilt — extraction from the working QEMU implementation
 waits on demand in
 [planning/proposed/FEATURES.md](planning/proposed/FEATURES.md).

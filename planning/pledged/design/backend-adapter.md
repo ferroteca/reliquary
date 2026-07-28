@@ -14,11 +14,14 @@ SPDX-License-Identifier: BSD-3-Clause
 > and ownership doctrines, and the non-goals. Method signatures and
 > exact types are deliberately absent: they land at the seam
 > extraction, defined by the working QEMU implementation per that
-> item's own doctrine (planning/proposed/FEATURES.md "The backend adapter
-> seam"). That extraction — the former milestone 10 — is
-> **backlog work since 2026-07-23**, unscheduled for lack of
-> use-case backing (DECISIONS.md D33); the doctrine below stands
-> settled and is unaffected by the scheduling.
+> item's own doctrine (planning/pledged/FEATURES.md "The backend
+> adapter seam"). That extraction — the former milestone 10, **F2** —
+> was backlog work from 2026-07-23 for lack of use-case backing
+> (DECISIONS.md D33) and is **pledged as of 2026-07-28**, with its
+> demand **U7** pledged in the same act; this document travelled
+> here with it. The doctrine below stands settled and is unaffected
+> by any of that scheduling — it was settled before the demand was
+> written, which is the D33 pattern it now exits.
 
 ## What the adapter API is
 
@@ -231,10 +234,18 @@ walk — that backend is probed alone, and `create` fails closed if
 it is unavailable or incapable. The assignment is recorded in the
 machine state, so the machine stays on that backend thereafter.
 
-The priority order itself is the seam extraction's decide-first
-question ([proposed/FEATURES.md](../FEATURES.md); proposed:
-QEMU, VirtualBox, VMware Workstation, Hyper-V — best scriptability
-first).
+The priority order is **QEMU, VirtualBox, VMware Workstation,
+Hyper-V** (owner, 2026-07-28; D66 — the seam extraction's
+decide-first, settled with the pledge it travelled on, and F2 now
+carries none). It ranks *agentless* scriptability, the capability
+every guest gets: QEMU alone has the full control plane set today;
+VBoxManage is the closest match to it, covering lifecycle,
+scancode input, screenshots and serial redirection; VMware
+Workstation exposes VNC but no comparable scancode surface; and
+Hyper-V has no VNC at all, leaving it with no agentless display
+plane. Order breaks ties among candidates already available and
+capable, so it never substitutes for a capability check
+([FEATURES.md](../FEATURES.md), work item 3).
 
 **Backend state stays in the cached materialization.** Each backend
 is instructed to keep its machine files (disk images, `.vbox`,

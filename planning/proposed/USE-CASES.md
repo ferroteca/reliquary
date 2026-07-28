@@ -281,47 +281,16 @@ smaller chunks where possible. **U9 and the U11–U13 chunk trio
 left in force** (D46, 2026-07-27): all four were delivered
 already, so the pledge and the promotion ran as one act and no
 stub stays behind — which is why both sweep ranges now read
-with holes in them. The calibrating example
+with holes in them. **U7 left for
+[pledged/USE-CASES.md](../pledged/USE-CASES.md)** on 2026-07-28,
+the ordinary move, alongside the adapter seam it schedules; the
+mapping sweep's first gap is closed. The calibrating example
 (owner): "a user at the keyboard should be able to easily
 find a codex blueprint, for example for freedos or openbsd,
 with minimal effort, and seed it into their library." People
 read these, so each must be succinct, digestible, and
 justified. Draft text is in the current list's exact bullet
 form, ready to move verbatim on delivery.
-
-**U7 — Materialize on the hypervisor the host provides** —
-drafted (add, 2026-07-23). The gap: the backend-adapter
-pillar — the adapter seam, the second backend, and the GUI
-era's remaining backends — has no use-case demand; VirtualBox,
-VMware, and Hyper-V appeared in the current list only as export
-targets (U1), import sources (U2), and — until U3 retired
-(D51) — guest-agent vendors, never as run substrates. **All three
-non-substrate roles have since gone**, which widens the gap
-instead of closing it: U3's successors mention no hypervisor at
-all, U2 withdrew from the pledged shelf, and U1's export clause
-left it for U8 on promotion (D61, 2026-07-27). No use case in
-force names a hypervisor in any role. The seam and the second backend
-left the numbered arc for the backlog on this very lack, the
-same day this draft was written (formerly milestones 10–11;
-D33). Pledging U7 is scheduling that pair back onto the arc,
-the citing item the pledge record; on pledging the
-the backend-adapter design and both returning features
-cite U7.
-
-> - **U7 — Materialize on the hypervisor the host provides.** A
->   blueprint and its scripts are written once; the hosts that
->   run them differ — a Windows laptop with Hyper-V already
->   enabled, a CI runner with only QEMU, a workstation with
->   VirtualBox. The machine materializes on whatever capable
->   backend the host offers, and the same blueprint and scripts
->   drive it there unchanged. Capability, not identity, is the
->   contract: a blueprint needing what a backend cannot give
->   fails closed naming the gap, never silently degrading;
->   declaring a `backend` explicitly is the exception, for when
->   the choice is the point. Without this, U4's journey breaks
->   at the second developer's host: a precisely shared
->   definition only helps if the machine can be built where
->   that developer is.
 
 **U8 — Keep what was built** — drafted (add, 2026-07-23; **the
 separation is complete since D61**, 2026-07-27). The gap: the

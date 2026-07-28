@@ -188,6 +188,122 @@ is waiting on an answer today.
 
 ## Decided
 
+- D66 — THE BACKEND PRIORITY ORDER RANKS AGENTLESS SCRIPTABILITY
+  — DECIDED (owner, 2026-07-28). Supports U7, U12, U1; P3, P11.
+  F2's decide-first, settled in the act that pledged it, so the
+  feature reached the shelf carrying none.
+
+  THE ORDER: **QEMU, VirtualBox, VMware Workstation, Hyper-V**,
+  for default assignment when a blueprint names no `backend`. It
+  breaks ties among candidates already available *and* capable —
+  assignment walks the list and takes the first that is both — so
+  it never stands in for a capability check (P11), and an explicit
+  `backend` skips the walk entirely.
+
+  WHY AGENTLESS SCRIPTABILITY IS THE RANK. The proposal said "best
+  scriptability"; sharpened, the criterion is the *agentless*
+  plane, and the reason is when the choice is made. Assignment
+  happens at materialization, before any guest exists, and the
+  install that follows is agentless by definition — P3's arc has
+  agentless operation preparing a guest and a native agent taking
+  over only once one is inside it. A backend's agent story is
+  therefore worth nothing at the moment of assignment, and for the
+  guests U12 and U1 actually drive it is worth nothing ever: DOS-era
+  systems stay agentless permanently.
+
+  THE RANKING, BACKEND BY BACKEND. QEMU is first on evidence
+  rather than preference — it is the only adapter with a full
+  control plane set, and F2 exists because the seam is read off
+  it. VirtualBox second: `VBoxManage` covers lifecycle, scancode
+  input, screenshots and serial redirection, the closest match to
+  the set scripts already rely on, with VNC behind the extension
+  pack. VMware Workstation third: it exposes VNC but no comparable
+  scancode surface. Hyper-V last, and not by prejudice — it has no
+  VNC at all (a capability failure, never an emulation), which
+  leaves it with no agentless display plane, and F5 keeps it
+  deliberately last for the same reason.
+
+  WEIGHED AND DECLINED: ordering by host ubiquity. U7's own text
+  invites it — "a Windows laptop with Hyper-V already enabled" —
+  and on the most common host it would default to the least
+  scriptable backend, which is the wrong outcome for the one thing
+  a default has to serve: U1's single command reaching a usable
+  machine through U12's unattended install. Ubiquity is already
+  honored where it belongs, in availability probing; it is not a
+  tie-break among the available.
+
+  ALSO DECLINED: no default at all, requiring an explicit
+  `backend`. U7 says the machine materializes on whatever capable
+  backend the host offers, and U1 claims the journey is one short
+  command; a required field costs both.
+
+  TWO OF THE FOUR ARE STUBS at F2 (work item 4, raising
+  `NotImplementedError`), so the order's tail is **intent recorded
+  now**, not shipped behavior — the same pattern as F3's VDI
+  format table, and honest for the same reason: the record says
+  what the project means before the code can prove it.
+
+  FOLDED: pledged/FEATURES.md (F2's decide-first becomes settled
+  text) and pledged/design/backend-adapter.md (the assignment
+  section's open question becomes the order, with its per-backend
+  ground).
+
+- D65 — A PLEDGED DEMAND IS NECESSARY AND NOT SUFFICIENT; F2
+  PLEDGES WHOLE — DECIDED (owner, 2026-07-28). Supports U7
+  (pledged in this round), P11. The pledges of U7 and F2 are
+  lifecycle acts and are not recorded here (D63); U7's argument
+  was written in its 2026-07-23 draft and needed no re-making.
+  What follows is what was adjudicated in their course.
+
+  THE SIZE CALL. F2 was tested against D42's one-sprint bound and
+  pledged **whole**, keeping its number rather than retiring it
+  for a piece each. The extraction is bounded twice over: by
+  working code — QEMU is the only adapter with a full control
+  plane set, so the seam is read off an implementation rather than
+  designed — and by a regression oracle that says when it is done,
+  all QEMU interaction through the adapter API with the FreeDOS
+  install script passing unchanged. Four of the five work items
+  are small (autodiscovery, default assignment, stubs, ownership
+  verification); the adapter API is the bulk. WEIGHED AND
+  DECLINED: cutting the seam from discovery-and-assignment. It
+  buys a smaller first commitment at the price of F2's number,
+  which backend-adapter.md and several entries cite, and the
+  pieces are not independently useful — discovery with no seam to
+  assign into delivers nothing.
+
+  NECESSARY, NOT SUFFICIENT. `proposed/FEATURES.md` said pledging
+  a feature's use case "is what returns the feature to a numbered
+  arc", which reads as sufficiency; that reading is declined. A
+  pledged use case makes a feature **pledgeable** and pledges
+  nothing itself — each feature still moves by its own decision.
+  F3 and F5 both cite U7 and both stay in `proposed/` under a
+  pledged U7, which is the test of the rule and not an oversight.
+  The converse half is unchanged and is why this round has two
+  moves in it: a feature may not be pledged ahead of its demand,
+  which is the error D61 undid and the reason F2 waited five days.
+
+  F5's DEMAND GAP NARROWED AND DID NOT CLOSE. The 2026-07-27 sweep
+  found F5 the one live traceability violation. U7 reaches part of
+  it — U7 names Hyper-V outright, so the last two adapters now
+  stand on pledged demand — and reaches none of the rest: the VNC
+  plane, the landmark asset spec and pointer input answer to
+  nothing in force or pledged, and materializing on the host's
+  hypervisor says nothing about driving a graphical installer.
+  Recorded as a finding, not an adjudication: the demand divides
+  exactly where D42's split would fall, which is for whoever
+  adjudicates F5 to use.
+
+  FOLDED: pledged/USE-CASES.md and pledged/FEATURES.md (U7 and F2
+  arrive; both shelves stop being empty); proposed/USE-CASES.md
+  and proposed/FEATURES.md (both leave; the F2–F6 preamble, F3's
+  and F5's banners, F7's two findings, one of which this round
+  closes); planning/README.md (the map's design rows);
+  `planning/pledged/design/backend-adapter.md` — moved from
+  `proposed/design/`, since design travels with what it serves
+  (D61), which returns a directory empty since that decision — and
+  the backend-adapter links in root ARCHITECTURE.md and
+  planning/design/guest-communication.md.
+
 - D64 — U4 DOES NOT CARRY U5's MECHANISM; U5 SPLITS AT THE
   DELIVERY LINE — DECIDED (owner, 2026-07-28). Supports (none) —
   a use-case adjudication is itself demand, not something demand

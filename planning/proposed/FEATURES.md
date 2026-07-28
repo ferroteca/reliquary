@@ -15,9 +15,15 @@ F2–F6 left the numbered arc for the same reason (D33, owner,
 2026-07-23): **no in-force or pledged use case demands it**. The
 numbered arc ran 1 through 9 and ended there, carrying text-mode
 DOS on QEMU end to end; generalizing beyond that one vertical is
-what waits here. Each names the drafted use case that would schedule
-it — pledging that case is what returns the feature to a numbered
-arc.
+what waits here. Each names the use case that would schedule it,
+and each of those was a draft when this paragraph was written.
+
+**F2 left on 2026-07-28**, the first of the five to go, pledged
+together with its demand U7 — which is the shape the paragraph
+above describes working. It settles what a pledged demand does and
+does not do: F3 and F5 cite U7 as well and both stay here, because
+a pledged use case makes a feature *pledgeable* and pledges
+nothing itself. Each feature is still moved by its own decision.
 
 **F7–F10 never were on the arc.** They are governance and tooling
 proposals moved out of TASKS.md's legacy Proposed section (D43), and
@@ -128,59 +134,19 @@ Deliverables:
 7. CLI `record` command family and API twins, landing together
    under parity.
 
-## F2 — The backend adapter seam
-
-> **Dropped from the numbered arc to the backlog** (owner,
-> 2026-07-23): the former Milestone 10, not yet scheduled — the
-> multi-backend pillar has no in-force use case demanding it.
-> Its demand is the U7 draft
-> ([proposed/USE-CASES.md](USE-CASES.md),
-> "materialize on the hypervisor the host provides"); pledging
-> U7 is what schedules this work back onto the arc, the citing
-> item the record. The design is settled and stands as written.
-
-Extract the adapter API from the now-complete QEMU implementation
-— the only adapter with a full control plane set — so the seam is
-defined by working code, not speculation. The seam's doctrine is
-pre-settled in
-[design/backend-adapter.md](design/backend-adapter.md)
-(layering, seam inventory, ownership and capability doctrines,
-extraction map); this milestone defines the signatures and records
-them there.
-
-Decide first:
-
-- The backend priority order for default assignment when a
-  blueprint names no backend (proposed: QEMU, VirtualBox, VMware
-  Workstation, Hyper-V — best scriptability first).
-
-Deliverables:
-
-1. The adapter API: lifecycle, media attachment, input, screen
-   access, and control plane endpoints, with honest per-backend
-   capability reporting feeding the existing capability checks.
-2. Backend autodiscovery (binaries on PATH and conventional
-   locations, the Hyper-V service/module) establishing
-   availability only.
-3. Real default assignment from the prioritized availability
-   list, recorded permanently into machine state; a declared
-   `backend` pins the choice and fails closed if unavailable or
-   incapable.
-4. Stub adapters for VirtualBox, VMware Workstation, and Hyper-V
-   raising `NotImplementedError`, mirroring platform handling.
-5. Generalized ownership verification: no adapter sends a control
-   command to a hypervisor object that doesn't match the
-   machine's recorded `backend-id`.
-
-Done when: all QEMU interaction flows through the adapter API and
-the FreeDOS install script passes unchanged.
-
 ## F3 — Second backend: VirtualBox
 
 > **Dropped from the numbered arc to the backlog** (owner,
-> 2026-07-23): the former Milestone 11, not yet scheduled on the
-> same ground as the seam extraction above — U7 is its demand
-> too, and it follows that extraction whenever the pair returns.
+> 2026-07-23): the former Milestone 11, not yet scheduled. It left
+> on the same ground as the seam extraction — no use case demanded
+> the pillar — and **that ground is gone**: U7 is its demand too,
+> and U7 was pledged on 2026-07-28 along with the extraction
+> itself (**F2**, now in
+> [pledged/FEATURES.md](../pledged/FEATURES.md)). What holds F3
+> here is no longer a missing argument but an unmade decision:
+> a pledged demand is necessary for a feature and sufficient for
+> none, and this one is pledged by its own move, after the seam it
+> proves.
 
 The first non-QEMU adapter end to end, proving the adapter API
 against a genuinely different hypervisor. VirtualBox is the
@@ -288,6 +254,19 @@ passes byte-for-byte.
 > away as U21 and left exactly the half that waits here — so
 > neither reference runs up the lifecycle, the same resolution D61
 > reached for F1. Whoever adjudicates starts there.
+>
+> **The gap narrowed on 2026-07-28 and did not close** (D65). This
+> entry is two features wearing one number, and U7's pledge reaches
+> only one of them: U7 names Hyper-V outright — "a Windows laptop
+> with Hyper-V already enabled" — so the *last two adapters* below
+> now stand on pledged demand like F2 and F3 do. **GUI automation
+> itself still cites nothing.** The VNC plane, the landmark asset
+> spec, and pointer input answer to no use case in force or
+> pledged, and U7 does not reach them: materializing on the host's
+> hypervisor says nothing about driving a graphical installer. The
+> honest reading is that the split D42 would force at pledge is
+> also where the demand divides, which is a finding for whoever
+> adjudicates rather than the adjudication itself.
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,
@@ -510,15 +489,20 @@ this item pledged there and proposed here at once and kept the
 proposal:
 
 - Two documents cite no U/P/G at all:
-  [design/backend-adapter.md](design/backend-adapter.md) (230
+  [backend-adapter.md](../pledged/design/backend-adapter.md) (230
   lines) and
   [blueprint-cookbook.md](../../docs/blueprint-cookbook.md) (440
-  lines, examples — arguably exempt).
+  lines, examples — arguably exempt). *The first was fixed on
+  2026-07-28 by its pillar being pledged: it now names U7 and F2,
+  and travelled to `pledged/design/` with them. One finding left.*
 - Beyond citation, three designs exist for pillars whose demand was
   never pledged — `backend-adapter.md`,
   [guest-communication.md](../design/guest-communication.md) and
   [design/landmarks.md](design/landmarks.md) — all demoted by D33
   *for lack of use-case backing* after their designs were written.
+  *Backend-adapter left this list on 2026-07-28, by the remedy the
+  traceability rule names: the demand was found and pledged (U7),
+  not the work deleted. Two left.*
   This is the retrospective pass over what predates the current
   shelving, where a design sits with the feature it serves and is
   swept with it.
@@ -552,7 +536,7 @@ real violation of every one:
   in the then-current roadmap cited none; re-run by hand
   2026-07-27 over what replaced it, **2 of 27**, and both already
   known ([F5](#f5--the-gui-era-vnc-gui-scripting-and-the-last-backends)
-  and `design/backend-adapter.md`). The improvement is not
+  and `backend-adapter.md`, the latter closed 2026-07-28). The improvement is not
   vigilance but construction — the restructure wrote each entry
   with its demand — which is the argument for a linter rather than
   against one: what construction fixed once, drift returns*;
@@ -1029,8 +1013,10 @@ and its inverse.
    rather than `find_qemu()`, so a caller gating integration tests
    never has to name an emulator to ask a backend-neutral question.
    Lowest priority of the three, and **probably not its own work**:
-   the honest version of it is F2's autodiscovery deliverable, so
-   this is a note against that feature as much as a request.
+   the honest version of it is F2's autodiscovery work item, so
+   this is a note against that feature as much as a request — and
+   since F2 was pledged on 2026-07-28, that note now has somewhere
+   to be filed.
 
 ## F18 — The media authoring commands
 

@@ -66,9 +66,43 @@ only carrier is the unpledged GUI era (F5) — went back to
 broken but a pledge paid, with the unpaid remainder returned to
 where unpledged demand lives.
 
-**Both pledged shelves are now empty** — this one and
-[pledged/FEATURES.md](FEATURES.md). The project owes no
-undelivered use case and no unbuilt feature. That is a state, not
-a defect: `proposed/` holds the argued demand, and the next thing
-this file holds will arrive by someone deciding to build it, which
-is the only way anything should ever have arrived here.
+**Both pledged shelves stood empty for the rest of that day** —
+this one and [pledged/FEATURES.md](FEATURES.md). The project owed
+no undelivered use case and no unbuilt feature, which was a state
+rather than a defect: `proposed/` held the argued demand, and what
+this file held next would arrive by someone deciding to build it.
+
+**U7 is that arrival** (owner, 2026-07-28), pledged in the same act
+as the feature that delivers its first half — the backend adapter
+seam, **F2** ([FEATURES.md](FEATURES.md)). The pairing is not a
+convenience: a feature may not be pledged ahead of the demand that
+justifies it, and this pillar is where that rule was learned. F2
+sat in `proposed/` for five days on exactly this lack.
+
+**U7 — Materialize on the hypervisor the host provides** — pledged
+2026-07-28 (owner). Drafted 2026-07-23 by the mapping sweep, which
+found the multi-backend pillar demand-free: no use case in force
+named a hypervisor in any role, and the three non-substrate roles
+that once did — export target (U1), import source (U2), guest-agent
+vendor (U3) — have all since gone, widening the gap rather than
+closing it. The pledge schedules the pair that left the numbered
+arc on that lack: **F2**, the adapter seam, pledged in the same
+act, and **F3**, the second backend, which follows F2 whenever it
+is pledged on its own move — U7's pledge is necessary for both and
+sufficient for neither. The backend-adapter design and both
+features cite U7 from here. Text verbatim as drafted:
+
+> - **U7 — Materialize on the hypervisor the host provides.** A
+>   blueprint and its scripts are written once; the hosts that
+>   run them differ — a Windows laptop with Hyper-V already
+>   enabled, a CI runner with only QEMU, a workstation with
+>   VirtualBox. The machine materializes on whatever capable
+>   backend the host offers, and the same blueprint and scripts
+>   drive it there unchanged. Capability, not identity, is the
+>   contract: a blueprint needing what a backend cannot give
+>   fails closed naming the gap, never silently degrading;
+>   declaring a `backend` explicitly is the exception, for when
+>   the choice is the point. Without this, U4's journey breaks
+>   at the second developer's host: a precisely shared
+>   definition only helps if the machine can be built where
+>   that developer is.
