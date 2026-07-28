@@ -140,6 +140,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`list-files`, `get-files` and `put-files`: the in-band file
+  family is complete.** A consumer that needed to know what a
+  stopped machine's drive held, or to move a whole tree across the
+  boundary, had no verb to ask and had to open the drive directory
+  itself. Now: `rlq list-files "A:\"` reports what is there,
+  `rlq put-files .\suite "A:\"` places a tree, and
+  `rlq get-files "A:\OUT" .\results` takes one back — twins
+  `list_files()` / `put_files()` / `get_files()`. Stopped-only over
+  a directory-source drive, exactly like the single-file verbs
+  they join.
+
+  **One address vocabulary across all five.** A directory is
+  addressed the way the guest names it, exactly as a file is;
+  the only new thing sayable is the drive itself, as `A:\` or the
+  bare `A:`, and a trailing separator is optional (`A:\OUT` and
+  `A:\OUT\` are one address). A file address still needs a file.
+
+  `list-files` reports one directory level, or the whole tree with
+  `--recursive`. Its `--json` document is a flat array sorted by
+  address, one object per entry —
+  `{"address", "name", "kind", "size"}`, `size` null for a
+  directory — and the addresses it reports are the ones the file
+  verbs accept, so a listing feeds the next command directly.
+
+  The plural verbs move a tree's **contents** into the destination
+  rather than nesting the source under it: they recurse, create
+  what they need, overwrite what is in the way, and delete
+  nothing — a copy, never a mirror. `get-files`' destination is
+  required and is created if absent; Reliquary invents no location
+  to write to. An image drive is refused by name on all five, the
+  QEMU adapter having no at-rest filesystem access.
+
 - **`pacing`: a settling gap before guest input.** A script that
   waits for a screen and then types was landing its keystroke on an
   installer that had painted the screen but not yet begun reading

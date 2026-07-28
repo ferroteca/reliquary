@@ -35,11 +35,14 @@ SPDX-License-Identifier: BSD-3-Clause
 
 ### Drafted
 
-*(**Empty today.** P16 — the last drafted principle — moved to
-[pledged/ARCHITECTURE.md](../pledged/ARCHITECTURE.md) on
-2026-07-27: D57 adjudicated the four questions it left open, and
-the move is the pledge. No stub is left behind — one global
-P-namespace, and the file an entry sits in says its state.)*
+*(**Empty today.** P16 — the last drafted principle — left on
+2026-07-27 and travelled the whole ladder that day: D57
+adjudicated the four questions it left open and moved it to
+[pledged/ARCHITECTURE.md](../pledged/ARCHITECTURE.md), the move
+being the pledge, and D62 delivered the two operations it named
+and moved it to the standing list, where it now binds. No stub is
+left behind at either step — one global P-namespace, and the file
+an entry sits in says its state.)*
 
 ### Tracked
 

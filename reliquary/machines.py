@@ -1402,13 +1402,20 @@ def _addressing(platform):
     return platform_dos
 
 
-def _host_path(machine_id, address, context):
+def _resolve_address(machine_id, address, context, *, directory=False):
     """Resolve a guest-terms address to a host path under a vvfat drive.
 
-    The whole of P17 in one function: the caller writes ``A:\\FOO.TXT``
-    and never learns which host directory backs it. Stopped-only, and
-    a drive that is not a host directory fails closed naming the gap
-    (P11) — an image drive has no in-band route until one is built.
+    The whole of P17 in one function, and the one place all five file
+    verbs go through: the caller writes ``A:\\FOO.TXT`` — or
+    ``A:\\OUT`` for a tree, or ``A:\\`` for the drive itself — and
+    never learns which host directory backs it. Stopped-only, and a
+    drive that is not a host directory fails closed naming the gap
+    (P11) — an image drive has no in-band route until the adapter
+    grows at-rest filesystem access.
+
+    Returns ``(host path, letter, segments, platform module)``; the
+    last two are what lets a listing render its own results back as
+    guest addresses.
     """
     state = load_machine_state(machine_id, context)
     phase = state.get("phase")
@@ -1422,7 +1429,8 @@ def _host_path(machine_id, address, context):
     platform = _addressing(state.get("platform"))
     drives = state.get("drives", {})
     letters = platform.drive_letters(drives)
-    letter, segments = platform.split_address(address)
+    letter, segments = (platform.split_directory_address(address)
+                        if directory else platform.split_address(address))
     key = letters.get(letter)
     if key is None:
         known = ", ".join(f"{name}: ({letters[name]})"
@@ -1461,7 +1469,38 @@ def _host_path(machine_id, address, context):
         raise PreflightError(
             f"{address} escapes drive {key}; a guest address stays "
             "inside its own drive", rule_id="drive.address-escapes")
-    return resolved
+    return resolved, letter, segments, platform
+
+
+def _host_path(machine_id, address, context):
+    """The host path behind a guest **file** address."""
+    return _resolve_address(machine_id, address, context)[0]
+
+
+def _guest_directory(machine_id, address, context, *, must_exist=True):
+    """The host directory behind a guest directory address.
+
+    Reading, absence is its own failure and never a listing of
+    nothing: a caller that misspelled ``A:\\OUT`` is told the guest
+    has no such directory rather than handed an empty tree. Writing,
+    it is created — ``put_file`` already makes the directories its
+    address names, and the plural verb would be arbitrary for
+    refusing to.
+    """
+    resolved, letter, segments, platform = _resolve_address(
+        machine_id, address, context, directory=True)
+    if os.path.isfile(resolved):
+        raise PreflightError(
+            f"{address} is a file, not a directory; address its "
+            "directory, or use get-file for the file itself",
+            rule_id="drive.address-not-a-directory")
+    if not os.path.isdir(resolved):
+        if must_exist:
+            raise PreflightError(
+                f"the guest has no directory at {address}",
+                rule_id="drive.guest-directory-missing")
+        os.makedirs(resolved)
+    return resolved, letter, segments, platform
 
 
 def put_file(source, destination, *, machine=None, blueprint=None,
@@ -1507,6 +1546,128 @@ def get_file(source, destination, *, machine=None, blueprint=None,
         os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
         shutil.copyfile(origin, target)
     return target
+
+
+def _entries(root, letter, segments, platform, recursive):
+    """The listing under one guest directory, sorted by address."""
+    found = []
+    pending = [(root, list(segments))]
+    while pending:
+        directory, prefix = pending.pop()
+        for name in sorted(os.listdir(directory)):
+            path = os.path.join(directory, name)
+            here = prefix + [name]
+            is_directory = os.path.isdir(path)
+            found.append({
+                "address": platform.join_address(letter, here),
+                "name": name,
+                "kind": "directory" if is_directory else "file",
+                # A directory's size is nothing the guest would
+                # report, so it is null rather than a host number
+                # dressed as a guest fact. Every entry keeps the same
+                # four fields either way (P7).
+                "size": None if is_directory else os.path.getsize(path),
+            })
+            if is_directory and recursive:
+                pending.append((path, here))
+    return sorted(found, key=lambda entry: entry["address"])
+
+
+def list_files(address, *, recursive=False, machine=None, blueprint=None,
+               context=None):
+    """List what a stopped machine's drive holds, in the guest's terms.
+
+    ``address`` is a guest directory — ``A:\\`` for the drive itself,
+    ``A:\\OUT`` for a tree inside it. Returns a flat array of entries
+    sorted by address, each ``{"address", "name", "kind", "size"}``:
+    ``kind`` is ``"file"`` or ``"directory"``, ``size`` the file's
+    bytes and ``None`` for a directory, and ``address`` the full guest
+    address — which is what a caller hands straight back to
+    :func:`get_file` without composing a path of its own (P17).
+
+    One directory level by default; ``recursive=True`` walks the tree.
+    Stopped-only, and the drive must be a directory-source drive, on
+    the same terms as :func:`get_file`.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    with _machine_lock(machine_id, context):
+        root, letter, segments, platform = _guest_directory(
+            machine_id, address, context)
+        return _entries(root, letter, segments, platform, recursive)
+
+
+def put_files(source, destination, *, machine=None, blueprint=None,
+              context=None):
+    """Copy a host directory tree into the guest, addressed in its terms.
+
+    The **contents** of host directory ``source`` land in guest
+    directory ``destination`` — ``A:\\`` puts them at the drive root —
+    which is the only shape a root can take, having no name of its own
+    to nest under. Directories are created as needed, the destination
+    itself included — :func:`put_file` already makes the ones its
+    address names — existing files are overwritten, and nothing at
+    the destination is removed first: this is a copy, never a mirror.
+    Stopped-only. Returns the guest addresses written, sorted.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    origin = os.path.abspath(os.fspath(source))
+    if not os.path.isdir(origin):
+        raise PreflightError(
+            f"no such directory: {origin}",
+            rule_id="drive.host-directory-missing")
+    written = []
+    with _machine_lock(machine_id, context):
+        root, letter, segments, platform = _guest_directory(
+            machine_id, destination, context, must_exist=False)
+        for directory, _subdirectories, files in os.walk(origin):
+            relative = os.path.relpath(directory, origin)
+            parts = ([] if relative == os.curdir
+                     else relative.split(os.sep))
+            target = os.path.join(root, *parts)
+            os.makedirs(target, exist_ok=True)
+            for name in sorted(files):
+                shutil.copyfile(os.path.join(directory, name),
+                                os.path.join(target, name))
+                written.append(
+                    platform.join_address(letter, segments + parts + [name]))
+    return sorted(written)
+
+
+def get_files(source, destination, *, machine=None, blueprint=None,
+              context=None):
+    """Retrieve a guest directory tree to the host, whole.
+
+    The mirror image of :func:`put_files`: the **contents** of guest
+    directory ``source`` land in host directory ``destination``, which
+    is created if it does not exist. ``destination`` is required —
+    Reliquary never invents a location to write to (P12), and a tree
+    is the caller's product to place (U14). Stopped-only, so the
+    guest's writes have been flushed. Returns the host paths written,
+    sorted.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    target = os.path.abspath(os.fspath(destination))
+    if os.path.exists(target) and not os.path.isdir(target):
+        raise PreflightError(
+            f"{target} is a file; get-files writes a directory tree",
+            rule_id="drive.host-destination-not-a-directory")
+    written = []
+    with _machine_lock(machine_id, context):
+        root, _letter, _segments, _platform = _guest_directory(
+            machine_id, source, context)
+        for directory, _subdirectories, files in os.walk(root):
+            relative = os.path.relpath(directory, root)
+            here = (target if relative == os.curdir
+                    else os.path.join(target, relative))
+            os.makedirs(here, exist_ok=True)
+            for name in sorted(files):
+                path = os.path.join(here, name)
+                shutil.copyfile(os.path.join(directory, name), path)
+                written.append(path)
+    return sorted(written)
 
 
 def destroy_machine(machine_id, context=None):

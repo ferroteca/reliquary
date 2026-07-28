@@ -532,6 +532,9 @@ rlq run-script LABEL (--blueprint NAME | --machine ID) [--progress MODE]
 rlq get-machine-var KEY (--blueprint NAME | --machine ID)
 rlq put-file HOST-PATH GUEST-ADDRESS (--blueprint NAME | --machine ID)
 rlq get-file GUEST-ADDRESS HOST-PATH (--blueprint NAME | --machine ID)
+rlq put-files HOST-DIR GUEST-DIR (--blueprint NAME | --machine ID)
+rlq get-files GUEST-DIR HOST-DIR (--blueprint NAME | --machine ID)
+rlq list-files GUEST-DIR [--recursive] (--blueprint NAME | --machine ID)
 rlq insert-media SLOT --file PATH (--blueprint NAME | --machine ID)
 ```
 
@@ -549,8 +552,12 @@ ready script sets a variable and you poll for it; Reliquary ships no
 readiness script of its own.
 
 Files come back **by their guest address** — `A:\RESULT.TXT`, the way
-the guest names it, never a host image path. `put-file` and `get-file`
-work while the machine is stopped, over a directory-source drive; the
+the guest names it, never a host image path. One file moves with
+`put-file` / `get-file` and a whole tree with `put-files` /
+`get-files`, whose addresses name a directory the same way (`A:\` is
+the drive itself); `list-files` says what is over there, printing
+addresses the other four accept. All of them work while the machine is
+stopped, over a directory-source drive; the
 backend snapshots that directory at attach, so a stopped machine is
 what makes a put visible and a guest write flushed.
 
@@ -559,11 +566,12 @@ When a reboot per round costs too much, swap the medium instead:
 flushes the guest's writes back to that same file.
 
 ```powershell
-rlq put-file .\build\TEST.EXE "A:\TEST.EXE" --machine rig-0
+rlq put-files .\suite "A:\" --machine rig-0
 rlq run-script test --machine rig-0 --progress jsonl > run.jsonl
 rlq get-machine-var result --machine rig-0
 rlq stop-machine --machine rig-0
-rlq get-file "A:\RESULT.TXT" .\out\result.txt --machine rig-0
+rlq list-files "A:\OUT" --recursive --machine rig-0
+rlq get-files "A:\OUT" .\out --machine rig-0
 ```
 
 `--progress` selects the live rendering: `pretty` for a person,

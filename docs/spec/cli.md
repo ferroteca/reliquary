@@ -685,31 +685,75 @@ rlq start-machine -b freedos
 ```
 rlq put-file <source> <destination> (--blueprint <name> | --machine <id>)
 rlq get-file <source> <destination> (--blueprint <name> | --machine <id>)
+rlq put-files <source> <destination> (--blueprint <name> | --machine <id>)
+rlq get-files <source> <destination> (--blueprint <name> | --machine <id>)
+rlq list-files <address> [--recursive] (--blueprint <name> | --machine <id>)
 ```
 
-Twins `put_file` / `get_file`. The guest-side path is written
-**the way the guest names it** — `A:\TEST.EXE` on DOS, that
-system's separators and roots, never an image file or a staging
-directory (**P17**). The drive letter resolves from the machine's
-declared platform and Reliquary's own drive assignment, never by
-inspecting a guest (**P10**).
+Twins `put_file` / `get_file` / `put_files` / `get_files` /
+`list_files`. The guest-side path is written **the way the guest
+names it** — `A:\TEST.EXE` on DOS, that system's separators and
+roots, never an image file or a staging directory (**P17**). The
+drive letter resolves from the machine's declared platform and
+Reliquary's own drive assignment, never by inspecting a guest
+(**P10**).
 
-Both are **stopped-only**, and the addressed drive must be a
+**One address vocabulary across all five**, not two spellings of
+it. A directory is addressed exactly as a file is, and only the
+drive itself is newly sayable: `A:\` (or the bare `A:`) is the
+drive root, a trailing separator is optional everywhere else, and
+`.` / `..` segments are refused. A file address needs a file — a
+plain `A:\` to `get-file` is an error, because a drive is not a
+file.
+
+All five are **stopped-only**, and the addressed drive must be a
 directory-source drive: the backend snapshots that directory when
 it attaches, so a change made while the machine runs would be
 invisible to the guest and a guest write is not flushed until it
 stops. A non-directory target, or a drive letter the declared
 facts do not map, is a preflight error naming the gap (**P11**),
-raised before anything is transferred.
+raised before anything is transferred. An image drive is the
+standing instance: the QEMU adapter has no at-rest filesystem
+access, so it says so by name rather than pretending.
 
-The in-band **directory** operations — listing, and whole-tree
-put/get — are unbuilt
-([planning/proposed/FEATURES.md](../../planning/proposed/FEATURES.md)
-"Horizon").
+The plural verbs move a tree's **contents**: `put-files` places
+what is inside the host directory into the guest directory, and
+`get-files` the reverse — the only shape a drive root can take,
+having no name of its own to nest under. Both recurse, create
+directories as needed — the destination included, as `put-file`
+already creates the ones its address names — overwrite a file
+already there, and remove
+nothing: a copy, never a mirror. `get-files`' destination is
+**required** — Reliquary invents no location to write to (**P12**)
+— and is created if absent. `put-files` returns the guest
+addresses written and `get-files` the host paths, each sorted.
+
+`list-files` reports one directory level, or the whole tree under
+`--recursive`. Its return is a flat array sorted by address, one
+object per entry:
+
+```json
+[
+  {"address": "A:\\JOB.BAT", "name": "JOB.BAT", "kind": "file", "size": 42},
+  {"address": "A:\\OUT", "name": "OUT", "kind": "directory", "size": null}
+]
+```
+
+`kind` is `file` or `directory`; `size` is the file's bytes and
+`null` for a directory, which is not a size the guest would
+report. `address` is the full guest address, so a caller feeds a
+listing straight back to `get-file` without composing a path of
+its own — the same vocabulary out as in (**P17**). The array is
+flat rather than nested because a tree costs every binding a
+walker and buys nothing a full address does not already carry
+(**P7**).
 
 ```powershell
 rlq put-file .\JOB.BAT "A:\JOB.BAT" --machine freedos-0
 rlq get-file "A:\RESULT.TXT" .\result.txt --machine freedos-0
+rlq put-files .\suite "A:\" --machine freedos-0
+rlq list-files "A:\" --recursive --machine freedos-0
+rlq get-files "A:\OUT" .\results --machine freedos-0
 ```
 
 ### Reading a machine variable
@@ -740,11 +784,12 @@ Prints the machine's cache directory —
 serializes it like any other return). A query: it works in any
 machine phase and touches nothing.
 
-The path is the door to out-of-band file exchange, and it is not
-the only door: single-file in-band exchange landed at milestone 9
-as `put-file` / `get-file`, while the in-band **directory**
-operations stay deferred (planning/proposed/FEATURES.md
-"Horizon"). While the machine is stopped on every control
+The path is the door to out-of-band file exchange, and it is no
+longer a door anything needs: the in-band family covers single
+files (`put-file` / `get-file`) and whole trees and listings
+(`put-files` / `get-files` / `list-files`), so reaching in is a
+convenience rather than a route (**P16**). While the machine is
+stopped on every control
 plane, its drives are plain host state — a drive whose media is a
 directory *is* that directory, and image drives are readable and
 writable with the user's own tools. Reliquary neither mediates nor records

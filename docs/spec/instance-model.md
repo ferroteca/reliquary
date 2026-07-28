@@ -79,13 +79,15 @@ instead).
 machine's cache directory as an absolute path — a query under
 the standard selectors, valid in any phase, touching nothing.
 
-The path is the door to **out-of-band file exchange**, the
-sanctioned way files cross the host/guest boundary (owner,
-2026-07-22 — the run-collection model was dropped; the in-band
-*directory* operations remain a deferred capability,
-planning/proposed/FEATURES.md "Horizon", while single-file
-in-band exchange landed at milestone 9 as `put-file` /
-`get-file`). While the machine is stopped on every control
+The path is the door to **out-of-band file exchange**, which is
+now a convenience rather than the way files cross the host/guest
+boundary (owner, 2026-07-22 — the run-collection model was
+dropped; the in-band verbs then closed the gap, single files at
+milestone 9 as `put-file` / `get-file` and whole trees and
+listings with D62 as `put-files` / `get-files` / `list-files`).
+Reaching in stays possible and always will — a stopped machine's
+drives are plain host state — but no supported use case requires
+it (**P16**). While the machine is stopped on every control
 plane, the content under `media/` is plain host state: a drive
 whose media is a directory *is* that directory, and image drives
 are readable and writable with the user's own tools. Reliquary

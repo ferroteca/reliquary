@@ -964,6 +964,52 @@ class CliExecRunTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertIn("directory-source", err)
 
+    def test_put_files_and_get_files_move_a_whole_tree(self):
+        suite = os.path.join(self.home, "suite")
+        os.makedirs(os.path.join(suite, "CASES"))
+        for path, text in ((os.path.join(suite, "RUN.BAT"), "GO"),
+                           (os.path.join(suite, "CASES", "ONE.DAT"), "1")):
+            with open(path, "w", encoding="ascii") as handle:
+                handle.write(text)
+        code, out, _err = self._run(
+            ["put-files", suite, "A:\\", "--machine", "rig-0"])
+        self.assertEqual(code, 0)
+        self.assertEqual(out.split(),
+                         [r"A:\CASES\ONE.DAT", r"A:\RUN.BAT"])
+        results = os.path.join(self.home, "back")
+        code, out, _err = self._run(
+            ["get-files", "A:\\", results, "--machine", "rig-0"])
+        self.assertEqual(code, 0)
+        self.assertIn(os.path.join(results, "CASES", "ONE.DAT"), out)
+        with open(os.path.join(results, "RUN.BAT"),
+                  encoding="ascii") as handle:
+            self.assertEqual(handle.read(), "GO")
+
+    def test_list_files_prints_addresses_and_serializes_entries(self):
+        os.makedirs(os.path.join(self.exchange, "OUT"))
+        with open(os.path.join(self.exchange, "OUT", "RESULT.TXT"), "w",
+                  encoding="ascii") as handle:
+            handle.write("PASS")
+        code, out, _err = self._run(
+            ["list-files", "A:\\", "--recursive", "--machine", "rig-0"])
+        self.assertEqual(code, 0)
+        self.assertIn(r"A:\OUT\RESULT.TXT", out)
+        self.assertIn("<DIR>", out)
+        code, out, _err = self._run(
+            ["list-files", r"A:\OUT", "--machine", "rig-0", "--json"])
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            json.loads(out),
+            [{"address": r"A:\OUT\RESULT.TXT", "name": "RESULT.TXT",
+              "kind": "file", "size": 4}])
+
+    def test_an_empty_guest_directory_says_so(self):
+        os.makedirs(os.path.join(self.exchange, "EMPTY"))
+        code, out, _err = self._run(
+            ["list-files", r"A:\EMPTY", "--machine", "rig-0"])
+        self.assertEqual(code, 0)
+        self.assertIn("no files", out)
+
     def test_insert_media_mounts_a_file_by_path(self):
         image = os.path.join(self.home, "round-1.img")
         with open(image, "wb") as handle:

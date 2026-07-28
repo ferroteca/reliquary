@@ -110,12 +110,20 @@ workflow:
   always reports the current boot, the `rlq`/`reliquary` key
   namespaces reserved; the setter's world-facing spelling is the
   script `set` verb, which is how the capability reaches the CLI
-  without a command of its own) and `put_file` / `get_file` (in-band
-  file exchange addressed in guest terms — P17 — over a
-  directory-source drive, stopped-only, with a non-vvfat target and
-  an unmapped letter failing closed naming the gap, P11; the letter
+  without a command of its own) and the in-band file family —
+  `put_file` / `get_file`, `put_files` / `get_files` (a tree's
+  contents, recursive, a copy and never a mirror) and `list_files`
+  (one level or `recursive=`, returning a flat array of
+  `{address, name, kind, size}` sorted by address, whose addresses
+  the other four accept). All five address in guest terms — P17 —
+  over a directory-source drive, stopped-only, with a non-vvfat
+  target and an unmapped letter failing closed naming the gap
+  (P11); one address form serves all of them, a directory spelled
+  as a file is and the drive root sayable as `A:\`
+  (`platform_dos.split_address` / `split_directory_address` /
+  `join_address`), and the letter
   map itself is `platform_dos.drive_letters`, built from declared
-  facts alone — P10);
+  facts alone — P10;
   ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
   numbering and an exclusive per-machine operation lock
@@ -675,7 +683,10 @@ Milestone-9 guarantees needing the same care:
 - a bound secret never reaches the event stream, and it suppresses automatic screenshots afterwards
 - a cancellation ends at a boundary with an in-flight input delivered whole
 - a machine variable is cleared by `start`
-- a non-vvfat or unmapped in-band file target fails closed naming the gap
+- a non-vvfat or unmapped in-band file target fails closed naming the gap —
+  on every one of the five verbs, an image drive being P16's standing residue
+- a listing's addresses are the ones the file verbs accept, and a missing
+  guest directory is an error rather than an empty listing
 
 Use stdlib `unittest` and `unittest.mock` unless a compelling reason justifies another dependency.
 

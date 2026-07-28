@@ -551,8 +551,8 @@ error naming both.
 One ordering caveat, for when a second controller type is wired:
 slot order is authoritative *within* a type, and across types the
 guest's firmware decides how the controllers themselves enumerate.
-On such a machine no disk letter is a declared fact, so `put-file`
-and `get-file` refuse every disk address rather than guess one
+On such a machine no disk letter is a declared fact, so the
+in-band file verbs refuse every disk address rather than guess one
 (floppies keep `A:` and `B:`, which nothing can shift). Prefer one
 controller type per machine when drive lettering matters, as it
 does under DOS. The constraint is recorded with the work that

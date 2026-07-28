@@ -125,17 +125,20 @@ def undetermined_letters(drives):
     return [key for key in sorted(drives) if key not in placed]
 
 
-def split_address(address):
+def _split(address, *, what):
     """Split a DOS guest address into ``(letter, path segments)``.
 
-    The address is what the guest's own user would write —
-    ``C:\\DOS\\FOO.TXT`` — with DOS separators and roots. Case is not
-    significant on DOS, so the letter is normalized; the path
-    segments are passed through as written (the host filesystem
-    matches them, and the vvfat staging directory is where they land).
+    The one address form, shared by every file verb: what the guest's
+    own user would write — ``C:\\DOS\\FOO.TXT`` — with DOS separators
+    and roots. Case is not significant on DOS, so the letter is
+    normalized; the path segments are passed through as written (the
+    host filesystem matches them, and the vvfat staging directory is
+    where they land). The segment list may be empty here — whether
+    that is an address at all is the caller's question, since a drive
+    root is a directory and never a file.
     """
     if not isinstance(address, str) or not address.strip():
-        raise StaticError("a guest file address is required",
+        raise StaticError(f"a guest {what} address is required",
             rule_id="drive.address-empty")
     match = _ADDRESS.match(address.strip())
     if match is None:
@@ -145,12 +148,45 @@ def split_address(address):
             rule_id="drive.address-malformed")
     letter, remainder = match.group(1).upper(), match.group(2)
     segments = [part for part in re.split(r"[\\/]+", remainder) if part]
-    if not segments:
-        raise StaticError(
-            f"{address!r} names a drive but no file",
-            rule_id="drive.address-has-no-file")
     if any(part in (".", "..") for part in segments):
         raise StaticError(
             f"{address!r} may not contain . or .. segments",
             rule_id="drive.address-has-dot-segments")
     return letter, segments
+
+
+def split_address(address):
+    """Split a guest **file** address into ``(letter, segments)``.
+
+    A file needs a name, so ``A:\\`` is refused here: it addresses the
+    drive itself, which is where :func:`split_directory_address`
+    starts.
+    """
+    letter, segments = _split(address, what="file")
+    if not segments:
+        raise StaticError(
+            f"{address!r} names a drive but no file",
+            rule_id="drive.address-has-no-file")
+    return letter, segments
+
+
+def split_directory_address(address):
+    """Split a guest **directory** address into ``(letter, segments)``.
+
+    The same form as a file's and never a second spelling of it
+    (P17): only the drive root is newly sayable, as ``A:\\`` or the
+    bare ``A:``, and a trailing separator is optional everywhere else
+    — ``A:\\OUT`` and ``A:\\OUT\\`` are one address. An empty segment
+    list *is* the answer for a root, not a missing one.
+    """
+    return _split(address, what="directory")
+
+
+def join_address(letter, segments):
+    """Render ``(letter, segments)`` back as the guest would write it.
+
+    The inverse of :func:`_split`, and the reason a listing can hand
+    back addresses a caller feeds straight to ``get-file``: what
+    Reliquary reports is the same vocabulary it accepts (P17).
+    """
+    return f"{letter}:\\" + "\\".join(segments)

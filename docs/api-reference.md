@@ -161,14 +161,37 @@ no meaning to what travels through them.
   context=None)` - The reverse: `source` is the guest address,
   `destination` a host path, and the host path is returned. CLI twin:
   `get-file`.
+- `put_files(source, destination, *, machine=None, blueprint=None,
+  context=None)` - Copy a host directory's **contents** into guest
+  directory `destination` (`"A:\\"` is the drive root), recursively.
+  Returns the guest addresses written, sorted. CLI twin: `put-files`.
+- `get_files(source, destination, *, machine=None, blueprint=None,
+  context=None)` - The reverse: the contents of guest directory
+  `source` land in host directory `destination`, which is created if
+  absent and is required — Reliquary invents no location to write to.
+  Returns the host paths written, sorted. CLI twin: `get-files`.
+- `list_files(address, *, recursive=False, machine=None,
+  blueprint=None, context=None)` - What a guest directory holds: a
+  flat list sorted by address, each entry
+  `{"address", "name", "kind", "size"}` — `kind` is `"file"` or
+  `"directory"`, `size` is `None` for a directory, and `address` is
+  the full guest address, ready to hand back to `get_file`. One
+  directory level unless `recursive=True`. CLI twin: `list-files`.
 
 The drive-letter mapping is built from the machine's declared
 platform and Reliquary's own drive assignment — never from
-inspecting a guest. Both file calls are **stopped-only**, and the
+inspecting a guest. All five are **stopped-only**, and the
 addressed drive must be a directory-source drive: the
 backend snapshots that directory at attach, so a put made while the
 machine runs would be invisible and a guest write is not flushed
-until it stops. Anything else raises `PreflightError` naming the gap.
+until it stops. Anything else raises `PreflightError` naming the gap
+— an image drive included, which has no in-band route until an
+adapter grows at-rest filesystem access.
+
+The plural verbs move a tree's contents rather than nesting the
+source inside the destination, which is the only shape a drive root
+can take; they recurse, overwrite what is in the way, and delete
+nothing.
 
 ## Blueprints (composed documents)
 

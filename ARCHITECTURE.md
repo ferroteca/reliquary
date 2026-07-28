@@ -374,6 +374,26 @@ differently under the new wording — is mere documentation work.
   request across a stated boundary. (P6 and P7 govern the
   invocation channel; the authored three carry expressive
   ceilings. Prose below; D27.)
+- **P16 — Reliquary is the only interface to a machine.** Every
+  supported use case can be completed without the consumer
+  reaching around Reliquary. The obligation binds Reliquary, not
+  the user: reaching in stays possible — a stopped machine's
+  drives are plain host state and always will be — and what is
+  forbidden is *requiring* it, so a violation is a missing verb
+  rather than a user's behaviour. The mechanism is invisible to
+  the test: that a file verb is served out of a vvfat directory
+  is plumbing, and the question is only ever whether a Reliquary
+  verb answers the need. Foreseeable means a use case **in force
+  or pledged**, so a citation points at a U-number rather than an
+  intuition. It does not govern what leaves Reliquary's purview
+  by design (`export-machine`, P1), the guest's own world, how
+  authored input arrives (that is P15), or escape hatches no use
+  case requires (`--display`, `hmp`). (Pledged by D57 and armed
+  by D62, which delivered the two operations that were in
+  violation — listing and whole-tree transfer. Rests on U14 and
+  U20. Known residue, filed as a defect: an image drive has no
+  in-band route, the QEMU adapter having no at-rest filesystem
+  access, and P11 names that gap rather than hiding it.)
 - **P17 — Guest files are named in the guest's terms.** A
   file action against a machine addresses its target as the
   guest OS does — that system's paths, separators, and roots —

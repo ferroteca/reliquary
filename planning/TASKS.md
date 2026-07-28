@@ -48,11 +48,11 @@ picks whatever they like. The one ordering that does bind is a
 feature's: **work that only makes sense as part of one pledged
 feature lives with that feature**, in
 [pledged/FEATURES.md](pledged/FEATURES.md), and has to be done to
-complete it — F23's items are the standing example, and as of
-2026-07-27 the only ones: F1's were, until F1 was withdrawn to
-`proposed/` (D61), and F17's until F17 delivered (D60). A
-task here that merely *relates* to a feature is still free to be
-picked whenever.
+complete it. **No feature has any today**, the shelf being empty:
+F1's items left with it when it was withdrawn to `proposed/`
+(D61), and F17's and F23's retired with their deliveries (D60,
+D62). A task here that merely *relates* to a feature is still free
+to be picked whenever.
 
 Housekeeping (D38) is the same instinct one size smaller: work tiny
 enough and obvious enough that it needs no entry here **at all**,
@@ -110,7 +110,26 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-*(Emptied and struck on 2026-07-27, the last of the five groups. The
+- **An image drive has no in-band route** (P16's residue, filed
+  with its arming — D62, 2026-07-27, per D48's bar). All five
+  in-band file verbs — `put-file` / `get-file` / `put-files` /
+  `get-files` / `list-files` — need a directory-source drive, and
+  refuse an image drive by name (`drive.not-a-host-directory`,
+  which is P11 doing its job). So a consumer whose results are on
+  an installed `C:` still has to reach around Reliquary with its
+  own image tooling, which is exactly what P16 now forbids
+  Reliquary to require. The fix is at-rest filesystem access
+  behind the adapter seam — read and write a FAT volume in a drive
+  image on the host, which is no more guest inspection than
+  reading an image's format is (P10 untouched, and the same
+  capability D56 named as the way to grow the letter map). It
+  stays capability-honest per call: a filesystem the adapter
+  cannot read fails **by name**, never by guess. Related but not
+  this: the *letter* map's own gap (D56) is refusal for a
+  different reason, and a backend with no vvfat equivalent is F2/F3's.
+
+*(The rest of this group was emptied and struck on 2026-07-27,
+the last of the five groups. The
 standing identifier defect was the final entry: `script-spec.md`
 requires an id of every diagnostic, and every diagnostic has one —
 284 ids across 26 subjects, all 26 listed in the spec's prefix list

@@ -33,10 +33,10 @@ from . import blueprint as blueprint_mod
 from .errors import (PreflightError, ReliquaryError, StaticError, UNEXPECTED,
                      exit_code)
 from .machines import (apply_blueprint, create_machine, destroy_machine,
-                       eject_media, get_file, get_machine_dir,
-                       get_machine_var, insert_media,
+                       eject_media, get_file, get_files, get_machine_dir,
+                       get_machine_var, insert_media, list_files,
                        list_machines, load_machine_state, machine_dir_path,
-                       put_file, recreate_machine, resolve_machine,
+                       put_file, put_files, recreate_machine, resolve_machine,
                        set_boot_order, split_machine_id,
                        start_machine, stop_machine)
 # Aliased on import: the twin is named for its command under the
@@ -69,6 +69,7 @@ _COMMANDS = frozenset({
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
     "get-machine-var", "put-file", "get-file",
+    "list-files", "put-files", "get-files",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
 })
@@ -671,6 +672,34 @@ def main(argv=None):
         "source", help=r"the guest address to read (e.g. A:\RESULT.TXT)")
     command.add_argument("destination", help="the host path to write")
 
+    command = subcommands.add_parser(
+        "list-files",
+        help="list what a stopped machine's guest directory holds")
+    _add_selectors(command)
+    command.add_argument(
+        "address", help=r"the guest directory to list (e.g. A:\ or A:\OUT)")
+    command.add_argument(
+        "--recursive", action="store_true",
+        help="walk the tree instead of listing one directory level")
+
+    command = subcommands.add_parser(
+        "put-files",
+        help="copy a host directory tree into a stopped machine's guest")
+    _add_selectors(command)
+    command.add_argument("source", help="the host directory to place")
+    command.add_argument(
+        "destination",
+        help=r"the guest directory its contents land in (e.g. A:\)")
+
+    command = subcommands.add_parser(
+        "get-files",
+        help="retrieve a directory tree from a stopped machine's guest")
+    _add_selectors(command)
+    command.add_argument(
+        "source", help=r"the guest directory to read (e.g. A:\OUT)")
+    command.add_argument(
+        "destination", help="the host directory its contents land in")
+
     # guest-console family (script-language identity)
     command = subcommands.add_parser(
         "type", help="type text with no trailing Enter")
@@ -1215,6 +1244,43 @@ def _get_file(arguments):
     return _emit(arguments, path, lambda: print(path))
 
 
+def _list_files(arguments):
+    entries = list_files(
+        arguments.address, recursive=arguments.recursive,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+
+    def render():
+        if not entries:
+            print("(no files)")
+            return
+        width = max(len(str(entry["size"] if entry["size"] is not None
+                            else "<DIR>")) for entry in entries)
+        for entry in entries:
+            size = entry["size"]
+            size = "<DIR>" if size is None else str(size)
+            print(f"{size:>{width}}  {entry['address']}")
+    return _emit(arguments, entries, render)
+
+
+def _put_files(arguments):
+    addresses = put_files(
+        arguments.source, arguments.destination,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, addresses,
+                 lambda: _print_names(addresses, "(no files)"))
+
+
+def _get_files(arguments):
+    paths = get_files(
+        arguments.source, arguments.destination,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, paths,
+                 lambda: _print_names(paths, "(no files)"))
+
+
 def _eject_media(arguments):
     machine_id = _require_machine_selector(arguments)
     eject_media(machine_id, arguments.slot)
@@ -1288,6 +1354,12 @@ def _dispatch(arguments):
         return _put_file(arguments)
     if arguments.command == "get-file":
         return _get_file(arguments)
+    if arguments.command == "list-files":
+        return _list_files(arguments)
+    if arguments.command == "put-files":
+        return _put_files(arguments)
+    if arguments.command == "get-files":
+        return _get_files(arguments)
     if arguments.command == "start-machine":
         machine_id = _require_machine_selector(arguments)
         started_port = start_machine(

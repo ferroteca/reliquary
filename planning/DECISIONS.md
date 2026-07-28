@@ -178,6 +178,111 @@ is waiting on an answer today.
 
 ## Decided
 
+- D62 — THE IN-BAND FILE FAMILY IS COMPLETE; P16 IS ARMED —
+  DECIDED (owner, 2026-07-27, the F23 round; four forks, all on
+  the recommendations) and delivered the same day, which retires
+  F23's number. Supports U14, U20; P7, P11, P12, P16, P17.
+  **Arms P16** — it moves to root
+  [ARCHITECTURE.md](../ARCHITECTURE.md) — under D34's
+  promotion-on-delivery rule and D48's *honored as a rule* bar.
+  Pledged by D57 the same morning, so the pledged shelf held it
+  for a day.
+
+  WHAT SHIPS: `list-files` / `get-files` / `put-files`, twins
+  `list_files` / `get_files` / `put_files`, stopped-only over a
+  directory-source drive on exactly the terms `put-file` /
+  `get-file` already took.
+
+  **ONE ADDRESS VOCABULARY, SETTLED FOR ALL FIVE**, which was the
+  work item everything else waited on. D5's rough
+  `<drive-key>:<path>` is dead — P17 refuses it outright, `hdd0:`
+  being a blueprint key no guest ever says — and a directory is
+  now addressed exactly as a file is. Only the drive itself is
+  newly sayable (`A:\`, or the bare `A:`), a trailing separator is
+  optional, and `.` / `..` stay refused. A file address still
+  needs a file: `get-file "A:\"` is an error, because a drive is
+  not a file. The mapping is unchanged and still built from
+  declared facts alone (P10, D56), so an undetermined letter fails
+  the same way here as there.
+
+  THE FOUR FORKS.
+  1. **THE LISTING IS A FLAT ARRAY OF FULL ADDRESSES**, one object
+     per entry — `address`, `name`, `kind`, `size` — sorted by
+     address, `size` null for a directory. Flat over nested because
+     a tree costs every binding a walker and buys nothing the full
+     address does not already carry (P7); full addresses over bare
+     names because what a listing reports is then exactly what the
+     file verbs accept, so no consumer composes a guest path of its
+     own (P17). A directory's `size` is null rather than 0 or the
+     host's number: it is not a fact the guest would report, and
+     every entry keeps one shape either way.
+  2. **`list-files` REPORTS ONE LEVEL, `--recursive` WALKS.**
+     Listing a whole drive stays a deliberate act, and both answers
+     are reachable. D5's "recursive" clause governs the transfer
+     verbs, where it is inherent, not the query.
+  3. **`get-files`' DESTINATION IS REQUIRED** — the answer D5
+     deferred to this round, and the answer is that there is no
+     default. Reliquary invents no location to write to (P12), and
+     an embedding call that defaulted to the host process's CWD
+     would scatter a tree wherever it happened to be. The plural
+     verbs move a tree's **contents** into the destination rather
+     than nesting the source under it, which is the only shape a
+     drive root can take, having no name of its own; both are a
+     copy and never a mirror — they overwrite what is in the way
+     and delete nothing.
+  4. **THE RESIDUE IS FILED AS ONE DEFECT** (the D48 condition):
+     an image drive has no in-band route, the QEMU adapter having
+     no at-rest filesystem access, so all five verbs refuse it by
+     name (P11). The second residue P16 predicted — backends with
+     no vvfat equivalent — is **not** filed: QEMU is the only
+     wired backend, so it describes a machine that cannot be built,
+     and it stays with F2/F3's device and backend growth exactly as
+     the mixed-controller caveat did.
+
+  **THE INTERFACE-CHANGE TRIAGE** (P8): no numbered use case is
+  cost and two are directly served — U14 and U20, both in force —
+  since a consumer that must read a drive directory to learn what
+  is on it is completing a supported use case outside Reliquary.
+  Three new commands and three new twins, landed together under
+  parity (P6). An easy approval under the rule.
+
+  WHAT ARMING P16 CHANGES, and it is not rhetorical: a gap against
+  it is now a *defect* rather than unbuilt work. The out-of-band
+  door (`get-machine-dir`) stays open and stays convenience — D57
+  settled that reaching around is always possible and never
+  required — so the specs that described it as *the* route for
+  file exchange are corrected here rather than left to imply a
+  route that no longer exists.
+
+  Folded: [platform_dos.py](../reliquary/platform_dos.py) (the
+  shared split, `split_directory_address`, `join_address`),
+  [machines.py](../reliquary/machines.py) (the three verbs over one
+  `_resolve_address`), [__init__.py](../reliquary/__init__.py) and
+  [cli.py](../reliquary/cli.py) (the twins and their commands),
+  `test_machines.py` / `test_cli.py`;
+  [cli.md](../docs/spec/cli.md) (normative: the in-band section
+  rewritten around all five, the listing document, the
+  machine-directory paragraph), [api.md](../docs/spec/api.md)
+  (surface table row, realignment note),
+  [instance-model.md](../docs/spec/instance-model.md) and
+  [script-spec.md](../docs/spec/script-spec.md) (the out-of-band
+  and capability-not-language paragraphs),
+  [cli-reference.md](../docs/cli-reference.md),
+  [api-reference.md](../docs/api-reference.md),
+  [blueprint-reference.md](../docs/blueprint-reference.md),
+  [dos-automation.md](../docs/dos-automation.md) (files are exchanged
+  *in band* now), README.md (the synopsis, the loop, the example);
+  root [ARCHITECTURE.md](../ARCHITECTURE.md) (P16 in force),
+  [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md) (emptied, no
+  stub — D23), [pledged/FEATURES.md](pledged/FEATURES.md) (F23
+  struck, its number retired), [TASKS.md](TASKS.md) (the image-drive
+  defect), [proposed/FEATURES.md](proposed/FEATURES.md) (F15's
+  neighbour note, the Horizon pointer),
+  [proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md) and
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (U18's citation,
+  which no longer schedules what is delivered), AGENTS.md, and the
+  CHANGELOG's unreleased section.
+
 - D60 — INPUT PACING IS CONTROL-PLANE PACING, NOT A `delay` VERB —
   DECIDED (owner, 2026-07-24, the question round) and delivered
   2026-07-27, which retires F17's number. Supports U14, U20, U12;

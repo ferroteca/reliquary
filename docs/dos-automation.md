@@ -11,8 +11,11 @@ Reliquary provides agentless automation for DOS guests through QEMU. No guest ag
 
 - **Input** is sent as keyboard events through QEMU's control protocol
 - **Output** is read directly from VGA text memory, without OCR
-- **Files** are exchanged out-of-band through a directory-source
-  media (a host directory served as a virtual FAT drive)
+- **Files** are exchanged in band over a directory-source media (a
+  host directory served as a virtual FAT drive), addressed the way
+  the guest names them — one file (`put-file` / `get-file`), a
+  whole tree (`put-files` / `get-files`), or a listing of what is
+  there (`list-files`)
 - **Command completion** is detected by watching for the DOS prompt
 - **Screenshots** are captured through QEMU
 

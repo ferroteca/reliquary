@@ -21,10 +21,11 @@ from reliquary.interaction_agentless import _command_output
 from reliquary.machines import exec as machines_exec
 from reliquary.machines import (apply_blueprint, create_machine,
                                 destroy_machine, eject_media, get_file,
-                                get_machine_dir, get_machine_var,
-                                insert_media, list_machines,
+                                get_files, get_machine_dir, get_machine_var,
+                                insert_media, list_files, list_machines,
                                 load_machine_state, machine_dir_path,
                                 machine_drive_args, mark_stopped, put_file,
+                                put_files,
                                 recreate_machine, resolve_machine,
                                 set_boot_order, set_machine_var,
                                 start_machine, stop_machine)
@@ -1235,6 +1236,172 @@ class InBandFileTests(_HomeCase):
         self.assertIn(r"A:\ABSENT.TXT", str(caught.exception))
 
 
+class InBandDirectoryTests(_HomeCase):
+    """Listing and whole-tree transfer, the two P16 owed (F23)."""
+
+    def _rig(self):
+        exchange = os.path.join(self.home, "exchange")
+        os.makedirs(exchange)
+        machine_id = self._create(
+            "rig", {"platform": "dos",
+                    "drives": {"hdd0": "blank",
+                               "floppy0": "exchange-dir"}},
+            media=[_BLANK,
+                   {"name": "exchange-dir", "materialize": "use",
+                    "location": {"local": exchange}}])
+        return machine_id, exchange
+
+    @staticmethod
+    def _place(path, text="x"):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="ascii") as handle:
+            handle.write(text)
+
+    def test_a_listing_reports_one_level_in_guest_terms(self):
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "JOB.BAT"), "ECHO")
+        self._place(os.path.join(exchange, "OUT", "RESULT.TXT"), "PASS")
+        entries = list_files("A:\\", machine=machine_id, context=self.home)
+        self.assertEqual(
+            entries,
+            [{"address": r"A:\JOB.BAT", "name": "JOB.BAT",
+              "kind": "file", "size": 4},
+             {"address": r"A:\OUT", "name": "OUT",
+              "kind": "directory", "size": None}])
+
+    def test_a_recursive_listing_walks_the_tree(self):
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "OUT", "RESULT.TXT"), "PASS")
+        addresses = [entry["address"] for entry
+                     in list_files("A:\\", recursive=True,
+                                   machine=machine_id, context=self.home)]
+        self.assertEqual(addresses, [r"A:\OUT", r"A:\OUT\RESULT.TXT"])
+
+    def test_a_listed_address_is_one_get_file_takes(self):
+        # The point of reporting full addresses: no consumer composes
+        # a guest path of its own (P17).
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "OUT", "RESULT.TXT"), "PASS")
+        entry = [e for e in list_files(r"A:\OUT", machine=machine_id,
+                                       context=self.home)][0]
+        target = os.path.join(self.home, "result.txt")
+        get_file(entry["address"], target, machine=machine_id,
+                 context=self.home)
+        with open(target, encoding="ascii") as handle:
+            self.assertEqual(handle.read(), "PASS")
+
+    def test_listing_a_file_says_it_is_a_file(self):
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "JOB.BAT"))
+        with self.assertRaises(PreflightError) as caught:
+            list_files(r"A:\JOB.BAT", machine=machine_id, context=self.home)
+        self.assertIn("is a file, not a directory", str(caught.exception))
+
+    def test_a_missing_guest_directory_is_not_an_empty_listing(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(PreflightError) as caught:
+            list_files(r"A:\ABSENT", machine=machine_id, context=self.home)
+        self.assertIn(r"A:\ABSENT", str(caught.exception))
+
+    def test_a_put_places_the_trees_contents_at_the_address(self):
+        machine_id, exchange = self._rig()
+        source = os.path.join(self.home, "suite")
+        self._place(os.path.join(source, "RUN.BAT"), "GO")
+        self._place(os.path.join(source, "CASES", "ONE.DAT"), "1")
+        written = put_files(source, "A:\\", machine=machine_id,
+                            context=self.home)
+        self.assertEqual(written, [r"A:\CASES\ONE.DAT", r"A:\RUN.BAT"])
+        with open(os.path.join(exchange, "CASES", "ONE.DAT"),
+                  encoding="ascii") as handle:
+            self.assertEqual(handle.read(), "1")
+
+    def test_a_put_makes_the_guest_directory_it_names(self):
+        # put_file already creates the directories its address names,
+        # so the plural verb refusing to would be arbitrary.
+        machine_id, exchange = self._rig()
+        source = os.path.join(self.home, "suite")
+        self._place(os.path.join(source, "RUN.BAT"), "GO")
+        written = put_files(source, r"A:\NEW\DEEP", machine=machine_id,
+                            context=self.home)
+        self.assertEqual(written, [r"A:\NEW\DEEP\RUN.BAT"])
+        self.assertTrue(os.path.isfile(
+            os.path.join(exchange, "NEW", "DEEP", "RUN.BAT")))
+
+    def test_a_get_retrieves_the_whole_tree(self):
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "OUT", "RESULT.TXT"), "PASS")
+        self._place(os.path.join(exchange, "OUT", "LOGS", "RUN.LOG"), "ok")
+        target = os.path.join(self.home, "results")
+        written = get_files(r"A:\OUT", target, machine=machine_id,
+                            context=self.home)
+        self.assertEqual(
+            written,
+            sorted([os.path.join(target, "LOGS", "RUN.LOG"),
+                    os.path.join(target, "RESULT.TXT")]))
+        with open(os.path.join(target, "LOGS", "RUN.LOG"),
+                  encoding="ascii") as handle:
+            self.assertEqual(handle.read(), "ok")
+
+    def test_a_get_overwrites_rather_than_mirroring(self):
+        # A copy, never a mirror: what was already at the destination
+        # and is not in the guest survives.
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "OUT", "RESULT.TXT"), "NEW")
+        target = os.path.join(self.home, "results")
+        self._place(os.path.join(target, "RESULT.TXT"), "OLD")
+        self._place(os.path.join(target, "MINE.TXT"), "keep")
+        get_files(r"A:\OUT", target, machine=machine_id, context=self.home)
+        with open(os.path.join(target, "RESULT.TXT"),
+                  encoding="ascii") as handle:
+            self.assertEqual(handle.read(), "NEW")
+        self.assertTrue(os.path.isfile(os.path.join(target, "MINE.TXT")))
+
+    def test_a_running_machine_is_refused(self):
+        machine_id, _exchange = self._rig()
+        self._force(machine_id, "running", vm=True)
+        with self.assertRaises(PreflightError) as caught:
+            list_files("A:\\", machine=machine_id, context=self.home)
+        self.assertIn("must be stopped", str(caught.exception))
+
+    def test_an_image_drive_fails_closed_naming_the_gap(self):
+        # The standing P16 residue: no at-rest filesystem access, so
+        # every one of the three says so by name rather than
+        # pretending (P11).
+        machine_id, _exchange = self._rig()
+        for call in (
+                lambda: list_files("C:\\", machine=machine_id,
+                                   context=self.home),
+                lambda: get_files("C:\\", os.path.join(self.home, "out"),
+                                  machine=machine_id, context=self.home),
+                lambda: put_files(self.home, "C:\\", machine=machine_id,
+                                  context=self.home)):
+            with self.assertRaises(PreflightError) as caught:
+                call()
+            self.assertIn("directory-source drive", str(caught.exception))
+
+    def test_a_missing_host_directory_fails_closed(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(PreflightError) as caught:
+            put_files(os.path.join(self.home, "absent"), "A:\\",
+                      machine=machine_id, context=self.home)
+        self.assertIn("no such directory", str(caught.exception))
+
+    def test_a_host_destination_that_is_a_file_fails_closed(self):
+        machine_id, exchange = self._rig()
+        self._place(os.path.join(exchange, "OUT", "RESULT.TXT"))
+        target = os.path.join(self.home, "results")
+        self._place(target)
+        with self.assertRaises(PreflightError) as caught:
+            get_files(r"A:\OUT", target, machine=machine_id,
+                      context=self.home)
+        self.assertIn("is a file", str(caught.exception))
+
+    def test_a_directory_address_may_not_escape_its_drive(self):
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(StaticError):
+            list_files(r"A:\..\..", machine=machine_id, context=self.home)
+
+
 class DosAddressingTests(unittest.TestCase):
     """The letter map comes from declared facts alone (P10/P17)."""
 
@@ -1327,6 +1494,30 @@ class DosAddressingTests(unittest.TestCase):
     def test_a_drive_with_no_file_is_not_an_address(self):
         with self.assertRaises(StaticError):
             platform_dos.split_address("A:\\")
+
+    def test_a_drive_root_is_a_directory_address(self):
+        # The one thing a directory may say that a file may not: the
+        # drive itself, spelled either way.
+        self.assertEqual(platform_dos.split_directory_address("A:\\"),
+                         ("A", []))
+        self.assertEqual(platform_dos.split_directory_address("a:"),
+                         ("A", []))
+
+    def test_a_trailing_separator_is_the_same_directory(self):
+        self.assertEqual(platform_dos.split_directory_address(r"A:\OUT"),
+                         platform_dos.split_directory_address("A:\\OUT\\"))
+
+    def test_a_directory_address_refuses_dot_segments(self):
+        with self.assertRaises(StaticError):
+            platform_dos.split_directory_address(r"A:\..\..")
+
+    def test_an_address_renders_back_as_the_guest_writes_it(self):
+        # What a listing reports is what the file verbs accept: one
+        # vocabulary, not two spellings of it (P17).
+        rendered = platform_dos.join_address("A", ["OUT", "RESULT.TXT"])
+        self.assertEqual(rendered, r"A:\OUT\RESULT.TXT")
+        self.assertEqual(platform_dos.split_address(rendered),
+                         ("A", ["OUT", "RESULT.TXT"]))
 
     def test_a_non_dos_platform_fails_closed(self):
         from reliquary.machines import _addressing

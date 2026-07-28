@@ -183,7 +183,7 @@ carries the exceptions and each family's contract home.
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media(slot, media=None, file=None)` (`--file` mounts an anonymous `local`+`use` image, U20) / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the out-of-band door | [instance model](instance-model.md) |
 | `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
-| in-band file put/get | guest-terms addressed (P17), over a vvfat drive, stopped-only, non-vvfat fails closed (P11) — milestone 9 (U14); names settle with the work | script spec |
+| `put-file` / `get-file` / `put-files` / `get-files` / `list-files` | the same names with underscores; `list_files(address, recursive=False)` returns the flat entry array — guest-terms addressed (P17) in one vocabulary across all five, over a vvfat drive, stopped-only, non-vvfat fails closed by name (P11). Single files landed at milestone 9, the trees and the listing with D62 (U14, U20; P16) | [cli.md](cli.md) |
 | `list-machines` / `list-blueprints` / `list-scripts` / `list-media`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
 | guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
@@ -235,11 +235,14 @@ The implemented binding uses the settled family:
 `lifecycle.py`'s legacy `start_machine(config)` name collision
 dies with the root-home model, whose `Runner` / `MachineConfig`
 surface is superseded by the blueprint machine model
-(file exchange is settled 2026-07-22: out-of-band host access
-to a stopped machine's drives — directory-source media and the
-user's own image tooling, the machine directory reported by
-`get-machine-dir` — with the in-band *directory* operations
-deferred (planning/proposed/FEATURES.md "Horizon") and no script
-verbs; vvfat is the mechanism a directory-source media attaches
-through. Single-file in-band exchange is **not** deferred:
-`put-file` / `get-file` landed at milestone 9).
+(file exchange is settled 2026-07-22 and completed by D62:
+in-band verbs cover single files, whole trees and listings —
+`put_file` / `get_file` / `put_files` / `get_files` /
+`list_files`, all guest-terms addressed and stopped-only, and
+none of them a script verb. Out-of-band host access to a stopped
+machine's drives remains possible and is now convenience alone
+(P16): the machine directory reported by `get_machine_dir`, the
+user's own image tooling. vvfat is the mechanism a
+directory-source media attaches through, and an image drive has
+no in-band route until an adapter grows at-rest filesystem
+access — a gap named rather than hidden, P11).

@@ -947,19 +947,21 @@ here before any work starts.
 
 > **Entered 2026-07-27** from a consuming project's proposal
 > (owner: admitted as a proposal). Demanded by **P17**, in force
-> since D47, and **P16**, pledged since D57 — P16 because the
+> since D47, and **P16**, in force since D62 — P16 because the
 > capability is reached today only by a caller reproducing
 > Reliquary's internal model outside it, and P17 because the
 > answer it owes is an address in the guest's own terms. **Neither
-> half of this citation is a hope any more**: one is a standing
-> rule, the other an owed one, which is what arming and pledging
-> respectively buy. Serves **U14** and **U20**. Its neighbour is
-> [F23](../pledged/FEATURES.md), the in-band file family, pledged
-> out of Horizon by the same decision — D5's
-> `<drive-key>:<path>` shape is an address form P17 refuses
-> outright now that it binds, so redesigning it is no longer
-> optional; if both land, they settle one address vocabulary
-> rather than two spellings of it.
+> half of this citation is a hope any more**, and the second
+> hardened while this entry sat: both are standing rules now, so a
+> gap against either is a defect rather than unbuilt work. Serves
+> **U14** and **U20**. **Its address question is already
+> answered**: the in-band file family (F23, delivered 2026-07-27
+> by D62) settled one guest-terms vocabulary for all five of its
+> verbs — a directory addressed exactly as a file is, `A:\` the
+> drive root — and D5's `<drive-key>:<path>` shape died there.
+> This verb adopts that vocabulary rather than reopening it; what
+> it owes is the *answer* — attach this directory, and tell me its
+> guest address in those terms.
 
 A caller that needs a host directory visible to a guest **synthesizes
 a directory-source drive into the blueprint**, which forces it to
@@ -1295,11 +1297,13 @@ complete it.)*
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.
-*(The in-band directory operations that sat here were promoted
-to [F23](../pledged/FEATURES.md) on 2026-07-27, when D57
-pledged P16 and made them the two places the shipped workflow
-fails its test. Their sequencing against the second backend is
-cut with the move: P16 does not wait on it.)*
+*(The in-band directory operations that sat here left on
+2026-07-27 and are done: D57 promoted them to F23, being the two
+places the shipped workflow failed P16's test, and D62 delivered
+them the same day as `list-files` / `get-files` / `put-files`.
+Their sequencing against the second backend was cut with the
+promotion — P16 did not wait on it, and the wait would have been
+the whole cost.)*
 
 - Media commands beyond `fetch-media` (verify, remove) —
   **split by D46** (2026-07-27), which put U13 in force:

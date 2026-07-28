@@ -400,6 +400,39 @@ rlq stop-machine --machine rig-0
 rlq get-file "A:\RESULT.TXT" .\out\result.txt --machine rig-0
 ```
 
+### `rlq put-files <host-dir> <guest-dir> (--blueprint NAME | --machine ID)`
+
+### `rlq get-files <guest-dir> <host-dir> (--blueprint NAME | --machine ID)`
+
+### `rlq list-files <guest-dir> [--recursive] (--blueprint NAME | --machine ID)`
+
+The same boundary, a whole tree at a time — and a way to ask what
+is over there. A directory is addressed exactly as a file is, with
+`A:\` (or bare `A:`) meaning the drive itself; the same
+stopped-only, directory-source-drive rules apply.
+
+The plural verbs move a tree's **contents**: `put-files .\suite "A:\"`
+puts everything inside `suite` at the drive root, and `get-files`
+does the reverse into a host directory it creates. Both recurse,
+overwrite what is in the way, and delete nothing — a copy, not a
+mirror. `put-files` prints the guest addresses written, `get-files`
+the host paths.
+
+`list-files` prints a size and an address per line, one directory
+level unless you pass `--recursive`. The addresses it prints are
+the ones `get-file` takes, so a listing feeds the next command
+directly. Under `--json` each entry is an object — `address`,
+`name`, `kind`, and `size` (`null` for a directory).
+
+```powershell
+rlq put-files .\suite "A:\" --machine rig-0
+rlq start-machine --machine rig-0
+rlq run-script test --machine rig-0
+rlq stop-machine --machine rig-0
+rlq list-files "A:\OUT" --recursive --machine rig-0
+rlq get-files "A:\OUT" .\results --machine rig-0
+```
+
 ### Iterating against a live machine
 
 When a reboot per round is the bottleneck, swap the medium instead.
