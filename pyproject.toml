@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reliquary"
-version = "0.1.0.dev2"
+version = "0.1.0.dev3"
 description = "OS installation scripting over agentless QEMU guest automation"
 readme = "README.md"
 authors = [{ name = "Paul Galbraith", email = "paul@galbraiths.ca" }]

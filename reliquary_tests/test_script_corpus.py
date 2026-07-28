@@ -69,6 +69,13 @@ _CORPUS = os.path.join(os.path.dirname(__file__), "fixtures",
                        "conformance", "script")
 _RULE = re.compile(r"^# rule: (S\d+)", re.M)
 _ID = re.compile(r"^# id: (\S+)", re.M)
+# The spec is source-tree only — `docs/` is not packaged — so the
+# four tests below that read it carry the sanctioned `skipUnless`
+# guard (AGENTS.md, "Dependencies and style"). The guard is per
+# method rather than on the class on purpose: every other test in
+# `InvalidCorpusTests` reads the fixtures, which *are* packaged, and
+# must keep running against an installed artifact. Skipping the
+# class would take the corpus itself down with the spec checks.
 _SPEC = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "docs", "spec", "script-spec.md")
@@ -214,6 +221,8 @@ class InvalidCorpusTests(unittest.TestCase):
                         "is a `# caught-by:` finding, not a mismatch "
                         "to shrug at.")
 
+    @unittest.skipUnless(os.path.isfile(_SPEC),
+                         "the script spec is source-tree only")
     def test_every_declared_id_is_listed_in_the_spec(self):
         """Every id the corpus names appears in the spec's rule list.
 
@@ -237,6 +246,8 @@ class InvalidCorpusTests(unittest.TestCase):
                     "in no S-rule's id list in "
                     "docs/spec/script-spec.md.")
 
+    @unittest.skipUnless(os.path.isfile(_SPEC),
+                         "the script spec is source-tree only")
     def test_every_subject_the_code_uses_is_one_the_spec_lists(self):
         """The prefix list is closed, and this is what closes it.
 
@@ -259,6 +270,8 @@ class InvalidCorpusTests(unittest.TestCase):
             "or reuse an existing subject — the list is the closed "
             "vocabulary, not a sample of it.")
 
+    @unittest.skipUnless(os.path.isfile(_SPEC),
+                         "the script spec is source-tree only")
     def test_the_spec_lists_no_subject_the_code_does_not_use(self):
         """A listed subject nothing raises is a namespace of nothing."""
         listed, used = _spec_subjects(), _raised_subjects()
@@ -296,6 +309,8 @@ class InvalidCorpusTests(unittest.TestCase):
                     "site was renamed to its own id, one rule now has "
                     "two names.")
 
+    @unittest.skipUnless(os.path.isfile(_SPEC),
+                         "the script spec is source-tree only")
     def test_the_spec_lists_no_id_the_code_does_not_raise(self):
         """The reverse: a listed id that nothing raises is fiction."""
         with open(_SPEC, encoding="utf-8") as handle:

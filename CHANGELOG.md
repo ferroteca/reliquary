@@ -9,7 +9,7 @@ All notable changes to Reliquary are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.1.0.dev3 - 2026-07-27
 
 ### Changed
 
@@ -363,6 +363,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   makes.
 
 ### Fixed
+
+- **The test suite passes against a built artifact, not only the
+  source tree.** Eleven tests read `docs/` or `README.md` without
+  the source-tree guard the rest of the suite carries, so
+  `python -m unittest reliquary_tests` against an installed wheel
+  reported four errors and seven failures — none of them a real
+  defect, all of them documents that are simply not packaged. The
+  documented-example tests now skip as a class when the documents
+  are absent, and the four script-corpus tests that read
+  `script-spec.md` skip individually, so the fixture checks beside
+  them keep running where they can. A downstream packager gets the
+  same command working against the unpacked source package and the
+  installed artifact alike, which is what the repository has always
+  claimed.
 
 - **Every diagnostic Reliquary can raise now names the rule it
   enforces.** `script-spec.md` requires a stable identifier of *every*
