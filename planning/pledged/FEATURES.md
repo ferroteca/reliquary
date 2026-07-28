@@ -10,7 +10,9 @@ carrying the work breakdown that delivers it. A feature arrives here
 by being moved out of
 [proposed/FEATURES.md](../proposed/FEATURES.md) — the move is the
 pledge and the commit is its record ([README.md](../README.md))
-— and leaves by being delivered.
+— and leaves by being delivered, or by being **withdrawn** back to
+that file when the pledge turns out to be one nobody meant (D44;
+first used by D61).
 
 Pledged is not scheduled: the numbered milestone arc ended with
 milestone 9, so nothing below is queued or dated. The work items are
@@ -23,50 +25,21 @@ Each feature carries an **F-number** and must fit in **one sprint**
 large is cut on pledge, the split retiring the parent's number
 for a fresh one per piece.
 
-## F1 — The U6 authoring recorder
-
-> **Unusually large — flagged, not cut** (owner, 2026-07-26). On the
-> sprint this project runs, its seven work items are not one feature
-> but at least seven. It stands as written by decision, and the flag
-> is the whole of the treatment; the sequencing note below marks
-> where a cut would fall if one is ever wanted.
-
-Use case **U6 — pledged, awaiting delivery** (moved 2026-07-23);
-design in [design/recorder.md](design/recorder.md). The one
-capability the numbered arc deliberately did not deliver while its
-demand was already pledged: the arc ended at milestone 9 with the
-recorder unbuilt.
-
-Work items, in rough dependency order:
-
-- Reliquary-owned console viewer over the vnc control plane
-  (recording prerequisite: backend display-window input is
-  invisible to Reliquary)
-- text-mode recorder first (no new language surface: waits from
-  VGA scrapes, type/press actions, generated-comment
-  uncertainty flags)
-- runner run-to-point / breakpoint / human-takeover machinery
-  (also the failure report's "take over from here" suggested
-  next command)
-- round-trip: fragment emission anchored by playback position;
-  opt-in surgical apply at the anchor (never regenerate, never
-  text-merge)
-- landmark catalog shape: decided (DECISIONS.md, the wrinkle
-  round; [design/landmarks.md](../proposed/design/landmarks.md)) —
-  implementation rides the asset spec work
-- run-events: handover event kinds (script/human control
-  passing); a capture session is one run record with mixed
-  drivers
-- CLI record command family + API twins land together (parity)
-
-**Sequencing note.** The console viewer rides the VNC control
-plane, which is itself unbuilt — it arrives with the GUI era (F5,
-[proposed/FEATURES.md](../proposed/FEATURES.md)). The text-mode
-recorder is what can proceed without it. That reference runs *up*
-the lifecycle, which D42 treats as a flaw rather than a dependency —
-tolerated here alongside the size, and noted so it is not mistaken
-for the normal shape. The text-mode half is the part that depends on
-nothing unpledged.
+**This shelf emptied twice on 2026-07-27, by the two exits it
+has.** F17 left by **delivery**, the ordinary one, and its number
+retires with it (below). **F1 left by withdrawal** (owner; D61) —
+the first use of that exit, and the reverse of the move that is
+supposed to fill this file. Nothing was rejected: the recorder's
+design stands and its demand is live. What was wrong was the
+pledge, which nobody ever made — the 2026-07-26 restructure housed
+the feature here because its work items had nowhere else to live,
+and D44's rename then converted what this shelf *claims*, from
+agreement into a commitment to deliver, without re-testing its
+occupants. **U6**, the use case F1 delivers, and **U2** left for
+[proposed/USE-CASES.md](../proposed/USE-CASES.md) in the same
+round; **U1** left upward, condensed and promoted to the current
+list. D44 wrote the remedy — a pledge nobody means is withdrawn or
+rejected, never left sitting — and this is its first use.
 
 *(F17 — input pacing before guest input — delivered 2026-07-27,
 so its number retires unreused. The `pacing` keyword, the

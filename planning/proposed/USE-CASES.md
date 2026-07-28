@@ -60,7 +60,13 @@ commit that moves it is the record, and the pledged proposal is
 citable from there; delivery is what makes it current. The
 door swings both ways: a settled use case whose delivery
 becomes unscheduled moves back to pledged/USE-CASES.md and lives
-only there until delivered. Numbers are never reused: a declined
+only there until delivered. **It swings at the second gate too**
+(D61, 2026-07-27): a pledge the project does not mean is withdrawn
+to this file or rejected outright, never left sitting as a promise
+nobody made. Withdrawal costs the commitment and nothing else — the
+number, the text, and every citation of it stand, since the
+U-namespace is shared across all three locations. Numbers are never
+reused: a declined
 proposal's number is retired with it (the decline recorded in
 [DECISIONS.md](../DECISIONS.md), the guard against re-litigating),
 and a superseded use case leaves the current list stubless —
@@ -89,8 +95,10 @@ preamble), so the dead proposal's U-number is the search key.
 Each proposal records what it proposes (add / retire /
 supersede / clarify), the use cases it touches, and its state:
 **tracked** (a change expected but not yet drafted — no number
-claimed) and **drafted** (full use-case text, number claimed).
-Those are the two states this file holds. Beyond them a use case
+claimed), **drafted** (full use-case text, number claimed), and
+**withdrawn** (pledged once and no longer — the argument still
+stands, the commitment does not; D61, 2026-07-27). Those are the
+three states this file holds. Beyond them a use case
 is **pledged** — moved to
 [pledged/USE-CASES.md](../pledged/USE-CASES.md), the move itself
 the record — and then **delivered**, moved again to the current
@@ -109,6 +117,106 @@ scenario waits on the GUI era, F5). A clarification claims no number of
 its own — it attaches to the use case it sharpens — and skips the
 argument entirely: it is simply delivered, applied in place to the
 current list and removed here.
+
+### Withdrawn from pledged
+
+**Both arrived here on 2026-07-27** (owner; D61), withdrawn from
+[pledged/USE-CASES.md](../pledged/USE-CASES.md) rather than
+rejected: each was argued and won, and neither is owed. They did
+not reach that shelf by a decision to build them — the 2026-07-26
+restructure filed them by the status word each carried, when
+*accepted* still meant the argument had won, and D44's rename the
+next day converted the shelf's claim to **a commitment to deliver**
+while clearing its occupants in a sentence rather than re-testing
+them. Re-tested, neither has any delivery behind it. Their text is
+verbatim as adopted and their numbers stand, so every existing
+citation stays resolvable; pledging either again is the ordinary
+move to `pledged/`, and what would earn it is work actually
+scheduled against it.
+
+**U2 — Import an existing VM as a blueprint** — withdrawn
+(2026-07-27; pledged 2026-07-26 by the restructure, settled as
+adopted 2026-07-22). **Nothing of it is implemented.** `import-vm`
+left the numbered arc on 2026-07-23 when machine mobility was
+demoted to Horizon, and there is a circularity in that record worth
+naming: mobility was demoted partly because "import's U2 loses its
+scheduled delivery with this move", so U2 was the backing for the
+work and demoting the work is what left U2 unscheduled. Each waited
+on the other. Its own entry already conceded the position —
+"rescheduling import-bearing work is its re-pledging" — and a
+re-pledge is only needed by something not currently pledged. The
+parked condensation below still applies. Text verbatim as adopted:
+
+> - **U2 — Import an existing VM as a blueprint.** A user has
+>   created a VM natively — in VMware, say — and wants to capture
+>   it as a Reliquary blueprint (`import` synthesizes the
+>   blueprint; realizing it afterward is an ordinary `create`).
+>   Import reads only a source at rest — a running or suspended
+>   source VM fails closed naming its state — and the captured
+>   disk image stays where the native hypervisor keeps it: import
+>   points a generated `media` component — a `local` source
+>   inside the blueprint — at it and never copies, moves, or
+>   modifies it; a user who wants the image somewhere more durable
+>   moves it and repoints that media, which is theirs. Two decision points are presented, never defaulted.
+>   First, whether to take a native snapshot — the one thing
+>   import may do to the source VM, and only with this consent:
+>   snapshotted, the blueprint pins the frozen extent and the
+>   source VM stays free to keep running natively; declined,
+>   nothing touches the source, but running it again breaks
+>   verification until re-import. Second, how machines materialize
+>   from the captured disk: each created machine a full copy of it
+>   (`duplicate` — the machine's drive stands alone afterward) or
+>   a differencing disk backed by it (`difference` — the cheapest
+>   create, but the source must stay byte-identical, and
+>   verification refuses a machine whose source has since been
+>   rewritten). The import flow's job is to present these choices,
+>   not bury them.
+
+**U6 — Author a script by doing the task once** — withdrawn
+(2026-07-27; pledged 2026-07-26 by the restructure, moved off the
+current list 2026-07-23). Its whole delivery is the authoring
+recorder, **F1** ([FEATURES.md](FEATURES.md)), withdrawn in the
+same round; the design is settled and stands at
+[design/recorder.md](design/recorder.md). **The residue it was
+pledged on is empty.** That residue is milestone 9's reserved
+run-event handover kinds, and
+[script-spec.md](../../docs/spec/script-spec.md) says of reserved
+kinds that one "has no constant in the implementation: the
+vocabulary the code declares is the vocabulary it emits" — a
+documented reservation keeping the recorder's shape growable, not
+delivery. The blocking dependency is total rather than partial:
+recording requires Reliquary to *be* the console, so the whole of
+F1 waits on the VNC plane that arrives with the GUI era (F5), text
+mode included. Text verbatim as adopted:
+
+> - **U6 — Author a script by doing the task once.** A user
+>   performs the task by hand — going through a Windows install,
+>   say — in a console session Reliquary supervises, and ends with
+>   a draft script and the image assets (landmarks) to reproduce
+>   it. Reliquary follows the session — every keystroke, click,
+>   and media swap, and the screen states between them — and
+>   drafts the wait conditions and actions, capturing the source
+>   screenshots landmarks crop from. The output is a *draft*:
+>   ordinary script text beside the landmark declarations and
+>   renderings it references — separate authored files, since a
+>   script carries no embedded assets (amended 2026-07-22; see
+>   planning/DECISIONS.md) — owned
+>   and edited like anything hand-written — recording cannot know
+>   which screen features are load-bearing or how long a step may
+>   honestly take, so the person tailors what Reliquary proposes.
+>   Tailoring is not a one-way exit: authoring round-trips. When
+>   the task changes or coverage grows, a later session captures
+>   the new screens and steps *against the tailored script* —
+>   playback carries the machine to the point of change, the
+>   person takes over and demonstrates, and Reliquary proposes
+>   the new fragment and assets without disturbing what the
+>   author wrote. A changed screen for an unchanged step is an
+>   asset refresh — a new landmark variant in the catalog — and
+>   touches the script not at all. The session machine is as
+>   disposable as any other; the script and assets are the
+>   product. (The authoring parallel to U2: import captures a
+>   machine built by hand; recording captures a procedure
+>   performed by hand.)
 
 ### Drafted
 
@@ -132,12 +240,14 @@ form, ready to move verbatim on delivery.
 drafted (add, 2026-07-23). The gap: the backend-adapter
 pillar — the adapter seam, the second backend, and the GUI
 era's remaining backends — has no use-case demand; VirtualBox,
-VMware, and Hyper-V appear in the current list only as export
+VMware, and Hyper-V appeared in the current list only as export
 targets (U1), import sources (U2), and — until U3 retired
-(D51) — guest-agent vendors, never as run substrates. The
-retirement widens the gap rather than closing it: one of the
-three non-substrate roles is now gone, and no successor
-mentions a hypervisor at all. The seam and the second backend
+(D51) — guest-agent vendors, never as run substrates. **All three
+non-substrate roles have since gone**, which widens the gap
+instead of closing it: U3's successors mention no hypervisor at
+all, U2 withdrew from the pledged shelf, and U1's export clause
+left it for U8 on promotion (D61, 2026-07-27). No use case in
+force names a hypervisor in any role. The seam and the second backend
 left the numbered arc for the backlog on this very lack, the
 same day this draft was written (formerly milestones 10–11;
 D33). Pledging U7 is scheduling that pair back onto the arc,
@@ -160,16 +270,19 @@ cite U7.
 >   definition only helps if the machine can be built where
 >   that developer is.
 
-**U8 — Keep what was built** — drafted (add, 2026-07-23). The
-gap: the export family — machine mobility, demoted from
-milestone 12 to Horizon for this very lack — hangs from half a
-sentence inside U1; the durable-exit concern deserves its own
-case (separation: U1 stays the easy-install journey, U2 the
-import journey, U8 the export journey). On pledge, U1
-gains a cross-reference clarification pointing at U8 (its
-nature — ending in a usable, exportable machine — is
-untouched); pledging U8 is scheduling the mobility work's
-export half back onto the arc, the citing item the record.
+**U8 — Keep what was built** — drafted (add, 2026-07-23; **the
+separation is complete since D61**, 2026-07-27). The gap: the
+export family — machine mobility, demoted from milestone 12 to
+Horizon for this very lack — hung from half a sentence inside U1,
+and the durable-exit concern deserved its own case (separation: U1
+the easy-install journey, U2 the import journey, U8 the export
+journey). **That half-sentence is now gone.** U1 condensed to its
+journey and promoted to the current list, citing U8 for the export
+exit rather than stating it, so the export demand rests here alone
+and nothing in force claims the capability. Pledging U8 is
+scheduling the mobility work's export half back onto the arc, the
+citing item the record — and it is now the *only* thing that
+would.
 
 > - **U8 — Keep what was built.** Sometimes the product is the
 >   machine after all: the sandbox worth keeping (U1), the
@@ -308,17 +421,24 @@ Parked in-place edits — no argument needed, delivered when
 applied; each must pass the clarification test (no past
 citation reads differently under the new wording).
 
-- **U1 — condense to the journey** (recorded 2026-07-23;
-  **contingent on U8 alone** since D46, 2026-07-27). Tighten
-  U1 to the composed journey it uniquely owns — one short,
-  terse command from a clean home to a usable machine,
-  easy-is-the-requirement included — citing U11 (find and
-  seed), U13 (media), U12 (the install), and U8 (the export
-  exit) for the capabilities it composes. Three of the four
-  are now in force; U8 is the last, and until it is pledged
-  U1's export clause stays load-bearing text rather than a
-  citation.
-- **U2 — condense** (recorded 2026-07-23). Trim the import
+- **U1 — condense to the journey** — **applied 2026-07-27** (D61),
+  and struck from this list. It ran without waiting on U8: the
+  contingency existed to keep the export clause owned by something,
+  and withdrawing rather than pledging is the other way to settle
+  who owns it. U1 is now the composed journey it uniquely owns —
+  one short, terse command from a clean home to a usable machine,
+  easy-is-the-requirement included — citing U11 (find and seed),
+  U13 (media) and U12 (the install) for what it composes, and U8
+  for the export exit it no longer claims. **It went in as a
+  supersession, not a clarification**: the clarification test is
+  that no past citation reads differently, and one did —
+  blueprint-guide's "you export it (U1)" now points at U8. With the
+  export clause gone every remaining word was delivered, so D34
+  promoted it to the current list in the same act.
+- **U2 — condense** (recorded 2026-07-23; U2 is withdrawn as of
+  D61, which does not disturb this — a proposed use case may be
+  reshaped freely, and this edit was always a trim rather than a
+  change of nature). Trim the import
   doctrine detail — never-copy, snapshot consent, and the
   duplicate/difference choice are settled in the dissolved roadmap's import
   design and DECISIONS.md — down to the demand itself: capture
@@ -337,9 +457,9 @@ citation reads differently under the new wording).
 - **Break U6 into finer use cases** — tracked (recorded
   2026-07-23; previously an expectation noted inside U6
   itself). Candidate cuts per the recorder design
-  ([planning/pledged/design/recorder.md](../pledged/design/recorder.md)): record
+  ([design/recorder.md](design/recorder.md)): record
   a task once into a draft script; extend a tailored script by
   round-trip re-recording; refresh assets for a changed
   screen. Left undrafted by the decomposition sweep: the
-  recorder is Horizon work, and premature cuts risk being the
+  recorder is unpledged (F1), and premature cuts risk being the
   wrong ones.

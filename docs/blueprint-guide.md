@@ -517,7 +517,7 @@ converted through the adapters' raw interchange, and media
 payloads copied in so the export stands alone.
 This is the first-class form of the intended endgame:
 Reliquary machines are ephemeral, and when something should live
-on, you export it (U1). An exported machine is independent and
+on, you export it (U8). An exported machine is independent and
 permanently outside Reliquary's purview — Reliquary will never
 touch it again.
 

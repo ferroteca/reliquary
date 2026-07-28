@@ -6,12 +6,14 @@ SPDX-License-Identifier: BSD-3-Clause
 # Script authoring by recording
 
 > **Status:** the settled design for U6's authoring recorder
-> (USE-CASES.md U6; owner rounds, 2026-07-21 — the
-> adjudication trail is in planning/DECISIONS.md). Delivery is
-> deliberately unscheduled: the recorder sits in
-> planning/proposed/FEATURES.md "Horizon", earning a numbered milestone
-> when its turn comes; work items are listed in
-> planning/TASKS.md.
+> (planning/proposed/USE-CASES.md U6; owner rounds, 2026-07-21 —
+> the adjudication trail is in planning/DECISIONS.md). **Nothing
+> here is pledged.** The recorder is **F1** in
+> planning/proposed/FEATURES.md, which carries its deliverables and
+> the cut they need at pledge; the design travelled with it when
+> both were withdrawn from `pledged/` (D61, 2026-07-27). The design
+> is settled and stands as written — what is unpledged is the
+> delivery, not the shape.
 
 The authoring recorder serves U6: a person performs the task once
 in a console session Reliquary supervises, and Reliquary drafts

@@ -17,7 +17,12 @@ SPDX-License-Identifier: BSD-3-Clause
 > today, which is why it lives at the repository root — so
 > pledge alone can never put an entry in it. All three share
 > one global U-namespace; numbers are permanent, never reused, and
-> no placeholder is left behind by either move.
+> no placeholder is left behind by any move — including the one
+> that runs backwards. **A pledge the project does not mean is
+> withdrawn** to `proposed/` or rejected outright, never left
+> sitting (D44; first used by D61). Withdrawal costs the
+> commitment and nothing else: the number, the text and every
+> citation stand.
 >
 > The second move is **automatic on full delivery** (D34): whoever
 > lands the work that fully meets a use case promotes it in the same
@@ -37,63 +42,16 @@ SPDX-License-Identifier: BSD-3-Clause
 > [proposed/USE-CASES.md](../proposed/USE-CASES.md); its U-number is
 > the search key.
 
-**U1 — Install a sandbox VM from the CLI, easily** — pledged;
-moved from the current list 2026-07-23 (owner: the current
-list is implemented-only). The install journey is delivered
-end to end — the north-star command works from a clean home —
-but the export clause is unimplemented Horizon work (machine
-mobility), so U1 as written is not met. **The delivered
-substance is now seated in the current list** as U11, U12 and
-U13 (D46, 2026-07-27), which is what that split was for; U1
-stays here for its export clause alone, and the pending
-condensation — contingent on U8, the last of the four it would
-cite — completes the story when export schedules. Text
-verbatim as adopted:
-
-> - **U1 — Install a sandbox VM from the CLI, easily.** A user
->   says, in effect, "I'd like to install FreeBSD" — and ends with
->   a usable sandbox machine, installed unattended from standard
->   vendor media, exportable to a hypervisor built for keeping
->   machines (e.g. VirtualBox) to take away and use. Easy is the
->   requirement: the command-line syntax stays terse and succinct,
->   and the blueprint and install recipe are easy to find, point
->   to, and use. From a clean home this is one short command
->   (`rlq run-script install --blueprint freedos`): the
->   codex seeds the blueprint (its media included) and scripts;
->   media is fetched and hash-verified; the script drives
->   the installer end to end — menus, partitioning, reboots, media
->   swaps — until the guest is installed.
-
-**U2 — Import an existing VM as a blueprint** — settled as
-adopted; unscheduled since machine mobility's demotion to
-Horizon (2026-07-23) took `import-vm` off the numbered arc,
-and nothing of it is implemented. Rescheduling import-bearing
-work is its re-pledging. Text verbatim as adopted:
-
-> - **U2 — Import an existing VM as a blueprint.** A user has
->   created a VM natively — in VMware, say — and wants to capture
->   it as a Reliquary blueprint (`import` synthesizes the
->   blueprint; realizing it afterward is an ordinary `create`).
->   Import reads only a source at rest — a running or suspended
->   source VM fails closed naming its state — and the captured
->   disk image stays where the native hypervisor keeps it: import
->   points a generated `media` component — a `local` source
->   inside the blueprint — at it and never copies, moves, or
->   modifies it; a user who wants the image somewhere more durable
->   moves it and repoints that media, which is theirs. Two decision points are presented, never defaulted.
->   First, whether to take a native snapshot — the one thing
->   import may do to the source VM, and only with this consent:
->   snapshotted, the blueprint pins the frozen extent and the
->   source VM stays free to keep running natively; declined,
->   nothing touches the source, but running it again breaks
->   verification until re-import. Second, how machines materialize
->   from the captured disk: each created machine a full copy of it
->   (`duplicate` — the machine's drive stands alone afterward) or
->   a differencing disk backed by it (`difference` — the cheapest
->   create, but the source must stay byte-identical, and
->   verification refuses a machine whose source has since been
->   rewritten). The import flow's job is to present these choices,
->   not bury them.
+**Three entries left this shelf on 2026-07-27** (owner; D61) — the
+first use of the withdrawal remedy D44 wrote. **U1** condensed to
+the journey it uniquely owns and went **up**, to the current list:
+its export clause is now U8's, and with that clause gone every
+remaining word of it is delivered. **U2** and **U6** went **back**,
+to [proposed/USE-CASES.md](../proposed/USE-CASES.md); neither had
+any delivery behind it, and both reached this shelf by D44's rename
+rather than by a decision to build them. U5 is what survived that
+re-test, and it survived on substance — milestone 8's
+parameterization machinery is real, shipped, U5-citing work.
 
 **U5 — Custom installation** — pledged; moved back from the
 current list 2026-07-23 (owner: an in-force use case whose
@@ -127,44 +85,3 @@ the delivery is real. Text verbatim as adopted:
 >   either way: an automated-testing blueprint may fix its user
 >   name as "testuser", while "paul" is a value its owner would
 >   never check in.
-
-**U6 — Author a script by doing the task once** — pledged in
-residue only; moved back from the current list 2026-07-23
-(owner, confirming the delivery-gate flag): the recorder —
-U6's whole delivery — sits unscheduled in proposed/FEATURES.md's Horizon,
-so U6 is not current. Its one scheduled thread is milestone
-9's reserved run-event handover kinds, which keep the
-recorder's shape growable from the interaction-run bracket.
-U6 lives only here while undelivered — the shared U-namespace
-keeps every existing citation valid — and returns to the
-current list when recorder delivery is scheduled and lands.
-Text verbatim as adopted:
-
-> - **U6 — Author a script by doing the task once.** A user
->   performs the task by hand — going through a Windows install,
->   say — in a console session Reliquary supervises, and ends with
->   a draft script and the image assets (landmarks) to reproduce
->   it. Reliquary follows the session — every keystroke, click,
->   and media swap, and the screen states between them — and
->   drafts the wait conditions and actions, capturing the source
->   screenshots landmarks crop from. The output is a *draft*:
->   ordinary script text beside the landmark declarations and
->   renderings it references — separate authored files, since a
->   script carries no embedded assets (amended 2026-07-22; see
->   planning/DECISIONS.md) — owned
->   and edited like anything hand-written — recording cannot know
->   which screen features are load-bearing or how long a step may
->   honestly take, so the person tailors what Reliquary proposes.
->   Tailoring is not a one-way exit: authoring round-trips. When
->   the task changes or coverage grows, a later session captures
->   the new screens and steps *against the tailored script* —
->   playback carries the machine to the point of change, the
->   person takes over and demonstrates, and Reliquary proposes
->   the new fragment and assets without disturbing what the
->   author wrote. A changed screen for an unchanged step is an
->   asset refresh — a new landmark variant in the catalog — and
->   touches the script not at all. The session machine is as
->   disposable as any other; the script and assets are the
->   product. (The authoring parallel to U2: import captures a
->   machine built by hand; recording captures a procedure
->   performed by hand.)

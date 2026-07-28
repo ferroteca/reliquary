@@ -49,6 +49,15 @@ carries an **open shape question** in its own text, and an argument
 still to finish is what `proposed/` is for. F17 made the same
 journey to `pledged/`, on its size rather than its surface.
 
+**F1 came back from [pledged/FEATURES.md](../pledged/FEATURES.md)**
+(owner, 2026-07-27; D61) — the first withdrawal, and the reverse of
+every arrival above. It was never pledged by anyone's decision: the
+2026-07-26 restructure housed it there because feature-bound work
+items had nowhere else to live, and D44's rename then changed what
+that shelf claims without re-testing its occupants. **U6**, the use
+case it delivers, and **U2** came back to
+[USE-CASES.md](USE-CASES.md) in the same round.
+
 A feature that is pledged but not yet built moves to
 [pledged/FEATURES.md](../pledged/FEATURES.md) and carries its work
 breakdown with it. Small work that is not a feature at all goes
@@ -60,6 +69,64 @@ sprint bound bites at pledge, so every entry below is many
 sprints of work, and the "milestone's worth of work" above describes
 what these entries *are* rather than a size any may be pledged at.
 Cutting one into implementable pieces is part of pledging it.
+
+## F1 — The U6 authoring recorder
+
+> **Withdrawn from [pledged/FEATURES.md](../pledged/FEATURES.md)**
+> (owner, 2026-07-27; D61), with **U6** — the use case it delivers
+> — in the same round. What is withdrawn is the promise, not the
+> design, which stands as written; the preamble above records how
+> the pledge arrived without anyone making it.
+>
+> Serves **U6** ([USE-CASES.md](USE-CASES.md)); design in
+> [design/recorder.md](design/recorder.md). The one capability the
+> numbered arc deliberately did not deliver — it ended at milestone
+> 9 with the recorder unbuilt.
+
+**THE WHOLE OF IT RIDES VNC**, which is the ground the withdrawal
+was decided on. Recording requires Reliquary to *be* the console:
+input typed into a backend's own display window never passes
+through Reliquary and cannot be followed, so the Reliquary-owned
+viewer over the `vnc` control plane is the recording prerequisite
+on **every** backend, QEMU included
+([design/recorder.md](design/recorder.md)). That plane arrives with
+the GUI era (**F5**). This entry's former sequencing note claimed a
+text-mode half depending on nothing unpledged, and **that was wrong
+against its own design** — what text mode avoids is the landmark
+and click work, which is F5's GUI asset spec and pointer input,
+never the viewer.
+
+Decide first:
+
+- **The cut.** The deliverables below are at least seven features
+  on the sprint this project runs, and D42 requires the split at
+  pledge — retiring F1's number for a fresh one per piece. The
+  viewer is the natural first cut line; the text-mode recorder is
+  what follows it, needing no new language surface.
+
+Deliverables:
+
+1. Reliquary-owned console viewer over the `vnc` control plane —
+   the recording prerequisite, backend display-window input being
+   invisible to Reliquary.
+2. The text-mode recorder: waits from VGA scrapes, type/press
+   actions, generated-comment uncertainty flags. No new language
+   surface.
+3. Runner run-to-point / breakpoint / human-takeover machinery,
+   which is also the failure report's "take over from here"
+   suggested next command.
+4. Round-trip: fragment emission anchored by playback position,
+   with opt-in surgical apply at the anchor — never regenerating,
+   never text-merging.
+5. The landmark catalog shape, already decided (DECISIONS.md, the
+   wrinkle round; [design/landmarks.md](design/landmarks.md)) —
+   implementation rides the asset spec work.
+6. Run-events handover kinds (script/human control passing), so a
+   capture session is one run record with mixed drivers. Milestone
+   9 reserved these in the spec and no constant exists in the
+   implementation.
+7. CLI `record` command family and API twins, landing together
+   under parity.
 
 ## F2 — The backend adapter seam
 
@@ -214,8 +281,9 @@ passes byte-for-byte.
 > adjudication, left open deliberately rather than papered over
 > with a citation written to fit. Two things point at demand
 > without being it: **U5**'s customized-Windows scenario waits on
-> this feature, and **U6**'s recorder needs the console viewer
-> that rides the VNC plane. Whoever adjudicates starts there.
+> this feature, and **U6**'s recorder (**F1**) needs the console
+> viewer that rides the VNC plane — the whole of F1 does, not the
+> GUI half only (D61). Whoever adjudicates starts there.
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,

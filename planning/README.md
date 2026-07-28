@@ -146,8 +146,8 @@ them, and `docs/spec/` refers to them.
 | [`INTERFACES.md`](INTERFACES.md) | *(root)* The interface-change rule every interface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The interfaces" |
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
 | [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, in no particular order |
-| [`proposed/design/`](proposed/design/) | Design for proposed features — `backend-adapter.md`, `landmarks.md` |
-| [`pledged/design/`](pledged/design/) | Design for pledged features — `recorder.md` (F1, U6) |
+| [`proposed/design/`](proposed/design/) | Design for proposed features — `backend-adapter.md`, `landmarks.md`, `recorder.md` (F1, U6) |
+| `pledged/design/` | Design for pledged features. **Currently empty and absent**: `recorder.md` was its only occupant and travelled with F1 on withdrawal (D61). The directory returns when a pledged feature has a design of its own |
 | [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
 
 Not here, deliberately: the normative specs of shipped interfaces

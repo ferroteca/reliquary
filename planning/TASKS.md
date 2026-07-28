@@ -48,7 +48,9 @@ picks whatever they like. The one ordering that does bind is a
 feature's: **work that only makes sense as part of one pledged
 feature lives with that feature**, in
 [pledged/FEATURES.md](pledged/FEATURES.md), and has to be done to
-complete it — F1's items are the standing example. A
+complete it — F23's items are the standing example, and as of
+2026-07-27 the only ones: F1's were, until F1 was withdrawn to
+`proposed/` (D61), and F17's until F17 delivered (D60). A
 task here that merely *relates* to a feature is still free to be
 picked whenever.
 

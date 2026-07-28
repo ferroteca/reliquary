@@ -58,6 +58,19 @@ its retirement is recorded in [planning/DECISIONS.md](planning/DECISIONS.md), it
 full text survives in git history, and successors name the
 number they superseded.
 
+- **U1 — Install a sandbox VM from the CLI, easily.** A user
+  says, in effect, "I'd like to install FreeBSD" — and ends with
+  a usable sandbox machine. Easy is the requirement: the
+  command-line syntax stays terse and succinct, and the blueprint
+  and install recipe are easy to find, point to, and use. From a
+  clean home this is one short command
+  (`rlq run-script install --blueprint freedos`), and that one
+  command is the whole of the claim — it composes finding and
+  seeding the blueprint (U11), acquiring and verifying its media
+  (U13), and driving the installer end to end (U12) into a single
+  keystroke-free journey. Keeping the machine afterward is a
+  separate journey and a separate demand (U8).
+
 - **U4 — A precisely defined test VM, shared through version
   control.** A developer is writing a program that cannot be
   tested in the work environment — it needs a VM, perhaps running

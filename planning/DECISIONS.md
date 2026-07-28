@@ -276,6 +276,160 @@ is waiting on an answer today.
   control-plane pacing), the script conformance corpus, and the
   CHANGELOG's unreleased section.
 
+- D61 — THE PLEDGED SHELF IS RE-TESTED ENTRY BY ENTRY: F1, U2 AND
+  U6 WITHDRAW, U1 CONDENSES AND PROMOTES — DECIDED (owner,
+  2026-07-27). Supports U8, U11, U12, U13; P8. **Amends D44**
+  (its clearing sentence only) and **retires D42's F1 tolerance**;
+  applies D34's promotion-on-delivery rule and D44's own
+  withdrawal remedy, for the first time since it was written.
+
+  WHAT STARTED IT (owner): *"I don't know how F1 got promoted to
+  pledged but that's an accident, it should be proposed only, we
+  are nowhere close to being ready to try VNC."* The accident is
+  real and it was not F1's alone.
+
+  HOW THE PLEDGES ARRIVED WITHOUT ANYONE MAKING THEM. Before
+  2026-07-26 there was no shelf at all: `USE-CASE-PROPOSALS.md`
+  held every use case and each carried its state as a **word**,
+  where *accepted* meant only that the argument had won —
+  "scheduling in the roadmap is acceptance", and D44 itself quotes
+  the governance skill saying *acceptance is agreement, not
+  commitment to deliver*. The restructure filed each entry by its
+  word, correctly. **F1 had no word to be filed by**: its work
+  items lived in ROADMAP's Horizon and TASKS.md, the restructure
+  ruled that feature-bound work items live with their feature, and
+  `accepted/FEATURES.md` was the only shelf that held work items —
+  so the feature entry was created there because the *items* had
+  nowhere else to go. The commit says it outright: "Feature-bound
+  work lives with its feature in accepted/FEATURES.md, where U6's
+  recorder moves from the Horizon it never belonged in." Then D44
+  changed what the shelf **claims** — agreement became a commitment
+  to deliver — and cleared its occupants in a single sentence.
+  Nobody ever decided to build the recorder.
+
+  THE RE-TEST, ENTRY BY ENTRY, AGAINST D44'S OWN CLAIM.
+  **U5 passes**: milestone 8's parameterization machinery is real,
+  shipped, U5-citing work, and the shelf's own preamble names it as
+  the model case. **U6 fails**: it was pledged "in residue only",
+  and that residue is milestone 9's reserved run-event handover
+  kinds — which script-spec.md describes as having "no constant in
+  the implementation: the vocabulary the code declares is the
+  vocabulary it emits". A documented reservation keeping a shape
+  growable is not delivery. **U2 fails** most plainly: nothing of
+  it is implemented, and its own entry conceded the position —
+  "rescheduling import-bearing work is its re-pledging", and only
+  something unpledged needs a re-pledge. There is a circularity in
+  that record worth naming: machine mobility was demoted partly
+  because "import's U2 loses its scheduled delivery with this
+  move", so U2 was the backing for the work and demoting the work
+  is what left U2 unscheduled — each waiting on the other.
+  **U1 fails differently, and upward** (below).
+
+  F1 WITHDRAWS, AND TWO D42 FLAWS RESOLVE RATHER THAN STAND. D42
+  found F1 failing both its new tests — seven work items are not
+  one feature, and the console viewer rides F5's VNC plane under
+  `proposed/` — and tolerated both as a grandfather clause. In
+  `proposed/` neither is a flaw: the size bound bites at the pledge,
+  so many-sprints is what that shelf is *for*, and the reference to
+  F5 becomes sideways instead of running up the lifecycle. The
+  breakdown travels as **Deliverables** in the proposed house style
+  (F2–F6's spelling; "work items" is what a pledged feature owes)
+  with the cut named as a decide-first, since D42 requires the
+  split at pledge and the split retires F1's number for a fresh one
+  per piece.
+
+  AND THE SEQUENCING NOTE WAS WRONG AGAINST ITS OWN DESIGN. It
+  claimed a text-mode half that "depends on nothing unpledged",
+  which is the escape hatch D42's tolerance rested on. recorder.md,
+  settled 2026-07-21, says recording requires Reliquary to **be**
+  the console — input into a backend's own display window never
+  passes through Reliquary — so the Reliquary-owned viewer over the
+  `vnc` control plane is "the recording prerequisite on every
+  backend — QEMU included". What text mode avoids is the landmark
+  and click work, which is F5's GUI asset spec and pointer input,
+  never the viewer. **There is no VNC-free slice of F1**, and the
+  owner's stated ground therefore reaches the whole of it.
+
+  U1 GOES UP, NOT BACK, AND ITS EXPORT CLAUSE IS DELETED. D46 had
+  already seated U1's delivered substance in the current list as
+  U11, U12 and U13 — "which is what that split was for" — leaving
+  U1 on the shelf, in its own fold line's words, because "its
+  export clause is why it stays". Remove that clause and nothing
+  undelivered remains. The owner removed it (*"remove the export
+  from the use case"*), which runs the parked **U1 — condense to
+  the journey** clarification without waiting on its U8
+  contingency: that contingency existed to keep the export demand
+  owned by *something*, and withdrawing the claim is the other way
+  to settle who owns it — U8, alone, where the same 2026-07-23
+  draft had already said it belonged ("the export family … hangs
+  from half a sentence inside U1"). **It lands as a supersession,
+  not a clarification**: the clarification test is that no past
+  citation reads differently, and blueprint-guide's "you export it
+  (U1)" now reads against U8. With the clause gone every remaining
+  word is delivered, so D34 promotes U1 to the current list in the
+  same act.
+
+  WHAT WOULD HAVE BEEN LOST BY DELETING INSTEAD OF CONDENSING. U1
+  uniquely claims that the **composite** is one short command —
+  "easy is the requirement: the command-line syntax stays terse and
+  succinct". U11 covers finding and seeding "with minimal effort",
+  U12 the unattended install; neither claims the journey is one
+  command, and nothing else in force does. Retiring U1 as
+  superseded by U11–U13 was **weighed and declined** on exactly
+  that: it is the D51 shape and it would have dropped the one claim
+  no successor carries, along with the north-star use case itself.
+  **Pledging U8 first**, as the parked plan assumed, was also
+  declined — it commits the project to building export, a new
+  pledge in a round whose whole direction is removing pledges
+  nobody made.
+
+  WITHDRAWAL COSTS THE COMMITMENT AND NOTHING ELSE. Numbers, text
+  and citations all stand — the U-namespace is shared across the
+  three locations and the F-number evaporates on delivery only, so
+  F1 is still F1 and every existing reference stays resolvable.
+  Designs travel with what they serve, so recorder.md moves to
+  `proposed/design/`, which empties `pledged/design/` entirely.
+  Neither withdrawal is a rejection: both arguments still stand and
+  either may be pledged again by ordinary means, which is work
+  actually scheduled against it.
+
+  THE SHAPE OF THE ERROR, STATED SO IT IS NOT REPEATED. A rename
+  that changes what a category **claims** must re-test the category
+  members one at a time; clearing them in a sentence is how a
+  vocabulary change silently manufactures commitments. D45 recorded
+  the same shape from a different angle — "a boundary extended to a
+  second thing without asking whether the reason for it extended
+  too" — and this is its twin: a *word* extended to a shelf of
+  entries without asking whether the claim it now makes was true of
+  each.
+
+  FOLDED: this entry, plus the annotations at D44's clearing
+  sentence and D42's F1 tolerance;
+  [proposed/FEATURES.md](proposed/FEATURES.md) (F1 arrives ahead of
+  F2, recast; the preamble's withdrawal note; F5's adjudication
+  pointer);
+  [pledged/FEATURES.md](pledged/FEATURES.md) (F1 removed, the
+  departure noted);
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (a third state and
+  a "Withdrawn from pledged" section holding U2 and U6; the
+  door-swings-both-ways rule extended to the second gate; U7's
+  hypervisor-roles sentence, U8's separation now complete, U1's
+  clarification struck as applied, U2's left standing);
+  [pledged/USE-CASES.md](pledged/USE-CASES.md) (U1, U2 and U6
+  removed, U5 alone with the note saying why);
+  root [USE-CASES.md](../USE-CASES.md) (U1 added, condensed, in
+  number order);
+  [README.md](README.md) (the map's design rows);
+  [TASKS.md](TASKS.md) (F23 is now the standing example of
+  feature-bound work, and with F17 delivered the same day it is the
+  only one left);
+  `planning/proposed/design/recorder.md` (moved, its stale banner
+  replaced); and the recorder.md links in
+  [docs/spec/asset-resolution.md](../docs/spec/asset-resolution.md),
+  [docs/spec/script-spec.md](../docs/spec/script-spec.md) and this
+  file's D50 fold list, with blueprint-guide's export citation
+  repointed to U8. No CHANGELOG line: nothing release-facing moved.
+
 - D59 — EVERY WORKING DIRECTORY IS PLACEABLE; P12 AND P4 AMENDED —
   DECIDED (owner, 2026-07-27) and delivered the same day, which
   retires F22's number. Supports U17 (pledged), U14, U4; P4, P6,
@@ -1521,6 +1675,12 @@ is waiting on an answer today.
   currently in `pledged/` fails that test — U2 and F1 are
   unscheduled, which the claim permits, not disavowed, which it
   does not — but the test now exists and did not before.
+  [**The clearing sentence is superseded by D61** (2026-07-27),
+  which applied the test entry by entry rather than in one
+  sentence: F1, U2 and U6 all failed it and were withdrawn, and U1
+  condensed and promoted. Everything else here stands — the remedy
+  this paragraph describes is exactly what D61 used, one day
+  later.]
 
   WEIGHED AND REFUSED. `planned/` was the owner's own first
   instinct and came closest; an objection from D42 (no roadmap) was
@@ -1786,6 +1946,14 @@ is waiting on an answer today.
   large, and the flag is the whole of the treatment. The bound
   governs what is accepted from here; it is not applied
   retroactively to the one entry predating it.
+  [**The tolerance is retired by D61** (2026-07-27), which
+  withdrew F1 to `proposed/` — where the bound does not bite and
+  the reference to F5 is sideways rather than up, so both flaws
+  resolve instead of standing. D61 also found the cut line named
+  here to be wrong: recorder.md makes the console viewer the
+  recording prerequisite on *every* backend, so the text-mode
+  recorder does not proceed without it. The bound itself, and its
+  non-retroactivity, stand as written.]
 
 - D41 — THE IDENTITY LEDGER IS DELETED; `add-media` AUTHORS A
   DECLARATION — DECIDED (owner, 2026-07-26). Supports P4, P8;
@@ -2404,7 +2572,7 @@ is waiting on an answer today.
   FOLDED: the move; USE-CASES.md's own links and its
   root-placement note; PRINCIPLES.md, AGENTS.md,
   planning/INTERFACES.md, planning/ROADMAP.md,
-  planning/USE-CASE-PROPOSALS.md, planning/pledged/design/recorder.md,
+  planning/USE-CASE-PROPOSALS.md, planning/proposed/design/recorder.md,
   this file's preamble, and the documentation-rules skill's
   placement list. Historical DECISIONS entries keep their
   `planning/USE-CASES.md` spellings under the spellings rule.
