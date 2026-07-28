@@ -155,7 +155,8 @@ workflow:
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
   `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
-  effective timeout and the scope that supplied it; `format_plan` /
+  effective timeout and every guest-input verb's effective `pacing` — the settling gap before its first
+  key event, D60 — each with the scope that supplied it; `format_plan` /
   `check_script` / `rlq check-script` report it without running).
   `binding.py` resolves declared script properties before a run —
   the flattened source order (explicit `--property`, blueprint
