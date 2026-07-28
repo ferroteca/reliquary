@@ -4,3 +4,19 @@
 include reliquary/codex/codex.json
 include reliquary/codex/blueprints/*.rlqb
 include reliquary/codex/scripts/*.rlqs
+
+# The suite's spec-conformance tests read the normative documents and
+# compare them against the code, so a source package without them is
+# one a downstream packager cannot fully verify. `planning/design` is
+# here for the script-example catalogue alone, which the suite parses;
+# the rest of `planning/` is maintainer governance and is not shipped.
+graft docs
+graft planning/design
+
+# The suite itself is sdist-only: the wheel is the runtime, and a
+# packager verifying the source package needs the tests and their
+# fixtures. Without this graft they would vanish from both artifacts,
+# because excluding `reliquary_tests` from the wheel also removes it
+# from the packages setuptools would otherwise carry into the sdist.
+graft reliquary_tests
+global-exclude __pycache__/* *.py[co]

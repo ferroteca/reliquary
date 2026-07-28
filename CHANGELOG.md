@@ -9,6 +9,33 @@ All notable changes to Reliquary are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **The wheel is the runtime; the source package is the whole
+  project.** `reliquary_tests` no longer ships in the wheel — an end
+  user has no use for 135 conformance fixtures in their
+  `site-packages` — and the sdist now carries the suite, `docs/`,
+  and `planning/design/` alongside it. The point is the
+  spec-conformance tests: they read the normative documents and
+  compare them against the code, so without those documents they
+  skipped, and a source package that cannot run its own checks is
+  not one a downstream packager can verify. Unpacking the sdist and
+  running `python -m unittest reliquary_tests` now runs **902 tests
+  with one skip** — the opt-in FreeDOS integration test — where it
+  previously skipped thirty-three.
+
+- **`tools/check_dist.py` checks the built artifacts.** With the
+  suite out of the wheel, nothing running inside the wheel inspects
+  it any more, and package data is exactly what goes missing
+  silently: a dropped `script_grammar.lark` or `schemas/*.json`
+  breaks an installed Reliquary at first use while every
+  source-tree test still passes. The script names what each
+  artifact must carry — and, for the wheel, what it must not —
+  rather than inferring it from a suite that happened to pass. Run
+  it after `python -m build`.
+
 ## 0.1.0.dev3 - 2026-07-27
 
 ### Changed

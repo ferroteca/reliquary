@@ -202,8 +202,10 @@ workflow:
   parsing, exit codes (`errors.exit_code` over one `ReliquaryError`
   arm), and the output discipline, and
   `__main__.py` preserves `python -m reliquary` execution.
-- `pyproject.toml` packages `reliquary` as the `reliquary` command and includes the installable `reliquary_tests` test
-  package.
+- `pyproject.toml` packages `reliquary` as the `reliquary` command. **The wheel is the runtime alone**: `reliquary_tests`
+  is excluded from it (the `reliquary*` glob would otherwise match it, so the exclude is load-bearing) and ships in the
+  sdist instead, via `MANIFEST.in`, together with `docs/` and `planning/design/`. A source package must be able to run
+  its own suite; an end user has no use for the fixtures.
 - `reliquary_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
   media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
@@ -572,9 +574,14 @@ Doctrine to preserve:
   the parser and *not* the schema while claiming the two cannot drift.
   A missing dev dependency should stop the suite and name itself.
   `skipUnless` is for a resource that genuinely may be absent in a
-  supported configuration — the source-tree-only guards on `docs/` and
-  `planning/` are the legitimate case, since neither is packaged and
-  `reliquary_tests` is installable.
+  supported configuration. **The bar is high, and it moved**: `docs/`
+  and `planning/design/` now ship in the sdist precisely so the
+  spec-conformance tests run there, so a guard on them fires nowhere
+  the suite is supposed to run. The suite skips exactly **one** test —
+  the opt-in FreeDOS integration run — in the source tree and in the
+  unpacked sdist alike; any other skip is a defect to fix, not a
+  configuration to tolerate. A guard that survives is one whose
+  resource is genuinely optional, and it says which.
 - Pillow is the image library: screenshot conversion uses it, and the
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.
@@ -642,11 +649,17 @@ $pythonFiles = (Get-ChildItem reliquary,reliquary_tests -Filter *.py).FullName
 ```
 
 `python -m build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
-After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, runtime
-dependencies, and the presence of the `reliquary_tests` package in both built artifacts. For release-facing packaging
-changes, install the wheel into a clean environment, change to a directory outside the source tree, and run
-`python -m unittest -v reliquary_tests`. Downstream packagers should be able to run the same command against both their
-unpacked source package and installed artifact.
+After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, and runtime
+dependencies in both built artifacts, then run `python tools/check_dist.py`, which asserts what each artifact must
+carry — the grammar, the schemas and the codex in the wheel; the suite, its fixtures, `docs/spec/` and the
+script-example catalogue in the sdist — and that the wheel carries no tests. It exists because the suite no longer
+ships in the wheel, so nothing running inside the wheel inspects it: package data is what disappears silently, and a
+missing `.lark` grammar breaks an installed Reliquary while every source-tree test still passes.
+
+For release-facing packaging changes, unpack the sdist outside the source tree and run `python -m unittest -v
+reliquary_tests` there: it must report one skip, the opt-in integration test. That is the run a downstream packager
+makes, and it is the one that proves the source package is complete. Install the wheel into a clean environment too, but
+check it by using it — `rlq --version` and an import — since it carries no suite to run.
 
 Run `git diff --check` before handing work back.
 

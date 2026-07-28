@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reliquary"
-version = "0.1.0.dev3"
+version = "0.1.0.dev4"
 description = "OS installation scripting over agentless QEMU guest automation"
 readme = "README.md"
 authors = [{ name = "Paul Galbraith", email = "paul@galbraiths.ca" }]
@@ -38,7 +38,13 @@ rlq = "reliquary:main"
 reliquary = "reliquary:main"
 
 [tool.setuptools.packages.find]
-include = ["reliquary*", "reliquary_tests"]
+# The wheel carries the runtime only. `reliquary_tests` ships in the
+# sdist (MANIFEST.in) so a packager can verify the source package,
+# but end users have no use for 135 conformance fixtures in their
+# site-packages. The exclude is required, not decorative: the
+# `reliquary*` glob would otherwise match `reliquary_tests` too.
+include = ["reliquary*"]
+exclude = ["reliquary_tests*"]
 
 [tool.setuptools.package-data]
 reliquary = [
@@ -48,4 +54,3 @@ reliquary = [
     "codex/blueprints/*.rlqb",
     "codex/scripts/*.rlqs",
 ]
-reliquary_tests = ["fixtures/*", "fixtures/**/*"]
