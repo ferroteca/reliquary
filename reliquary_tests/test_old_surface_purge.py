@@ -58,6 +58,8 @@ _SWEEP_ROOTS = (
     "docs",
     "README.md",
     "AGENTS.md",
+    "ARCHITECTURE.md",
+    "USE-CASES.md",
 )
 
 # Files that may quote the old surface deliberately.
