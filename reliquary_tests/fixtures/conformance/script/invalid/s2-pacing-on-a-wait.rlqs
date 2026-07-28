@@ -1,0 +1,8 @@
+# invalid: the placement matrix: pacing paces the actor, and a
+# wait acts on nothing
+# rule: S2
+# id: node.timing-placement
+# spec: Timing
+
+platform dos
+wait "x" pacing=1s

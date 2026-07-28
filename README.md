@@ -197,8 +197,8 @@ rlq stop-machine --blueprint freedos
 ```
 
 To inspect a script without running it, `rlq check-script` prints
-the resolved timing plan (each observation's timeout and where it
-came from):
+the resolved timing plan — each observation's timeout, each guest
+input's pacing, and where each came from:
 
 ```powershell
 rlq check-script freedos-install

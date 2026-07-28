@@ -37,13 +37,17 @@ _SIGNATURES = {
     "wait_branching": ("timeout",),
     "on_handler": ("stable",),
     "always_handler": ("stable",),
-    "phase": ("timeout", "deadline"),
+    "phase": ("timeout", "deadline", "pacing"),
     "property_def": ("prompt",),
     "http_def": ("port-min", "port-max"),
     "content_def": ("indent", "from"),
     "http_control": (),
-    "select": ("exclude",),
-    "enter": (), "type_text": (), "press": (), "screenshot": (),
+    # The guest-input verbs, and only they, accept `pacing`: it is
+    # the gap before the first key event, so a verb that delivers no
+    # keys has nothing to pace.
+    "select": ("exclude", "pacing"),
+    "enter": ("pacing",), "type_text": ("pacing",),
+    "press": ("pacing",), "screenshot": (),
     "insert": (), "eject": (), "set_boot": (), "set_var": (),
     "start": (), "stop": (),
     "goto": (), "finish": (),
@@ -62,7 +66,8 @@ _DISPLAY = {
 # Modifiers whose value must be a duration. They are also the
 # closed timing set that separates an observation's own modifiers
 # from the channels it observes.
-_DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable"})
+_DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable",
+                                 "pacing"})
 
 # The placement matrix (script-spec.md, "Timing"): every timing
 # word the signatures above reject is rejected for a reason, and
@@ -89,6 +94,44 @@ _PLACEMENT = {
     ("phase", "stable"):
         "only a match can be required to hold, and a phase has no "
         "condition of its own",
+    ("wait_one", "pacing"):
+        "pacing paces the actor, not the observation: write it on the "
+        "input verb that follows, or on the phase",
+    ("wait_branching", "pacing"):
+        "pacing paces the actor, not the observation: write it on the "
+        "input verb that follows, or on the phase",
+    ("on_handler", "pacing"):
+        "pacing belongs to a guest-input verb or the scope containing "
+        "one: write it on the input verb in this handler, or on the "
+        "phase",
+    ("always_handler", "pacing"):
+        "pacing belongs to a guest-input verb or the scope containing "
+        "one: write it on the input verb in this handler, or on the "
+        "phase",
+    ("screenshot", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("insert", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("eject", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("set_boot", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("set_var", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("start", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("stop", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
+    ("http_control", "pacing"):
+        "pacing is the gap before delivering guest input, and this "
+        "verb delivers none",
 }
 # A modifier value's terminal, as the condition kind it spells.
 _CONDITION_KINDS = {
@@ -151,6 +194,7 @@ class Statement(_Observed):
     handlers: Tuple[Handler, ...] = ()
     timeout: Optional[str] = None
     stable: Optional[str] = None
+    pacing: Optional[str] = None
     exclude: Optional[StringLiteral] = None
     contents: Tuple["HttpContent", ...] = ()
     line: int = 0
@@ -178,6 +222,7 @@ class Phase:
     handlers: Tuple[Handler, ...] = ()
     timeout: Optional[str] = None
     deadline: Optional[str] = None
+    pacing: Optional[str] = None
     line: int = 0
     column: int = 1
 
@@ -216,6 +261,7 @@ class Script:
     entry: Optional[str] = None
     timeout: Optional[str] = None
     deadline: Optional[str] = None
+    pacing: Optional[str] = None
     properties: Tuple[Property, ...] = ()
     http: Optional[Http] = None
     statements: Tuple[Statement, ...] = ()
@@ -448,6 +494,9 @@ class _Builder(Transformer):
     def h_deadline(self, children):
         return ("deadline", str(children[1]), _line(children[0]))
 
+    def h_pacing(self, children):
+        return ("pacing", str(children[1]), _line(children[0]))
+
     # -- declarations --------------------------------------------
     def property_def(self, children):
         words = [child for child in children
@@ -662,18 +711,27 @@ class _Builder(Transformer):
         return Statement(verb, arguments, line=_line(children[0]),
                          column=_column(children[0]))
 
+    def _paced(self, verb, node, children, arguments):
+        """A guest-input verb: like ``_simple``, keeping ``pacing``."""
+        modifiers = _modifiers(
+            node, [c for c in children if isinstance(c, tuple)])
+        return Statement(verb, arguments,
+                         pacing=_duration(modifiers.get("pacing")),
+                         line=_line(children[0]),
+                         column=_column(children[0]))
+
     def enter(self, children):
-        return self._simple("enter", "enter", children,
-                            (children[1].reliquary.value,))
+        return self._paced("enter", "enter", children,
+                           (children[1].reliquary.value,))
 
     def type_text(self, children):
-        return self._simple("type", "type_text", children,
-                            (children[1].reliquary.value,))
+        return self._paced("type", "type_text", children,
+                           (children[1].reliquary.value,))
 
     def press(self, children):
         keys = tuple(str(c) for c in children[1:]
                      if isinstance(c, LarkToken) and c.type == "NAME")
-        return self._simple("press", "press", children, keys)
+        return self._paced("press", "press", children, keys)
 
     def http_control(self, children):
         _modifiers("http_control",
@@ -696,6 +754,7 @@ class _Builder(Transformer):
                                    rule_id="node.modifier-not-a-string")
         return Statement(
             "select", (children[1].reliquary.value,),
+            pacing=_duration(modifiers.get("pacing")),
             exclude=exclude.reliquary.value if exclude else None, line=line,
             column=_column(children[0]))
 
@@ -744,7 +803,8 @@ class _Builder(Transformer):
             tuple(c for c in children if isinstance(c, Statement)),
             tuple(c for c in children if isinstance(c, Handler)),
             _duration(modifiers.get("timeout")),
-            _duration(modifiers.get("deadline")), _line(children[0]),
+            _duration(modifiers.get("deadline")),
+            _duration(modifiers.get("pacing")), _line(children[0]),
             _column(children[0]))
 
     def phased_body(self, children):
@@ -783,6 +843,7 @@ class _Builder(Transformer):
             headers.get("platform"), headers.get("description"),
             headers.get("machine"), headers.get("entry"),
             headers.get("timeout"), headers.get("deadline"),
+            headers.get("pacing"),
             tuple(properties), http, tuple(statements), tuple(phases), lines)
 
 

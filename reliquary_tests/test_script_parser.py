@@ -322,6 +322,13 @@ class SignatureTests(unittest.TestCase):
             parse_script(_HEAD + 'enter "x" timeout=5m\n')
         self.assertIn("enter does not accept the modifier 'timeout'",
                       str(caught.exception))
+        # The listing is what the node *does* accept: `enter` is a
+        # guest-input verb, so it takes pacing and nothing else.
+        self.assertIn("accepts: pacing", str(caught.exception))
+
+    def test_a_node_accepting_no_modifier_says_so(self):
+        with self.assertRaises(ScriptParseError) as caught:
+            parse_script(_HEAD + 'eject floppy0 timeout=5m\n')
         self.assertIn("accepts: none", str(caught.exception))
 
     def test_a_wait_takes_the_timing_modifiers_that_are_its_own(self):

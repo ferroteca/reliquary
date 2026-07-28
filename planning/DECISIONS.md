@@ -178,6 +178,104 @@ is waiting on an answer today.
 
 ## Decided
 
+- D60 — INPUT PACING IS CONTROL-PLANE PACING, NOT A `delay` VERB —
+  DECIDED (owner, 2026-07-24, the question round) and delivered
+  2026-07-27, which retires F17's number. Supports U14, U20, U12;
+  G1, G5, G6; P5, P6. Every guest-input verb pauses before its
+  first key event, on the lexical ladder `statement > phase >
+  header > built-in 0.1s`, spelled `pacing` in both positions.
+
+  **THE EVIDENCE.** `freedos-install.rlqs` waited for the
+  installer's welcome screen and then `press enter`; the keystroke
+  was swallowed, because the installer paints the screen *before*
+  it starts reading the keyboard. The wait timed out 30s later at
+  the next step, and pressing Enter by hand seconds afterwards
+  advanced it immediately. Reproduced on the pre-milestone tree, so
+  structural rather than a regression. It was worked around by
+  switching that one line to `select "Yes"` — feedback-driven, so
+  it re-reads the screen between keys, which is also why every
+  other confirmation in that script already worked.
+
+  **WHY THIS IS LEGAL WHERE A `delay` VERB IS NOT**, the framing
+  the whole feature rests on. The distinction is between a pause an
+  author *sequences* and a pause that is a property of *delivering
+  input*. A `delay` verb is the first: a step standing between two
+  others, encoding a guess about guest speed that will be wrong on
+  another host. Pacing is the second — the control plane's own gap
+  before it starts typing, taken whether or not anyone writes the
+  word. The spec's Timing section already ended "Screen polling and
+  input-event pacing remain control-plane-owned; the script does
+  not tune them", and a gap between observing a screen and
+  delivering the next input *is* input-event pacing; what changed
+  is only that the tunable half became tunable. G1 supplies the
+  rest: agentlessly the guest's *input* readiness is unobservable
+  where its output is not, so a control plane that types the
+  instant a screen paints asserts something it cannot know. The
+  mechanism was already half-present — `send_keys` paces at 0.06s
+  *between* key events — and what was missing is the pause before
+  the first.
+
+  **WEIGHED AND DECLINED: `stable=` as the tool.** It strengthens
+  the observation where the need is to pace the actor; it costs a
+  poll interval plus its duration; it changes what the author is
+  asserting; and it must be written on every wait, which is the
+  burden being objected to.
+
+  **THE SPELLING** is `pacing` in both positions (`pacing 300ms` in
+  a header, `press enter pacing=300ms` on a statement) — one
+  spelling everywhere (G6), and a *pace* is naturally a rate where
+  what is being set is an interval. The rejected candidates are
+  worth keeping: `settle` read best on meaning but sat a
+  near-homophone from `stable` in one small vocabulary, on the
+  opposite half of the model — a real G6 cost; `ready` reads
+  naturally but collides with the resting machine phase.
+
+  **THE DEFAULT IS 0.1s AND PROVISIONAL.** The number will swing
+  wildly — a plain text screen renders quickly, an animated TUI
+  menu very slowly — so no default serves every screen by
+  construction, which is itself the argument for the per-phase and
+  per-statement override carrying real weight rather than being
+  speculative generality. **The bisection that would fix the number
+  is not done**: it needs a FreeDOS install rig, and its output
+  revises a default the design already calls provisional, so it is
+  separable from the language. Filed as the one work item this
+  entry does not close.
+
+  Two questions the round did not reach, settled here. **There is
+  no branching-`wait` rung**: an observation container cannot carry
+  pacing — pacing paces the actor and a `wait` acts on nothing — so
+  a verb inside a handler inherits from its phase, skipping the
+  `wait` that contains it. And **`pacing=0s` is legal**, the one
+  duration in the language not required to be positive: a zero
+  *bound* asks for what can never happen, which is why `timeout`,
+  `deadline` and `stable` still refuse it, but a zero *interval*
+  reads perfectly well — "this guest is ready, do not wait" — and
+  refusing it would only produce `pacing=1ms`, which says the same
+  thing less honestly. A negative pacing needs no rule: the
+  duration token carries no sign, so a check could never fire, and
+  adding one would have been an unreachable diagnostic of exactly
+  the kind the 2026-07-27 sweeps kept finding.
+
+  **THE INTERFACE-CHANGE TRIAGE** (P8): no numbered use case is
+  cost and three are served — U14, U20 and U12, all in force since
+  D46, since a script that cannot reliably land a keystroke serves
+  none of them. An easy approval under the rule.
+
+  Folded: [script_nodes.py](../reliquary/script_nodes.py) (the
+  keyword), [script_grammar.lark](../reliquary/script_grammar.lark)
+  and [script_parser.py](../reliquary/script_parser.py) (the
+  signatures and the placement reasons),
+  [script_timing.py](../reliquary/script_timing.py) (the parse-time
+  plan and its report),
+  [script_runner.py](../reliquary/script_runner.py) (`_pace`, taken
+  before delivery so a cancellation arriving during it ends the run
+  cleanly at that boundary),
+  [script-spec.md](../docs/spec/script-spec.md) (normative: the
+  placement matrix's fourth column, the ladder, and the "no
+  `delay`" paragraph amended to distinguish the absent *verb* from
+  control-plane pacing), the script conformance corpus, and the
+  CHANGELOG's unreleased section.
+
 - D59 — EVERY WORKING DIRECTORY IS PLACEABLE; P12 AND P4 AMENDED —
   DECIDED (owner, 2026-07-27) and delivered the same day, which
   retires F22's number. Supports U17 (pledged), U14, U4; P4, P6,

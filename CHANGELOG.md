@@ -140,6 +140,52 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`pacing`: a settling gap before guest input.** A script that
+  waits for a screen and then types was landing its keystroke on an
+  installer that had painted the screen but not yet begun reading
+  the keyboard, and the key was swallowed —
+  `freedos-install.rlqs` hit exactly this, timing out 30s later at
+  the next step while pressing Enter by hand advanced it
+  immediately. Every guest-input verb (`enter`, `type`, `press`,
+  `select`) now pauses before its first key event; the default is
+  **0.1s** and is expected to be revisited.
+
+  The gap is tunable on the same lexical ladder `timeout` uses —
+  `statement > phase > header > built-in` — as a `pacing` header,
+  a `pacing=` phase modifier, or a `pacing=` on the verb itself.
+  There is no branching-`wait` rung: an observation cannot carry
+  `pacing`, so a verb inside a handler inherits from its phase.
+  Resolution is entirely parse-time, so `check-script` reports a
+  `guest input` section naming each verb's gap and the scope that
+  supplied it, exactly as it already does for observation
+  timeouts.
+
+  **This is not the `delay` verb, and that prohibition stands.**
+  The distinction is between a pause an author sequences and a
+  pause that is a property of delivering input. Agentlessly a
+  guest's *input* readiness is unobservable where its output is
+  not, so a control plane that types the instant a screen paints
+  asserts something it cannot know; `send_keys` already paced
+  *between* key events, and this is the missing pause before the
+  first. What the language gained is the ability to tune that gap,
+  not to insert one.
+
+  `pacing=0s` is legal and means "this guest is ready, do not
+  wait" — the one duration in the language not required to be
+  positive. A bound of zero asks for what can never happen, which
+  is why `timeout`, `deadline` and `stable` still refuse it; a
+  zero *interval* reads perfectly well, and refusing it would only
+  produce `pacing=1ms` saying the same thing less honestly.
+
+  Placement is enforced: `pacing` on an observation or on a
+  host-side verb (`insert`, `eject`, `set-boot`, `screenshot`,
+  `set`, `start`, `stop`, `http`) is a parse error naming why.
+  `select` is the one verb in both halves of the model — it
+  observes *and* delivers — so it carries a `timeout` for its
+  feedback and a `pacing` for its delivery, and appears twice in
+  the plan. Normative:
+  `docs/spec/script-spec.md` "Timing"; recorded as D60.
+
 - The README's "Blueprints and machines" section now shows the
   model instead of only describing it: a whole 1 MB MS-DOS
   blueprint, two machines created from it, `insert-media` changing

@@ -529,6 +529,64 @@ class InputVerbTests(_RuntimeCase):
             self.console.commands,
             [("select", "Plain DOS system", 45.0, ("with sources",))])
 
+    def test_every_guest_input_verb_pays_the_pacing_gap(self):
+        """The pause lands before the first key event, once per verb.
+
+        The fake clock only advances when the engine sleeps, so the
+        elapsed time *is* the gap that was taken.
+        """
+        for source, expected in (('enter "x"\n', 0.1),
+                                 ('type "x"\n', 0.1),
+                                 ("press enter\n", 0.1),
+                                 ('select "Yes"\n', 0.1)):
+            with self.subTest(source=source):
+                engine = self.engine(source)
+                self.run_linear(engine)
+                self.assertAlmostEqual(self.clock.now, expected)
+
+    def test_a_host_side_verb_pays_nothing(self):
+        engine = self.engine("set answer \"42\"\n")
+        with mock.patch("reliquary.script_runner._machines"):
+            self.run_linear(engine)
+        self.assertEqual(self.clock.now, 0.0)
+
+    def test_the_gap_is_the_one_the_plan_resolved(self):
+        engine = self.engine('pacing 2s\nenter "x" pacing=5s\n')
+        self.run_linear(engine)
+        self.assertAlmostEqual(self.clock.now, 5.0)
+
+    def test_the_header_gap_applies_where_no_statement_says(self):
+        engine = self.engine('pacing 2s\nenter "x"\n')
+        self.run_linear(engine)
+        self.assertAlmostEqual(self.clock.now, 2.0)
+
+    def test_a_zero_gap_does_not_sleep(self):
+        """`pacing=0s` is the author saying the guest is ready."""
+        engine = self.engine('enter "x" pacing=0s\n')
+        self.run_linear(engine)
+        self.assertEqual(self.clock.now, 0.0)
+
+    def test_the_gap_precedes_delivery(self):
+        """Nothing reaches the console until the guest has settled.
+
+        A gap taken *after* delivery would pace nothing; this is the
+        whole point of the feature, so it is asserted directly rather
+        than inferred from the elapsed total.
+        """
+        engine = self.engine('enter "x" pacing=3s\n')
+        observed = []
+        original = self.clock.sleep
+
+        def watch(seconds):
+            observed.append(("sleep", seconds, list(self.console.commands)))
+            original(seconds)
+
+        engine._sleep = watch
+        self.run_linear(engine)
+        self.assertEqual(observed, [("sleep", 3.0, [])])
+        self.assertEqual(self.console.commands,
+                         [("send_text", "x", True)])
+
     def test_an_unbound_property_reference_is_a_named_error(self):
         for source in ('enter "setup /owner=${owner}"\n',
                        'wait "welcome ${owner}"\n'):

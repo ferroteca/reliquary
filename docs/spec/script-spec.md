@@ -447,6 +447,7 @@ Header nodes:
 | `entry` | phase name | required in a phased script, forbidden in a linear one |
 | `timeout` | duration | script-wide observation default |
 | `deadline` | duration | wall-clock budget for the whole run |
+| `pacing` | duration | script-wide gap before guest input |
 
 Declarations:
 
@@ -467,10 +468,10 @@ Statements:
 | `goto` | phase name | — | — |
 | `finish` | — | — | — |
 | `http` | `start` plus optional content names, or `stop` | — | optional `content` entries for `start` |
-| `enter` | string | — | — |
-| `type` | string | — | — |
-| `press` | key names | — | — |
-| `select` | string | `exclude` | — |
+| `enter` | string | `pacing` | — |
+| `type` | string | `pacing` | — |
+| `press` | key names | `pacing` | — |
+| `select` | string | `exclude`, `pacing` | — |
 | `screenshot` | optional name | — | — |
 | `insert` | slot, `@media` or `$property` | — | — |
 | `eject` | slot | — | — |
@@ -483,7 +484,7 @@ And the phase declaration:
 
 | node | arguments | modifiers | block |
 |---|---|---|---|
-| `phase` | name | `timeout`, `deadline` | statements, or `always` handlers |
+| `phase` | name | `timeout`, `deadline`, `pacing` | statements, or `always` handlers |
 
 ### Grammar (normative)
 
@@ -501,7 +502,8 @@ header          = "description" , string , eol
                 | "machine" , ( "running" | "stopped" ) , eol
                 | "entry" , name , eol
                 | "timeout" , duration , eol
-                | "deadline" , duration , eol ;
+                | "deadline" , duration , eol
+                | "pacing" , duration , eol ;
 
 property-def    = "property" , [ "text" | "media" | "secret" ] ,
                   property-key , [ prompt-mod ] , eol ;
@@ -524,7 +526,8 @@ phased-body     = phase , { phase } ;
 phase           = "phase" , name , { timing-mod } , block-open ,
                   ( sequential-body | reactive-body ) ,
                   block-close ;
-timing-mod      = ( "timeout" | "deadline" ) , "=" , duration ;
+timing-mod      = ( "timeout" | "deadline" | "pacing" ) , "=" ,
+                  duration ;
 
 sequential-body = statement-list ;
 reactive-body   = always-handler , { always-handler } ;
@@ -543,20 +546,22 @@ handler         = "on" , condition ,
                   [ "stable" , "=" , duration ] , block-open ,
                   statement-list , block-close ;
 watch-mod       = ( "timeout" | "stable" ) , "=" , duration ;
+pacing-mod      = "pacing" , "=" , duration ;
 
 condition       = string | regex
                 | "machine" , "=" , machine-state ;
 machine-state   = "stopped" ;
 
-action          = "enter" , string , eol
-                | "type" , string , eol
+action          = "enter" , string , [ pacing-mod ] , eol
+                | "type" , string , [ pacing-mod ] , eol
                 | "http" , ( "start" , { name } | "stop" ) ,
                   eol
                 | "http" , "start" , block-open ,
                   content-def , { content-def } , block-close
-                | "press" , key , { key } , eol
+                | "press" , key , { key } , [ pacing-mod ] , eol
                 | "select" , string ,
-                  [ "exclude" , "=" , string ] , eol
+                  [ "exclude" , "=" , string ] ,
+                  [ pacing-mod ] , eol
                 | "screenshot" , [ name ] , eol
                 | "insert" , slot , ( media-ref | property-ref ) ,
                   eol
@@ -1469,11 +1474,12 @@ always "Installation complete" stable=1s {
 The timing model in one sentence: **`timeout` bounds the time to
 the next observed event, `deadline` bounds the total wall clock of
 the construct it annotates, `stable` strengthens one observation,
-and there is no `delay`.** When each clock starts, where it is
+`pacing` sets the gap before guest input, and there is no
+`delay`.** When each clock starts, where it is
 checked, and how expiry is declared are defined by the
 [execution model's clock table](#clocks).
 
-The two families scope differently, and placement is the law:
+The three families scope differently, and placement is the law:
 
 - **Per-observation settings (`timeout`, `stable`) are lexically
   scoped.** An observation bound is a parameter of an observation,
@@ -1493,29 +1499,53 @@ The two families scope differently, and placement is the law:
   starts a fresh budget, so a legitimately revisited phase is
   budgeted per visit; the header `deadline` is the backstop that
   bounds the whole run, cycles included.
+- **Input pacing (`pacing`) is lexically scoped** like the first
+  family, and applies to the four guest-input verbs:
+
+  ```text
+  statement > phase > header > built-in 0.1s
+  ```
+
+  There is no branching-`wait` rung: an observation container
+  cannot carry `pacing`, because pacing paces the actor and a
+  `wait` acts on nothing. A guest-input verb inside a handler
+  therefore inherits from its phase or the header, skipping the
+  `wait` that contains it.
 
 Where each word may appear, and what it means there — any other
 placement is a parse error:
 
-| written on | `timeout` | `deadline` | `stable` |
-|---|---|---|---|
-| header | default for all observations | budget for the run | error |
-| `phase` | default within the phase | budget per phase entry | error |
-| single-condition `wait` | bound on this observation | error | hold requirement on this match |
-| branching `wait` | bound on reaching the first match | error | error — put it on the `on` |
-| `on` / `always` | error — the container owns the waiting | error | hold requirement on this condition |
+| written on | `timeout` | `deadline` | `stable` | `pacing` |
+|---|---|---|---|---|
+| header | default for all observations | budget for the run | error | default for all guest input |
+| `phase` | default within the phase | budget per phase entry | error | default within the phase |
+| single-condition `wait` | bound on this observation | error | hold requirement on this match | error — it delivers no input |
+| branching `wait` | bound on reaching the first match | error | error — put it on the `on` | error — it delivers no input |
+| `on` / `always` | error — the container owns the waiting | error | hold requirement on this condition | error — put it on the input verb |
+| `enter` / `type` / `press` / `select` | error | error | error | gap before this delivery |
+| every other statement | error | error | error | error — it delivers no input |
 
-Two placements are rejected deliberately rather than tolerated:
+Three placements are rejected deliberately rather than tolerated:
 `deadline` on a single observation would be an exact synonym for
 `timeout` (a scope containing one observation has identical bound
 and budget), and a language should refuse two spellings for one
 meaning; `stable` on a container is meaningless because only a
-match can be required to hold.
+match can be required to hold; and `pacing` on an observation or a
+host-side verb names a delivery that does not happen there.
 
-Because per-observation resolution is fully lexical, the effective
-timeout of every observation is computable at parse time (G3,
-G4):
-`check-script` reports the resolved timing plan, and a timing
+`timeout`, `deadline` and `stable` must each be a **positive**
+duration — a bound of zero asks for what can never happen.
+`pacing` is the exception: `0s` is legal and means "this guest is
+ready, do not wait". It is an interval rather than a bound, and an
+author who knows a screen is entitled to say so; refusing it would
+only yield `pacing=1ms`, which says the same thing less honestly.
+
+Because per-observation and pacing resolution are fully lexical,
+the effective timeout of every observation and the effective gap
+before every guest input are computable at parse time (G3, G4):
+`check-script` reports the resolved timing plan — including a
+`guest input` section naming each verb's pacing and the scope that
+supplied it — and a timing
 failure names which clock expired and the scope that supplied it —
 an observation timeout from a statement, a phase deadline from its
 declaration, or the run deadline from the header.
@@ -1532,8 +1562,24 @@ blind
 pause encodes a guess about guest speed that will be wrong on
 another host. Every pause must be justified by an observation;
 `stable` strengthens one rather than blindly pausing after it.
-Screen polling and input-event pacing remain control-plane-owned;
-the script does not tune them.
+
+**`pacing` is not that verb, and the prohibition stands.** The
+distinction is between a pause an author *sequences* and a pause
+that is a property of *delivering input*. A `delay` verb would be
+the first: a step in the script, standing between two others,
+encoding a guess about how long something takes. `pacing` is the
+second — the control plane's own gap before it starts typing,
+which it takes whether or not anyone writes the word. What the
+language adds is the ability to tune that gap, not to insert one.
+
+The gap exists because agentlessly a guest's *input* readiness is
+unobservable where its output is not (G1): an installer paints its
+welcome screen before it begins reading the keyboard, so a control
+plane that types the instant a screen appears asserts something it
+cannot know. `send_keys` already paces *between* key events; this
+is the missing pause before the first. Screen polling remains
+control-plane-owned and untunable; input-event pacing is
+control-plane-owned and tunable, on the ladder above.
 
 ## Input verbs
 
@@ -1545,6 +1591,14 @@ Completion claims belong to the observation that follows, and an
 unmappable character is the named input error the
 [lexical rules](#lexical-rules) promise, never a silent
 substitution.
+
+Every verb in this section pays the pacing gap before its first
+key event, and each accepts `pacing=` to tune it
+([Timing](#timing)). The four are `enter`, `type`, `press` and
+`select`; the supporting operations below are not guest input and
+pay nothing. `select` is both — it delivers keys *and* observes
+between them — so it carries a `timeout` for its feedback and a
+`pacing` for its delivery, and appears twice in the resolved plan.
 
 ### `enter`
 

@@ -259,7 +259,8 @@ matching, an automatic screenshot, and the command to try next.
 ### `rlq check-script <name> [--blueprint NAME | --machine ID]`
 
 Parse and statically check a script; print its resolved timing plan
-(each observation's effective timeout and source scope) and, for each
+(each observation's effective timeout, each guest-input verb's
+effective pacing, and the scope that supplied each) and, for each
 declared property, the source that would supply it — flag, blueprint
 parameter, environment, properties file, or the ask — never its
 value. Accepts the same `--property` and `--properties` as

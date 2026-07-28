@@ -384,6 +384,17 @@ def _durations(script):
 
     Where each may be written is the placement matrix, which the
     node signatures enforce (S2); this is the value rule.
+
+    **`pacing` is deliberately absent from it.** A bound of zero
+    asks for something that can never happen, which is why
+    `timeout`, `deadline` and `stable` are checked here; `pacing` is
+    an interval rather than a bound, and `0s` reads perfectly well —
+    "this guest is ready, do not wait" — an assertion an author is
+    entitled to make about a screen they know. Refusing it would
+    only produce `pacing=1ms`, which says the same thing less
+    honestly. A negative pacing needs no rule either: the duration
+    token carries no sign, so the lexer has already refused it, and
+    a check here could never fire.
     """
     for name in ("timeout", "deadline"):
         _positive(getattr(script, name), name,

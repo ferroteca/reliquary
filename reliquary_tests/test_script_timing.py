@@ -8,7 +8,7 @@ import unittest
 import reliquary
 from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import parse_script
-from reliquary.script_timing import parse_duration, resolve
+from reliquary.script_timing import format_plan, parse_duration, resolve
 
 # The reference script is a shipped builtin, resolved as package
 # data so these tests run against an installed artifact too.
@@ -176,6 +176,75 @@ class TimingPlanTests(unittest.TestCase):
         self.assertTrue(all(o.timeout.spelling == "5m" for o in formatting))
         shutdown = [o for o in plan.observations if o.phase == "shutdown"]
         self.assertEqual([o.timeout.spelling for o in shutdown], ["2m"])
+
+
+class PacingPlanTests(unittest.TestCase):
+    """Pacing resolves on its own ladder, one rung shorter."""
+
+    def plan(self, source):
+        return resolve(parse_script(source))
+
+    def test_the_built_in_gap_paces_an_unadorned_script(self):
+        plan = self.plan(_HEAD + 'enter "x"\n')
+        self.assertEqual(plan.default_pacing.spelling, "0.1s")
+        self.assertEqual(plan.default_pacing.scope, "built-in")
+        self.assertEqual(plan.inputs[0].pacing.seconds, 0.1)
+
+    def test_innermost_wins_across_every_scope_that_carries_it(self):
+        plan = self.plan(
+            _HEAD + "entry a\npacing 300ms\n"
+            "phase a pacing=250ms {\n"
+            '    enter "phase default"\n'
+            '    type "own gap" pacing=1s\n'
+            "    wait timeout=2m {\n"
+            '        on "branch" {\n'
+            '            press enter\n'
+            "            finish\n        }\n"
+            '        on "other" {\n            finish\n        }\n'
+            "    }\n}\n"
+            "phase b {\n"
+            '    select "header default"\n'
+            "    finish\n}\n")
+        self.assertEqual(
+            [(i.verb, i.pacing.spelling, i.pacing.scope) for i in plan.inputs],
+            [("enter", "250ms", "phase"),
+             ("type", "1s", "statement"),
+             # A branching wait is no rung for pacing, so the handler
+             # body inherits the phase straight through.
+             ("press", "250ms", "phase"),
+             ("select", "300ms", "header")])
+
+    def test_a_gap_names_the_scope_that_supplied_it(self):
+        plan = self.plan(
+            _HEAD + "entry a\nphase a pacing=250ms {\n"
+            '    enter "x"\n    finish\n}\n')
+        gap = plan.inputs[0].pacing
+        self.assertEqual(gap.source, "phase a (line 3)")
+        self.assertEqual(str(gap), "250ms from the phase a (line 3)")
+
+    def test_select_appears_in_both_lists(self):
+        """It observes *and* delivers, so it carries both clocks."""
+        plan = self.plan(_HEAD + 'timeout 20s\npacing 2s\nselect "Yes"\n')
+        self.assertEqual((plan.observations[0].kind,
+                          plan.observations[0].timeout.spelling),
+                         ("select", "20s"))
+        self.assertEqual((plan.inputs[0].verb, plan.inputs[0].pacing.spelling),
+                         ("select", "2s"))
+
+    def test_a_host_side_verb_is_absent_from_the_plan(self):
+        plan = self.plan(_HEAD + 'screenshot\nstart\nset answer "42"\n')
+        self.assertEqual(plan.inputs, ())
+
+    def test_a_gap_is_found_from_its_parsed_node(self):
+        script = parse_script(_HEAD + 'press enter pacing=1s\n')
+        gap = resolve(script).pacing_at(script.statements[0])
+        self.assertEqual(gap.seconds, 1.0)
+
+    def test_the_report_names_the_gap_beside_the_bounds(self):
+        report = format_plan(self.plan(_HEAD + 'pacing 2s\nenter "x"\n'))
+        self.assertIn("default pacing: 2s from the header", report)
+        self.assertIn("guest input:", report)
+        self.assertIn("enter: pacing 2s from the header", report)
 
 
 class CycleTests(unittest.TestCase):

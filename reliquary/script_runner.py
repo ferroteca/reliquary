@@ -924,6 +924,31 @@ class _ScriptEngine:
         entry = self._plan.at(node)
         return entry.timeout if entry is not None else self._plan.default
 
+    def _pace(self, statement):
+        """Let the guest settle before the first key event.
+
+        Agentlessly the guest's *input* readiness is unobservable
+        where its output is not, so a control plane that types the
+        instant a screen paints asserts something it cannot know
+        (G1). This is the gap the plan resolved for this statement —
+        never re-derived here, so a report can name the scope that
+        supplied it.
+
+        It is control-plane pacing and not a `delay` verb: the pause
+        is a property of delivering input, not a step an author
+        sequences. `send_keys` already paces *between* key events;
+        this is the missing pause before the first.
+
+        The gap is taken before delivery, so a cancellation arriving
+        during it ends the run cleanly at this boundary rather than
+        mid-delivery.
+        """
+        gap = self._plan.pacing_at(statement)
+        if gap is None or gap.seconds <= 0:
+            return
+        self._sleep(gap.seconds)
+        self._check_clocks(statement)
+
     def _check_clocks(self, statement=None):
         """Check the budgets — and a cancellation — at a boundary."""
         if self._cancelled.is_set():
@@ -1023,6 +1048,7 @@ class _ScriptEngine:
         self._note_secret(statement.arguments[0])
         self._action(statement, "enter", repr(text))
         self._requires_running(statement)
+        self._pace(statement)
         with self._console() as console:
             console.send_text(text, True)
         self._completed(statement, "enter")
@@ -1032,6 +1058,7 @@ class _ScriptEngine:
         self._note_secret(statement.arguments[0])
         self._action(statement, "type", repr(text))
         self._requires_running(statement)
+        self._pace(statement)
         with self._console() as console:
             console.send_text(text, False)
         self._completed(statement, "type")
@@ -1066,6 +1093,7 @@ class _ScriptEngine:
                 raise self._error(str(unknown), statement,
                                   rule_id=unknown.rule_id) from None
         self._requires_running(statement)
+        self._pace(statement)
         with self._console() as console:
             console.send_keys(combos)
         self._completed(statement, "press")
@@ -1079,6 +1107,7 @@ class _ScriptEngine:
             detail += f" (exclude: {exclude[0]!r})"
         self._action(statement, "select", detail)
         self._requires_running(statement)
+        self._pace(statement)
         with self._console() as console:
             console.cursor_menu_select(
                 item, timeout=self._bound(statement).seconds,

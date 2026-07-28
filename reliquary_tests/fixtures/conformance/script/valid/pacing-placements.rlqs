@@ -1,0 +1,14 @@
+# valid: pacing on every scope that may carry it
+# spec: Timing
+
+platform dos
+entry begin
+pacing  300ms
+
+phase begin pacing=250ms {
+    press enter pacing=1s
+    type "immediately" pacing=0s
+    enter "inherits the phase"
+    select "Yes"
+    finish
+}

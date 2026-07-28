@@ -51,6 +51,7 @@ _DELIMITERS = " \t{}#"
 # there would surface as "unexpected token" instead of a named rule.
 KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
+    "pacing",
     "property", "http", "content", "phase", "wait", "on", "always",
     "goto", "finish", "enter", "type", "press", "select", "screenshot",
     "insert", "eject", "set-boot", "set", "start", "stop",

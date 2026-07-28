@@ -1,0 +1,8 @@
+# invalid: the placement matrix: pacing is the gap before guest
+# input, and screenshot delivers none
+# rule: S2
+# id: node.timing-placement
+# spec: Timing
+
+platform dos
+screenshot pacing=1s
