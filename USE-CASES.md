@@ -155,3 +155,21 @@ number they superseded.
   granularity and the medium's size. The retrieved result is the
   product, exactly as U14; only the transport differs, chosen
   when reboot-per-round is the bottleneck.
+
+- **U21 — Parameterize a blueprint, and keep the secret out of
+  it.** A blueprint's author foresees what its users will
+  change — a login name, a product key, which supplemental
+  disk — and designs the seam in: the blueprint answers the
+  properties its scripts declare, either by fixing a value
+  directly, so every machine built from it gets that value, or by
+  naming a property each user defines locally, so the blueprint
+  carries the key and never the value. That second binding is what
+  a license key needs. It is never checked into source control, so
+  Reliquary holds it on the host and retrieves it at use — a
+  secret's value never enters the properties file either, which
+  leaves the blueprint and that file both shareable and
+  versionable. This is U4's model applied to values: the artifact
+  defines everything except what it must not contain. The design
+  beats a user's standing defaults; an explicit per-run value
+  beats the design; and nothing reaches a script that did not
+  declare the key.

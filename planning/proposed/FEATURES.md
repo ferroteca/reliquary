@@ -283,7 +283,11 @@ passes byte-for-byte.
 > without being it: **U5**'s customized-Windows scenario waits on
 > this feature, and **U6**'s recorder (**F1**) needs the console
 > viewer that rides the VNC plane — the whole of F1 does, not the
-> GUI half only (D61). Whoever adjudicates starts there.
+> GUI half only (D61). Both now sit in `proposed/` alongside this
+> entry — U5 as of D64 (2026-07-28), which cut its delivered half
+> away as U21 and left exactly the half that waits here — so
+> neither reference runs up the lifecycle, the same resolution D61
+> reached for F1. Whoever adjudicates starts there.
 
 The arc's endpoint: GUI installer automation, carried by the
 VNC/RFB control plane where backends provide it — QEMU natively,

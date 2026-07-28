@@ -26,12 +26,15 @@ SPDX-License-Identifier: BSD-3-Clause
 >
 > The second move is **automatic on full delivery** (D34): whoever
 > lands the work that fully meets a use case promotes it in the same
-> change — adds it to the root list, deletes it here, records the
-> move in [DECISIONS.md](../DECISIONS.md) — rather than holding it for
-> a separate sign-off. *Full* delivery is the trigger: a use case
+> change — adds it to the root list, deletes it here — rather than
+> holding it for a separate sign-off. The moving commit is the whole
+> record, and the delivery evidence belongs in its message; no
+> [DECISIONS.md](../DECISIONS.md) entry marks a promotion (D63). *Full* delivery is the trigger: a use case
 > whose work has partly landed stays here, since the root list is an
-> implementation claim (milestone 8 pledged U5, but its canonical
-> scenario waits on the GUI era, F5).
+> implementation claim — unless the delivered part is a use case in
+> its own right, in which case it is promoted under its own number
+> and the remainder returns to `proposed/`. U5 did both in turn
+> (D64).
 >
 > A use case in force is clarified, retired, or superseded — never
 > changed in nature. One pledged here may still be reshaped, its
@@ -53,35 +56,19 @@ rather than by a decision to build them. U5 is what survived that
 re-test, and it survived on substance — milestone 8's
 parameterization machinery is real, shipped, U5-citing work.
 
-**U5 — Custom installation** — pledged; moved back from the
-current list 2026-07-23 (owner: an in-force use case whose
-delivery is unscheduled is a real problem — proposed is the
-honest state). Its canonical scenario — a customized Windows
-install — waits on the unscheduled GUI era (F5); the
-parameterization machinery lands at milestone 8 — the
-scheduled, U5-citing work that constitutes its pledge,
-while the unscheduled scenario is why it is not current. U5
-lives only
-here while undelivered — the shared U-namespace keeps every
-existing citation valid — and returns to the current list when
-the delivery is real. Text verbatim as adopted:
+**U5 left the next day, and this shelf is now empty** (owner; D64,
+2026-07-28). It left by the substance that had saved it: that
+machinery was cut out as **U21** and promoted to the current list,
+which is what the pledge had bought, and the residue — the
+seed-and-customize journey, whose seam is compositional and whose
+only carrier is the unpledged GUI era (F5) — went back to
+[proposed/USE-CASES.md](../proposed/USE-CASES.md). Not a pledge
+broken but a pledge paid, with the unpaid remainder returned to
+where unpledged demand lives.
 
-> - **U5 — Custom installation.** A user wants the German version
->   of Windows. The codex will not carry such flavors —
->   there are too many variants — so it defines one standard
->   Windows install. From the CLI the user easily finds that
->   standard blueprint, seeds a local blueprint from it, and
->   customizes it. The blueprint's author has foreseen this need
->   and wrote it with an obvious locale seam; the user changes the
->   language to German — preferably in the blueprint, outside the
->   script, so the script can stand alone — and proceeds. A user
->   name and a license key are equally obvious examples of
->   blueprint parameterization — and they show its two bindings:
->   some parameters are specified directly in the blueprint, while
->   others are only *referred to* there and must be defined
->   externally. A license key is never checked into source
->   control, so Reliquary must provide a mechanism to store it
->   locally and retrieve it at use. The same parameter can go
->   either way: an automated-testing blueprint may fix its user
->   name as "testuser", while "paul" is a value its owner would
->   never check in.
+**Both pledged shelves are now empty** — this one and
+[pledged/FEATURES.md](FEATURES.md). The project owes no
+undelivered use case and no unbuilt feature. That is a state, not
+a defect: `proposed/` holds the argued demand, and the next thing
+this file holds will arrive by someone deciding to build it, which
+is the only way anything should ever have arrived here.

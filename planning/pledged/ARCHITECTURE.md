@@ -27,8 +27,9 @@ SPDX-License-Identifier: BSD-3-Clause
 > The second move is **automatic on full delivery** (D34): whoever
 > lands the work that makes the code honor a principle promotes it
 > in the same change — adds it to the standing list, deletes it
-> here, records the move in [DECISIONS.md](../DECISIONS.md) — rather
-> than holding it for a separate sign-off. **A principle's bar is
+> here — rather than holding it for a separate sign-off; the moving
+> commit is the record, and no [DECISIONS.md](../DECISIONS.md) entry
+> marks a promotion (D63). **A principle's bar is
 > *honored as a rule*, not full delivery** (D48): it cannot be
 > exhaustively proven, and holding it here until it is perfect
 > keeps every shortfall invisible, which is the worse outcome.

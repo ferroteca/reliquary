@@ -109,30 +109,47 @@ sweep above).
 
 Delivery moves it **automatically** (D34): whoever lands the work
 that fully meets a use case promotes it in the same change — into
-the current list, out of the pledged file, recorded in
-DECISIONS.md — not on a separate sign-off. Full delivery is the
+the current list, out of the pledged file — not on a separate
+sign-off, and not recorded in DECISIONS.md, since the moving commit
+is the record and carries the delivery evidence (D63). Full
+delivery is the
 trigger: a use case whose work has partly landed stays pledged
-rather than current (milestone 8 pledged U5, but its canonical
-scenario waits on the GUI era, F5). A clarification claims no number of
+rather than current — unless the delivered part is a use case in
+its own right, in which case it is cut out under its own number
+and goes current, the remainder staying here. U5 did both in turn:
+milestone 8's parameterization machinery met part of it while its
+canonical scenario waited on the GUI era (F5), and on 2026-07-28
+that part was cut out as U21 (D64). The cut must stand alone; a
+rind of a use case is not one. A clarification claims no number of
 its own — it attaches to the use case it sharpens — and skips the
 argument entirely: it is simply delivered, applied in place to the
 current list and removed here.
 
 ### Withdrawn from pledged
 
-**Both arrived here on 2026-07-27** (owner; D61), withdrawn from
-[pledged/USE-CASES.md](../pledged/USE-CASES.md) rather than
-rejected: each was argued and won, and neither is owed. They did
-not reach that shelf by a decision to build them — the 2026-07-26
-restructure filed them by the status word each carried, when
-*accepted* still meant the argument had won, and D44's rename the
-next day converted the shelf's claim to **a commitment to deliver**
-while clearing its occupants in a sentence rather than re-testing
-them. Re-tested, neither has any delivery behind it. Their text is
-verbatim as adopted and their numbers stand, so every existing
-citation stays resolvable; pledging either again is the ordinary
-move to `pledged/`, and what would earn it is work actually
-scheduled against it.
+**Withdrawal costs the commitment and nothing else.** An entry here
+left [pledged/USE-CASES.md](../pledged/USE-CASES.md) without being
+rejected: its argument still stands, and its number and every
+citation of it stay resolvable, since the U-namespace is shared
+across all three locations. Its text stands as it stood — verbatim
+as adopted, or reshaped where the withdrawal was itself a reshape,
+which this file permits freely. Pledging one again is the ordinary
+move to `pledged/`, and what earns it is work actually scheduled
+against it.
+
+**The grounds differ, and each entry carries its own.** What this
+section must never do is assert one ground for all of them: that is
+how the shelf went wrong in the first place — a category claim
+extended to its members without re-testing each, D61's own closing
+lesson — and the two grounds so far are opposites. **U2 and U6**
+arrived together on 2026-07-27 (owner; D61) because their pledges
+were never made: the 2026-07-26 restructure filed them by the status
+word each carried, when *accepted* still meant only that the
+argument had won, and D44's rename the next day converted the
+shelf's claim to **a commitment to deliver** while clearing its
+occupants in a sentence rather than re-testing them. Re-tested,
+neither had any delivery behind it. **U5** arrived on 2026-07-28
+(owner; D64) because its pledge was real and was paid.
 
 **U2 — Import an existing VM as a blueprint** — withdrawn
 (2026-07-27; pledged 2026-07-26 by the restructure, settled as
@@ -171,6 +188,42 @@ parked condensation below still applies. Text verbatim as adopted:
 >   verification refuses a machine whose source has since been
 >   rewritten). The import flow's job is to present these choices,
 >   not bury them.
+
+**U5 — Custom installation** — withdrawn (2026-07-28; pledged
+2026-07-26 by the restructure, moved off the current list
+2026-07-23, and re-tested onto the shelf 2026-07-27 by D61),
+reshaped to the residue of the split that promoted **U21**. Its
+delivered substance was the value seam and the secret custody
+behind it — milestone 8's parameterization machinery, real and
+shipped, which is what carried it past D61's re-test the previous
+day. That substance now stands as U21, in force under its own
+number, so the pledge it justified is discharged rather than
+abandoned. **What remains is the journey, and none of it is
+built.** The codex carries two blueprints, freedos and openbsd;
+there is no standard Windows install to seed from, no shipped
+blueprint declares a seam at all, and the localized-installer seam
+is compositional — the half no value can reach, which is why the
+machinery landing did not deliver it. Its only carrier is the GUI
+era (**F5**), itself proposed and under an open demand
+adjudication that names this use case as one of its two threads.
+Reshaped text:
+
+> - **U5 — Custom installation.** A user wants the German
+>   version of Windows. The codex will not carry such flavors —
+>   there are too many variants — so it defines one standard
+>   Windows install. The user finds that blueprint easily (U11),
+>   seeds a local copy, and customizes it. The author has
+>   foreseen the need, and the seam this one takes is
+>   compositional rather than a value: a localized edition is a
+>   different installer showing different text, which no
+>   parameter can reach. The blueprint already names both
+>   halves — the media it installs from and the scripts that
+>   drive it — so the customized copy points both at the
+>   localized pair, each script standing alone against the media
+>   it was written for. The user changes what the blueprint
+>   names, outside the script, and proceeds. The values an author
+>   *can* parameterize are U21's; this is the case values cannot
+>   reach.
 
 **U6 — Author a script by doing the task once** — withdrawn
 (2026-07-27; pledged 2026-07-26 by the restructure, moved off the
@@ -448,13 +501,15 @@ citation reads differently under the new wording).
 
 ### Tracked
 
-- **Break U5 into finer pieces** — tracked (recorded
-  2026-07-23, the decomposition sweep; U5 itself is pledged
-  above, awaiting delivery). Candidate cuts: the
-  seed-and-customize journey; parameterization's two bindings
-  (in-blueprint values vs externally defined); secret custody
-  (never in source control). Cut when U5 approaches delivery
-  or an argument needs the finer citation.
+- **Break U5 into finer pieces** — **executed 2026-07-28** (D64),
+  and closed. Recorded 2026-07-23 by the decomposition sweep with
+  three candidate cuts; two of them — parameterization's two
+  bindings (in-blueprint values vs externally defined) and secret
+  custody (never in source control) — went as one to the current
+  list as **U21**, met by milestone 8's machinery, and the third —
+  the seed-and-customize journey — is what U5 now is. The trigger
+  it named fired on its second clause: an argument needed the
+  finer citation.
 - **Break U6 into finer use cases** — tracked (recorded
   2026-07-23; previously an expectation noted inside U6
   itself). Candidate cuts per the recorder design

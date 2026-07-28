@@ -11,13 +11,13 @@ docs/spec/script-spec.md, "The property sources":
     2. a blueprint parameter             (the design's answer)
     3. RELIQUARY_PROPERTY_* environment  (the session's answer)
     4. the user properties file          (the person's answer)
-    5. the declared derivation           (the script's answer)  [T4]
+    5. the declared derivation           (the script's answer)
     6. the interactive ask               (a person, once per key)
 
-This module owns steps 1-4 and 6; the declared derivation (5) lands
-with T4 and slots in between the file and the ask without disturbing
-the ranks around it — the model's own claim that a new tier is a
-one-line insertion (D19).
+This module owns all six. The declared derivation arrived last
+(milestone 8, T4) and slotted in between the file and the ask
+without disturbing the ranks around it — the model's own claim
+that a new tier is a one-line insertion (D19), tested once.
 
 Binding finishes before any media is materialized or any machine is
 created or started (G3), so a missing value fails a run early rather

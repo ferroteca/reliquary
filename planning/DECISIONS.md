@@ -188,6 +188,78 @@ is waiting on an answer today.
 
 ## Decided
 
+- D64 — U4 DOES NOT CARRY U5's MECHANISM; U5 SPLITS AT THE
+  DELIVERY LINE — DECIDED (owner, 2026-07-28). Supports (none) —
+  a use-case adjudication is itself demand, not something demand
+  calls for. First entry written under D63: the promotion of U21
+  and the withdrawal of U5 are lifecycle acts and are not narrated
+  here, and U21's delivery evidence rides the moving commit.
+
+  THE OVERLAP RULING. Asked whether U4, in force, already carries
+  U5's "mechanism to store [a license key] locally and retrieve it
+  at use" — which would make the delivered cut a restatement
+  rather than a use case. It does not, and the timing is
+  dispositive: U4 was adjudicated met as written at 17:06 on
+  2026-07-23, and the property machinery landed after it — the
+  user properties file at 23:32 that night, secret storage at
+  23:48, binding into a run at 00:12 the next day. When U4 was
+  declared met, no property could reach a script at all, so its
+  met-ness rests on nothing in that subsystem. The record had
+  already assigned the two roles in one clause — properties carry
+  what must not be checked in, "U4's license, U5's mechanism" —
+  and the specs cite U4 as a bound ON the mechanism (a secret may
+  not be a direct parameter value, because blueprints are shared
+  and versioned) rather than as the demand FOR it. U14 was tested
+  the same way and cleared: it owns the caller's tier, U5 the
+  design's and the person's.
+
+  THE SCOPE CALL. U5 held two seams and only one was delivered.
+  The value seam — a parameter fixed directly or redirected to a
+  locally defined property, a secret's value never in the
+  blueprint and never in the properties file — is met by shipped
+  code and becomes U21. The locale seam is compositional, not a
+  value: a localized edition is a different installer showing
+  different text, and script properties never reach watch
+  conditions (G2, G3), so no parameter could ever have delivered
+  it. That half is what U5 now is, and its only carrier is F5,
+  unpledged.
+
+  THE RULE THIS SETS. Partial delivery has a second branch. A use
+  case whose work has partly landed stays pledged — or is split,
+  where the delivered part is a use case in its own right, which
+  goes current under its own number while the remainder returns to
+  `proposed/`. The condition is load-bearing: the cut must be a
+  case someone would have written on its own. A rind is not one,
+  and without that bar the branch is licence to carve whatever
+  happens to be delivered into a fresh number and grow a list
+  whose whole value is that it is an implementation claim.
+
+  WEIGHED AND DECLINED: demoting U5 whole. It would have reversed
+  D61's re-test on the same test three days later with no new
+  facts, left a shipped subsystem's only demand citation sitting
+  on an unpledged shelf, and cut F5's one remaining thread to
+  demand while leaving the delivered machinery claimed by nothing
+  in force.
+
+  FOLDED: root USE-CASES.md (U21); pledged/USE-CASES.md (U5
+  removed, the shelf empty, the full-delivery rule's second
+  branch); proposed/USE-CASES.md (the same branch, the withdrawal
+  section's grounds moved per-entry, U5's entry and reshaped text,
+  the break-up tracked item closed); proposed/FEATURES.md (F5's
+  demand note); reliquary/binding.py (a docstring saying the
+  declared derivation had not landed, four days after it did).
+
+  ALSO CARRIED, AS D63's RESIDUE: three promotion preambles still
+  instructed the promoter to record the move in this file —
+  pledged/USE-CASES.md, pledged/ARCHITECTURE.md and
+  proposed/USE-CASES.md. D63 landed hours earlier and said
+  "nothing else in the tree changes"; these are what it missed,
+  found because this round edited two of the three paragraphs for
+  another reason. A rule that abolishes a practice has to reach
+  the documents that instruct it, and the FOLDED list is the
+  instrument — this is the second time in three days a change to
+  what a category claims failed to reach its members (D61).
+
 - D63 — A LIFECYCLE ACT ALONE EARNS NO ENTRY; THE PROMOTION
   GENRE CLOSES — DECIDED (owner, 2026-07-28). Supports (none) —
   record discipline, demanded by no numbered entry; what it
