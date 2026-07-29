@@ -87,39 +87,4 @@ violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
 
-### Defects
-
-A gap against a *standing* principle is a bug: the principle is
-already its demand, so these need no pledge, only fixing. A gap
-against a **shipped spec** is the same class and sits here too —
-where `docs/spec/` and the code disagree the spec is right and the
-code has the bug, so the norm is already the demand.
-
-- **A hard disk is assumed to hold one volume** (D71's residue,
-  filed with the assumption per D48's bar). `platform_dos.drive_letters`
-  places disks from `C:` in slot order and CD-ROMs after them, on
-  the assumption that each disk carries exactly one volume. It is
-  true of every disk Reliquary materializes and it is not a fact:
-  a guest that repartitions `hdd0` into two volumes shifts every
-  letter after it, and the map then names **the wrong drive
-  silently** — it does not fail, which is what makes this a defect
-  rather than a stated limit — and, since P10 was sharpened, an
-  outright violation of it: assuming is guessing.
-
-  **The reader that answers it exists, and is not wired to it**
-  (D73, D74). `at_rest.Image` enumerates the volumes in a drive
-  image, and the file verbs already refuse
-  (`drive.volume-count-unsupported`) when a disk they were sent to
-  holds more than one — so the wrong-drive case is caught at the
-  one place it is reachable today. What is missing is the *map*
-  consulting it, and the reason is cost: resolving one address
-  would mean flattening every disk on the machine, where today it
-  flattens at most the one addressed. Whoever closes this decides
-  where that answer is cached — the natural home is the machine's
-  own state, recorded when a disk is materialized or adopted and
-  invalidated with it. **This is now the only thing standing
-  between the letter map and the truth**, P16's own residue having
-  closed. What stays refused permanently is a *declared* volume
-  count in the blueprint (D56): the guest is the source of truth
-  for its own volumes, and a declaration would carry a spec's
-  authority over an assertion the guest can silently contradict.
+The queue is empty.

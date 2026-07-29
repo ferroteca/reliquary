@@ -188,6 +188,217 @@ is waiting on an answer today.
 
 ## Decided
 
+- D78 — THE LETTER MAP READS THE DISK; D71'S ASSUMPTION IS GONE —
+  DECIDED (owner, 2026-07-29) and delivered the same day. Supports
+  U14, U20; P10, P11, P16, P17. **Closes D71's residue** in
+  [TASKS.md](TASKS.md), which leaves that file by deletion (D52),
+  and spends what D77 bought.
+
+  WHAT WAS WRONG. `platform_dos.drive_letters` placed hard disks
+  from `C:` in slot order assuming each held exactly one volume. A
+  guest that repartitioned its disk moved every letter behind it,
+  and the map then named **the wrong drive without failing** — a
+  `get-file` aimed at `D:` could read a different drive entirely
+  and report success. Silence is what made it a defect rather than
+  a documented limit, and under P10 as D72 sharpened it, assuming
+  is guessing.
+
+  WHAT REPLACES IT. Each disk takes **one letter per volume it
+  actually holds**, and the count is read off the image on the
+  host — P10's second source, the one D72 enumerated and D77 built
+  the reader for. A disk partitioned in two takes `C:` and `D:`
+  and the next disk starts at `E:`; both volumes are addressable,
+  where a two-volume disk was refused outright before. A disk
+  holding **no** volumes takes no letter, which is what DOS itself
+  does and what a blank looks like until a guest partitions it.
+
+  WHERE THE ANSWER IS CACHED, WHICH THE DEFECT RESERVED FOR
+  WHOEVER CLOSED IT. In the machine's own state, per drive, and
+  **cleared at every start** — the same discipline a machine
+  variable already follows, and for the same reason: a guest can
+  repartition a disk and can only do it while running, so a count
+  taken before a boot says nothing about the one after it. Cleared
+  at start rather than at stop, so an interrupted run cannot leave
+  a stale one behind. Losing the cache costs a reread and never an
+  answer.
+
+  IT IS AFFORDABLE ONLY BECAUSE OF D77. The defect named cost as
+  the reason it stayed open: resolving one address would have
+  meant flattening every disk on the machine. Opening a disk where
+  it lies makes reading a partition table cost the sectors it
+  occupies, which is what turned a standing defect into an
+  afternoon.
+
+  THE SPECIFIC REFUSAL SURVIVES THE INDIRECTION, which is the part
+  that took the care. A disk whose volumes cannot be read leaves
+  every letter behind it unplaced — correct, since it shifts them
+  by an unknown amount — but reporting *that* would replace "this
+  backend cannot read a drive image at rest" with "reliquary
+  cannot determine which drive is C:", which is a worse answer
+  whenever the first is the truth. So the blocking disk answers
+  for the address in its own vocabulary and with its own id, and
+  the symptom answers only when nothing else can (P11).
+
+  RETIRED: `drive.volume-count-unsupported`, which existed because
+  the map assumed one volume and could not say which letter a
+  second took. There is no such case now. `drive.volume-vanished`
+  replaces it for the one thing that can still go wrong — the disk
+  disagreeing with the count the map was built from, which nothing
+  should be able to cause between two reads of a stopped machine's
+  disk and is therefore reported rather than read past.
+
+  P8 TRIAGE: an interface change, and an easy approval. Addresses
+  that were refused now work, no address that worked changes
+  meaning **except where the old one was wrong** — a blank disk no
+  longer consumes `C:`, which is the defect itself and not a
+  regression. One id retires and one arrives. D56 is untouched: a
+  *declared* volume count in a blueprint stays permanently
+  refused, and reading the disk is an observation rather than an
+  assertion.
+
+  FOLDED: this entry; [TASKS.md](TASKS.md) (the defect struck, and
+  with it the Defects group, which is empty — an empty heading
+  being a record this file does not keep);
+  [platform_dos.py](../reliquary/platform_dos.py)
+  (`drive_letters(drives, volumes)` returning
+  `{letter: (key, index)}`, `undetermined_letters`);
+  [machines.py](../reliquary/machines.py) (`_disk_volumes`,
+  `_count_volumes`, the cache and its clearing at start,
+  `_ImageVolume` selecting its volume);
+  [at_rest.py](../reliquary/at_rest.py) (the blank-disk answer);
+  root [ARCHITECTURE.md](../ARCHITECTURE.md) (P17's letter-map
+  prose — every drive has a letter and none of them is a guess);
+  normative [cli.md](../docs/spec/cli.md);
+  [api-reference.md](../docs/api-reference.md),
+  [AGENTS.md](../AGENTS.md); `test_machines.py`, `test_at_rest.py`;
+  and the CHANGELOG's unreleased section.
+
+- D77 — A DRIVE IMAGE IS OPENED WHERE IT LIES, NOT COPIED; THE
+  COMMIT POINT MOVES INTO THE FORMAT — DECIDED (owner, 2026-07-29)
+  and delivered the same day. Supports U14, U20; P10, P11, P12,
+  P16, P17. **Amends D73's transport choice and D74's third rule**,
+  and removes the cost D71's residue in [TASKS.md](TASKS.md) named
+  as the reason the letter map still assumed — which D78 spends.
+
+  WHAT CHANGED, AND WHY IT IS NOT A REVERSAL OF D73. D73 asked
+  "why `qemu-img convert` and not a qcow2 reader" and answered
+  correctly: writing one is real work and would have to track
+  QEMU's format as it moves. **That question is not this one.**
+  Nothing here reads qcow2 — QEMU still owns the format entirely.
+  It is served by `qemu-nbd` on the loopback interface and
+  addressed over the wire, so the adapter's job is unchanged in
+  kind and only the transport moved: a socket instead of a
+  temporary file. The refusal D73 recorded stands; what it was
+  refusing was never this.
+
+  WHAT IT BUYS. The copy is gone. Reading one directory out of a
+  2 GB disk cost 2 GB of I/O and a temporary file; it now costs
+  the sectors that listing touches. A write lands in the image
+  itself, with QEMU allocating clusters, keeping refcounts and
+  copying a backing chain on write — which is why a differencing
+  image is still a difference afterwards **without anything here
+  arranging it**, where `import_raw` had to rebuild over its own
+  base with `-B` to stop `convert` flattening the relationship.
+
+  THE THIRD RULE MOVED AND DID NOT WEAKEN. D74 held the write with
+  three rules, and the third was that the write is staged in a
+  scratch copy the adapter swaps over the real image at the end.
+  Writing in place cannot keep that mechanism, so **the rule is
+  now stated over the guarantee rather than the means**: every
+  write stands on a commit point the device's owner holds open,
+  and what provides it is the format's business. qcow2 provides an
+  internal snapshot — taken before the first byte moves, discarded
+  on commit, applied when the caller does not reach one. An image
+  already **raw** has nowhere to stand an undo and keeps D74's
+  staging exactly as it was. The guarantee is identical and the
+  price is not: a rollback point that cost a copy of the disk now
+  costs the clusters the write touched. Measured at 66 KB against
+  a 64 MB image.
+
+  AND IT SURVIVES A CRASH, WHICH STAGING DID NOT HAVE TO. A
+  snapshot left behind is a write that never finished, so the next
+  access rolls it back and clears it — the same discipline the
+  machine model already uses for an interrupted operation, rather
+  than a second idiom for the same shape.
+
+  THE LOCK IS OURS, BECAUSE QEMU'S IS NOT THERE. The obvious
+  reading was that `qemu-nbd` holding its own image lock is what
+  keeps two callers off one disk. **It was tested and it is false
+  on the delivered host**: QEMU implements image locking in its
+  POSIX file driver and the Windows one implements none, so two
+  servers opened the same qcow2 without complaint. Reliquary
+  therefore takes its own advisory lock, and **where it takes it
+  is the design** — one byte far past the end of any image,
+  because a claim over the image's own content is one the server
+  trips on when it reads the qcow2 header. It is honest about its
+  reach: it excludes another reliquary, not a process that takes
+  no lock. What keeps a *running* machine's disk safe is unchanged
+  and is that at-rest access is stopped-only.
+
+  A PARTITION IS READ FOR WHAT IT DECLARES ITSELF TO BE. The walk
+  was permissive — it skipped extended containers and accepted
+  every other type, letting a foreign partition fail later as an
+  unreadable filesystem. The type byte is now pinned value by
+  value, and an unreadable type is **refused rather than skipped**:
+  skipping renumbers every volume after it, so the answer would be
+  confident and wrong about which drive is which, which is the
+  shape P11 exists to forbid. `0x85` left the extended set with
+  it — it is Linux's container, and this is the DOS workflow's
+  reader.
+
+  AND A BLANK DISK HOLDS ZERO VOLUMES, WHICH IS AN ANSWER. An
+  image with nothing written where a table or a boot sector would
+  be used to be refused as unreadable. It is what a disk reliquary
+  just materialized looks like, and DOS gives an unpartitioned
+  disk no letter, so zero is the fact — the distinction being that
+  *nothing* written is different from *something* written that
+  this cannot read, which is still refused.
+
+  GEOMETRY IS READABLE. `geometry()` reports the partition table
+  with each entry's declared type, the volume count, and the BPB's
+  own heads and sectors-per-track where a volume states them —
+  unanswered rather than guessed where none does. This is P10's
+  *read on the host* source exactly as D72 described it, and D78
+  is what consumes it.
+
+  P8 TRIAGE: an interface change, and an easy approval. Two
+  adapter surfaces collapse into one (`raw_image` + `import_raw` →
+  `open_drive`), no world-facing verb changes shape, and four ids
+  are added — `image.locked`, `image.format-not-at-rest`,
+  `image.serve-failed`, `image.serve-timeout`, plus the
+  transport's own under the same `image.` subject. **No new id
+  prefix was invented**: the spec's own rule is that a subject is
+  a noun the model already uses, and the subject of every one of
+  these is the drive image. U14 and U20 are served faster where
+  they were already served. The adapter API is INTERNAL by
+  decision, so its change is recorded in
+  [design/backend-adapter.md](design/backend-adapter.md).
+
+  ONLY WHAT IS TESTED IS CLAIMED. qcow2 and raw are opened at
+  rest; every other format QEMU can read is refused
+  (`image.format-not-at-rest`) rather than served untested, which
+  is P11's bar for an unexercised path.
+
+  FOLDED: this entry; [at_rest.py](../reliquary/at_rest.py) (the
+  device seam, `LocalDevice`, the lock and its offset, pinned
+  partition types, the blank-disk answer, `geometry()`);
+  [nbd.py](../reliquary/nbd.py) (new — the client);
+  [backends.py](../reliquary/backends.py) and
+  [backend_qemu.py](../reliquary/backend_qemu.py) (`open_drive`
+  replacing `raw_image`/`import_raw`; `_ServedAccess`,
+  `_StagedRawAccess`, the claim and the snapshot);
+  [machines.py](../reliquary/machines.py) (`_ImageVolume` on the
+  new seam); [design/backend-adapter.md](design/backend-adapter.md);
+  normative [cli.md](../docs/spec/cli.md);
+  [api-reference.md](../docs/api-reference.md),
+  [AGENTS.md](../AGENTS.md) (the module list gains `nbd.py` and
+  `at_rest.py`, which it had never carried); `test_nbd.py` (new —
+  a scripted server, so a refusal code, a mismatched handle and a
+  dropped connection are cases rather than incidents),
+  `test_at_rest.py`, `test_backend_qemu.py`, `fat_image.py` (an
+  EBR-chain builder), `fake_backend.py`; and the CHANGELOG's
+  unreleased section.
+
 - D76 — THE BOOT SIGNATURE WAS BYTE-SWAPPED IN BOTH THE READER AND
   ITS ORACLE — DECIDED (owner, 2026-07-29). Supports P11, P16;
   P24. **Amends D74's independence claim.** A defect against
