@@ -161,6 +161,9 @@ class _FakeAccess:
     against QEMU's particular staging is caught here.
     """
 
+    #: The seam's ``backing`` fact: the fake's images are raw files.
+    format = "raw"
+
     def __init__(self, adapter, path, *, writable=False):
         self.adapter = adapter
         self.path = path

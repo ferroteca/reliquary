@@ -229,6 +229,26 @@ identifier alone cannot authorize a command, because an addressable
 endpoint outlives its owner, so the per-start token is checked
 too.
 
+Beside the resolved shape sit the **recorded observations** —
+facts read from the machine's own materialization, never part of
+the blueprint digest. Per hard disk, `volumes` (how many volumes
+the disk actually holds, read on the host — D78) and `geometry`
+(the drive record behind `describe-drives` — D83: the backing, the
+partition table as it declares itself, per-volume filesystem,
+label and BPB geometry, or the `unread` refusal, each stamped
+`read-at`). Per floppy drive, `launch-size` — the byte size of the
+medium attached at launch, which fixes the drive's geometry for
+the boot. Their lifecycles differ deliberately: `volumes` is
+cleared at every start, because a guest can repartition only while
+running and addressing must never trust a pre-boot count;
+`geometry` is **read at every start** — the first step, before the
+backend is engaged — so while the machine runs it records this
+boot's own starting state, and between boots it moves only when
+something reads a disk: the file verbs' stopped re-reads (the same
+read that restores the count, so the two cannot drift), a
+`describe-drives` meeting a disk never yet recorded, or an
+explicit `refresh-drives`.
+
 The phase is one of `creating`, `ready`, `running`, `stopping`,
 or `destroying`. Every mutating operation takes an exclusive
 per-machine lock before inspecting backend state. On startup

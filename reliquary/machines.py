@@ -121,14 +121,17 @@ def _blueprint_digest(resolved, drives):
     """Digest the resolved blueprint snapshot (the machine baseline).
 
     Covers the resolved logical shape only — the per-drive cache
-    ``path`` (environment-specific) is excluded — so the same blueprint
-    resolves to the same digest across homes, which is what ``apply``
-    compares against.
+    ``path`` (environment-specific) and the recorded observations
+    (``volumes``, ``geometry``, ``launch-size``: what a disk was
+    *seen* to hold, not what the blueprint asked for) are excluded —
+    so the same blueprint resolves to the same digest across homes
+    and across boots, which is what ``apply`` compares against.
     """
+    observed = {"path", "volumes", "geometry", "launch-size"}
     snapshot = dict(resolved)
     snapshot["drives"] = {
         key: {name: value for name, value in entry.items()
-              if name != "path"}
+              if name not in observed}
         for key, entry in drives.items()
     }
     canonical = json.dumps(
@@ -1351,11 +1354,23 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
         for drive in drives.values():
             if drive.get("medium") == "floppy":
                 drive["launch-size"] = _medium_size(drive.get("path"))
-        # A recorded volume count belongs to one boot too, and for the
-        # same reason: a guest can repartition its disk and can only
-        # do it while running, so a count taken before this boot says
-        # nothing about the one after it. Dropped here rather than at
-        # stop, so an interrupted run cannot leave a stale one behind.
+        # The drive record is refreshed here, as the first step of a
+        # start and before the backend is engaged (D83): what the
+        # guest is about to boot from is read off each disk, so the
+        # record a running machine's `describe-drives` answers from
+        # is this boot's own starting state. An unreadable disk
+        # records the refusal rather than failing the start — the
+        # machine may boot it fine; only at-rest access refuses.
+        for key, drive in sorted(drives.items()):
+            if drive.get("medium") == "hdd":
+                drive["geometry"] = _read_drive_record(
+                    state.get("backend") or "qemu", drive, key)[0]
+        # A recorded volume count belongs to one boot, and is dropped
+        # even though the record above was just read: a guest can
+        # repartition its disk and can only do it while running, so
+        # addressing after this boot must re-read — which refreshes
+        # the record with it (D78). Dropped here rather than at stop,
+        # so an interrupted run cannot leave a stale one behind.
         for drive in drives.values():
             drive.pop("volumes", None)
         state["drives"] = drives
@@ -1713,6 +1728,186 @@ def get_machine_var(key, *, machine=None, blueprint=None, context=None):
     return (state.get("variables") or {}).get(key)
 
 
+def describe_drives(*, machine=None, blueprint=None, context=None):
+    """Report the selected machine's drives and what they hold.
+
+    One machine-level report for a created machine (D83): per drive
+    the declared and chosen facts (key, medium, slot, media,
+    materialization); per hard disk what was read at rest — the
+    backing standing behind it, the partitions as the table declares
+    them, and per volume the filesystem it declares itself to be
+    (the claim stops at FAT16), its label where one exists, and the
+    BPB's own geometry where it states one; and the platform's
+    derivation over that — for DOS the letter map, letter to
+    (drive key, volume index), with unplaced drives named as
+    undetermined carrying the blocking disk's own reason and id, the
+    same words the file verbs use, because they are the same facts
+    (P11, P17).
+
+    **The report answers from the record** in the machine's own
+    state, and is never phase-refused. The record is read at every
+    start — the first step, before the backend is engaged, so a
+    running machine's answer is this boot's own starting state — and
+    by the file verbs' stopped re-reads (D78's counts force those,
+    and the record refreshes with them). This call reads a disk in
+    exactly one case: the machine is down and the disk has no record
+    yet, which covers the window between create and first start.
+    Anything else standing answers as recorded (``recorded: true``,
+    each disk's ``read-at`` saying when) — a change made behind the
+    record, a guest session's repartitioning included, is picked up
+    at the next start or by an explicit :func:`refresh_drives`.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    state = load_machine_state(machine_id, context)
+    if state.get("phase") == "ready":
+        drives = state.get("drives", {})
+        missing = {key: drive for key, drive in sorted(drives.items())
+                   if drive.get("medium") == "hdd"
+                   and not isinstance(drive.get("geometry"), dict)}
+        if missing:
+            # The one automatic read outside a start (D83): a disk
+            # that has never been recorded, on a machine that is
+            # down, for a report the user asked for.
+            for key, drive in missing.items():
+                record, count = _read_drive_record(
+                    state.get("backend") or "qemu", drive, key)
+                drive["geometry"] = record
+                if count is not None:
+                    drive["volumes"] = count
+            state["drives"] = drives
+            _write_state(machine_id, state, context)
+            return _compose_drive_report(machine_id, state,
+                                         recorded=False)
+    return _compose_drive_report(machine_id, state, recorded=True)
+
+
+def refresh_drives(*, machine=None, blueprint=None, context=None):
+    """Re-read a stopped machine's disks and return the fresh report.
+
+    The explicit refresh (D83): the record otherwise moves only at a
+    start, so a drive layout changed while the machine was last up —
+    a guest session's repartitioning, an out-of-band edit — is
+    invisible to :func:`describe_drives` until the next boot. This
+    is the offline way to pick it up now. Stopped-only, because a
+    running guest owns its disks; the return is the same report
+    ``describe_drives`` gives, read fresh.
+    """
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    state = load_machine_state(machine_id, context)
+    phase = state.get("phase")
+    if phase != "ready":
+        raise PreflightError(
+            f"machine {machine_id} must be stopped to refresh its "
+            f"drive record (phase: {phase}): a running guest owns "
+            "its disks, and a running machine's report answers from "
+            "the record", rule_id="machine.must-be-stopped")
+    drives = state.get("drives", {})
+    for drive in drives.values():
+        if drive.get("medium") == "hdd":
+            drive.pop("volumes", None)
+            drive.pop("geometry", None)
+    _disk_volumes(machine_id, state, drives, context)
+    return _compose_drive_report(machine_id, state, recorded=False)
+
+
+_MEDIUM_ORDER = {"floppy": 0, "hdd": 1, "cdrom": 2}
+
+
+def _compose_drive_report(machine_id, state, recorded):
+    """The drive report document, composed from the drive records.
+
+    The mapping section derives from the same records the drive
+    section shows, so the two cannot disagree (D83). The platform's
+    section speaks that platform's own vocabulary — DOS is the
+    delivered platform and its letter map the delivered content; any
+    other platform's mapping is a named gap rather than a guess
+    (P11).
+    """
+    drives = state.get("drives", {})
+    counts = {}
+    reasons = {}
+    entries = []
+    for key, drive in sorted(
+            drives.items(),
+            key=lambda item: (_MEDIUM_ORDER.get(item[1].get("medium"), 3),
+                              item[1].get("slot", 0), item[0])):
+        entry = {
+            "key": key,
+            "medium": drive.get("medium"),
+            "slot": drive.get("slot"),
+            "media": drive.get("media"),
+            "materialize": drive.get("materialize"),
+        }
+        if drive.get("medium") == "hdd":
+            record = drive.get("geometry")
+            if record is None:
+                # A machine whose state predates the record, read
+                # while running: nothing was extracted, and nothing
+                # may be read now.
+                record = _unread_record(
+                    None, "drive.geometry-unrecorded",
+                    f"drive {key} has no recorded geometry — describe "
+                    "the machine while it is stopped to read one")[0]
+            entry["geometry"] = record
+            unread = record.get("unread")
+            if unread is None:
+                counts[key] = len(record.get("volumes") or [])
+            else:
+                reasons[key] = (unread["id"], unread["reason"])
+        entries.append(entry)
+    platform_name = state.get("platform") or "dos"
+    if platform_name == "dos":
+        from . import platform_dos
+        letters = platform_dos.drive_letters(drives, counts)
+        undetermined_keys = platform_dos.undetermined_letters(
+            drives, counts)
+        # The first disk whose volumes could not be read answers for
+        # every drive behind it, in its own vocabulary and with its
+        # own id — the file verbs' rule, kept here because these are
+        # the same facts (P11).
+        blocked = [key for key in undetermined_keys if key in reasons]
+        undetermined = []
+        for key in undetermined_keys:
+            if key in reasons:
+                rule, detail = reasons[key]
+            elif blocked:
+                rule, detail = reasons[blocked[0]]
+                detail = (f"{detail}. Drive {key}'s letter depends on "
+                          "that disk: its volumes are what place every "
+                          "letter behind it")
+            else:
+                rule = "drive.letter-undetermined"
+                detail = (f"drive {key}'s letter cannot be determined "
+                          "on this machine, which mixes controller "
+                          "types: slot order is authoritative only "
+                          "within a type")
+            undetermined.append({"drive": key, "id": rule,
+                                 "reason": detail})
+        mapping = {
+            "letters": {
+                letter: {"drive": placed[0], "volume": placed[1]}
+                for letter, placed in sorted(letters.items())},
+            "undetermined": undetermined,
+        }
+    else:
+        mapping = {"unmapped": {
+            "id": "platform.verb-not-implemented",
+            "reason": f"the guest namespace mapping is not implemented "
+                      f"for platform {platform_name!r}; DOS is the "
+                      "delivered workflow"}}
+    return {
+        "machine": machine_id,
+        "blueprint": state.get("blueprint"),
+        "platform": platform_name,
+        "phase": state.get("phase"),
+        "recorded": recorded,
+        "drives": entries,
+        "mapping": mapping,
+    }
+
+
 def exec(command, *, machine=None, blueprint=None, timeout=120,
          context=None):
     """Run one command in a running guest and return its output.
@@ -1904,6 +2099,10 @@ def _disk_volumes(machine_id, state, drives, context):
     survive this**, because "reliquary cannot determine which drive
     is C:" is a worse answer than "this backend cannot read a drive
     image at rest" whenever the second is the truth (P11).
+
+    Reading a disk stores its full geometry record beside the count
+    (D83), so the record and the letters derived from it refresh
+    together and cannot drift.
     """
     found = {}
     reasons = {}
@@ -1912,27 +2111,20 @@ def _disk_volumes(machine_id, state, drives, context):
         if drive.get("medium") != "hdd":
             continue
         recorded = drive.get("volumes")
-        if isinstance(recorded, int) and recorded >= 0:
+        if isinstance(recorded, int) and recorded >= 0 \
+                and isinstance(drive.get("geometry"), dict):
             found[key] = recorded
             continue
-        root = drive.get("path")
-        if not root:
-            reasons[key] = ("drive.slot-empty",
-                            f"drive {key} has no realized medium")
-            continue
-        if os.path.isdir(root):
-            # A directory-source disk is one volume by construction:
-            # the backend presents the host directory as one FAT
-            # volume, and reliquary built it.
-            found[key] = 1
-        else:
-            counted, reason = _count_volumes(state, root, key)
-            if counted is None:
-                reasons[key] = reason
-                continue
-            found[key] = counted
-        drive["volumes"] = found[key]
+        record, count = _read_drive_record(
+            state.get("backend") or "qemu", drive, key)
+        drive["geometry"] = record
         unrecorded = True
+        if count is None:
+            reasons[key] = (record["unread"]["id"],
+                            record["unread"]["reason"])
+            continue
+        found[key] = count
+        drive["volumes"] = count
     if unrecorded:
         # Written back so the next verb in a batch does not reopen
         # every disk. Losing this costs a reread and never an answer.
@@ -1941,39 +2133,107 @@ def _disk_volumes(machine_id, state, drives, context):
     return found, reasons
 
 
-def _count_volumes(state, image_path, key):
-    """``(count, None)``, or ``(None, reason)`` when it cannot be read.
+def _read_drive_record(backend, drive, key):
+    """One hard disk's geometry record, plus its volume count.
 
-    Unreadable is an answer here rather than an exception: the map
-    leaves the disk unplaced, and whether that matters depends on
-    which letter the caller actually addressed.
+    ``(record, count)`` — the record is what machine state stores and
+    :func:`describe_drives` reports (D83): read at every start (the
+    first step, before the backend is engaged), by the file verbs'
+    stopped re-reads, by an explicit :func:`refresh_drives`, and
+    once for a disk never yet recorded on a down machine. An
+    unreadable disk records the refusal itself — id and reason, the
+    same words the file verbs use, because **the specific refusal
+    has to survive** (P11) — and counts ``None``, so the letter map
+    leaves it and every drive behind it unplaced rather than
+    guessed at.
     """
-    backend = state.get("backend") or "qemu"
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    root = drive.get("path")
+    if not root:
+        return _unread_record(stamp, "drive.slot-empty",
+                              f"drive {key} has no realized medium")
+    if os.path.isdir(root):
+        # A directory-source disk is one volume by construction: the
+        # backend presents the host directory as one FAT volume, and
+        # reliquary built it. Its facts are the backend's to compose
+        # at attach, so they are unanswered rather than guessed.
+        return {
+            "read-at": stamp,
+            "backing": "directory",
+            "partitioned": False,
+            "partitions": [],
+            "cylinders": None,
+            "volumes": [_unanswered_volume(0)],
+        }, 1
     try:
         adapter = backends.adapter(backend)
         report = adapter.capabilities()
     except ReliquaryError as error:
-        return None, ("machine.backend-unavailable", str(error))
+        return _unread_record(stamp, "machine.backend-unavailable",
+                              str(error))
     if not report.at_rest:
-        return None, (
-            "drive.no-at-rest-access",
+        return _unread_record(
+            stamp, "drive.no-at-rest-access",
             f"drive {key} is a drive image, and the {backend} adapter "
             "cannot read one at rest — give the machine a "
             "directory-source drive for exchange, and have the guest "
             "copy to it")
     access = None
     try:
-        access = adapter.open_drive(image_path)
-        return len(at_rest.Image(access.device).volumes), None
-    except (at_rest.UnreadableImage, OSError) as error:
-        return None, ("drive.image-unreadable",
-                      f"drive {key} cannot be read at rest — {error}")
-    except ReliquaryError as error:
-        return None, ("drive.image-unreadable",
-                      f"drive {key} cannot be read at rest — {error}")
+        access = adapter.open_drive(root)
+        image = at_rest.Image(access.device)
+        geometry = image.geometry()
+        volumes = [_volume_facts(index, volume)
+                   for index, volume in enumerate(image.volumes)]
+        return {
+            "read-at": stamp,
+            "backing": getattr(access, "format", None),
+            "partitioned": geometry.partitioned,
+            "partitions": [
+                {"number": entry.number,
+                 "type": entry.kind,
+                 "declares": entry.description,
+                 "size": entry.length,
+                 "logical": entry.logical}
+                for entry in geometry.partitions],
+            "cylinders": geometry.cylinders,
+            "volumes": volumes,
+        }, len(volumes)
+    except (at_rest.UnreadableImage, OSError, ReliquaryError) as error:
+        return _unread_record(
+            stamp, "drive.image-unreadable",
+            f"drive {key} cannot be read at rest — {error}")
     finally:
         if access is not None:
             access.close()
+
+
+def _volume_facts(index, volume):
+    """One volume's read facts, as the drive record stores them.
+
+    The filesystem is what the volume declares itself to be — the
+    cluster count decides the width, and the claim stops at FAT16
+    (D83). Geometry words are the BPB's own, ``None`` where it
+    states none: unanswered rather than guessed (P10).
+    """
+    return {
+        "index": index,
+        "filesystem": f"FAT{volume.bits}",
+        "label": volume.volume_label(),
+        "size": volume.length,
+        "heads": volume.heads,
+        "sectors-per-track": volume.sectors_per_track,
+    }
+
+
+def _unanswered_volume(index):
+    return {"index": index, "filesystem": None, "label": None,
+            "size": None, "heads": None, "sectors-per-track": None}
+
+
+def _unread_record(stamp, rule, reason):
+    return {"read-at": stamp,
+            "unread": {"id": rule, "reason": reason}}, None
 
 
 class _HostDirectory:

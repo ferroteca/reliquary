@@ -22,12 +22,14 @@ from reliquary.interaction_agentless import (AgentlessGuestExec,
                                              _command_output)
 from reliquary.machines import exec as machines_exec
 from reliquary.machines import (apply_blueprint, create_machine,
+                                describe_drives,
                                 destroy_machine, eject_media, get_file,
                                 get_files, get_machine_dir, get_machine_var,
                                 insert_media, list_files, list_machines,
                                 load_machine_state, machine_dir_path,
                                 mark_stopped, put_file, put_files,
-                                recreate_machine, resolve_machine,
+                                recreate_machine, refresh_drives,
+                                resolve_machine,
                                 set_boot_order, set_machine_var,
                                 start_machine, stop_machine)
 from reliquary.backends import Capabilities
@@ -1463,6 +1465,188 @@ class InBandFileTests(_HomeCase):
             get_file(r"A:\ABSENT.TXT", os.path.join(self.home, "x"),
                      machine=machine_id, context=self.home)
         self.assertIn(r"A:\ABSENT.TXT", str(caught.exception))
+
+
+class DescribeDrivesTests(_HomeCase):
+    """The drive report (D83): the record, its refresh, and the map."""
+
+    def _two_volumes(self):
+        return fat_image.partitioned([
+            fat_image.volume({"ONE.TXT": b"1"}, bits=16, sectors=20000,
+                             per_cluster=4),
+            fat_image.volume({"TWO.TXT": b"2"}, bits=16, sectors=20000,
+                             per_cluster=4)])
+
+    def _geo(self, drives=None, media=None):
+        return self._create(
+            "geo", {"platform": "dos",
+                    "drives": drives or {"hdd0": "blank"}},
+            media=media or [_BLANK])
+
+    def _entry(self, report, key):
+        return next(drive for drive in report["drives"]
+                    if drive["key"] == key)
+
+    def test_a_create_records_nothing_and_describe_reads_once(self):
+        """The one automatic read outside a start: no record yet, the
+        machine down, and the report user-requested — the window
+        between create and first start (D83)."""
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo()
+        drive = self._state(machine_id)["drives"]["hdd0"]
+        self.assertNotIn("geometry", drive)
+        self.assertNotIn("volumes", drive)
+        report = describe_drives(machine=machine_id, context=self.home)
+        self.assertFalse(report["recorded"])
+        record = self._entry(report, "hdd0")["geometry"]
+        self.assertEqual(record["backing"], "raw")
+        self.assertTrue(record["partitioned"])
+        self.assertEqual(
+            [volume["filesystem"] for volume in record["volumes"]],
+            ["FAT16", "FAT16"])
+        self.assertEqual(
+            [entry["declares"] for entry in record["partitions"]],
+            ["FAT16B", "FAT16B"])
+        drive = self._state(machine_id)["drives"]["hdd0"]
+        self.assertEqual(drive["volumes"], 2)
+        self.assertIn("geometry", drive)
+
+    def test_a_start_reads_this_boots_starting_state(self):
+        """The automatic read is the first step of a start (D83), so
+        the record a running machine answers from describes what the
+        guest actually booted from — not what create materialized."""
+        self.backend.image_payload = fat_image.volume(
+            {"A.TXT": b"a"}, bits=16, sectors=20000, per_cluster=4)
+        machine_id = self._geo()
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "wb") as handle:
+            handle.write(self._two_volumes())
+        start_machine(machine_id, context=self.home)
+        record = self._state(machine_id)["drives"]["hdd0"]["geometry"]
+        self.assertEqual(len(record["volumes"]), 2)
+
+    def test_an_offline_describe_stands_on_the_record(self):
+        """A recorded disk is not re-read by describe: a layout
+        changed behind the record waits for the next start, or for
+        an explicit refresh (D83)."""
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo()
+        describe_drives(machine=machine_id, context=self.home)
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "wb") as handle:
+            handle.write(b"\x01" * 4096)
+        report = describe_drives(machine=machine_id, context=self.home)
+        self.assertTrue(report["recorded"])
+        record = self._entry(report, "hdd0")["geometry"]
+        self.assertEqual(len(record["volumes"]), 2)
+
+    def test_refresh_rereads_and_is_stopped_only(self):
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo()
+        describe_drives(machine=machine_id, context=self.home)
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "wb") as handle:
+            handle.write(b"\x01" * 4096)
+        report = refresh_drives(machine=machine_id, context=self.home)
+        self.assertFalse(report["recorded"])
+        unread = self._entry(report, "hdd0")["geometry"]["unread"]
+        self.assertEqual(unread["id"], "drive.image-unreadable")
+        self._force(machine_id, "running", vm=True)
+        with self.assertRaises(PreflightError) as caught:
+            refresh_drives(machine=machine_id, context=self.home)
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.must-be-stopped")
+
+    def test_the_report_maps_letters_from_the_records(self):
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo(
+            drives={"floppy0": None, "hdd0": "blank"})
+        report = describe_drives(machine=machine_id, context=self.home)
+        self.assertFalse(report["recorded"])
+        self.assertEqual(report["platform"], "dos")
+        self.assertEqual(report["mapping"]["letters"], {
+            "A": {"drive": "floppy0", "volume": 0},
+            "C": {"drive": "hdd0", "volume": 0},
+            "D": {"drive": "hdd0", "volume": 1}})
+        self.assertEqual(report["mapping"]["undetermined"], [])
+
+    def test_the_lazy_read_reports_an_unreadable_disk(self):
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo()
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "wb") as handle:
+            handle.write(b"\x01" * 4096)
+        report = describe_drives(machine=machine_id, context=self.home)
+        self.assertFalse(report["recorded"])
+        unread = self._entry(report, "hdd0")["geometry"]["unread"]
+        self.assertEqual(unread["id"], "drive.image-unreadable")
+        self.assertEqual(
+            [entry["drive"]
+             for entry in report["mapping"]["undetermined"]],
+            ["hdd0"])
+
+    def test_a_running_machine_answers_from_the_record(self):
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo()
+        start_machine(machine_id, context=self.home)
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        # The disk changes under the record; a running machine's
+        # report must answer from the record, not the disk.
+        with open(path, "wb") as handle:
+            handle.write(b"\x01" * 4096)
+        report = describe_drives(machine=machine_id, context=self.home)
+        self.assertTrue(report["recorded"])
+        self.assertEqual(report["phase"], "running")
+        record = self._entry(report, "hdd0")["geometry"]
+        self.assertEqual(len(record["volumes"]), 2)
+        self.assertEqual(report["mapping"]["letters"]["C"],
+                         {"drive": "hdd0", "volume": 0})
+
+    def test_a_start_drops_the_count_and_keeps_the_record(self):
+        self.backend.image_payload = self._two_volumes()
+        machine_id = self._geo()
+        start_machine(machine_id, context=self.home)
+        drive = self._state(machine_id)["drives"]["hdd0"]
+        self.assertNotIn("volumes", drive)
+        self.assertIn("geometry", drive)
+
+    def test_a_blocking_disk_answers_for_the_drives_behind_it(self):
+        self.backend.image_payload = fat_image.volume(
+            {"A.TXT": b"a"}, bits=16, sectors=20000, per_cluster=4)
+        machine_id = self._geo(
+            drives={"hdd0": "blank", "hdd1": "blank2"},
+            media=[_BLANK, dict(_BLANK, name="blank2")])
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "wb") as handle:
+            handle.write(b"\x01" * 4096)
+        report = describe_drives(machine=machine_id, context=self.home)
+        undetermined = report["mapping"]["undetermined"]
+        self.assertEqual([entry["drive"] for entry in undetermined],
+                         ["hdd0", "hdd1"])
+        self.assertEqual(undetermined[0]["id"], "drive.image-unreadable")
+        # The drive behind the blocker carries the blocker's reason,
+        # not its own absence — the specific cause outranks the
+        # symptom (P11).
+        self.assertEqual(undetermined[1]["id"], "drive.image-unreadable")
+        self.assertIn("hdd0", undetermined[1]["reason"])
+        self.assertEqual(report["mapping"]["letters"], {})
+
+    def test_a_directory_disk_reports_its_backing_unread(self):
+        exchange = os.path.join(self.home, "exchange")
+        os.makedirs(exchange)
+        machine_id = self._geo(
+            drives={"hdd0": "exchange-dir"},
+            media=[{"name": "exchange-dir", "materialize": "use",
+                    "location": {"local": exchange}}])
+        report = describe_drives(machine=machine_id, context=self.home)
+        record = self._entry(report, "hdd0")["geometry"]
+        self.assertEqual(record["backing"], "directory")
+        self.assertEqual(
+            record["volumes"],
+            [{"index": 0, "filesystem": None, "label": None,
+              "size": None, "heads": None, "sectors-per-track": None}])
+        self.assertEqual(report["mapping"]["letters"],
+                         {"C": {"drive": "hdd0", "volume": 0}})
 
 
 class InBandDirectoryTests(_HomeCase):

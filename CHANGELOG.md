@@ -11,6 +11,55 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **`describe-drives` and `refresh-drives`, with twins
+  `describe_drives()` / `refresh_drives()`** (D83). One
+  machine-level report of what a machine's drives are and what they
+  actually hold — the observation the letter map and the file verbs
+  already ran on, now given a window. Per drive, the declared and
+  chosen facts (key, medium, slot, media, materialization); per hard
+  disk, the at-rest read — the backing standing behind it (`qcow2`,
+  `raw`, or a directory served as one FAT volume), the partition
+  table as it declares itself, and per volume the filesystem, its
+  label where one exists, and the BPB's own geometry where it states
+  one, `null` rather than guessed where it does not; and the
+  platform's letter map over those facts, letter to (drive key,
+  volume index), with every unplaced drive named as undetermined
+  carrying the blocking disk's own reason and id — the same words
+  the file verbs use, because they are the same facts.
+
+  **The report answers from the record and is never phase-refused.**
+  Every `start` reads the disks as its first step, before the
+  backend is engaged, so a running machine's report is this boot's
+  own starting state — `"recorded": true`, each disk stamped
+  `read-at`. `describe-drives` itself reads a disk only when the
+  machine is down and the disk has no record yet (the window
+  between create and first start); a layout changed behind the
+  record is picked up at the next start, or now by
+  `refresh-drives`, the explicit stopped-only re-read returning the
+  same report fresh. Addressing still never trusts a pre-boot
+  count: the file verbs' volume counts stay cleared at every start,
+  and the re-read that restores them refreshes this record with
+  them. `--json` prints exactly what each twin returns.
+
+### Changed
+
+- **The at-rest recognition claim narrowed to FAT12, FAT16 and
+  FAT16B over standard MBR primary/extended partitioning** (D83).
+  FAT32 partition types (`0x0B`/`0x0C`) and FAT32-scale volumes are
+  now refused by name like every other unrecognized format, where
+  0.1.0.dev5 read them. The claim follows what the DOS workflow's
+  guests make; a FAT32 disk still boots and runs — only at-rest
+  access (the file verbs, the letter map, the drive report) refuses
+  it, naming FAT32 as the reason.
+
+- **The machine-state schema catches up with the state the code
+  writes**: the per-drive `volumes` count (read on the host, cleared
+  at each start), the floppy `launch-size`, and the new `geometry`
+  record are now part of `machine-state.schema.json`, and none of
+  the three enters the blueprint digest.
+
 ## 0.1.0.dev5 - 2026-07-29
 
 ### Added

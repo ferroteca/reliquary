@@ -113,7 +113,7 @@
       "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
     },
     "driveState": {
-      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; media names the resolved media (null in an empty removable slot, and also null for an anonymous image mounted by insert-media --file, which has no catalog identity) and materialize records how it is realized (new/difference/copy/use, null for an empty slot); size is present for a 'new' image; path is the cache location, the host path of an anonymous mounted image, or null for an empty removable slot.",
+      "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; media names the resolved media (null in an empty removable slot, and also null for an anonymous image mounted by insert-media --file, which has no catalog identity) and materialize records how it is realized (new/difference/copy/use, null for an empty slot); size is present for a 'new' image; path is the cache location, the host path of an anonymous mounted image, or null for an empty removable slot. Beside the resolved shape sit the recorded observations, which never enter the blueprint digest: volumes and geometry for a hard disk, launch-size for a floppy.",
       "type": "object",
       "properties": {
         "medium": {"enum": ["floppy", "hdd", "cdrom"]},
@@ -128,9 +128,82 @@
           "type": "string",
           "pattern": "^[1-9][0-9]*[KkMmGgTt]$"
         },
-        "path": {"type": ["string", "null"]}
+        "path": {"type": ["string", "null"]},
+        "volumes": {
+          "description": "How many volumes the disk actually holds, read on the host (D78) — the letter map's addressing fact. Cleared at every start, because a guest can repartition its disk and can only do so while running; absent until a stopped-machine verb reads the disk again.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "launch-size": {
+          "description": "The byte size of the medium a floppy drive carried at launch, or null for an empty slot. The backend fixes a floppy drive's geometry from that medium, so a later live swap must match it; recorded at start, the only moment the fact is knowable.",
+          "type": ["integer", "null"]
+        },
+        "geometry": {"$ref": "#/$defs/driveGeometry"}
       },
       "required": ["medium", "slot"],
+      "additionalProperties": false
+    },
+    "driveGeometry": {
+      "description": "What a hard disk was seen to hold, read at rest on the host (D83): read at every start (the first step, before the backend is engaged) so a running machine's describe-drives answers with this boot's starting state, refreshed by the file verbs' stopped re-reads and by an explicit refresh-drives, and read once by describe-drives for a disk never yet recorded on a down machine — read-at says when. Carries either the read facts (backing, partitioned, partitions, cylinders, volumes) or unread, the refusal in its own vocabulary and with its own id. The recognition claim is FAT12/FAT16/FAT16B over standard MBR primary/extended partitioning; everything else records as unread.",
+      "type": "object",
+      "properties": {
+        "read-at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "unread": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "reason": {"type": "string", "minLength": 1}
+          },
+          "required": ["id", "reason"],
+          "additionalProperties": false
+        },
+        "backing": {
+          "description": "What stands behind the device: the adapter's own format vocabulary (qemu: qcow2 or raw), or 'directory' for a directory served as one FAT volume.",
+          "type": ["string", "null"]
+        },
+        "partitioned": {"type": "boolean"},
+        "partitions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/partitionFacts"}
+        },
+        "cylinders": {"type": ["integer", "null"]},
+        "volumes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/volumeFacts"}
+        }
+      },
+      "required": ["read-at"],
+      "additionalProperties": false
+    },
+    "partitionFacts": {
+      "description": "One partition-table entry as the table declares it: the type byte verbatim, and what this build reads it as.",
+      "type": "object",
+      "properties": {
+        "number": {"type": "integer", "minimum": 1},
+        "type": {"type": "integer", "minimum": 0, "maximum": 255},
+        "declares": {"type": "string"},
+        "size": {"type": "integer", "minimum": 0},
+        "logical": {"type": "boolean"}
+      },
+      "required": ["number", "type", "declares", "size", "logical"],
+      "additionalProperties": false
+    },
+    "volumeFacts": {
+      "description": "One volume's read facts. Geometry words are the BPB's own and null where it states none — unanswered rather than guessed; a directory-backed volume answers null throughout, its facts being the backend's to compose at attach.",
+      "type": "object",
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "filesystem": {"type": ["string", "null"]},
+        "label": {"type": ["string", "null"]},
+        "size": {"type": ["integer", "null"]},
+        "heads": {"type": ["integer", "null"]},
+        "sectors-per-track": {"type": ["integer", "null"]}
+      },
+      "required": ["index", "filesystem", "label", "size", "heads",
+                   "sectors-per-track"],
       "additionalProperties": false
     },
     "vmState": {

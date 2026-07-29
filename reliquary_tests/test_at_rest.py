@@ -9,6 +9,7 @@ are right. What the *verbs* do with a volume is
 """
 
 import os
+import struct
 import tempfile
 import unittest
 
@@ -170,11 +171,22 @@ class PartitionTypeTests(_ImageCase):
                               per_cluster=4)], kinds=[kind])
 
     def test_every_dos_fat_type_is_read(self):
-        for kind in (0x01, 0x04, 0x06, 0x0B, 0x0C, 0x0E):
+        for kind in (0x01, 0x04, 0x06, 0x0E):
             with self.subTest(kind=f"0x{kind:02X}"):
                 image = self._image(self._one(kind))
                 self.assertEqual(len(image.volumes), 1)
                 self.assertEqual(image.partitions[0].kind, kind)
+
+    def test_fat32_is_recognized_and_refused_by_name(self):
+        """The recognition claim stops at FAT16 (D83): a FAT32
+        partition is named for what it is and refused, never read —
+        and never skipped, which would renumber the volumes after
+        it."""
+        for kind in (0x0B, 0x0C):
+            with self.subTest(kind=f"0x{kind:02X}"):
+                with self.assertRaises(at_rest.UnreadableImage) as caught:
+                    self._image(self._one(kind))
+                self.assertIn("FAT32", str(caught.exception))
 
     def test_a_foreign_type_is_refused_and_names_what_it_is(self):
         for kind, expected in ((0x07, "NTFS or exFAT"),
@@ -370,12 +382,20 @@ class ReadingTests(_ImageCase):
         return self._image(fat_image.volume(TREE, **geometry)).volumes[0]
 
     def _widths(self):
-        # FAT32 needs 65525 clusters before it *is* FAT32, so its
-        # image is the big one: the width is the cluster count's
-        # answer and cannot be asked for directly.
+        # The claimed widths (D83): FAT12 and FAT16. FAT32 is the
+        # refusal case below, not a width here.
         return (("fat12", {}),
-                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}),
-                ("fat32", {"bits": 32, "sectors": 70000, "per_cluster": 1}))
+                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}))
+
+    def test_a_fat32_scale_volume_is_refused_by_name(self):
+        """The width is the cluster count's answer, so a volume at
+        FAT32 scale is refused whatever any type byte said (D83) —
+        the claim stops at FAT16."""
+        payload = fat_image.volume(TREE, bits=32, sectors=70000,
+                                   per_cluster=1)
+        with self.assertRaises(at_rest.UnreadableImage) as caught:
+            self._image(payload)
+        self.assertIn("FAT32", str(caught.exception))
 
     def test_a_root_listing_is_sorted_with_directory_sizes_null(self):
         for label, geometry in self._widths():
@@ -450,6 +470,46 @@ class ReadingTests(_ImageCase):
             volume.entries(["NOPE"])
 
 
+class VolumeLabelTests(_ImageCase):
+    """The label as DOS maintains it, unanswered when there is none.
+
+    The root directory's label entry is what ``LABEL`` writes and
+    ``DIR`` shows, so it outranks the BPB's copy; "NO NAME" is the
+    format's own spelling of unlabeled and never reads as a name.
+    """
+
+    def _labeled_boot(self, payload, label):
+        patched = bytearray(payload)
+        patched[38] = 0x29
+        patched[43:54] = label.ljust(11).encode("ascii")
+        return bytes(patched)
+
+    def test_an_unlabeled_volume_answers_none(self):
+        volume = self._image(fat_image.volume(TREE)).volumes[0]
+        self.assertIsNone(volume.volume_label())
+
+    def test_the_bpb_label_answers_behind_its_signature(self):
+        payload = self._labeled_boot(fat_image.volume(TREE), "RELICS")
+        volume = self._image(payload).volumes[0]
+        self.assertEqual(volume.volume_label(), "RELICS")
+
+    def test_no_name_reads_as_no_label(self):
+        payload = self._labeled_boot(fat_image.volume(TREE), "NO NAME")
+        volume = self._image(payload).volumes[0]
+        self.assertIsNone(volume.volume_label())
+
+    def test_the_root_entry_outranks_the_bpb(self):
+        payload = bytearray(self._labeled_boot(fat_image.volume({}),
+                                               "OLDNAME"))
+        reserved = struct.unpack_from("<H", payload, 14)[0]
+        fat_sectors = struct.unpack_from("<H", payload, 22)[0]
+        root_at = (reserved + payload[16] * fat_sectors) * 512
+        payload[root_at:root_at + 11] = b"NEWNAME    "
+        payload[root_at + 11] = 0x08
+        volume = self._image(bytes(payload)).volumes[0]
+        self.assertEqual(volume.volume_label(), "NEWNAME")
+
+
 class WritingTests(_ImageCase):
     """Writing back into a volume, checked structurally after each one.
 
@@ -479,12 +539,11 @@ class WritingTests(_ImageCase):
         return path
 
     def _widths(self):
-        # FAT32 needs 65525 clusters before it *is* FAT32, so its
-        # image is the big one: the width is the cluster count's
-        # answer and cannot be asked for directly.
+        # The claimed widths (D83): FAT12 and FAT16. The FAT32
+        # refusal is ReadingTests' case; nothing writable remains
+        # past it.
         return (("fat12", {}),
-                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}),
-                ("fat32", {"bits": 32, "sectors": 70000, "per_cluster": 1}))
+                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}))
 
     def _reads_back(self, path, segments, expected):
         with opened(path) as image:

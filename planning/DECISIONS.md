@@ -188,6 +188,106 @@ is waiting on an answer today.
 
 ## Decided
 
+- D83 — THE DRIVE REPORT: RECORDED AT MATERIALIZE, REFRESHED
+  OFFLINE, STANDING WHILE RUNNING; THE RECOGNITION CLAIM NARROWS TO
+  FAT12/FAT16/FAT16B — DECIDED (owner, 2026-07-29) and delivered
+  the same day, retiring F29. Supports U14; P10, P11, P17. **Amends
+  D77's recognition claim** (which read FAT32) and builds on D78's
+  record; D56 is untouched — a *declared* volume count stays
+  refused, and this report is the observation that makes declaring
+  one unnecessary.
+
+  WHAT WAS SETTLED, from F29's decide-first list (owner, in the
+  round): **one report, not two** — the mapping is derived from the
+  geometry, and two verbs invite the two to drift; **the name is
+  `describe-drives`**, twin `describe_drives` under the twin-name
+  identity rule, parallel to the `describe_*` spelling that already
+  means "name the facts without acting"; **created-only** — the
+  dry-run family owns the before side, and the two families stay
+  distinguishable by their subjects (a create *would* build; this
+  *did* build).
+
+  THE RUNNING ANSWER, WHICH RETRACTED A RECOMMENDED REFUSAL AND
+  THEN SHARPENED TWICE (owner, in the round). The report is
+  **never phase-refused**, and it answers **from the record** in
+  the machine's own state. The automatic read is **the first step
+  of every start, before the backend is engaged** — D78's own
+  logic carried to its conclusion: the boot boundary is the
+  record's epoch, so a running machine's answer is this boot's own
+  starting state, `recorded: true`, each disk stamped `read-at`. A
+  first draft extracted at materialize time instead; the owner
+  moved the moment to the start, which leaves a stopped machine's
+  describe meeting an unrecorded disk exactly once — the window
+  between create and first start — and **that is the one read the
+  describe verb itself performs** (machine down, record absent,
+  report user-requested). Everything else it answers as recorded:
+  a layout changed behind the record — a guest session's
+  repartitioning, an out-of-band edit — is picked up at the next
+  start **or by `refresh-drives`**, the explicit stopped-only
+  re-read the owner asked be surfaced at the API level, returning
+  the same report fresh. A running guest owns its disks, so
+  reliquary does not read them live. D78's addressing discipline
+  does not move: the file verbs' counts are still cleared at every
+  start and force a fresh read — which refreshes this record with
+  them, so the two cannot drift. The blueprint digest excludes the
+  observations (`volumes`, `geometry`, `launch-size`): what a disk
+  was *seen* to hold is not what the blueprint asked for.
+
+  THE RECOGNITION CLAIM NARROWS, AND ACROSS THE WHOLE AT-REST
+  LAYER (owner, in the round): **DOS platforms; FAT12, FAT16 and
+  FAT16B filesystems; standard MBR primary/extended partitioning.
+  Everything else is "no capability."** The reach question was put
+  explicitly — dev5 shipped FAT32 at rest, pinned, tested and
+  consumed by the letter map — and the answer is one claim, not
+  two: a report answering "no capability" about a volume a file
+  verb happily reads would be the drift the one-report ruling
+  refused. FAT32 (`0x0B`/`0x0C`, and any FAT32-scale cluster
+  count) is now refused by name; the LBA variants stay, because
+  the ruling names *filesystems* and *partitioning shape* — `0x0E`
+  declares FAT16B and `0x0F` is standard MBR extended, merely
+  LBA-addressed, and FreeDOS's own fdisk writes both. A FAT32 disk
+  still boots and runs; only at-rest access refuses it, naming
+  FAT32 as the reason.
+
+  THE UNDETERMINED DRIVES KEEP THE FILE VERBS' WORDS. A disk that
+  cannot be read leaves itself and every drive behind it unplaced,
+  and each undetermined entry carries the blocking disk's own
+  reason and id — the specific refusal survives the indirection
+  (D78's rule), because these are the same facts (P11). A non-DOS
+  platform's mapping is the named gap
+  (`platform.verb-not-implemented`), room reserved for a future
+  platform's own vocabulary without reshaping the report.
+
+  P8 TRIAGE: an interface change on both counts. The verb is a
+  pure addition serving U14/P17 — a caller composing guest
+  addresses between create and start can now *learn* the letters
+  it must speak. The narrowing changes a released surface
+  (0.1.0.dev5 read FAT32 at rest) and is a clean pre-1.0 break,
+  recorded in the CHANGELOG; no shipped codex workflow touches a
+  FAT32 volume at rest. The machine-state schema also catches up
+  with fields the code already wrote (`volumes`, `launch-size`) —
+  a dev5 sync gap closed in passing.
+
+  FOLDED: this entry; [proposed/FEATURES.md](proposed/FEATURES.md)
+  (F29 retired); [at_rest.py](../reliquary/at_rest.py) (the
+  narrowed pin, the FAT32-scale refusal, `volume_label()`, the
+  FAT32 machinery deleted); [machines.py](../reliquary/machines.py)
+  (`describe_drives`, `refresh_drives`, `_read_drive_record`, the
+  start-time read, the digest's observation exclusion);
+  [backend_qemu.py](../reliquary/backend_qemu.py) and
+  `fake_backend.py` (the access objects' `format`);
+  [cli.py](../reliquary/cli.py) (`describe-drives`, the renderer);
+  [machine-state.schema.json](../reliquary/schemas/machine-state.schema.json);
+  normative [cli.md](../docs/spec/cli.md) ("Describing drives" —
+  `refresh-drives` beside it — and the narrowed claim under file
+  exchange),
+  [api.md](../docs/spec/api.md),
+  [instance-model.md](../docs/spec/instance-model.md) (the
+  recorded observations); [api-reference.md](../docs/api-reference.md),
+  [README.md](../README.md), [AGENTS.md](../AGENTS.md);
+  `test_at_rest.py`, `test_machines.py`; and the CHANGELOG's
+  unreleased section.
+
 - D82 — THE PROJECT IS GPL-3.0-ONLY, RELICENSING IS RESERVED, AND
   CONTRIBUTIONS ARE ASSIGNED — DECIDED (owner, 2026-07-29). Supports
   (none): no use case or principle demands a licence, and the

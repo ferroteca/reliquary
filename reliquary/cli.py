@@ -29,11 +29,13 @@ from .library import (list_blueprints, list_builtin_blueprints,
 from . import blueprint as blueprint_mod
 from .errors import (PreflightError, ReliquaryError, StaticError, UNEXPECTED,
                      exit_code)
-from .machines import (apply_blueprint, create_machine, destroy_machine,
+from .machines import (apply_blueprint, create_machine, describe_drives,
+                       destroy_machine,
                        eject_media, get_file, get_files, get_machine_dir,
                        get_machine_var, insert_media, list_files,
                        list_machines, load_machine_state, machine_dir_path,
                        put_file, put_files, read_vm_state, recreate_machine,
+                       refresh_drives,
                        resolve_machine, set_boot_order, split_machine_id,
                        start_machine, stop_machine)
 # Aliased on import: the twin is named for its command under the
@@ -65,7 +67,8 @@ _COMMANDS = frozenset({
     "list-machines", "list-scripts", "list-media",
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
-    "get-machine-var", "put-file", "get-file",
+    "get-machine-var", "describe-drives", "refresh-drives",
+    "put-file", "get-file",
     "list-files", "put-files", "get-files",
     "type", "enter", "press", "exec", "select", "screen", "wait",
     "screenshot", "hmp",
@@ -661,6 +664,16 @@ def main(argv=None):
     command.add_argument("key", help="the variable's key")
 
     command = subcommands.add_parser(
+        "describe-drives",
+        help="report a machine's drives and what they hold")
+    _add_selectors(command)
+
+    command = subcommands.add_parser(
+        "refresh-drives",
+        help="re-read a stopped machine's disks into the drive record")
+    _add_selectors(command)
+
+    command = subcommands.add_parser(
         "put-file",
         help="copy a host file into a stopped machine's guest")
     _add_selectors(command)
@@ -1230,6 +1243,77 @@ def _get_machine_var(arguments):
                  lambda: None if value is None else print(value))
 
 
+def _describe_drives(arguments):
+    report = describe_drives(
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, report, lambda: _render_drive_report(report))
+
+
+def _refresh_drives(arguments):
+    report = refresh_drives(
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None))
+    return _emit(arguments, report, lambda: _render_drive_report(report))
+
+
+def _render_drive_report(report):
+    """The drive report's human rendering; ``--json`` is the record."""
+    recorded = "  (recorded)" if report.get("recorded") else ""
+    print(f"{report['machine']}  blueprint {report['blueprint']}  "
+          f"{report['platform']}  {report['phase']}{recorded}")
+    for drive in report.get("drives") or []:
+        media = drive.get("media") or "(empty)"
+        mode = drive.get("materialize") or "-"
+        line = (f"{drive['key']}  {drive['medium']} slot "
+                f"{drive['slot']}  {media}  {mode}")
+        record = drive.get("geometry")
+        if record is None:
+            print(line)
+            continue
+        unread = record.get("unread")
+        if unread is not None:
+            print(line)
+            print(f"  unread — {unread['id']}: {unread['reason']}")
+            continue
+        volumes = record.get("volumes") or []
+        plural = "" if len(volumes) == 1 else "s"
+        backing = record.get("backing") or "-"
+        read_at = record.get("read-at") or "-"
+        print(f"{line}  {backing}  {len(volumes)} volume{plural}  "
+              f"read {read_at}")
+        for entry in record.get("partitions") or []:
+            logical = " logical" if entry.get("logical") else ""
+            print(f"  partition {entry['number']}: type "
+                  f"0x{entry['type']:02X} {entry['declares']}"
+                  f"{logical}  {entry['size']} bytes")
+        for volume in volumes:
+            parts = [f"  [{volume['index']}]"]
+            if volume.get("filesystem"):
+                parts.append(volume["filesystem"])
+            if volume.get("label"):
+                parts.append(f"label {volume['label']}")
+            if volume.get("size") is not None:
+                parts.append(f"{volume['size']} bytes")
+            if volume.get("heads"):
+                parts.append(f"heads {volume['heads']}")
+            if volume.get("sectors-per-track"):
+                parts.append(
+                    f"sectors/track {volume['sectors-per-track']}")
+            if len(parts) == 1:
+                parts.append("(composed by the backend at attach)")
+            print("  ".join(parts))
+    mapping = report.get("mapping") or {}
+    unmapped = mapping.get("unmapped")
+    if unmapped is not None:
+        print(f"mapping: {unmapped['reason']}")
+        return
+    for letter, placed in (mapping.get("letters") or {}).items():
+        print(f"{letter}: {placed['drive']} [{placed['volume']}]")
+    for entry in mapping.get("undetermined") or []:
+        print(f"?: {entry['drive']} — {entry['id']}: {entry['reason']}")
+
+
 def _put_file(arguments):
     address = put_file(
         arguments.source, arguments.destination,
@@ -1349,6 +1433,10 @@ def _dispatch(arguments):
         return _set_boot_order(arguments)
     if arguments.command == "get-machine-var":
         return _get_machine_var(arguments)
+    if arguments.command == "describe-drives":
+        return _describe_drives(arguments)
+    if arguments.command == "refresh-drives":
+        return _refresh_drives(arguments)
     if arguments.command == "put-file":
         return _put_file(arguments)
     if arguments.command == "get-file":

@@ -144,7 +144,18 @@ workflow:
   (a guest repartitions only while running). A disk whose volumes
   cannot be read leaves every letter behind it unplaced and
   answers with the reason it could not be read, never the
-  symptom — P10, D71 closed;
+  symptom — P10, D71 closed. `describe_drives` is the window onto
+  all of it (D83): one machine-level report — declared and chosen
+  facts per drive, the at-rest read per disk (backing, partitions,
+  per-volume filesystem/label/BPB geometry), and the letter map
+  with its undetermined drives — never phase-refused, because it
+  answers from the record in `machine.json`: **read at every
+  start's first step**, before the backend is engaged, so a running
+  machine answers with this boot's starting state
+  (`recorded: true`); the call reads a disk only when the machine
+  is down and no record exists yet, and `refresh_drives` is the
+  explicit stopped-only re-read for a layout changed behind the
+  record;
   ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
   numbering and an exclusive per-machine operation lock
@@ -187,8 +198,9 @@ workflow:
   every command**, because a stream out of step would otherwise hand a caller another request's sector.
   `at_rest.py` is **the portable half of at-rest access** and never learns what qcow2 is: it reads a
   *device* (`size` / `read_at` / `write_at` / `flush` / `close`), finding the partition table if there is
-  one and a FAT12/16/32 volume past it, with the width decided by cluster count because that is what the
-  format says decides it. `LocalDevice` is the one device it owns — an image already raw, opened where it
+  one and a FAT12 or FAT16 volume past it, with the width decided by cluster count because that is what the
+  format says decides it. **The recognition claim stops there** (D83): FAT12, FAT16 and FAT16B over
+  standard MBR primary/extended partitioning, and everything else — FAT32 included — is a named refusal. `LocalDevice` is the one device it owns — an image already raw, opened where it
   lies under the advisory host lock. **The lock sits one byte past any image** (`_LOCK_OFFSET`): a lock
   over the image's own content is one the *server* trips on, since QEMU reads the header of a qcow2 it is
   serving, so the claim is placed where nothing reads. QEMU's own image locking is not the mechanism —

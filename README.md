@@ -552,6 +552,8 @@ command — removing one means editing the blueprint that declares it.)
 ```text
 rlq run-script LABEL (--blueprint NAME | --machine ID) [--progress MODE]
 rlq get-machine-var KEY (--blueprint NAME | --machine ID)
+rlq describe-drives (--blueprint NAME | --machine ID)
+rlq refresh-drives (--blueprint NAME | --machine ID)
 rlq put-file HOST-PATH GUEST-ADDRESS (--blueprint NAME | --machine ID)
 rlq get-file GUEST-ADDRESS HOST-PATH (--blueprint NAME | --machine ID)
 rlq put-files HOST-DIR GUEST-DIR (--blueprint NAME | --machine ID)
@@ -587,6 +589,18 @@ mounts the disk on the host and works the filesystem inside it, so
 files move into and out of an installed `C:` with no guest running.
 A write is staged and swapped in at the end, so an interrupted one
 leaves the disk as it was.
+
+The letters themselves are learnable, not guessed at:
+`describe-drives` reports what the machine's drives are and what
+they actually hold — per disk the partitions and volumes as read
+from the image (filesystem, label, geometry), and the resulting
+letter map, letter to drive and volume. Every start reads the
+disks as its first step, so a running machine's report describes
+what this boot started from — and says so, with each disk stamped
+by when it was read. Changed a disk while the machine was down?
+`refresh-drives` re-reads and reports in one step. A disk
+Reliquary cannot read is named as undetermined with the reason,
+never mapped by guesswork.
 
 When a reboot per round costs too much, swap the medium instead:
 `insert-media --file` mounts an image you built, live, and ejecting

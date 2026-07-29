@@ -302,6 +302,10 @@ class _ServedAccess:
     affordable enough to do at all.
     """
 
+    #: What stands behind the device — the recorded ``backing`` fact
+    #: the drive report carries (D83).
+    format = "qcow2"
+
     def __init__(self, path, *, writable=False):
         self.path = path
         self.writable = writable
@@ -443,6 +447,10 @@ class _StagedRawAccess:
     the bytes are already what the reader wants, and only a write
     pays for the copy.
     """
+
+    #: What stands behind the device — the recorded ``backing`` fact
+    #: the drive report carries (D83).
+    format = "raw"
 
     def __init__(self, path, *, writable=False):
         self.path = path

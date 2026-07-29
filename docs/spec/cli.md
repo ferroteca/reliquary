@@ -828,9 +828,10 @@ partition table is walked in the order the guest sees — primaries,
 then the logical drives behind a DOS extended container — and a
 partition whose type this build does not read is refused by name
 rather than skipped, because skipping renumbers every volume after
-it and answers confidently for the wrong one. FAT12, FAT16 and
-FAT32 partition types are read; anything else is
-`drive.image-unreadable` naming what the type was.
+it and answers confidently for the wrong one. **The recognition
+claim is FAT12, FAT16 and FAT16B over standard MBR
+primary/extended partitioning** (D83); everything else — FAT32
+included — is `drive.image-unreadable` naming what the type was.
 
 A guest-side name must be one the guest could type: **8.3, or a
 refusal** (`drive.image-unreadable`), never a silent truncation
@@ -917,6 +918,147 @@ and the driving program polls for it. Variables are cleared at
 each `start`, so a value always reports the current boot. There
 is no `set-machine-var` command: writing is the script verb's,
 and the host side only reads.
+
+### Describing drives
+
+```
+rlq describe-drives (--blueprint <name> | --machine <id>)
+rlq refresh-drives (--blueprint <name> | --machine <id>)
+```
+
+Twins `describe_drives` /
+`refresh_drives`. **One machine-level report of what the
+machine's drives are and what they actually hold** — the
+observation the letter map and the file verbs already run on,
+given a window (D83). Per drive it reports the declared and
+chosen facts: key, medium, slot, media, materialization. Per hard
+disk it reports what was **read at rest**: the backing standing
+behind the drive (`qcow2`, `raw`, or `directory` — a directory
+served as one FAT volume), the partition table as it declares
+itself (the type byte verbatim, and what this build reads it as),
+and per volume the filesystem it declares itself to be, its label
+where one exists, and the BPB's own geometry where it states one —
+`null` rather than guessed where it does not. The `mapping`
+section is the platform's derivation over those same facts in the
+platform's own vocabulary: for DOS, the letter map — letter to
+(drive key, volume index) — with every unplaced drive named as
+**undetermined**, carrying the blocking disk's own reason and id,
+the same words the file verbs use, because they are the same
+facts (**P11**).
+
+**The recognition claim is deliberate and narrow** (D83): DOS
+platforms; FAT12, FAT16 and FAT16B filesystems; standard MBR
+primary/extended partitioning. Everything else — FAT32 included —
+reports as a named refusal (`unread`), never as a guess. A
+non-DOS platform's `mapping` is the named gap
+(`platform.verb-not-implemented`) rather than a borrowed DOS
+answer.
+
+**The report answers from the record in the machine's state, and
+is never phase-refused.** The automatic read is **the first step
+of every `start`, before the backend is engaged**, so the record
+a running machine answers from is this boot's own starting state;
+the file verbs' stopped re-reads refresh it too — their counts
+are cleared at every start (D78), and the read that restores them
+rewrites this record with it. `describe-drives` itself reads a
+disk in exactly one case: the machine is down and the disk has no
+record yet, which is the window between create and first start.
+Everything else answers as recorded — `"recorded": true` when the
+call read nothing, each disk's own `read-at` saying when it was
+read; a running guest owns its disks, so Reliquary does not read
+them live.
+
+A layout changed *behind* the record — a guest session's
+repartitioning, an out-of-band edit through the machine directory
+— is picked up at the next start, or now by **`refresh-drives`**:
+the explicit re-read. It is stopped-only
+(`machine.must-be-stopped`), because a running guest owns its
+disks, and it returns the same report `describe-drives` gives,
+read fresh.
+
+The report is for a **created** machine — its subject is disks
+that exist. What a create *would* build is the dry-run family's
+question (`create-machine --dry-run`), and the two families stay
+distinguishable by their subjects.
+
+```powershell
+rlq describe-drives --machine freedos-0
+rlq describe-drives -b freedos --json
+```
+
+Under `--json` the document is exactly the twin's return:
+
+```json
+{
+  "machine": "freedos-0",
+  "blueprint": "freedos",
+  "platform": "dos",
+  "phase": "ready",
+  "recorded": false,
+  "drives": [
+    {
+      "key": "floppy0",
+      "medium": "floppy",
+      "slot": 0,
+      "media": "boot-floppy",
+      "materialize": "use"
+    },
+    {
+      "key": "hdd0",
+      "medium": "hdd",
+      "slot": 0,
+      "media": "freedos-disk",
+      "materialize": "copy",
+      "geometry": {
+        "read-at": "2026-07-29T18:00:00Z",
+        "backing": "qcow2",
+        "partitioned": true,
+        "partitions": [
+          {
+            "number": 1,
+            "type": 6,
+            "declares": "FAT16B",
+            "size": 66060288,
+            "logical": false
+          }
+        ],
+        "cylinders": 130,
+        "volumes": [
+          {
+            "index": 0,
+            "filesystem": "FAT16",
+            "label": "FREEDOS",
+            "size": 66060288,
+            "heads": 16,
+            "sectors-per-track": 63
+          }
+        ]
+      }
+    }
+  ],
+  "mapping": {
+    "letters": {
+      "A": {
+        "drive": "floppy0",
+        "volume": 0
+      },
+      "C": {
+        "drive": "hdd0",
+        "volume": 0
+      }
+    },
+    "undetermined": []
+  }
+}
+```
+
+An unreadable disk's `geometry` carries `unread` — `id` and
+`reason`, the refusal's own vocabulary — in place of the read
+facts, and appears under `mapping.undetermined` together with
+every drive behind it, each entry naming the blocking disk. A
+directory-source disk is one volume by construction, its
+per-volume facts `null` throughout: the backend composes them at
+attach, so they are unanswered rather than guessed.
 
 ### The machine directory
 

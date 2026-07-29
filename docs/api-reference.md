@@ -168,6 +168,30 @@ no meaning to what travels through them.
 - `get_machine_var(key, *, machine=None, blueprint=None,
   context=None)` - Read one machine variable, or `None` when it is
   not set. A query, valid in any phase. CLI twin: `get-machine-var`.
+- `describe_drives(*, machine=None, blueprint=None, context=None)` -
+  One report of the machine's drives and what they actually hold:
+  per drive the declared and chosen facts; per hard disk the at-rest
+  read (backing, the partition table as it declares itself, and per
+  volume the filesystem, label and BPB geometry — `None` where
+  unstated); and the platform's letter map over those facts, letter
+  to `(drive key, volume index)`, with unplaced drives named as
+  undetermined carrying the blocking disk's own reason. Never
+  phase-refused, and it answers **from the record** in
+  `machine.json`: every `start` reads the disks as its first step,
+  so a running machine's answer is this boot's starting state
+  (`"recorded": true`, each disk stamped `read-at`); the call
+  itself reads a disk only when the machine is down and the disk
+  has no record yet — the window between create and first start.
+  Recognized: DOS platforms, FAT12/FAT16/FAT16B, and standard MBR
+  primary/extended partitioning — everything else reports as a
+  named `unread` refusal. CLI twin: `describe-drives`.
+- `refresh_drives(*, machine=None, blueprint=None, context=None)` -
+  Re-read a stopped machine's disks into the record and return the
+  same report, fresh. The explicit way to pick up a layout changed
+  behind the record — a guest session's repartitioning, an
+  out-of-band edit — without waiting for the next start.
+  Stopped-only: a running guest owns its disks. CLI twin:
+  `refresh-drives`.
 - `set_machine_var(machine_id, key, value, *, context=None)` - Record
   one. Its world-facing spelling is the script `set` verb, so the
   capability reaches the CLI through the scripting language rather

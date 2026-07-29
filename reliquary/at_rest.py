@@ -12,7 +12,10 @@ both halves of the letter question eventually.
 Two layers, and this module is the portable one. It reads a **device**
 -- anything answering ``size`` / ``read_at`` / ``write_at`` /
 ``flush`` / ``close`` -- finding the partition table if there is one
-and past it a FAT12/16/32 volume. Presenting a backend's own image
+and past it a FAT12 or FAT16 volume. **The recognition claim stops
+there** (owner, D83): FAT12, FAT16 and FAT16B partitions over
+standard MBR primary/extended partitioning, and everything else --
+FAT32 included -- is a named refusal rather than a read. Presenting a backend's own image
 format as such a device belongs to that backend's adapter, since the
 format is its choice: QEMU serves a qcow2 over NBD and hands back
 :class:`reliquary.nbd.NbdDevice`, and neither qcow2 nor NBD is this
@@ -88,13 +91,14 @@ _EXTENDED = {0x05: "extended (CHS)", 0x0F: "extended (LBA)"}
 #: The type byte is what a partition declares itself to be, and the
 #: table is pinned value by value rather than derived from a range:
 #: one byte's difference is a different filesystem, and the reader
-#: acts on the meaning.
+#: acts on the meaning. **FAT32 is deliberately absent** (owner,
+#: D83): the recognized filesystems are FAT12, FAT16 and FAT16B --
+#: CHS or LBA typed, the same filesystem either way -- and FAT32 is
+#: refused by name with the rest.
 _FAT_TYPES = {
     0x01: "FAT12",
     0x04: "FAT16 (under 32 MB)",
     0x06: "FAT16B",
-    0x0B: "FAT32 (CHS)",
-    0x0C: "FAT32 (LBA)",
     0x0E: "FAT16B (LBA)",
 }
 
@@ -104,6 +108,8 @@ _FAT_TYPES = {
 _KNOWN_FOREIGN = {
     0x05: "an extended container",
     0x07: "NTFS or exFAT",
+    0x0B: "FAT32 (CHS)",
+    0x0C: "FAT32 (LBA)",
     0x0F: "an extended container",
     0x82: "Linux swap",
     0x83: "Linux",
@@ -218,8 +224,8 @@ def _describe(kind, number, path):
     holds = named if named else f"partition type 0x{kind:02X}"
     raise UnreadableImage(
         f"{path}: partition {number} holds {holds}, and reliquary's "
-        "DOS workflow reads FAT partitions and DOS extended "
-        "containers only")
+        "DOS workflow reads FAT12 and FAT16 partitions and DOS "
+        "extended containers only")
 
 
 class LocalDevice:
@@ -594,13 +600,22 @@ class Volume:
         # boundaries are the specification's, not a heuristic: a
         # volume is FAT12/16/32 by how many clusters it has and by
         # nothing else -- not its size, and not what formatted it.
-        self.bits = 12 if clusters < 4085 else (16 if clusters < 65525
-                                                else 32)
-        self.root_cluster = _u32(boot, 44) if self.bits == 32 else 0
-        self.fsinfo_offset = None
-        if self.bits == 32 and _u16(boot, 48):
-            self.fsinfo_offset = (self.offset
-                                  + _u16(boot, 48) * self.bytes_per_sector)
+        # A FAT32-scale count is recognized and refused (owner, D83):
+        # the claim stops at FAT16, whatever the partition type said.
+        if clusters >= 65525:
+            raise UnreadableImage(
+                f"partition {self.label} holds a FAT32-scale cluster "
+                "count, and reliquary reads FAT12 and FAT16 volumes "
+                "only")
+        self.bits = 12 if clusters < 4085 else 16
+        # The BPB's own label field, behind the extended boot
+        # signature. "NO NAME" is the format's spelling of unlabeled,
+        # so it reads as no label rather than as a name.
+        self._bpb_label = None
+        if boot[38] == 0x29:
+            stated = bytes(boot[43:54]).decode("cp437", "replace").strip()
+            if stated and stated.upper() != "NO NAME":
+                self._bpb_label = stated
         if self.cluster_bytes == 0:
             raise UnreadableImage(
                 f"partition {self.label}: a cluster is zero bytes")
@@ -628,13 +643,11 @@ class Volume:
                     f"partition {self.label}: a chain runs past the FAT")
             value = _u16(table, index)
             return value >> 4 if cluster & 1 else value & 0x0FFF
-        width = self.bits // 8
-        index = cluster * width
-        if index + width > self.fat_bytes:
+        index = cluster * 2
+        if index + 2 > self.fat_bytes:
             raise UnreadableImage(
                 f"partition {self.label}: a chain runs past the FAT")
-        return (_u16(table, index) if self.bits == 16
-                else _u32(table, index) & 0x0FFFFFFF)
+        return _u16(table, index)
 
     def _set_fat_entry(self, cluster, value):
         table = self._table()
@@ -646,18 +659,12 @@ class Volume:
             else:
                 current = (current & 0xF000) | (value & 0x0FFF)
             struct.pack_into("<H", table, index, current)
-        elif self.bits == 16:
-            struct.pack_into("<H", table, cluster * 2, value & 0xFFFF)
         else:
-            # The top four bits of a FAT32 entry are reserved and
-            # belong to whoever set them, not to this write.
-            kept = _u32(table, cluster * 4) & 0xF0000000
-            struct.pack_into("<I", table, cluster * 4,
-                             kept | (value & 0x0FFFFFFF))
+            struct.pack_into("<H", table, cluster * 2, value & 0xFFFF)
         self._fat_dirty = True
 
     def _is_end(self, value):
-        return value >= {12: 0x0FF8, 16: 0xFFF8, 32: 0x0FFFFFF8}[self.bits]
+        return value >= {12: 0x0FF8, 16: 0xFFF8}[self.bits]
 
     def _chain(self, first):
         """Every cluster of a chain, in order."""
@@ -680,8 +687,6 @@ class Volume:
     # -- directories --------------------------------------------------
 
     def _root_records(self):
-        if self.bits == 32:
-            return self._chained_records(self.root_cluster)
         return [self.image.read(self.root_offset, self.root_entries * 32)]
 
     def _chained_records(self, first):
@@ -735,7 +740,7 @@ class Volume:
         host directory.
         """
         entries = self._entries(self._root_records())
-        found = (True, 0, self.root_cluster)
+        found = (True, 0, 0)
         for index, segment in enumerate(segments):
             match = next((entry for entry in entries
                           if entry[0].upper() == segment.upper()), None)
@@ -776,6 +781,34 @@ class Volume:
         return sorted((name, is_dir, None if is_dir else size)
                       for name, is_dir, size, _cluster
                       in self._entries(records))
+
+    def volume_label(self):
+        """The volume's label, or ``None`` when it has none.
+
+        The root directory's own label entry is what DOS's ``LABEL``
+        command maintains and ``DIR`` shows, so it answers first; the
+        BPB's label field stands in where no entry exists. Unlabeled
+        is ``None`` -- "NO NAME" is the format's own spelling of it,
+        so it reads as no label rather than as a name.
+        """
+        for block in self._root_records():
+            for start in range(0, len(block) - 31, 32):
+                record = block[start:start + 32]
+                marker = record[0]
+                if marker == 0x00:
+                    break                 # nothing is written past here
+                attributes = record[11]
+                if marker == 0xE5 or attributes & _ATTR_LONG_NAME \
+                        == _ATTR_LONG_NAME:
+                    continue
+                if attributes & _ATTR_VOLUME_LABEL \
+                        and not attributes & _ATTR_DIRECTORY:
+                    stated = bytes(record[0:11]).decode(
+                        "cp437", "replace").strip()
+                    if stated and stated.upper() != "NO NAME":
+                        return stated
+                    return self._bpb_label
+        return self._bpb_label
 
     def copy_to(self, segments, destination):
         """Write the addressed file out to ``destination``.
@@ -856,18 +889,12 @@ class Volume:
         self.flush()
 
     def flush(self):
-        """Put both FAT copies back, and mark a FAT32 hint stale."""
+        """Put both FAT copies back from the one in-memory table."""
         if not self._fat_dirty:
             return
         for copy in range(self.fat_count):
             self.image.write(self.fat_offset + copy * self.fat_bytes,
                              bytes(self._fat))
-        if self.bits == 32 and self.fsinfo_offset is not None:
-            # The free count is a hint, and ours is now wrong. Saying
-            # "unknown" is the format's own way to retract it; leaving
-            # a stale number would have the guest trust it.
-            self.image.write(self.fsinfo_offset + 488,
-                             struct.pack("<II", 0xFFFFFFFF, 0xFFFFFFFF))
         self._fat_dirty = False
 
     # -- allocation ---------------------------------------------------
@@ -895,7 +922,7 @@ class Volume:
                 f"partition {self.label} has room for {len(found)} more "
                 f"clusters and the file needs {count}")
         self._cursor = cluster
-        end = {12: 0x0FFF, 16: 0xFFFF, 32: 0x0FFFFFFF}[self.bits]
+        end = {12: 0x0FFF, 16: 0xFFFF}[self.bits]
         for index, block in enumerate(found):
             self._set_fat_entry(
                 block, found[index + 1] if index + 1 < len(found) else end)
@@ -930,7 +957,7 @@ class Volume:
         ``None`` is the FAT12/16 root, which is a fixed area rather
         than a chain and is the one directory that cannot grow.
         """
-        here = None if self.bits != 32 else self.root_cluster
+        here = None
         for index, segment in enumerate(segments):
             name = _validated_short_name(segment)
             record = self._find_record(here, name)
