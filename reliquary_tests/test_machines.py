@@ -1105,6 +1105,12 @@ class InBandFileTests(_HomeCase):
         self.backend.image_payload = fat_image.volume(self.INSTALLED)
         return self._rig()
 
+    def _problems(self, machine_id):
+        """Structural problems in the machine's disk, read independently."""
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "rb") as handle:
+            return fat_image.consistency(handle.read())
+
     def test_an_exchange_disk_behind_an_installed_c_is_addressable(self):
         # What D71 bought, and the shape P16 was failing on: results
         # live on an installed C: and the exchange drive is the second
@@ -1190,19 +1196,85 @@ class InBandFileTests(_HomeCase):
         with open(target, "rb") as handle:
             self.assertEqual(handle.read(), b"pass\r\n")
 
-    def test_writing_to_an_image_drive_is_refused_by_name(self):
-        # The half that is not built: reading a FAT volume is one job
-        # and writing one back is a much less forgiving other, so the
-        # refusal names that rather than the whole capability (P11).
+    def test_a_file_written_into_an_image_lands_in_the_volume(self):
+        # The write half: the guest will read this at next boot, and
+        # the volume is left structurally sound — checked by a reader
+        # written from the format rather than by the one that wrote it.
         machine_id, _exchange = self._image_rig()
-        source = os.path.join(self.home, "x.txt")
-        with open(source, "w", encoding="ascii") as handle:
-            handle.write("x")
+        source = os.path.join(self.home, "JOB.BAT")
+        with open(source, "wb") as handle:
+            handle.write(b"ECHO hello\r\n")
+        self.assertEqual(
+            put_file(source, r"C:\JOB.BAT", machine=machine_id,
+                     context=self.home), r"C:\JOB.BAT")
+        back = os.path.join(self.home, "back.bat")
+        get_file(r"C:\JOB.BAT", back, machine=machine_id, context=self.home)
+        with open(back, "rb") as handle:
+            self.assertEqual(handle.read(), b"ECHO hello\r\n")
+        self.assertEqual(self._problems(machine_id), [])
+
+    def test_a_write_creates_the_directories_its_address_names(self):
+        machine_id, _exchange = self._image_rig()
+        source = os.path.join(self.home, "R.TXT")
+        with open(source, "wb") as handle:
+            handle.write(b"deep")
+        put_file(source, r"C:\OUT\LOGS\R.TXT", machine=machine_id,
+                 context=self.home)
+        listed = list_files(r"C:\OUT\LOGS", machine=machine_id,
+                            context=self.home)
+        self.assertEqual([entry["address"] for entry in listed],
+                         [r"C:\OUT\LOGS\R.TXT"])
+        self.assertEqual(self._problems(machine_id), [])
+
+    def test_a_name_the_guest_could_not_type_is_refused(self):
+        # 8.3 or nothing: a silently truncated name would land
+        # somewhere the caller never addressed (P11, P17).
+        machine_id, _exchange = self._image_rig()
+        source = os.path.join(self.home, "long.txt")
+        with open(source, "wb") as handle:
+            handle.write(b"x")
         with self.assertRaises(PreflightError) as caught:
-            put_file(source, r"C:\X.TXT", machine=machine_id,
+            put_file(source, r"C:\RESULTS.TAR.GZ", machine=machine_id,
                      context=self.home)
+        self.assertEqual(caught.exception.rule_id, "drive.image-unreadable")
+        self.assertIn("8.3", str(caught.exception))
+
+    def test_a_backend_that_cannot_rebuild_an_image_refuses_the_write(self):
+        with fake_backend.installed(capabilities=Capabilities(
+                backend="qemu",
+                control_planes=("agentless-display",),
+                media=("floppy", "hdd", "cdrom"),
+                controllers=("ide",),
+                materialize=("new", "difference", "copy", "use"),
+                vvfat=True, at_rest=True)) as adapter:
+            adapter.image_payload = fat_image.volume({"A.TXT": b"a"})
+            machine_id = self._create(
+                "read-only", {"platform": "dos",
+                              "drives": {"hdd0": "blank"}},
+                media=[_BLANK])
+            source = os.path.join(self.home, "X.TXT")
+            with open(source, "wb") as handle:
+                handle.write(b"x")
+            with self.assertRaises(PreflightError) as caught:
+                put_file(source, r"C:\X.TXT", machine=machine_id,
+                         context=self.home)
         self.assertEqual(caught.exception.rule_id, "drive.no-at-rest-write")
-        self.assertIn("does not write one", str(caught.exception))
+
+    def test_the_original_image_is_untouched_when_a_write_fails(self):
+        # The safety property the scratch copy buys: a refusal partway
+        # through leaves the machine's disk exactly as it was.
+        machine_id, _exchange = self._image_rig()
+        image = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(image, "rb") as handle:
+            before = handle.read()
+        source = os.path.join(self.home, "X.TXT")
+        with open(source, "wb") as handle:
+            handle.write(b"x")
+        with self.assertRaises(PreflightError):
+            put_file(source, r"C:\NOT A NAME.TXT", machine=machine_id,
+                     context=self.home)
+        with open(image, "rb") as handle:
+            self.assertEqual(handle.read(), before)
 
     def test_a_backend_that_cannot_flatten_its_images_says_so(self):
         # Capability honesty at the seam: an adapter reporting no
@@ -1422,13 +1494,26 @@ class InBandDirectoryTests(_HomeCase):
             sorted(os.path.relpath(path, out) for path in written),
             ["AUTOEXEC.BAT", os.path.join("OUT", "RESULT.LOG")])
 
-    def test_writing_a_tree_to_an_image_drive_is_refused_by_name(self):
+    def test_a_whole_tree_is_written_into_an_image(self):
         self.backend.image_payload = fat_image.volume({"A.TXT": b"a"})
         machine_id, _exchange = self._rig()
-        with self.assertRaises(PreflightError) as caught:
-            put_files(self.home, "C:\\", machine=machine_id,
-                      context=self.home)
-        self.assertEqual(caught.exception.rule_id, "drive.no-at-rest-write")
+        suite = os.path.join(self.home, "suite")
+        os.makedirs(os.path.join(suite, "CASES"))
+        for path, text in ((os.path.join(suite, "RUN.BAT"), b"GO\r\n"),
+                           (os.path.join(suite, "CASES", "ONE.TXT"), b"1")):
+            with open(path, "wb") as handle:
+                handle.write(text)
+        written = put_files(suite, "C:\\", machine=machine_id,
+                            context=self.home)
+        self.assertEqual(written, [r"C:\CASES\ONE.TXT", r"C:\RUN.BAT"])
+        listed = [entry["address"] for entry in
+                  list_files("C:\\", recursive=True, machine=machine_id,
+                             context=self.home)]
+        self.assertEqual(listed, [r"C:\A.TXT", r"C:\CASES",
+                                  r"C:\CASES\ONE.TXT", r"C:\RUN.BAT"])
+        path = self._state(machine_id)["drives"]["hdd0"]["path"]
+        with open(path, "rb") as handle:
+            self.assertEqual(fat_image.consistency(handle.read()), [])
 
     def test_a_missing_host_directory_fails_closed(self):
         machine_id, _exchange = self._rig()

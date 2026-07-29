@@ -89,6 +89,11 @@ class Capabilities:
     #: nothing can flatten says so, and the file verbs refuse by name
     #: instead of guessing at the drive's contents (P11).
     at_rest: bool = False
+    #: Whether the adapter can also put a modified image back. Split
+    #: from ``at_rest`` because reading and writing a disk are
+    #: different promises: an adapter may be able to flatten its own
+    #: format and not to rebuild it.
+    at_rest_write: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -185,7 +190,7 @@ class BackendAdapter:
         has nothing to do here.
         """
 
-    def raw_image(self, path, workspace):
+    def raw_image(self, path, workspace, *, mutable=False):
         """The drive image at ``path`` as raw bytes, for reading at rest.
 
         Returns a path to a raw image: ``path`` itself when the
@@ -195,9 +200,29 @@ class BackendAdapter:
         undoing it is the adapter's job and the portable FAT reader
         above never learns what qcow2 is.
 
+        ``mutable`` asks for a copy **always**, never the original, so
+        a caller that intends to write cannot touch the real image
+        until :meth:`import_raw` puts it back. That is what makes a
+        failed write leave the disk exactly as it was.
+
         Only called for a **stopped** machine: a running backend may
         hold the image open, and a copy taken under it would be a
         torn one.
+        """
+        raise NotImplementedError
+
+    def import_raw(self, raw_path, image_path):
+        """Put a modified raw image back, in the adapter's own format.
+
+        The counterpart of :meth:`raw_image`, and the only writing
+        step: the caller has finished with the scratch copy and wants
+        it to become the machine's disk. **Atomic from the caller's
+        side** -- the image is either the old one or the new one, so
+        an interrupted write does not leave a half-rebuilt disk.
+
+        An adapter whose format carries a backing relationship keeps
+        it: a differencing image stays a differencing image over the
+        same base.
         """
         raise NotImplementedError
 

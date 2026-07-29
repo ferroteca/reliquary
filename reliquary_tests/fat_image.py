@@ -68,7 +68,7 @@ class _Builder:
         return first
 
     def _end(self):
-        return 0xFF8 if self.bits == 12 else 0xFFF8
+        return {12: 0xFF8, 16: 0xFFF8, 32: 0x0FFFFFF8}[self.bits]
 
     def directory(self, tree, *, parent=None, own=None):
         """Build one directory's records, allocating what it contains.
@@ -100,7 +100,13 @@ class _Builder:
 
     def fat(self, entries):
         """The FAT itself, sized to the volume."""
-        table = bytearray(entries * (2 if self.bits == 16 else 2))
+        if self.bits == 32:
+            table = bytearray(entries * 4)
+            struct.pack_into("<II", table, 0, 0x0FFFFFF8, 0x0FFFFFFF)
+            for cluster, value in self.chains.items():
+                struct.pack_into("<I", table, cluster * 4, value)
+            return bytes(table)
+        table = bytearray(entries * 2)
         if self.bits == 16:
             struct.pack_into("<HH", table, 0, 0xFFF8, 0xFFFF)
             for cluster, value in self.chains.items():
@@ -125,12 +131,28 @@ def volume(tree, *, bits=12, sectors=2880, per_cluster=1, root_entries=224):
 
     ``tree`` maps a name to ``bytes`` for a file or to a nested dict
     for a directory. The geometry defaults to a 1.44 MB floppy, which
-    is FAT12; pass ``bits=16`` with more sectors for a small disk.
+    is FAT12; pass ``bits=16`` or ``bits=32`` with more sectors for a
+    disk. FAT32 has no fixed root area -- its root is a cluster chain
+    like any other directory, which is the shape the reader has to
+    handle differently and so the shape worth building.
     """
     builder = _Builder(bits, sectors, per_cluster)
-    root = builder.directory(tree)
-    if len(root) > root_entries * 32:
-        raise ValueError("the root directory does not fit")
+    if bits == 32:
+        root_entries = 0
+        # Cluster 2 is the root, claimed before anything else so the
+        # children below it allocate from 3 upwards.
+        builder.next_cluster = 3
+        builder.data += bytes(builder.cluster_bytes)
+        root = builder.directory(tree)
+        if len(root) > builder.cluster_bytes:
+            raise ValueError("the root directory does not fit one cluster")
+        builder.data[0:len(root)] = root
+        builder.chains[2] = builder._end()
+        root = b""
+    else:
+        root = builder.directory(tree)
+        if len(root) > root_entries * 32:
+            raise ValueError("the root directory does not fit")
 
     # The FAT has to cover every cluster the volume could hold, which
     # depends on the FAT's own size -- so it is sized once against the
@@ -140,23 +162,155 @@ def volume(tree, *, bits=12, sectors=2880, per_cluster=1, root_entries=224):
     table = builder.fat(clusters)
     fat_sectors = -(-len(table) // SECTOR)
     root_sectors = -(-root_entries * 32 // SECTOR)
+    reserved = 32 if bits == 32 else 1
 
     boot = bytearray(SECTOR)
     boot[0:3] = b"\xeb\x3c\x90"
     boot[3:11] = b"RELIQARY"
     struct.pack_into("<HBHBHHBHHHII", boot, 11,
-                     SECTOR, per_cluster, 1, 2, root_entries,
+                     SECTOR, per_cluster, reserved, 2, root_entries,
                      sectors if sectors < 0x10000 else 0,
-                     0xF8, fat_sectors, 18, 2, 0,
+                     0xF8, 0 if bits == 32 else fat_sectors, 18, 2, 0,
                      sectors if sectors >= 0x10000 else 0)
+    if bits == 32:
+        # The FAT32 header: its own FAT size, the root's cluster, and
+        # the FSInfo sector the writer marks stale.
+        struct.pack_into("<I", boot, 36, fat_sectors)
+        struct.pack_into("<I", boot, 44, 2)
+        struct.pack_into("<H", boot, 48, 1)
     struct.pack_into("<H", boot, 510, 0x55AA)
 
     image = bytearray(boot)
+    if bits == 32:
+        fsinfo = bytearray(SECTOR)
+        struct.pack_into("<I", fsinfo, 0, 0x41615252)
+        struct.pack_into("<I", fsinfo, 484, 0x61417272)
+        struct.pack_into("<II", fsinfo, 488, 0xFFFFFFFF, 0xFFFFFFFF)
+        struct.pack_into("<H", fsinfo, 510, 0x55AA)
+        image += fsinfo
+    image += bytes((reserved - len(image) // SECTOR) * SECTOR)
     for _copy in range(2):
         image += table.ljust(fat_sectors * SECTOR, b"\0")
     image += root.ljust(root_sectors * SECTOR, b"\0")
     image += builder.data
     return bytes(image).ljust(sectors * SECTOR, b"\0")
+
+
+def consistency(payload, *, offset=0):
+    """Structural problems in a FAT volume, as a list of strings.
+
+    Written from the format rather than from ``at_rest``, so it is an
+    independent opinion on what that module's *writer* produced —
+    which matters more here than for the reader, because a reader that
+    is wrong reports nonsense and a writer that is wrong leaves a disk
+    the guest cannot mount.
+
+    It checks what a wrong writer actually breaks: the two FAT copies
+    disagreeing, a cluster claimed by two files, a chain that runs off
+    the end or never terminates, and a file whose chain is shorter
+    than its recorded size.
+    """
+    problems = []
+    boot = payload[offset:offset + SECTOR]
+    if struct.unpack_from("<H", boot, 510)[0] != 0x55AA:
+        return ["no boot signature"]
+    per_sector = struct.unpack_from("<H", boot, 11)[0]
+    per_cluster = boot[13]
+    reserved = struct.unpack_from("<H", boot, 14)[0]
+    fat_count = boot[16]
+    root_entries = struct.unpack_from("<H", boot, 17)[0]
+    fat_sectors = (struct.unpack_from("<H", boot, 22)[0]
+                   or struct.unpack_from("<I", boot, 36)[0])
+    total = (struct.unpack_from("<H", boot, 19)[0]
+             or struct.unpack_from("<I", boot, 32)[0])
+    fat_at = offset + reserved * per_sector
+    fat_bytes = fat_sectors * per_sector
+    root_sectors = -(-root_entries * 32 // per_sector)
+    root_at = fat_at + fat_count * fat_bytes
+    data_at = offset + (reserved + fat_count * fat_sectors
+                        + root_sectors) * per_sector
+    cluster_bytes = per_cluster * per_sector
+    clusters = (total - (reserved + fat_count * fat_sectors
+                         + root_sectors)) // per_cluster
+    bits = 12 if clusters < 4085 else (16 if clusters < 65525 else 32)
+
+    first_fat = payload[fat_at:fat_at + fat_bytes]
+    for copy in range(1, fat_count):
+        other = payload[fat_at + copy * fat_bytes:
+                        fat_at + (copy + 1) * fat_bytes]
+        if other != first_fat:
+            problems.append(f"FAT copy {copy} differs from copy 0")
+
+    def entry(cluster):
+        if bits == 12:
+            index = cluster + cluster // 2
+            value = struct.unpack_from("<H", first_fat, index)[0]
+            return value >> 4 if cluster & 1 else value & 0x0FFF
+        if bits == 16:
+            return struct.unpack_from("<H", first_fat, cluster * 2)[0]
+        return struct.unpack_from("<I", first_fat, cluster * 4)[0] & 0x0FFFFFFF
+
+    end = {12: 0x0FF8, 16: 0xFFF8, 32: 0x0FFFFFF8}[bits]
+    owner = {}
+
+    def chain(start, who):
+        visited = []
+        cluster = start
+        while 2 <= cluster < clusters + 2:
+            if cluster in owner:
+                problems.append(
+                    f"cluster {cluster} is claimed by {owner[cluster]} "
+                    f"and by {who}")
+                return visited
+            owner[cluster] = who
+            visited.append(cluster)
+            if len(visited) > clusters:
+                problems.append(f"{who}: the chain never ends")
+                return visited
+            value = entry(cluster)
+            if value >= end:
+                return visited
+            cluster = value
+        problems.append(f"{who}: the chain leaves the volume at {cluster}")
+        return visited
+
+    def walk(first, where):
+        if first is None:
+            block = payload[root_at:root_at + root_entries * 32]
+        else:
+            block = b"".join(
+                payload[data_at + (cluster - 2) * cluster_bytes:
+                        data_at + (cluster - 1) * cluster_bytes]
+                for cluster in chain(first, where or "root"))
+        for start in range(0, len(block) - 31, 32):
+            record = block[start:start + 32]
+            if record[0] == 0x00:
+                return
+            if record[0] == 0xE5 or record[11] & 0x0F == 0x0F:
+                continue
+            stem = record[0:8].decode("cp437").rstrip()
+            extension = record[8:11].decode("cp437").rstrip()
+            name = stem + ("." + extension if extension else "")
+            if name in (".", ".."):
+                # The self and parent links, whose clusters belong to
+                # the directories they name and not to these records.
+                continue
+            here = (where + "\\" if where else "") + name
+            cluster = (struct.unpack_from("<H", record, 20)[0] << 16
+                       | struct.unpack_from("<H", record, 26)[0])
+            size = struct.unpack_from("<I", record, 28)[0]
+            if record[11] & 0x10:
+                walk(cluster, here)
+            elif cluster:
+                held = len(chain(cluster, here)) * cluster_bytes
+                if held < size:
+                    problems.append(
+                        f"{here}: {size} bytes recorded, {held} held")
+            elif size:
+                problems.append(f"{here}: {size} bytes but no cluster")
+
+    walk(None if bits != 32 else struct.unpack_from("<I", boot, 44)[0], "")
+    return problems
 
 
 def partitioned(volumes, *, gap=SECTOR):

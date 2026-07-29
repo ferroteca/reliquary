@@ -561,10 +561,10 @@ stopped, at whatever letter the drive lands on — including behind an
 installed `C:`. Over a directory-source drive the backend snapshots
 that directory at attach, so a stopped machine is what makes a put
 visible and a guest write flushed; over a **drive image** Reliquary
-mounts the disk on the host and reads the filesystem inside it, so
-results leave an installed `C:` with no guest running. Writing back
-into an image is not built yet, and says so rather than
-pretending.
+mounts the disk on the host and works the filesystem inside it, so
+files move into and out of an installed `C:` with no guest running.
+A write is staged and swapped in at the end, so an interrupted one
+leaves the disk as it was.
 
 When a reboot per round costs too much, swap the medium instead:
 `insert-media --file` mounts an image you built, live, and ejecting

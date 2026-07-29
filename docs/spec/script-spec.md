@@ -1845,8 +1845,8 @@ listings (D62) — twins `put_file` / `get_file` / `put_files` /
 the guest names it — `A:\TEST.EXE`, or `A:\OUT` and `A:\` for a
 directory, per **P17**, in force since D47, and not
 the `<drive-key>:<path>` form D5 had roughed — over a
-directory-source drive — or, for the three read verbs, a drive
-image read at rest — stopped-only, with a write to an image
+directory-source drive or a drive image worked at rest,
+stopped-only, with a filesystem or a backend that cannot answer
 failing closed naming the gap (P11). The
 letter map is built from the machine's declared platform and
 reliquary's own drive assignment, never by inspecting a guest

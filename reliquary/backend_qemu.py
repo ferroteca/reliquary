@@ -641,6 +641,7 @@ class QemuAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
             at_rest=True,
+            at_rest_write=True,
         )
 
     # -- materialize and dispose ----------------------------------
@@ -649,27 +650,61 @@ class QemuAdapter(BackendAdapter):
         """QEMU's native per-machine image: qcow2, named for its media."""
         return os.path.join(root, f"{stem}.qcow2")
 
-    def raw_image(self, path, workspace):
+    def raw_image(self, path, workspace, *, mutable=False):
         """Flatten a qcow2 (or any format qemu-img reads) to raw bytes.
 
         ``qemu-img convert`` does the work, which is the honest tool
         for it: a differencing image's whole backing chain resolves,
         and a format this build of QEMU cannot read fails here rather
         than producing a plausible-looking wrong answer. An image
-        already raw is handed back where it lies, so the common
-        ``materialize: use`` payload costs nothing.
+        already raw is handed back where it lies for a read, so the
+        common ``materialize: use`` payload costs nothing -- and is
+        copied for a write, because the real image must not change
+        until :meth:`import_raw` says so.
 
         The copy is the cost of reading a qcow2 without a writer for
         it: proportional to the disk, paid per call, and gone with
         ``workspace``.
         """
         path = os.path.abspath(os.fspath(path))
-        if probe_image_format(path) == "raw":
-            return path
         flattened = os.path.join(workspace, "raw.img")
+        if probe_image_format(path) == "raw":
+            if not mutable:
+                return path
+            shutil.copyfile(path, flattened)
+            return flattened
         _run_qemu_img(["convert", "-O", "raw", path, flattened],
                       "flattening", path)
         return flattened
+
+    def import_raw(self, raw_path, image_path):
+        """Rebuild the image from a modified raw copy, atomically.
+
+        The rebuild lands beside the image and is moved over it, so
+        the disk is the old one or the new one and never a partial
+        third thing. A differencing image is rebuilt **over its own
+        base** (``-B``), so what was a difference stays one rather
+        than silently becoming a standalone disk; how densely qemu-img
+        stores it afterwards is its business.
+        """
+        image_path = os.path.abspath(os.fspath(image_path))
+        completed = _run_qemu_img(
+            ["info", "--output=json", image_path], "probing", image_path)
+        report = json.loads(completed.stdout)
+        if report["format"] == "raw":
+            os.replace(raw_path, image_path)
+            return image_path
+        arguments = ["convert", "-O", report["format"]]
+        backing = report.get("backing-filename")
+        if backing:
+            arguments += ["-B", backing]
+            if report.get("backing-filename-format"):
+                arguments += ["-F", report["backing-filename-format"]]
+        rebuilt = image_path + ".rlq-rebuilt"
+        _run_qemu_img(arguments + [raw_path, rebuilt],
+                      "rebuilding", image_path)
+        os.replace(rebuilt, image_path)
+        return image_path
 
     def create_image(self, path, *, mode, size=None, base=None):
         if mode == "new":

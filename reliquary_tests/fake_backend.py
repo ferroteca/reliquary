@@ -12,6 +12,7 @@ test module; QEMU's own adapter is exercised in
 
 import contextlib
 import os
+import shutil
 
 from reliquary import backends
 from reliquary.backends import Availability, BackendAdapter, Capabilities
@@ -72,8 +73,10 @@ class FakeAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
             at_rest=True,
+            at_rest_write=True,
         )
         self.images = []
+        self.imported = []
         self.starts = []
         self.stops = []
         self.disposed = []
@@ -110,10 +113,22 @@ class FakeAdapter(BackendAdapter):
                 handle.write(self.image_payload)
         return path
 
-    def raw_image(self, path, workspace):
-        """The fake's images are already raw, so they are read in place."""
-        del workspace
-        return os.path.abspath(os.fspath(path))
+    def raw_image(self, path, workspace, *, mutable=False):
+        """The fake's images are already raw; a write still gets a copy,
+        so the real one is untouched until ``import_raw``."""
+        path = os.path.abspath(os.fspath(path))
+        if not mutable:
+            return path
+        scratch = os.path.join(workspace, "raw.img")
+        shutil.copyfile(path, scratch)
+        return scratch
+
+    def import_raw(self, raw_path, image_path):
+        """Move the scratch copy over the image, as QEMU's does."""
+        image_path = os.path.abspath(os.fspath(image_path))
+        os.replace(raw_path, image_path)
+        self.imported.append(image_path)
+        return image_path
 
     def dispose(self, machine_dir):
         self.disposed.append(machine_dir)

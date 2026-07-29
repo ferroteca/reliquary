@@ -959,15 +959,18 @@ class CliExecRunTests(unittest.TestCase):
         with open(back, "rb") as handle:
             self.assertEqual(handle.read(), b"MZ")
 
-    def test_a_non_vvfat_target_exits_three(self):
+    def test_an_unformatted_image_target_exits_three(self):
+        # hdd0 in this rig is a blank the fake adapter never wrote, so
+        # there is no filesystem to reach. PREFLIGHT ERROR: the gap
+        # names itself rather than answering as though it were empty
+        # (P11).
         source = os.path.join(self.home, "x.txt")
         with open(source, "w", encoding="ascii") as handle:
             handle.write("x")
         code, _out, err = self._run(
             ["put-file", source, r"C:\X.TXT", "--machine", "rig-0"])
-        # PREFLIGHT ERROR: the capability gap names itself (P11).
         self.assertEqual(code, 3)
-        self.assertIn("directory-source", err)
+        self.assertIn("cannot be read at rest", err)
 
     def test_put_files_and_get_files_move_a_whole_tree(self):
         suite = os.path.join(self.home, "suite")

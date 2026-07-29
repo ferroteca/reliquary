@@ -1529,6 +1529,17 @@ class _HostDirectory:
     def copy_out(self, segments, destination):
         shutil.copyfile(self.path(segments), destination)
 
+    def write_file(self, segments, source):
+        target = self.path(segments)
+        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+        shutil.copyfile(source, target)
+
+    def make_directory(self, segments):
+        os.makedirs(self.path(segments), exist_ok=True)
+
+    def commit(self):
+        """Nothing to do: the backend flushes this drive at attach."""
+
     def close(self):
         pass
 
@@ -1549,25 +1560,28 @@ class _ImageVolume:
     eagerly -- that refusal is the one a caller most needs early.
     """
 
-    writable = False
-
-    def __init__(self, adapter, image_path, key, letter, address):
+    def __init__(self, adapter, image_path, key, letter, address,
+                 writable):
         self.adapter = adapter
         self.image_path = image_path
         self.key = key
         self.letter = letter
         self.address = address
+        self.writable = writable
         self._image = None
         self._volume = None
         self._workspace = None
+        self._raw = None
+        self._written = False
 
     def _opened(self):
         if self._volume is not None:
             return self._volume
         self._workspace = tempfile.mkdtemp(prefix="rlq-at-rest-")
         try:
-            raw = self.adapter.raw_image(self.image_path, self._workspace)
-            self._image = at_rest.Image(raw)
+            self._raw = self.adapter.raw_image(
+                self.image_path, self._workspace, mutable=self.writable)
+            self._image = at_rest.Image(self._raw, writable=self.writable)
         except (at_rest.UnreadableImage, OSError) as error:
             self.close()
             raise PreflightError(
@@ -1608,6 +1622,32 @@ class _ImageVolume:
     def copy_out(self, segments, destination):
         self._guarded(self._opened().copy_to, segments, destination)
 
+    def write_file(self, segments, source):
+        parent = list(segments[:-1])
+        if parent:
+            self._guarded(self._opened().make_directory, parent)
+        self._guarded(self._opened().write_file, segments, source)
+        self._written = True
+
+    def make_directory(self, segments):
+        if segments:
+            self._guarded(self._opened().make_directory, list(segments))
+            self._written = True
+
+    def commit(self):
+        """Put the modified copy back as the machine's disk.
+
+        The last step and the only one that touches the real image, so
+        everything before it is undoable by deleting a scratch file.
+        """
+        if not self._written:
+            return
+        self._image.flush()
+        self._image.close()
+        self._image = None
+        self.adapter.import_raw(self._raw, self.image_path)
+        self._written = False
+
     def _guarded(self, call, *arguments):
         """Restate a reader complaint as the refusal a caller sees."""
         try:
@@ -1635,14 +1675,16 @@ def _at_rest_volume(state, image_path, key, letter, address):
     """
     backend = state.get("backend") or "qemu"
     adapter = backends.adapter(backend)
-    if not adapter.capabilities().at_rest:
+    report = adapter.capabilities()
+    if not report.at_rest:
         raise PreflightError(
             f"{address}: drive {key} ({letter}:) is a drive image, and "
             f"the {backend} adapter cannot read one at rest — give the "
             "machine a directory-source drive for exchange, and have "
             "the guest copy to it",
             rule_id="drive.no-at-rest-access")
-    return _ImageVolume(adapter, image_path, key, letter, address)
+    return _ImageVolume(adapter, image_path, key, letter, address,
+                        report.at_rest_write)
 
 
 def _writable(source, address, verb):
@@ -1651,9 +1693,9 @@ def _writable(source, address, verb):
         return source
     source.close()
     raise PreflightError(
-        f"{address}: {verb} needs a directory-source (vvfat) drive — "
-        "reliquary reads a drive image at rest but does not write one, "
-        "so put a file where the guest can fetch it instead",
+        f"{address}: {verb} needs a drive this backend can write — it "
+        "reads a drive image at rest and cannot rebuild one, so write "
+        "to a directory-source (vvfat) drive instead",
         rule_id="drive.no-at-rest-write")
 
 
@@ -1683,7 +1725,7 @@ def _guest_directory(machine_id, address, context, *, must_exist=True):
                 f"the guest has no directory at {address}",
                 rule_id="drive.guest-directory-missing")
         _writable(source, address, "creating a guest directory")
-        os.makedirs(source.path(segments))
+        source.make_directory(segments)
     return source, letter, segments, platform
 
 
@@ -1703,15 +1745,14 @@ def put_file(source, destination, *, machine=None, blueprint=None,
         raise PreflightError(f"no such file: {origin}",
             rule_id="media.file-missing")
     with _machine_lock(machine_id, context):
-        source_drive, _letter, segments, _platform = _resolve_address(
+        drive, _letter, segments, _platform = _resolve_address(
             machine_id, destination, context)
-        _writable(source_drive, destination, "put-file")
+        _writable(drive, destination, "put-file")
         try:
-            target = source_drive.path(segments)
-            os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-            shutil.copyfile(origin, target)
+            drive.write_file(segments, origin)
+            drive.commit()
         finally:
-            source_drive.close()
+            drive.close()
     return destination
 
 
@@ -1822,13 +1863,13 @@ def put_files(source, destination, *, machine=None, blueprint=None,
                 relative = os.path.relpath(directory, origin)
                 parts = ([] if relative == os.curdir
                          else relative.split(os.sep))
-                target = drive.path(segments + parts)
-                os.makedirs(target, exist_ok=True)
+                drive.make_directory(segments + parts)
                 for name in sorted(files):
-                    shutil.copyfile(os.path.join(directory, name),
-                                    os.path.join(target, name))
+                    drive.write_file(segments + parts + [name],
+                                     os.path.join(directory, name))
                     written.append(platform.join_address(
                         letter, segments + parts + [name]))
+            drive.commit()
         finally:
             drive.close()
     return sorted(written)

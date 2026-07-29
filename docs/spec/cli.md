@@ -710,21 +710,26 @@ All five are **stopped-only**, and the addressed drive must be a
 directory-source drive: the backend snapshots that directory when
 it attaches, so a change made while the machine runs would be
 invisible to the guest and a guest write is not flushed until it
-stops. A **drive image is read at rest**: with the machine
-stopped its disk is a file the host owns, so `list-files`,
-`get-file` and `get-files` reach an installed `C:` by mounting the
-image and reading the FAT volume in it — no guest, no boot, and
-no reaching around Reliquary. `put-file` and `put-files` do
-**not**: writing a FAT volume back is unbuilt, and
-`drive.no-at-rest-write` says so by name, the remedy being a
-directory-source drive the guest fetches from. A backend that
-cannot flatten its own image format answers
-`drive.no-at-rest-access`; a filesystem this build cannot read
-answers `drive.image-unreadable`; and a disk holding more than one
-volume answers `drive.volume-count-unsupported`, because the
-letter map assumes one volume per disk and reading either would
-answer for a drive the caller did not address. Every one of them
-is raised before anything is transferred (**P11**).
+stops. A **drive image is read and written at rest**: with the
+machine stopped its disk is a file the host owns, so all five
+verbs reach an installed `C:` by mounting the image and working
+the FAT volume in it — no guest, no boot, and no reaching around
+Reliquary. A write lands in a scratch copy and replaces the disk
+in one step at the end, so an interrupted or refused write leaves
+the image exactly as it was; a differencing image stays one, over
+the same base.
+
+A guest-side name must be one the guest could type: **8.3, or a
+refusal** (`drive.image-unreadable`), never a silent truncation
+that would land the file where the caller cannot find it.
+Three more refusals name themselves, each raised before anything
+is transferred (**P11**): `drive.no-at-rest-access` when the
+backend cannot flatten its own image format,
+`drive.no-at-rest-write` when it can read one and not rebuild it,
+and `drive.volume-count-unsupported` when a disk holds more than
+one volume — the letter map assumes one per disk, so answering
+for either would answer for a drive the caller did not
+address.
 
 **The letter map places every drive**, so a directory-source drive
 is addressable wherever it sits — including behind an installed

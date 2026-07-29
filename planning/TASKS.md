@@ -95,27 +95,6 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **A drive image is read at rest but never written** (what is
-  left of P16's residue after D73). `list-files`, `get-file` and
-  `get-files` reach an installed `C:` now — the host mounts the
-  image and reads the FAT volume in it — so results leave a disk
-  without the guest's help, which is what P16 was failing on.
-  `put-file` and `put-files` still answer
-  `drive.no-at-rest-write`, and that is P11 doing its job rather
-  than a shape anyone wants.
-
-  **Writing is the harder half and was split on purpose** (D73):
-  free-cluster search, chain building, directory growth, and two
-  FAT copies to keep identical — where a reader that is wrong
-  reports nonsense and a writer that is wrong corrupts a disk the
-  user cannot rebuild. Closing it means the same seam in reverse,
-  with the same per-call honesty: a filesystem the adapter cannot
-  write fails **by name**, never by guess. It also wants the write
-  to be crash-safe, since the machine's disk is the only copy.
-  DOS/FAT is the delivered case; a backend that cannot flatten its
-  own format already answers `drive.no-at-rest-access` and stays
-  the second backend's problem.
-
 - **A hard disk is assumed to hold one volume** (D71's residue,
   filed with the assumption per D48's bar). `platform_dos.drive_letters`
   places disks from `C:` in slot order and CD-ROMs after them, on
@@ -127,8 +106,8 @@ code has the bug, so the norm is already the demand.
   rather than a stated limit — and, since P10 was sharpened, an
   outright violation of it: assuming is guessing.
 
-  **The reader that answers it now exists, and is not wired to
-  it** (D73). `at_rest.Image` enumerates the volumes in a drive
+  **The reader that answers it exists, and is not wired to it**
+  (D73, D74). `at_rest.Image` enumerates the volumes in a drive
   image, and the file verbs already refuse
   (`drive.volume-count-unsupported`) when a disk they were sent to
   holds more than one — so the wrong-drive case is caught at the
@@ -138,7 +117,9 @@ code has the bug, so the norm is already the demand.
   flattens at most the one addressed. Whoever closes this decides
   where that answer is cached — the natural home is the machine's
   own state, recorded when a disk is materialized or adopted and
-  invalidated with it. What stays refused permanently is a *declared* volume
+  invalidated with it. **This is now the only thing standing
+  between the letter map and the truth**, P16's own residue having
+  closed. What stays refused permanently is a *declared* volume
   count in the blueprint (D56): the guest is the source of truth
   for its own volumes, and a declaration would carry a spec's
   authority over an assertion the guest can silently contradict.

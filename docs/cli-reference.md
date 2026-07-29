@@ -384,11 +384,11 @@ Both are **stopped-only**: the backend snapshots a
 directory-source drive when it is attached, so a change made while
 the machine runs would be invisible to the guest and a guest write
 is not flushed until it stops — and a drive image is only safe to
-read once nothing holds it open. `get-file` reads either kind,
-mounting the image and reading its FAT volume where there is no
-host directory, so results leave an installed `C:` directly.
-`put-file` needs a directory-source drive and says so by name:
-writing a FAT volume back is unbuilt.
+work once nothing holds it open. Both reach either kind, mounting
+the image and working its FAT volume where there is no host
+directory, so files move into and out of an installed `C:`
+directly. A guest-side name has to be one DOS could type — 8.3, or
+a refusal rather than a silent truncation.
 
 `put-file` prints the guest address it wrote; `get-file` prints the
 host path.

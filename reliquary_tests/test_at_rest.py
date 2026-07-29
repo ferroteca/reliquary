@@ -91,8 +91,12 @@ class ReadingTests(_ImageCase):
         return self._image(fat_image.volume(TREE, **geometry)).volumes[0]
 
     def _widths(self):
+        # FAT32 needs 65525 clusters before it *is* FAT32, so its
+        # image is the big one: the width is the cluster count's
+        # answer and cannot be asked for directly.
         return (("fat12", {}),
-                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}))
+                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}),
+                ("fat32", {"bits": 32, "sectors": 70000, "per_cluster": 1}))
 
     def test_a_root_listing_is_sorted_with_directory_sizes_null(self):
         for label, geometry in self._widths():
@@ -165,6 +169,151 @@ class ReadingTests(_ImageCase):
             volume.copy_to(["OUT"], os.path.join(self.workdir.name, "x"))
         with self.assertRaises(at_rest.UnreadableImage):
             volume.entries(["NOPE"])
+
+
+class WritingTests(_ImageCase):
+    """Writing back into a volume, checked structurally after each one.
+
+    ``fat_image.consistency`` is the assertion that matters here: it
+    reads the result from the format rather than through the writer,
+    so a chain the writer built wrong, two files claiming one cluster,
+    or FAT copies drifting apart are caught by something that does not
+    share the writer's opinion.
+    """
+
+    def _source(self, name, payload):
+        path = os.path.join(self.workdir.name, name)
+        with open(path, "wb") as handle:
+            handle.write(payload)
+        return path
+
+    def _written(self, geometry, work):
+        """Run ``work`` against a fresh volume, returning its bytes."""
+        path = os.path.join(self.workdir.name, "target.img")
+        with open(path, "wb") as handle:
+            handle.write(fat_image.volume(TREE, **geometry))
+        with at_rest.Image(path, writable=True) as image:
+            work(image.volumes[0])
+        with open(path, "rb") as handle:
+            payload = handle.read()
+        self.assertEqual(fat_image.consistency(payload), [])
+        return path
+
+    def _widths(self):
+        # FAT32 needs 65525 clusters before it *is* FAT32, so its
+        # image is the big one: the width is the cluster count's
+        # answer and cannot be asked for directly.
+        return (("fat12", {}),
+                ("fat16", {"bits": 16, "sectors": 60000, "per_cluster": 4}),
+                ("fat32", {"bits": 32, "sectors": 70000, "per_cluster": 1}))
+
+    def _reads_back(self, path, segments, expected):
+        with at_rest.Image(path) as image:
+            target = os.path.join(self.workdir.name, "back.bin")
+            image.volumes[0].copy_to(segments, target)
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), expected)
+
+    def test_a_new_file_appears_and_reads_back(self):
+        source = self._source("NEW.TXT", b"written from the host\r\n")
+        for label, geometry in self._widths():
+            with self.subTest(width=label):
+                path = self._written(
+                    geometry, lambda v: v.write_file(["NEW.TXT"], source))
+                self._reads_back(path, ["NEW.TXT"],
+                                 b"written from the host\r\n")
+
+    def test_a_file_larger_than_one_cluster_chains(self):
+        payload = bytes(range(256)) * 300
+        source = self._source("BIG.DAT", payload)
+        for label, geometry in self._widths():
+            with self.subTest(width=label):
+                path = self._written(
+                    geometry, lambda v: v.write_file(["BIG.DAT"], source))
+                self._reads_back(path, ["BIG.DAT"], payload)
+
+    def test_an_overwrite_replaces_the_content_and_the_size(self):
+        """Shrinking matters: the old chain has to go back to the pool
+        or the volume leaks clusters an overwrite should have reused."""
+        big = self._source("BIG.DAT", b"x" * 40000)
+        small = self._source("SMALL.TXT", b"tiny")
+        for label, geometry in self._widths():
+            with self.subTest(width=label):
+                def work(volume):
+                    volume.write_file(["OUT", "RESULT.LOG"], big)
+                    volume.write_file(["OUT", "RESULT.LOG"], small)
+                path = self._written(geometry, work)
+                self._reads_back(path, ["OUT", "RESULT.LOG"], b"tiny")
+
+    def test_a_directory_is_created_with_its_parents(self):
+        source = self._source("R.TXT", b"deep")
+        for label, geometry in self._widths():
+            with self.subTest(width=label):
+                def work(volume):
+                    volume.make_directory(["NEW", "INNER"])
+                    volume.write_file(["NEW", "INNER", "R.TXT"], source)
+                path = self._written(geometry, work)
+                self._reads_back(path, ["NEW", "INNER", "R.TXT"], b"deep")
+                with at_rest.Image(path) as image:
+                    self.assertEqual(
+                        image.volumes[0].kind(["NEW", "INNER"]), "directory")
+
+    def test_a_directory_grows_past_its_first_cluster(self):
+        """A subdirectory is a chain like any other, so filling one has
+        to extend it rather than run off the end."""
+        source = self._source("ONE.TXT", b"1")
+        def work(volume):
+            volume.make_directory(["MANY"])
+            for index in range(48):
+                volume.write_file(["MANY", f"F{index:04}.TXT"], source)
+        path = self._written({}, work)
+        with at_rest.Image(path) as image:
+            self.assertEqual(len(image.volumes[0].entries(["MANY"])), 48)
+
+    def test_a_full_root_directory_refuses_rather_than_overrunning(self):
+        source = self._source("ONE.TXT", b"1")
+        def work(volume):
+            for index in range(400):
+                volume.write_file([f"F{index:04}.TXT"], source)
+        with self.assertRaises(at_rest.UnreadableImage) as caught:
+            self._written({"root_entries": 32}, work)
+        self.assertIn("root directory is full", str(caught.exception))
+
+    def test_a_volume_without_room_refuses_before_writing_anything(self):
+        source = self._source("HUGE.DAT", b"x" * (2 * 1024 * 1024))
+        path = os.path.join(self.workdir.name, "small.img")
+        with open(path, "wb") as handle:
+            handle.write(fat_image.volume({}, sectors=800))
+        with at_rest.Image(path, writable=True) as image:
+            with self.assertRaises(at_rest.UnreadableImage) as caught:
+                image.volumes[0].write_file(["HUGE.DAT"], source)
+        self.assertIn("room", str(caught.exception))
+        with open(path, "rb") as handle:
+            self.assertEqual(fat_image.consistency(handle.read()), [])
+
+    def test_a_name_that_is_not_8_3_is_refused(self):
+        source = self._source("x", b"x")
+        volume = self._image(fat_image.volume(TREE)).volumes[0]
+        for name in ("RESULTS.TAR.GZ", "TOOLONGNAME.TXT", "A.TEXT",
+                     "HAS SPACE.TXT", "BAD*.TXT", ""):
+            with self.subTest(name=name):
+                with self.assertRaises(at_rest.UnreadableImage):
+                    volume.write_file([name], source)
+
+    def test_a_lowercase_name_is_stored_as_dos_holds_it(self):
+        source = self._source("job.bat", b"GO")
+        path = self._written({}, lambda v: v.write_file(["job.bat"], source))
+        with at_rest.Image(path) as image:
+            self.assertIn(
+                "JOB.BAT",
+                [name for name, _dir, _size in image.volumes[0].entries([])])
+
+    def test_writing_needs_a_writable_image(self):
+        volume = self._image(fat_image.volume(TREE)).volumes[0]
+        source = self._source("N.TXT", b"n")
+        with self.assertRaises(at_rest.UnreadableImage) as caught:
+            volume.write_file(["N.TXT"], source)
+        self.assertIn("reading only", str(caught.exception))
 
 
 if __name__ == "__main__":

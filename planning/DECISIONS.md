@@ -188,6 +188,102 @@ is waiting on an answer today.
 
 ## Decided
 
+- D74 — A DRIVE IMAGE IS WRITTEN AT REST, STAGED AND SWAPPED —
+  DECIDED (owner, 2026-07-28) and delivered the same day. Supports
+  U14, U20; P10, P11, P12, P16, P17. **Closes P16's residue
+  entirely**, the half D73 split off and filed, and empties the
+  in-band defect from [TASKS.md](TASKS.md).
+
+  WHAT IT CLOSES. `put-file` and `put-files` reach an installed
+  `C:` now: the host mounts the disk, writes into the FAT volume,
+  and the guest reads it at next boot. With D73's reading half,
+  every in-band verb works against every drive Reliquary can
+  materialize, which is the whole of what P16 asked for.
+
+  THREE RULES HOLD THE WRITE, and they are the entry's substance.
+  **Every allocation happens before any byte is written**, so a
+  volume without room refuses with the file untouched rather than
+  half-landing it. **Both FAT copies are put back from one
+  in-memory table**, so they cannot drift apart — the failure that
+  makes a disk unmountable rather than merely wrong. And **the
+  write is staged**: it lands in a scratch copy, and the adapter
+  swaps that over the real image in one step at the end. An
+  interrupted, refused or crashed write costs a temporary file and
+  nothing else, which is the property the defect asked for by
+  name.
+
+  A DIFFERENCING IMAGE STAYS ONE. The obvious rebuild —
+  `qemu-img convert -O qcow2` — would flatten a difference into a
+  standalone disk, silently unsharing its base. `import_raw` reads
+  the image's own backing reference first and rebuilds over it
+  (`-B`, with `-F` for the backing format), so what was a
+  difference is a difference afterwards and the base stays
+  pristine. How densely qemu-img stores the result is its
+  business; what is preserved is the relationship and the content.
+  This was tested against a real backing chain, not assumed.
+
+  A NAME THE GUEST COULD NOT TYPE IS REFUSED, NEVER MANGLED. 8.3
+  or nothing, and no long-name entries are generated. Truncating
+  `results.tar.gz` to `RESULTS.TAR` would put the file somewhere
+  the caller never addressed and could not find, which is the
+  silent-wrong-answer shape P11 exists to forbid. It is the same
+  reasoning that made the reader skip long-name entries rather
+  than decode them (D73): what the guest can say is the contract.
+
+  READING AND WRITING ARE DIFFERENT PROMISES, so they are
+  different capabilities. `at_rest_write` is separate from
+  `at_rest`: an adapter may be able to flatten its own format and
+  not to rebuild it, and `drive.no-at-rest-write` is what it
+  answers then. The stubs claim neither.
+
+  FAT32 IS COVERED NOW, AND WAS NOT WHEN IT SHIPPED. D73's reader
+  handled FAT32 by construction and nothing exercised it — the
+  test builder made FAT12 and FAT16 only, so the width whose root
+  is a cluster chain rather than a fixed area was untested code on
+  a path that can corrupt a disk. The builder grew a FAT32 mode
+  (its own root cluster, its own FAT width, an FSInfo sector) and
+  both suites run all three widths. The writer also marks FAT32's
+  free-cluster hint unknown rather than leaving a stale number
+  behind, which is the format's own way to retract it.
+
+  THE STRUCTURAL CHECK IS INDEPENDENT, WHICH FOR A WRITER IS THE
+  POINT. `fat_image.consistency` reads a volume from the format's
+  layout rather than through `at_rest`, and every write test runs
+  it: FAT copies that disagree, a cluster claimed twice, a chain
+  that never ends or leaves the volume, a file whose chain is
+  shorter than its recorded size. A writer validated only by its
+  own reader would agree with itself about a shared mistake.
+
+  P8 TRIAGE: an interface change, and an easy approval. Two verbs
+  reach drives they could not reach, one adapter surface grows
+  (`import_raw`) and one gains a keyword (`raw_image(mutable=)`),
+  one capability is added, one id is retired in place rather than
+  removed — `drive.no-at-rest-write` still fires, for a backend
+  that cannot rebuild rather than for a capability nobody built.
+  U14 and U20 are served where they were blocked.
+
+  FOLDED: this entry; [TASKS.md](TASKS.md) (P16's in-band defect
+  struck — it is done, and done work leaves by deletion, D52 —
+  with D71's volume entry noting it is now the only thing between
+  the letter map and the truth);
+  [at_rest.py](../reliquary/at_rest.py) (the write layer: claim,
+  release, store, directory growth, 8.3 validation, timestamps,
+  FSInfo); [backends.py](../reliquary/backends.py) and
+  [backend_qemu.py](../reliquary/backend_qemu.py) (`import_raw`,
+  `raw_image(mutable=)`, the `at_rest_write` capability);
+  [machines.py](../reliquary/machines.py) (one write surface across
+  both drive sources, and `commit` as the last step);
+  [design/backend-adapter.md](design/backend-adapter.md);
+  normative [cli.md](../docs/spec/cli.md) and
+  [script-spec.md](../docs/spec/script-spec.md);
+  [api-reference.md](../docs/api-reference.md),
+  [cli-reference.md](../docs/cli-reference.md),
+  [README.md](../README.md), [ARCHITECTURE.md](../ARCHITECTURE.md)
+  (P16 carries no residue now); `fat_image.py` (FAT32, and the
+  consistency checker), `test_at_rest.py`, `test_machines.py`,
+  `test_cli.py` and `fake_backend.py`; and the CHANGELOG's
+  unreleased section.
+
 - D73 — A DRIVE IMAGE IS READ AT REST; THE WRITE HALF IS SPLIT OFF
   AND FILED — DECIDED (owner, 2026-07-28) and delivered the same
   day. Supports U14, U20; P10, P11, P12, P16, P17. Closes the

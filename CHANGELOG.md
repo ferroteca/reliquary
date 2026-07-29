@@ -13,9 +13,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **Results come off an installed disk directly.** `list-files`,
-  `get-file` and `get-files` now read a **drive image** while the
-  machine is stopped: the host mounts the disk, reads the partition
+- **Files move to and from an installed disk directly.** All five
+  in-band verbs now work a **drive image** while the machine is
+  stopped: the host mounts the disk, reads the partition
   table and the FAT volume behind it, and hands the files back in the
   guest's own terms. A consumer whose output landed on an installed
   `C:` no longer has to reach around Reliquary with its own image
@@ -32,21 +32,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whole backing chain and costs a temporary flattened copy for the
   duration of the call.
 
-  **Writing into an image is not built**, and says so:
-  `put-file` and `put-files` answer `drive.no-at-rest-write` and
-  point at a directory-source drive. Reading a FAT volume and
-  writing one back are not the same job — a reader that is wrong
-  reports nonsense, and a writer that is wrong corrupts a disk you
-  cannot rebuild — so the halves shipped separately and the second
-  stays filed.
+  **Files go in the same way.** `put-file` and `put-files` write
+  into a drive image too, so a script's inputs can be placed on an
+  installed `C:` before the machine boots:
 
-  Three more refusals name themselves rather than answering as
-  though a drive were empty: `drive.no-at-rest-access` (the backend
-  cannot flatten its own image format), `drive.image-unreadable`
-  (the image or its filesystem is not one this build reads), and
+  ```powershell
+  rlq put-file .\JOB.BAT "C:\JOB.BAT" --machine rig-0
+  ```
+
+  A write is **staged and swapped**: it lands in a scratch copy and
+  replaces the disk in one step at the end, so an interrupted or
+  refused write leaves the image exactly as it was. Allocation
+  happens before any byte is written, so a full volume refuses with
+  the file untouched; both FAT copies are written from one table, so
+  they cannot drift apart; and a **differencing image stays one**,
+  rebuilt over its own base rather than silently flattened into a
+  standalone disk.
+
+  A guest-side name must be one the guest could type — **8.3, or a
+  refusal**. `RESULTS.TAR.GZ` is rejected rather than truncated to
+  something you would not find later.
+
+  Three refusals name themselves rather than answering as though a
+  drive were empty: `drive.no-at-rest-access` (the backend cannot
+  flatten its own image format), `drive.no-at-rest-write` (it can
+  read one and not rebuild it), and
   `drive.volume-count-unsupported` (the disk holds more than one
-  volume, so the drive-letter map is wrong about it and reading
-  either would answer for a drive you did not address).
+  volume, so the drive-letter map is wrong about it and answering
+  would answer for a drive you did not address).
 
 - **In-band file exchange reaches a drive at any letter.** A machine
   with an installed `C:` and a directory-source drive for exchange

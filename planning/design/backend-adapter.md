@@ -309,7 +309,8 @@ unmet(requirements)                         -> tuple[str, ...]
 
 image_path(root, stem)                      -> path
 create_image(path, *, mode, size, base)     -> path
-raw_image(path, workspace)                  -> path
+raw_image(path, workspace, *, mutable)      -> path
+import_raw(raw_path, image_path)            -> path
 dispose(machine_dir)
 
 start(state, *, machine_dir, backend_dir,
