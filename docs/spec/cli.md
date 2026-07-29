@@ -589,6 +589,16 @@ worth the composite, and the platform owns the completion
 knowledge the caller would otherwise re-spell. A CLI/API
 capability above the language, not a language concept.
 
+**Completion means this command finished**, not that a prompt is
+visible: the guest was already at one before the command was sent,
+so detection requires evidence the command landed. What `exec`
+returns is the command's own output or a failure — never text it
+cannot attribute. A command that scrolls more than a screenful
+leaves only its tail, which is agentless capture's documented
+limit and is returned; output that cannot be tied to the command
+at all is `screen.no-echo`, because a plausible tuple of somebody
+else's rows is worse than an error (**P11**).
+
 ```powershell
 rlq exec "ver" -b freedos
 # → FreeDOS kernel 2043 (Build 2043) [compiled Feb 26 2021]

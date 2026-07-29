@@ -188,6 +188,84 @@ is waiting on an answer today.
 
 ## Decided
 
+- D75 — A PROMPT IS NOT COMPLETION, AND UNATTRIBUTABLE OUTPUT IS A
+  FAILURE — DECIDED (owner, 2026-07-28) and delivered the same day.
+  Supports U12, U14, U9; P11. Fixes
+  [#6](https://github.com/ferroteca/reliquary/issues/6), a gap
+  against [cli.md](../docs/spec/cli.md)'s `exec` contract and so a
+  defect needing no pledge — it arrived already fixed, so it never
+  entered [TASKS.md](TASKS.md).
+
+  WHAT WAS WRONG, AND IT WAS NOT A RACE. `execute` sent the command
+  and then asked, on its first pass and before any sleep, whether a
+  prompt was on screen. `wait_ready` returns *because* a prompt is
+  on screen. So the completion test was the postcondition of the
+  call before it: satisfied the instant it was asked, by the prompt
+  already sitting there. The reporter framed it as a timing
+  window — true of when it *bites*, since a guest still running
+  `FDAUTO.BAT` echoes slowly — but the defect is structural, and a
+  quiet guest hid it only because typing took long enough for the
+  echo to land first.
+
+  THE TEST IS NOW *THIS COMMAND FINISHED*, not *a prompt is
+  visible*. Completion needs evidence the command landed: its echo,
+  or failing that a screen that has changed since it was sent. The
+  screen-changed fallback is there because the echo can scroll away
+  under a command that floods the display, and neither signal alone
+  covers both ends.
+
+  THE SECOND HALF IS WHAT MAKES THE FIRST SAFE. `_command_output`
+  fell back to returning every row above the prompt when it could
+  not find the echo, which turned a detection failure into
+  confident wrong data — the exact shape P11 forbids, and the
+  reason the bug was silent rather than loud. **But the fallback is
+  not simply wrong**: it is also the documented scroll-off path,
+  where the echo is gone precisely because the command produced
+  more than a screenful. The two are indistinguishable from the
+  final screen.
+
+  SO THE WAIT REMEMBERS. `echoed` is sticky across the poll loop:
+  seen once and later missing is scrolling, and the visible tail is
+  returned as it always was; never seen at all is
+  `screen.no-echo`. The distinction needs information the last
+  screen does not carry, which is why it lives in the wait rather
+  than in the slicing — and it is why the two halves the issue
+  listed separately are one mechanism.
+
+  THE POLL RAMPS, and that is load-bearing rather than tuning. The
+  echo has to be *caught* before the command's own output scrolls
+  it away, so the first seconds are read at 0.1s; after that there
+  is nothing to catch and only a prompt to wait out, so it drops to
+  the old 2s. A single slow interval would have made the sticky
+  flag miss legitimate scroll-off and turned working commands into
+  errors.
+
+  P8 TRIAGE: an interface change, and an easy approval. `exec` can
+  now raise where it returned a tuple — but only where the tuple
+  was somebody else's text, so nothing that was ever correct
+  changes. No numbered use case is cost and three are served: U12
+  and U14 depend on a command's output being that command's, and
+  U9's caller is the one that cannot tell the difference by
+  inspection. One id is added, `screen.no-echo`, under a subject
+  the scheme already names.
+
+  A TEST ENCODED THE BUG, which is worth recording because it is
+  how the defect survived. `test_core.py`'s adapter test drove a
+  console frozen at a prompt that never echoed and never changed,
+  and asserted `execute` returned — so the suite asserted the
+  broken behaviour as though it were the contract. It now drives a
+  screen that moves, and says why in a comment.
+
+  FOLDED: this entry;
+  [interaction_agentless.py](../reliquary/interaction_agentless.py)
+  (the completion test, `_echo_at`, the sticky flag, the ramped
+  poll, and `_command_output`'s required `echoed`); normative
+  [cli.md](../docs/spec/cli.md) (`exec`'s completion and what it
+  will not return); [api-reference.md](../docs/api-reference.md);
+  `test_machines.py` (the completion suite and the no-echo case),
+  `test_core.py` (the fixture that encoded the bug); and the
+  CHANGELOG's unreleased section, under Fixed.
+
 - D74 — A DRIVE IMAGE IS WRITTEN AT REST, STAGED AND SWAPPED —
   DECIDED (owner, 2026-07-28) and delivered the same day. Supports
   U14, U20; P10, P11, P12, P16, P17. **Closes P16's residue

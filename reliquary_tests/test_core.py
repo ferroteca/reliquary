@@ -669,14 +669,28 @@ class InteractionAdapterTests(unittest.TestCase):
 
 class RunCommandTests(unittest.TestCase):
     def test_agentless_adapter_executes_through_display_console(self):
+        # The screen has to *move*: a command completes when there is
+        # evidence it ran, not when a prompt is visible, so a console
+        # frozen at the prompt wait_ready left would wait out the whole
+        # timeout — which is the behaviour, not a fixture quirk.
+        frames = iter([["C:\\>"] + [""] * 24,
+                       ["C:\\>dir", "2 FILE(S)", "C:\\>"] + [""] * 22])
+        showing = []
+
+        def screen_text():
+            nonlocal showing
+            showing = next(frames, showing)
+            return list(showing)
+
         console = mock.Mock()
-        console.screen_text.return_value = ["C:\\>"] + [""] * 24
+        console.screen_text.side_effect = screen_text
         with _over(console), \
                 mock.patch.object(agentless_module.time, "sleep"):
-            agentless_module.AgentlessGuestExec(
+            rows = agentless_module.AgentlessGuestExec(
                 machine_module.Machine()).execute("dir")
 
         console.send_text.assert_called_once_with("dir")
+        self.assertEqual(rows, ("2 FILE(S)",))
 
 class ScreenshotTests(unittest.TestCase):
     def setUp(self):

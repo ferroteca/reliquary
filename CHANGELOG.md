@@ -203,6 +203,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   rather than inferring it from a suite that happened to pass. Run
   it after `python -m build`.
 
+### Fixed
+
+- **`exec` could return before the command ran, yielding unrelated
+  screen text** ([#6](https://github.com/ferroteca/reliquary/issues/6)).
+  The first `exec` after `start_machine` returned the guest's *boot*
+  output instead of the command's, silently — no error, just a
+  plausible-looking tuple of rows belonging to something else.
+
+  The completion test asked only whether a prompt was on screen, and
+  `wait_ready` returns *because* a prompt is on screen. So `exec`
+  opened by testing the condition its own predecessor had just
+  guaranteed, and the check ran before the guest — still finishing its
+  boot script — had echoed anything. Completion now needs evidence
+  that *this* command landed: its echo, or failing that a screen that
+  has changed since the command was sent.
+
+- **`exec` no longer returns text it cannot attribute to the command.**
+  When the echo could not be found, the old code returned everything
+  above the prompt, which is right when the output scrolled past its
+  own echo and wrong when the command never ran — indistinguishable
+  from the final screen alone. `exec` now tracks whether the echo was
+  ever seen: if it was, a later absence is scrolling and the visible
+  tail is returned as before; if it never appeared, that is
+  `screen.no-echo` rather than somebody else's rows.
+
 ## 0.1.0.dev3 - 2026-07-27
 
 ### Changed

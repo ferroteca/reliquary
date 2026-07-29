@@ -12,6 +12,15 @@ from .machine import Machine
 
 _PROMPT_RE = re.compile(r"^[A-Z]:(\\[^>]*)?>$")
 
+#: How often the screen is read while waiting for a command to finish.
+#: The first seconds are polled hard and the rest slowly, because the
+#: two waits want opposite things: the echo has to be *caught* before
+#: the command's own output can scroll it away, and after that there
+#: is nothing to catch, only a prompt to wait out.
+_ECHO_POLL = 0.1
+_ECHO_WINDOW = 3.0
+_PROMPT_POLL = 2.0
+
 
 class AgentlessGuestExec:
     """Concrete GuestExec adapter for an agentless DOS guest."""
@@ -44,31 +53,78 @@ class AgentlessGuestExec:
         scrolls more than a screenful leaves only its tail there.
         Reliquary attaches no meaning to any of it (G2); the text is
         the caller's to read.
+
+        **A prompt alone does not mean this command finished.**
+        :meth:`wait_ready` returns *because* a prompt is on screen, so
+        a completion test that only asks for one is satisfied by the
+        prompt already sitting there — and returns whatever was above
+        it, which is the boot's output rather than the command's. The
+        wait therefore needs evidence that *this* command landed: its
+        echo, or failing that a screen that has changed since it was
+        sent.
         """
         with self._machine.console() as console:
+            before = [row for row in console.screen_text() if row]
             console.send_text(command)
-            deadline = time.monotonic() + timeout
+            sent = time.monotonic()
+            deadline = sent + timeout
+            echoed = False
             while time.monotonic() < deadline:
                 rows = [row for row in console.screen_text() if row]
-                if rows and _PROMPT_RE.match(rows[-1]):
-                    return _command_output(rows, command)
-                time.sleep(2)
+                # Sticky: once the echo has been seen, a later screen
+                # without it is a scrolled one, not a command that
+                # never ran. Nothing else can tell those apart.
+                echoed = echoed or _echo_at(rows, command) is not None
+                landed = echoed or rows != before
+                if landed and rows and _PROMPT_RE.match(rows[-1]):
+                    return _command_output(rows, command, echoed=echoed)
+                time.sleep(_ECHO_POLL if time.monotonic() - sent < _ECHO_WINDOW
+                           else _PROMPT_POLL)
         raise RunFailure(
             f"timed out after {timeout}s waiting for command to finish: "
             f"{command}", rule_id="screen.no-match")
 
 
-def _command_output(rows, command):
+def _echo_at(rows, command):
+    """Where the command's echo sits in ``rows``, or ``None``.
+
+    The echo is the last row that both ends with the command and
+    carries a prompt before it — the guest repeating back what was
+    typed at it.
+    """
+    needle = command.strip()
+    if not needle:
+        return None
+    for index in range(len(rows) - 1, -1, -1):
+        text = rows[index].rstrip()
+        if text.endswith(needle) and ">" in text:
+            return index
+    return None
+
+
+def _command_output(rows, command, *, echoed):
     """The rows a command produced, between its echo and the prompt.
 
     ``rows`` are the non-blank screen rows, the last being the prompt
-    that came back. The echo is the nearest earlier row that both
-    ends with the command and carries a prompt before it.
+    that came back.
+
+    ``echoed`` says whether the echo was seen at any point during the
+    wait, and it is what separates the two ways the echo can be
+    missing from the final screen. **Scrolled off** — the command
+    produced more than a screenful, which is agentless capture's
+    documented limit — leaves the visible tail, which is the honest
+    answer. **Never there at all** means the command's output could
+    not be located, and returning the rows above the prompt would
+    hand back somebody else's text as though it were the answer. That
+    is a failure to report, not a value to return (P11).
     """
     end = len(rows) - 1
-    needle = command.strip()
-    for index in range(end - 1, -1, -1):
-        text = rows[index].rstrip()
-        if needle and text.endswith(needle) and ">" in text:
-            return tuple(rows[index + 1:end])
-    return tuple(rows[:end])
+    index = _echo_at(rows[:end], command)
+    if index is not None:
+        return tuple(rows[index + 1:end])
+    if echoed:
+        return tuple(rows[:end])
+    raise RunFailure(
+        f"the guest never echoed {command!r}, so what is on screen "
+        "cannot be attributed to it — reliquary will not return text "
+        "it cannot place", rule_id="screen.no-echo")

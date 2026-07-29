@@ -18,7 +18,8 @@ from unittest import mock
 
 from reliquary import platform_dos
 from reliquary.errors import PreflightError, RunFailure, StaticError
-from reliquary.interaction_agentless import _command_output
+from reliquary.interaction_agentless import (AgentlessGuestExec,
+                                             _command_output)
 from reliquary.machines import exec as machines_exec
 from reliquary.machines import (apply_blueprint, create_machine,
                                 destroy_machine, eject_media, get_file,
@@ -1067,18 +1068,113 @@ class CommandOutputTests(unittest.TestCase):
     def test_the_rows_between_echo_and_prompt_are_the_output(self):
         rows = _command_output(
             ["C:\\>DIR", "VOL SERIAL IS 1234", "2 FILE(S)", "C:\\>"],
-            "DIR")
+            "DIR", echoed=True)
         self.assertEqual(rows, ("VOL SERIAL IS 1234", "2 FILE(S)"))
 
     def test_a_command_with_no_output_returns_nothing(self):
         self.assertEqual(
-            _command_output(["C:\\>CLS", "C:\\>"], "CLS"), ())
+            _command_output(["C:\\>CLS", "C:\\>"], "CLS", echoed=True), ())
 
     def test_a_scrolled_echo_yields_what_is_still_visible(self):
         # The honest limit of screen scraping: the echo scrolled off,
-        # so what remains on screen is what the caller gets.
-        rows = _command_output(["LINE 1", "LINE 2", "C:\\>"], "TYPE BIG.TXT")
+        # so what remains on screen is what the caller gets. `echoed`
+        # is what says it scrolled rather than never arrived.
+        rows = _command_output(["LINE 1", "LINE 2", "C:\\>"],
+                               "TYPE BIG.TXT", echoed=True)
         self.assertEqual(rows, ("LINE 1", "LINE 2"))
+
+    def test_an_echo_never_seen_is_a_failure_not_a_tuple(self):
+        # The same screen, and the opposite answer: with no echo ever
+        # observed, the rows above the prompt belong to something else
+        # and returning them would pass one command's text off as
+        # another's (P11).
+        with self.assertRaises(RunFailure) as caught:
+            _command_output(["LINE 1", "LINE 2", "C:\\>"],
+                            "TYPE BIG.TXT", echoed=False)
+        self.assertEqual(caught.exception.rule_id, "screen.no-echo")
+        self.assertIn("never echoed", str(caught.exception))
+
+
+class _ScriptedConsole:
+    """A console playing a fixed sequence of screens."""
+
+    def __init__(self, frames):
+        self.frames = list(frames)
+        self.sent = []
+
+    def send_text(self, text, enter=True):
+        del enter
+        self.sent.append(text)
+
+    def screen_text(self):
+        return list(self.frames[0] if len(self.frames) == 1
+                    else self.frames.pop(0))
+
+
+class _ScriptedMachine:
+    def __init__(self, frames):
+        self.console_double = _ScriptedConsole(frames)
+
+    @contextlib.contextmanager
+    def console(self):
+        yield self.console_double
+
+
+class CommandCompletionTests(unittest.TestCase):
+    """A prompt alone does not mean *this* command finished.
+
+    `wait_ready` returns because a prompt is on screen, so a
+    completion test that asks only for a prompt is satisfied by the
+    one already there — and hands back the boot's output as though it
+    were the command's. These are the cases that tell the two apart.
+    """
+
+    PROMPT = "C:\\>"
+    BOOT = ["UDVD2 CD driver, success",
+            "Modules using memory below 1 MB:", PROMPT]
+
+    def _run(self, frames, command="VER", timeout=1):
+        guest = AgentlessGuestExec(_ScriptedMachine(frames))
+        return guest.execute(command, timeout)
+
+    def test_the_prompt_wait_ready_left_is_not_completion(self):
+        # The reported failure: the guest is still finishing its boot
+        # script, the echo has not landed, and the screen is exactly
+        # what wait_ready saw. Nothing here is this command's.
+        with self.assertRaises(RunFailure) as caught:
+            self._run([self.BOOT, self.BOOT])
+        self.assertIn("timed out", str(caught.exception))
+
+    def test_output_is_returned_once_the_echo_lands(self):
+        rows = self._run([
+            self.BOOT, self.BOOT,
+            ["C:\\>VER"],
+            ["C:\\>VER", "FreeCom version 0.86", self.PROMPT]])
+        self.assertEqual(rows, ("FreeCom version 0.86",))
+
+    def test_a_scrolled_echo_still_completes_with_the_tail(self):
+        # Seen once, gone later: that is scrolling, and the tail is
+        # the documented answer rather than an error.
+        rows = self._run([
+            [self.PROMPT],
+            ["C:\\>TYPE BIG.TXT"],
+            ["LINE 24", "LINE 25", self.PROMPT]], "TYPE BIG.TXT")
+        self.assertEqual(rows, ("LINE 24", "LINE 25"))
+
+    def test_a_changed_screen_without_an_echo_still_refuses_to_guess(self):
+        # The screen moved, so something happened and the wait ends —
+        # but nothing ties it to this command, so it fails rather than
+        # returning rows it cannot place.
+        with self.assertRaises(RunFailure) as caught:
+            self._run([[self.PROMPT],
+                       ["SOMETHING ELSE ENTIRELY", self.PROMPT]])
+        self.assertEqual(caught.exception.rule_id, "screen.no-echo")
+
+    def test_the_command_is_sent_exactly_once(self):
+        guest = AgentlessGuestExec(_ScriptedMachine([
+            [self.PROMPT], ["C:\\>VER", "FreeCom version", self.PROMPT]]))
+        guest.execute("VER", 1)
+        self.assertEqual(guest._machine.console_double.sent, ["VER"])
 
 
 class InBandFileTests(_HomeCase):

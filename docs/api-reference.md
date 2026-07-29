@@ -142,6 +142,10 @@ no meaning to what travels through them.
   storing nothing. Agentless capture, so the output is the visible
   screen — a command that scrolls further leaves only its tail;
   retrieve a file or read a machine variable when you need more.
+  Completion means *this* command finished rather than that a prompt
+  is visible, so output that cannot be tied to the command raises
+  `RunFailure` (`screen.no-echo`) instead of returning rows that
+  belong to something else.
   Non-DOS platforms raise `NotImplementedError`. CLI twin: `exec`.
   (The name shadows the Python builtin where it is imported by name,
   which is the price of the twin-name identity rule; `builtins.exec`
