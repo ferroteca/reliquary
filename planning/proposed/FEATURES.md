@@ -1335,6 +1335,101 @@ declarations; that is the constraint's whole point, and the
 pressure runs the other way by design: a settings key in repeated
 use across blueprints is demand arriving for a curated F27 name.
 
+## F29 — The drive-geometry report
+
+> **Entered 2026-07-29** from a consuming project's proposal
+> (owner: admitted as a proposal). Demanded by **U14** in force —
+> the caller drives a machine from a program, and between create
+> and start it stages files and composes the commands that will
+> run them, both spoken in guest addresses — with **P17** beside
+> it: guest files are named in the guest's terms, and a caller can
+> only cooperate with that rule for terms it has some way to
+> *learn*. **P11** shapes the entry rather than demanding it: the
+> facts exist since 0.1.0.dev5 (D77/D78) and every file verb
+> consumes them, so a caller that cannot ask is left rediscovering
+> them by inference — the exact defect D78 retired. That demand is
+> not hypothetical: the day D78 shipped, a consuming project
+> briefly mirrored the retired one-volume rule to keep its letters
+> and withdrew the mirror the same day, choosing to stay on
+> 0.1.0.dev4 until this surface exists.
+
+Reliquary reads a stopped machine's disks and answers to nobody.
+The at-rest layer walks the partition table, pins the FAT types
+value by value, and reads the BPB; per-disk volume counts are
+computed and cached in machine state; the letter map consumes
+them. All of it is private: the five file verbs answer only about
+an *address*, and `platform_dos.drive_letters` now takes a
+`volumes` argument no public caller can supply. The observation
+exists; there is no window onto it.
+
+The ask: **one machine-level report for a created, stopped
+machine** — what its drives are and what they actually hold.
+
+- **Per drive, the declared and chosen facts**: key, medium, slot;
+  the materialization performed (`use`, `copy`, `difference`) and
+  the backing standing behind it (qcow2, raw, a directory served
+  as one FAT volume).
+- **Per disk, what was read at rest**: the volume count, and per
+  volume the filesystem read for what it declares itself to be,
+  its label where one exists, and its geometry where the BPB
+  states one — unanswered rather than guessed where none does.
+- **The platform's derivation over that**: the volume-to-guest-
+  namespace mapping in the platform's own vocabulary — for DOS,
+  the letter map, letter to (drive key, volume index). A disk
+  whose volumes cannot be read leaves the letters behind it
+  **named as undetermined, with the blocking disk's own reason
+  and id** — the same words the file verbs already use, because
+  they are the same facts (P11).
+
+The window is the at-rest window and nothing new: between
+`create_machine` and `start_machine` — a created machine's phase
+is `ready` and the at-rest gate admits exactly that — and after
+any stop; a running machine is refused as every at-rest verb
+refuses it. Counts are cleared at every start (D78), so the
+answer is always about *this* boot's disk.
+
+The posture already has a sibling on the other side of
+materialization: `create-machine --dry-run` reports what a create
+*would* build before anything exists; this reports what a create
+*did* build before anything boots. Landing rule: **P6** — the API
+function and its CLI twin land in one change, and `--json` prints
+exactly what the twin returns, the dry-run family's own
+convention.
+
+**Room reserved, not scope**: the mapping section is per-platform
+vocabulary owned by each platform layer. DOS is the delivered
+platform and its letter map is the delivered content; a future
+Linux/BSD platform would add its own map (device nodes and
+mounts) under the same section without reshaping the report.
+Nothing platform-plural is built here.
+
+**Not adopted from the source proposal**: nothing — it is
+deliberately shape-agnostic, asks for the answer and not the
+mechanism, and leaves name, arity, and dress to this side. D56 is
+untouched: a *declared* volume count stays refused; this report
+is the observation that makes declaring one unnecessary.
+
+DECIDE FIRST:
+
+- **One report or two.** The geometry and the mapping could be
+  separate verbs; one report is argued here, because the mapping
+  is derived from the geometry and two verbs invite the two to
+  drift. The open shape question on F19 (a report of the *home*)
+  is a different subject and neither folds into the other.
+- **The name.** `describe-sources` is the nearest existing
+  spelling; the `list-*` family is the nearest plural. Whatever
+  is chosen becomes the API twin's name under the identity rule
+  (F20's lesson).
+- **Whether an unmaterialized blueprint may ask.** The dry-run
+  family owns the before side; the recommendation is created-only,
+  so the report never speaks about disks that do not exist yet
+  and the two families stay distinguishable by their subjects.
+- **Whether a running machine gets a partial answer** (floppies
+  place regardless). The recommendation is refusal, phase-gated
+  like the file verbs: a partial letter map is how a caller
+  addresses the wrong drive confidently, which is the defect
+  class D78 exists to prevent.
+
 ## Horizon — smaller and later
 
 > **Not a feature, and so unnumbered.** This is a holding list of
