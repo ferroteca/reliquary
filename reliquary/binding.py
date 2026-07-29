@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Binding declared script properties before a run.
 
 A script declares each property it consumes; before the machine

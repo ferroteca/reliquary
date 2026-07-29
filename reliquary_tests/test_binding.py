@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The property binding pipeline (milestone 8, T3).
 
 Order: --property, blueprint parameter, environment, properties file,

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for the static rules S3, S5, S7-S11 over the typed tree."""
 
 import unittest

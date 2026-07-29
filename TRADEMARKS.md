@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Paul Galbraith
-SPDX-License-Identifier: BSD-3-Clause
+SPDX-License-Identifier: GPL-3.0-only
 -->
 
 # Name and trademarks
@@ -10,16 +10,21 @@ that name as it relates to this software, including the word
 "Reliquary" used to identify the project, its distributions, and its
 command-line entry points.
 
-The [BSD 3-Clause License](LICENSE) covers the **software** — copyright
-in the source and binaries. It does **not** grant rights in the
+The [GNU General Public License v3.0](LICENSE) covers the **software** —
+copyright in the source and binaries. It does **not** grant rights in the
 Reliquary name or other project marks. Those remain with Paul
 Galbraith and are governed by this policy.
+
+Reserving the name is expressly permitted by the GPL: section 7(e) allows
+a license to decline to grant rights in trade names or trademarks, and
+this policy is that declination. It restricts nothing the GPL grants in
+the software itself.
 
 ## What you may do
 
 Without further permission, you may:
 
-- Fork, modify, and redistribute the software under the BSD-3-Clause
+- Fork, modify, and redistribute the software under the GPL-3.0-only
   terms, under a **different** project name.
 - Refer to the upstream project factually — for example, "based on
   Reliquary", "compatible with Reliquary", or "forked from
@@ -49,5 +54,5 @@ The code may be free to reuse; the name is not.
 
 When someone installs or runs "Reliquary", they should be getting this
 project from its author. Keeping the name reserved preserves that
-signal while leaving the BSD-licensed code free to fork and ship under
+signal while leaving the GPL-licensed code free to fork and ship under
 another name.

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for the blueprint file-authoring conveniences.
 
 Composed-blueprint parsing is covered by test_document.py; this module

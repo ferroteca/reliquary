@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Paul Galbraith
-SPDX-License-Identifier: BSD-3-Clause
+SPDX-License-Identifier: GPL-3.0-only
 -->
 
 # DECISIONS
@@ -187,6 +187,117 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D82 — THE PROJECT IS GPL-3.0-ONLY, RELICENSING IS RESERVED, AND
+  CONTRIBUTIONS ARE ASSIGNED — DECIDED (owner, 2026-07-29). Supports
+  (none): no use case or principle demands a licence, and the
+  governing vision is silent on ownership. Recorded because it
+  constrains what may enter the codebase forever afterward, which
+  nothing else in this record would otherwise state.
+
+  THE LICENCE IS GPL-3.0-ONLY, replacing BSD-3-Clause. Reliquary is
+  copyleft from here: it may be run, studied, modified, and
+  redistributed freely, and may not be taken into a proprietary
+  product. Releases through `0.1.0.dev4` went out under BSD and stay
+  there — a licence change binds forward only, and nothing published
+  is withdrawn.
+
+  WEIGHED AND DECLINED: **GPL-3.0-or-later**, which would have kept the
+  door open to absorbing GPL-2.0-only code from the QEMU orbit. The
+  reservation below closes that door for an unrelated reason, so the
+  flexibility bought nothing and the cost was real — "or later"
+  delegates the definition of future terms to a third party, which is
+  the one thing an owner reserving relicensing rights should not do.
+  **AGPL-3.0-only** was also declined: it closes a narrow
+  hosted-service gap at the price of the many corporate policies that
+  refuse AGPL outright even for internal use, and the project would
+  rather be usable.
+
+  RELICENSING IS RESERVED, AND NOTHING IS PLANNED. The owner holds
+  copyright in the whole work and reserves the right to relicense on
+  any terms. There is no second licence, no commercial offering, and
+  nothing in preparation; the reservation exists so the option is not
+  lost by default. **It is framed as relicensing rather than dual
+  licensing deliberately** — dual licensing names one particular use of
+  the right and would advertise an intention the project does not
+  have.
+
+  THE RESERVATION COSTS SOMETHING AND THE COST IS PAID OPENLY. A
+  reserved right that surfaces later reads as a rug-pull, so it is
+  stated in README.md, CONTRIBUTING.md, and CLA.md, together with the
+  binding counterweight: `CLA.md` section 4 makes it a term, not a
+  promise, that no relicensing may withdraw a release already made
+  under the GPL.
+
+  CONTRIBUTIONS ARE ASSIGNED, NOT MERELY LICENSED. This follows the
+  standing `manage-contribution-licensing` policy for the owner's
+  GPL-3.0 projects. WEIGHED AND DECLINED: the **Qt model** — contributor
+  retains copyright, grants an irrevocable sublicensable licence — which
+  is sufficient for relicensing and lower friction, and was the first
+  recommendation put to the owner in the design round. It was declined
+  on **enforcement standing**: only a copyright owner may bring an
+  infringement action, so under a licence-only CLA the project could
+  not act alone against a proprietary fork of a contributor's code.
+  A copyleft licence is only worth what its enforceability is worth,
+  which makes ownership the point rather than a formality. **Plain
+  assignment with no fallback** was declined too: assignment between
+  living persons is void in some jurisdictions (§29 UrhG is the
+  standing example), and an assignment that simply fails leaves the
+  project holding nothing. `CLA.md` therefore falls back automatically
+  to the broadest exclusive sublicensable licence a jurisdiction
+  permits, and licenses the contribution back to its author so
+  assigning it costs them no use of their own work.
+
+  ASSIGNABILITY REPLACES LICENCE COMPATIBILITY AS THE INCOMING TEST,
+  which is the sharpest practical consequence and the one most likely
+  to be got wrong. Third-party source cannot be accepted **at all**,
+  however permissive its licence, because a contributor cannot assign
+  title they do not hold. Third-party code enters as a declared
+  dependency or not at all. The dependency tiers that govern which
+  licences may be depended on, and on what terms, are stated in
+  AGENTS.md, which is their normative home.
+
+  WHAT IS STATED AND WHAT IS VETTED AGAINST ARE DELIBERATELY
+  DIFFERENT, and the gap is the ruling rather than an oversight.
+  Publicly the project reserves *relicensing* and says nothing is
+  planned, which is true and is the whole of the disclosure the
+  reservation needs. Internally, every external source — dependency
+  and prior-art reference alike — is vetted as though the likely form
+  of any relicensing is a **commercial dual licence**, because that is
+  the strictest realistic outcome and vetting to a weaker bar forfeits
+  the reserved option invisibly. The operative question is therefore
+  "could this ship inside a proprietary product?", never "is this
+  GPL-compatible?" — the GPL arm could absorb a great deal a
+  commercial arm never could, and the difference between those two
+  sets is exactly what the reservation holds open. WEIGHED AND
+  DECLINED: vetting to the GPL bar and revisiting if a commercial
+  licence is ever wanted. The asymmetry kills it — judging correctly
+  costs nothing when a dependency is first considered and cannot be
+  revisited at any price afterwards, because by then the code is
+  load-bearing and the upstream author owes nobody a sale.
+
+  RECORD BOTH REASONS WHEREVER DOCTRINE AND LICENCE AGREE, which this
+  round learned the hard way and is the reason the prior-art
+  correction below was needed at all. The two fail differently: a
+  licence argument can be falsified by a licence change, and doctrine
+  cannot. A boundary resting on the licence alone is one relicense
+  away from having no reason behind it, which is precisely what
+  happened to the os-autoinst paragraph the day this decision landed.
+
+  THE PRIOR-ART REASONING WAS FALSIFIED BY THIS CHANGE AND IS
+  CORRECTED IN PLACE — in AGENTS.md, where the doctrine lives, not
+  here. Recorded because the old reasoning is quotable and someone
+  will quote it: while the project was BSD-3-Clause, os-autoinst's
+  GPL-2.0-or-later licence *by itself* barred porting its code. Under
+  GPL-3.0-only that is simply false — GPL-2.0-or-later may be taken
+  under GPLv3 — so licence compatibility stopped being the obstacle
+  the moment this project became copyleft. **The boundary did not
+  move, which is the point.** It rested all along on doctrine (a close
+  translation is a port whatever a licence permits), and it is now
+  joined by assignability, which bars the same code permanently and
+  for an independent reason. The 2026-07 note that "the bar is
+  doctrine, and it does not move with the license" was written
+  anticipating exactly this, and it held.
 
 - D81 — STATICALLY REACHABLE MEANS THE GUEST DECIDED NOTHING; THE
   CHECK FAMILY IS GUARDED, NOT MERELY GONE — DECIDED (owner,

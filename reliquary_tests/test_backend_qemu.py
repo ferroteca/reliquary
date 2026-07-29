@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Installed tests for the QEMU adapter: ownership, images, rendering.
 
 Everything below the adapter seam that only QEMU knows — the owned

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The error taxonomy: one root, four classes, one internal fault.
 
 Every deliberate reliquary error subclasses :class:`ReliquaryError`,

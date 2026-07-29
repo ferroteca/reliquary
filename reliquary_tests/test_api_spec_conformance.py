@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """CLI-API parity, checked against the rule that states it.
 
 P24's inventory pass over the embedding API. The comparison the

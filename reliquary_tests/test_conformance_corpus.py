@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The shared static-conformance corpus (composed blueprint model).
 
 Every fixture under ``fixtures/conformance/blueprint/`` is run against

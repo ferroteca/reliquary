@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for whole-source catalog + fetch-plan resolution.
 
 This is where the second phase of validation lives, so it is where the

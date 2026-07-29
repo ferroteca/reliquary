@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Assert the built artifacts carry what they must.
 
 The suite is sdist-only, so nothing running inside the wheel checks

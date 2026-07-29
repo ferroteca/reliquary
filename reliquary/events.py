@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The run event stream — live output, never a file.
 
 A run emits one normative event stream (docs/spec/script-spec.md,

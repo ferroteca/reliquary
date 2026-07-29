@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Paul Galbraith
-SPDX-License-Identifier: BSD-3-Clause
+SPDX-License-Identifier: GPL-3.0-only
 -->
 
 # Changelog
@@ -71,6 +71,72 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   install — rather than implying a completeness it cannot have.
 
 ### Changed
+
+- **BREAKING: Reliquary is now GPL-3.0-only.** The project was
+  BSD-3-Clause through `0.1.0.dev4`; every release from here is
+  copyleft. Anyone may still run, study, modify, and redistribute it,
+  but a distributed work incorporating Reliquary must now also be
+  GPL-3.0-only, and it can no longer be taken into a proprietary
+  product. Already-published releases are unaffected: what went out
+  under BSD stays under BSD, and this changes nothing retroactively.
+
+  `LICENSE` now carries the GPL v3 text, `LICENSES/BSD-3-Clause.txt` is
+  replaced by `LICENSES/GPL-3.0-only.txt`, and the SPDX header on every
+  file in the repository (127 of them) reads `GPL-3.0-only`, as do
+  `REUSE.toml` and the `license` field in `pyproject.toml`.
+
+- **The relicensing reservation is now stated, and it is the reason
+  contributions require a copyright assignment.** Paul Galbraith holds
+  copyright in the whole work and reserves the right to relicense it on
+  any terms. Nothing is planned or in preparation; the reservation
+  exists so the option is not lost by default. It takes nothing back —
+  every version published under the GPL stays under the GPL
+  permanently, which `CLA.md` section 4 makes a binding term rather
+  than a promise.
+
+  **New: `CLA.md`**, a copyright assignment with an automatic fallback
+  to an exclusive sublicensable licence for jurisdictions that bar
+  assignment between living persons, plus a licence-back so a
+  contributor keeps full use of their own work. It carries an explicit
+  notice that it awaits legal review before the first external
+  contribution is accepted under it.
+
+  `CONTRIBUTING.md` gains the terms in human form, including the rule
+  that surprises people most: **third-party source cannot be accepted
+  at all**, however permissive its licence, because a contributor
+  cannot assign title they do not hold. Assignability, not licence
+  compatibility, is the test now.
+
+- **`AGENTS.md` gains dependency licence tiers and a corrected prior-art
+  record.** Tier 1 is sublicensable and freely dependable, tier 2 is
+  arm's-length only (LGPL as an unmodified dependency, GPL as a
+  separate process), tier 3 is refused outright. Build-time
+  dependencies are out of scope — they are not distributed.
+
+  The tiers are drawn against a stricter bar than the licence itself
+  needs. What the project *states* is that relicensing is reserved and
+  nothing is planned; what it *vets against* is the strictest realistic
+  outcome, a commercial dual licence. So the question asked of any
+  external source — dependency or prior-art reference — is "could this
+  ship inside a proprietary product?", never "is this GPL-compatible?"
+  The GPL arm could absorb a great deal a commercial arm never could,
+  and vetting to the looser bar would forfeit the reserved option
+  invisibly, at a moment when the judgement was free and long before
+  anyone noticed it had been made.
+
+  The prior-art section corrects reasoning that the relicense falsified.
+  It previously held that os-autoinst's GPL-2.0-or-later licence *by
+  itself* barred porting its code into a BSD project. That was true and
+  is now not: GPL-2.0-or-later may be taken under GPLv3, so licence
+  compatibility stopped being the obstacle the moment Reliquary became
+  copyleft. **The boundary did not move.** It rests where it always
+  actually rested — on doctrine, a close translation being a port
+  whatever a licence permits — now joined by assignability, which bars
+  the same code permanently and for an independent reason. The
+  `consoles/VNC.pm` carve-out is corrected on the same grounds. The
+  standing invitation to reassess adopting QEMU's in-tree `QEMUMachine`
+  is withdrawn: it is GPL-2.0-only and unassignable, so the answer is
+  no on licensing grounds regardless of maintenance.
 
 - **BREAKING: `check-script` is gone. `run-script --dry-run` is its
   one spelling**, and `check_script()` / `ScriptCheck` go with it —

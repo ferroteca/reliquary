@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Runtime executor for ``.rlqs`` scripts on QEMU/DOS.
 
 The dynamic semantics are docs/spec/script-spec.md's

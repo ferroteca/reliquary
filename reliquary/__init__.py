@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """OS installation scripting over agentless QEMU guest automation."""
 
 from .blueprint import add_media, delete_blueprint, new_blueprint

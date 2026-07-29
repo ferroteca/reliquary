@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 #
 # NARROWED 2026-07-27 (D53). This file used to carry two problems:
 # the reservation asymmetry, and the contrast below. The first is

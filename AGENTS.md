@@ -686,23 +686,84 @@ Doctrine to preserve:
 
 ## Licensing
 
-The project is BSD-3-Clause and follows REUSE conventions. The name
-**Reliquary** is reserved to Paul Galbraith under [TRADEMARKS.md](TRADEMARKS.md);
-do not weaken or contradict that policy in docs or packaging metadata.
+The project is **GPL-3.0-only** and follows REUSE conventions. The name
+**Reliquary** is reserved to Paul Galbraith under [TRADEMARKS.md](TRADEMARKS.md) — a reservation GPL section 7(e)
+expressly permits; do not weaken or contradict that policy in docs or packaging metadata.
 
-Every new file authored for the project by Paul needs:
+Every new file authored for the project needs:
 
 ```text
 SPDX-FileCopyrightText: 2026 Paul Galbraith
-SPDX-License-Identifier: BSD-3-Clause
+SPDX-License-Identifier: GPL-3.0-only
 ```
 
 Use the appropriate comment syntax for the file type. Files that cannot or should not carry headers must be covered by
 `REUSE.toml`.
 
-External contributors retain copyright in accepted contributions and license them under BSD-3-Clause. Their new files
-must use accurate contributor copyright notices rather than attributing their work to Paul. Keep the human submission
-terms in `CONTRIBUTING.md` synchronized with this policy.
+### The relicensing reservation, and what it constrains
+
+Paul holds copyright in the whole work and **reserves the right to relicense the project on any terms**. Nothing is
+planned; the reservation exists so the option is not lost by default. Two consequences bind everything below, and
+neither is negotiable at the level of an individual change:
+
+- **The project must own every line it ships.** Relicensing is only available to a party holding rights in the whole
+  work, and enforcing copyleft requires standing that only an owner has. One file the project cannot account for
+  forecloses both, permanently and silently.
+- **Assignability, not licence compatibility, is the test for incoming code.** GPL-compatible is not good enough. Code
+  the project cannot acquire *title* to cannot enter, whatever its licence.
+
+**Vet against a commercial dual licence, and say only "relicensing" out loud.** These are two different jobs and the
+difference between them is deliberate. What the project *states* — in README.md, CONTRIBUTING.md, and CLA.md — is that
+relicensing is reserved and nothing is planned, which is true and is all the disclosure the reservation needs. What the
+project *vets against* is the strictest realistic outcome, which is a commercial dual licence, because vetting to a
+weaker bar would forfeit the reserved option invisibly.
+
+So the question to ask of any external source is **"could this ship inside a proprietary product?"** — never "is this
+GPL-compatible?" The second question has a comfortable answer far more often than the first, which is exactly why it is
+the wrong one. Reliquary's own GPL arm could absorb a great deal that a commercial arm never could, and the difference
+between those two sets is precisely what the reservation is holding open.
+
+The asymmetry is what makes this worth the discipline: judging correctly costs nothing at the moment a dependency or a
+reference is first considered, and cannot be revisited afterwards at any price. By the time it matters the code is
+load-bearing, and the upstream author is under no obligation to sell anything.
+
+Contributions are therefore accepted only under the copyright assignment in `CLA.md`, with an automatic fallback to an
+exclusive sublicensable licence where a jurisdiction bars assignment. Once assigned, a contributor's files carry Paul's
+copyright notice, because he is then the actual owner — the REUSE record states ownership, not authorship, and
+authorship credit lives in the git history. Keep the human submission terms in `CONTRIBUTING.md` synchronized with this
+policy.
+
+**Never merge third-party source.** Not permissively licensed source, not public-domain-looking snippets, not vendored
+files. The contributor cannot assign what they do not own, and neither can the project. Third-party code enters as a
+declared dependency or not at all.
+
+### Dependency licence tiers
+
+Every runtime dependency sorts into exactly one tier, and the tiers are drawn against the commercial-dual-licence bar
+above rather than against GPL compatibility. Adding a dependency in a lower tier than it belongs is the single change
+most likely to cost the project something it cannot get back.
+
+| Tier | What qualifies | Standing |
+|---|---|---|
+| **1 — Sublicensable** | MIT, BSD-2/3-Clause, Apache-2.0, ISC, PSF, MIT-CMU/HPND, Zlib | Freely dependable. Attribution obligations carry into any redistribution. |
+| **2 — Arm's length only** | LGPL as an unmodified, separately installed dependency; GPL invoked as a **separate process** | Permitted, never combined. Vendoring, forking, patching, or bundling it into a frozen executable demotes it to tier 3. |
+| **3 — Refused** | Any GPL/AGPL code that would be linked, imported, or copied into the project | Never. Compatible with the GPL arm and fatal to the reservation, which is the whole point of the tier. |
+
+Build-time and development dependencies are **out of scope entirely** — they are not distributed, so their licences
+impose nothing. The tiers govern what a `pip install reliquary` pulls in.
+
+The current runtime closure is tier 1 throughout except `qemu.qmp`, which is tier 2 and discussed under prior art
+below. Verify a new dependency's whole transitive closure, not just the package named — a tier-1 package that pulls a
+tier-3 one is a tier-3 problem.
+
+Two conditions on tier 2 exist only because of the commercial-arm bar, and both are easy to breach by accident:
+
+- **A frozen single-file executable is not arm's length.** Shipping Reliquary via PyInstaller, Nuitka, or py2exe would
+  bundle `qemu.qmp` in a form the user cannot replace, which is exactly what LGPL's relinking requirement forbids.
+  Decide the LGPL story before building one, not after.
+- **LGPL requires permitting reverse engineering for debugging modifications** to the library. A boilerplate
+  commercial EULA's blanket anti-reverse-engineering clause would breach it. If a commercial licence is ever drafted,
+  carve this out — it is invisible until someone reads both documents together, and by then it is a breach.
 
 ## Development environment
 
@@ -815,10 +876,36 @@ subcommand help.
 
 ## Architecture and prior art
 
+**Every project named in this section is a concept reference. None is an implementation source.** The rule is doctrine
+and it predates the licence change: designs are studied and reimplemented, code is never read for reimplementation,
+ported, or translated. What the GPL-3.0-only move and the relicensing reservation add is a second, independent reason
+the answer can never be yes — the project cannot acquire title to another author's code, so adopting it would forfeit
+the reservation permanently. **Where the two reasons ever appear to diverge, the doctrine governs.** A close
+translation is a port whatever a licence permits.
+
+Vet these the way dependencies are vetted, against the commercial-dual-licence bar rather than GPL compatibility. For
+every project named below the doctrine already settles it, so the licence question is never the one doing the work —
+but **record both reasons anyway**, because they fail differently. A licence argument can be falsified by a licence
+change, and this section has already had that happen once: the os-autoinst reasoning below was true under BSD and
+false the day the project became copyleft, while the doctrine it sat beside did not move an inch. A boundary resting
+on one reason is one licence change away from having none.
+
 Reliquary uses QEMU's published `qemu.qmp` library for protocol handling and implements the machine-lifecycle role
-locally. QEMU's in-tree `QEMUMachine`
-is not published independently; if that changes, reassess whether replacing local lifecycle code would reduce
-maintenance without weakening ownership checks or the public interface.
+locally.
+
+`qemu.qmp` is **tier 2**, and stays there by being left alone: an unmodified, separately installed dependency, imported
+and never vendored, forked, patched, or frozen into a bundled executable. Most of it is LGPL-2.0-or-later, which the
+tier permits. **`qemu/qmp/legacy.py` (`QEMUMonitorProtocol`) is GPL-2.0-only and must never be imported** — it sits in
+a package the project already depends on, so nothing but this rule stands between it and an ordinary-looking import.
+
+QEMU itself is **tier 2 by process separation**, and that separation is load-bearing rather than incidental: Reliquary
+invokes `qemu` as a separate program over the documented QMP protocol, which is arm's-length use of a GPL work rather
+than a combination with it. Never link it, never vendor it, never ship a patched build.
+
+QEMU's in-tree `QEMUMachine` is not published independently. **If that changes, the answer is still no** unless it is
+published under a permissive or LGPL licence: the in-tree code is GPL-2.0-only, unassignable, and adopting it would
+foreclose the reservation. This supersedes the earlier standing invitation to reassess on maintenance grounds — the
+question is no longer about maintenance.
 
 QEMU's own functional tests validate the broad model of scripting a guest over QMP and asserting on observable state.
 Reliquary adds the DOS-specific layer: keyboard conventions, VGA text scraping, prompt
@@ -831,10 +918,25 @@ adapter seam, command completion over serial via echoed marker strings, per-step
 "milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend
 implementations — Reliquary learns from its designs (the input event model, needle area types, console seams), never
 from its code. Study the documentation and the ideas; reimplement from scratch. **The bar is doctrine, and it does not
-move with the license.** os-autoinst is GPL-2.0-or-later, which already bars porting code, needles, or test modules
-into this BSD-3-Clause project — but `consoles/VNC.pm`, its RFB client and precisely the file a VNC control plane would
-reach for, is dual-licensed `Artistic-1.0 OR GPL-1.0-or-later`, and copyleft does not reach it. It is off limits
-regardless: a close translation is a port whatever the license permits. Deliberate divergences to preserve: VGA text
+move with the license** — which this project has now demonstrated the hard way, because the licence moved and the bar
+did not.
+
+The record is worth keeping straight, since the old reasoning is still quotable and is now wrong. While Reliquary was
+BSD-3-Clause, os-autoinst's GPL-2.0-or-later licence *by itself* barred porting its code, needles, or test modules.
+Under GPL-3.0-only that is no longer true: GPL-2.0-**or-later** may be taken under GPLv3, so licence compatibility
+stopped being the obstacle the moment this project became copyleft. **Nothing about the boundary changed.** What holds
+it now is firmer than what held it before:
+
+- **Doctrine, first and regardless.** A close translation is a port whatever any licence permits, and that was always
+  the actual rule.
+- **Assignability, permanently.** The project cannot acquire title to SUSE's code. Merging it would forfeit the
+  relicensing reservation for good — a one-way door, and one that closes silently.
+
+The same correction applies to `consoles/VNC.pm`, its RFB client and precisely the file a VNC control plane would reach
+for. It is dual-licensed `Artistic-1.0 OR GPL-1.0-or-later`; the earlier note that "copyleft does not reach it" was
+never the point, and both arms are in any case reachable from a GPLv3 project. Artistic-1.0 is additionally too vague
+to build anything on — the FSF's long-standing objection to it stands. It is off limits for the reasons above, which
+apply to it exactly as they apply to the rest of the tree. Deliberate divergences to preserve: VGA text
 scraping instead of image needles for text-mode guests, authored step documents instead of Perl test modules, and a
 local ephemeral-machine tool instead of a testing service (scheduler, workers, and web UI are permanently out of
 scope).
@@ -845,8 +947,24 @@ the matched image. Its vocabulary lands almost one-to-one on the settled landmar
 (`planning/proposed/design/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
 deferred selecting region, tolerance to the similarity percent — and that convergence is the useful part: it says the
 asset model is well-trodden rather than novel. Proprietary, so the concept-reference rule applies by default; the
-public documentation is the whole of what is readable.
+public documentation is the whole of what is readable, and it is the *only* thing to be read — no trial binaries
+decompiled, no EULA-gated material, no support-portal content.
+
+eggPlant is the one reference here where the relicensing reservation *raises* rather than lowers the stakes. A GPL
+hobby project converging on a commercial tool's vocabulary is unremarkable; a project that has publicly reserved the
+right to relicense is a more attractive target for a patent holder in the same space, and the convergence documented
+against `planning/proposed/design/landmarks.md` is a discoverable record. The convergence is genuine and independently
+arrived at, which is exactly why it should stay documented as such — evidence of parallel design, not of borrowing.
+Should the reservation ever be exercised, this is the reference to review first, with advice.
 
 Espressif's `pytest-embedded-qemu` is useful prior art for a future
 `pytest-reliquary` plugin: host pytest orchestration around a native guest test framework. It is not directly reusable
-because it assumes Espressif targets, serial output, and Unity result grammar.
+because it assumes Espressif targets, serial output, and Unity result grammar. MIT-licensed, so it is **tier 1** and
+the only reference here that could in principle be depended on — as a dependency, never as copied source, and the
+concept-reference rule governs its designs like any other.
+
+FreeRDP is the realistic vendored stack should an RDP display carrier ever be built (see
+`planning/proposed/FEATURES.md`). Apache-2.0, so **tier 1**, with two conditions attached: its NOTICE obligations flow
+into every redistribution, and it was relicensed *from* GPL historically, so per-component licensing must be verified
+at the file level before anything is vendored. A project-level licence statement is not sufficient evidence for a
+relicensed codebase.

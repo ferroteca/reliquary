@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The three unbuilt adapters: VirtualBox, VMware Workstation, Hyper-V.
 
 Each is a real entry in the backend priority order (D66) and a real

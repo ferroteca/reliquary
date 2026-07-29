@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Reading and writing a FAT volume in a drive image, on the host.
 
 The at-rest half of in-band file exchange (P16's residue): a machine

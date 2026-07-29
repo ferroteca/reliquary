@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """JSON with Comments (JSONC) reader.
 
 Implements RFC 8259 + // and /* */ comments + trailing commas.

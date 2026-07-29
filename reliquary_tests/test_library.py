@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Built-in library seeding for the composed blueprint model.
 
 Media are components inside the blueprint ``.rlqb`` now, so seeding a

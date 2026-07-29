@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The built-in library: copy-out seeding of shipped artifacts.
 
 The library is a seed, not a resolution tier (docs/spec/codex.md).

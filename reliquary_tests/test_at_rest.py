@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for the at-rest FAT reader (at_rest.py).
 
 The images come from ``fat_image``, written from the format's own

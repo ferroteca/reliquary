@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Whole-source resolution over composed blueprint documents.
 
 Parses every ``.rlqb`` in the active asset source into one catalog —

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Blueprint file-authoring conveniences.
 
 Parsing and validating a composed ``.rlqb`` blueprint lives in

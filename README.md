@@ -1,6 +1,6 @@
 # Reliquary
 
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue.svg)](https://www.python.org/downloads/)
 
 Reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
@@ -789,7 +789,20 @@ Stop QEMU before reading files written to the virtual FAT drive. Writes are flus
 
 ## License
 
-BSD-3-Clause. See [LICENSE](LICENSE).
+GPL-3.0-only. See [LICENSE](LICENSE).
+
+Reliquary is copyleft. You may run, study, modify, and redistribute it
+freely; any work you distribute that incorporates it must also be
+GPL-3.0-only. It cannot be taken into a proprietary product.
+
+Paul Galbraith holds copyright in the project and **reserves the right to
+relicense it**, on any terms, at any time. No relicensing is planned or
+in preparation — the reservation exists so the option is not lost by
+default, not because it is about to be used. It takes nothing back from
+what has already been released: every version published under the GPL
+stays under the GPL, permanently. Contributions are accepted under a
+copyright assignment that keeps the reservation intact; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 The name **Reliquary** is owned by Paul Galbraith and is not licensed
 for use by forks or redistributions. See [TRADEMARKS.md](TRADEMARKS.md).

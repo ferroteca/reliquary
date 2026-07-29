@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Media acquisition and cache reclamation.
 
 Media are specs inside a ``.rlqb``, parsed by ``document.py`` and

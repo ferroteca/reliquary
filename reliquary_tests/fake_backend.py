@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """A backend adapter double, and the seam that installs it.
 
 Cross-cutting on purpose (the neutral home the tdd rules allow): the

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The old script surface and superseded CLI names do not survive.
 
 Milestone 4 task 11: a whole-tree sweep. Historical records

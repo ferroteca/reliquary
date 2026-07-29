@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Backend-neutral interaction with and diagnostics for a running machine.
 
 Above the adapter seam: this module names no backend, opens no

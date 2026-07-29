@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """The conformance corpus for the `.rlqs` scripting language.
 
 P24's second conformance corpus, and the answer to the question

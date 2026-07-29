@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-only
 """Secret properties: the credential store and the fail-safe order.
 
 Spec: docs/spec/script-properties.md, "Secret storage".
