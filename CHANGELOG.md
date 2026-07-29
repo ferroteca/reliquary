@@ -64,6 +64,52 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one verdict, which is what lets the question above be asked at all.
   `assign()` is now expressed over it.
 
+- **`run-script --dry-run` reports how much of a script it could not
+  statically reach.** A statement inside a handler runs only if the
+  guest puts it there, so the plan says how many statements it cannot
+  promise — `10 of 37 statically reachable` on the shipped FreeDOS
+  install — rather than implying a completeness it cannot have.
+
+### Changed
+
+- **BREAKING: `check-script` is gone. `run-script --dry-run` is its
+  one spelling**, and `check_script()` / `ScriptCheck` go with it —
+  deleted, not aliased. A dry run of a script is what `check-script`
+  always was, and carrying two names for one semantic is what this
+  retires. `run_script(label, dry_run=True)` returns the same `DryRun`
+  the create half does.
+
+  Three things change with the merge, none of them a rename:
+
+  - **The selector is optional under `--dry-run` and required for a
+    run**, because its presence chooses which tier is checked: without
+    one, every legality rule; with one, the machine rules as well.
+    Those are the two modes the script spec has always specified, and
+    collapsing them would have deleted one in silence.
+  - **A dry run is a document, not a stream.** `run-script` rejects
+    `--json` because a live run's output is its event stream; under
+    `--dry-run` the twin returns a document, so `--json` becomes legal
+    and prints exactly it. `--progress` and `--display` are refused
+    with `--dry-run` — a plan has no stream to render and no window to
+    show.
+  - The positional keeps `run-script`'s name, `label`, and resolves
+    label-first then bare stem as it always has.
+
+  **Fixed on the way**: `--blueprint` now actually reaches the
+  machine tier. The script spec has always said either selector adds
+  the machine rules, and `check-script` applied them for `--machine`
+  only — so `--blueprint freedos` silently checked less than it
+  claimed to, even with `freedos-0` sitting there. The report naming
+  its own tier is what caught it. A dry run still stops where a run
+  would *create*, so a blueprint with no machine yet reaches the
+  static tier and the report says so.
+
+- **BREAKING: `check_key()` is private.** It validated a property key
+  and returned it — a predicate on a string, exported from the package
+  but named in no parity row and reachable from no command, which made
+  it a standing gap in the CLI–API rule. The parser applies it; a
+  caller pre-validating a key was a use nobody had.
+
 ### Fixed
 
 - **The drive-letter map no longer assumes what a disk holds.** It

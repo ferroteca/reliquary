@@ -234,20 +234,20 @@ class KeyRulesTests(unittest.TestCase):
     def test_valid_keys(self):
         for key in ("alpha", "identity.full-name", "a.b.c",
                     "products.windows-98.install-key", "x_y"):
-            self.assertEqual(properties.check_key(key), key)
+            self.assertEqual(properties._check_key(key), key)
 
     def test_invalid_keys(self):
         for key in ("", "9lives", ".leading", "trailing.",
                     "two..dots", "has space", "-dash", "_under",
                     "seg.9nine"):
             with self.assertRaises(PropertiesError, msg=key):
-                properties.check_key(key)
+                properties._check_key(key)
 
     def test_reserved_namespaces(self):
         for key in ("rlq", "rlq.host.username", "reliquary",
                     "reliquary.anything"):
             with self.assertRaises(PropertiesError, msg=key) as caught:
-                properties.check_key(key)
+                properties._check_key(key)
             self.assertIn("reserved", str(caught.exception))
 
     def test_keys_are_case_sensitive(self):

@@ -44,8 +44,8 @@ from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
 from .properties import (get_property, has_credential, set_property,
                          unset_property, list_properties, is_secret)
-from .script_runner import (ScriptRuntimeError, check_script,
-                            run_script, _resolve_key)
+from .script_runner import (ScriptRuntimeError, run_script,
+                            _resolve_key)
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
 
@@ -57,7 +57,7 @@ _COMMANDS = frozenset({
     "create-machine", "start-machine", "stop-machine",
     "destroy-machine", "recreate-machine", "apply-blueprint",
     "get-machine-dir",
-    "run-script", "check-script", "fetch-media",
+    "run-script", "fetch-media",
     "seed-blueprint", "seed-script", "new-blueprint",
     "delete-blueprint", "search-blueprints",
     "get-property", "set-property", "unset-property",
@@ -504,13 +504,14 @@ def main(argv=None):
         "--display", action="store_true",
         help="show the backend's own display window while the script "
              "runs (input through it is invisible to reliquary)")
-
-    # check-script
-    command = subcommands.add_parser(
-        "check-script", help="check a script")
-    _add_selectors(command)
-    _add_property_inputs(command)
-    command.add_argument("name", help="script name")
+    command.add_argument(
+        "--dry-run", action="store_true",
+        help="report what the run would do and run none of it: no "
+             "machine is started and no statement reaches a guest. "
+             "The only mode in which a selector is optional -- its "
+             "presence chooses which tier is checked -- and the only "
+             "one that answers to --json, a plan being a document "
+             "rather than a stream")
 
     # fetch-media
     command = subcommands.add_parser(
@@ -846,22 +847,31 @@ def _apply_blueprint(arguments):
 
 
 def _script(arguments):
-    """Run a script live and exit by outcome.
+    """Run a script live and exit by outcome, or report a dry run.
 
     Stream-bearing: the run's output is the event stream, which
     ``--progress`` has already rendered — under ``jsonl`` onto stdout,
     terminal event last; under the human modes onto stderr, leaving
     stdout empty. Nothing is written to disk (D36), and nothing more
     is printed here: the outcome travels by exit code.
+
+    ``--dry-run`` makes it the other thing entirely — a document
+    rather than a stream — so the selector, the ``--json`` refusal
+    and the printed result all change with it.
     """
-    _reject_stream_json(arguments, "run-script")
     blueprint_name = getattr(arguments, "blueprint", None)
     machine_selector = getattr(arguments, "machine", None)
-    if not blueprint_name and not machine_selector:
-        raise StaticError(
-            "run-script requires --blueprint or --machine",
-            rule_id="machine.no-selector")
-    run_script(
+    dry_run = getattr(arguments, "dry_run", False)
+    if not dry_run:
+        # A run needs a machine to run against; a dry run does not,
+        # and its selector chooses the tier instead (script-spec.md's
+        # two checkable tiers, preserved by the respelling).
+        _reject_stream_json(arguments, "run-script")
+        if not blueprint_name and not machine_selector:
+            raise StaticError(
+                "run-script requires --blueprint or --machine",
+                rule_id="machine.no-selector")
+    result = run_script(
         arguments.label,
         blueprint=blueprint_name,
         machine=machine_selector,
@@ -869,23 +879,15 @@ def _script(arguments):
         properties=_explicit_properties(arguments),
         properties_file=_properties_file(arguments),
         progress=arguments.progress,
+        dry_run=dry_run,
     )
+    if dry_run:
+        # Under --dry-run the twin returns a document, so --json is
+        # legal here and prints exactly that -- the same rule that
+        # makes it illegal on a live run's event stream.
+        return _emit(arguments, dataclasses.asdict(result),
+                     lambda: print(result.report, end=""))
     return 0
-
-
-def _check_script(arguments):
-    result = check_script(
-        arguments.name,
-        blueprint=getattr(arguments, "blueprint", None),
-        machine=getattr(arguments, "machine", None),
-        properties=_explicit_properties(arguments),
-        properties_file=_properties_file(arguments),
-    )
-    return _emit(
-        arguments,
-        {"report": result.report,
-         "property_sources": result.property_sources},
-        lambda: print(result.report, end=""))
 
 
 def _list_blueprints(arguments):
@@ -1305,8 +1307,6 @@ def _dispatch(arguments):
         return _create(arguments)
     if arguments.command == "run-script":
         return _script(arguments)
-    if arguments.command == "check-script":
-        return _check_script(arguments)
     if arguments.command == "fetch-media":
         return _fetch_media(arguments)
     if arguments.command == "seed-blueprint":

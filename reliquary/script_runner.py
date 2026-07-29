@@ -39,9 +39,10 @@ from .resolve import load_namespace
 from .script_parser import load_script
 from .script_timing import (format_plan, parse_duration,
                             resolve as resolve_timing)
-from .script_validation import PORTABLE_KEY_NAMES
+from .script_validation import PORTABLE_KEY_NAMES, reach
 from . import events as _events
 from . import machines as _machines
+from .machines import DryRun
 
 
 # Returned by a statement list that ended in `finish`: the run is
@@ -318,17 +319,6 @@ class ScriptRun:
     final_phase: str = "-"
     machine_phase: str = "-"
     events: tuple = ()
-
-
-@dataclasses.dataclass(frozen=True)
-class ScriptCheck:
-    """Result of ``check_script``: path, plan, and printable report."""
-
-    script_path: str
-    plan: object
-    report: str
-    machine_id: str = None
-    property_sources: dict = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1526,7 +1516,7 @@ def _blueprint_parameters(state, context):
 
 def run_script(label, *, blueprint=None, machine=None, context=None,
                display=False, properties=None, properties_file=None,
-               progress="auto"):
+               progress="auto", dry_run=False):
     """Resolve ``label``, ensure a machine, run it, and return its output.
 
     Looks up ``label`` in the machine's blueprint ``scripts`` map
@@ -1544,7 +1534,28 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     jsonl``). A failure raises by error class; a Ctrl-C ends the run
     at the next event boundary and raises
     :class:`~reliquary.errors.RunCancelled`.
+
+    ``dry_run=True`` returns a :class:`~reliquary.machines.DryRun`
+    instead — a document, not a stream — having started no machine
+    and delivered no guest input. It is the only mode in which the
+    selector is optional, because its presence chooses which tier is
+    checked; ``display`` and a non-default ``progress`` are refused
+    with it, a plan having no window to show and no stream to render.
     """
+    if dry_run:
+        if display:
+            raise StaticError(
+                "--display shows a running machine's window, and "
+                "--dry-run starts none",
+                rule_id="progress.display-on-a-dry-run")
+        if progress not in (None, "auto"):
+            raise StaticError(
+                "--dry-run returns a document, not a stream, so there "
+                "is no progress to render; read it with --json",
+                rule_id="progress.stream-on-a-document")
+        return _dry_run_script(
+            label, blueprint=blueprint, machine=machine, context=context,
+            properties=properties, properties_file=properties_file)
     # Resolve to an existing machine (or None) without creating, so
     # declared properties bind before any machine or media is made.
     machine_id = _existing_machine(
@@ -1609,32 +1620,44 @@ def _redactor(bindings):
     return redact
 
 
-def check_script(name, *, blueprint=None, machine=None, context=None,
-                 properties=None, properties_file=None):
-    """Parse and statically check a script; return its timing plan.
+def _dry_run_script(label, *, blueprint=None, machine=None, context=None,
+                    properties=None, properties_file=None):
+    """Evaluate a script run, committing none of it.
 
-    Read-only: does not seed the home, create a machine, execute
-    guest steps, prompt, or read a secret's value.
-    Without a selector, ``name`` is a bare script stem. With
-    ``--blueprint`` or ``--machine``, ``name`` resolves through that
-    blueprint's ``scripts`` map first. When a machine is selected,
-    media-slot preflight runs as well. The result names each declared
-    property's supplying source without binding it.
+    The script half of the dry run whose rule is stated in
+    docs/spec/cli.md. Read-only throughout: it seeds nothing, creates
+    no machine, executes no guest step, never prompts and never reads
+    a secret's value — it stops before the machine starts and before
+    any statement reaches a guest.
+
+    **The selector chooses the tier**, which is why it is optional
+    here and required for a real run. Without one, ``label`` is a
+    bare script stem and every legality rule applies. With
+    ``blueprint=`` or ``machine=`` it resolves through that
+    blueprint's ``scripts`` map first and the machine rules apply as
+    well — the two modes script-spec.md specifies, preserved by the
+    respelling rather than collapsed into one.
     """
     machine_id = None
     scripts_map = {}
     parameters = {}
-    if machine is not None:
-        machine_id = _machines.resolve_machine(
+    if machine is not None or blueprint is not None:
+        # Resolved exactly as a live run resolves it, and stopping
+        # where a run would create: `--blueprint` naming a blueprint
+        # with no machine yet leaves nothing to apply the machine
+        # rules against, which the report says rather than implying
+        # the tier it could not reach.
+        machine_id = _existing_machine(
             machine=machine, blueprint=blueprint, context=context)
+    if machine_id is not None:
         state = _machines.load_machine_state(machine_id, context)
         scripts_map = state.get("scripts") or {}
         parameters = _blueprint_parameters(state, context)
     elif blueprint is not None:
         from .library import locate_blueprint
         from .document import load_document
-        # Read-only: locate resolves the codex file directly in home mode
-        # without seeding, so check-script never writes.
+        # Read-only: locate resolves the codex file directly in home
+        # mode without seeding, so a dry run never writes.
         doc = load_document(locate_blueprint(blueprint, context=context))
         machine_component = doc.machines.get(blueprint)
         if machine_component is None and len(doc.machines) == 1:
@@ -1643,7 +1666,7 @@ def check_script(name, *, blueprint=None, machine=None, context=None,
                        if machine_component is not None else {})
         parameters = (dict(machine_component.parameters)
                       if machine_component is not None else {})
-    stem = _resolve_script_stem(name, scripts_map)
+    stem = _resolve_script_stem(label, scripts_map)
     script_path = locate_script(stem, context=context)
     script = load_script(script_path)
     if machine_id is not None:
@@ -1653,12 +1676,63 @@ def check_script(name, *, blueprint=None, machine=None, context=None,
     property_sources = describe_sources(
         script, parameters=parameters, explicit=properties,
         properties_file=properties_file, context=context)
-    plan = resolve_timing(script)
-    report = format_plan(plan, name=os.path.basename(script_path))
-    if property_sources:
-        report += "\n\nproperties:\n" + "\n".join(
-            f"  {key}: {property_sources[key]}"
-            for key in sorted(property_sources))
-    return ScriptCheck(
-        script_path=script_path, plan=plan, report=report,
-        machine_id=machine_id, property_sources=property_sources)
+    timing = resolve_timing(script)
+    reachable, total = reach(script)
+    plan = {
+        "script": script_path,
+        "label": label,
+        "machine": machine_id,
+        "tier": "preflight" if machine_id is not None else "static",
+        "selector": ("machine" if machine is not None
+                     else "blueprint" if blueprint is not None else None),
+        "statements": {"total": total, "statically-reachable": reachable},
+        "timing": dataclasses.asdict(timing),
+        "properties": dict(property_sources),
+    }
+    return DryRun(operation="run-script",
+                  report=_dry_script_report(plan, timing, script_path),
+                  plan=plan)
+
+
+def _dry_script_report(plan, timing, script_path):
+    """Render a script's dry run the way the CLI prints it."""
+    lines = [f"run-script {plan['label']} --dry-run", ""]
+    lines.append(f"script: {script_path}")
+    if plan["machine"] is not None:
+        lines.append(f"machine: {plan['machine']}")
+        lines.append("tier: preflight -- every legality rule, and the "
+                     "machine rules with it")
+    elif plan["selector"] is None:
+        lines.append("tier: static -- every legality rule; no machine "
+                     "was selected, so the machine rules were not "
+                     "applied")
+    else:
+        # The selector chose the preflight tier and there is nothing
+        # to apply it against. A run would create the machine here;
+        # a dry run says so instead of reporting the tier it reached
+        # as though it were the tier that was asked for.
+        lines.append("tier: static -- that blueprint has no machine "
+                     "yet, so the machine rules had nothing to apply "
+                     "to; a run would create one")
+    lines.append("")
+    lines.append(format_plan(timing,
+                             name=os.path.basename(script_path)).rstrip())
+    if plan["properties"]:
+        lines.append("")
+        lines.append("properties:")
+        for key in sorted(plan["properties"]):
+            lines.append(f"  {key}: {plan['properties'][key]}")
+    counts = plan["statements"]
+    lines.append("")
+    lines.append(f"statements: {counts['statically-reachable']} of "
+                 f"{counts['total']} statically reachable")
+    unreached = counts["total"] - counts["statically-reachable"]
+    if unreached:
+        # Said outright rather than left to be inferred: a plan can
+        # only ever be a plan, and a report that implied otherwise
+        # would be claiming a completeness it cannot have.
+        lines.append(f"  {unreached} depend on what the guest does, so "
+                     "no static pass can promise they run")
+    lines.append("")
+    lines.append("nothing was run.")
+    return "\n".join(lines) + "\n"

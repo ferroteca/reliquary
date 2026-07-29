@@ -215,8 +215,24 @@ workflow:
   `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
   effective timeout and every guest-input verb's effective `pacing` — the settling gap before its first
-  key event, D60 — each with the scope that supplied it; `format_plan` /
-  `check_script` / `rlq check-script` report it without running).
+  key event, D60 — each with the scope that supplied it; `format_plan` and
+  `run_script(dry_run=True)` / `rlq run-script --dry-run` report it without running,
+  with `script_validation.reach` counting the statements no static pass can promise
+  will run — a handler body is the guest's decision, not the plan's).
+  **The script dry run is the same `DryRun` the create half returns** and the same
+  rule: read-only throughout, seeding nothing and never prompting, stopping before
+  the machine starts and before any statement reaches a guest. Two things are its
+  own. **The selector is optional there alone** — its presence chooses which of
+  script-spec.md's two checkable tiers applies, which is what keeps the
+  selector-less mode the respelling would otherwise have deleted in silence. And
+  `--dry-run` flips the command from a stream to a **document**: `--json` becomes
+  legal (it prints exactly what the twin returns) while `--progress` and
+  `--display` are refused, a plan having no stream to render and no window to
+  show. **The whole check family is deleted rather than aliased** (P9): its
+  command, its twin, its result type, and the property-key predicate that went
+  private with them — a public predicate on a string with no CLI twin was a
+  standing P6 residue. `test_old_surface_purge.py` holds the spellings and keeps
+  them retired, which is why they are not written out here.
   `binding.py` resolves declared script properties before a run —
   the flattened source order (explicit `--property`, blueprint
   parameter with its `{"property": ...}` redirect, `RELIQUARY_PROPERTY_*`
@@ -224,7 +240,7 @@ workflow:
   declared `default=` derivation, then an
   interactive ask), the text/media/secret kind rules, secret values
   pulled from the credential store, and `describe_sources` the dry
-  twin that names each key's source for `check-script` without
+  twin that names each key's source for a dry run without
   binding or prompting; declarations bind in topological order so a
   derivation's referents resolve first. `facts.py` owns the `rlq.*`
   run facts a derivation may reference (`rlq.host.username`
@@ -594,7 +610,8 @@ The cached-machine model is the sole embedding surface: `machines.py`'s
 flat verb-noun functions (`create_machine` / `start_machine` /
 `stop_machine` / `destroy_machine` / `recreate_machine` /
 `apply_blueprint` / `get_machine_dir` / `resolve_machine` / …) and the
-script runtime (`script_runner.py`'s `run_script` / `check_script`). The
+script runtime (`script_runner.py`'s `run_script`, whose `dry_run=` returns a
+`DryRun` rather than a `ScriptRun`). The
 milestone-1 root-home runner surface — `workflows.py`'s
 `Runner` / `MachineConfig` / `run_guest_program` / `run_task` / `start`,
 the old root-home state files (a root `machine.json`, `drives/`,

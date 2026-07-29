@@ -325,7 +325,7 @@ replaces the home's file rather than layering over it;
   on reaching the store; the CLI renders it as a stderr warning
   rather than folding it into the result.
 - `is_secret(value)` / `secret_marker()` - Recognize and build the
-  secret marker. `check_key(key)` validates a property key.
+  secret marker.
 
 Secrets are stored in the host's credential service, scoped by the
 absolute path of the properties file holding the marker and the
@@ -359,12 +359,15 @@ an ordinary `set_property` on that key refuses to overwrite.
   stream as plain dicts, in order, the terminal event last. Keep it
   if you want a record; Reliquary keeps none. Failures raise by error
   class (below). CLI twin: `run-script`.
-- `check_script(name, *, blueprint=None, machine=None, context=None,
-  properties=None, properties_file=None)` - Parse and statically
-  check a script; return a printable timing plan and, on
-  `ScriptCheck.property_sources`, each declared property's supplying
-  source — without prompting, running, or reading a secret's value.
-  CLI twin: `check-script`.
+- `run_script(label, dry_run=True, ...)` returns a `DryRun` instead
+  of a `ScriptRun`: it parses and statically checks the script and
+  reports the timing plan, each declared property's supplying source,
+  and how many statements no static pass can promise will run —
+  without prompting, starting a machine, running a guest step or
+  reading a secret's value. **The selector is optional in this mode
+  alone**, its presence choosing which of the two checkable tiers
+  applies. `display=` and a non-default `progress=` are refused with
+  it. Normative: [cli.md](spec/cli.md#the-dry-run).
 - `execute_script(script, *, machine_id, context=None,
   display=False, script_path=None, bindings=None, events=None)` -
   Execute an already-parsed script against a specific machine.
@@ -375,7 +378,7 @@ an ordinary `set_property` on that key refuses to overwrite.
   properties_file=None, context=None, asker=None)` - Resolve every
   declared property through the source order, or raise
   `PropertyBindingError`. `describe_sources(...)` is its dry twin,
-  naming each key's source without binding it (what `check_script`
+  naming each key's source without binding it (what a dry run
   reports).
 
 `create_machine`, `recreate_machine`, and `apply_blueprint` accept

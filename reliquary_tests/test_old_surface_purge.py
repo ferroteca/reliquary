@@ -25,7 +25,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Superseded CLI command words (exact argv tokens).
 _OLD_CLI_COMMANDS = frozenset({
     "script", "keys", "menu", "text", "create", "destroy",
-    "start", "stop", "list",
+    "start", "stop", "list", "check-script",
 })
 
 # Superseded public API names.
@@ -37,6 +37,13 @@ _OLD_API_NAMES = (
     "ExpectBranch",
     "State",
     "EmbeddedMedia",
+    # The check family, retired when `--dry-run` became the one
+    # spelling of "evaluate without doing" (F25). `check_key` went
+    # with them: a public predicate on a string with no CLI twin was
+    # a standing P6 residue, and privacy closed it.
+    "check_script",
+    "ScriptCheck",
+    "check_key",
     # The two-directory model and the asset-root knob, retired when
     # all six working directories became placeable. `set_home` and
     # `set_cache` are the old spellings of `set_home_dir` /
@@ -67,6 +74,9 @@ _ALLOW_PATH_SUFFIXES = (
     # Negative tests: old spellings must fail to parse.
     os.path.join("reliquary_tests", "test_script_parser.py"),
     os.path.join("reliquary_tests", "test_script_validation.py"),
+    # Same rationale: it asserts the retired `check-script` command
+    # is gone, which it cannot do without naming it.
+    os.path.join("reliquary_tests", "test_dry_run.py"),
     # This module names the forbidden spellings.
     os.path.join("reliquary_tests", "test_old_surface_purge.py"),
     # The API spec's realignment section records a completed rename
@@ -97,6 +107,14 @@ _FORBIDDEN = (
      re.compile(r"\blist\s+blueprints\b")),
     ("nested list scripts",
      re.compile(r"\blist\s+scripts\b")),
+    ("check_script",
+     re.compile(r"\bcheck_script\b")),
+    ("ScriptCheck",
+     re.compile(r"\bScriptCheck\b")),
+    ("public check_key",
+     re.compile(r"(?<!_)\bcheck_key\b")),
+    ("rlq check-script",
+     re.compile(r"\bcheck-script\b")),
     ("rlq keys",
      re.compile(r"\brlq\s+keys\b")),
     ("rlq menu",

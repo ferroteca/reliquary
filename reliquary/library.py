@@ -201,7 +201,7 @@ def locate_blueprint(name, context=None):
 
     Identity is the file's ``name`` field when declared, else its
     stem. With autoseeding on, a miss falls back to reading the codex
-    file directly (no copy) so a read-only ``check-script`` never
+    file directly (no copy) so a read-only dry run never
     writes; with it off the directory is the sole source. Copying a
     codex file out on first reference is ``create_machine``'s job.
     Raises :class:`PreflightError` when nothing resolves.
@@ -370,8 +370,7 @@ def locate_script(stem, context=None):
     Resolves from the scripts directory; with autoseeding on, a miss
     falls back to the codex file directly (no copy), with it off the
     directory is the sole source. Raises :class:`PreflightError` when
-    nothing resolves — ``check-script`` uses this so a check never
-    writes.
+    nothing resolves — a dry run uses this so it never writes.
     """
     source = assets.source_for(context)
     path = _script_index(source).get(stem)

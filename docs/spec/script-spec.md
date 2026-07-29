@@ -281,11 +281,13 @@ tiers:
   ([the execution model](#execution-model)). What goes wrong
   here is a RUN FAILURE.
 
-`check-script` has exactly two modes, one per checkable tier:
-without a machine it applies every legality rule; with
+`run-script --dry-run` has exactly two modes, one per checkable
+tier: without a machine it applies every legality rule; with
 `--machine`/`--blueprint` (and optionally
-explicit property values) it adds the machine rules. Dynamic semantics are
-exercised only by a run. See
+explicit property values) it adds the machine rules. **That is why
+the selector is optional under `--dry-run` and required for a
+run** — its presence is how a caller names the tier. Dynamic
+semantics are exercised only by a run. See
 [error classes](#error-classes-and-exit-codes) for how the tiers
 surface to callers.
 
@@ -1543,9 +1545,9 @@ only yield `pacing=1ms`, which says the same thing less honestly.
 Because per-observation and pacing resolution are fully lexical,
 the effective timeout of every observation and the effective gap
 before every guest input are computable at parse time (G3, G4):
-`check-script` reports the resolved timing plan — including a
-`guest input` section naming each verb's pacing and the scope that
-supplied it — and a timing
+`run-script --dry-run` reports the resolved timing plan —
+including a `guest input` section naming each verb's pacing and
+the scope that supplied it — and a timing
 failure names which clock expired and the scope that supplied it —
 an observation timeout from a statement, a phase deadline from its
 declaration, or the run deadline from the header.
@@ -1917,15 +1919,16 @@ capability; a script never runs halfway before discovering that a
 later statement is impossible.
 
 ```text
-rlq check-script <script_name>
+rlq run-script <script_name> --dry-run
     [--machine <id> | --blueprint <name>]
     [--property <key>=<value>]... [--properties <path>]
 ```
 
 performs parsing and static
 analysis — including the resolved timing plan, each observation's
-effective timeout, and its source scope — without executing the
-script, changing the user's properties, accessing secret
+effective timeout, and its source scope, and a count of the
+statements no static pass can promise will run — without executing
+the script, changing the user's properties, accessing secret
 values, or writing any file. Supplying a machine (and any
 explicit values) also performs typed binding — reporting each
 declared property's supplying
@@ -1936,7 +1939,8 @@ Source-aware checking reports property presence, kind, and
 supplying source; it
 never reveals a property value. Its two modes are the two
 checkable tiers of the [processing model](#processing-model);
-the embedding API's twins are `run_script` and `check_script` —
+the embedding API's twin is `run_script(dry_run=True)`, which
+returns a `DryRun` and never a `ScriptRun` —
 `start_script` joins them as `run-script --detach`'s twin,
 returning the run handle whose operations the CLI `run` family
 mirrors, and `attach_run` reopens that handle from a fresh

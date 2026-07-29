@@ -65,7 +65,7 @@ def _properties_path(context=None, properties_file=None):
     from .home import home_dir
     return os.path.join(home_dir(context), "user.properties")
 
-def check_key(key):
+def _check_key(key):
     """Validate a property key, returning it.
 
     Keys are dot-separated segments of ASCII letters, digits, `_`
@@ -224,7 +224,7 @@ def _read(path):
                 rule_id="prop.file-line-malformed")
         key = key.strip()
         try:
-            check_key(key)
+            _check_key(key)
         except PropertiesError as error:
             # The key charter is one rule wherever the key was
             # written, so the id travels and only the location is
@@ -248,7 +248,7 @@ def get_property(key, context=None, properties_file=None):
     actually present is `has_credential`'s question, kept separate
     so reading a property never depends on reaching the store.
     """
-    check_key(key)
+    _check_key(key)
     return _read(_properties_path(context, properties_file)).value(key)
 
 def has_credential(key, context=None, properties_file=None):
@@ -256,7 +256,7 @@ def has_credential(key, context=None, properties_file=None):
 
     Read-only: it never stores or removes anything.
     """
-    check_key(key)
+    _check_key(key)
     path = _properties_path(context, properties_file)
     return credentials.has_secret(credentials.scope_for(path), key)
 
@@ -267,7 +267,7 @@ def get_secret(key, context=None, properties_file=None):
     run. It is deliberately not exported to the CLI: `get-property`
     and `list-properties` reveal only the marker.
     """
-    check_key(key)
+    _check_key(key)
     path = _properties_path(context, properties_file)
     return credentials.read_secret(credentials.scope_for(path), key)
 
@@ -306,7 +306,7 @@ def set_property(key, value, secret=False, context=None,
     (recoverable, and reported) but never a marker whose credential
     was reported bound and is absent.
     """
-    check_key(key)
+    _check_key(key)
     path = _properties_path(context, properties_file)
     properties = _read(path)
     current = properties.value(key)
@@ -342,7 +342,7 @@ def unset_property(key, context=None, properties_file=None):
     nothing. Unsetting a key with no marker still clears an
     orphaned credential — this is the cleanup door.
     """
-    check_key(key)
+    _check_key(key)
     path = _properties_path(context, properties_file)
     properties = _read(path)
     current = properties.value(key)
@@ -372,7 +372,7 @@ def list_properties(prefix=None, context=None, properties_file=None):
     properties = _read(path).projection()
     if prefix is None:
         return dict(sorted(properties.items()))
-    check_key(prefix)
+    _check_key(prefix)
     selected = {
         key: value for key, value in properties.items()
         if key == prefix or key.startswith(prefix + ".")}

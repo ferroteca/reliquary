@@ -134,123 +134,27 @@ delivery drew: a static answer about a backend is not a machine
 materialized on one. What F24 delivers is the question, not the
 capability.)*
 
-## F25 — `run-script --dry-run`, and the end of the check family
+*(F25 — `run-script --dry-run`, and the end of the check family —
+delivered 2026-07-29, the day it was pledged, so its number retires
+unreused and the work items go with it. `check-script`, its twin and
+its result type are **deleted, not aliased** (P9), and
+`test_old_surface_purge.py` keeps them retired; `check_key` went
+private with them, closing the P6 residue D79 found. The three
+surface collisions landed as the entry read them: the selector is
+optional under `--dry-run` alone and its presence chooses the tier,
+`--json` becomes legal there while `--progress` and `--display` are
+refused, and the positional keeps `run-script`'s own name. The
+report now says how much of a script no static pass can promise
+will run. The rulings the build produced are
+[D81](../DECISIONS.md); the surface is normative in
+[cli.md](../../docs/spec/cli.md)'s "The dry run" and
+[script-spec.md](../../docs/spec/script-spec.md)'s two checkable
+tiers.)*
 
-> **Pledged 2026-07-29** (owner), cut from **F11** with F24 — the
-> create half, delivered the same day (above) — and the parent's
-> number retires unreused (D42, D79). Serves **P6** — it retires the
-> second spelling of one semantic — and **P9**, which deletes the
-> old spelling rather than aliasing it. **No use-case impact**:
-> `check-script` ships, and this is a better spelling for it, which
-> is the first triage bullet of
-> [INTERFACES.md](../INTERFACES.md). **This feature carries no
-> decide-first** — D79 settled every one it arrived with.
-
-**`run-script --dry-run` is what `check-script` already is.**
-Everything `ScriptCheck` returns — script path, timing plan,
-resolved machine, property sources, printable report — is a dry run
-of a script. Evaluate parse, static checks, property binding
-(naming unbound keys and their sources), referenced media and
-landmarks, the timing plan, and the machine selector resolving to a
-real machine; stop before starting the machine and before any
-statement reaches a guest. The rule both halves share is stated
-in [cli.md](../../docs/spec/cli.md)'s "The dry run", where F24's
-delivery made it normative.
-
-THE CHECK INVENTORY — three public names carrying the word, and
-they are not one thing:
-
-| name | disposition |
-|---|---|
-| `check_script()` | becomes `run_script(dry_run=True)` |
-| `ScriptCheck` | becomes `DryRun` |
-| `check_key()` | goes private — a different species |
-
-`check_key(key)` validates a property key and returns it. There is
-no operation to dry-run: it is a predicate on a string, like
-`str.isidentifier()`, and folding it into `--dry-run` would be
-forcing it. **It goes private** (D79), which is the tidier of the
-two dispositions F11 offered and the one that closes something —
-it is exported from `reliquary/__init__.py`, appears in no `api.md`
-parity row and has no CLI twin, so it is a standing P6 residue
-today. Privacy closes it; `validate_key()` would keep it open and
-owe a CLI twin for a string predicate. P9 deletes the old spelling
-rather than aliasing it.
-
-THREE SURFACE COLLISIONS, all settled in D79 and none of them
-visible until the shipped commands were read side by side. This is
-what makes the respelling more than a rename, and it is why this
-half — not the create half — is where the surface work is, which
-F24's delivery confirmed: it needed no output-discipline work at
-all.
-
-- **A dry run is a document, not a stream, and the flip is
-  forced.** `run-script` rejects `--json` today, naming
-  `--progress jsonl`: a live run is an event stream. Under
-  `--dry-run` the twin returns a `DryRun`, and `cli.md`'s own rule
-  is that `--json` prints *exactly what the API twin returns* — so
-  `--json` becomes legal and `--progress` has no stream to render.
-  `--progress` and `--display` are refused under `--dry-run` rather
-  than accepted and ignored (P11: say what cannot be done).
-- **The selector relaxes, and the two modes survive.**
-  `run-script` requires `--blueprint` or `--machine`;
-  `check-script` does not, and `script-spec.md` makes the
-  selector-less mode normative — "exactly two modes, one per
-  checkable tier". So under `--dry-run` the selector is optional
-  and its presence chooses the tier: without one, every legality
-  rule; with one, the machine rules as well. Merged without this,
-  the respelling silently deletes a specified mode.
-- **One positional, one name.** `check_script`'s first parameter is
-  `name` and `run_script`'s is `label`; the merged verb keeps
-  `label`, resolving label-first then bare stem exactly as D8 item
-  7 settled — that resolution survives the rename intact.
-
-THE REPORT COVERS THE WHOLE SCRIPT AND SAYS WHAT IT COULD NOT REACH
-(D79). Conditions and handlers depend on guest state, so a plan can
-only ever be a plan — the report states the limit outright
-(`3 statements not statically reachable`) rather than implying a
-completeness it cannot have, which is P11 at the report level.
-Reporting only the statically decidable part was declined: a reader
-cannot tell what was omitted, and the counts stop describing the
-script the caller wrote.
-
-SURFACE, both presentations together (P6):
-
-    rlq run-script LABEL --dry-run [--blueprint NAME | --machine ID]
-
-    run_script(label, *, dry_run=False, ...) -> ScriptRun | DryRun
-
-WHAT IS DELIBERATELY EXCLUDED — mocked statement results, so
-control flow could execute. That is where the feature would change
-species, and the tell is sharp: **a dry run's output is *about* the
-run — a plan, a report, a verdict; a fake backend's output is *of*
-the run.** Once output is *of* the run, three obligations follow
-that a flag is a poor place to carry: somewhere to declare the
-responses, a way to distinguish simulated output from real, and a
-guarantee it cannot be switched on by accident. The accident is
-concrete for any caller that parses guest output — a misconfigured
-run reports every guest test passing having booted nothing. A plan
-can never be mistaken that way; fabricated output can.
-**[F12](../proposed/FEATURES.md) is where that belongs, and the two
-are documented in the same breath**: the first reading of
-`--dry-run`, including by this project's own author, is "simulate
-the run", so the fix is making the fake backends easy to find
-rather than making the validator into one.
-
-Work items:
-
-1. `run_script(dry_run=True)` absorbing `check_script`'s body, and
-   `ScriptCheck` becoming the `DryRun` F24 shipped
-   (`reliquary.machines`: `operation` / `report` / `plan`), whose
-   plan document this operation fills with its own shape.
-2. `--dry-run` on `run-script`: the selector optional and choosing
-   the tier, `--json` legal, `--progress` and `--display` refused.
-3. The report naming what it could not statically reach.
-4. `check_key` private, out of `__init__.py` and out of
-   `api-reference.md`.
-5. `check-script` deleted — the subcommand, the twin, and every
-   mention across `cli.md`, `api.md`, `script-spec.md`,
-   `script-properties.md`, `http-serve.md`, the two references,
-   `README.md` and `AGENTS.md`. P9 leaves no alias behind.
-6. The CHANGELOG line, under the unreleased section, naming the
-   deleted spelling — this is a rename users hit.
+**This shelf stands empty again**, the day it refilled — both
+halves of the cut delivered on the day they were pledged, which is
+what a sprint-sized pledge is supposed to look like. The project
+owes no unbuilt feature; [USE-CASES.md](USE-CASES.md) still owes
+**U7**, which neither half met and neither claimed to. What fills
+this file next arrives the way F24 and F25 did: by someone deciding
+to build something argued in [proposed/](../proposed/).

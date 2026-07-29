@@ -187,7 +187,8 @@ class OrdinaryMistakesAreNotFaultsTests(unittest.TestCase):
         self._write("plain", json.dumps(
             {"type": "machine", "name": "plain", "platform": "dos"}))
         code, text = self._run(
-            "--blueprint", "plain", "check-script", "no-such-script")
+            "--blueprint", "plain", "run-script", "no-such-script",
+            "--dry-run")
         self.assertEqual(code, 3)
         self.assertIn("no-such-script", text)
 

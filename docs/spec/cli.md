@@ -995,7 +995,7 @@ is unbuilt — the codex index it would query is itself planned
 rlq run-script <label> (--blueprint <name> | --machine <id>)
     [--property <key>=<value>]... [--properties <path>]
     [--display] [--detach] [--progress <mode>]
-rlq check-script <label-or-name>
+rlq run-script <label-or-name> --dry-run
     [--blueprint <name> | --machine <id>]
     [--property <key>=<value>]... [--properties <path>]
 ```
@@ -1070,21 +1070,49 @@ machine-readable result — diagnostics go to stderr, and the exit
 code carries the outcome. `plain` and `jsonl` never prompt: an
 unbound property fails preflight instead of hanging a program.
 
-`check-script` runs preflight only: parsing, static control-flow
-checks, capability preflight. With a machine selector, its
-argument resolves exactly as `run-script`'s — label first, then
-bare script name — and it also binds properties and checks media
-resolution; without a selector there is no `scripts` map to
-consult, so the argument is a bare script name. Read-only, no
-guest steps.
+`--dry-run` runs preflight only: parsing, static control-flow
+checks, capability preflight. It starts no machine and delivers no
+guest input, and like every dry run it seeds nothing, writes
+nothing and never prompts ([the dry run](#the-dry-run) states the
+rule both operations share).
+
+**The selector is optional here and nowhere else, because its
+presence chooses the tier.** With one, the machine resolves exactly
+as a live `run-script`'s does — and the argument with it, label
+first then bare script name — and the machine rules are applied as
+well: properties bind, media resolve, and named slots are checked.
+Without one there is no `scripts` map to consult, so the argument is
+a bare script name and every legality rule still applies. Those are
+the two checkable tiers
+([script spec](script-spec.md#static-and-dynamic-semantics)), and a
+dry run is how each is asked for.
+
+A dry run stops where a run would **create**, so `--blueprint`
+naming a blueprint with no machine yet has nothing to apply the
+machine rules against. The report says which tier it actually
+reached rather than the one that was asked for.
+
+**A dry run is a document, not a stream.** A live run's output is
+its event stream, so `run-script` refuses `--json` and renders
+through `--progress`; `--dry-run` returns a `DryRun` instead, so
+`--json` is legal and prints exactly that. `--progress` and
+`--display` are refused with it — a plan has no stream to render
+and no window to show.
+
+The report names the timing plan, each declared property's
+supplying source, and **how much of the script it could not
+statically reach**: a statement inside a handler runs only if the
+guest puts it there, so the plan says how many statements it
+cannot promise rather than implying a completeness it cannot
+have.
 
 ```powershell
 rlq run-script install --blueprint freedos --display
 rlq run-script install --blueprint freedos --property identity.full-name="Paul Galbraith"
 rlq run-script install --blueprint freedos --progress jsonl
 
-rlq check-script freedos-install
-rlq check-script install --blueprint freedos
+rlq run-script freedos-install --dry-run
+rlq run-script install --blueprint freedos --dry-run
 ```
 
 ### The run returns its output
@@ -1289,8 +1317,9 @@ the `run` operations,
 guest-console family `type`, `enter`, `press`, `exec`, `select`,
 `screen`, `wait`, `screenshot`, `hmp`) at least one is required;
 `run-script` auto-creates a machine when `--blueprint` names a
-blueprint with none yet. `check-script` uses a selector for label
-resolution and property binding when one is given. Commands that
+blueprint with none yet. Under `--dry-run` a selector is optional
+and chooses the tier: given one, it resolves the label and binds
+properties as a live run would. Commands that
 don't operate on a machine (`list-*`, `search-*`, `fetch-media`,
 the property family, `clean-*`, `new-blueprint`,
 `delete-blueprint`, `seed-*`) ignore them.

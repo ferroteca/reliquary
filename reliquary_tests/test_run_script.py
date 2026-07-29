@@ -329,6 +329,7 @@ class RunScriptWiringTests(unittest.TestCase):
             properties=None,
             properties_file=None,
             progress="auto",
+            dry_run=False,
         )
         # A stream-bearing command's human modes leave stdout empty:
         # the outcome travels by exit code.

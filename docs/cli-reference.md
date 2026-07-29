@@ -50,8 +50,11 @@ flag winning; what none of them names derives from what does.
   prints `{}`). Diagnostics stay on stderr and exit codes are
   unchanged. Stream-bearing commands (`run-script`, `fetch-media`)
   reject `--json` — their machine-readable form is `--progress jsonl`.
+  `run-script --dry-run` is not stream-bearing: a plan is a document,
+  so it takes `--json` like any other result.
 - `--progress (auto | pretty | plain | jsonl)` - Live rendering, on
-  the stream-bearing commands (`run-script`, `fetch-media`) only.
+  the stream-bearing commands (`run-script`, `fetch-media`) only, and
+  refused under `run-script --dry-run`, which has no stream to render.
   See [Live progress](#live-progress) below.
 - `--version` - Show version and exit
 
@@ -267,20 +270,25 @@ expired and the scope that supplied it, the route through the phase
 graph with its revisit counts, the screen row that came nearest to
 matching, an automatic screenshot, and the command to try next.
 
-### `rlq check-script <name> [--blueprint NAME | --machine ID]`
+### `rlq run-script <name> --dry-run [--blueprint NAME | --machine ID]`
 
 Parse and statically check a script; print its resolved timing plan
 (each observation's effective timeout, each guest-input verb's
-effective pacing, and the scope that supplied each) and, for each
-declared property, the source that would supply it — flag, blueprint
+effective pacing, and the scope that supplied each), for each
+declared property the source that would supply it — flag, blueprint
 parameter, environment, properties file, or the ask — never its
-value. Accepts the same `--property` and `--properties` as
-`run-script`. Read-only: does not seed the home, create a machine,
-run guest steps, prompt, or read a secret's value. Without a
-selector, `<name>` is a bare script stem (home `scripts/` or a
-builtin). With `--blueprint` or `--machine`, `<name>` may be a
-blueprint scripts-map label. With a machine, media-slot preflight
-runs as well. Static errors exit 2.
+value, and how many statements no static pass can promise will run.
+Read-only: it seeds nothing, creates no machine, runs no guest step,
+never prompts and never reads a secret's value.
+
+**The selector is optional here alone**, because its presence
+chooses the tier. Without one, `<name>` is a bare script stem and
+every legality rule applies. With `--blueprint` or `--machine`,
+`<name>` may be a blueprint scripts-map label and the machine rules
+apply as well, media-slot preflight included. Static errors exit 2.
+
+`--dry-run` returns a document rather than a stream, so `--json`
+prints it and `--progress` and `--display` are refused.
 
 ## Media and cache
 

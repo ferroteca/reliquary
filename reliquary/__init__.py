@@ -41,14 +41,14 @@ from .resolve import load_namespace
 from .binding import (BoundProperties, PropertyBindingError,
                       bind_properties, describe_sources)
 from .credentials import CredentialError
-from .properties import (PropertiesError, check_key, get_property,
+from .properties import (PropertiesError, get_property,
                          has_credential, is_secret, list_properties,
                          secret_marker, set_property, unset_property)
 from .script_nodes import ScriptParseError
 from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
-from .script_runner import (ScriptCheck, ScriptRun, ScriptRuntimeError,
-                            check_script, execute_script, run_script)
+from .script_runner import (ScriptRun, ScriptRuntimeError,
+                            execute_script, run_script)
 
 __all__ = [
     "Condition",
@@ -58,7 +58,6 @@ __all__ = [
     "Handler",
     "Machine",
     "Script",
-    "ScriptCheck",
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
@@ -107,7 +106,6 @@ __all__ = [
     "blueprints_dir",
     "cache_dir",
     "bind_properties",
-    "check_key",
     "describe_sources",
     "has_credential",
     "is_secret",
@@ -162,6 +160,5 @@ __all__ = [
     "unset_property",
     "wait_text",
     "execute_script",
-    "check_script",
     "run_script",
 ]

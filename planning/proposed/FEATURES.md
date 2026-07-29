@@ -748,8 +748,10 @@ puts the real code path under those tests.
 **Simulated results are marked in the return value**, and the marking
 is not optional: it is P11 at the value level, and it is what lets a
 caller refuse simulated results everywhere outside its own tests —
-the guard against exactly the accident
-[F25](../pledged/FEATURES.md) refuses to enable.
+the guard against exactly the accident `--dry-run` refuses to
+enable, and it is the reason the two are documented in the same
+breath: the validator shipped 2026-07-29 and deliberately fabricates
+nothing.
 
 DECIDE FIRST, and it is a genuine obstacle rather than a detail:
 **what shape the responder takes under P6 and P7.** A callback is the

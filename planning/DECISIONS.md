@@ -188,6 +188,81 @@ is waiting on an answer today.
 
 ## Decided
 
+- D81 — STATICALLY REACHABLE MEANS THE GUEST DECIDED NOTHING; THE
+  CHECK FAMILY IS GUARDED, NOT MERELY GONE — DECIDED (owner,
+  2026-07-29) and delivered the same day. Supports P6, P9, P11. The
+  delivery of F25 is a lifecycle act and is not recorded here
+  (D63); D79 settled the three surface collisions before the work
+  started, and they landed unchanged. What follows is what the
+  build itself had to decide.
+
+  WHAT "STATICALLY REACHABLE" MEANS, which D79 asked for as a count
+  and did not define. **A statement is statically reachable when
+  getting to it depends on nothing the guest does.** A linear
+  script is wholly reachable but for its handler bodies; a phased
+  one is walked from `entry` following only the `goto`s in a
+  phase's **own** statement list, never one inside a handler.
+  WEIGHED AND DECLINED: counting handler bodies alone, which is a
+  line of code and overstates the answer — a phase only a handler
+  can reach is just as much the guest's decision as the handler
+  body that jumps to it, and on the shipped FreeDOS install script
+  that is most of the file. The measured answer is 10 of 37
+  statements, and a report claiming 30 would have been the kind of
+  false completeness the count exists to prevent (P11).
+
+  THE SELECTOR NOW ACTUALLY CHOOSES THE TIER, which it did not.
+  `script-spec.md` says `--machine`/`--blueprint` adds the machine
+  rules; the retired implementation resolved a machine for
+  `--machine` only, so `--blueprint` quietly stayed at the static
+  tier even where the blueprint's machine existed. The code was
+  realigned to the spec, which is the direction that rule runs.
+  **The report is what found it**: naming the tier out loud is a
+  claim, and the first claim it made was false. A dry run still
+  stops where a run would *create*, so `--blueprint` with no
+  machine yet reaches the static tier — and says which tier it
+  reached rather than the one that was asked for, which is the same
+  honesty the statement count is there for.
+
+  THE REFUSALS ARE TYPED, NOT IGNORED. `--display` and a non-default
+  `--progress` under `--dry-run` raise `StaticError` with their own
+  ids (`progress.display-on-a-dry-run`,
+  `progress.stream-on-a-document`) rather than being accepted and
+  quietly doing nothing. Accepting a flag that cannot mean anything
+  is how a caller comes to believe it did something.
+
+  THE TIMING PLAN IS SERIALIZED INTO THE DOCUMENT, so the merge
+  costs a caller nothing. The retired result type exposed the
+  resolved `TimingPlan` object; a `plan` mapping that carried only
+  the printable report would have made a Python caller parse prose
+  for what it used to hold. The plan's own dataclasses serialize
+  as they stand, so this names no new vocabulary.
+
+  DELETION IS GUARDED, WHICH IS WHAT MAKES P9 STICK. The retired
+  spellings — the command, its twin, its result type, and the
+  property-key predicate — are entered in
+  `test_old_surface_purge.py`, which sweeps the live tree and fails
+  on any of them. P9 says the old shape is deleted rather than
+  bridged; a sweep proves it stayed deleted, where a sweep done once
+  by hand only proves it was. `check_key` went **private** rather
+  than away: the properties verbs still call it, so what was
+  removed is the public name, which is exactly the P6 residue D79
+  named.
+
+  FOLDED: reliquary/script_runner.py (`run_script(dry_run=)`, the
+  dry evaluation and its report; the retired result type deleted),
+  reliquary/script_validation.py (`reach`), reliquary/cli.py (the
+  retired subcommand deleted, `--dry-run` on `run-script`),
+  reliquary/properties.py and reliquary/__init__.py (the predicate
+  private, the retired names out of the package surface);
+  docs/spec/cli.md, docs/spec/script-spec.md,
+  docs/spec/script-properties.md, docs/spec/http-serve.md,
+  docs/spec/api.md, docs/cli-reference.md, docs/api-reference.md,
+  README.md, CHANGELOG.md, AGENTS.md;
+  reliquary_tests/test_dry_run.py (the script half joins the create
+  half — one module for one family), test_old_surface_purge.py,
+  test_cli.py, test_errors.py, test_run_script.py,
+  test_properties.py.
+
 - D80 — A DRY RUN REFUSES WHAT A CREATE REFUSES, AND HASHES
   NOTHING — DECIDED (owner, 2026-07-29) and delivered the same day.
   Supports U7 (pledged); P7, P10, P11. The delivery of F24 is a

@@ -17,7 +17,7 @@ SPDX-License-Identifier: BSD-3-Clause
 > blueprint parameter with its redirect, environment with collision
 > preflight, file, the **declared derivation** with its `rlq.*` host
 > facts, the interactive ask), the kind rules, and the runtime
-> secret rules (transcript and diagnostic redaction; `check-script`
+> secret rules (transcript and diagnostic redaction; a dry run
 > naming each key's source, never its value); and **`${key}`
 > location references** binding at `create` / `apply` through the
 > same order, the resolved location recorded in state and never
@@ -174,7 +174,7 @@ document owns the operator-side mechanics:
   literal default always answers, so declaring one is opting to
   stop here — and a key no candidate answers falls through to
   the ask. Derivations are recorded like any source:
-  `check-script` and transcripts name the supplying source, so
+  a dry run and transcripts name the supplying source, so
   a host-derived value is always auditable, and no hermetic ban
   applies — a project wanting determinism pins the key in its
   committed properties file.
@@ -254,7 +254,7 @@ inserts one. The model still expands, on three designed routes
   before=/after=<rank>)` seam may let *code* insert a source at
   a named rank — custody stays with a developer whose artifact
   versions the choice, never with per-machine operator
-  configuration — and provenance is mandatory: `check-script`
+  configuration — and provenance is mandatory: a dry run
   and transcripts name the injected source like any built-in
   tier. The provider protocol will be Reliquary-defined and
   flat (planning/INTERFACES.md — a shape every binding language
@@ -427,8 +427,8 @@ must still use the guest's password or product-key entry fields correctly.
 
 ## Checking and diagnostics
 
-`check-script` validates property-key syntax and declaration/kind
-compatibility without changing the properties file or credential store. It reports
+`run-script --dry-run` validates property-key syntax and
+declaration/kind compatibility without changing the properties file or credential store. It reports
 each declared property's supplying source — flag, blueprint
 parameter (direct or redirect), environment, file, derivation,
 or ask — but never reports values. A missing property is reported as an unresolved

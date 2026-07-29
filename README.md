@@ -196,17 +196,23 @@ rlq start-machine --blueprint freedos
 rlq stop-machine --blueprint freedos
 ```
 
-To inspect a script without running it, `rlq check-script` prints
-the resolved timing plan — each observation's timeout, each guest
-input's pacing, and where each came from:
+To inspect a script without running it, `--dry-run` prints the
+resolved timing plan — each observation's timeout, each guest
+input's pacing, and where each came from — along with each declared
+property's source and how much of the script no static pass can
+promise will run, a statement inside a handler being the guest's
+decision rather than the plan's. It starts no machine and sends no
+keystroke. The selector is optional here and nowhere else, because
+its presence is what asks for the machine checks as well:
 
 ```powershell
-rlq check-script freedos-install
-rlq check-script install --blueprint freedos
+rlq run-script freedos-install --dry-run
+rlq run-script install --blueprint freedos --dry-run
 ```
 
-To ask the same of a machine — is this blueprint sound, and what
-would it build? — `rlq create-machine --dry-run` reports the machine
+The same question about a machine — is this blueprint sound, and
+what would it build? — is `rlq create-machine --dry-run`, which
+reports the machine
 id it would allocate, the backend it would land on, every drive's
 resolved plan, and where each media would come from, while building
 none of it. Nothing is seeded, fetched or written, and nothing is
@@ -737,8 +743,8 @@ with machine.qmp() as qmp:
 The lifecycle and scripting verbs are all available as Python calls
 with the same names as their CLI twins: `create_machine` /
 `start_machine` / `stop_machine` / `destroy_machine` /
-`recreate_machine` / `apply_blueprint`, and `run_script` /
-`check_script` for the `.rlqs` language. `run_script` **returns the
+`recreate_machine` / `apply_blueprint`, and `run_script` for the
+`.rlqs` language. `run_script` **returns the
 run's output** — the whole event stream, plus the final script phase
 and the machine's phase — and writes nothing to disk; it raises by
 error class on failure. See the [API reference](docs/api-reference.md)

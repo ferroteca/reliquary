@@ -13,16 +13,25 @@ reading.
 import contextlib
 import dataclasses
 import hashlib
+import io
 import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
-from reliquary import backends
+import reliquary
+from reliquary import backends, cli
+from reliquary import home as home_module
 from reliquary.backends import Capabilities
 from reliquary.errors import PreflightError, StaticError
 from reliquary.home import Context
 from reliquary.machines import DryRun, create_machine, load_machine_state
+from reliquary.script_nodes import RULE_OF, ScriptParseError
+from reliquary.script_parser import load_script, parse_script
+from reliquary.script_runner import run_script
+from reliquary.script_timing import format_plan, resolve as resolve_timing
+from reliquary.script_validation import reach
 from reliquary_tests import fake_backend
 
 
@@ -448,6 +457,282 @@ def _no_network():
     return mock.patch("reliquary.acquire._download",
                       side_effect=AssertionError(
                           "a test create tried to download"))
+
+
+# --- the script half ------------------------------------------------
+
+_HEAD = "platform dos\n"
+
+
+class FormatPlanTests(unittest.TestCase):
+    """The plan report names every observation's timeout and source."""
+
+    def test_the_report_lists_defaults_budgets_and_observations(self):
+        script = parse_script(
+            _HEAD + "entry a\ntimeout 30s\ndeadline 45m\n"
+            "phase a timeout=5m deadline=20m {\n"
+            '    wait "x"\n'
+            '    wait "y" timeout=90s\n'
+            "    finish\n}\n")
+        report = format_plan(resolve_timing(script), name="sample.rlqs")
+        self.assertIn("timing plan for sample.rlqs", report)
+        self.assertIn("default timeout: 30s from the header", report)
+        self.assertIn("run deadline: 45m from the header", report)
+        self.assertIn("phase a: 20m from the phase a", report)
+        self.assertIn("wait: 5m from the phase a", report)
+        self.assertIn("wait: 90s from the statement", report)
+
+    def test_a_built_in_default_is_named(self):
+        report = format_plan(resolve_timing(parse_script(
+            _HEAD + 'wait "x"\n')))
+        self.assertIn("default timeout: 60s from the built-in", report)
+
+
+class ReachTests(unittest.TestCase):
+    """What a static pass can and cannot promise will run."""
+
+    def test_a_linear_script_is_wholly_reachable(self):
+        script = parse_script(_HEAD + 'start\nwait "x"\n')
+        self.assertEqual((2, 2), reach(script))
+
+    def test_a_handler_body_is_the_guests_decision(self):
+        script = parse_script(
+            _HEAD + "entry a\nphase a {\n"
+            '    wait {\n        on "x" {\n            press enter\n'
+            "            finish\n        }\n"
+            '        on "y" {\n            finish\n        }\n'
+            "    }\n}\n")
+        reachable, total = reach(script)
+        # The wait is reached; what its handlers do is not.
+        self.assertEqual(1, reachable)
+        self.assertEqual(4, total)
+
+    def test_a_phase_only_a_handler_can_reach_is_not_reachable(self):
+        script = parse_script(
+            _HEAD + "entry a\nphase a {\n"
+            '    wait {\n        on "x" {\n            goto b\n'
+            "        }\n"
+            '        on "y" {\n            finish\n        }\n'
+            "    }\n}\n"
+            "phase b {\n    press enter\n    finish\n}\n")
+        reachable, _total = reach(script)
+        self.assertEqual(1, reachable)
+
+    def test_an_unconditional_goto_carries_reachability_along(self):
+        script = parse_script(
+            _HEAD + "entry a\nphase a {\n    start\n    goto b\n}\n"
+            'phase b {\n    wait "x"\n    finish\n}\n')
+        self.assertEqual((4, 4), reach(script))
+
+    def test_the_shipped_install_script_is_mostly_the_guests(self):
+        # The real shape this exists to report: a branching wait puts
+        # most of a real installer script behind the guest.
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(reliquary.__file__)),
+            "codex", "scripts", "freedos-install.rlqs")
+        reachable, total = reach(load_script(path))
+        self.assertLess(reachable, total)
+        self.assertGreater(reachable, 0)
+
+
+class ScriptDryRunTests(unittest.TestCase):
+    """run_script(dry_run=True): the check family's one spelling."""
+
+    def _codex_context(self, home):
+        """A home with the codex behind it, as the CLI would have it.
+
+        Autoseeding is the CLI's default and never the library's, so
+        a test reading a codex script asks for it (home.py).
+        """
+        return Context(home_dir=home, autoseed=True)
+
+    def _dry(self, label, **kwargs):
+        return run_script(label, dry_run=True, **kwargs)
+
+    def test_it_returns_a_dry_run_and_not_a_script_run(self):
+        with tempfile.TemporaryDirectory() as home:
+            result = self._dry("freedos-install",
+                               context=self._codex_context(home))
+        self.assertIsInstance(result, DryRun)
+        self.assertEqual("run-script", result.operation)
+        self.assertIn("nothing was run.", result.report)
+
+    def test_a_bare_name_reads_a_builtin_without_writing(self):
+        with tempfile.TemporaryDirectory() as home:
+            result = self._dry("freedos-install",
+                               context=self._codex_context(home))
+            self.assertEqual(
+                "45m", result.plan["timing"]["run_deadline"]["spelling"])
+            self.assertFalse(os.path.isdir(os.path.join(home, "scripts")))
+            self.assertIn("timing plan for", result.report)
+            self.assertIn("45m", result.report)
+
+    def test_without_a_selector_the_tier_is_static(self):
+        with tempfile.TemporaryDirectory() as home:
+            plan = self._dry("freedos-install",
+                             context=self._codex_context(home)).plan
+        self.assertEqual("static", plan["tier"])
+        self.assertIsNone(plan["machine"])
+
+    def test_a_home_script_wins_over_the_builtin(self):
+        with tempfile.TemporaryDirectory() as home:
+            scripts = os.path.join(home, "scripts")
+            os.makedirs(scripts)
+            path = os.path.join(scripts, "mine.rlqs")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(_HEAD + 'timeout 12s\nwait "x"\n')
+            plan = self._dry("mine", context=home).plan
+            self.assertEqual(path, plan["script"])
+            self.assertEqual("12s", plan["timing"]["default"]["spelling"])
+
+    def test_a_blueprint_label_resolves_without_creating_a_machine(self):
+        with tempfile.TemporaryDirectory() as home:
+            result = self._dry("install", blueprint="freedos",
+                               context=self._codex_context(home))
+            self.assertIn("freedos-install", result.plan["script"])
+            self.assertFalse(os.path.isdir(os.path.join(home, "cache")))
+            self.assertEqual(
+                "45m", result.plan["timing"]["run_deadline"]["spelling"])
+
+    def test_a_blueprint_with_a_machine_reaches_the_preflight_tier(self):
+        # The selector chooses the tier, so --blueprint has to resolve
+        # a machine exactly as a live run does -- which is what the
+        # retired spelling did only for --machine.
+        with tempfile.TemporaryDirectory() as home, \
+                fake_backend.installed():
+            context = self._codex_context(home)
+            create_machine("freedos", context=context)
+            plan = self._dry("install", blueprint="freedos",
+                             context=context).plan
+        self.assertEqual("freedos-0", plan["machine"])
+        self.assertEqual("preflight", plan["tier"])
+
+    def test_a_blueprint_with_no_machine_says_which_tier_it_reached(self):
+        with tempfile.TemporaryDirectory() as home:
+            result = self._dry("install", blueprint="freedos",
+                               context=self._codex_context(home))
+        self.assertIsNone(result.plan["machine"])
+        self.assertEqual("static", result.plan["tier"])
+        self.assertEqual("blueprint", result.plan["selector"])
+        self.assertIn("has no machine yet", result.report)
+
+    def test_a_static_error_propagates(self):
+        with tempfile.TemporaryDirectory() as home:
+            scripts = os.path.join(home, "scripts")
+            os.makedirs(scripts)
+            with open(os.path.join(scripts, "bad.rlqs"),
+                      "w", encoding="utf-8") as handle:
+                handle.write(_HEAD + "entry a\nphase a {\n    goto a\n}\n")
+            with self.assertRaises(ScriptParseError) as caught:
+                self._dry("bad", context=home)
+            self.assertEqual("S12", RULE_OF[caught.exception.rule_id])
+
+    def test_with_a_machine_media_slots_are_preflighted(self):
+        with tempfile.TemporaryDirectory() as home:
+            scripts = os.path.join(home, "scripts")
+            os.makedirs(scripts)
+            with open(os.path.join(scripts, "use-cd.rlqs"),
+                      "w", encoding="utf-8") as handle:
+                handle.write(
+                    _HEAD + 'insert cdrom0 @freedos-livecd\n'
+                    'wait "x"\n')
+            with mock.patch(
+                    "reliquary.script_runner._machines") as machines:
+                machines.resolve_machine.return_value = "plain-0"
+                machines.load_machine_state.return_value = {
+                    "scripts": {},
+                    "drives": {"hdd0": {"medium": "hdd"}},
+                }
+                with self.assertRaises(PreflightError) as caught:
+                    self._dry("use-cd", machine="plain-0", context=home)
+            self.assertIn("no drive cdrom0", str(caught.exception))
+
+    def test_the_report_counts_what_it_could_not_reach(self):
+        with tempfile.TemporaryDirectory() as home:
+            result = self._dry("freedos-install",
+                               context=self._codex_context(home))
+        counts = result.plan["statements"]
+        self.assertLess(counts["statically-reachable"], counts["total"])
+        self.assertIn("statically reachable", result.report)
+        self.assertIn("depend on what the guest does", result.report)
+
+    def test_a_wholly_reachable_script_claims_no_gap(self):
+        with tempfile.TemporaryDirectory() as home:
+            scripts = os.path.join(home, "scripts")
+            os.makedirs(scripts)
+            with open(os.path.join(scripts, "flat.rlqs"),
+                      "w", encoding="utf-8") as handle:
+                handle.write(_HEAD + 'start\nwait "x"\n')
+            result = self._dry("flat", context=home)
+        self.assertIn("statements: 2 of 2 statically reachable",
+                      result.report)
+        self.assertNotIn("depend on what the guest does", result.report)
+
+    def test_display_and_progress_are_refused(self):
+        with tempfile.TemporaryDirectory() as home:
+            context = self._codex_context(home)
+            with self.assertRaises(StaticError) as caught:
+                self._dry("freedos-install", context=context, display=True)
+            self.assertEqual("progress.display-on-a-dry-run",
+                             caught.exception.rule_id)
+            with self.assertRaises(StaticError) as caught:
+                self._dry("freedos-install", context=context,
+                          progress="jsonl")
+            self.assertEqual("progress.stream-on-a-document",
+                             caught.exception.rule_id)
+
+
+class ScriptDryRunCliTests(unittest.TestCase):
+    """The surface collisions the respelling had to settle."""
+
+    def setUp(self):
+        saved = dict(home_module._globals)
+        self.addCleanup(home_module._globals.update, saved)
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+        scripts = os.path.join(self.home, "scripts")
+        os.makedirs(scripts)
+        with open(os.path.join(scripts, "flat.rlqs"), "w",
+                  encoding="utf-8") as handle:
+            handle.write(_HEAD + 'start\nwait "x"\n')
+
+    def _run(self, *args):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), \
+                contextlib.redirect_stderr(stderr):
+            code = cli.main(["--home-dir", self.home] + list(args))
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_the_selector_is_optional_under_dry_run(self):
+        code, out, _err = self._run("run-script", "flat", "--dry-run")
+        self.assertEqual(0, code)
+        self.assertIn("nothing was run.", out)
+
+    def test_a_live_run_still_requires_one(self):
+        code, _out, err = self._run("run-script", "flat")
+        self.assertEqual(2, code)
+        self.assertIn("--blueprint or --machine", err)
+
+    def test_json_is_legal_on_a_dry_run(self):
+        code, out, _err = self._run(
+            "run-script", "flat", "--dry-run", "--json")
+        self.assertEqual(0, code)
+        document = json.loads(out)
+        self.assertEqual("run-script", document["operation"])
+        self.assertEqual("static", document["plan"]["tier"])
+
+    def test_json_is_still_refused_on_a_live_run(self):
+        # The flip is the whole point: a plan is a document, a run is
+        # a stream, and one flag means one thing on each.
+        code, _out, err = self._run(
+            "run-script", "flat", "--blueprint", "nope", "--json")
+        self.assertEqual(2, code)
+        self.assertIn("--progress jsonl", err)
+
+    def test_check_script_is_gone(self):
+        with self.assertRaises(SystemExit):
+            self._run("check-script", "flat")
 
 
 if __name__ == "__main__":

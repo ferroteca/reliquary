@@ -441,6 +441,44 @@ def _all_statements(script):
     return statements
 
 
+def reach(script):
+    """``(statically reachable, total)`` statement counts.
+
+    **A statement is statically reachable when getting to it depends
+    on nothing the guest does.** That is the honest bound on what a
+    dry run can report: a plan can only ever be a plan, and saying
+    how much of the script it could not reach is what keeps it from
+    implying a completeness it cannot have (P11 at the report
+    level).
+
+    A linear script is wholly reachable but for its handler bodies.
+    In a phased one the walk starts at ``entry`` and follows only
+    the ``goto``s in a phase's **own** statement list, never one
+    inside a handler: a handler fires on a guest condition, so every
+    statement in its body — and every phase only it can reach — is
+    guest-conditional. A reactive phase is handlers alone, so it
+    contributes nothing reachable and transfers nothing statically.
+    """
+    total = len(_all_statements(script))
+    if not script.phases:
+        return len(script.statements), total
+    reachable = 0
+    seen = set()
+    pending = [script.entry]
+    by_name = {phase.name: phase for phase in script.phases}
+    while pending:
+        name = pending.pop()
+        if name in seen or name not in by_name:
+            continue
+        seen.add(name)
+        phase = by_name[name]
+        reachable += len(phase.statements)
+        for statement in phase.statements:
+            if statement.verb == "goto":
+                pending.append(statement.arguments[0])
+    return reachable, total
+
+
 def _variables(script):
     """Every ``set`` key is outside reliquary's reserved namespaces.
 

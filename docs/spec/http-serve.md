@@ -324,7 +324,8 @@ check fails before the run.
 The main surface is the script declaration. `run-script` and
 `run_script()` need no extra server flags: the script says whether
 there is a server, and the live address is bound inside that run.
-`check-script` reports the HTTP plan, including generated paths,
+`run-script --dry-run` reports the HTTP plan, including generated
+paths,
 port range, and whether generated content references secrets,
 without rendering or printing secret values.
 

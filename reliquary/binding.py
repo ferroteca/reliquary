@@ -40,7 +40,7 @@ class PropertyBindingError(PreflightError):
     or any machine starts — so this is a PREFLIGHT ERROR, exit ``3``.
     """
 
-# The sources named in provenance, for check-script and the run's
+# The sources named in provenance, for a dry run and the run's
 # event stream.
 FLAG = "--property"
 PARAMETER = "blueprint parameter"
@@ -100,7 +100,7 @@ class _Binder:
             answer = self._ask(declaration)
         if answer is None:
             if self._dry_run:
-                # check-script names what *would* answer; with no
+                # A dry run names what *would* answer; with no
                 # concrete source, an interactive run would ask.
                 self._sources[key] = ASK
                 return
@@ -414,7 +414,8 @@ def describe_sources(script, *, parameters=None, explicit=None,
                      properties_file=None, context=None):
     """Name each declared property's supplying source, without a run.
 
-    The dry counterpart of :func:`bind_properties` for check-script:
+    The dry counterpart of :func:`bind_properties` for a script's
+    dry run:
     it consults the same sources in order, never prompts, never reads
     a secret's value, and never fails on an unanswered key — an
     interactive run would ask, so its source is reported as the ask.

@@ -23,8 +23,8 @@ Three families scope differently
 :func:`resolve` therefore computes the whole plan up front: every
 observation's effective timeout and the scope that supplied it,
 every guest-input verb's effective pacing and its scope, each
-phase's budget, and the run's. ``check-script`` reports the
-plan, a timing failure names the clock that expired and its
+phase's budget, and the run's. ``run-script --dry-run`` reports
+the plan, a timing failure names the clock that expired and its
 source scope, and the runner never re-derives a bound it could
 have been handed.
 
@@ -189,7 +189,7 @@ def resolve(script):
 
 
 def format_plan(plan, name=None):
-    """Render a timing plan the way ``check-script`` prints it."""
+    """Render a timing plan the way a dry run prints it."""
     lines = []
     if name:
         lines.append(f"timing plan for {name}")
