@@ -3,6 +3,7 @@
 """Machine materialization and cached-state management."""
 
 import contextlib
+import dataclasses
 import hashlib
 import json
 import os
@@ -10,6 +11,7 @@ import re
 import shutil
 from datetime import datetime, timezone
 
+from . import acquire
 from . import at_rest
 from . import backends
 from . import events as _events
@@ -18,7 +20,8 @@ from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError)
 from .home import machines_dir
 from .library import seed_blueprint
-from .resolve import load_namespace, resolve_media
+from .resolve import (load_namespace, location_property_keys,
+                      resolve_media, resolve_media_plan)
 
 
 def _drive_media(drive, namespace):
@@ -468,8 +471,333 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
         asker=binding.console_asker())
 
 
+# --- the dry run -----------------------------------------------------
+#
+# *A dry run performs every step that costs nothing and commits
+# nothing, stops at the first step that would, and reports what it
+# would have done.* Two invariants carry it. It **leaves no state
+# behind** — no machine directory, no ``machine.json``, no fetched
+# payload, no seeded blueprint, no lock file — and its **return
+# describes the run** rather than impersonating the run's output.
+#
+# It raises what a real create would raise, where a real create would
+# raise it: a dry run whose verdict is "this would fail" fails, and
+# the diagnostic is the answer. There are exactly two exceptions, and
+# each is something a dry run specifically *cannot do* rather than a
+# judgement about how bad a finding is:
+#
+#   1. It must not prompt, so a media location no concrete source
+#      answers is reported unevaluated instead of asked for.
+#   2. Under an explicit ``backend=`` the question is what *another*
+#      host would do, so that backend's absence here is reported
+#      rather than raised. Incapability still raises — that is the
+#      answer to the question that was asked.
+
+
+@dataclasses.dataclass(frozen=True)
+class DryRun:
+    """What an operation would do, having done none of it.
+
+    The return of every ``dry_run=True`` call, and a **distinct type
+    on purpose**: a dry create must not hand back something a caller
+    can mistake for the real return — a machine id naming no machine,
+    or ``None`` — because that makes misuse a confusing failure three
+    layers down, where this makes it a ``TypeError`` at the call site.
+
+    ``operation`` names the verb described, ``report`` is the
+    printable human rendering, and ``plan`` is the operation's own
+    document, which is the mapping ``--json`` serializes. Three
+    fields are the whole type, so a second operation contributes a
+    plan shape and no new field.
+    """
+
+    operation: str
+    report: str
+    plan: dict = dataclasses.field(default_factory=dict)
+
+
+def _dry_namespace(name, context):
+    """The resolution namespace a dry run reads, seeding nothing.
+
+    ``create_machine`` copies a codex blueprint into the blueprints
+    directory on first reference; a dry run must not, a seeded file
+    being state left behind. So a codex blueprint is read where it
+    lies and merged in — the same fallback ``library.locate_blueprint``
+    already makes for a read-only check, for the same reason.
+    """
+    from . import assets
+    from .library import locate_blueprint
+    from .resolve import build_namespace
+    paths = list(assets.source_for(context).document_files())
+    namespace = build_namespace(paths)
+    if name in namespace.machines:
+        return namespace
+    try:
+        path = locate_blueprint(name, context=context)
+    except PreflightError:
+        return namespace
+    if path in paths:
+        return namespace
+    return build_namespace(paths + [path])
+
+
+def _describe_location_properties(machine, namespace, *, explicit=None,
+                                  properties_file=None, context=None):
+    """Name each location key's source without asking for any of them.
+
+    The dry twin of :func:`_bind_location_properties`: a create binds
+    these keys, prompting on a terminal for one nothing else answers,
+    and a dry run must not — so it takes what the concrete sources
+    give and reports the rest as the ask a real create would make.
+    """
+    from . import binding
+    keys = set()
+    for drive in machine.drives.values():
+        if not drive.enabled or drive.media is None:
+            continue
+        media = namespace.media.get(drive.media)
+        if media is not None:
+            keys.update(location_property_keys(media, namespace))
+    if not keys:
+        return binding.BoundProperties({}, {})
+    return binding.describe_keys(
+        keys, parameters=dict(machine.parameters), explicit=explicit,
+        properties_file=properties_file, context=context)
+
+
+def _record(entries, entry):
+    """Append one media entry, a media two drives share appearing once."""
+    if any(existing["name"] == entry["name"] for existing in entries):
+        return
+    entries.append(entry)
+
+
+def _dry_payload(media, namespace, context, properties, entries):
+    """Where this media's payload would come from, fetching nothing.
+
+    Returns the path a create would attach or build over, or ``None``
+    when the location cannot be rendered without asking.
+    """
+    needs = sorted(location_property_keys(media, namespace)
+                   - set(properties or ()))
+    if needs:
+        _record(entries, {
+            "name": media.name, "state": "unbound", "needs": needs,
+            "source": None, "path": None, "sha256": None})
+        return None
+    plan = resolve_media_plan(media, namespace, properties)
+    if plan is None:
+        return None
+    residency = acquire.residency(
+        plan, media.name, acquire.payload_extension(media, plan), context)
+    for entry in residency:
+        _record(entries, entry)
+    return residency[0]["path"] if residency else None
+
+
+def _refuse_missing(entries):
+    """Refuse a plan whose local payloads are not on the disk.
+
+    A missing local file is an error a dry run can and should
+    catch — a create hits it too, and a plan that cannot be executed
+    must not report success (P11). It is raised **after** the whole
+    plan is walked so every such media is named at once: a validator
+    that stops at the first fault costs a fix-and-rerun for each one,
+    and enumerating them is exactly what this pass is good at.
+    Nothing else is collected this way, so every other refusal still
+    lands where a create's would.
+    """
+    missing = [entry for entry in entries
+               if entry["state"] == "local-missing"]
+    if not missing:
+        return
+    named = "\n".join(f"  media {entry['name']!r} is declared at "
+                      f"{entry['path']}, but nothing is there"
+                      for entry in missing)
+    raise PreflightError(
+        "this blueprint cannot be built as it stands:\n" + named
+        + "\nRestore the files, or edit the blueprint that declares "
+          "them to name where they live now",
+        rule_id="media.file-missing")
+
+
+def _dry_drive(key, drive, adapter, media_root, namespace, context,
+               properties, entries):
+    """One drive's resolved plan, materializing nothing.
+
+    Mirrors :func:`_materialize_drive` decision for decision — the
+    same refusals in the same order — recording what it would have
+    written in place of writing it. ``adapter.image_path`` is
+    composition, not creation, so asking where an image would land
+    costs nothing and says exactly what a create would do.
+    """
+    entry = dict(key=key, **_drive_common(key, drive))
+    media = _drive_media(drive, namespace)
+    if media is None:
+        entry.update(media=None, materialize=None, path=None)
+        return entry
+    mode = media.materialize
+    if drive.medium == "cdrom" and mode != "use":
+        raise StaticError(
+            f"drives.{key}: a cdrom is read-only, so its media must "
+            f"'use' (attach), not '{mode}'", rule_id="drive.cdrom-read-only")
+    entry["media"] = media.name
+    entry["materialize"] = mode
+    if mode == "new":
+        entry.update(size=media.size,
+                     path=adapter.image_path(media_root,
+                                             _image_stem(media, key)))
+        return entry
+    payload = _dry_payload(media, namespace, context, properties, entries)
+    if mode == "use":
+        entry["path"] = payload
+    elif mode in ("difference", "copy"):
+        entry["base"] = payload
+        entry["path"] = adapter.image_path(media_root,
+                                           _image_stem(media, key))
+    else:
+        raise InternalError(f"unknown materialize mode {mode!r} for {key}")
+    return entry
+
+
+def _dry_backend(machine, namespace, backend):
+    """The backend a create would land on, and why — plus its probe.
+
+    With no ``backend`` this is assignment itself: a declared one
+    pins, otherwise the priority walk. With one it is the other
+    question — whether the blueprint would work *there* — so
+    availability is reported and only capability decides (P11).
+    """
+    requirements = _requirements(machine, namespace)
+    if backend is None:
+        assigned = backends.assign(requirements, declared=machine.backend)
+        source = "declared" if machine.backend else "priority walk"
+        return assigned, source, None
+    verdict = backends.evaluate(backend, requirements)
+    if verdict.unmet:
+        raise PreflightError(
+            f"backend {backend!r} cannot provide: "
+            f"{', '.join(verdict.unmet)}",
+            rule_id="machine.backend-incapable")
+    return backend, "--backend", verdict
+
+
+def _dry_create(machine, namespace, *, context, blueprint_name, source,
+                number, bound, backend):
+    """Evaluate one create, committing none of it."""
+    if number is None:
+        # The directory is read; the allocation lock is not taken,
+        # because taking it would create `.locks/` — state left
+        # behind — and a predicted number is a prediction either way.
+        machine_id = _allocate_machine_id(blueprint_name, context)
+        numbering = "lowest free"
+    else:
+        machine_id = machine_id_for(blueprint_name, number)
+        if os.path.exists(machine_dir_path(machine_id, context)):
+            raise PreflightError(
+                f"machine {machine_id} already exists",
+                rule_id="machine.already-exists")
+        numbering = "pinned"
+    assigned, chosen, verdict = _dry_backend(machine, namespace, backend)
+    adapter = backends.adapter(assigned)
+    media_root = _machine_media_dir(machine_id, context)
+    entries = []
+    drives = [
+        _dry_drive(key, drive, adapter, media_root, namespace, context,
+                   bound.values, entries)
+        for key, drive in sorted(machine.drives.items()) if drive.enabled]
+    _refuse_missing(entries)
+    memory = machine.memory
+    if memory is None:
+        memory = _PLATFORM_MEMORY.get(machine.platform, 16)
+    plan = {
+        "blueprint": blueprint_name,
+        "blueprint-source": (os.path.abspath(os.fspath(source))
+                             if source is not None else None),
+        "machine": machine_id,
+        "machine-number": numbering,
+        "machine-dir": machine_dir_path(machine_id, context),
+        "backend": assigned,
+        "backend-source": chosen,
+        "platform": machine.platform,
+        "memory": memory,
+        "cpus": machine.cpus if machine.cpus is not None else 1,
+        "boot": list(machine.boot),
+        "control-planes": _resolve_control_planes(machine),
+        "drives": drives,
+        "media": entries,
+        "properties": dict(bound.sources),
+    }
+    if verdict is not None:
+        plan["backend-available"] = verdict.available
+        plan["backend-detail"] = verdict.detail
+    return DryRun(operation="create-machine", report=_dry_report(plan),
+                  plan=plan)
+
+
+def _drive_line(drive):
+    """One drive's line in the report: what it is, and where it lands."""
+    where = f"{drive['medium']} slot {drive['slot']}"
+    if drive.get("controller"):
+        where += f" {drive['controller']}"
+    if drive["materialize"] is None:
+        # An empty removable slot. The test is the mode and not the
+        # media name, because the anonymous inline blank has no name
+        # either and is emphatically not an empty slot.
+        return f"  {drive['key']} ({where}): empty"
+    what = f"{drive['media'] or '(inline)'} {drive['materialize']}"
+    if drive.get("size"):
+        what += f" {drive['size']}"
+    target = drive.get("path") or "(unresolved)"
+    return f"  {drive['key']} ({where}): {what} -> {target}"
+
+
+def _media_line(entry):
+    """One media's line: its residency, and what it resolved to."""
+    if entry["state"] == "unbound":
+        needs = ", ".join("${" + key + "}" for key in entry["needs"])
+        return f"  {entry['name']}: unbound -- needs {needs}"
+    line = f"  {entry['name']}: {entry['state']} -- {entry['source']}"
+    if entry.get("mirrors"):
+        line += f" (+{entry['mirrors'] - 1} mirrors)"
+    return line
+
+
+def _dry_report(plan):
+    """Render a create's dry run the way the CLI prints it."""
+    lines = [f"create-machine {plan['blueprint']} --dry-run", ""]
+    lines.append(f"machine: {plan['machine']} ({plan['machine-number']})")
+    lines.append(f"directory: {plan['machine-dir']}")
+    lines.append(f"backend: {plan['backend']} ({plan['backend-source']})")
+    if plan.get("backend-available") is False:
+        lines.append(f"  not available on this host: "
+                     f"{plan['backend-detail']}")
+        lines.append("  capability alone was judged, which is what "
+                     "--backend asks")
+    lines.append(f"platform: {plan['platform']}")
+    lines.append(f"memory: {plan['memory']}")
+    lines.append(f"cpus: {plan['cpus']}")
+    if plan["boot"]:
+        lines.append("boot: " + ", ".join(plan["boot"]))
+    lines.append("control planes: " + ", ".join(plan["control-planes"]))
+    if plan["drives"]:
+        lines.append("drives:")
+        lines.extend(_drive_line(drive) for drive in plan["drives"])
+    if plan["media"]:
+        lines.append("media:")
+        lines.extend(_media_line(entry) for entry in plan["media"])
+    if plan["properties"]:
+        lines.append("properties:")
+        for key in sorted(plan["properties"]):
+            lines.append(f"  {key}: {plan['properties'][key]}")
+    lines.append("")
+    lines.append("nothing was created.")
+    return "\n".join(lines) + "\n"
+
+
 def create_machine(name, *, context=None, number=None, properties=None,
-                   properties_file=None, events=None):
+                   properties_file=None, events=None, dry_run=False,
+                   backend=None):
     """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
     A blueprint the home does not contain is seeded from the
@@ -479,8 +807,39 @@ def create_machine(name, *, context=None, number=None, properties=None,
     the old id); omitted, the lowest free number is allocated.
     ``properties`` / ``properties_file`` bind any ``${key}`` a media
     location references, before materialization.
+
+    ``dry_run=True`` materializes nothing and returns a
+    :class:`DryRun` describing what a create would do — the machine
+    id it would allocate, the backend it would land on, each drive's
+    resolved plan, and where every media would come from. It leaves
+    no state behind (nothing is seeded, fetched, locked or written)
+    and never prompts. ``backend`` asks what a *named* backend would
+    do rather than what this host would: its capability decides and
+    its absence here is only reported. Being a question rather than a
+    configuration, it is legal with ``dry_run`` alone — the machine's
+    backend comes from its blueprint (P10).
     """
     from .assets import source_for
+    if backend is not None and not dry_run:
+        raise StaticError(
+            "--backend asks what another backend would do and means "
+            "something only with --dry-run; a machine's backend comes "
+            "from its blueprint",
+            rule_id="machine.backend-outside-dry-run")
+    if dry_run:
+        namespace = _dry_namespace(name, context)
+        if name not in namespace.machines:
+            raise PreflightError(
+                f"no machine blueprint named {name!r} in the resolution "
+                "source", rule_id="blueprint.unknown")
+        machine = namespace.machines[name]
+        return _dry_create(
+            machine, namespace, context=context, blueprint_name=name,
+            source=namespace.origin.get(("machine", name)), number=number,
+            bound=_describe_location_properties(
+                machine, namespace, explicit=properties,
+                properties_file=properties_file, context=context),
+            backend=backend)
     # With autoseeding on, the blueprint (and the scripts it carries)
     # copies out of the codex on first reference — idempotent, never
     # overwriting. With it off nothing is seeded and the blueprints

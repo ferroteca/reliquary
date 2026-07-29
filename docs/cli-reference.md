@@ -139,6 +139,21 @@ bound value that is itself a reference is refused — a location binds
 once, it does not chain. `recreate-machine` and `apply-blueprint`
 take the same `--property` / `--properties`.
 
+`--dry-run` reports what a create would do and does none of it:
+nothing is seeded, fetched, locked or written, and nothing is ever
+asked for. It prints the machine id it would allocate, the backend
+it would land on, each drive's resolved plan, and each media as
+`cached`, `would-download`, `would-extract`, `local-present` or
+`unbound` — resolved, never fetched, and never hashed. It fails
+where a create would fail, so a nonzero exit is the verdict.
+
+`--backend NAME`, legal only with `--dry-run`, asks whether the
+blueprint would work on that backend rather than on this host: its
+capability decides and it need not be installed here. It is not
+simulation — `--dry-run --backend simulator` validates and stops,
+while running simulated means dropping `--dry-run` and keeping the
+backend.
+
 ### `rlq start-machine (--blueprint NAME | --machine ID) [--display]`
 
 Start a machine (a selector is required). Returns when QEMU is

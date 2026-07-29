@@ -65,11 +65,26 @@ by the CLI and never by the library, for the same reason.
 ## Cached machines (the blueprint lifecycle)
 
 - `create_machine(name, *, context=None, properties=None,
-  properties_file=None)` - Materialize a new machine
-  from a blueprint name; returns the machine id
+  properties_file=None, dry_run=False, backend=None)` - Materialize
+  a new machine from a blueprint name; returns the machine id
   (`<blueprint>-<n>`, lowest free number). Seeds codex content on
   first reference. `properties` / `properties_file` bind any
   `${key}` a media location references. CLI twin: `create-machine`.
+- `create_machine(name, dry_run=True)` returns a `DryRun` instead —
+  never a machine id, so misuse is a `TypeError` at the call site
+  rather than a confusing failure three layers down. It materializes
+  nothing, seeds nothing, fetches nothing, locks nothing and never
+  prompts, and it reports the machine id it would allocate, the
+  backend it would land on, each drive's resolved plan and where
+  every media would come from. It raises what a create would raise,
+  where a create would raise it. `backend=` asks whether the
+  blueprint would work on a *named* backend — capability decides and
+  it need not be installed here — and is legal only with
+  `dry_run=True`. Normative:
+  [cli.md](spec/cli.md#the-dry-run).
+- `DryRun` - `operation` (the verb described), `report` (the
+  printable rendering) and `plan` (the operation's own document,
+  which is what `--json` serializes).
 - `create(machine, namespace, *, context=None, blueprint_name="")` -
   The same, from an already-parsed machine component and the
   resolution namespace (`load_namespace`).

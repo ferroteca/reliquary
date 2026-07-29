@@ -205,6 +205,22 @@ rlq check-script freedos-install
 rlq check-script install --blueprint freedos
 ```
 
+To ask the same of a machine — is this blueprint sound, and what
+would it build? — `rlq create-machine --dry-run` reports the machine
+id it would allocate, the backend it would land on, every drive's
+resolved plan, and where each media would come from, while building
+none of it. Nothing is seeded, fetched or written, and nothing is
+asked for; a media that is not cached yet is simply reported as one
+that would be downloaded. `--backend` turns it into a question about
+somewhere else: whether the blueprint would work on VirtualBox or
+Hyper-V, answered from what that backend can do, with nothing
+installed and nothing booted.
+
+```powershell
+rlq create-machine --blueprint freedos --dry-run
+rlq create-machine --blueprint freedos --dry-run --backend hyperv
+```
+
 Vendor media is cached and verified against pinned SHA-256 hashes on every use, under `cache/media/`
 (`Documents\reliquary` by default; override the payload cache with `--media-dir`, or move everything
 at once with `--home-dir` or the `RELIQUARY_HOME_DIR` environment variable).

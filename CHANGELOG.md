@@ -11,6 +11,59 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **`create-machine --dry-run`, and the `create_machine(dry_run=True)`
+  twin.** Scripts could be checked without running them; machines
+  could not, so there was no way to ask "is this blueprint sound, and
+  what would it build?" without building it. A dry run performs every
+  step that costs nothing and commits nothing, stops at the first step
+  that would, and reports what it would have done — the machine id it
+  would allocate, the backend it would land on, each drive's resolved
+  plan, and where every media would come from.
+
+  **It leaves no state behind**: no machine directory, no
+  `machine.json`, no image, no fetched payload, no lock file, and no
+  seeded blueprint — a codex-only blueprint is read where it lies
+  rather than copied out. And **it never prompts**: a media location
+  no concrete source answers is reported as `unbound` with the key
+  named, and the report says a real create would ask for it.
+
+  Media resolve and are never fetched, each reported as `cached`,
+  `would-download`, `would-extract`, `local-present` or `unbound`.
+  Nothing is hashed — `cached` says the file is in the cache, not that
+  it is the right one — and a byte total appears only where something
+  on the host knows one, so a `would-download` carries its URL and its
+  pinned hash and no size.
+
+  It refuses what a create would refuse, where a create would refuse
+  it, so a nonzero exit is the verdict. Missing *local* payloads are
+  the one class collected rather than raised on sight: every one is
+  named at once, because stopping at the first would cost a
+  fix-and-rerun for each.
+
+  The twin returns a `DryRun` — `operation`, `report`, `plan` — and
+  never a machine id, so a `dry_run=True` result can never pass for
+  the real one. `--json` prints that document, under the ordinary rule
+  that a command's `--json` is exactly what its twin returns.
+
+- **`create-machine --dry-run --backend NAME`** asks whether a
+  blueprint would work on a *named* backend rather than on this host:
+  its capability decides, it need not be installed here, and its
+  absence is reported as a line in the plan rather than raised. That
+  is the capability-not-identity contract checked statically, with
+  nothing installed and nothing booted. The flag is legal only with
+  `--dry-run` — a machine's backend comes from its blueprint, and a
+  flag that changed it at materialization would put that
+  configuration outside the blueprint. It is not simulation:
+  `--dry-run --backend simulator` validates and stops, while running
+  simulated means dropping `--dry-run` and keeping the backend.
+
+- `backends.evaluate(name, requirements)` reports a backend's
+  availability and its unmet requirements as two answers rather than
+  one verdict, which is what lets the question above be asked at all.
+  `assign()` is now expressed over it.
+
 ### Fixed
 
 - **The drive-letter map no longer assumes what a disk holds.** It

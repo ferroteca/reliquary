@@ -116,121 +116,29 @@ and F3 stays proposed: what is delivered is the seam U7 demanded,
 not the capability, and the order's tail remains intent recorded
 (D66).)*
 
-## F24 — `create-machine --dry-run`
+*(F24 — `create-machine --dry-run` — delivered 2026-07-29, the day
+it was pledged, so its number retires unreused and the work items
+go with it. A create's whole evaluation now runs with nothing
+committed: the machine id it would allocate, the backend it would
+land on, every drive's resolved plan, and each media reported
+`cached` / `would-download` / `would-extract` / `local-present` /
+`unbound` without a fetch and without a hash. `--backend` asks the
+U7 question about a host one is not standing on, capability alone
+deciding. The rulings the build produced — what a dry run refuses
+and what it merely reports, why nothing is hashed, and the shape of
+the `DryRun` F25 inherits — are [D80](../DECISIONS.md); the surface
+is normative in [cli.md](../../docs/spec/cli.md)'s "The dry run".
 
-> **Pledged 2026-07-29** (owner), cut from **F11** with
-> [F25](#f25--run-script---dry-run-and-the-end-of-the-check-family);
-> the parent's number retires unreused (D42, D79). Serves **U7**
-> ([USE-CASES.md](USE-CASES.md)) through the portability reading
-> below, and **P11**, which is what a backend-aware validation
-> reports. F11's banner cited U7 as a draft; it was pledged
-> 2026-07-28 (D65). **This feature carries no decide-first** —
-> D79 settled every one it arrived with.
-
-THE RULE, shared with F25 and the whole of why the two are one
-semantic: *a dry run performs every step that costs nothing and
-commits nothing, stops at the first step that would, and reports
-what it would have done.* Two invariants carry it. It **leaves no
-state behind** — no machine directory, no `machine.json`, no
-fetched payload, no started process; a step that cannot be
-evaluated without committing is reported unevaluated rather than
-performed. And its **return describes the run, never impersonating
-the run's output**, which is the line F25's exclusion draws.
-
-**This is the gap, and filling it is the point.** Scripts can be
-checked today; machines cannot, so there is no way to ask "is this
-blueprint sound, and what would it build?" without building it.
-
-Evaluate: blueprint parse, namespace resolution, reference closure,
-drive and medium compatibility, backend capability, slot limits,
-the machine id that would be allocated, and each drive's resolved
-plan — `new` (size), `use` (which location, cached or not),
-`difference` / `copy` (over which base). Stop before the machine
-directory, `machine.json`, `create_hdd_image`, and any fetch.
-
-MEDIA RESOLVES AND NEVER FETCHES, resolution and acquisition being
-different costs. Report each medium as cached, would-download (with
-size and sha256), local-present, or local-missing: a missing
-*local* file is an error a dry run can and should catch, and a
-not-yet-downloaded remote is not. A later `--dry-run=verify` that
-additionally hashes what is already cached is the check people want
-before a long install — noted, not proposed, and its own interface
-change when someone wants it. `--dry-run` is a **boolean** here and
-binds as one (P7); a value vocabulary is what that later form would
-have to argue for.
-
-**IT MUST NOT PROMPT, AND TODAY'S CREATE DOES.** `create_machine`
-binds every `${key}` a media location references through
-`binding.bind_keys(…, asker=console_asker())`, which asks. The dry
-run needs the *describe* treatment instead — naming each key's
-supplying source without binding it, which `binding.describe_sources`
-already does for the script side and `check-script` already
-promises. That is the one piece of real machinery this feature adds
-beyond splitting evaluation from commitment.
-
-**`--backend` IS A QUESTION, NOT A CONFIGURATION** (D79), and it is
-new surface: the only `--backend` in the tree today is
-`new-blueprint`'s scaffold field. It is **legal only with
-`--dry-run`**, where it names the backend to validate against and
-materializes nothing — so `rlq create-machine --blueprint NAME
---dry-run --backend vmware` answers "would this blueprint work over
-there?" with nothing installed and nothing booted. That is the U7
-contract — capability, not identity, failing closed by name
-(P11) — checked statically, out of machinery that already exists.
-It is confined to `--dry-run` because P10 gives the blueprint
-authority over what a machine *is*: a flag that changed the
-assigned backend at materialization would put that configuration
-outside the blueprint, which is a different feature needing a
-different argument. Note the combination that is *not* simulation:
-`--dry-run --backend simulator` validates against the simulator's
-capabilities and stops; running simulated means dropping
-`--dry-run` and keeping the backend. Worth a line of help text,
-because the mistake is natural.
-
-SURFACE, both presentations together (P6):
-
-    rlq create-machine --blueprint NAME --dry-run [--backend NAME]
-
-    create_machine(name, *, dry_run=False, backend=None, ...)
-        -> str | DryRun
-
-**A distinct return type is the point.** A `dry_run=True` call must
-not return something a caller can mistake for the real return: a
-machine id naming no machine, or `None`, makes misuse a confusing
-failure three layers down, where a `DryRun` object makes it a
-`TypeError` at the call site. `dry_run` is already the project's
-word (`prune_media`, D22), so this is consistency rather than
-overloading, and it is **per-call only** — no `set_dry_run()`, no
-`Context(dry_run=…)`, an ambient mode being how a dry run gets left
-on.
-
-This half needs no output-discipline work: `create-machine` is
-already a result-bearing `--json` command, so the `DryRun` document
-lands in the machinery that is there. F25 is where that costs
-something.
-
-Work items:
-
-1. Split evaluation from commitment in `machines.create` — every
-   check the create path already makes, reached without the
-   directory, the state file, the image work or the allocation.
-2. The `DryRun` return type and its `--json` document, defined
-   once and shared with F25's script variant.
-3. Media resolved and never fetched, reporting the four states,
-   with a missing local file an error.
-4. Location properties described rather than bound, so nothing
-   prompts.
-5. `--backend` under `--dry-run` only, and the help text naming the
-   simulation mistake.
-6. The surface landed on both presentations, `cli.md` and `api.md`
-   with it, and tests asserting the two invariants directly: no
-   state behind, and the return not the run's.
+**U7 stays pledged**, and this is the same distinction F2's
+delivery drew: a static answer about a backend is not a machine
+materialized on one. What F24 delivers is the question, not the
+capability.)*
 
 ## F25 — `run-script --dry-run`, and the end of the check family
 
-> **Pledged 2026-07-29** (owner), cut from **F11** with
-> [F24](#f24--create-machine---dry-run); the parent's number
-> retires unreused (D42, D79). Serves **P6** — it retires the
+> **Pledged 2026-07-29** (owner), cut from **F11** with F24 — the
+> create half, delivered the same day (above) — and the parent's
+> number retires unreused (D42, D79). Serves **P6** — it retires the
 > second spelling of one semantic — and **P9**, which deletes the
 > old spelling rather than aliasing it. **No use-case impact**:
 > `check-script` ships, and this is a better spelling for it, which
@@ -245,7 +153,9 @@ of a script. Evaluate parse, static checks, property binding
 (naming unbound keys and their sources), referenced media and
 landmarks, the timing plan, and the machine selector resolving to a
 real machine; stop before starting the machine and before any
-statement reaches a guest. F24 states the rule both halves share.
+statement reaches a guest. The rule both halves share is stated
+in [cli.md](../../docs/spec/cli.md)'s "The dry run", where F24's
+delivery made it normative.
 
 THE CHECK INVENTORY — three public names carrying the word, and
 they are not one thing:
@@ -270,7 +180,9 @@ rather than aliasing it.
 THREE SURFACE COLLISIONS, all settled in D79 and none of them
 visible until the shipped commands were read side by side. This is
 what makes the respelling more than a rename, and it is why this
-half — not F24's — is where the surface work is.
+half — not the create half — is where the surface work is, which
+F24's delivery confirmed: it needed no output-discipline work at
+all.
 
 - **A dry run is a document, not a stream, and the flip is
   forced.** `run-script` rejects `--json` today, naming
@@ -328,7 +240,9 @@ rather than making the validator into one.
 Work items:
 
 1. `run_script(dry_run=True)` absorbing `check_script`'s body, and
-   `ScriptCheck` becoming the `DryRun` F24 defines.
+   `ScriptCheck` becoming the `DryRun` F24 shipped
+   (`reliquary.machines`: `operation` / `report` / `plan`), whose
+   plan document this operation fills with its own shape.
 2. `--dry-run` on `run-script`: the selector optional and choosing
    the tier, `--json` legal, `--progress` and `--display` refused.
 3. The report naming what it could not statically reach.

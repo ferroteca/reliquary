@@ -170,7 +170,7 @@ carries the exceptions and each family's contract home.
 
 | CLI | API twin | contract home |
 |---|---|---|
-| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores | [blueprint guide](../blueprint-guide.md) |
+| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores; `create_machine(name, *, dry_run=False, backend=None)` returns `str \| DryRun` — a distinct type so a dry return can never pass for the real one, and `backend=` (legal only under `dry_run`) asks what a *named* backend would do | [blueprint guide](../blueprint-guide.md), [cli.md](cli.md#the-dry-run) |
 | `export-drive` / `export-machine` | `export_drive(key, destination)` / `export_machine(to=, destination=None)` — stream-bearing; `to=` names an exporter (a vocabulary decoupled from backends) and is required | blueprint guide |
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |

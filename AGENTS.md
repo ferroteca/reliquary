@@ -101,7 +101,20 @@ workflow:
   `backends.Requirements`, and a declared `backend` pins the choice while an absent one walks the priority
   order (`backends.PRIORITY`, D66) and takes the first backend both available and capable. A requirement no
   candidate can honor fails closed naming the backend and the requirement, rather than recording a policy
-  nothing can honor (P11) — plus lifecycle (`create` / `start` / `stop` / `destroy` /
+  nothing can honor (P11). **The dry run is the same evaluation with nothing committed** —
+  `create_machine(dry_run=True)` returns a `DryRun` (`operation` / `report` / `plan`, the type F25's script
+  variant shares) and writes nothing at all: no machine directory, no `machine.json`, no image, no fetched
+  payload, no lock file and no seeded blueprint, a codex-only blueprint being read where it lies as a
+  read-only check reads it. It resolves media without fetching them (`acquire.residency` reports
+  `cached` / `would-download` / `would-extract` / `local-present` / `local-missing`, hashing nothing —
+  `cached` is presence, not verification) and describes location properties without binding them
+  (`binding.describe_keys`), because it must never prompt. It refuses what a create would refuse where a
+  create would refuse it, with two deliberate exceptions, each a thing it *cannot do* rather than a
+  severity judgement: an unbound location is reported unevaluated, and under `backend=` an absent backend
+  is reported rather than raised — that flag asks whether the blueprint would work *there*, so capability
+  alone decides (`backends.evaluate`), and it is legal only under `dry_run` because P10 gives the blueprint
+  authority over what a machine is. Missing local payloads are the one class collected and raised together,
+  so a validator pass names them all — plus lifecycle (`create` / `start` / `stop` / `destroy` /
   `recreate_machine` (destroy+create under the same id) / `apply_blueprint` (adopt blueprint edits into a
   stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
   already-materialized media image) / `get_machine_dir` (the out-of-band door) /
@@ -157,7 +170,10 @@ workflow:
   carrier session), the `Availability` / `Capabilities` / `Requirements` vocabulary the report and the demand
   share, `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
   per-start `token`, and an adapter-shaped `endpoint`), the registry (`adapter(name)`, `discover()`), and
-  `assign()`. `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
+  `assign()` — built over `evaluate(name, requirements)`, which reports availability and unmet
+  requirements as **two answers rather than one verdict**, because whether this host has a backend and
+  whether that backend could build this machine are two questions and a dry run asks only the second.
+  `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
   `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
   and boot rendering a machine's state lowers into, the owned launch with its identity verification, `Qmp`,
   the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape

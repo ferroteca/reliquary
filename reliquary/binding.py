@@ -383,6 +383,33 @@ def bind_keys(keys, *, parameters=None, explicit=None, properties_file=None,
         binder.bind(declaration)
     return binder.result().values
 
+def describe_keys(keys, *, parameters=None, explicit=None,
+                  properties_file=None, context=None):
+    """Bind what a location's bare keys can bind, asking nothing.
+
+    The dry counterpart of :func:`bind_keys`, as
+    :func:`describe_sources` is of :func:`bind_properties`: the same
+    sources in the same order, but it never prompts, never reads a
+    secret's value, and never fails on an unanswered key — an
+    interactive create would ask, so that key reports the ask as its
+    source and carries no value.
+
+    Returns :class:`BoundProperties`: ``values`` holds what
+    concretely bound, which is what a location can be rendered from,
+    and ``sources`` names every key including the ones that did not.
+    """
+    declarations = [
+        _LocationKey(key=key, kind="text", prompt=None, defaults=())
+        for key in sorted(keys)]
+    _preflight_environment(declarations)
+    binder = _Binder(
+        parameters=parameters, explicit=explicit,
+        properties_file=properties_file, context=context, asker=None,
+        dry_run=True)
+    for declaration in declarations:
+        binder.bind(declaration)
+    return binder.result()
+
 def describe_sources(script, *, parameters=None, explicit=None,
                      properties_file=None, context=None):
     """Name each declared property's supplying source, without a run.

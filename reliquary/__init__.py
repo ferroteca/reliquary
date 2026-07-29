@@ -23,7 +23,7 @@ from .machine import (Machine, cursor_menu_select, screen_text,
 from .errors import (InternalError, PreflightError, ReliquaryError,
                      RunCancelled, RunFailure, StaticError)
 from .events import Event, EventStream
-from .machines import (apply_blueprint, create, create_machine,
+from .machines import (DryRun, apply_blueprint, create, create_machine,
                        destroy_machine, eject_media, get_file, get_files,
                        get_machine_dir, get_machine_var,
                        insert_media, list_files, list_machines,
@@ -83,6 +83,7 @@ __all__ = [
     "Capabilities",
     "Context",
     "DIRECTORIES",
+    "DryRun",
     "GuestExec",
     "adapter",
     "discover",

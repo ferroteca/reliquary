@@ -52,10 +52,11 @@ picks whatever they like. The one ordering that does bind is a
 feature's: **work that only makes sense as part of one pledged
 feature lives with that feature**, in
 [pledged/FEATURES.md](pledged/FEATURES.md), and has to be done to
-complete it. **Two features carry work items today** — F24 and F25,
-the halves of `--dry-run` (D79) — and none of it is in this file. A
-task here that merely *relates* to a feature is still free to be
-picked whenever.
+complete it. **One feature carries work items today** — F25, the
+script half of `--dry-run` (D79); the create half delivered the day
+it was pledged and its items went with its number — and none of it
+is in this file. A task here that merely *relates* to a feature is
+still free to be picked whenever.
 
 Housekeeping (D38) is the same instinct one size smaller: work tiny
 enough and obvious enough that it needs no entry here **at all**,

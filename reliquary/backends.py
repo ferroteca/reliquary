@@ -97,6 +97,25 @@ class Capabilities:
 
 
 @dataclasses.dataclass(frozen=True)
+class Evaluation:
+    """One backend judged against one blueprint's demand.
+
+    Availability and capability are **two answers because they are
+    two questions**: whether this host has the backend, and whether
+    the backend could build this machine at all. Assignment needs
+    both. Asking whether a blueprint would work on a host one is not
+    standing on needs the second alone, which is what
+    ``create-machine --dry-run --backend`` asks — so the two are
+    reported separately rather than collapsed into one verdict.
+    """
+
+    backend: str
+    available: bool
+    detail: str = ""
+    unmet: Tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
 class Requirements:
     """What one whole blueprint asks a backend for.
 
@@ -320,6 +339,21 @@ def discover(backends=None):
                  for name in (backends or PRIORITY))
 
 
+def evaluate(name, requirements):
+    """Probe one backend and judge it, choosing nothing.
+
+    The judgment :func:`assign` is built from, exposed on its own
+    because a dry run asks the capability half without the
+    availability half — a backend nothing installed here can still
+    answer whether it could build this machine.
+    """
+    found = adapter(name)
+    probe = found.discover()
+    return Evaluation(backend=name, available=probe.available,
+                      detail=probe.detail,
+                      unmet=found.unmet(requirements))
+
+
 def assign(requirements, *, declared=None):
     """Pick the backend a machine materializes on.
 
@@ -332,31 +366,27 @@ def assign(requirements, *, declared=None):
     thereafter.
     """
     if declared is not None:
-        found = adapter(declared)
-        probe = found.discover()
-        if not probe.available:
+        verdict = evaluate(declared, requirements)
+        if not verdict.available:
             raise PreflightError(
                 f"blueprint pins backend {declared!r}, which is not "
-                f"available on this host: {probe.detail}",
+                f"available on this host: {verdict.detail}",
                 rule_id="machine.backend-unavailable")
-        missing = found.unmet(requirements)
-        if missing:
+        if verdict.unmet:
             raise PreflightError(
                 f"blueprint pins backend {declared!r}, which cannot "
-                f"provide: {', '.join(missing)}",
+                f"provide: {', '.join(verdict.unmet)}",
                 rule_id="machine.backend-incapable")
         return declared
     refusals = []
     for name in PRIORITY:
-        candidate = adapter(name)
-        probe = candidate.discover()
-        if not probe.available:
-            refusals.append(f"  {name}: {probe.detail}")
+        verdict = evaluate(name, requirements)
+        if not verdict.available:
+            refusals.append(f"  {name}: {verdict.detail}")
             continue
-        missing = candidate.unmet(requirements)
-        if missing:
+        if verdict.unmet:
             refusals.append(f"  {name}: cannot provide "
-                            f"{', '.join(missing)}")
+                            f"{', '.join(verdict.unmet)}")
             continue
         return name
     raise PreflightError(

@@ -188,6 +188,102 @@ is waiting on an answer today.
 
 ## Decided
 
+- D80 — A DRY RUN REFUSES WHAT A CREATE REFUSES, AND HASHES
+  NOTHING — DECIDED (owner, 2026-07-29) and delivered the same day.
+  Supports U7 (pledged); P7, P10, P11. The delivery of F24 is a
+  lifecycle act and is not recorded here (D63); what follows is what
+  the build adjudicated, none of it settled by D79 and all of it
+  binding on F25, which inherits the type and the rule.
+
+  REFUSE OR REPORT, WHICH IS THE WHOLE QUESTION. A validator that
+  finds a fault can raise it or file it, and a feature whose two
+  invariants are *commits nothing* and *describes the run* has an
+  honest case for either. **It raises what a create would raise,
+  where a create would raise it**: a dry run whose verdict is "this
+  would fail" fails, and the diagnostic is the answer. Reporting
+  faults into a document with a zero exit was declined — it would
+  say a blueprint is sound while knowing it is not, which is the
+  dishonesty P11 exists to forbid, and it would put the outcome
+  somewhere other than the exit code, where every other command
+  keeps it (P7 — a program drives the CLI by that code).
+
+  THE TWO EXCEPTIONS, and each is something a dry run **cannot do**
+  rather than a judgement about how bad a finding is — which is the
+  test that keeps the list from growing:
+
+  1. **It must not prompt**, so a media location no concrete source
+     answers is reported `unbound` with its key named. The step
+     cannot be evaluated without asking, so it is reported
+     unevaluated. `binding.describe_keys` is the dry twin of
+     `bind_keys` here, exactly as `describe_sources` is of
+     `bind_properties`.
+  2. **Under `--backend` the question is what another host would
+     do**, so that backend's absence *here* is a line in the plan
+     and not a refusal. Its incapability still raises: that is the
+     answer to the question asked.
+
+  ONE CLASS IS COLLECTED RATHER THAN RAISED ON SIGHT: a missing
+  *local* payload. Every one is named at once, after the whole plan
+  is walked. Enumerating faults is what this pass is uniquely good
+  at, and stopping at the first costs a fix-and-rerun for each —
+  but only this class, because mixing findings of different error
+  *classes* into one raise would have no honest class to raise, and
+  a general findings-with-severity model is surface F11 never
+  proposed.
+
+  NOTHING IS HASHED, which is where the `--dry-run=verify` line
+  actually falls. `cached` says the payload is in the cache, not
+  that it is the one this blueprint pins — verifying it means
+  hashing what may be a 400 MB LiveCD, which is not a step that
+  costs nothing. The rule generalizes to totals: **a byte count
+  appears only where something on this host knows one**, which is
+  the media spec's own honest-totals rule, so a cached or local file
+  reports its size and a `would-download` reports its URL and its
+  pinned hash and no size at all. Asking the network for one was
+  never considered: a HEAD is a step that costs something.
+
+  A FIFTH MEDIA STATE, and the pledge named four. `would-extract`
+  joins `cached` / `would-download` / `local-present` /
+  `local-missing`, because a container's child is a cache entry in
+  its own right and calling its arrival a download would be wrong.
+  The container is listed **only when the child is missing** — the
+  same closure `prune-media` reclaims by, so what the report shows
+  is what the fetch would actually do.
+
+  CAPABILITY WITHOUT AVAILABILITY NEEDED A SEAM. `assign` asked one
+  question and answered with a choice, so there was nowhere to ask
+  the capability half alone. `backends.evaluate(name, requirements)`
+  now reports availability and unmet requirements as **two answers
+  rather than one verdict**, and `assign` is expressed over it —
+  whether this host has a backend and whether that backend could
+  build this machine being two questions, which is the distinction
+  `--dry-run --backend` is entirely made of.
+
+  THE `DryRun` SHAPE IS THREE FIELDS: `operation`, `report`, and a
+  `plan` document. A flat record carrying every machine field was
+  weighed and declined — F25's script variant would then contribute
+  four more fields to a type half of whose surface is meaningless
+  to either operation. Three fields bind cleanly from C or Java
+  (two strings and a map, P7), let each operation's document keep
+  the project's own hyphenated field names, and mean a second
+  operation adds a plan shape and no field. It lives in
+  `machines.py` because that module owns the operation delivered
+  first and `script_runner` already depends on it, so F25 imports
+  downstream rather than a new module being introduced for one type.
+
+  FOLDED: reliquary/machines.py (the dry-run block and
+  `create_machine(dry_run=, backend=)`), reliquary/acquire.py
+  (`residency`, `payload_extension`), reliquary/backends.py
+  (`Evaluation`, `evaluate`, `assign` over it),
+  reliquary/binding.py (`describe_keys`), reliquary/cli.py
+  (`--dry-run`, `--backend`), reliquary/__init__.py (`DryRun`);
+  docs/spec/cli.md ("The dry run", normative), docs/spec/api.md
+  (the twin's row), docs/cli-reference.md, docs/api-reference.md,
+  README.md, CHANGELOG.md, AGENTS.md;
+  reliquary_tests/test_dry_run.py (the two invariants asserted
+  against the disk, and the plan checked against what a create then
+  writes).
+
 - D79 — F11 IS CUT IN TWO; A DRY RUN IS A DOCUMENT, NOT A STREAM —
   DECIDED (owner, 2026-07-29). Supports U7 (pledged); P6, P9, P10,
   P11. The pledges of F24 and F25 are lifecycle acts and are not

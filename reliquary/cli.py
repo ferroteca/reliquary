@@ -3,6 +3,7 @@
 """Command-line parsing and dispatch."""
 
 import argparse
+import dataclasses
 import getpass
 import importlib.metadata
 import json
@@ -96,6 +97,8 @@ _FLAG_ARITY = {
     "--properties": 1,
     "--progress": 1,
     "--file": 1,
+    "--dry-run": 0,
+    "--backend": 1,
 }
 
 
@@ -400,6 +403,18 @@ def main(argv=None):
     command.add_argument(
         "--blueprint", required=True,
         help="blueprint to materialize")
+    command.add_argument(
+        "--dry-run", action="store_true",
+        help="report what a create would do and do none of it: "
+             "nothing is seeded, fetched, locked or written")
+    command.add_argument(
+        "--backend", default=None,
+        help="with --dry-run, ask whether this blueprint would work "
+             "on the named backend -- its capability decides and it "
+             "need not be installed here. Not simulation: "
+             "--dry-run --backend simulator validates and stops, "
+             "while running simulated means dropping --dry-run and "
+             "keeping the backend")
 
     # start-machine
     command = subcommands.add_parser(
@@ -790,11 +805,20 @@ def _create(arguments):
             "create-machine allocates the machine number; "
             "do not pass --machine",
             rule_id="machine.selector-not-allowed")
-    machine_id = create_machine(
+    dry_run = getattr(arguments, "dry_run", False)
+    result = create_machine(
         arguments.blueprint,
+        dry_run=dry_run,
+        backend=getattr(arguments, "backend", None),
         properties=_explicit_properties(arguments),
         properties_file=_properties_file(arguments))
-    return _emit(arguments, machine_id, lambda: print(machine_id))
+    if dry_run:
+        # The twin returns a DryRun, so that is what --json prints;
+        # the pretty form is its own report, which is the same
+        # document rendered for a person.
+        return _emit(arguments, dataclasses.asdict(result),
+                     lambda: print(result.report, end=""))
+    return _emit(arguments, result, lambda: print(result))
 
 
 def _recreate_machine(arguments):

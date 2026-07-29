@@ -358,7 +358,7 @@ planning/proposed/FEATURES.md "Machine mobility".
 ### Creating a machine
 
 ```
-rlq create-machine --blueprint <name>
+rlq create-machine --blueprint <name> [--dry-run [--backend <name>]]
 ```
 
 Resolves `<name>` to a blueprint in `blueprints/`. If the file
@@ -393,6 +393,93 @@ blueprint file. Editing the blueprint affects future
 `create-machine` operations only; adopt edits into an existing
 machine (or return a diverged machine to its blueprint shape)
 with [`apply-blueprint`](#applying-blueprint-edits).
+
+#### The dry run
+
+`--dry-run` performs every step that costs nothing and commits
+nothing, stops at the first step that would, and reports what it
+would have done. Its twin is `create_machine(name, dry_run=True)`,
+whose return is a `DryRun` and never a machine id, so a caller
+cannot mistake one for the other.
+
+Two invariants define it:
+
+- **It leaves no state behind.** No machine directory, no
+  `machine.json`, no image, no fetched payload, no lock file — and
+  no seeded blueprint: a blueprint that lives only in the codex is
+  read where it lies rather than copied out, exactly as a read-only
+  check does.
+- **Its return describes the run** and never impersonates the run's
+  output. What comes back is a plan, a report and a verdict; a
+  fabricated *guest* output would be the other thing entirely, and
+  is deliberately out of scope.
+
+It evaluates the blueprint parse, namespace resolution, the
+reference closure, drive and medium compatibility, backend
+capability, slot limits, the machine id it would allocate, and each
+drive's resolved plan — `new` (size and image path), `use` (which
+payload), `difference` / `copy` (over which base). It stops before
+the machine directory, `machine.json`, any image creation, and any
+fetch.
+
+**Media resolve; they are never fetched.** Each is reported as
+`cached`, `would-download`, `would-extract`, `local-present` or
+`unbound`. A container is listed only when the child that comes out
+of it is not already cached, which is the closure `prune-media`
+reclaims by. Nothing is hashed: `cached` says the file is in the
+cache, not that it is the right one, and a byte total appears only
+where something on this host knows one — so a `would-download`
+carries its URL and its pinned `sha256` and no size.
+
+**It refuses what a create would refuse, where a create would
+refuse it**, so a dry run whose verdict is "this would fail" fails
+and the diagnostic is the answer. One class is collected rather than
+raised on sight: every missing *local* payload is named at once,
+because enumerating them is what this pass is good at and stopping
+at the first would cost a fix-and-rerun for each. There are exactly
+two things it will not refuse, and each is something it *cannot do*
+rather than a judgement about severity:
+
+- **It never prompts.** A media location no concrete source answers
+  is reported `unbound` with the key named, and the properties
+  section says a real create would ask.
+- **Under `--backend`, absence is reported and not raised** (below).
+
+`--backend <name>` asks whether the blueprint would work on the
+named backend rather than what this host would do — so **its
+capability decides and it need not be installed here**, and its
+absence is reported as a line in the plan. That is the U7 contract
+checked statically: capability, not identity, failing closed by
+name. It is legal **only** with `--dry-run`: a machine's backend
+comes from its blueprint, and a flag that changed the assigned
+backend at materialization would put that configuration outside the
+blueprint. Note the combination that is *not* simulation —
+`--dry-run --backend simulator` validates against the simulator's
+capabilities and stops; running simulated means dropping
+`--dry-run` and keeping the backend.
+
+```powershell
+$ rlq create-machine --blueprint freedos --dry-run
+create-machine freedos --dry-run
+
+machine: freedos-0 (lowest free)
+directory: ...\cache\machines\freedos-0
+backend: qemu (priority walk)
+platform: dos
+memory: 32
+cpus: 1
+boot: hdd0, cdrom0
+control planes: agentless-display
+drives:
+  cdrom0 (cdrom slot 0 ide): empty
+  hdd0 (hdd slot 0 ide): (inline) new 20M -> ...\media\hdd0.qcow2
+
+nothing was created.
+```
+
+`--json` prints the `DryRun` itself — `operation`, `report` and the
+`plan` document — under the ordinary rule that a command's `--json`
+is exactly what its twin returns.
 
 ### Starting and stopping
 

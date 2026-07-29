@@ -337,6 +337,87 @@ def _payload_ext(media, plan):
     return media.extension or _plan_ext(plan)
 
 
+def payload_extension(media, plan):
+    """The extension the cached payload of ``media`` carries."""
+    return _payload_ext(media, plan)
+
+
+def residency(plan, name, extension, context=None):
+    """What running ``plan`` would have to do, having run none of it.
+
+    The dry counterpart of :func:`_run`, and it lives here because
+    the cache layout is this module's invariant: only what knows
+    where a payload lands can say whether it is already there. Every
+    node the plan would cache becomes one entry, outermost first,
+    each a mapping of ``name`` / ``state`` / ``source`` / ``path``
+    (and ``sha256`` / ``size`` / ``mirrors`` where they are known).
+    The states:
+
+    ``cached``
+        the cache already holds this payload
+    ``would-download``
+        it does not, and a URL supplies it
+    ``would-extract``
+        it does not, and it comes out of a container — whose own
+        entry follows, since the container is fetched only when the
+        child is missing (the closure ``prune`` reclaims by)
+    ``local-present`` / ``local-missing``
+        a host path outside the cache, used in place
+
+    **Nothing is hashed.** ``cached`` says the file is there, not
+    that it is the right one: hashing a LiveCD is not a step that
+    costs nothing, and checking what is already cached is what a
+    later ``--dry-run=verify`` would add.
+    """
+    entries = []
+    _residency(plan, name, extension, context, entries)
+    return tuple(entries)
+
+
+def _residency(plan, name, extension, context, entries):
+    if isinstance(plan, resolve.Alternatives):
+        _residency(plan.options[0], name, extension, context, entries)
+        if len(plan.options) > 1:
+            entries[-1]["mirrors"] = len(plan.options)
+        return
+
+    if isinstance(plan, resolve.LocalFile):
+        # A local payload is used in place and never enters the
+        # cache, so its residency is simply whether it is still there
+        # — the check ``_run`` makes before verifying anything.
+        present = os.path.exists(plan.path)
+        entry = {
+            "name": name,
+            "state": "local-present" if present else "local-missing",
+            "source": plan.path,
+            "path": plan.path,
+            "sha256": plan.sha256,
+        }
+        if present and os.path.isfile(plan.path):
+            entry["size"] = os.path.getsize(plan.path)
+        entries.append(entry)
+        return
+
+    destination = os.path.join(media_dir(context),
+                               _cached_name(name, extension))
+    cached = os.path.exists(destination)
+    entry = {"name": name, "path": destination, "sha256": plan.sha256}
+    if isinstance(plan, resolve.Download):
+        entry["source"] = plan.url
+        entry["state"] = "cached" if cached else "would-download"
+    elif isinstance(plan, resolve.Extract):
+        entry["source"] = f"{plan.parent}/{plan.member}"
+        entry["state"] = "cached" if cached else "would-extract"
+    else:
+        raise InternalError(f"unknown plan step: {plan!r}")
+    if cached:
+        entry["size"] = os.path.getsize(destination)
+    entries.append(entry)
+    if isinstance(plan, resolve.Extract) and not cached:
+        _residency(plan.inner, plan.parent, _plan_ext(plan.inner),
+                   context, entries)
+
+
 def fetch_media(media, namespace, context=None, on_mismatch="fail",
                 properties=None, events=None, cancelled=None):
     """Return a media's verified payload path, fetching on demand.

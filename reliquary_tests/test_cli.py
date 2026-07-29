@@ -348,6 +348,51 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(stdout.getvalue().strip(), "plain-0")
 
+    def test_create_machine_dry_run_reports_and_builds_nothing(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home-dir", self.home,
+                "create-machine", "--blueprint", "plain", "--dry-run",
+            ])
+        self.assertEqual(result, 0)
+        printed = stdout.getvalue()
+        self.assertIn("machine: plain-0", printed)
+        self.assertIn("nothing was created.", printed)
+        self.assertFalse(
+            os.path.exists(os.path.join(self.home, "cache")),
+            "a dry run at the CLI wrote to the cache")
+
+    def test_create_machine_dry_run_json_is_the_document(self):
+        result, out = self._json_out(
+            ["create-machine", "--blueprint", "plain", "--dry-run"])
+        self.assertEqual(result, 0)
+        document = json.loads(out)
+        self.assertEqual("create-machine", document["operation"])
+        self.assertEqual("plain-0", document["plan"]["machine"])
+        self.assertIn("report", document)
+
+    def test_backend_needs_dry_run(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = cli.main([
+                "--home-dir", self.home,
+                "create-machine", "--blueprint", "plain",
+                "--backend", "vmware",
+            ])
+        self.assertEqual(result, 2)
+        self.assertIn("--dry-run", stderr.getvalue())
+
+    def test_dry_run_flags_before_command(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main([
+                "--home-dir", self.home, "--dry-run",
+                "--blueprint", "plain", "create-machine",
+            ])
+        self.assertEqual(result, 0)
+        self.assertIn("nothing was created.", stdout.getvalue())
+
     def test_get_machine_dir(self):
         with contextlib.redirect_stdout(io.StringIO()):
             cli.main(["--home-dir", self.home, "create-machine",
