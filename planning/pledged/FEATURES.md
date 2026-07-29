@@ -63,17 +63,8 @@ so its number retires unreused. The `pacing` keyword, the
 `statement > phase > header > built-in 0.1s` ladder, the
 parse-time plan `check-script` reports, and the runtime pause are
 recorded in [D60](../DECISIONS.md); the model is normative in
-[script-spec.md](../../docs/spec/script-spec.md)'s Timing section.
-
-**One item did not travel with it, and is not closed.** The
-bisection that would fix the default — the interval that reliably
-lands a keystroke on the installer screen that motivated this —
-needs a FreeDOS install rig, and no evidence yet fixes the number:
-what is known is that "immediately" is too little and "several
-seconds later" is enough. The shipped 0.1s is provisional by
-design, so this revises a default rather than completing a
-feature, which is why it did not hold the rest back. It wants its
-own entry when someone stands the rig up.)*
+[script-spec.md](../../docs/spec/script-spec.md)'s Timing
+section.)*
 
 *(F23 — in-band listing and whole-tree file transfer — delivered
 2026-07-27, the same day it was pledged, so its number retires

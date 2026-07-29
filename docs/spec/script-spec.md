@@ -1581,6 +1581,18 @@ is the missing pause before the first. Screen polling remains
 control-plane-owned and untunable; input-event pacing is
 control-plane-owned and tunable, on the ladder above.
 
+A swallowed first keystroke is this gap being too short, and it
+does not surface as an input failure: the verb completes, having
+delivered, and what fails is the *observation after it*, timing
+out on a screen that never advanced. Raise `pacing` on the phase
+that meets that screen — or, where one fits, prefer a
+feedback-driven verb: `select` re-reads between keys, so it
+accommodates a guest that was not yet listening rather than
+estimating how long it would take to start. The built-in 0.1s is
+a floor rather than an estimate of any screen's readiness, so a
+guest that needs more is expected to say so rather than to be
+predicted.
+
 ## Input verbs
 
 All input verbs share one delivery contract: the selected control

@@ -41,10 +41,12 @@ from .errors import StaticError
 DEFAULT_TIMEOUT = "60s"
 
 # The built-in gap before the first key event of a guest-input verb.
-# Deliberately small and deliberately provisional: a plain text
-# screen paints quickly and an animated TUI menu very slowly, so no
-# single number serves every screen — which is the argument for the
-# per-phase and per-statement override carrying real weight.
+# Deliberately small, and a floor rather than an estimate (D69):
+# what makes a guest ready to *read* differs in kind from screen to
+# screen — an installer arming its keyboard handler, a shell entering
+# its read loop — so no single number serves every one, which is the
+# argument for the per-phase and per-statement override carrying real
+# weight. Nonzero because that readiness is unobservable (G1).
 DEFAULT_PACING = "0.1s"
 
 _UNITS = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0}

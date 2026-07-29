@@ -188,6 +188,99 @@ is waiting on an answer today.
 
 ## Decided
 
+- D69 — THE PACING BISECTION IS REFUSED; THE 0.1s DEFAULT IS
+  DELIBERATE, NOT PROVISIONAL — DECIDED (owner, 2026-07-28).
+  Supports U14, U20, U12; G1. **Amends D60**, its default
+  paragraph only, and closes the one work item that entry left
+  open: the feature, the ladder, the spelling and the `pacing=0s`
+  ruling all stand, and the number itself does not move.
+
+  WHAT STARTED IT (owner): *"I don't think the F17 bisection is
+  worth doing. The 'best' delay is going to vary widely depending
+  on the type of wait condition."*
+
+  THE ENTRY THAT FILED IT ALREADY REFUTED IT. D60's default
+  paragraph argues that no default serves every screen **by
+  construction**, and calls that the reason the per-phase and
+  per-statement overrides carry real weight rather than being
+  speculative generality — then, in the next sentence, files a rig
+  to find the number it has just said does not exist. Both halves
+  cannot be right. The construction argument is the one that
+  survives, because it is why `pacing` is on a ladder at all.
+
+  THE VARIANCE IS IN THE READINESS MECHANISM, NOT THE PAINT SPEED
+  — the advance on D60, and what makes the refusal structural
+  rather than a matter of appetite. D60 reasoned about *rendering*:
+  a plain text screen paints quickly, an animated TUI menu slowly.
+  That is one mechanism at different speeds, and a distribution has
+  a center worth measuring. The variance that actually governs is
+  in what makes a guest ready to *read*: an installer arming its
+  keyboard handler after it paints, a shell printing a prompt
+  before it enters its read loop, a menu discarding keys until an
+  animation finishes. Those are unrelated mechanisms rather than
+  one with a wide spread, so a measurement against any of them
+  carries no information about the others.
+
+  WHAT A RIG WOULD ACTUALLY HAVE PRODUCED is a number calibrated to
+  one guest, one installer and one screen, promoted to the built-in
+  every other guest inherits. It would have made the default
+  **less** honest rather than more: 0.1s reads transparently as a
+  floor, where a bisected 2.4s reads as a finding — measured,
+  authoritative, and wrong everywhere except the rig it came from.
+  Standing up a FreeDOS install rig is what that would have cost.
+
+  SO THE DEFAULT'S JOB IS NOT TO BE RIGHT, which is the whole
+  substance of this entry. It is a floor. **Nonzero**, because
+  agentlessly a guest's input readiness is unobservable where its
+  output is not (G1), so typing the instant a screen paints asserts
+  what cannot be known. **Small**, because every guest-input verb in
+  every script pays it, and a script whose guest is ready should pay
+  almost nothing. **Overridable**, because the author who knows the
+  screen is the only party in a position to be right. Correctness
+  lives on the ladder; the built-in only has to be a defensible
+  floor, and it is defensible on construction rather than on
+  evidence — which is why no evidence was owed.
+
+  WHAT IS NOT REFUSED. This is no promise never to revise 0.1s:
+  evidence out of real scripts may still move it, and dev3's
+  CHANGELOG line saying the default is expected to be revisited
+  stays true as written. What is refused is the *method* — stand a
+  rig up, bisect, adopt the answer as the built-in — and with it
+  the framing that the number is owed to anyone.
+
+  THE ONE RESIDUE, FOLDED HERE RATHER THAN FILED. The failure that
+  motivated F17 is still live for the next author who meets it: the
+  first keystroke swallowed, and the wait timing out 30s later at
+  the following step. Both remedies already exist — raise `pacing`
+  on the phase, or prefer a feedback-driven verb, which is what
+  actually fixed `freedos-install.rlqs` — but both were written as
+  justification for the feature rather than as what to do when it
+  happens to you, and `pacing` appears in no guide or cookbook at
+  all. One sentence in the spec's own `pacing` prose closes it;
+  filing a task for one sentence is the ceremony TASKS.md refuses
+  (D38).
+
+  P8 TRIAGE: nothing to vet. No surface moves and no requirement
+  changes — [script-spec.md](../docs/spec/script-spec.md) never
+  called the default provisional, stating the ladder and the number
+  and stopping there, so the word being retired lived in two
+  planning documents and one code comment. The added sentence is
+  guidance under an unchanged norm.
+
+  FOLDED: this entry; D60's default paragraph (the bracketed
+  amendment); [pledged/FEATURES.md](pledged/FEATURES.md) (F17's
+  open-item paragraph struck — the work it describes will not
+  happen, and a note about work that will not happen is parking of
+  exactly the kind [TASKS.md](TASKS.md) refuses);
+  [script_timing.py](../reliquary/script_timing.py) (the
+  `DEFAULT_PACING` comment, which already carried the construction
+  argument and now rests on it alone);
+  [script-spec.md](../docs/spec/script-spec.md) (the guidance
+  sentence, non-normative, in the `pacing` rationale). No CHANGELOG
+  line: nothing release-facing moved. D45's account of F17's sizing
+  is left standing as the past-tense record it is — a sizing
+  judgment that was correct when it was made.
+
 - D68 — P3 SHARPENS TO BOTH SIDES; THE LINE IS THE AGENT, NOT THE
   SIDE — DECIDED (owner, 2026-07-28) and armed the same day, which
   empties [proposed/ARCHITECTURE.md](proposed/ARCHITECTURE.md).
@@ -771,6 +864,15 @@ is waiting on an answer today.
   revises a default the design already calls provisional, so it is
   separable from the language. Filed as the one work item this
   entry does not close.
+  [D69 refuses the bisection and retires this heading's second
+  half: the default is **deliberate**, not provisional. The
+  paragraph's own construction argument is why — no number serves
+  every screen, and the variance is in the readiness mechanism
+  rather than the paint speed, so a rig would have measured one
+  installer and promoted the answer to a built-in it could not
+  support. The number is unchanged and the work item is closed
+  unstarted; the default is a floor, and correctness lives on the
+  ladder above it.]
 
   Two questions the round did not reach, settled here. **There is
   no branching-`wait` rung**: an observation container cannot carry
