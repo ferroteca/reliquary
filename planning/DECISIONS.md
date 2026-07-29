@@ -188,6 +188,69 @@ is waiting on an answer today.
 
 ## Decided
 
+- D76 — THE BOOT SIGNATURE WAS BYTE-SWAPPED IN BOTH THE READER AND
+  ITS ORACLE — DECIDED (owner, 2026-07-29). Supports P11, P16;
+  P24. **Amends D74's independence claim.** A defect against
+  [ARCHITECTURE.md](../ARCHITECTURE.md)'s P16 entry, which asserts
+  a drive image is read and written at rest, so it needed no pledge
+  — and it arrived fixed, so it never entered
+  [TASKS.md](TASKS.md).
+
+  WHAT WAS WRONG. `at_rest` compared the boot sector's last two
+  bytes as a little-endian word against `0x55AA`. On disk those
+  bytes are `0x55` then `0xAA`, which reads back as `0xAA55`. The
+  comparison could therefore never be true, so **every real disk
+  was rejected** as "no partition table and no FAT boot sector"
+  and the whole at-rest capability was inoperative outside its own
+  tests. Found by running the D75 fix against the integration rig
+  and noticing that a machine which had just booted FreeDOS from
+  `hdd0` was a disk this reader claimed it could not identify.
+
+  WHY THE SUITE PASSED, WHICH IS THE PART WORTH KEEPING.
+  `fat_image` writes the images `at_rest` reads, and it wrote the
+  same constant the same wrong way — `struct.pack_into("<H", …,
+  0x55AA)`. The two agreed, so 27 tests passed against images no
+  formatter would produce, and the one thing neither could see was
+  the thing they shared.
+
+  **D74 CLAIMED MORE THAN IT HAD.** Its entry says the structural
+  check "reads a volume from the format's layout rather than
+  through `at_rest`", and that "a writer validated only by its own
+  reader would agree with itself about a shared mistake." Both
+  sentences are true of the *method* and were not true of the
+  *artifact*: written by one hand in one sitting, the builder
+  inherited the reader's misreading of the specification rather
+  than checking it. An oracle is independent of the code it
+  checks, not of the person who wrote both.
+
+  THE REMEDY IS LITERAL BYTES, NOT A SHARED SYMBOL. Moving the
+  constant somewhere common would have made the two agree *by
+  construction*, which is the failure with a tidier name. Instead
+  the guards state the layout as fact — the signature is asserted
+  to be `b"\x55\xaa"` at offset 510 on both a volume and a
+  partition table, and a hand-assembled MBR owing nothing to the
+  builder must be accepted. Each fails against the old code, which
+  is the test of a regression guard worth having.
+
+  WHAT THIS SAYS ABOUT ORACLES GENERALLY (P24's grain). A
+  second implementation is a real check on logic and a weak one on
+  *constants and layout*, because those are copied rather than
+  reasoned out. Where a format is the contract, at least one
+  assertion should quote the format's own bytes. That is the
+  standing lesson, and it is why this entry exists rather than the
+  fix being a commit line.
+
+  NO CHANGELOG LINE. The at-rest capability is in the unreleased
+  section and has never been in anyone's hands, so there is no
+  shipped behaviour to report fixed; the entry describing it now
+  describes something that works.
+
+  FOLDED: this entry; D74's independence paragraph (the bracketed
+  amendment); [at_rest.py](../reliquary/at_rest.py) (the signature
+  compared as the bytes it is, in all three places);
+  `fat_image.py` (the same, and the shared constant named for what
+  it is); `test_at_rest.py` (the layout guards).
+
 - D75 — A PROMPT IS NOT COMPLETION, AND UNATTRIBUTABLE OUTPUT IS A
   FAILURE — DECIDED (owner, 2026-07-28) and delivered the same day.
   Supports U12, U14, U9; P11. Fixes
@@ -331,6 +394,13 @@ is waiting on an answer today.
   that never ends or leaves the volume, a file whose chain is
   shorter than its recorded size. A writer validated only by its
   own reader would agree with itself about a shared mistake.
+  [D76 corrects this paragraph: independent of the *code*, and not
+  of the author. Both sides carried the same byte-swapped boot
+  signature, so the suite passed against images no formatter would
+  produce and every real disk was refused. The method stands; the
+  claim as written overstated what one hand writing both sides can
+  buy, and the guards it now leans on quote the format's own bytes
+  rather than a shared symbol.]
 
   P8 TRIAGE: an interface change, and an easy approval. Two verbs
   reach drives they could not reach, one adapter surface grows

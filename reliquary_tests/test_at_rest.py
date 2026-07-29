@@ -37,6 +37,46 @@ class _ImageCase(unittest.TestCase):
         return image
 
 
+class OnDiskLayoutTests(_ImageCase):
+    """Facts about the bytes, asserted without either module's help.
+
+    The builder existing to check the reader only works while the two
+    disagree about nothing *except* what is right. They once shared a
+    byte-swapped boot signature — the reader looked for it and the
+    builder wrote it, so every test passed and every real disk was
+    rejected as unreadable. These assertions state the layout
+    literally, so an agreed-upon mistake has nowhere to hide.
+    """
+
+    def test_the_boot_signature_is_0x55_then_0xaa_on_disk(self):
+        payload = fat_image.volume({"A.TXT": b"a"})
+        self.assertEqual(payload[510:512], b"\x55\xaa")
+
+    def test_a_partition_table_ends_the_same_way(self):
+        payload = fat_image.partitioned(
+            [fat_image.volume({"A.TXT": b"a"}, bits=16, sectors=20000,
+                              per_cluster=4)])
+        self.assertEqual(payload[510:512], b"\x55\xaa")
+
+    def test_a_hand_built_mbr_is_accepted(self):
+        """An MBR assembled here from the layout, owing nothing to the
+        builder: one FAT16 partition at LBA 63, which is what a real
+        formatter produces and what this reader once turned away."""
+        volume = fat_image.volume({"REAL.TXT": b"real"}, bits=16,
+                                  sectors=20000, per_cluster=4)
+        sector = bytearray(512)
+        sector[446] = 0x80                       # bootable
+        sector[446 + 4] = 0x06                   # FAT16
+        sector[446 + 8:446 + 12] = (63).to_bytes(4, "little")
+        sector[446 + 12:446 + 16] = (
+            len(volume) // 512).to_bytes(4, "little")
+        sector[510:512] = b"\x55\xaa"
+        image = self._image(bytes(sector) + bytes(62 * 512) + volume)
+        self.assertEqual(len(image.volumes), 1)
+        self.assertEqual([name for name, _dir, _size
+                          in image.volumes[0].entries([])], ["REAL.TXT"])
+
+
 class VolumeDiscoveryTests(_ImageCase):
     """Finding the volumes, with and without a partition table."""
 

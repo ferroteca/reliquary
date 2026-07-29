@@ -39,7 +39,11 @@ import datetime
 import os
 import struct
 
-_SIGNATURE = 0x55AA
+#: The two bytes ending a boot sector, in the order they sit on
+#: disk. Compared as bytes rather than as a little-endian word,
+#: because "the 0x55AA signature" is written 0x55 then 0xAA and
+#: reads back as 0xAA55 -- a constant that is its own trap.
+_SIGNATURE = b"\x55\xaa"
 _SECTOR = 512
 
 #: Partition types that hold a chain of logical drives rather than a
@@ -82,11 +86,11 @@ def _looks_like_a_bpb(sector):
     table.
 
     Checked before the partition table, not after: a boot sector also
-    carries the ``0x55AA`` signature, so its boot code read as
+    carries the boot signature, so its boot code read as
     partition entries can look plausible. The jump instruction and the
     sector size are what tell them apart.
     """
-    if len(sector) < _SECTOR or _u16(sector, 510) != _SIGNATURE:
+    if len(sector) < _SECTOR or sector[510:512] != _SIGNATURE:
         return False
     if sector[0] not in (0xEB, 0xE9):
         return False
@@ -149,7 +153,7 @@ class Image:
             # A partitionless image -- a floppy, or a disk formatted
             # as one whole volume. There is nothing to walk.
             return [Volume(self, 0, self.size, "1")]
-        if _u16(first, 510) != _SIGNATURE:
+        if first[510:512] != _SIGNATURE:
             raise UnreadableImage(
                 f"{self.path}: no partition table and no FAT boot "
                 "sector; reliquary cannot tell what is in this image")
@@ -190,7 +194,7 @@ class Image:
         while here and here not in seen and here < self.size:
             seen.add(here)
             record = self.read(here, _SECTOR)
-            if _u16(record, 510) != _SIGNATURE:
+            if record[510:512] != _SIGNATURE:
                 break
             entry = record[446:462]
             if entry[4] and _u32(entry, 12):

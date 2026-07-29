@@ -20,6 +20,10 @@ import struct
 
 SECTOR = 512
 
+#: The boot signature, in the byte order a real formatter
+#: writes it: 0x55 then 0xAA.
+SIGNATURE = b"\x55\xaa"
+
 
 def _short(name):
     """``NAME.EXT`` as the 11 padded bytes a directory record holds."""
@@ -178,7 +182,7 @@ def volume(tree, *, bits=12, sectors=2880, per_cluster=1, root_entries=224):
         struct.pack_into("<I", boot, 36, fat_sectors)
         struct.pack_into("<I", boot, 44, 2)
         struct.pack_into("<H", boot, 48, 1)
-    struct.pack_into("<H", boot, 510, 0x55AA)
+    boot[510:512] = SIGNATURE
 
     image = bytearray(boot)
     if bits == 32:
@@ -186,7 +190,7 @@ def volume(tree, *, bits=12, sectors=2880, per_cluster=1, root_entries=224):
         struct.pack_into("<I", fsinfo, 0, 0x41615252)
         struct.pack_into("<I", fsinfo, 484, 0x61417272)
         struct.pack_into("<II", fsinfo, 488, 0xFFFFFFFF, 0xFFFFFFFF)
-        struct.pack_into("<H", fsinfo, 510, 0x55AA)
+        fsinfo[510:512] = SIGNATURE
         image += fsinfo
     image += bytes((reserved - len(image) // SECTOR) * SECTOR)
     for _copy in range(2):
@@ -212,7 +216,7 @@ def consistency(payload, *, offset=0):
     """
     problems = []
     boot = payload[offset:offset + SECTOR]
-    if struct.unpack_from("<H", boot, 510)[0] != 0x55AA:
+    if boot[510:512] != SIGNATURE:
         return ["no boot signature"]
     per_sector = struct.unpack_from("<H", boot, 11)[0]
     per_cluster = boot[13]
@@ -325,5 +329,5 @@ def partitioned(volumes, *, gap=SECTOR):
         table[446 + 16 * slot:462 + 16 * slot] = entry
         body += bytes(start - gap - len(body)) + payload
         start += len(payload)
-    struct.pack_into("<H", table, 510, 0x55AA)
+    table[510:512] = SIGNATURE
     return bytes(table).ljust(gap, b"\0") + body
