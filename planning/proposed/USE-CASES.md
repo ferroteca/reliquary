@@ -438,6 +438,34 @@ milestone cite U19.
 >   a follower attaches to its record while it runs and detaches
 >   without disturbing it.
 
+**U22 — The device is the machine's whole point** — drafted (add,
+2026-07-29; the case F27's admission said must be drafted before
+that feature could be pledged, drafted in the round that pledged
+it — owner). The gap: no case names the guest's *hardware* as the
+subject. U14's consumers are exactly who this serves, and U4/U16
+reach a precisely-defined machine, but none reaches a machine
+whose *device model* is the point — a driver under test binds one
+particular device, and its developer needs that device's presence
+to be a declarable, portable fact that assignment can honor and
+preflight can refuse by name. The hatch sentence is F28's demand
+citation, and the driver-half sentence states the split F27's
+decide-first asks to have stated.
+
+> - **U22 — The device is the machine's whole point.** A
+>   developer is testing a device driver inside a guest: the
+>   machine exists so that one particular device is present for
+>   the driver to bind. They declare that device in the blueprint
+>   as a portable fact — not an engine preference and not a
+>   backend pin — and assignment finds a backend that provides
+>   it, whichever that is. Where no available backend can, the
+>   machine is refused up front, naming the device — the need,
+>   not a symptom. A device the vocabulary does not yet name is
+>   reachable through the backend's own settings section, at the
+>   price of portability — the pressure that grows the vocabulary
+>   one name at a time. Whether the *guest* has a driver for the
+>   device stays the caller's business: the machine provides the
+>   hardware; what runs on it is the point of the exercise.
+
 ### Pending clarifications
 
 Parked in-place edits — no argument needed, delivered when
