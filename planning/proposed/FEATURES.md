@@ -50,6 +50,21 @@ delivery order; that order has no standing here (D42 — `proposed/`
 is not a queue), and what survives of it is the dependency each
 entry records in its own text.
 
+**F11 was the first of the six to go, on 2026-07-29** — and it went
+by an exit no entry here had used before. It was not pledged: it
+was **cut**, failing D42's one-sprint bound, so its number retired
+unreused and F24 and F25 carry the halves to
+[pledged/FEATURES.md](../pledged/FEATURES.md). The lesson is about
+this file rather than about that feature. An entry here is sized by
+nobody — "size is no bar to sitting here" is the rule four
+paragraphs down — so what one costs is discovered at the pledge, by
+reading the shipped surface it would change. F11 read as a rename
+with a new command beside it; the reading found a flag it assumed
+into existence, an output discipline that inverts, and a normative
+mode the rename would have deleted in silence (D79). Arriving from
+outside made none of that worse: the entry was argued in good faith
+and the gaps are the ordinary ones.
+
 **F18–F20 arrived from [TASKS.md](../TASKS.md)** (owner,
 2026-07-27), by the gate audit of that day. Each adds a CLI command
 or changes a CLI spelling — which is **no bar to being a task**
@@ -677,130 +692,17 @@ Raised 2026-07-26 in the spec/descriptive round; **the owner agreed
 it needs to win this argument, not that it has** — so unlike F7–F9
 this one was asked for, and still waits on its own case.
 
-## F11 — `--dry-run`, and the end of the check family
-
-> **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). Demand is **split, and only half
-> of it is thin.** The `run-script` half has *no use-case impact*:
-> it is a better spelling for `check-script`, which ships — the
-> first triage bullet of [INTERFACES.md](../INTERFACES.md) — and it
-> serves **P6** by retiring the second spelling of one semantic.
-> The `create-machine` half is new capability, and its demand is
-> the **U7** draft through the portability reading below, plus
-> **P11**, which is what a backend-aware validation reports.
-
-THE RULE that makes it one feature, and the reason it stays a
-validator: *a dry run performs every step that costs nothing and
-commits nothing, stops at the first step that would, and reports
-what it would have done.* Two invariants carry it. It **leaves no
-state behind** — no machine directory, no `machine.json`, no fetched
-payload, no started process; a step that cannot be evaluated without
-committing is reported unevaluated rather than performed. And its
-**return describes the run, never impersonating the run's output**,
-which is the line the exclusion at the end of this entry draws.
-
-**`create-machine --dry-run` is the gap worth filling first.**
-Scripts can be checked today; machines cannot, so there is no way to
-ask "is this blueprint sound, and what would it build?" without
-building it. Evaluate: blueprint parse, namespace resolution,
-reference closure, drive/medium compatibility, backend capability,
-slot limits, the machine id that would be allocated, and each
-drive's resolved plan — `new` (size), `use` (which location, cached
-or not), `difference` / `copy` (over which base). Stop before the
-machine directory, `machine.json`, `create_hdd_image`, and any
-fetch.
-
-MEDIA IS THE ONE REAL DESIGN QUESTION, because resolution and
-acquisition are different costs. Proposed: **resolve, never fetch** —
-report each medium as cached, would-download (with size and sha256),
-local-present, or local-missing. A missing *local* file is an error a
-dry run can and should catch; a not-yet-downloaded remote is not. A
-later `--dry-run=verify` that additionally hashes what is already
-cached is the check people want before a long install; it is noted
-and not proposed here.
-
-**`run-script --dry-run` is what `check-script` already is.**
-Everything `ScriptCheck` returns — script path, timing plan,
-resolved machine, property sources, printable report — is a dry run
-of a script. Evaluate parse, static checks, property binding (naming
-unbound keys and their sources), referenced media and landmarks,
-the timing plan, and the machine selector resolving to a real
-machine; stop before starting the machine and before any statement
-reaches a guest.
-
-Decide first: whether the report covers **the whole script** or only
-the statically reachable part. Conditions and handlers depend on
-guest state, so a plan can only ever be a plan — say so in the report
-(`3 statements not statically reachable`) rather than implying a
-completeness it cannot have.
-
-THE CHECK INVENTORY — three public names carrying the word, and they
-are not one thing:
-
-| name | disposition |
-|---|---|
-| `check_script()` | becomes `run_script(dry_run=True)` |
-| `ScriptCheck` | becomes `DryRun` |
-| `check_key()` | a different species — below |
-
-`check_key(key)` validates a property key and returns it. There is no
-operation to dry-run: it is a predicate on a string, like
-`str.isidentifier()`, and folding it into `--dry-run` would be
-forcing it. Either rename it `validate_key()` or — tidier — make it
-private, since it is a validator the parser should already be
-applying and a caller pre-validating a key is a thin use case.
-Whichever wins, **P9 deletes the old spellings** rather than aliasing
-them.
-
-SURFACE, both presentations together (P6):
-
-    rlq create-machine NAME --dry-run
-    rlq run-script NAME --dry-run
-
-    create_machine(name, *, dry_run=False, ...) -> str | DryRun
-    run_script(label, *, dry_run=False, ...)    -> ScriptRun | DryRun
-
-- **A distinct return type is the point.** A `dry_run=True` call must
-  not return something a caller can mistake for the real return: a
-  machine id naming no machine, or `None`, makes misuse a confusing
-  failure three layers down, where a `DryRun` object makes it a
-  `TypeError` at the call site. `ScriptCheck` is already shaped this
-  way and becomes `DryRun`'s script variant.
-- **`dry_run` is already the project's word** (`prune_media`), so
-  this is consistency rather than overloading.
-- **Per-call only.** No `set_dry_run()`, no `Context(dry_run=…)`. An
-  ambient mode is how a dry run gets left on.
-
-**`--backend` is meaningful under `--dry-run`, and it is not
-simulation.** Part of what a dry run validates is backend-dependent —
-controller support, medium compatibility, slot limits, whatever a
-backend has wired; Reliquary already refuses a non-`ide` controller
-because only `ide` is wired on QEMU. So
-`rlq create-machine NAME --dry-run --backend vmware` answers "would
-this blueprint work over there?" with nothing installed and nothing
-booted. That is the U7 contract — capability, not identity, failing
-closed by name (P11) — checked statically, and it falls out of
-machinery that already exists. Note the combination that is *not*
-simulation: `--dry-run --backend simulator` validates against the
-simulator's capabilities and stops; running simulated means dropping
-`--dry-run` and keeping the backend. Worth a line of help text,
-because the mistake is natural.
-
-WHAT IS DELIBERATELY EXCLUDED — mocked statement results, so control
-flow could execute. That is where the feature would change species,
-and the tell is sharp: **a dry run's output is *about* the run — a
-plan, a report, a verdict; a fake backend's output is *of* the run.**
-Once output is *of* the run, three obligations follow that a flag is
-a poor place to carry: somewhere to declare the responses, a way to
-distinguish simulated output from real, and a guarantee it cannot be
-switched on by accident. The accident is concrete for any caller that
-parses guest output — a misconfigured run reports every guest test
-passing having booted nothing. A plan can never be mistaken that way;
-fabricated output can. **F12 is where that belongs, and the two are
-documented in the same breath**: the first reading of `--dry-run`,
-including by this project's own author, is "simulate the run", so the
-fix is making the fake backends easy to find rather than making the
-validator into one.
+*(F11 — `--dry-run`, and the end of the check family — was
+**cut on pledge** on 2026-07-29, so its number retires unreused
+(D42) and a fresh one came to each piece:
+[F24](../pledged/FEATURES.md) is `create-machine --dry-run`, the
+gap this entry called worth filling first, and
+[F25](../pledged/FEATURES.md) is `run-script --dry-run` with the
+check family's end. Both are pledged. This is the first use of
+D42's cut-on-pledge rule — D65 weighed F2 for the same cut a day
+earlier and pledged it whole — and the rulings the cut produced,
+including three surface collisions this entry never named, are in
+[D79](../DECISIONS.md).)*
 
 ## F12 — The `simulator` backend
 
@@ -846,7 +748,8 @@ puts the real code path under those tests.
 **Simulated results are marked in the return value**, and the marking
 is not optional: it is P11 at the value level, and it is what lets a
 caller refuse simulated results everywhere outside its own tests —
-the guard against exactly the accident F11 refuses to enable.
+the guard against exactly the accident
+[F25](../pledged/FEATURES.md) refuses to enable.
 
 DECIDE FIRST, and it is a genuine obstacle rather than a detail:
 **what shape the responder takes under P6 and P7.** A callback is the

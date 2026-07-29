@@ -188,6 +188,112 @@ is waiting on an answer today.
 
 ## Decided
 
+- D79 — F11 IS CUT IN TWO; A DRY RUN IS A DOCUMENT, NOT A STREAM —
+  DECIDED (owner, 2026-07-29). Supports U7 (pledged); P6, P9, P10,
+  P11. The pledges of F24 and F25 are lifecycle acts and are not
+  recorded here (D63); what follows is what was adjudicated in
+  their course. F11's argument was written in its 2026-07-27 entry
+  and needed no re-making — but reading the surface it would change
+  produced four rulings that entry never contemplated.
+
+  THE SIZE CALL, AND THE FIRST CUT ON PLEDGE. F11 fails D42's
+  one-sprint bound, so its number **retires unreused** and a fresh
+  one goes to each piece: **F24**, `create-machine --dry-run`, and
+  **F25**, `run-script --dry-run` with the check family's end. That
+  rule has sat in `pledged/FEATURES.md`'s preamble since D42 and
+  this is its first use; D65 is the near miss, having weighed F2
+  for the same cut a day earlier and pledged it whole because its
+  pieces were not independently useful. These two are: each lands
+  coherently on its own, and neither waits on the other beyond the
+  `DryRun` return type, which whichever lands first defines.
+
+  **Both are pledged**, and the alternative was real. Pledging one
+  and leaving the other in `proposed/` buys a smaller first
+  commitment, which is D65's own framing of what a cut is for. It
+  was declined because pledged is not scheduled: `--dry-run` on one
+  command with `check-script` still standing beside it is two
+  spellings of one semantic coexisting for an unbounded time, which
+  is precisely the P6 defect the feature exists to end. A cut that
+  is only half-pledged leaves the thing being fixed in place, at no
+  saving that a date would ever cash.
+
+  `--backend` IS A QUESTION, NOT A CONFIGURATION. F11's headline
+  example assumed a flag that does not exist — the only
+  `--backend` in the tree is `new-blueprint`'s scaffold field — and
+  it is load-bearing: without it the create half's U7 citation
+  collapses to P11 alone, since the portability reading *is* asking
+  what a blueprint would do on a backend this host does not have.
+  It is added, and it is **legal only with `--dry-run`**. The line
+  is P10: what a machine *is* comes from the blueprint, so a flag
+  that changed the assigned backend at materialization would put
+  that configuration outside the blueprint and needs its own
+  argument. Under `--dry-run` nothing materializes, so the flag
+  names a hypothetical to validate against — a question, which the
+  blueprint's authority does not reach.
+
+  A DRY RUN IS A DOCUMENT, AND THE FLIP IS FORCED. `run-script`
+  rejects `--json` today, naming `--progress jsonl`: a live run is
+  an event stream, not a document. `check-script` is the other
+  thing — a `--json` result-bearing command. Nothing new is needed
+  to settle the merge, because `cli.md` already says `--json`
+  prints *exactly what the API twin returns*: under `--dry-run` the
+  twin returns a `DryRun`, so `--json` becomes legal and
+  `--progress` has no stream to render. This is F11's own invariant
+  — the return describes the run and never impersonates its output
+  — turning out to be the CLI rule already written down.
+  `--progress` and `--display` are **refused** under `--dry-run`
+  rather than accepted and ignored, P11 holding at the flag level.
+  Only the script half pays this: `create-machine` is already a
+  `--json` command with no `--progress`, which inverts F11's
+  implicit sizing of its two halves.
+
+  THE SELECTOR RELAXES, AND D8's TWO MODES SURVIVE. `run-script`
+  requires `--blueprint` or `--machine`; `check-script` does not,
+  and `script-spec.md` makes the selector-less mode **normative** —
+  "exactly two modes, one per checkable tier". So under `--dry-run`
+  the selector is optional and its presence chooses the tier.
+  Without this ruling the respelling deletes a specified mode in
+  silence, which is the kind of loss a rename is least likely to be
+  audited for. D8 item 7's label-first-then-bare-stem resolution is
+  untouched and travels into the merged verb.
+
+  `check_key` GOES PRIVATE, CLOSING A P6 RESIDUE. F11 offered a
+  rename to `validate_key()` or privacy, calling the second tidier;
+  privacy also *closes* something. `check_key` is exported from
+  `reliquary/__init__.py`, appears in no `api.md` parity row and
+  has no CLI twin — a public capability unreachable from the CLI,
+  standing today. Making it private ends the question; renaming it
+  keeps it public and owes a CLI twin for a predicate on a string.
+  It is not a dry run of anything and never was, so it rides F25 as
+  the check family's last member rather than as a dry-run item.
+
+  THE SCRIPT REPORT COVERS THE WHOLE SCRIPT AND COUNTS WHAT IT
+  COULD NOT REACH. Conditions and handlers depend on guest state,
+  so a plan can only ever be a plan; the report states that limit
+  outright (`3 statements not statically reachable`) rather than
+  implying a completeness it cannot have. Reporting only the
+  statically decidable part was declined: a reader cannot tell what
+  was omitted, and the counts stop describing the script the caller
+  wrote. This is P11 at the report level — the same rule that makes
+  a capability gap name itself.
+
+  WHAT THE RECORD ALREADY HELD, and it invites this rather than
+  refusing it. D8 item 7 (2026-07-21) made `check-script` the check
+  family and left *"a future check blueprint/media validation
+  family"* open; F24 is that family arriving under a better
+  spelling. D22 is where `dry_run` entered the vocabulary, on
+  `prune-media`, so F11's claim that it is already the project's
+  word holds. Nothing bearing on `--dry-run` is recorded anywhere
+  as killed, declined or superseded.
+
+  FOLDED: pledged/FEATURES.md (F24 and F25 arrive with their work
+  breakdowns; the refill paragraph); proposed/FEATURES.md (F11
+  leaves by cut, the F11–F16 preamble gains what the cut taught
+  about sizing an entry nobody sized, and F12's closing citation
+  repoints to F25); pledged/USE-CASES.md (U7's citer list);
+  TASKS.md (the claim that no feature has work items, true since
+  D67 and now not).
+
 - D78 — THE LETTER MAP READS THE DISK; D71'S ASSUMPTION IS GONE —
   DECIDED (owner, 2026-07-29) and delivered the same day. Supports
   U14, U20; P10, P11, P16, P17. **Closes D71's residue** in

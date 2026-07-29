@@ -52,7 +52,8 @@ picks whatever they like. The one ordering that does bind is a
 feature's: **work that only makes sense as part of one pledged
 feature lives with that feature**, in
 [pledged/FEATURES.md](pledged/FEATURES.md), and has to be done to
-complete it. **No feature has any today**, the shelf being empty. A
+complete it. **Two features carry work items today** — F24 and F25,
+the halves of `--dry-run` (D79) — and none of it is in this file. A
 task here that merely *relates* to a feature is still free to be
 picked whenever.
 

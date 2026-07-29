@@ -95,8 +95,10 @@ demanded exists, but the case is met when a machine materializes on
 the hypervisor a host actually provides, and three of the four
 adapters are stubs that claim no capability. What F2 delivered is
 what U7 required, not what U7 asks for. The backend-adapter design
-(now `design/backend-adapter.md`, its feature delivered) and F3
-cite U7 from here. Text verbatim as drafted:
+(now `design/backend-adapter.md`, its feature delivered), F3, and
+**F24** — pledged 2026-07-29, whose `--backend` under `--dry-run`
+answers U7's question about a host before there is a host to ask it
+on (D79) — cite U7 from here. Text verbatim as drafted:
 
 > - **U7 — Materialize on the hypervisor the host provides.** A
 >   blueprint and its scripts are written once; the hosts that
