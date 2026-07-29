@@ -95,18 +95,20 @@ class ScriptedServer:
             reply_handle = handle if self.next_handle is None \
                 else self.next_handle
             self.next_handle = None
+            if kind == 1 and not error:
+                # Applied *before* the reply, which is what the reply
+                # means: a client that has been told its write
+                # succeeded may look at the result immediately. Doing
+                # it afterwards made this server race its own client.
+                self.store[offset:offset + len(payload)] = payload
             connection.sendall(
                 struct.pack(">IIQ", REPLY_MAGIC, error, reply_handle))
             if self.drop_after_header:
                 self.drop_after_header = False
                 return
-            if error:
+            if error or kind != 0:
                 continue
-            if kind == 0:
-                connection.sendall(
-                    bytes(self.store[offset:offset + count]))
-            elif kind == 1:
-                self.store[offset:offset + len(payload)] = payload
+            connection.sendall(bytes(self.store[offset:offset + count]))
 
 
 def _exactly(connection, count):
