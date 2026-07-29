@@ -2063,11 +2063,23 @@ package carries an id, every id's subject is one this list names,
 and both conformance corpora check that the id a fixture declares
 is the id that fires.
 
-What no surface but this one has is a **located** diagnostic. A
-script diagnostic cites a line and column, or the statement it
-came from; a blueprint diagnostic cites a field breadcrumb and no
-position, because the document parser walks an already-parsed
-object. That is a gap in the diagnostics, not in the ids.
+**The blueprint surface is located too** (D70). A script
+diagnostic cites a line and column, or the statement it came from;
+a blueprint diagnostic cites its field breadcrumb *and* the line
+and column that field was written at, rendered by the same
+skeleton — `<path>:<line>:<column>: error: <message> (<id>)`, with
+the source line and a caret beneath it. The breadcrumb did not
+move into the rendering: it stays in the message, because it says
+which field and the position says where, and the two answer
+different questions.
+
+Position is **optional and its absence is not a defect**. It comes
+from the document's text, so a blueprint loaded from a path has
+one and a value handed straight to the API does not — there is
+nothing to point into, and citing nothing is the honest answer.
+Other surfaces stand where they stood: a preflight diagnostic
+about the media namespace has no document position to cite and
+carries an id alone.
 
 The grammar's own rejections are the coarsest ids in the scheme:
 `syn.unexpected-token` and `syn.unexpected-end` name a token, not

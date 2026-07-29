@@ -188,6 +188,115 @@ is waiting on an answer today.
 
 ## Decided
 
+- D70 — THE BLUEPRINT SURFACE IS LOCATED; POSITIONS RIDE ON THE
+  PARSED CONTAINERS — DECIDED (owner, 2026-07-28) and delivered the
+  same day. Supports U4, U11; G6; P6, P8. Closes the small item
+  [TASKS.md](TASKS.md) had carried since the identifier sweep, and
+  amends [script-spec.md](../docs/spec/script-spec.md)'s identifier
+  section, which named the gap rather than demanding it closed —
+  which is why this was a task and never a defect.
+
+  WHAT WAS WRONG. A bad field in a `.rlqb` reported the field and
+  stopped: `unknown media field: drives.hdd0.bogus`, with nothing
+  saying which of four `hdd0` blocks in a long document it meant.
+  The cause was structural rather than an omission. `document.py`
+  validated an **already-parsed** object — `jsonc` having handed it
+  plain dicts — so the position was gone before any rule ran, and
+  the hand-threaded `where` breadcrumb was what stood in for it.
+
+  HOW POSITIONS ARE PRODUCED, which is the whole design question.
+  Three ways were available and two were refused. **A
+  position-aware replacement parser** would put JSON's semantics in
+  our hands — number forms, string escapes, surrogate pairs,
+  repeated keys, and the decode failure's own message and position,
+  which this module already forwards verbatim — for a feature that
+  needs none of them. **Wrapping every value** to carry its own
+  position cannot be done honestly: `bool` and `None` are not
+  subclassable, so the scalars a diagnostic most often names are
+  exactly the ones that would have no position. What ships is the
+  third: `json.loads` stays the one authority on what a document
+  *means*, and a structure-only second pass over the same text
+  records where each member was *written*. The two are zipped in
+  lockstep and the containers come back as `PositionedDict` and
+  `PositionedList`, which are a `dict` and a `list` in every other
+  respect — the schema validator, `json.dumps` and an equality
+  assertion all see no difference.
+
+  WHY A SECOND PASS AGREES WITH THE FIRST. Because comment blanking
+  was built to make it so. `jsonc` replaces a comment with spaces of
+  the same length and keeps its newlines, so the blanked text has
+  the original file's coordinates — groundwork laid for the JSON
+  decoder's own error position and now carrying the whole feature.
+  A comment above a bad field shifts nothing, which is asserted in
+  both test modules rather than assumed.
+
+  DISAGREEMENT COSTS POSITIONS AND NEVER TRUTH. Where the scan's
+  shape does not match the parsed value, that subtree keeps its
+  plain containers and its diagnostics go unlocated — which is what
+  this module produced before, so the floor is yesterday's
+  behavior. A *misplaced* caret is worse than none: it sends a
+  reader to a field that is fine.
+
+  THE BREADCRUMB DID NOT MOVE INTO THE RENDERING. It stays in the
+  message, where it always was, because the two answer different
+  questions — the breadcrumb says which field and the position says
+  where — and a reader wants both. That is also what keeps the
+  unlocated case honest: with no position the diagnostic renders
+  exactly as it rendered before, rather than degrading to something
+  that has lost information.
+
+  DESCENT IS EXPLICIT. `Where.at(container, key)` takes the
+  container rather than remembering it from the last descent. A
+  `Where` that tracked its own node would be one invariant away
+  from pointing at the wrong field, and an argument that has to be
+  passed cannot drift.
+
+  POSITION IS OPTIONAL, AND WHICH ENTRY POINT YOU USED DECIDES.
+  `load_document(path)` has a file to point into and locates every
+  diagnostic it raises; `parse_document(value)` — the public entry
+  point, handed a value that never had a position — locates none,
+  and citing nothing is the honest answer rather than a gap. The
+  rendering is `ScriptParseError`'s skeleton exactly:
+  `<path>:<line>:<column>: error: <message> (<id>)`, the source line,
+  and a caret.
+
+  WHAT WAS DELIBERATELY NOT DONE. The machine half's breadcrumbs are
+  unrooted where the media half's are composed — `platform` and
+  `drives.hdd0.media` against `spec[0].location` — and they stay
+  that way. That inconsistency is older than this change and is
+  about what a diagnostic *says*; touching it here would have mixed
+  a wording change into a change about where a diagnostic *points*,
+  and put message text no test pins under a diff nobody could
+  review. It wants its own entry if it bothers anyone.
+
+  P8 TRIAGE: an interface change, and an easy approval. Ids and exit
+  codes are untouched, `except StaticError` still catches everything
+  it caught (`BlueprintError` is one), and the message wording is
+  unchanged — what moved is a rendering, which this spec has always
+  held uncontracted. No numbered use case is cost and two are served.
+  `BlueprintError` joins the exported names for the same reason
+  `ScriptParseError` is exported: one spelling across the two
+  authored surfaces (P6).
+
+  FOLDED: this entry; [TASKS.md](TASKS.md) (the small item struck
+  with its heading — done work leaves by deletion, D52, and the
+  group emptied);
+  [jsonc.py](../reliquary/jsonc.py) (the positions pass, the two
+  container types, and the scanner);
+  [document.py](../reliquary/document.py) (`BlueprintError`,
+  `Where`, and every one of the module's diagnostics — no
+  `raise StaticError` remains in it);
+  [errors.py](../reliquary/errors.py) (the identity-is-not-location
+  paragraph names both classes now);
+  [__init__.py](../reliquary/__init__.py) (the export);
+  [script-spec.md](../docs/spec/script-spec.md) (normative: the
+  identifier section's located-diagnostic paragraph, replaced);
+  [api-reference.md](../docs/api-reference.md) (what each entry
+  point raises and what it can cite); `test_jsonc.py` and
+  `test_document.py` (the position and located-diagnostic suites);
+  `test_errors.py` (`_Unreadable` joins the exempt control-flow
+  signals, with its reason); and the CHANGELOG's unreleased section.
+
 - D69 — THE PACING BISECTION IS REFUSED; THE 0.1s DEFAULT IS
   DELIBERATE, NOT PROVISIONAL — DECIDED (owner, 2026-07-28).
   Supports U14, U20, U12; G1. **Amends D60**, its default

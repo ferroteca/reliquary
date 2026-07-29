@@ -55,10 +55,10 @@ class ReliquaryError(Exception):
     parsing and the beta id index can be generated.
 
     Identity is not location. Where a diagnostic can also say *where*
-    it happened, that comes from the class: ``ScriptParseError``
-    carries line and column, and the script runner's ``_Located``
-    cites the statement. Preflight diagnostics about the media
-    namespace have no script line to cite and carry an id alone.
+    it happened, that comes from the class: ``ScriptParseError`` and
+    ``BlueprintError`` carry line and column, and the script runner's
+    ``_Located`` cites the statement. Preflight diagnostics about the
+    media namespace have no script line to cite and carry an id alone.
 
     ``None`` means no id is assigned yet, which is a measured gap
     rather than an estimate: the script conformance corpus asserts

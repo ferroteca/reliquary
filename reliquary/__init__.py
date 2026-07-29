@@ -4,7 +4,8 @@
 
 from .blueprint import add_media, delete_blueprint, new_blueprint
 from .cli import main
-from .document import Document, load_document, parse_document
+from .document import (BlueprintError, Document, load_document,
+                       parse_document)
 from .home import (DIRECTORIES, Context, autoseed, blueprints_dir,
                    cache_dir, default_home_dir, documents_dir, home_dir,
                    machines_dir, media_dir, scripts_dir, set_autoseed,
@@ -61,6 +62,7 @@ __all__ = [
     "ScriptParseError",
     "ScriptRun",
     "ScriptRuntimeError",
+    "BlueprintError",
     "BoundProperties",
     "CredentialError",
     "InternalError",

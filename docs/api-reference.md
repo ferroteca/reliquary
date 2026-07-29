@@ -201,7 +201,13 @@ nothing.
   validate a `.rlqb` document: an array of specs, or a lone spec
   object as sugar for the array of one. Returns `Document`, whose
   `machines` and `media` are dicts by name. `type` defaults to
-  `media`, so a machine declares `"type": "machine"`.
+  `media`, so a machine declares `"type": "machine"`. Errors raise
+  `BlueprintError` (a `StaticError`, so exit `2` and
+  `except StaticError` are unchanged). `load_document` has a file to
+  point into and gives each one a `line` and `column`, rendered with
+  the source line and a caret; `parse_document` is handed a value
+  that never had a position, so those are `None` and the diagnostic
+  is its field breadcrumb alone.
 - `load_namespace(context=None)` - Build the merged `(name, type)`
   catalog from every `.rlqb` in the active source;
   `resolve_machine`/`create` and media resolution read it.

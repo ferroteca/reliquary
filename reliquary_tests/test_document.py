@@ -12,6 +12,7 @@ model says, and that a repair says what it repaired.
 
 import os
 import re
+import tempfile
 import unittest
 import warnings
 
@@ -348,6 +349,96 @@ class MediaFieldTests(unittest.TestCase):
         with self.assertRaises(StaticError):
             parse_document([{"type": "machine", "name": "rig",
                              "platform": "dos", "drives": {"hdd0": None}}])
+
+
+class LocatedDiagnosticTests(unittest.TestCase):
+    """A blueprint diagnostic cites a line and column (D70).
+
+    The two entry points differ on purpose: ``load_document`` has a file
+    to point into and locates every diagnostic it raises;
+    ``parse_document`` is handed a value that never had a position, and
+    renders exactly as it did before positions existed.
+    """
+
+    def _load(self, text):
+        """Parse ``text`` as a blueprint file, returning the diagnostic."""
+        handle = tempfile.NamedTemporaryFile(
+            "w", suffix=".rlqb", delete=False, encoding="utf-8")
+        try:
+            handle.write(text)
+            handle.close()
+            with self.assertRaises(StaticError) as caught:
+                document.load_document(handle.name)
+        finally:
+            os.unlink(handle.name)
+        return caught.exception
+
+    def test_an_unknown_field_is_located_at_the_field(self):
+        error = self._load(
+            '[\n'
+            '  { "type": "machine", "name": "b", "platform": "dos",\n'
+            '    "drives": { "hdd0": { "media": "d", "bogus": 1 } } }\n'
+            ']\n')
+        self.assertEqual((error.line, error.column), (3, 41))
+        self.assertEqual(error.rule_id, "field.unknown")
+
+    def test_a_comment_above_the_error_shifts_nothing(self):
+        """The gap this closed was structural, and this is why: comments
+        are blanked rather than removed, so the second pass reads the
+        original file's coordinates."""
+        error = self._load(
+            '[\n'
+            '  // a comment\n'
+            '  /* and a\n'
+            '     block one */\n'
+            '  { "type": "machine", "name": "b", "platform": "linux" }\n'
+            ']\n')
+        self.assertEqual(error.line, 5)
+
+    def test_the_rendering_cites_the_file_and_shows_the_source(self):
+        error = self._load(
+            '[\n'
+            '  { "type": "machine", "name": "b", "platform": "linux" }\n'
+            ']\n')
+        rendered = str(error).split("\n")
+        self.assertIn(".rlqb:2:37: error: platform must be one of",
+                      rendered[0])
+        self.assertIn("(value.not-in-vocabulary)", rendered[0])
+        self.assertEqual(rendered[1],
+                         '2 |   { "type": "machine", "name": "b", '
+                         '"platform": "linux" }')
+        self.assertEqual(rendered[2].rstrip(), " " * (4 + 36) + "^")
+
+    def test_an_array_element_is_located_at_the_element(self):
+        error = self._load(
+            '[\n'
+            '  { "type": "machine", "name": "b", "platform": "dos",\n'
+            '    "drives": { "hdd0": "d" },\n'
+            '    "boot": ["hdd0",\n'
+            '             "cdrom0"] }\n'
+            ']\n')
+        self.assertEqual((error.line, error.column), (5, 14))
+        self.assertEqual(error.rule_id, "drive.boot-undeclared")
+
+    def test_a_value_handed_in_directly_is_unlocated(self):
+        with self.assertRaises(StaticError) as caught:
+            parse_document([{"type": "machine", "name": "b",
+                             "platform": "linux"}])
+        error = caught.exception
+        self.assertIsNone(error.line)
+        self.assertEqual(
+            str(error),
+            "platform must be one of dos, openbsd, win9x, winnt, "
+            "got: 'linux'")
+
+    def test_the_breadcrumb_is_unchanged_by_locating(self):
+        """Position was the gap; the wording was not, and did not move."""
+        error = self._load(
+            '[\n'
+            '  { "name": "m", "location": "${mem:-512M}" }\n'
+            ']\n')
+        self.assertIn("spec.location: unknown reference qualifier 'mem'",
+                      str(error))
 
 
 if __name__ == "__main__":

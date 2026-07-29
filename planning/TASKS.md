@@ -113,23 +113,3 @@ code has the bug, so the norm is already the demand.
   this: the *letter* map's own gap (D56) is refusal for a
   different reason, and a backend with no vvfat equivalent is the
   second backend's.
-
-### Small items
-
-- **A blueprint diagnostic cites no position.** The gap
-  [script-spec.md](../docs/spec/script-spec.md) names in its
-  identifier section: a script diagnostic cites a line and column,
-  a blueprint diagnostic cites a field breadcrumb and nothing else
-  — `unknown media field: drives.hdd0.bogus` says which field and
-  not which line. The cause is structural rather than an omission:
-  `document.py` validates an **already-parsed** object, `jsonc`
-  having handed it plain dicts, so source position is gone before
-  the rules run and the hand-threaded `where` breadcrumb is what
-  stands in for it. Closing it means position-preserving parsing —
-  a loader recording each value's line and column, and a `where`
-  that carries them — through every diagnostic in the module.
-  **Not a defect**: no norm requires a located blueprint
-  diagnostic, and the spec names the gap rather than demanding it
-  closed. Untouched by the identifier sweep, which gave these
-  diagnostics their ids and deliberately left their positions
-  alone.

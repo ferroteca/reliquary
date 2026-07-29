@@ -13,6 +13,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A blueprint diagnostic cites a line and column.** A bad field in a
+  `.rlqb` used to report the field and nothing more — `unknown media
+  field: drives.hdd0.bogus`, with no hint which of the four `hdd0`
+  blocks in a long document it meant. It now reports where it was
+  written, in the compiler-style form script diagnostics have always
+  used:
+
+  ```text
+  rlq: blueprints\dos622.rlqb:8:34: error: unknown media field: drives.hdd0.bogus (field.unknown)
+  8 |       "hdd0": { "media": "disk", "bogus": 1 }
+                                       ^
+  ```
+
+  The breadcrumb stays in the message: it says *which field* where the
+  position says *where*, and a reader wants both. Ids, exit codes and
+  the message wording are unchanged, so anything switching on
+  `rule_id` or on exit `2` is unaffected.
+
+  The gap was structural rather than an omission — the parser
+  validated an already-parsed object, so positions were gone before
+  the rules ran. `jsonc.loads(..., positions=True)` now records where
+  each member was written, in a second pass over the same text that
+  `json.loads` already read, so the JSON semantics keep exactly one
+  authority. Comment blanking already preserved offsets, which is what
+  made a second pass agree with the first.
+
+  **Position is optional and its absence is not a defect**: it comes
+  from a document's text, so `load_document(path)` locates every
+  diagnostic it raises, and `parse_document(value)` — handed a value
+  that never had a position — renders exactly as it did before. Where
+  the two passes disagree about shape, positions are dropped for that
+  subtree rather than guessed at; a misplaced caret is worse than
+  none.
+
 - **The backend adapter seam.** Every backend operation now goes
   through one adapter API (`reliquary/backends.py`), extracted from
   the working QEMU implementation rather than designed ahead of one:
