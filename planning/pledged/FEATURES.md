@@ -190,6 +190,12 @@ same act, so the reference runs sideways.
 > stays proposed: the surfaces are separable, and its own
 > decide-first is unsettled. The error-text refusal
 > recommendation below travels unresolved to delivery.
+>
+> **The spelling is settled** (owner, 2026-07-29, in U22's
+> flush-out round): a parameter — `check=True` on the `exec`
+> twin, `--check` at the CLI — with a command that signalled
+> failure raising `RunFailure` naming the command (exit `4`) and
+> the row return unchanged. U22's step 8 is the worked spelling.
 
 `exec` returns the visible screen as rows and deliberately reads no
 meaning into it (P18, G2). That honesty leaves a caller running a
@@ -218,7 +224,8 @@ DECIDE FIRST:
 - **The spelling** — a parameter on `exec` or a sibling verb. The
   source proposal offered either; one concept should get one
   spelling (the G6 instinct, though `exec` is CLI/API surface
-  rather than script language).
+  rather than script language). *Settled — a parameter,
+  `check=True` / `--check`; see the pledge annotation above.*
 - **The error-text supplement — and this entry argues a refusal.**
   `COMMAND.COM` leaves ERRORLEVEL unchanged on `Bad command or
   file name`, so a mistyped command escapes the probe. The
@@ -233,8 +240,8 @@ DECIDE FIRST:
 
 Work:
 
-1. Settle the spelling (the decide-first above), then land the
-   opt-in on both twins in one change (P6).
+1. Land `check=True` / `--check` on both twins in one change
+   (P6), the spelling settled above.
 2. The probe's honest scope recorded in the normative spec,
    error-text supplement settled per the decide-first (P11).
 

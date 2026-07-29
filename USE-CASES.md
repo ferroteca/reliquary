@@ -42,6 +42,19 @@ beside [ARCHITECTURE.md](ARCHITECTURE.md) rather than under
 `planning/`: both describe current reality, and neither is a
 plan.
 
+**The landing bar** (owner, 2026-07-29): a use case lands here
+fully flushed. Every interface it names is delivered exactly as
+written, and a case authored as a worked journey — a summary of
+what it achieves plus the numbered steps that achieve it — reads
+as a precise recipe: a user follows it as written, over public
+interfaces, to accomplish the goal. Nothing here may lean on an
+undelivered piece — a proposed or pledged case flags such steps
+by the pledged feature they require, and no flag can survive to
+this list, because the feature's handle evaporates on the very
+delivery that makes the case current. The implementation claim
+above is therefore step-checkable for a journey case: every
+call, field, and refusal it names exists as written.
+
 A use case in force is never changed in nature (a proposed
 one may still be reshaped freely in the proposals doc). It
 may be

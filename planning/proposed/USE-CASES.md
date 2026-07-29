@@ -49,6 +49,24 @@ the only three:
   nature must change is superseded by new use cases, never
   edited.
 
+## The bar, by stage
+
+A use case is written toward one destination shape: the summary
+of why it exists and what it achieves for the user, and — for a
+worked journey — the step-by-step a user follows over Reliquary's
+public interfaces, spelled exactly. **Proposed and pledged cases
+are not held to that bar; getting them there is the job** (owner,
+2026-07-29). At these stages a step may lean on an undelivered
+piece so long as it is clearly flagged — *requires F-number*, the
+pledged feature that delivers it — spelled in the form that
+feature is committed to deliver where that form is settled, and
+flagged open where it is not. The flags are the case's own
+delivery checklist: its distance from force is its outstanding
+marks, and none can survive the move, because an F-handle
+evaporates on delivery — replacing each flag with the delivered
+spelling is part of landing the work. The landing bar itself is
+stated where it bites, in the current list's preamble.
+
 ## Numbering
 
 Proposed and in-force use cases share one global namespace: a
@@ -441,30 +459,217 @@ milestone cite U19.
 **U22 — The device is the machine's whole point** — drafted (add,
 2026-07-29; the case F27's admission said must be drafted before
 that feature could be pledged, drafted in the round that pledged
-it — owner). The gap: no case names the guest's *hardware* as the
-subject. U14's consumers are exactly who this serves, and U4/U16
-reach a precisely-defined machine, but none reaches a machine
-whose *device model* is the point — a driver under test binds one
+it, and reworked the same day into the shape below — owner: **the
+use case is the journey itself**, the summary and the numbered
+steps together the adopted text, moving together on delivery).
+The gap: no case names the guest's *hardware* as the subject.
+U14's consumers are exactly who this serves, and U4/U16 reach a
+precisely-defined machine, but none reaches a machine whose
+*device model* is the point — a driver under test binds one
 particular device, and its developer needs that device's presence
 to be a declarable, portable fact that assignment can honor and
-preflight can refuse by name. The hatch sentence is F28's demand
-citation, and the driver-half sentence states the split F27's
-decide-first asks to have stated.
+preflight can refuse by name. The journey is written from the
+real workflow of the consumer class that raised it — a guest-side
+driver project and the test harness that drives it — generalized
+per the doctrine that consumers are never named. The hatch
+sentence is F28's demand citation, and the driver-half sentence
+states the split F27's decide-first asks to have stated.
 
 > - **U22 — The device is the machine's whole point.** A
->   developer is testing a device driver inside a guest: the
->   machine exists so that one particular device is present for
->   the driver to bind. They declare that device in the blueprint
->   as a portable fact — not an engine preference and not a
->   backend pin — and assignment finds a backend that provides
->   it, whichever that is. Where no available backend can, the
->   machine is refused up front, naming the device — the need,
->   not a symptom. A device the vocabulary does not yet name is
->   reachable through the backend's own settings section, at the
->   price of portability — the pressure that grows the vocabulary
->   one name at a time. Whether the *guest* has a driver for the
->   device stays the caller's business: the machine provides the
->   hardware; what runs on it is the point of the exercise.
+>   developer writing a guest-side driver for a paravirtual
+>   device tests it from their own harness, in a machine that
+>   exists so that one particular device is present for the
+>   driver to bind — without it nothing under test runs: not a
+>   weaker test but a different one. Today that need can only be
+>   spelled as an engine — a backend pin plus raw device
+>   arguments — which records the wrong fact, forecloses every
+>   other backend that genuinely provides the device, and fails
+>   late or not at all. Declaring the device in the blueprint as
+>   a portable fact is what the case buys the user: assignment
+>   finds any backend that provides it, a host where none can
+>   refuses up front naming the device — the need, not a
+>   symptom — the blueprint stays shareable and checked in
+>   (U4/U17), and the whole loop — stage, load, exercise, read
+>   back, dispose — runs from the caller's own code through one
+>   tool, with no raw engine flags and no second harness. A
+>   device the vocabulary does not yet name is reachable through
+>   the backend's own settings section, at the price of
+>   portability — the pressure that grows the vocabulary one name
+>   at a time. Whether the *guest* has a driver for the device
+>   stays the caller's business: the machine provides the
+>   hardware; supplying the driver is the point of the exercise.
+
+**The use case, step by step** — a precise recipe over
+Reliquary's public interfaces: a user should be able to follow it
+as written to accomplish the goal. Every spelling is the surface
+as it stands today, except where a step is marked **requires
+F26/F27/F28** — a pledged, undelivered piece, spelled in the form
+its feature is committed to deliver. At the proposed stage a gap
+is fine as long as it is flagged (owner, 2026-07-29): the marks
+are the flags, and what they cover is flushed out as the pieces
+settle — the case reads complete only when nothing marked remains
+open. API spellings shown; every step has its CLI twin (U9).
+
+1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
+   paravirtual device — with my host toolchain, and I want it
+   tested against the real device model, from my own harness."
+   The build lands in `build\out\` beside its load-time
+   transport (`TRANSPRT.EXE`) and its exerciser (`DRVTEST.EXE`),
+   which exits `0` on success and `1` on any failure.
+
+2. **Pin the world to the project tree** (U17). The harness
+   builds one context and passes it everywhere; nothing resolves
+   from the user's home or the codex:
+
+   ```python
+   ctx = reliquary.Context(
+       home_dir=".rig",              # caches and machines land here
+       blueprints_dir="blueprints",  # checked in, used in place
+       scripts_dir="scripts",
+       autoseed=False)
+   ```
+
+3. **Author `blueprints\driver-rig.rlqb`**, checked in — the
+   device declared beside memory and drives (**F27**), the work
+   drive pointing straight at the build output, relative
+   locations resolving against the project's own directories so
+   the file stays portable:
+
+   ```json
+   [
+     {
+       "type": "machine",
+       "name": "driver-rig",
+       "platform": "dos",
+       "memory": "32M",
+       "devices": ["virtio-rng"],
+       "boot": ["hdd0"],
+       "scripts": {
+         "ready": "driver-ready"
+       },
+       "drives": {
+         "hdd0": {
+           "type": "media",
+           "name": "dos-base",
+           "location": {"local": "images/dos-base.img"},
+           "materialize": "difference"
+         },
+         "hdd1": {
+           "type": "media",
+           "name": "work",
+           "location": {"local": "build/out"},
+           "materialize": "use"
+         }
+       }
+     }
+   ]
+   ```
+
+   `hdd0` materializes as a differencing image over the
+   checked-in installed base, so every machine boots the same
+   bytes and the base is never written; `hdd1` *is* the build
+   directory, served to the guest as one FAT volume. The
+   `devices` line **requires F27** (pledged): the field, its
+   closed curated vocabulary, and the assignment axis step 5
+   exercises. A device the vocabulary does not yet name takes the
+   escape hatch instead — **requires F28** (pledged) — pinning
+   the backend and passing that backend's own arguments, the same
+   machine at the price of portability:
+
+   ```json
+   {
+     "backend": "qemu",
+     "backend-settings": {
+       "qemu": {
+         "args": ["-device", "virtio-rng-pci"]
+       }
+     }
+   }
+   ```
+
+4. **Author `scripts\driver-ready.rlqs`** — the caller's own
+   readiness protocol, because Reliquary ships no readiness
+   policy (U14's idiom: the guest says ready, the host reads it
+   back):
+
+   ```text
+   description "Boot to a DOS prompt and say so"
+   platform dos
+   machine  stopped
+   timeout  2m
+
+   start
+   wait /[A-Z]:\\.*>/
+   set ready "yes"
+   ```
+
+5. **Create the machine.**
+   `reliquary.create_machine("driver-rig", context=ctx)` — CLI
+   twin `rlq create-machine --blueprint driver-rig` — returns
+   `"driver-rig-0"`. Assignment reads the whole demand, `devices`
+   included (**requires F27**): the priority walk takes the first
+   backend both available and capable of `virtio-rng`, and a host
+   where none is refuses **now**, at preflight, naming the
+   device — a `PreflightError`, exit `3` at the CLI — not
+   mid-boot as a driver that mysteriously would not load, and
+   never by silently landing on an engine without the device.
+
+6. **Learn the guest's own names.**
+   `reliquary.describe_drives(machine="driver-rig-0",
+   context=ctx)` — `rlq describe-drives -m driver-rig-0` — and
+   the report's mapping says the work drive is one FAT volume at
+   `D:` (delivered, D83). That letter is the address every later
+   step speaks (P17); nothing is inferred from a boot screen.
+
+7. **Boot, and let the guest say ready.**
+   `reliquary.run_script("ready", machine="driver-rig-0",
+   context=ctx)` resolves the blueprint's `scripts` map, starts
+   the stopped machine as the script's own `start` directs, waits
+   out the boot to a prompt, and sets the variable;
+   `reliquary.get_machine_var("ready", machine="driver-rig-0",
+   context=ctx)` reads back `"yes"`.
+
+8. **Load the driver — setup whose output is nothing and whose
+   success is everything.** In order, once per session, each
+   checked (**requires F26**; spelling settled in this round —
+   owner: a parameter, `check=True`, CLI `--check`):
+
+   ```python
+   reliquary.exec(r"D:\TRANSPRT.EXE", check=True,
+                  machine="driver-rig-0", context=ctx)
+   reliquary.exec(r"D:\DRIVER.EXE", check=True,
+                  machine="driver-rig-0", context=ctx)
+   ```
+
+   After each command Reliquary's interaction layer probes the
+   guest with `IF ERRORLEVEL 1` and a sentinel of its own
+   composing; a command that signalled failure — "no device
+   present", already resident, wrong load order — raises
+   `RunFailure` naming the command (CLI: exit `4`), so a refused
+   loader ends the session here as one legible failure, not later
+   as every test failing strangely. The row return is unchanged.
+   A command that never ran at all — mistyped — escapes the
+   probe: its honest scope is commands that ran and signalled
+   failure.
+
+9. **Exercise, and read the results back.**
+   `rows = reliquary.exec(r"D:\DRVTEST.EXE 48",
+   machine="driver-rig-0", timeout=30, context=ctx)` returns the
+   screen rows, and parsing them is the caller's business (P18) —
+   Reliquary attaches no meaning. Bulkier results are redirected
+   in-guest to the work drive (`DRVTEST -v > D:\RUN.LOG`) and
+   retrieved after a stop with
+   `reliquary.get_file(r"D:\RUN.LOG", "results/run.log",
+   machine="driver-rig-0", context=ctx)` — named in guest terms,
+   both directions.
+
+10. **Iterate, then dispose.** Rebuild the driver; the
+    directory-source work drive re-reads at the next start, so a
+    round is `stop_machine` → `run_script("ready")` → load →
+    exercise — or U20's live `insert-media --file` swap when
+    reboot-per-round is the bottleneck. When the work ends,
+    `reliquary.destroy_machine("driver-rig-0", ctx)`: nothing
+    durable remains but the retrieved results (U14).
 
 ### Pending clarifications
 
