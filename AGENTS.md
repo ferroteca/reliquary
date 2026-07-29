@@ -155,8 +155,27 @@ workflow:
   `assign()`. `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
   `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
   and boot rendering a machine's state lowers into, the owned launch with its identity verification, `Qmp`,
-  and the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
-  hatch `QemuSession.native()`; `backend_stubs.py` holds the three unbuilt adapters (VirtualBox, VMware
+  the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
+  hatch `QemuSession.native()`, and **at-rest access** (`open_drive`): a qcow2 is served by `qemu-nbd` on
+  the loopback interface and addressed through `nbd.NbdDevice` rather than copied, with a qcow2 internal
+  snapshot as the commit point a write is undone from; an image already raw keeps the staged copy, having
+  nowhere else to stand an undo. Only qcow2 and raw are claimed — any other format QEMU could read is
+  refused (`image.format-not-at-rest`) rather than served untested. `nbd.py` is the **NBD client** — the
+  fixed-newstyle handshake and the four commands at-rest access uses, exposing an export as the byte device
+  `at_rest` reads through. It knows nothing of qcow2 and nothing of FAT; **the reply handle is checked on
+  every command**, because a stream out of step would otherwise hand a caller another request's sector.
+  `at_rest.py` is **the portable half of at-rest access** and never learns what qcow2 is: it reads a
+  *device* (`size` / `read_at` / `write_at` / `flush` / `close`), finding the partition table if there is
+  one and a FAT12/16/32 volume past it, with the width decided by cluster count because that is what the
+  format says decides it. `LocalDevice` is the one device it owns — an image already raw, opened where it
+  lies under the advisory host lock. **The lock sits one byte past any image** (`_LOCK_OFFSET`): a lock
+  over the image's own content is one the *server* trips on, since QEMU reads the header of a qcow2 it is
+  serving, so the claim is placed where nothing reads. QEMU's own image locking is not the mechanism —
+  it lives in QEMU's POSIX file driver and the Windows one implements none. **Partition types are pinned
+  value by value** and an unreadable one is refused rather than skipped, because skipping renumbers every
+  volume after it; `geometry()` reports the drive's shape (partitions with their declared types, volume
+  count, and the BPB's own CHS where it states one) as P10's *read on the host* source.
+  `backend_stubs.py` holds the three unbuilt adapters (VirtualBox, VMware
   Workstation, Hyper-V): their host probe is real, they claim **no capability**, so assignment passes over
   them even where the backend is installed, and a pinned one fails preflight naming the gap.
   `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and

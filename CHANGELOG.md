@@ -9,6 +9,69 @@ All notable changes to Reliquary are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **A drive image is no longer copied to be read.** At-rest access
+  used to flatten the whole disk to a temporary raw file with
+  `qemu-img convert`, work on that, and convert it back — a cost
+  proportional to the disk and paid on every call. QEMU now serves
+  the image with `qemu-nbd` on the loopback interface and Reliquary
+  addresses it directly, so listing one directory costs the sectors
+  that listing touches. Nothing about the guest's view changes; the
+  same five in-band verbs reach the same drives.
+
+  ```powershell
+  rlq get-files "C:\OUT" .\results --machine rig-0   # no longer copies 2 GB
+  ```
+
+  **A write now lands in the image itself**, with a qcow2 internal
+  snapshot standing behind it as the commit point: taken before the
+  first byte moves, discarded when the write completes, and applied
+  when it does not. The guarantee is the one staging gave — an
+  interrupted, refused or crashed write leaves the disk exactly as
+  it was — at the cost of the clusters a write touches rather than
+  the size of the disk. A snapshot left behind by a run that never
+  finished is reconciled by the next access, the way an interrupted
+  machine operation is. An image already **raw** keeps the staged
+  copy, having nowhere else to stand an undo, and a differencing
+  image is still a difference over the same base afterwards.
+
+### Added
+
+- **A drive image is locked for the length of an at-rest access**,
+  so two callers cannot work one disk at once; a second one meeting
+  the lock is refused (`image.locked`) rather than made to wait.
+  The lock is Reliquary's own and deliberately sits one byte past
+  the end of any image: a claim over the image's own bytes is one
+  the image server trips on. QEMU's image locking is not what backs
+  this — that lives in QEMU's POSIX file driver, and the Windows
+  one, on the delivered host, implements none.
+
+- **A partition is read for what it declares itself to be.** The
+  partition table is walked in the order the guest sees it —
+  primaries, then the logical drives behind a DOS extended
+  container (`0x05` and `0x0F`) — and the FAT partition types are
+  pinned value by value. A partition whose type this build does not
+  read is now **refused by name** rather than skipped:
+  `partition 1 holds Linux`, `holds NTFS or exFAT`, `holds a GPT
+  protective partition — this disk is GPT, not MBR`. Skipping one
+  would renumber every volume after it and answer confidently for a
+  drive the caller never addressed. `0x85` is Linux's extended
+  container, not DOS's, and is refused with the rest.
+
+- **Drive geometry is readable at rest** — the partition table with
+  each entry's declared type, the volume count, and the BPB's own
+  heads, sectors-per-track and derived cylinders where a volume
+  states them, unanswered rather than guessed where none does. This
+  is P10's *read on the host* source, and it is the answer the
+  drive-letter map needs; wiring it into that map is not done here.
+
+- **Only qcow2 and raw are claimed for at-rest access.** Any other
+  format QEMU could read is refused (`image.format-not-at-rest`)
+  rather than served untested.
+
 ## 0.1.0.dev4 - 2026-07-29
 
 ### Added

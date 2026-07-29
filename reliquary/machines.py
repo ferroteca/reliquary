@@ -8,7 +8,6 @@ import json
 import os
 import re
 import shutil
-import tempfile
 from datetime import datetime, timezone
 
 from . import at_rest
@@ -1547,17 +1546,17 @@ class _HostDirectory:
 class _ImageVolume:
     """A drive image, read where it lies: the FAT volume inside it.
 
-    **Read-only**, which is the honest half of at-rest access. Listing
-    and retrieval need only a reader; writing a FAT volume back needs
-    free-cluster search, chain building, directory growth and two FAT
-    copies kept identical, and a bug there corrupts a disk the user
-    cannot rebuild. So the write verbs refuse by name here rather than
-    landing half-built (P11), and the rest stays filed.
+    **Opened lazily**, because opening a disk is not free: a verb that
+    turns out to be a write it cannot do, or an address that turns out
+    to be malformed, should cost nothing. The capability is still
+    settled eagerly -- that refusal is the one a caller most needs
+    early.
 
-    **Opened lazily**, because flattening a disk is not free: a verb
-    that turns out to be a write, or an address that turns out to be
-    malformed, should cost nothing. The capability is still settled
-    eagerly -- that refusal is the one a caller most needs early.
+    **The image is never copied to be read.** The adapter presents its
+    own format as an addressable device and this reads through it, so
+    the cost of a listing is the sectors the listing touches. The
+    image is locked for the length of the access, and an uncommitted
+    write is undone when it closes.
     """
 
     def __init__(self, adapter, image_path, key, letter, address,
@@ -1568,20 +1567,19 @@ class _ImageVolume:
         self.letter = letter
         self.address = address
         self.writable = writable
+        self._access = None
         self._image = None
         self._volume = None
-        self._workspace = None
-        self._raw = None
         self._written = False
 
     def _opened(self):
         if self._volume is not None:
             return self._volume
-        self._workspace = tempfile.mkdtemp(prefix="rlq-at-rest-")
         try:
-            self._raw = self.adapter.raw_image(
-                self.image_path, self._workspace, mutable=self.writable)
-            self._image = at_rest.Image(self._raw, writable=self.writable)
+            self._access = self.adapter.open_drive(
+                self.image_path, writable=self.writable)
+            self._image = at_rest.Image(self._access.device,
+                                        writable=self.writable)
         except (at_rest.UnreadableImage, OSError) as error:
             self.close()
             raise PreflightError(
@@ -1635,17 +1633,18 @@ class _ImageVolume:
             self._written = True
 
     def commit(self):
-        """Put the modified copy back as the machine's disk.
+        """Keep the writes: the last step, and the only one that is
+        not undoable.
 
-        The last step and the only one that touches the real image, so
-        everything before it is undoable by deleting a scratch file.
+        Everything before it stands on the adapter's own commit point
+        — a snapshot for a served image, a staged copy for a raw one —
+        so a refusal or a crash between the first write and this leaves
+        the disk exactly as it was.
         """
         if not self._written:
             return
         self._image.flush()
-        self._image.close()
-        self._image = None
-        self.adapter.import_raw(self._raw, self.image_path)
+        self._access.commit()
         self._written = False
 
     def _guarded(self, call, *arguments):
@@ -1658,12 +1657,12 @@ class _ImageVolume:
                 rule_id="drive.image-unreadable") from error
 
     def close(self):
-        if self._image is not None:
-            self._image.close()
-            self._image = None
-        if self._workspace:
-            shutil.rmtree(self._workspace, ignore_errors=True)
-            self._workspace = None
+        """Release the access, undoing a write that never committed."""
+        self._image = None
+        self._volume = None
+        if self._access is not None:
+            self._access.close()
+            self._access = None
 
 
 def _at_rest_volume(state, image_path, key, letter, address):

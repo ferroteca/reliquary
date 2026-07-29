@@ -195,13 +195,14 @@ directory-source drive at attach, so a put made while the machine
 runs would be invisible and a guest write is not flushed until it
 stops — and a drive image is only safe to work once nothing holds
 it open. All five reach either kind of drive, mounting the image
-and working its FAT volume where there is no host directory. A
-write is staged in a scratch copy and replaces the disk in one
-step, so a refusal partway through leaves the image untouched.
-Anything the reader or the backend cannot answer raises
-`PreflightError` naming it — a name that is not 8.3, a backend
-that cannot rebuild its own format, a disk holding more than one
-volume.
+and working its FAT volume where there is no host directory. The
+image is opened where it lies rather than copied, locked for the
+length of the access, and every write stands on a commit point the
+backend holds until the last write returns — so a refusal partway
+through leaves the image untouched. Anything the reader or the
+backend cannot answer raises `PreflightError` naming it — a name
+that is not 8.3, a partition type this build does not read, an
+image another caller holds, a disk holding more than one volume.
 
 The plural verbs move a tree's contents rather than nesting the
 source inside the destination, which is the only shape a drive root

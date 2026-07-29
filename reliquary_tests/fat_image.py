@@ -317,17 +317,73 @@ def consistency(payload, *, offset=0):
     return problems
 
 
-def partitioned(volumes, *, gap=SECTOR):
-    """An MBR disk holding ``volumes`` as primary partitions."""
+def partitioned(volumes, *, gap=SECTOR, kinds=None):
+    """An MBR disk holding ``volumes`` as primary partitions.
+
+    ``kinds`` overrides the type byte per slot, which is how a test
+    puts a partition the DOS reader must refuse on an otherwise
+    ordinary disk.
+    """
     table = bytearray(SECTOR)
     body = b""
     start = gap
     for slot, payload in enumerate(volumes):
         sectors = len(payload) // SECTOR
-        entry = (bytes(4) + bytes([0x06]) + bytes(3)
+        kind = 0x06 if kinds is None else kinds[slot]
+        entry = (bytes(4) + bytes([kind]) + bytes(3)
                  + struct.pack("<II", start // SECTOR, sectors))
         table[446 + 16 * slot:462 + 16 * slot] = entry
         body += bytes(start - gap - len(body)) + payload
         start += len(payload)
     table[510:512] = SIGNATURE
     return bytes(table).ljust(gap, b"\0") + body
+
+
+def _entry(kind, start_sector, sectors):
+    return (bytes(4) + bytes([kind]) + bytes(3)
+            + struct.pack("<II", start_sector, sectors))
+
+
+def extended(primaries, logicals, *, gap=SECTOR, container=0x05):
+    """An MBR disk whose second slot is an extended container.
+
+    The EBR chain is written the way DOS writes it, and the two
+    bases differ on purpose: a logical drive's own entry counts from
+    **its EBR**, while the link to the next EBR counts from the
+    **container's start**. Getting those two the same way round is
+    most of what walking a chain is, so the builder states them
+    separately rather than sharing one number.
+    """
+    table = bytearray(SECTOR)
+    body = b""
+    start = gap
+    for slot, payload in enumerate(primaries):
+        sectors = len(payload) // SECTOR
+        table[446 + 16 * slot:462 + 16 * slot] = _entry(
+            0x06, start // SECTOR, sectors)
+        body += payload
+        start += len(payload)
+
+    container_at = start
+    chain = b""
+    places = []
+    for payload in logicals:
+        places.append(container_at + len(chain))
+        chain += bytes(SECTOR) + payload
+    for index, payload in enumerate(logicals):
+        ebr = bytearray(SECTOR)
+        ebr[446:462] = _entry(0x06, 1, len(payload) // SECTOR)
+        if index + 1 < len(logicals):
+            following = places[index + 1] - container_at
+            ebr[462:478] = _entry(
+                container, following // SECTOR,
+                (len(logicals[index + 1]) + SECTOR) // SECTOR)
+        ebr[510:512] = SIGNATURE
+        offset = places[index] - container_at
+        chain = chain[:offset] + bytes(ebr) + chain[offset + SECTOR:]
+
+    slot = len(primaries)
+    table[446 + 16 * slot:462 + 16 * slot] = _entry(
+        container, container_at // SECTOR, len(chain) // SECTOR)
+    table[510:512] = SIGNATURE
+    return bytes(table).ljust(gap, b"\0") + body + chain

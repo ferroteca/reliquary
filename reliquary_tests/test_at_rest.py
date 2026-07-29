@@ -23,16 +23,32 @@ TREE = {
 }
 
 
+def opened(path, *, writable=False):
+    """One image over a local device: how a raw image is opened now.
+
+    The device is the seam — a served format arrives as an adapter's
+    own device instead — so every caller composes the two rather than
+    handing :class:`at_rest.Image` a path it would have to open.
+    """
+    return at_rest.Image(at_rest.LocalDevice(path, writable=writable),
+                         writable=writable)
+
+
 class _ImageCase(unittest.TestCase):
     def setUp(self):
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
+        self._serial = 0
 
     def _image(self, payload):
-        path = os.path.join(self.workdir.name, "disk.img")
+        # A fresh name per image: the device holds an exclusive lock
+        # until it is closed, and a case that built two images under
+        # one name would be contending with itself.
+        self._serial += 1
+        path = os.path.join(self.workdir.name, f"disk{self._serial}.img")
         with open(path, "wb") as handle:
             handle.write(payload)
-        image = at_rest.Image(path)
+        image = opened(path)
         self.addCleanup(image.close)
         return image
 
@@ -102,7 +118,7 @@ class VolumeDiscoveryTests(_ImageCase):
         specification's own test."""
         small = self._image(fat_image.volume(TREE))
         self.assertEqual(small.volumes[0].bits, 12)
-        larger = at_rest.Image(self._write(
+        larger = opened(self._write(
             fat_image.volume(TREE, bits=16, sectors=60000, per_cluster=1)))
         self.addCleanup(larger.close)
         self.assertEqual(larger.volumes[0].bits, 16)
@@ -122,6 +138,215 @@ class VolumeDiscoveryTests(_ImageCase):
     def test_a_truncated_image_says_so_rather_than_answering(self):
         with self.assertRaises(at_rest.UnreadableImage):
             self._image(b"")
+
+
+class PartitionTypeTests(_ImageCase):
+    """What the table declares is what the reader acts on.
+
+    The type byte is the highest-variability, highest-blast-radius
+    input this module takes: one byte decides which filesystem a
+    partition holds, and the reader *acts* on that meaning. So the
+    mapping is pinned value by value, and the unmapped bytes are
+    pinned too.
+    """
+
+    def _one(self, kind):
+        return fat_image.partitioned(
+            [fat_image.volume({"A.TXT": b"a"}, bits=16, sectors=20000,
+                              per_cluster=4)], kinds=[kind])
+
+    def test_every_dos_fat_type_is_read(self):
+        for kind in (0x01, 0x04, 0x06, 0x0B, 0x0C, 0x0E):
+            with self.subTest(kind=f"0x{kind:02X}"):
+                image = self._image(self._one(kind))
+                self.assertEqual(len(image.volumes), 1)
+                self.assertEqual(image.partitions[0].kind, kind)
+
+    def test_a_foreign_type_is_refused_and_names_what_it_is(self):
+        for kind, expected in ((0x07, "NTFS or exFAT"),
+                               (0x83, "Linux"),
+                               (0x82, "Linux swap"),
+                               (0xEE, "GPT")):
+            with self.subTest(kind=f"0x{kind:02X}"):
+                with self.assertRaises(at_rest.UnreadableImage) as caught:
+                    self._image(self._one(kind))
+                self.assertIn(expected, str(caught.exception))
+
+    def test_an_unmapped_type_is_refused_by_its_number(self):
+        with self.assertRaises(at_rest.UnreadableImage) as caught:
+            self._image(self._one(0x3C))
+        self.assertIn("0x3C", str(caught.exception))
+
+    def test_a_linux_extended_container_is_not_a_dos_one(self):
+        """0x85 is Linux's, and this is the DOS workflow's reader. It
+        used to be walked as though DOS had written it."""
+        with self.assertRaises(at_rest.UnreadableImage) as caught:
+            self._image(self._one(0x85))
+        self.assertIn("Linux", str(caught.exception))
+
+    def test_a_foreign_partition_is_refused_and_not_skipped(self):
+        """Skipping would renumber every volume after it, so the
+        answer would be confident and wrong about which drive is
+        which — which is the failure this refusal exists to prevent."""
+        payload = fat_image.partitioned(
+            [fat_image.volume({"ONE.TXT": b"1"}, bits=16, sectors=20000,
+                              per_cluster=4),
+             fat_image.volume({"TWO.TXT": b"2"}, bits=16, sectors=20000,
+                              per_cluster=4)],
+            kinds=[0x83, 0x06])
+        with self.assertRaises(at_rest.UnreadableImage):
+            self._image(payload)
+
+    def test_an_empty_slot_is_not_a_partition_and_not_an_error(self):
+        image = self._image(self._one(0x06))
+        self.assertEqual(len(image.partitions), 1)
+
+
+class ExtendedPartitionTests(_ImageCase):
+    """Logical drives behind a DOS extended container."""
+
+    def _disk(self, count=2, container=0x05):
+        def volume(name):
+            return fat_image.volume({name: name.encode()}, bits=16,
+                                    sectors=20000, per_cluster=4)
+        return fat_image.extended(
+            [volume("PRIMARY.TXT")],
+            [volume(f"LOG{index}.TXT") for index in range(count)],
+            container=container)
+
+    def test_logical_drives_follow_the_primaries(self):
+        image = self._image(self._disk())
+        self.assertEqual(len(image.volumes), 3)
+        self.assertEqual(
+            [entry[0] for entry in image.volumes[0].entries([])],
+            ["PRIMARY.TXT"])
+        self.assertEqual(
+            [entry[0] for entry in image.volumes[1].entries([])],
+            ["LOG0.TXT"])
+        self.assertEqual(
+            [entry[0] for entry in image.volumes[2].entries([])],
+            ["LOG1.TXT"])
+
+    def test_the_container_itself_is_not_a_volume(self):
+        image = self._image(self._disk())
+        containers = [entry for entry in image.partitions
+                      if entry.kind in (0x05, 0x0F)]
+        self.assertEqual(len(containers), 1)
+        self.assertEqual(len(image.volumes), len(image.partitions) - 1)
+
+    def test_the_lba_container_is_walked_the_same_way(self):
+        image = self._image(self._disk(container=0x0F))
+        self.assertEqual(len(image.volumes), 3)
+
+    def test_a_logical_drive_knows_it_is_one(self):
+        image = self._image(self._disk())
+        self.assertEqual([entry.logical for entry in image.partitions],
+                         [False, False, True, True])
+
+
+class GeometryTests(_ImageCase):
+    """The drive's shape, read on the host (P10's second source)."""
+
+    def test_a_partitionless_floppy_reports_one_volume_and_no_table(self):
+        geometry = self._image(fat_image.volume(TREE)).geometry()
+        self.assertFalse(geometry.partitioned)
+        self.assertEqual(geometry.partitions, ())
+        self.assertEqual(geometry.volumes, 1)
+
+    def test_a_partitioned_disk_reports_each_partition(self):
+        image = self._image(fat_image.partitioned([
+            fat_image.volume({"ONE.TXT": b"1"}, bits=16, sectors=20000,
+                             per_cluster=4),
+            fat_image.volume({"TWO.TXT": b"2"}, bits=16, sectors=20000,
+                             per_cluster=4)]))
+        geometry = image.geometry()
+        self.assertTrue(geometry.partitioned)
+        self.assertEqual(geometry.volumes, 2)
+        self.assertEqual([entry.number for entry in geometry.partitions],
+                         [1, 2])
+        self.assertEqual([entry.description
+                          for entry in geometry.partitions],
+                         ["FAT16B", "FAT16B"])
+
+    def test_a_partitions_offset_and_length_are_the_tables_own(self):
+        volume = fat_image.volume({"A.TXT": b"a"}, bits=16, sectors=20000,
+                                  per_cluster=4)
+        image = self._image(fat_image.partitioned([volume]))
+        entry = image.geometry().partitions[0]
+        self.assertEqual(entry.offset, 512)
+        self.assertEqual(entry.length, len(volume))
+
+    def test_the_bpbs_geometry_is_reported_when_it_states_one(self):
+        geometry = self._image(fat_image.volume(TREE)).geometry()
+        self.assertEqual(geometry.heads, 2)
+        self.assertEqual(geometry.sectors_per_track, 18)
+        self.assertEqual(geometry.bytes_per_sector, 512)
+
+    def test_cylinders_follow_from_the_size_and_the_rest(self):
+        geometry = self._image(fat_image.volume(TREE)).geometry()
+        self.assertEqual(
+            geometry.cylinders,
+            geometry.size // (geometry.heads
+                              * geometry.sectors_per_track * 512))
+
+
+class LockingTests(_ImageCase):
+    """A drive image is locked for the length of an access."""
+
+    def _file(self, name="locked.img"):
+        path = os.path.join(self.workdir.name, name)
+        with open(path, "wb") as handle:
+            handle.write(fat_image.volume(TREE))
+        return path
+
+    def test_a_second_opener_is_refused_while_the_first_holds_it(self):
+        path = self._file()
+        first = opened(path, writable=True)
+        self.addCleanup(first.close)
+        with self.assertRaises(at_rest.UnreadableImage) as caught:
+            opened(path)
+        self.assertIn("locked by another process", str(caught.exception))
+
+    def test_closing_releases_it_for_the_next_caller(self):
+        path = self._file()
+        opened(path, writable=True).close()
+        second = opened(path, writable=True)
+        self.addCleanup(second.close)
+        self.assertEqual(len(second.volumes), 1)
+
+    def test_the_lock_does_not_block_reading_the_image_itself(self):
+        """The regression that made the lock work at all.
+
+        A served image is opened by the *backend*, which reads its
+        header — so a lock taken over the image's own bytes would be
+        one QEMU trips on, and the first version of this took byte
+        zero. The claim has to sit where nothing reads.
+        """
+        path = self._file()
+        held = opened(path, writable=True)
+        self.addCleanup(held.close)
+        with open(path, "rb") as handle:
+            self.assertEqual(handle.read(2), b"\xeb\x3c")
+
+    def test_a_lock_only_alone_still_excludes_a_second_caller(self):
+        """What a served image holds: the claim without the device."""
+        path = self._file()
+        lock = at_rest.ImageLock(path)
+        self.addCleanup(lock.close)
+        with self.assertRaises(at_rest.UnreadableImage):
+            at_rest.ImageLock(path)
+
+    def test_a_refused_lock_leaves_no_handle_behind(self):
+        """The failed opener must not keep the file open, or the
+        image could never be opened again in this process."""
+        path = self._file()
+        first = opened(path, writable=True)
+        with self.assertRaises(at_rest.UnreadableImage):
+            opened(path)
+        first.close()
+        third = opened(path, writable=True)
+        self.addCleanup(third.close)
+        self.assertEqual(len(third.volumes), 1)
 
 
 class ReadingTests(_ImageCase):
@@ -232,7 +457,7 @@ class WritingTests(_ImageCase):
         path = os.path.join(self.workdir.name, "target.img")
         with open(path, "wb") as handle:
             handle.write(fat_image.volume(TREE, **geometry))
-        with at_rest.Image(path, writable=True) as image:
+        with opened(path, writable=True) as image:
             work(image.volumes[0])
         with open(path, "rb") as handle:
             payload = handle.read()
@@ -248,7 +473,7 @@ class WritingTests(_ImageCase):
                 ("fat32", {"bits": 32, "sectors": 70000, "per_cluster": 1}))
 
     def _reads_back(self, path, segments, expected):
-        with at_rest.Image(path) as image:
+        with opened(path) as image:
             target = os.path.join(self.workdir.name, "back.bin")
             image.volumes[0].copy_to(segments, target)
         with open(target, "rb") as handle:
@@ -294,7 +519,7 @@ class WritingTests(_ImageCase):
                     volume.write_file(["NEW", "INNER", "R.TXT"], source)
                 path = self._written(geometry, work)
                 self._reads_back(path, ["NEW", "INNER", "R.TXT"], b"deep")
-                with at_rest.Image(path) as image:
+                with opened(path) as image:
                     self.assertEqual(
                         image.volumes[0].kind(["NEW", "INNER"]), "directory")
 
@@ -307,7 +532,7 @@ class WritingTests(_ImageCase):
             for index in range(48):
                 volume.write_file(["MANY", f"F{index:04}.TXT"], source)
         path = self._written({}, work)
-        with at_rest.Image(path) as image:
+        with opened(path) as image:
             self.assertEqual(len(image.volumes[0].entries(["MANY"])), 48)
 
     def test_a_full_root_directory_refuses_rather_than_overrunning(self):
@@ -324,7 +549,7 @@ class WritingTests(_ImageCase):
         path = os.path.join(self.workdir.name, "small.img")
         with open(path, "wb") as handle:
             handle.write(fat_image.volume({}, sectors=800))
-        with at_rest.Image(path, writable=True) as image:
+        with opened(path, writable=True) as image:
             with self.assertRaises(at_rest.UnreadableImage) as caught:
                 image.volumes[0].write_file(["HUGE.DAT"], source)
         self.assertIn("room", str(caught.exception))
@@ -343,7 +568,7 @@ class WritingTests(_ImageCase):
     def test_a_lowercase_name_is_stored_as_dos_holds_it(self):
         source = self._source("job.bat", b"GO")
         path = self._written({}, lambda v: v.write_file(["job.bat"], source))
-        with at_rest.Image(path) as image:
+        with opened(path) as image:
             self.assertIn(
                 "JOB.BAT",
                 [name for name, _dir, _size in image.volumes[0].entries([])])

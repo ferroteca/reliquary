@@ -446,8 +446,14 @@ differently under the new wording — is mere documentation work.
   inspection than reading an image's format is. It answers *file
   transfer* into and out of an installed disk, and it refuses a
   disk holding two volumes rather than answering for the wrong
-  one; what it does not yet do is feed the letter map, which
-  would cost flattening every disk to resolve one address. The
+  one; it reads a drive's whole **geometry** — the partition
+  table with each entry's declared type, the volume count, the
+  BPB's own CHS — which is the answer the map wants. What it does
+  not yet do is feed the map. The cost that argued against it has
+  gone: a disk is opened where it lies rather than flattened, so
+  resolving one address no longer means copying every disk on the
+  machine. What is left is deciding where the answer is cached,
+  which is the open half of that defect. The
   partial route is online: ask the guest which letters it has, an
   observation rather than an inference (P10), bounded by the boot
   it was taken in. What may never grow is a

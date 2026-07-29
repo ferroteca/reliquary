@@ -724,18 +724,34 @@ stops. A **drive image is read and written at rest**: with the
 machine stopped its disk is a file the host owns, so all five
 verbs reach an installed `C:` by mounting the image and working
 the FAT volume in it — no guest, no boot, and no reaching around
-Reliquary. A write lands in a scratch copy and replaces the disk
-in one step at the end, so an interrupted or refused write leaves
-the image exactly as it was; a differencing image stays one, over
-the same base.
+Reliquary. **The image is never copied to be read**, so a listing
+costs the sectors it touches rather than the size of the disk.
+Every write stands on a commit point the backend holds open until
+the last write returns, so an interrupted, refused or crashed
+write leaves the image exactly as it was; a differencing image
+stays one, over the same base.
+
+**The image is locked for the length of the access**, and a second
+caller meeting that lock is refused (`image.locked`) rather than
+made to wait: two callers working one disk at once is the case the
+lock exists to prevent.
+
+**A partition is read for what it declares itself to be.** The
+partition table is walked in the order the guest sees — primaries,
+then the logical drives behind a DOS extended container — and a
+partition whose type this build does not read is refused by name
+rather than skipped, because skipping renumbers every volume after
+it and answers confidently for the wrong one. FAT12, FAT16 and
+FAT32 partition types are read; anything else is
+`drive.image-unreadable` naming what the type was.
 
 A guest-side name must be one the guest could type: **8.3, or a
 refusal** (`drive.image-unreadable`), never a silent truncation
 that would land the file where the caller cannot find it.
 Three more refusals name themselves, each raised before anything
 is transferred (**P11**): `drive.no-at-rest-access` when the
-backend cannot flatten its own image format,
-`drive.no-at-rest-write` when it can read one and not rebuild it,
+backend cannot open its own image format at rest,
+`drive.no-at-rest-write` when it can read one and not write it,
 and `drive.volume-count-unsupported` when a disk holds more than
 one volume — the letter map assumes one per disk, so answering
 for either would answer for a drive the caller did not

@@ -83,16 +83,16 @@ class Capabilities:
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
     vvfat: bool = False
-    #: Whether the adapter can hand back a drive image as raw bytes,
-    #: which is what at-rest reading of a stopped machine's disk
-    #: needs. Reported rather than assumed: an adapter whose format
-    #: nothing can flatten says so, and the file verbs refuse by name
-    #: instead of guessing at the drive's contents (P11).
+    #: Whether the adapter can present a drive image as an addressable
+    #: device, which is what at-rest reading of a stopped machine's
+    #: disk needs. Reported rather than assumed: an adapter whose
+    #: format nothing can open says so, and the file verbs refuse by
+    #: name instead of guessing at the drive's contents (P11).
     at_rest: bool = False
-    #: Whether the adapter can also put a modified image back. Split
-    #: from ``at_rest`` because reading and writing a disk are
-    #: different promises: an adapter may be able to flatten its own
-    #: format and not to rebuild it.
+    #: Whether that access can also be writable, with a commit point
+    #: behind it. Split from ``at_rest`` because reading and writing a
+    #: disk are different promises: an adapter may be able to open its
+    #: own format and have nowhere to stand an undo.
     at_rest_write: bool = False
 
 
@@ -190,39 +190,36 @@ class BackendAdapter:
         has nothing to do here.
         """
 
-    def raw_image(self, path, workspace, *, mutable=False):
-        """The drive image at ``path`` as raw bytes, for reading at rest.
+    def open_drive(self, path, *, writable=False):
+        """The drive image at ``path`` as an at-rest **access**.
 
-        Returns a path to a raw image: ``path`` itself when the
-        adapter's format already is raw, or a flattened copy inside
-        ``workspace``, which the caller owns and removes. The native
-        format is the adapter's choice (P12's twin at this seam), so
-        undoing it is the adapter's job and the portable FAT reader
-        above never learns what qcow2 is.
+        The native format is the adapter's choice (P12's twin at this
+        seam), so presenting it as addressable bytes is the adapter's
+        job and the portable FAT reader above never learns what qcow2
+        is. What comes back answers:
 
-        ``mutable`` asks for a copy **always**, never the original, so
-        a caller that intends to write cannot touch the real image
-        until :meth:`import_raw` puts it back. That is what makes a
-        failed write leave the disk exactly as it was.
+        ``device``
+            The byte device :mod:`reliquary.at_rest` reads and writes
+            through -- ``size`` / ``read_at`` / ``write_at`` /
+            ``flush`` / ``close``.
+        ``commit()``
+            Make the writes permanent. **Atomic from the caller's
+            side**: the image is the old one or the new one, never a
+            half-written third thing. An adapter whose format carries
+            a backing relationship keeps it -- a differencing image is
+            still a difference over the same base afterwards.
+        ``close()``
+            Release everything. A writable access closed **without**
+            ``commit()`` puts the image back as it was, so a refused,
+            interrupted or crashed write costs nothing.
 
-        Only called for a **stopped** machine: a running backend may
-        hold the image open, and a copy taken under it would be a
-        torn one.
-        """
-        raise NotImplementedError
+        **The image is locked for the length of the access**, so
+        nothing else writes the disk part-way through. An image
+        another process holds is refused by name rather than waited
+        for.
 
-    def import_raw(self, raw_path, image_path):
-        """Put a modified raw image back, in the adapter's own format.
-
-        The counterpart of :meth:`raw_image`, and the only writing
-        step: the caller has finished with the scratch copy and wants
-        it to become the machine's disk. **Atomic from the caller's
-        side** -- the image is either the old one or the new one, so
-        an interrupted write does not leave a half-rebuilt disk.
-
-        An adapter whose format carries a backing relationship keeps
-        it: a differencing image stays a differencing image over the
-        same base.
+        Only called for a **stopped** machine: a running backend holds
+        its own lock on the image, and this would be refused by it.
         """
         raise NotImplementedError
 

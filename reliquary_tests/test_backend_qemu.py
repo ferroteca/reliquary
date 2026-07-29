@@ -8,6 +8,7 @@ drive and boot rendering a machine's state lowers into, and the
 carriers a session exposes.
 """
 
+import io
 import os
 import sys
 import tempfile
@@ -31,6 +32,7 @@ except ModuleNotFoundError:
 import reliquary
 from reliquary import backend_qemu as qemu_module
 from reliquary.errors import PreflightError, RunFailure, StaticError
+from reliquary_tests import fat_image
 
 
 class _FakeProcess:
@@ -511,6 +513,150 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(report.controllers, ("ide",))
         self.assertTrue(report.vvfat)
         self.assertIn("floppy", report.media)
+
+
+class _ExitedProcess:
+    """A server that gave up, and what it said on the way out."""
+
+    def __init__(self, complaint):
+        self.returncode = 1
+        self.stdout = None
+        self.stderr = io.StringIO(complaint)
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        pass
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+    def kill(self):
+        pass
+
+
+class AtRestAccessTests(unittest.TestCase):
+    """Opening a stopped machine's disk, short of launching a server.
+
+    The served path itself needs ``qemu-nbd``, which no unit test
+    launches. What *is* reachable here is every refusal around it —
+    and those are what a caller acts on.
+    """
+
+    def setUp(self):
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.adapter = qemu_module.QemuAdapter()
+
+    def _image(self, name="disk.img", payload=b""):
+        path = os.path.join(self.workdir.name, name)
+        with open(path, "wb") as handle:
+            handle.write(payload or fat_image.volume({"A.TXT": b"a"}))
+        return path
+
+    def _as_format(self, found):
+        return mock.patch.object(qemu_module, "probe_image_format",
+                                 lambda _path: found)
+
+    def test_a_format_that_is_neither_qcow2_nor_raw_is_refused(self):
+        """Serving an untested format would be claiming a capability
+        nobody exercised, which P11 makes a refusal."""
+        path = self._image("payload.vmdk")
+        for found in ("vmdk", "vdi", "vhdx", "vpc"):
+            with self.subTest(format=found):
+                with self._as_format(found):
+                    with self.assertRaises(PreflightError) as caught:
+                        self.adapter.open_drive(path)
+                self.assertEqual(caught.exception.rule_id,
+                                 "image.format-not-at-rest")
+                self.assertIn(found, str(caught.exception))
+
+    def test_a_raw_image_is_read_where_it_lies(self):
+        path = self._image()
+        before = os.path.getsize(path)
+        with self._as_format("raw"):
+            access = self.adapter.open_drive(path)
+        self.addCleanup(access.close)
+        self.assertEqual(access.device.size, before)
+        self.assertEqual(access.device.read_at(510, 2), b"\x55\xaa")
+
+    def test_a_raw_write_is_staged_and_lands_only_on_commit(self):
+        path = self._image()
+        with self._as_format("raw"):
+            access = self.adapter.open_drive(path, writable=True)
+        access.device.write_at(0x2000, b"STAGED")
+        with open(path, "rb") as handle:
+            handle.seek(0x2000)
+            self.assertNotEqual(handle.read(6), b"STAGED")
+        access.commit()
+        access.close()
+        with open(path, "rb") as handle:
+            handle.seek(0x2000)
+            self.assertEqual(handle.read(6), b"STAGED")
+
+    def test_a_raw_write_closed_without_committing_never_lands(self):
+        path = self._image()
+        with self._as_format("raw"):
+            access = self.adapter.open_drive(path, writable=True)
+        access.device.write_at(0x2000, b"GHOST")
+        access.close()
+        with open(path, "rb") as handle:
+            handle.seek(0x2000)
+            self.assertNotEqual(handle.read(5), b"GHOST")
+
+    def test_an_image_another_caller_holds_is_refused_by_name(self):
+        path = self._image()
+        with self._as_format("raw"):
+            held = self.adapter.open_drive(path, writable=True)
+            self.addCleanup(held.close)
+            with self.assertRaises(PreflightError) as caught:
+                self.adapter.open_drive(path, writable=True)
+        self.assertEqual(caught.exception.rule_id, "image.locked")
+
+    def test_a_server_refusing_the_lock_reads_as_contention(self):
+        """QEMU leaves the same exit status behind for every startup
+        failure, so its wording is what separates them."""
+        path = self._image("disk.qcow2")
+        complaint = ('qemu-nbd: Failed to get "write" lock\n'
+                     "Is another process using the image?")
+        with self._as_format("qcow2"), \
+                mock.patch.object(qemu_module, "find_qemu_nbd",
+                                  lambda: "qemu-nbd"), \
+                mock.patch.object(qemu_module.subprocess, "Popen",
+                                  lambda *a, **k: _ExitedProcess(complaint)):
+            with self.assertRaises(PreflightError) as caught:
+                self.adapter.open_drive(path)
+        self.assertEqual(caught.exception.rule_id, "image.locked")
+
+    def test_a_server_failing_for_any_other_reason_says_so(self):
+        path = self._image("disk.qcow2")
+        with self._as_format("qcow2"), \
+                mock.patch.object(qemu_module, "find_qemu_nbd",
+                                  lambda: "qemu-nbd"), \
+                mock.patch.object(
+                    qemu_module.subprocess, "Popen",
+                    lambda *a, **k: _ExitedProcess("no such format")):
+            with self.assertRaises(RunFailure) as caught:
+                self.adapter.open_drive(path)
+        self.assertEqual(caught.exception.rule_id, "image.serve-failed")
+
+    def test_a_failed_open_leaves_no_lock_behind(self):
+        """A refusal that kept the claim would make the disk
+        unopenable for the rest of the process."""
+        path = self._image("disk.qcow2")
+        with self._as_format("qcow2"), \
+                mock.patch.object(qemu_module, "find_qemu_nbd",
+                                  lambda: "qemu-nbd"), \
+                mock.patch.object(
+                    qemu_module.subprocess, "Popen",
+                    lambda *a, **k: _ExitedProcess("no such format")):
+            with self.assertRaises(RunFailure):
+                self.adapter.open_drive(path)
+        with self._as_format("raw"):
+            access = self.adapter.open_drive(path)
+        self.addCleanup(access.close)
+        self.assertTrue(access.device.size)
 
 
 class PackageSurfaceTests(unittest.TestCase):

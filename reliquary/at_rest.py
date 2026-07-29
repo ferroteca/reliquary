@@ -9,20 +9,39 @@ guest inspection than probing an image's format is -- it is the
 **read on the host** source P10 names, and the reader that closes
 both halves of the letter question eventually.
 
-Two layers, and this module is the portable one. It reads a **raw**
-byte image: the partition table if there is one, and past it a
-FAT12/16/32 volume. Turning a backend's own image format into raw
-bytes belongs to that backend's adapter, since the format is its
-choice -- QEMU's qcow2 is not this module's business.
+Two layers, and this module is the portable one. It reads a **device**
+-- anything answering ``size`` / ``read_at`` / ``write_at`` /
+``flush`` / ``close`` -- finding the partition table if there is one
+and past it a FAT12/16/32 volume. Presenting a backend's own image
+format as such a device belongs to that backend's adapter, since the
+format is its choice: QEMU serves a qcow2 over NBD and hands back
+:class:`reliquary.nbd.NbdDevice`, and neither qcow2 nor NBD is this
+module's business. :class:`LocalDevice` is the one device that is,
+because an image already holding raw bytes needs no backend to
+present it.
+
+**The device is addressed, never seeked.** A cursor would be state
+two callers could disagree about, and every caller here computes the
+offset it wants anyway.
+
+**A partition is read for what it declares itself to be.** The type
+byte says which filesystem a partition holds, so a type this build
+does not read is refused by name rather than walked into and found
+unreadable further in (P11) -- and refused rather than skipped,
+because a disk with a partition reliquary cannot account for is a
+disk whose volume ordering it cannot vouch for either.
 
 **Writing is the careful half**, and three rules hold it. Every
 allocation is made before any byte is written, so a volume without
 room refuses with the file untouched rather than half-landing it.
 Both FAT copies are put back from one in-memory table, so they
-cannot drift apart. And the image this operates on is a scratch
-copy that the caller commits over the real disk only after every
-write has returned -- which is what makes an interrupted write cost
-nothing.
+cannot drift apart. And **every write stands on a commit point the
+device's owner provides** -- a qcow2's own snapshot where the
+adapter serves one, a staged copy where the image is already raw --
+so an interrupted, refused or crashed write costs nothing. That
+third rule is the one that moved: it used to be a scratch copy this
+module was always handed, and it is now a promise the adapter keeps
+by whichever means its format affords.
 
 **A name the guest could not type is refused, never mangled**: a
 silently truncated ``results.tar.gz`` would land somewhere the
@@ -35,9 +54,22 @@ reporting a name the guest cannot type would be a listing it could
 not use.
 """
 
+import dataclasses
 import datetime
 import os
 import struct
+import sys
+from typing import Optional, Tuple
+
+# The host's file-locking call. Windows is the delivered platform and
+# locks byte ranges; the POSIX path exists and is correct, and is not
+# exercised by this project's suite.
+if sys.platform == "win32":
+    import msvcrt
+    fcntl = None
+else:
+    import fcntl
+    msvcrt = None
 
 #: The two bytes ending a boot sector, in the order they sit on
 #: disk. Compared as bytes rather than as a little-endian word,
@@ -47,9 +79,77 @@ _SIGNATURE = b"\x55\xaa"
 _SECTOR = 512
 
 #: Partition types that hold a chain of logical drives rather than a
-#: filesystem. DOS made all three; which one a tool wrote does not
-#: change how the chain is walked.
-_EXTENDED = {0x05, 0x0F, 0x85}
+#: filesystem. Both are DOS's; which one a tool wrote does not change
+#: how the chain is walked. ``0x85`` is *not* here -- it is Linux's
+#: extended container, and this is the DOS workflow's reader.
+_EXTENDED = {0x05: "extended (CHS)", 0x0F: "extended (LBA)"}
+
+#: The FAT partition types a DOS guest makes and this build reads.
+#: The type byte is what a partition declares itself to be, and the
+#: table is pinned value by value rather than derived from a range:
+#: one byte's difference is a different filesystem, and the reader
+#: acts on the meaning.
+_FAT_TYPES = {
+    0x01: "FAT12",
+    0x04: "FAT16 (under 32 MB)",
+    0x06: "FAT16B",
+    0x0B: "FAT32 (CHS)",
+    0x0C: "FAT32 (LBA)",
+    0x0E: "FAT16B (LBA)",
+}
+
+#: Types worth naming in a refusal because a user meeting one is
+#: owed better than a hex byte. Anything absent is reported as its
+#: number, which is still a refusal that names what it refused.
+_KNOWN_FOREIGN = {
+    0x05: "an extended container",
+    0x07: "NTFS or exFAT",
+    0x0F: "an extended container",
+    0x82: "Linux swap",
+    0x83: "Linux",
+    0x85: "a Linux extended container",
+    0xA5: "FreeBSD",
+    0xEE: "a GPT protective partition — this disk is GPT, not MBR",
+    0xEF: "an EFI system partition",
+}
+
+
+@dataclasses.dataclass(frozen=True)
+class Partition:
+    """One partition-table entry, as the table declares it.
+
+    ``kind`` is the type byte verbatim and ``description`` is what
+    this build reads it as, so a report says both what was on the
+    disk and what reliquary made of it.
+    """
+
+    number: int
+    kind: int
+    description: str
+    offset: int
+    length: int
+    logical: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class Geometry:
+    """A drive's shape, read from the host (P10's second source).
+
+    Declared facts and observations are the other two; nothing here
+    is inferred. ``heads`` and ``sectors_per_track`` come from the
+    BPB of the first volume that carries them, which is where DOS
+    itself looks, and are ``None`` when no volume stated them --
+    unanswered rather than guessed.
+    """
+
+    size: int
+    bytes_per_sector: int
+    partitioned: bool
+    partitions: Tuple[Partition, ...]
+    volumes: int
+    heads: Optional[int] = None
+    sectors_per_track: Optional[int] = None
+    cylinders: Optional[int] = None
 
 #: Directory-entry attribute bits, of the six only these three matter
 #: to a reader: a long-name fragment is skipped, a volume label is not
@@ -101,22 +201,202 @@ def _looks_like_a_bpb(sector):
     return per_cluster != 0 and per_cluster & (per_cluster - 1) == 0
 
 
-class Image:
-    """A raw disk image, opened for reading, and the volumes in it."""
+def _describe(kind, number, path):
+    """What a type byte declares, or a refusal naming what it was.
 
-    def __init__(self, path, *, writable=False):
-        self.path = os.path.abspath(os.fspath(path))
-        self.writable = writable
-        self._handle = open(self.path, "r+b" if writable else "rb")
+    The DOS workflow's reader reads DOS's own partitions: the FAT
+    types and the two extended containers. Anything else is refused
+    here rather than further in, where the failure would read as an
+    unreadable filesystem instead of a partition this build was never
+    going to open (P11).
+    """
+    if kind in _FAT_TYPES:
+        return _FAT_TYPES[kind]
+    if kind in _EXTENDED:
+        return _EXTENDED[kind]
+    named = _KNOWN_FOREIGN.get(kind)
+    holds = named if named else f"partition type 0x{kind:02X}"
+    raise UnreadableImage(
+        f"{path}: partition {number} holds {holds}, and reliquary's "
+        "DOS workflow reads FAT partitions and DOS extended "
+        "containers only")
+
+
+class LocalDevice:
+    """An image already holding raw bytes, addressed where it lies.
+
+    The one device this module owns, because presenting raw bytes as
+    raw bytes needs no backend's help. **The file is locked for the
+    length of the access**, so a second reliquary cannot write the
+    disk this one is part-way through: an advisory host lock other
+    lock-takers honor, taken exclusively for a write and shared for a
+    read. It is not a claim over processes that take no lock -- what
+    keeps a *running* machine's disk safe is that at-rest access is
+    stopped-only, and for a served format the backend's own image
+    lock.
+    """
+
+    def __init__(self, path, *, writable=False, lock=True):
+        self.name = os.path.abspath(os.fspath(path))
+        self.read_only = not writable
+        self.size = os.path.getsize(self.name)
+        self._locked = lock
+        self._handle = open(self.name, "r+b" if writable else "rb")
         try:
-            self.size = os.path.getsize(self.path)
-            self.volumes = self._volumes()
+            if lock:
+                _lock(self._handle, exclusive=writable, path=self.name)
+        except Exception:
+            self._handle.close()
+            raise
+
+    def read_at(self, offset, length):
+        self._handle.seek(offset)
+        data = self._handle.read(length)
+        if len(data) != length:
+            raise UnreadableImage(
+                f"{self.name}: the image ends before offset {offset}")
+        return data
+
+    def write_at(self, offset, data):
+        if self.read_only:
+            raise UnreadableImage(f"{self.name}: opened for reading only")
+        self._handle.seek(offset)
+        self._handle.write(data)
+
+    def flush(self):
+        if self.read_only:
+            return
+        self._handle.flush()
+        os.fsync(self._handle.fileno())
+
+    def close(self):
+        if self._handle is None:
+            return
+        try:
+            if self._locked:
+                _unlock(self._handle)
+        finally:
+            self._handle.close()
+            self._handle = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exception):
+        self.close()
+
+
+#: Where the advisory lock is taken: one byte far past the end of any
+#: drive image. **The offset is the whole design.** A lock over the
+#: image's own content would be a lock the *server* trips on -- QEMU
+#: reads the header of a qcow2 it is asked to serve -- so the range
+#: is placed where nothing reads, and the lock is a token two
+#: reliquary processes contend for rather than a barrier across the
+#: bytes.
+_LOCK_OFFSET = 1 << 62
+
+
+def _lock(handle, *, exclusive, path):
+    """Take the host's advisory lock, or say who has it.
+
+    Non-blocking on purpose: a caller that waited would hang a CLI on
+    a lock it cannot see, where failing names the contention and the
+    remedy (P11).
+
+    **This is not a claim over processes that take no lock.** What
+    keeps a *running* machine's disk out of reach is that at-rest
+    access is stopped-only; what this stops is a second reliquary
+    reading a drive a first one is part-way through writing. QEMU's
+    own image locking would be the stronger guarantee and is not
+    available on the delivered host: it lives in QEMU's POSIX file
+    driver, and the Windows one implements none.
+    """
+    try:
+        handle.seek(_LOCK_OFFSET)
+        if msvcrt is not None:
+            # Windows locks byte ranges rather than files, and this
+            # one range is the whole of the convention: every taker
+            # here locks the same byte, so every taker collides.
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            flags = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+            fcntl.lockf(handle.fileno(), flags | fcntl.LOCK_NB, 1,
+                        _LOCK_OFFSET, os.SEEK_SET)
+    except OSError as error:
+        raise UnreadableImage(
+            f"{path} is locked by another process — reliquary will not "
+            "read or write a drive image something else may be writing"
+        ) from error
+    finally:
+        handle.seek(0)
+
+
+def _unlock(handle):
+    """Release the lock, tolerating a handle already past it."""
+    try:
+        handle.seek(_LOCK_OFFSET)
+        if msvcrt is not None:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.lockf(handle.fileno(), fcntl.LOCK_UN, 1, _LOCK_OFFSET,
+                        os.SEEK_SET)
+    except OSError:
+        # Closing the handle drops the lock on every host reliquary
+        # runs on; a failure here would only mask the real error.
+        pass
+
+
+class ImageLock:
+    """The advisory lock alone, for an image someone else will open.
+
+    :class:`LocalDevice` locks the handle it reads through, but a
+    served image is opened by the backend rather than here — so the
+    claim has to be held by a handle of its own, taken before the
+    server starts and dropped after it stops.
+    """
+
+    def __init__(self, path, *, exclusive=True):
+        self.path = os.path.abspath(os.fspath(path))
+        self._handle = open(self.path, "rb")
+        try:
+            _lock(self._handle, exclusive=exclusive, path=self.path)
         except Exception:
             self._handle.close()
             raise
 
     def close(self):
-        self._handle.close()
+        if self._handle is None:
+            return
+        try:
+            _unlock(self._handle)
+        finally:
+            self._handle.close()
+            self._handle = None
+
+
+class Image:
+    """A drive image as a device, and the volumes in it.
+
+    The device is any object answering ``size`` / ``read_at`` /
+    ``write_at`` / ``flush`` / ``close``: :class:`LocalDevice` for an
+    image already raw, and whatever an adapter hands back for a
+    format that needed serving. The image is owned from here -- this
+    closes it — so the caller hands one over rather than sharing it.
+    """
+
+    def __init__(self, device, *, writable=False):
+        self.device = device
+        self.path = getattr(device, "name", repr(device))
+        self.writable = writable and not getattr(device, "read_only", False)
+        try:
+            self.size = device.size
+            self.volumes = self._volumes()
+        except Exception:
+            device.close()
+            raise
+
+    def close(self):
+        self.device.close()
 
     def __enter__(self):
         return self
@@ -125,49 +405,55 @@ class Image:
         self.close()
 
     def read(self, offset, length):
-        self._handle.seek(offset)
-        data = self._handle.read(length)
-        if len(data) != length:
+        if offset < 0 or offset + length > self.size:
             raise UnreadableImage(
                 f"{self.path}: the image ends before offset {offset}")
-        return data
+        return self.device.read_at(offset, length)
 
     def write(self, offset, data):
         if not self.writable:
             raise UnreadableImage(f"{self.path}: opened for reading only")
-        if offset + len(data) > self.size:
+        if offset < 0 or offset + len(data) > self.size:
             # The image's own bounds are the last guard against a
             # miscomputed offset turning a write into a resize.
             raise UnreadableImage(
                 f"{self.path}: a write would run past the image")
-        self._handle.seek(offset)
-        self._handle.write(data)
+        self.device.write_at(offset, data)
 
     def flush(self):
-        self._handle.flush()
-        os.fsync(self._handle.fileno())
+        self.device.flush()
 
     def _volumes(self):
         first = self.read(0, _SECTOR)
         if _looks_like_a_bpb(first):
             # A partitionless image -- a floppy, or a disk formatted
             # as one whole volume. There is nothing to walk.
+            self.partitions = ()
+            self.partitioned = False
             return [Volume(self, 0, self.size, "1")]
         if first[510:512] != _SIGNATURE:
             raise UnreadableImage(
                 f"{self.path}: no partition table and no FAT boot "
                 "sector; reliquary cannot tell what is in this image")
+        self.partitioned = True
+        self.partitions = tuple(self._partitions(first))
         volumes = []
-        for index, (start, length, kind) in enumerate(
-                self._partitions(first), start=1):
-            if kind in _EXTENDED:
+        for entry in self.partitions:
+            if entry.kind in _EXTENDED:
                 continue
-            volumes.append(Volume(self, start, length, str(index)))
+            volumes.append(
+                Volume(self, entry.offset, entry.length, str(entry.number)))
         return volumes
 
     def _partitions(self, mbr):
-        """Every primary partition, and the logical drives behind an
-        extended one, in the order DOS walks them."""
+        """Every partition the table declares, primary then logical.
+
+        In the order DOS walks them, and **typed**: a partition whose
+        type this build does not read stops the walk by name rather
+        than being skipped. Skipping would leave the volumes that
+        follow it renumbered against what the guest sees, which is
+        the silently-wrong answer P11 forbids.
+        """
         found = []
         extended_at = None
         for slot in range(4):
@@ -179,12 +465,42 @@ class Image:
             length = _u32(entry, 12) * _SECTOR
             if length == 0 or start >= self.size:
                 continue
-            found.append((start, length, kind))
+            found.append(Partition(
+                number=len(found) + 1, kind=kind,
+                description=_describe(kind, slot + 1, self.path),
+                offset=start, length=length))
             if kind in _EXTENDED and extended_at is None:
                 extended_at = start
-        if extended_at is not None:
-            found.extend(self._logical(extended_at))
+        for start, length, kind in self._logical(extended_at) \
+                if extended_at is not None else []:
+            found.append(Partition(
+                number=len(found) + 1, kind=kind,
+                description=_describe(kind, len(found) + 1, self.path),
+                offset=start, length=length, logical=True))
         return found
+
+    def geometry(self):
+        """The drive's shape, for a caller that must know it.
+
+        Read on the host from the partition table and the first BPB
+        that states one — P10's second source, and the reason a
+        letter map need never assume what a disk holds.
+        """
+        heads = sectors_per_track = None
+        for volume in self.volumes:
+            if volume.heads and volume.sectors_per_track:
+                heads = volume.heads
+                sectors_per_track = volume.sectors_per_track
+                break
+        sector = self.volumes[0].bytes_per_sector if self.volumes else _SECTOR
+        cylinders = None
+        if heads and sectors_per_track:
+            cylinders = self.size // (heads * sectors_per_track * sector)
+        return Geometry(
+            size=self.size, bytes_per_sector=sector,
+            partitioned=self.partitioned, partitions=self.partitions,
+            volumes=len(self.volumes), heads=heads,
+            sectors_per_track=sectors_per_track, cylinders=cylinders)
 
     def _logical(self, extended_at):
         """Walk the EBR chain inside an extended partition."""
@@ -235,6 +551,11 @@ class Volume:
                 "reliquary can read")
         self.bytes_per_sector = _u16(boot, 11)
         self.sectors_per_cluster = boot[13]
+        # The BPB's own geometry words, where DOS itself looks. Zero
+        # means the formatter stated none, which is reported as
+        # unanswered rather than filled in with a plausible number.
+        self.sectors_per_track = _u16(boot, 24) or None
+        self.heads = _u16(boot, 26) or None
         reserved = _u16(boot, 14)
         self.fat_count = boot[16]
         self.root_entries = _u16(boot, 17)
@@ -476,8 +797,9 @@ class Volume:
     # written until every allocation has succeeded, so a volume with no
     # room is refused rather than half-filled. Both FAT copies are put
     # back from one in-memory table, so they cannot disagree. And the
-    # image this operates on is a scratch copy -- the caller commits it
-    # over the real one only after every write returned.
+    # device this operates on stands on a commit point its owner holds
+    # open -- so nothing here is final until the caller says so, and a
+    # write that never got there leaves the disk as it was.
 
     def write_file(self, segments, source):
         """Write host file ``source`` to the addressed path.

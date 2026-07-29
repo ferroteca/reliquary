@@ -23,13 +23,14 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
 from PIL import Image
 from qemu.qmp import ConnectError, ExecuteError, QMPClient
 
-from . import backends
+from . import at_rest, backends, nbd
 from .backends import Availability, BackendAdapter, Capabilities
 from .errors import (PreflightError, ReliquaryError, RunFailure,
                      StaticError)
@@ -38,6 +39,7 @@ from .home import effective_home
 
 _QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
 _QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
+_QEMU_NBD_BIN = "qemu-nbd.exe" if os.name == "nt" else "qemu-nbd"
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
@@ -230,6 +232,304 @@ def create_duplicate_image(filename, base):
         ["convert", "-O", "qcow2", base, path],
         "duplicating", path)
     return path
+
+
+# -- at-rest access -----------------------------------------------
+#
+# The two shapes a stopped machine's disk is opened in, both
+# answering the seam's `open_drive` contract: a device, a commit
+# point, and a close that undoes an uncommitted write.
+
+#: The internal snapshot that *is* the commit point for a served
+#: image. One fixed name, because a leftover means exactly one thing
+#: -- a write that never finished -- and the next access reconciles
+#: it the way an interrupted machine operation is reconciled.
+_AT_REST_SNAPSHOT = "rlq-at-rest"
+
+#: How long to wait for the server to start listening. Generous
+#: because it is a process launch, and bounded because a wait with no
+#: end is a hang the user cannot diagnose.
+_SERVE_TIMEOUT = 20.0
+
+
+def find_qemu_nbd():
+    """Locate ``qemu-nbd`` from configuration and common paths."""
+    return _find_qemu_tool(_QEMU_NBD_BIN)
+
+
+def _claim(path, *, exclusive):
+    """Take the at-rest claim on an image, or refuse by name.
+
+    One place, so the refusal does not depend on which format the
+    image turned out to be: a caller meeting a busy disk gets the
+    same answer whether it is served or opened directly.
+    """
+    try:
+        return at_rest.ImageLock(path, exclusive=exclusive)
+    except at_rest.UnreadableImage as error:
+        raise PreflightError(
+            f"{path} is in use by another reliquary process — a drive "
+            "image is read at rest by one caller at a time",
+            rule_id="image.locked") from error
+
+
+def _reads_as_a_lock(detail):
+    """Whether the server's complaint is contention over the image.
+
+    Matched on QEMU's own wording rather than an exit code, which it
+    does not distinguish: the lock failure and every other startup
+    failure leave the same status behind.
+    """
+    lowered = detail.lower()
+    return "lock" in lowered or "another process" in lowered
+
+
+def _snapshot_names(path):
+    """Every internal snapshot the image carries, by name."""
+    completed = _run_qemu_img(
+        ["info", "--output=json", path], "probing", path)
+    report = json.loads(completed.stdout)
+    return {entry.get("name") for entry in report.get("snapshots") or []}
+
+
+class _ServedAccess:
+    """A qcow2 served over NBD and written where it lies.
+
+    The snapshot is the whole of the undo: taken before the first
+    byte moves, discarded when the caller commits, and applied when
+    it does not. It costs the clusters a write touches rather than
+    the size of the disk, which is what makes writing in place
+    affordable enough to do at all.
+    """
+
+    def __init__(self, path, *, writable=False):
+        self.path = path
+        self.writable = writable
+        self.device = None
+        self._server = None
+        self._staged = False
+        self._lock = None
+        try:
+            # Taken before the snapshot, and before the server: every
+            # step after this assumes nothing else is moving the
+            # image, so the claim has to precede the first of them.
+            self._lock = _claim(path, exclusive=writable)
+            if writable:
+                self._reconcile()
+                _run_qemu_img(
+                    ["snapshot", "-c", _AT_REST_SNAPSHOT, self.path],
+                    "snapshotting", self.path)
+                self._staged = True
+            port = available_port()
+            self._server = self._serve(port)
+            self.device = self._connect(port)
+        except Exception:
+            self.close()
+            raise
+
+    def _reconcile(self):
+        """Undo a write an earlier run never finished.
+
+        The same discipline the machine model uses for an interrupted
+        operation: the next one reconciles it rather than refusing
+        forever or stepping over it.
+        """
+        if _AT_REST_SNAPSHOT not in _snapshot_names(self.path):
+            return
+        _run_qemu_img(["snapshot", "-a", _AT_REST_SNAPSHOT, self.path],
+                      "rolling back", self.path)
+        _run_qemu_img(["snapshot", "-d", _AT_REST_SNAPSHOT, self.path],
+                      "clearing the rollback point of", self.path)
+
+    def _serve(self, port):
+        """Start ``qemu-nbd`` on the loopback interface, or say why not.
+
+        ``-t`` keeps it up across connections so a retry does not end
+        it; this owns the process and stops it in :meth:`close`. No
+        ``--force-share``: QEMU's own image lock is what keeps a
+        running machine's disk out of reach, and defeating it is the
+        one thing that would make this dangerous.
+        """
+        command = [find_qemu_nbd(), "-t", "-b", "127.0.0.1",
+                   "-p", str(port), "-f", "qcow2"]
+        if not self.writable:
+            command.append("-r")
+        command.append(self.path)
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True)
+        deadline = time.monotonic() + _SERVE_TIMEOUT
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                detail = self._complaint(process)
+                if _reads_as_a_lock(detail):
+                    # QEMU's own image lock, which is the thing keeping
+                    # a running machine's disk out of reach. Naming it
+                    # as contention beats naming it as a server that
+                    # would not start.
+                    raise PreflightError(
+                        f"{self.path} is held by another process — a "
+                        "machine using this disk is still running, and "
+                        "reliquary reads a drive at rest only when it "
+                        "is stopped", rule_id="image.locked")
+                raise RunFailure(
+                    f"qemu-nbd failed serving {self.path}"
+                    + (f": {detail}" if detail else ""),
+                    rule_id="image.serve-failed")
+            if port_in_use(port):
+                return process
+            time.sleep(0.02)
+        _stop_process(process)
+        raise RunFailure(
+            f"the image server for {self.path} did not start listening "
+            f"within {_SERVE_TIMEOUT:.0f}s", rule_id="image.serve-timeout")
+
+    @staticmethod
+    def _complaint(process):
+        """Whatever the server said before it gave up."""
+        return ((process.stderr.read() if process.stderr else "")
+                or "").strip()
+
+    def _connect(self, port):
+        """Attach to the export, retrying while the server settles."""
+        deadline = time.monotonic() + _SERVE_TIMEOUT
+        while True:
+            try:
+                return nbd.NbdDevice(port=port)
+            except ReliquaryError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.05)
+
+    def commit(self):
+        """Keep the writes: drop the point they would have been undone
+        from."""
+        if not self._staged:
+            return
+        if self.device is not None:
+            self.device.flush()
+        self._release()
+        _run_qemu_img(["snapshot", "-d", _AT_REST_SNAPSHOT, self.path],
+                      "committing", self.path)
+        self._staged = False
+
+    def close(self):
+        """Release everything, undoing a write that never committed."""
+        self._release()
+        if self._staged:
+            self._reconcile()
+            self._staged = False
+        if self._lock is not None:
+            # Last: the rollback above is part of what the lock is
+            # held for.
+            self._lock.close()
+            self._lock = None
+
+    def _release(self):
+        """Drop the connection and the server, in that order."""
+        if self.device is not None:
+            self.device.close()
+            self.device = None
+        if self._server is not None:
+            _stop_process(self._server)
+            self._server = None
+
+
+class _StagedRawAccess:
+    """An image already raw: read in place, written through a copy.
+
+    A raw file has nowhere to stand an undo, so the staging D74 built
+    is kept for it exactly as it was. Reading still costs nothing —
+    the bytes are already what the reader wants, and only a write
+    pays for the copy.
+    """
+
+    def __init__(self, path, *, writable=False):
+        self.path = path
+        self.writable = writable
+        self.device = None
+        self._lock = None
+        self._origin = None
+        self._workspace = None
+        self._scratch = None
+        try:
+            # The claim comes first here too, and by the same route,
+            # so a busy image answers the same whatever its format.
+            self._lock = _claim(path, exclusive=writable)
+            if not writable:
+                self.device = at_rest.LocalDevice(path, lock=False)
+                return
+            # Copied *under the claim*, so the bytes staged are the
+            # bytes nothing else was free to change.
+            self._origin = at_rest.LocalDevice(path, writable=True,
+                                               lock=False)
+            self._workspace = tempfile.mkdtemp(prefix="rlq-at-rest-")
+            self._scratch = os.path.join(self._workspace, "raw.img")
+            _copy_device(self._origin, self._scratch)
+            self.device = at_rest.LocalDevice(self._scratch, writable=True,
+                                              lock=False)
+        except Exception:
+            self.close()
+            raise
+
+    def commit(self):
+        """Move the staged copy over the image, in one step."""
+        if self._scratch is None:
+            return
+        self.device.flush()
+        self.device.close()
+        self.device = None
+        # Every handle on the image has to go before the move: a held
+        # one is a sharing violation on the delivered host, not a
+        # safeguard. The claim goes last, so nothing else can take the
+        # image between the release and the replace.
+        self._origin.close()
+        self._origin = None
+        self._lock.close()
+        self._lock = None
+        os.replace(self._scratch, self.path)
+        self._scratch = None
+        self._cleanup()
+
+    def close(self):
+        for held in (self.device, self._origin, self._lock):
+            if held is not None:
+                held.close()
+        self.device = None
+        self._origin = None
+        self._lock = None
+        self._scratch = None
+        self._cleanup()
+
+    def _cleanup(self):
+        if self._workspace:
+            shutil.rmtree(self._workspace, ignore_errors=True)
+            self._workspace = None
+
+
+def _copy_device(device, destination):
+    """Lay a device's bytes down as a file, a chunk at a time."""
+    chunk = 1 << 20
+    with open(destination, "wb") as handle:
+        offset = 0
+        while offset < device.size:
+            block = device.read_at(offset, min(chunk, device.size - offset))
+            handle.write(block)
+            offset += len(block)
+
+
+def _stop_process(process):
+    """End a child and wait for it, so nothing is left untracked."""
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
+    for stream in (process.stdout, process.stderr):
+        if stream is not None:
+            stream.close()
 
 
 class Qmp:
@@ -650,61 +950,42 @@ class QemuAdapter(BackendAdapter):
         """QEMU's native per-machine image: qcow2, named for its media."""
         return os.path.join(root, f"{stem}.qcow2")
 
-    def raw_image(self, path, workspace, *, mutable=False):
-        """Flatten a qcow2 (or any format qemu-img reads) to raw bytes.
+    def open_drive(self, path, *, writable=False):
+        """Open a stopped machine's disk where it lies.
 
-        ``qemu-img convert`` does the work, which is the honest tool
-        for it: a differencing image's whole backing chain resolves,
-        and a format this build of QEMU cannot read fails here rather
-        than producing a plausible-looking wrong answer. An image
-        already raw is handed back where it lies for a read, so the
-        common ``materialize: use`` payload costs nothing -- and is
-        copied for a write, because the real image must not change
-        until :meth:`import_raw` says so.
+        **A qcow2 is served, not copied.** ``qemu-nbd`` exports it on
+        the loopback interface and :class:`reliquary.nbd.NbdDevice`
+        addresses it, so a read costs nothing proportional to the
+        disk and a write lands in the image itself -- clusters
+        allocated, refcounts kept and a backing chain copied on write
+        by QEMU, which owns the format and is the only thing that
+        should. A differencing image is therefore still a difference
+        afterwards without anything here arranging it.
 
-        The copy is the cost of reading a qcow2 without a writer for
-        it: proportional to the disk, paid per call, and gone with
-        ``workspace``.
+        **An image already raw needs no server**, and is opened
+        directly. Its write path keeps the staged copy D74 built,
+        because a raw file has nowhere to stand an undo: qcow2's own
+        snapshot is what replaces staging, and a format without one
+        keeps it.
+
+        **Two formats are claimed and the rest are refused by name.**
+        qcow2 is what reliquary materializes and raw is what a
+        ``materialize: use`` payload usually is; both are tested on
+        the delivered host. QEMU reads plenty more, and serving one
+        untested would be claiming a capability nobody exercised —
+        which P11 makes a refusal rather than a quiet promise.
         """
         path = os.path.abspath(os.fspath(path))
-        flattened = os.path.join(workspace, "raw.img")
-        if probe_image_format(path) == "raw":
-            if not mutable:
-                return path
-            shutil.copyfile(path, flattened)
-            return flattened
-        _run_qemu_img(["convert", "-O", "raw", path, flattened],
-                      "flattening", path)
-        return flattened
-
-    def import_raw(self, raw_path, image_path):
-        """Rebuild the image from a modified raw copy, atomically.
-
-        The rebuild lands beside the image and is moved over it, so
-        the disk is the old one or the new one and never a partial
-        third thing. A differencing image is rebuilt **over its own
-        base** (``-B``), so what was a difference stays one rather
-        than silently becoming a standalone disk; how densely qemu-img
-        stores it afterwards is its business.
-        """
-        image_path = os.path.abspath(os.fspath(image_path))
-        completed = _run_qemu_img(
-            ["info", "--output=json", image_path], "probing", image_path)
-        report = json.loads(completed.stdout)
-        if report["format"] == "raw":
-            os.replace(raw_path, image_path)
-            return image_path
-        arguments = ["convert", "-O", report["format"]]
-        backing = report.get("backing-filename")
-        if backing:
-            arguments += ["-B", backing]
-            if report.get("backing-filename-format"):
-                arguments += ["-F", report["backing-filename-format"]]
-        rebuilt = image_path + ".rlq-rebuilt"
-        _run_qemu_img(arguments + [raw_path, rebuilt],
-                      "rebuilding", image_path)
-        os.replace(rebuilt, image_path)
-        return image_path
+        found = probe_image_format(path)
+        if found == "raw":
+            return _StagedRawAccess(path, writable=writable)
+        if found != "qcow2":
+            raise PreflightError(
+                f"{path} is a {found} image, and reliquary reads a "
+                "drive at rest in qcow2 or raw form only — convert it, "
+                "or exchange files through a directory-source drive",
+                rule_id="image.format-not-at-rest")
+        return _ServedAccess(path, writable=writable)
 
     def create_image(self, path, *, mode, size=None, base=None):
         if mode == "new":
