@@ -1208,10 +1208,11 @@ class InBandFileTests(_HomeCase):
             return fat_image.consistency(handle.read())
 
     def test_an_exchange_disk_behind_an_installed_c_is_addressable(self):
-        # What D71 bought, and the shape P16 was failing on: results
-        # live on an installed C: and the exchange drive is the second
-        # disk. Its letter is D: on the one-volume-per-disk assumption,
-        # where before the whole machine was unaddressable.
+        # The shape P16 was failing on: results live on an installed
+        # C: and the exchange drive is the second disk. Its letter is
+        # D: because the installed disk really does hold one volume —
+        # read, now, rather than assumed.
+        self.backend.image_payload = fat_image.volume(self.INSTALLED)
         exchange = os.path.join(self.home, "exchange2")
         os.makedirs(exchange)
         machine_id = self._create(
@@ -1265,7 +1266,9 @@ class InBandFileTests(_HomeCase):
     def test_an_empty_removable_slot_says_it_is_empty(self):
         # Now reachable, because the letter map places a cdrom behind
         # a disk. It is neither an image nor a directory, and calling
-        # it an image would be the lie the old message told.
+        # it an image would be the lie the old message told. The disk
+        # carries a real volume, which is what puts the cdrom at D:.
+        self.backend.image_payload = fat_image.volume(self.INSTALLED)
         exchange = os.path.join(self.home, "exchange3")
         os.makedirs(exchange)
         machine_id = self._create(
@@ -1392,10 +1395,14 @@ class InBandFileTests(_HomeCase):
         self.assertEqual(caught.exception.rule_id, "drive.no-at-rest-access")
         self.assertIn("qemu", str(caught.exception))
 
-    def test_a_disk_holding_two_volumes_refuses_rather_than_picking(self):
-        # The one place D71's assumption is checkable. Two volumes on
-        # one disk means every letter after it is wrong, so answering
-        # for either would be confident and unfounded.
+    def test_a_disk_holding_two_volumes_gives_each_its_own_letter(self):
+        """D71's defect, closed end to end.
+
+        Two volumes on one disk used to be refused, because the letter
+        map assumed one and could not say which letter the second
+        took. It reads the count now, so both are addressable and
+        each answers for itself.
+        """
         self.backend.image_payload = fat_image.partitioned([
             fat_image.volume({"ONE.TXT": b"1"}, bits=16, sectors=20000,
                              per_cluster=4),
@@ -1404,14 +1411,32 @@ class InBandFileTests(_HomeCase):
         machine_id = self._create(
             "two-volumes", {"platform": "dos", "drives": {"hdd0": "blank"}},
             media=[_BLANK])
-        with self.assertRaises(PreflightError) as caught:
-            list_files("C:\\", machine=machine_id, context=self.home)
-        self.assertEqual(caught.exception.rule_id,
-                         "drive.volume-count-unsupported")
-        self.assertIn("2 volumes", str(caught.exception))
+        self.assertEqual(
+            [entry["name"] for entry in
+             list_files("C:\\", machine=machine_id, context=self.home)],
+            ["ONE.TXT"])
+        self.assertEqual(
+            [entry["name"] for entry in
+             list_files("D:\\", machine=machine_id, context=self.home)],
+            ["TWO.TXT"])
+
+    def test_a_volume_count_is_recorded_and_cleared_by_a_start(self):
+        """The cache and its invalidation, which is what makes reading
+        the disk affordable *and* correct: a guest can only repartition
+        while it runs, so a count cannot outlive the boot after it."""
+        machine_id, _exchange = self._image_rig()
+        list_files("C:\\", machine=machine_id, context=self.home)
+        self.assertEqual(
+            self._state(machine_id)["drives"]["hdd0"]["volumes"], 1)
+        start_machine(machine_id=machine_id, context=self.home)
+        self.assertNotIn(
+            "volumes", self._state(machine_id)["drives"]["hdd0"])
 
     def test_an_undeclared_letter_names_the_ones_that_exist(self):
-        machine_id, _exchange = self._rig()
+        # The disk is readable here on purpose: a letter nothing could
+        # ever take is a different failure from one reliquary cannot
+        # place, and this asserts the first.
+        machine_id, _exchange = self._image_rig()
         with self.assertRaises(PreflightError) as caught:
             get_file(r"Z:\X.TXT", os.path.join(self.home, "x"),
                      machine=machine_id, context=self.home)
@@ -1651,10 +1676,11 @@ class DosAddressingTests(unittest.TestCase):
             "hdd0": {"medium": "hdd", "slot": 0, "controller": "ide"},
             "hdd1": {"medium": "hdd", "slot": 1, "controller": "scsi"},
         }
-        self.assertEqual(platform_dos.drive_letters(drives),
-                         {"A": "floppy0"})
+        counts = {"hdd0": 1, "hdd1": 1}
+        self.assertEqual(platform_dos.drive_letters(drives, counts),
+                         {"A": ("floppy0", 0)})
         # Both disks, named as undetermined rather than absent.
-        self.assertEqual(platform_dos.undetermined_letters(drives),
+        self.assertEqual(platform_dos.undetermined_letters(drives, counts),
                          ["hdd0", "hdd1"])
 
     def test_one_controller_type_places_every_disk(self):
@@ -1665,14 +1691,13 @@ class DosAddressingTests(unittest.TestCase):
             "hdd0": {"medium": "hdd", "slot": 0, "controller": "ide"},
             "hdd1": {"medium": "hdd", "slot": 1, "controller": "ide"},
         }
-        self.assertEqual(platform_dos.drive_letters(drives),
-                         {"A": "floppy0", "C": "hdd0", "D": "hdd1"})
+        self.assertEqual(
+            platform_dos.drive_letters(drives, {"hdd0": 1, "hdd1": 1}),
+            {"A": ("floppy0", 0), "C": ("hdd0", 0), "D": ("hdd1", 0)})
 
-    def test_every_drive_is_placed_one_volume_per_disk(self):
-        # D71's assumption in full: disks from C: in slot order, then
-        # the CD-ROMs after them, which is the order DOS assigns in.
-        # A guest that repartitions makes this wrong — the filed
-        # defect, and the reason the assumption is written down.
+    def test_every_drive_is_placed_from_the_volumes_each_disk_holds(self):
+        # Disks from C: in slot order, then the CD-ROMs after them,
+        # which is the order DOS assigns in.
         drives = {
             "floppy0": {"medium": "floppy", "slot": 0},
             "floppy1": {"medium": "floppy", "slot": 1},
@@ -1680,11 +1705,60 @@ class DosAddressingTests(unittest.TestCase):
             "hdd1": {"medium": "hdd", "slot": 1},
             "cdrom0": {"medium": "cdrom", "slot": 0},
         }
+        counts = {"hdd0": 1, "hdd1": 1}
         self.assertEqual(
-            platform_dos.drive_letters(drives),
-            {"A": "floppy0", "B": "floppy1", "C": "hdd0", "D": "hdd1",
-             "E": "cdrom0"})
-        self.assertEqual(platform_dos.undetermined_letters(drives), [])
+            platform_dos.drive_letters(drives, counts),
+            {"A": ("floppy0", 0), "B": ("floppy1", 0), "C": ("hdd0", 0),
+             "D": ("hdd1", 0), "E": ("cdrom0", 0)})
+        self.assertEqual(platform_dos.undetermined_letters(drives, counts),
+                         [])
+
+    def test_a_disk_of_two_volumes_takes_two_letters(self):
+        """D71's defect, closed: the count places the letters.
+
+        Under the assumption this returned C: and D: for the two
+        disks, which is what a guest that repartitioned `hdd0` made
+        silently wrong. Both volumes of `hdd0` are now addressable and
+        `hdd1` is where DOS actually puts it.
+        """
+        drives = {
+            "hdd0": {"medium": "hdd", "slot": 0},
+            "hdd1": {"medium": "hdd", "slot": 1},
+            "cdrom0": {"medium": "cdrom", "slot": 0},
+        }
+        self.assertEqual(
+            platform_dos.drive_letters(drives, {"hdd0": 2, "hdd1": 1}),
+            {"C": ("hdd0", 0), "D": ("hdd0", 1), "E": ("hdd1", 0),
+             "F": ("cdrom0", 0)})
+
+    def test_an_unpartitioned_disk_takes_no_letter(self):
+        """DOS gives letters to volumes, not to disks.
+
+        A blank reliquary just materialized holds nothing until a
+        guest partitions it, so the drive behind it is C: — which the
+        one-volume-per-disk assumption used to call D:.
+        """
+        drives = {
+            "hdd0": {"medium": "hdd", "slot": 0},
+            "hdd1": {"medium": "hdd", "slot": 1},
+        }
+        self.assertEqual(
+            platform_dos.drive_letters(drives, {"hdd0": 0, "hdd1": 1}),
+            {"C": ("hdd1", 0)})
+
+    def test_a_disk_whose_volumes_are_unknown_stops_the_walk(self):
+        """An unreadable disk moves everything behind it by an unknown
+        amount, so nothing behind it is placed rather than guessed."""
+        drives = {
+            "hdd0": {"medium": "hdd", "slot": 0},
+            "hdd1": {"medium": "hdd", "slot": 1},
+            "floppy0": {"medium": "floppy", "slot": 0},
+        }
+        self.assertEqual(platform_dos.drive_letters(drives, {"hdd1": 1}),
+                         {"A": ("floppy0", 0)})
+        self.assertEqual(
+            platform_dos.undetermined_letters(drives, {"hdd1": 1}),
+            ["hdd0", "hdd1"])
 
     def test_cdroms_are_determined_when_no_hard_disk_shifts_them(self):
         # With no disk to carry volumes, nothing can move a cdrom's
@@ -1696,22 +1770,24 @@ class DosAddressingTests(unittest.TestCase):
         }
         self.assertEqual(
             platform_dos.drive_letters(drives),
-            {"A": "floppy0", "C": "cdrom0", "D": "cdrom1"})
+            {"A": ("floppy0", 0), "C": ("cdrom0", 0), "D": ("cdrom1", 0)})
         self.assertEqual(platform_dos.undetermined_letters(drives), [])
 
     def test_a_cdrom_takes_c_when_there_is_no_hard_disk(self):
         letters = platform_dos.drive_letters(
             {"cdrom0": {"medium": "cdrom", "slot": 0}})
-        self.assertEqual(letters, {"C": "cdrom0"})
+        self.assertEqual(letters, {"C": ("cdrom0", 0)})
 
     def test_a_cdrom_follows_the_disk_it_sits_behind(self):
         drives = {
             "hdd0": {"medium": "hdd", "slot": 0},
             "cdrom0": {"medium": "cdrom", "slot": 0},
         }
-        self.assertEqual(platform_dos.drive_letters(drives),
-                         {"C": "hdd0", "D": "cdrom0"})
-        self.assertEqual(platform_dos.undetermined_letters(drives), [])
+        counts = {"hdd0": 1}
+        self.assertEqual(platform_dos.drive_letters(drives, counts),
+                         {"C": ("hdd0", 0), "D": ("cdrom0", 0)})
+        self.assertEqual(platform_dos.undetermined_letters(drives, counts),
+                         [])
 
     def test_an_address_splits_into_letter_and_segments(self):
         self.assertEqual(platform_dos.split_address(r"c:\DOS\FOO.TXT"),

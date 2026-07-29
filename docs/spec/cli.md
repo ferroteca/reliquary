@@ -748,26 +748,32 @@ FAT32 partition types are read; anything else is
 A guest-side name must be one the guest could type: **8.3, or a
 refusal** (`drive.image-unreadable`), never a silent truncation
 that would land the file where the caller cannot find it.
-Three more refusals name themselves, each raised before anything
+Two more refusals name themselves, each raised before anything
 is transferred (**P11**): `drive.no-at-rest-access` when the
-backend cannot open its own image format at rest,
-`drive.no-at-rest-write` when it can read one and not write it,
-and `drive.volume-count-unsupported` when a disk holds more than
-one volume — the letter map assumes one per disk, so answering
-for either would answer for a drive the caller did not
-address.
+backend cannot open its own image format at rest, and
+`drive.no-at-rest-write` when it can read one and not write it.
 
-**The letter map places every drive**, so a directory-source drive
-is addressable wherever it sits — including behind an installed
-`C:`, which is the ordinary shape and used to be unreachable
-entirely. Floppies take `A:` and `B:` by slot; hard disks follow
-from `C:` in slot order; CD-ROMs follow the last disk. Disk
-letters rest on **one stated assumption — one volume per hard
-disk** — which is true of every disk Reliquary materializes and
-which a guest that repartitions can silently contradict; reading
-the real volume layout off the image is unbuilt. The one thing
-that still unfixes a letter is a machine mixing controller types,
-where slot order is authoritative only within a type.
+**The letter map is read, never assumed.** Floppies take `A:` and
+`B:` by slot, always. Hard disks follow from `C:` in slot order,
+**each taking one letter per volume it holds** — a disk
+partitioned in two takes `C:` and `D:`, and the next disk starts
+at `E:`. CD-ROMs follow the last disk volume. A disk holding no
+volumes — a blank Reliquary materialized, before a guest
+partitions it — takes **no letter at all**, which is what DOS
+itself does. The volume count is read off the image on the host,
+which is a declared-or-read fact and never an inference about a
+guest (**P10**); it is recorded in the machine's state and
+**cleared at every start**, because a guest can repartition a disk
+and can only do so while it is running.
+
+A directory-source drive is therefore addressable wherever it
+sits, including behind an installed `C:`. Two things unfix a
+letter, and both fail closed naming what could not be placed: a
+disk whose volumes Reliquary cannot read — which shifts every
+letter behind it by an unknown amount, and which answers with the
+reason it could not be read rather than with the symptom — and a
+machine mixing controller types, where slot order is
+authoritative only within a type.
 
 The plural verbs move a tree's **contents**: `put-files` places
 what is inside the host directory into the guest directory, and

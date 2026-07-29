@@ -11,6 +11,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Fixed
+
+- **The drive-letter map no longer assumes what a disk holds.** It
+  placed hard disks from `C:` in slot order on the assumption that
+  each carried exactly one volume. A guest that repartitioned its
+  disk made that **silently wrong** — every letter behind it moved,
+  and the map named the wrong drive rather than failing, so a
+  `get-file` aimed at `D:` could read a different drive entirely and
+  say nothing.
+
+  Each disk now takes **one letter per volume it actually holds**,
+  read off the image on the host. A disk partitioned in two takes
+  `C:` and `D:`, and the next disk starts at `E:`; both volumes are
+  addressable, where a two-volume disk used to be refused outright.
+  A disk holding **no** volumes — a blank just materialized, before
+  a guest partitions it — takes no letter at all, which is what DOS
+  itself does, so the drive behind it is `C:`.
+
+  The count is recorded in the machine's state and **cleared at
+  every start**: a guest can repartition a disk and can only do it
+  while running, so a count taken before a boot says nothing about
+  the one after it. Reading it is affordable because the same change
+  stopped copying disks to read them.
+
+  A disk whose volumes Reliquary *cannot* read leaves every letter
+  behind it unplaced, and says why in the terms of the thing that
+  failed — the backend cannot read a drive image at rest, or the
+  image itself is unreadable — rather than reporting the symptom
+  that a letter could not be determined.
+
+  `drive.volume-count-unsupported` is retired: a disk holding more
+  than one volume is now addressed rather than refused.
+
 ### Changed
 
 - **A drive image is no longer copied to be read.** At-rest access

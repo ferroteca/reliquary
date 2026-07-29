@@ -188,8 +188,9 @@ The drive-letter mapping is built from the machine's declared
 platform and Reliquary's own drive assignment — never from
 inspecting a guest — and places every drive: floppies at `A:`/`B:`
 by slot, hard disks from `C:` in slot order, CD-ROMs after them.
-Disk letters rest on one stated assumption, **one volume per hard
-disk**, which a guest that repartitions can silently contradict.
+Disk letters follow the volumes each disk **actually holds**, read
+off the image on the host and re-read after every boot; a disk
+holding none takes no letter, as on DOS itself.
 All five are **stopped-only**: the backend snapshots a
 directory-source drive at attach, so a put made while the machine
 runs would be invisible and a guest write is not flushed until it

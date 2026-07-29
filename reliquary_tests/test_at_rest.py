@@ -130,10 +130,24 @@ class VolumeDiscoveryTests(_ImageCase):
         return path
 
     def test_an_image_that_is_neither_says_so(self):
+        """Something is written where a table would be, and it is not
+        one — which is different from nothing being written at all."""
+        payload = bytearray(4096)
+        payload[0:8] = b"NOTADISK"
         with self.assertRaises(at_rest.UnreadableImage) as caught:
-            self._image(bytes(4096))
+            self._image(bytes(payload))
         self.assertIn("cannot tell what is in this image",
                       str(caught.exception))
+
+    def test_a_blank_disk_holds_no_volumes_rather_than_refusing(self):
+        """A disk reliquary just materialized, before a guest touches
+        it. DOS gives an unpartitioned disk no letter, so zero is the
+        answer that lets a letter map be right about the drives behind
+        it — refusing would make the whole machine unaddressable."""
+        image = self._image(bytes(4096))
+        self.assertEqual(image.volumes, [])
+        self.assertFalse(image.partitioned)
+        self.assertEqual(image.geometry().volumes, 0)
 
     def test_a_truncated_image_says_so_rather_than_answering(self):
         with self.assertRaises(at_rest.UnreadableImage):

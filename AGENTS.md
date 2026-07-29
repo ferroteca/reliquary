@@ -125,8 +125,13 @@ workflow:
   (`platform_dos.split_address` / `split_directory_address` /
   `join_address`), and the letter
   map itself is `platform_dos.drive_letters`, built from declared
-  facts and one stated assumption, one volume per hard disk —
-  P10, D71;
+  facts *and the volumes each disk actually holds* — read on the
+  host, one letter per volume, a disk holding none taking none,
+  cached per-drive in `machine.json` and cleared at every start
+  (a guest repartitions only while running). A disk whose volumes
+  cannot be read leaves every letter behind it unplaced and
+  answers with the reason it could not be read, never the
+  symptom — P10, D71 closed;
   ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
   numbering and an exclusive per-machine operation lock

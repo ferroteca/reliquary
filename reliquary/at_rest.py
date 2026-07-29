@@ -432,6 +432,19 @@ class Image:
             self.partitioned = False
             return [Volume(self, 0, self.size, "1")]
         if first[510:512] != _SIGNATURE:
+            if not any(first):
+                # **A blank disk holds no volumes, and that is an
+                # answer.** Nothing is written where a partition table
+                # or a boot sector would be, which is what a disk
+                # reliquary just materialized looks like until a guest
+                # partitions it. DOS gives an unpartitioned disk no
+                # drive letter at all, so reporting zero is what lets
+                # a letter map be right about the drives behind it —
+                # where refusing would make the whole machine
+                # unaddressable (P16).
+                self.partitions = ()
+                self.partitioned = False
+                return []
             raise UnreadableImage(
                 f"{self.path}: no partition table and no FAT boot "
                 "sector; reliquary cannot tell what is in this image")

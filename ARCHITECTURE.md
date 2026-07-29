@@ -430,37 +430,29 @@ differently under the new wording — is mere documentation work.
   assignment — never from inspecting a guest (P10). Where the
   declared facts leave an address ambiguous, the call fails
   closed naming the ambiguity (P11).
-  **Every drive has a letter today, and one of them is a guess.**
-  Disks take letters from `C:` in slot order on the stated
-  assumption that each holds one volume (D71) — an assumption,
-  which is to say a P10 violation, filed as a defect. It was
-  worth making because refusing it left an exchange drive behind
-  an installed `C:` unaddressable at all, which P16 forbids; and
-  it is silent when wrong, which is what keeps it a defect rather
-  than a documented limit. A wrong address and an unknowable one
-  remain different failures, and the refusals still say which.
-  **The assumption is a placeholder for a fact, not a policy**,
-  and two routes replace it. The stronger is offline and built:
-  the host mounts the drive image and reads it — the partition
-  table, and past it the FAT volume — which is no more guest
-  inspection than reading an image's format is. It answers *file
-  transfer* into and out of an installed disk, and it refuses a
-  disk holding two volumes rather than answering for the wrong
-  one; it reads a drive's whole **geometry** — the partition
-  table with each entry's declared type, the volume count, the
-  BPB's own CHS — which is the answer the map wants. What it does
-  not yet do is feed the map. The cost that argued against it has
-  gone: a disk is opened where it lies rather than flattened, so
-  resolving one address no longer means copying every disk on the
-  machine. What is left is deciding where the answer is cached,
-  which is the open half of that defect. The
-  partial route is online: ask the guest which letters it has, an
-  observation rather than an inference (P10), bounded by the boot
-  it was taken in. What may never grow is a
-  *declaration* of the guest's own arrangement: a blueprint
-  saying how a disk was partitioned would carry a spec's
-  authority over an assertion the guest can silently contradict,
-  which is worse than the gap it closes.
+  **Every drive has a letter, and none of them is a guess.**
+  Disks take letters from `C:` in slot order, each consuming one
+  letter per volume it actually holds, and the count is **read
+  off the image on the host** — the partition table, and past it
+  the FAT volume — which is no more guest inspection than
+  reading an image's format is. A disk holding no volumes takes
+  no letter, as on DOS itself. The count is recorded in the
+  machine's state and cleared at every start, a guest being able
+  to repartition only while it runs. This closed D71's assumption
+  that each disk holds one volume, which was a P10 violation
+  filed as a defect: it was silent when wrong, naming the wrong
+  drive rather than failing, and that silence is what kept it a
+  defect rather than a documented limit. A wrong address and an
+  unknowable one remain different failures, and the refusals
+  still say which — a disk whose volumes cannot be read leaves
+  every letter behind it unplaced, and answers with the reason it
+  could not be read. The **online** route stays available and
+  unbuilt: ask the guest which letters it has, an observation
+  rather than an inference (P10), bounded by the boot it was
+  taken in. What may never grow is a *declaration* of the guest's
+  own arrangement: a blueprint saying how a disk was partitioned
+  would carry a spec's authority over an assertion the guest can
+  silently contradict, which is worse than the gap it closes.
   `get-machine-dir` is the
   named exemption: the out-of-band door returns a host path by
   definition (D5). (docs/spec/script-spec.md, the in-band file

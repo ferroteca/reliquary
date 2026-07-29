@@ -32,42 +32,41 @@ def _mixes_controller_types(drives):
     return len(types) > 1
 
 
-def drive_letters(drives):
-    """Map DOS drive letters to drive keys, from declared facts and
-    **one stated assumption**.
+def drive_letters(drives, volumes=None):
+    """Map DOS drive letters to ``(drive key, volume index)``.
 
     Built from reliquary's own drive assignment — each drive's medium
-    and slot, which reliquary chose — and never from inspecting a
-    guest (P10):
+    and slot, which reliquary chose — and from **how many volumes each
+    disk actually holds**, read off the image on the host. Both are
+    P10 sources: the first is declared, the second is *read on the
+    host*, which is no more guest inspection than probing an image's
+    format is. Nothing here is inferred from a guest, and nothing is
+    assumed:
 
     - floppies take ``A:`` and ``B:`` by slot, always: DOS gives the
       floppy drives those letters whatever the disks carry;
-    - hard disks follow from ``C:`` in slot order;
-    - CD-ROMs follow the last disk, in slot order — ``C:`` when there
-      is no disk at all.
+    - hard disks follow from ``C:`` in slot order, **each consuming
+      one letter per volume it holds** — a disk partitioned in two
+      takes ``C:`` and ``D:``, and the next disk starts at ``E:``;
+    - CD-ROMs follow the last disk volume, in slot order — ``C:``
+      when there is no disk at all.
 
-    **The assumption is one volume per hard disk** (owner,
-    2026-07-28, D71), and it is what places every letter after the
-    first disk. It is not a fact: a disk the guest partitioned in two
-    shifts every letter after it, and a blueprint declares drives
-    rather than what was made of them. It is true of every disk
-    reliquary itself materializes — a blank is one volume, and a
-    payload image is what its author built — and the price of
-    refusing it was that a machine with any hard disk could not
-    address its own exchange drive at all, which is what P16 forbids
-    (D62's residue).
+    ``volumes`` maps a disk's key to its volume count. A disk absent
+    from it has a count reliquary could not read, and **that disk and
+    every drive after it go unplaced** rather than being guessed at:
+    an unreadable disk shifts the letters behind it by an unknown
+    amount, so answering for them would be answering confidently for
+    a drive the caller did not address (P11). Passing ``None`` treats
+    every count as unknown, which places the floppies alone.
 
-    **A guest that repartitions makes this silently wrong**, and that
-    is filed as a defect rather than hidden: the mapping would name
-    the wrong drive, not fail. Closing it means reading volume layout
-    off the image on the host — the partition table, and past it
-    whatever volume manager a guest layered on — which is no more
-    guest inspection than :func:`backend_qemu.probe_image_format` is.
-    What stops it today is that every layout is its own reader rather
-    than a rule.
+    **The one-volume-per-disk assumption is gone** (D71, closed by
+    D77). It used to place every letter after the first disk, and a
+    guest that repartitioned made the map silently wrong — naming
+    the wrong drive rather than failing, which is why it was a defect
+    and not a stated limit.
 
     **Mixed controller types still unfix every disk letter**, and no
-    assumption rescues them. Slot order is authoritative only within
+    volume count rescues them. Slot order is authoritative only within
     a type; across types the guest's firmware decides how the
     controllers themselves enumerate, so even the *first* disk is not
     placeable. The floppies still are: DOS gives them ``A:`` and
@@ -77,16 +76,16 @@ def drive_letters(drives):
     blueprint (owner, 2026-07-27, D56): the guest is the source of
     truth for its own volumes, and a declaration would carry a spec's
     authority over an assertion the guest can silently contradict.
-    D71 does not reopen that — an assumption reliquary makes in its
-    own code, stated here and filed as a defect, is not a field an
-    author can assert into a document.
+    Reading the disk is not that — it observes what is there instead
+    of asserting what should be.
     """
+    volumes = volumes or {}
     letters = {}
     for slot, key in sorted((drive.get("slot", 0), key)
                             for key, drive in drives.items()
                             if drive.get("medium") == "floppy"):
         if slot in (0, 1):
-            letters[chr(ord("A") + slot)] = key
+            letters[chr(ord("A") + slot)] = (key, 0)
     if _mixes_controller_types(drives):
         # Slot order is authoritative only *within* a controller type.
         # Across types the guest's firmware decides how the controllers
@@ -110,23 +109,31 @@ def drive_letters(drives):
         for _slot, key in sorted((drive.get("slot", 0), key)
                                  for key, drive in drives.items()
                                  if drive.get("medium") == medium):
-            letters[chr(ord("C") + ordinal)] = key
-            ordinal += 1
+            if medium == "cdrom":
+                count = 1
+            else:
+                count = volumes.get(key)
+                if count is None:
+                    # An unreadable disk moves everything behind it by
+                    # an unknown amount, so the walk stops here rather
+                    # than placing letters it cannot stand behind.
+                    return letters
+            for index in range(count):
+                letters[chr(ord("C") + ordinal)] = (key, index)
+                ordinal += 1
     return letters
 
 
-def undetermined_letters(drives):
-    """The drive keys whose letter the declared facts do not fix.
+def undetermined_letters(drives, volumes=None):
+    """The drive keys whose letter the known facts do not fix.
 
     Every drive a machine declares that :func:`drive_letters` cannot
-    place. Since D71 places every disk and CD-ROM on the one-volume-per
-    -disk assumption, this is empty for every machine that exists —
-    only a machine mixing controller types has drives it cannot place,
-    and no controller but ``ide`` is wired. Callers use it to say
-    *why* a letter is unavailable, and it stays because the day a
-    second controller type lands is the day it fills again.
+    place: the disks behind one whose volumes could not be read, and
+    every drive of a machine mixing controller types. Callers use it
+    to say *why* a letter is unavailable rather than reporting a
+    drive as absent when the truth is that its letter is unknown.
     """
-    placed = set(drive_letters(drives).values())
+    placed = {key for key, _index in drive_letters(drives, volumes).values()}
     return [key for key in sorted(drives) if key not in placed]
 
 

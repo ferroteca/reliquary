@@ -992,6 +992,13 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
         for drive in drives.values():
             if drive.get("medium") == "floppy":
                 drive["launch-size"] = _medium_size(drive.get("path"))
+        # A recorded volume count belongs to one boot too, and for the
+        # same reason: a guest can repartition its disk and can only
+        # do it while running, so a count taken before this boot says
+        # nothing about the one after it. Dropped here rather than at
+        # stop, so an interrupted run cannot leave a stale one behind.
+        for drive in drives.values():
+            drive.pop("volumes", None)
         state["drives"] = drives
         # A machine variable belongs to one boot: a script `set` it
         # while the guest ran, so the next start starts empty.
@@ -1443,20 +1450,36 @@ def _resolve_address(machine_id, address, context, *, directory=False):
             rule_id="machine.must-be-stopped")
     platform = _addressing(state.get("platform"))
     drives = state.get("drives", {})
-    letters = platform.drive_letters(drives)
+    volumes, unreadable = _disk_volumes(machine_id, state, drives, context)
+    letters = platform.drive_letters(drives, volumes)
     letter, segments = (platform.split_directory_address(address)
                         if directory else platform.split_address(address))
-    key = letters.get(letter)
-    if key is None:
-        known = ", ".join(f"{name}: ({letters[name]})"
+    placed = letters.get(letter)
+    if placed is None:
+        known = ", ".join(f"{name}: ({letters[name][0]})"
                           for name in sorted(letters)) or "none"
         # Two different failures wear one shape, and saying "no such
         # drive" for the second would be a lie: the machine may well
         # have a drive there, and reliquary simply cannot say which
-        # letter it took (P17). Only a machine mixing controller types
-        # reaches that branch now (D71), and none exists yet.
-        undetermined = platform.undetermined_letters(drives)
+        # letter it took (P17).
+        undetermined = platform.undetermined_letters(drives, volumes)
         if undetermined:
+            # **The specific cause outranks the symptom.** A disk this
+            # could not read is why the letters behind it are unknown,
+            # and naming that is more use than naming the consequence
+            # — so the first blocked disk answers for the address, in
+            # its own vocabulary and with its own id (P11). Only when
+            # nothing was blocked by a disk (a machine mixing
+            # controller types) does the symptom answer for itself.
+            blocked = [key for key in undetermined if key in unreadable]
+            if blocked:
+                rule, detail = unreadable[blocked[0]]
+                raise PreflightError(
+                    f"{address}: {detail}. Reliquary cannot say which "
+                    f"drive is {letter}: while that disk is unread, "
+                    "because its volumes are what place every letter "
+                    f"behind it. Determined letters: {known}",
+                    rule_id=rule)
             raise PreflightError(
                 f"{address}: reliquary cannot determine which drive "
                 f"is {letter}: on this machine, which mixes controller "
@@ -1471,6 +1494,7 @@ def _resolve_address(machine_id, address, context, *, directory=False):
         raise PreflightError(
             f"{address}: the machine declares no drive at {letter}:; "
             f"declared letters: {known}", rule_id="drive.letter-not-declared")
+    key, volume_index = placed
     root = drives[key].get("path")
     if root is None and drives[key].get("media") is None:
         raise PreflightError(
@@ -1489,8 +1513,108 @@ def _resolve_address(machine_id, address, context, *, directory=False):
                 f"{address} escapes drive {key}; a guest address stays "
                 "inside its own drive", rule_id="drive.address-escapes")
     else:
-        source = _at_rest_volume(state, root, key, letter, address)
+        source = _at_rest_volume(state, root, key, letter, address,
+                                 volume_index)
     return source, letter, segments, platform
+
+
+def _disk_volumes(machine_id, state, drives, context):
+    """How many volumes each hard disk holds, read on the host.
+
+    **The answer the letter map needs**, and the reason it no longer
+    assumes (D71). A directory-source disk is one volume by
+    construction — reliquary built it, and the backend presents it as
+    one FAT volume — so only an image is opened, and only for its
+    partition table.
+
+    The count is cached in the machine's own state and **cleared at
+    every start**, the same discipline a machine variable follows: a
+    guest can repartition its disk, and it can only do so while it is
+    running, so a count taken before a boot says nothing about the
+    one after it. A disk this cannot read is left out of the map
+    rather than guessed at.
+
+    Only reachable for a stopped machine, which is what makes it
+    affordable to be right: the caller is already past the
+    ``machine.must-be-stopped`` gate, so every disk is a file the host
+    may open.
+
+    Returns ``(counts, reasons)``. A disk missing from ``counts`` is
+    one whose volumes could not be read, and ``reasons`` says why in
+    the caller's own vocabulary — **the specific refusal has to
+    survive this**, because "reliquary cannot determine which drive
+    is C:" is a worse answer than "this backend cannot read a drive
+    image at rest" whenever the second is the truth (P11).
+    """
+    found = {}
+    reasons = {}
+    unrecorded = False
+    for key, drive in drives.items():
+        if drive.get("medium") != "hdd":
+            continue
+        recorded = drive.get("volumes")
+        if isinstance(recorded, int) and recorded >= 0:
+            found[key] = recorded
+            continue
+        root = drive.get("path")
+        if not root:
+            reasons[key] = ("drive.slot-empty",
+                            f"drive {key} has no realized medium")
+            continue
+        if os.path.isdir(root):
+            # A directory-source disk is one volume by construction:
+            # the backend presents the host directory as one FAT
+            # volume, and reliquary built it.
+            found[key] = 1
+        else:
+            counted, reason = _count_volumes(state, root, key)
+            if counted is None:
+                reasons[key] = reason
+                continue
+            found[key] = counted
+        drive["volumes"] = found[key]
+        unrecorded = True
+    if unrecorded:
+        # Written back so the next verb in a batch does not reopen
+        # every disk. Losing this costs a reread and never an answer.
+        state["drives"] = drives
+        _write_state(machine_id, state, context)
+    return found, reasons
+
+
+def _count_volumes(state, image_path, key):
+    """``(count, None)``, or ``(None, reason)`` when it cannot be read.
+
+    Unreadable is an answer here rather than an exception: the map
+    leaves the disk unplaced, and whether that matters depends on
+    which letter the caller actually addressed.
+    """
+    backend = state.get("backend") or "qemu"
+    try:
+        adapter = backends.adapter(backend)
+        report = adapter.capabilities()
+    except ReliquaryError as error:
+        return None, ("machine.backend-unavailable", str(error))
+    if not report.at_rest:
+        return None, (
+            "drive.no-at-rest-access",
+            f"drive {key} is a drive image, and the {backend} adapter "
+            "cannot read one at rest — give the machine a "
+            "directory-source drive for exchange, and have the guest "
+            "copy to it")
+    access = None
+    try:
+        access = adapter.open_drive(image_path)
+        return len(at_rest.Image(access.device).volumes), None
+    except (at_rest.UnreadableImage, OSError) as error:
+        return None, ("drive.image-unreadable",
+                      f"drive {key} cannot be read at rest — {error}")
+    except ReliquaryError as error:
+        return None, ("drive.image-unreadable",
+                      f"drive {key} cannot be read at rest — {error}")
+    finally:
+        if access is not None:
+            access.close()
 
 
 class _HostDirectory:
@@ -1560,13 +1684,17 @@ class _ImageVolume:
     """
 
     def __init__(self, adapter, image_path, key, letter, address,
-                 writable):
+                 writable, volume_index=0):
         self.adapter = adapter
         self.image_path = image_path
         self.key = key
         self.letter = letter
         self.address = address
         self.writable = writable
+        #: Which volume on this disk the addressed letter is. The
+        #: letter map counted the volumes to place the letter, so this
+        #: is that count's other half rather than a second guess.
+        self.volume_index = volume_index
         self._access = None
         self._image = None
         self._volume = None
@@ -1589,20 +1717,20 @@ class _ImageVolume:
         except Exception:
             self.close()
             raise
-        if len(self._image.volumes) != 1:
-            # The one place D71's assumption is checkable, so it is
-            # checked: with two volumes on one disk every letter after
-            # it is wrong, and reading *this* one would answer
-            # confidently for a drive the caller did not address.
-            count = len(self._image.volumes)
+        count = len(self._image.volumes)
+        if self.volume_index >= count:
+            # The disk changed under the count the letter map was
+            # built from. Nothing should be able to do that between
+            # the two reads — a stopped machine's disk is not moving —
+            # so this is a disagreement to report, never one to read
+            # past into whichever volume happens to be there.
             self.close()
             raise PreflightError(
-                f"{self.address}: drive {self.key} ({self.letter}:) holds "
-                f"{count} volumes, and reliquary's letter map assumes one "
-                "volume per disk — so which letter this volume took is "
-                "not something it can say. Address a directory-source drive "
-                "instead", rule_id="drive.volume-count-unsupported")
-        self._volume = self._image.volumes[0]
+                f"{self.address}: drive {self.key} ({self.letter}:) was "
+                f"placed as volume {self.volume_index + 1} of this disk "
+                f"and the disk holds {count}; the layout changed while "
+                "reliquary was reading it", rule_id="drive.volume-vanished")
+        self._volume = self._image.volumes[self.volume_index]
         return self._volume
 
     def path(self, segments):
@@ -1665,7 +1793,8 @@ class _ImageVolume:
             self._access = None
 
 
-def _at_rest_volume(state, image_path, key, letter, address):
+def _at_rest_volume(state, image_path, key, letter, address,
+                    volume_index=0):
     """The FAT volume inside a stopped machine's drive image.
 
     The capability is settled here and the image is opened later: an
@@ -1683,7 +1812,7 @@ def _at_rest_volume(state, image_path, key, letter, address):
             "the guest copy to it",
             rule_id="drive.no-at-rest-access")
     return _ImageVolume(adapter, image_path, key, letter, address,
-                        report.at_rest_write)
+                        report.at_rest_write, volume_index)
 
 
 def _writable(source, address, verb):
