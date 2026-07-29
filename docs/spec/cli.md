@@ -710,11 +710,24 @@ All five are **stopped-only**, and the addressed drive must be a
 directory-source drive: the backend snapshots that directory when
 it attaches, so a change made while the machine runs would be
 invisible to the guest and a guest write is not flushed until it
-stops. A non-directory target, or a drive letter the declared
-facts do not map, is a preflight error naming the gap (**P11**),
-raised before anything is transferred. An image drive is the
-standing instance: the QEMU adapter has no at-rest filesystem
-access, so it says so by name rather than pretending.
+stops. A non-directory target is a preflight error naming the gap
+(**P11**), raised before anything is transferred. An image drive
+is the standing instance: Reliquary has no at-rest filesystem
+access, so `drive.no-at-rest-access` says so by name rather than
+pretending, and the remedy is to give the machine a
+directory-source drive and have the guest copy to it.
+
+**The letter map places every drive**, so a directory-source drive
+is addressable wherever it sits — including behind an installed
+`C:`, which is the ordinary shape and used to be unreachable
+entirely. Floppies take `A:` and `B:` by slot; hard disks follow
+from `C:` in slot order; CD-ROMs follow the last disk. Disk
+letters rest on **one stated assumption — one volume per hard
+disk** — which is true of every disk Reliquary materializes and
+which a guest that repartitions can silently contradict; reading
+the real volume layout off the image is unbuilt. The one thing
+that still unfixes a letter is a machine mixing controller types,
+where slot order is authoritative only within a type.
 
 The plural verbs move a tree's **contents**: `put-files` places
 what is inside the host directory into the guest directory, and

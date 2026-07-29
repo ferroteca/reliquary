@@ -1417,10 +1417,15 @@ def _resolve_address(machine_id, address, context, *, directory=False):
     The whole of P17 in one function, and the one place all five file
     verbs go through: the caller writes ``A:\\FOO.TXT`` — or
     ``A:\\OUT`` for a tree, or ``A:\\`` for the drive itself — and
-    never learns which host directory backs it. Stopped-only, and a
-    drive that is not a host directory fails closed naming the gap
-    (P11) — an image drive has no in-band route until the adapter
-    grows at-rest filesystem access.
+    never learns which host directory backs it.
+
+    Stopped-only, and reachable for a **directory-source (vvfat)
+    drive** at any letter: the letter map places every disk on the
+    one-volume-per-disk assumption (D71), so an exchange drive behind
+    an installed ``C:`` is addressable where it used to be
+    unreachable. A drive image at the addressed letter is the
+    capability refusal — reliquary cannot read one at rest, and says
+    so by name rather than guessing (P11).
 
     Returns ``(host path, letter, segments, platform module)``; the
     last two are what lets a listing render its own results back as
@@ -1447,17 +1452,17 @@ def _resolve_address(machine_id, address, context, *, directory=False):
         # Two different failures wear one shape, and saying "no such
         # drive" for the second would be a lie: the machine may well
         # have a drive there, and reliquary simply cannot say which
-        # letter it took (P17). Reading volume layout off the images
-        # would let it -- that is unbuilt, not forbidden.
+        # letter it took (P17). Only a machine mixing controller types
+        # reaches that branch now (D71), and none exists yet.
         undetermined = platform.undetermined_letters(drives)
         if undetermined:
             raise PreflightError(
                 f"{address}: reliquary cannot determine which drive "
-                f"is {letter}: on this machine. Its letter depends on "
-                "how many volumes the disks before it carry, which a "
-                "blueprint does not declare and reliquary does not "
-                "yet read from the drive images. "
-                f"Determined letters: {known}. Undetermined drives: "
+                f"is {letter}: on this machine, which mixes controller "
+                "types: slot order is authoritative only within a type, "
+                "and across types the guest's firmware decides how the "
+                "controllers enumerate. "
+                f"Determined letters: {known}. Unplaceable drives: "
                 f"{', '.join(undetermined)} — address one of the "
                 "determined letters, or give the exchange drive a "
                 "floppy slot, whose letter no disk can shift",
@@ -1466,12 +1471,24 @@ def _resolve_address(machine_id, address, context, *, directory=False):
             f"{address}: the machine declares no drive at {letter}:; "
             f"declared letters: {known}", rule_id="drive.letter-not-declared")
     root = drives[key].get("path")
-    if not root or not os.path.isdir(root):
+    if root is None and drives[key].get("media") is None:
         raise PreflightError(
-            f"{address}: drive {key} ({letter}:) is an image, not a "
-            "host directory; in-band file exchange needs a "
-            "directory-source drive there",
-            rule_id="drive.not-a-host-directory")
+            f"{address}: drive {key} ({letter}:) is an empty removable "
+            "slot — insert a medium before exchanging files through it",
+            rule_id="drive.slot-empty")
+    if not root or not os.path.isdir(root):
+        # The capability, not the address: the drive is the right one
+        # and reliquary cannot read it. At-rest access to a drive image
+        # is unbuilt, so it is refused by name rather than guessed at
+        # (P11), and the gap is filed rather than implied.
+        raise PreflightError(
+            f"{address}: drive {key} ({letter}:) is a drive image, and "
+            "reliquary has no at-rest filesystem access — in-band file "
+            "exchange reaches a directory-source (vvfat) drive only. "
+            "Give the machine one for exchange, and have the guest copy "
+            f"to it; {letter}: itself needs the image reader that is "
+            "not built yet",
+            rule_id="drive.no-at-rest-access")
     resolved = os.path.abspath(os.path.join(root, *segments))
     root = os.path.abspath(root)
     if os.path.commonpath([root, resolved]) != root:

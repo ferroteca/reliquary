@@ -33,50 +33,53 @@ def _mixes_controller_types(drives):
 
 
 def drive_letters(drives):
-    """Map DOS drive letters to drive keys, from declared facts alone.
+    """Map DOS drive letters to drive keys, from declared facts and
+    **one stated assumption**.
 
     Built from reliquary's own drive assignment — each drive's medium
     and slot, which reliquary chose — and never from inspecting a
-    guest (P10). **It maps only the letters the declared facts
-    determine**, which is fewer than the drives a machine has:
+    guest (P10):
 
     - floppies take ``A:`` and ``B:`` by slot, always: DOS gives the
       floppy drives those letters whatever the disks carry;
-    - with **no hard disk** declared, CD-ROMs follow from ``C:`` in
-      slot order — nothing can shift them;
-    - with a hard disk declared, the first one is ``C:``.
+    - hard disks follow from ``C:`` in slot order;
+    - CD-ROMs follow the last disk, in slot order — ``C:`` when there
+      is no disk at all.
 
-    Nothing beyond that is mapped, and the omission is deliberate.
-    Every later letter depends on how many **volumes** the disks
-    before it carry: a disk the guest partitioned in two shifts every
-    letter after it. A blueprint declares drives, not what was made
-    of them, so reliquary has no fact to reason from and refuses
-    rather than guessing (P11, P17). The caller's fix today is to
-    address a determined drive — for in-band exchange, a floppy or
-    the first hard disk.
+    **The assumption is one volume per hard disk** (owner,
+    2026-07-28, D71), and it is what places every letter after the
+    first disk. It is not a fact: a disk the guest partitioned in two
+    shifts every letter after it, and a blueprint declares drives
+    rather than what was made of them. It is true of every disk
+    reliquary itself materializes — a blank is one volume, and a
+    payload image is what its author built — and the price of
+    refusing it was that a machine with any hard disk could not
+    address its own exchange drive at all, which is what P16 forbids
+    (D62's residue).
 
-    **Volume count is one of two things that unfix a letter; the
-    other is mixed controller types.** Slot order is authoritative
-    only within a type, and across types the guest's firmware decides
-    how the controllers themselves enumerate — so on such a machine
-    even the *first* disk is not a declared fact, and no disk letter
-    is returned. The floppies still are: DOS gives them ``A:`` and
+    **A guest that repartitions makes this silently wrong**, and that
+    is filed as a defect rather than hidden: the mapping would name
+    the wrong drive, not fail. Closing it means reading volume layout
+    off the image on the host — the partition table, and past it
+    whatever volume manager a guest layered on — which is no more
+    guest inspection than :func:`backend_qemu.probe_image_format` is.
+    What stops it today is that every layout is its own reader rather
+    than a rule.
+
+    **Mixed controller types still unfix every disk letter**, and no
+    assumption rescues them. Slot order is authoritative only within
+    a type; across types the guest's firmware decides how the
+    controllers themselves enumerate, so even the *first* disk is not
+    placeable. The floppies still are: DOS gives them ``A:`` and
     ``B:`` whatever the disks do.
-
-    **This is unimplemented, not impossible.** Volume layout can be
-    read from the drive image on the host — the partition table, and
-    past it whatever volume manager a guest layered on — which is no
-    more guest inspection than
-    :func:`backend_qemu.probe_image_format` is. Growing the mapping that
-    way is open; what stops it is that every layout is its own
-    reader, not a rule. The refusal here keeps the gap honest in the
-    meantime.
 
     What is refused permanently is a *declared* volume count in the
     blueprint (owner, 2026-07-27, D56): the guest is the source of
     truth for its own volumes, and a declaration would carry a spec's
-    authority over an assertion the guest can silently contradict —
-    worse than the assumption it replaced.
+    authority over an assertion the guest can silently contradict.
+    D71 does not reopen that — an assumption reliquary makes in its
+    own code, stated here and filed as a defect, is not a field an
+    author can assert into a document.
     """
     letters = {}
     for slot, key in sorted((drive.get("slot", 0), key)
@@ -99,17 +102,16 @@ def drive_letters(drives):
         # away means the day a second type is wired, this mapping
         # quietly starts answering a question it has no fact for.
         return letters
-    hdds = sorted((drive.get("slot", 0), key)
-                  for key, drive in drives.items()
-                  if drive.get("medium") == "hdd")
-    if hdds:
-        letters["C"] = hdds[0][1]
-        return letters
-    for ordinal, (_slot, key) in enumerate(
-            sorted((drive.get("slot", 0), key)
-                   for key, drive in drives.items()
-                   if drive.get("medium") == "cdrom")):
-        letters[chr(ord("C") + ordinal)] = key
+    ordinal = 0
+    for medium in ("hdd", "cdrom"):
+        # Disks first and then CD-ROMs, which is the order DOS itself
+        # assigns in: the disk volumes take their letters at boot and
+        # MSCDEX takes the next one after them.
+        for _slot, key in sorted((drive.get("slot", 0), key)
+                                 for key, drive in drives.items()
+                                 if drive.get("medium") == medium):
+            letters[chr(ord("C") + ordinal)] = key
+            ordinal += 1
     return letters
 
 
@@ -117,9 +119,12 @@ def undetermined_letters(drives):
     """The drive keys whose letter the declared facts do not fix.
 
     Every drive a machine declares that :func:`drive_letters` cannot
-    place. Callers use it to say *why* a letter is unavailable — the
-    machine has drives beyond the determined ones, and which letter
-    each landed on is the guest's answer, not reliquary's.
+    place. Since D71 places every disk and CD-ROM on the one-volume-per
+    -disk assumption, this is empty for every machine that exists —
+    only a machine mixing controller types has drives it cannot place,
+    and no controller but ``ide`` is wired. Callers use it to say
+    *why* a letter is unavailable, and it stays because the day a
+    second controller type lands is the day it fills again.
     """
     placed = set(drive_letters(drives).values())
     return [key for key in sorted(drives) if key not in placed]

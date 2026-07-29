@@ -376,14 +376,17 @@ Move one file across the guest boundary, addressed **the way the
 guest names it** — `A:\TEST.EXE`, not an image file or a staging
 directory. The drive-letter mapping comes from the machine's declared
 platform and Reliquary's own drive assignment; nothing is inferred by
-inspecting the guest.
+inspecting the guest. Every drive gets a letter — floppies `A:`/`B:`,
+hard disks from `C:` in slot order, CD-ROMs after them — on the stated
+assumption that each hard disk holds one volume.
 
 Both are **stopped-only**, and the addressed drive must be a
 directory-source drive: the backend snapshots that
 directory when the drive is attached, so a change made while the
 machine runs would be invisible to the guest, and a guest write is
 not flushed until it stops. An image drive has no in-band route and
-says so rather than pretending.
+says so rather than pretending, so an exchange drive is how results
+leave an installed disk.
 
 `put-file` prints the guest address it wrote; `get-file` prints the
 host path.

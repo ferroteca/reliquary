@@ -188,6 +188,98 @@ is waiting on an answer today.
 
 ## Decided
 
+- D71 — ONE VOLUME PER HARD DISK, ASSUMED AND FILED; AN IMAGE DRIVE
+  ANSWERS NO CAPABILITY — DECIDED (owner, 2026-07-28) and delivered
+  the same day. Supports U14, U20; P11, P16, P17. **Amends D56's
+  letter map** and narrows P16's standing residue in
+  [TASKS.md](TASKS.md) to the capability it actually needs, filing
+  a second defect for the assumption this entry makes.
+
+  WHAT WAS WRONG, AND IT WAS WORSE THAN THE DEFECT SAID. P16's
+  residue was filed as *an image drive has no in-band route*, which
+  described the wrong wall. The one that actually stopped people was
+  the **letter map**: with any hard disk declared, D56 placed `C:`
+  and refused every letter after it, because a disk the guest
+  partitioned in two shifts them all. So a machine with an installed
+  `C:` and a vvfat drive for exchange could not address the exchange
+  drive **either** — `drive.letter-undetermined`, on the drive
+  Reliquary itself manages and can read perfectly well. The
+  documented remedy was to give the exchange drive a floppy slot,
+  which is 1.44 MB and not a remedy.
+
+  THE ASSUMPTION, STATED RATHER THAN HIDDEN: **one volume per hard
+  disk**. Disks take letters from `C:` in slot order, CD-ROMs follow
+  them, and every drive is placed. It is true of every disk
+  Reliquary materializes — a blank is one volume, a payload image is
+  what its author built — and it is not a fact, because a guest may
+  repartition. The cost of refusing it was the whole in-band story
+  on any machine with a disk, which is what P16 forbids Reliquary to
+  require.
+
+  THE FAILURE MODE IS SILENT, AND THAT IS WHY IT IS A DEFECT AND NOT
+  A LIMIT. A guest that splits `hdd0` in two shifts every later
+  letter, and the map then names the **wrong drive** rather than
+  failing. Nothing in the addressing can catch it: only the image's
+  own partition table can, and reading that is the filed work. An
+  assumption whose violation is loud may be a documented limit; one
+  whose violation is quiet owes a defect entry, and it has one.
+
+  THIS DOES NOT REOPEN D56. What D56 refused permanently is a
+  *declared* volume count in the blueprint — an author asserting
+  into a document something the guest can silently contradict, with
+  a spec's authority behind it. An assumption Reliquary makes in its
+  own code, written into the function's docstring and filed as a
+  defect, carries no such authority and is corrigible by the reader
+  that closes it. The distinction is where the claim lives, not how
+  confident it is.
+
+  THE IMAGE DRIVE ANSWERS NO CAPABILITY, WHICH IS A DIFFERENT
+  SENTENCE FROM THE OLD ONE. `drive.not-a-host-directory` said *you
+  addressed the wrong kind of drive*; `drive.no-at-rest-access` says
+  *that is the right drive and Reliquary cannot read it*, which is
+  the honest report now that the letter resolves. It names the
+  remedy — a directory-source drive for exchange, with the guest
+  copying to it — and the id changes because the rule did (P9: the
+  old shape is deleted, not bridged).
+
+  A THIRD SENTENCE CAME OUT OF THE SAME BRANCH. An **empty
+  removable slot** was calling itself an image, and the letter map
+  now makes it reachable: a CD-ROM behind a disk used to be
+  unaddressable, so nobody met the lie. It answers `drive.slot-empty`
+  and says to insert a medium.
+
+  MIXED CONTROLLER TYPES STILL UNFIX EVERY DISK LETTER, and no
+  assumption rescues them: slot order is authoritative only within a
+  type, and across types the guest's firmware decides how the
+  controllers enumerate. `undetermined_letters` is empty for every
+  machine that exists — only `ide` is wired — and stays, because the
+  day a second type lands is the day it fills again.
+
+  P8 TRIAGE: an interface change, argued and approved. `list-files`
+  and the four transfer verbs reach drives they could not reach, two
+  ids are retired for two that say what is actually true, and U14
+  and U20 are served where they were blocked. What it costs is
+  honesty about the assumption, which is paid in the docstring, the
+  spec, and a defect entry.
+
+  FOLDED: this entry; [TASKS.md](TASKS.md) (P16's residue rewritten
+  to the at-rest reader, and the volume-enumeration defect filed
+  beside it); [platform_dos.py](../reliquary/platform_dos.py)
+  (`drive_letters` places every drive; `undetermined_letters` keeps
+  the mixed-controller case); [machines.py](../reliquary/machines.py)
+  (`drive.no-at-rest-access` and `drive.slot-empty` replace
+  `drive.not-a-host-directory`, and the undetermined-letter message
+  names controller types rather than volume counts);
+  [cli.md](../docs/spec/cli.md) and
+  [script-spec.md](../docs/spec/script-spec.md) (normative: the
+  in-band section's addressing paragraph and the letter-map clause);
+  [api-reference.md](../docs/api-reference.md),
+  [cli-reference.md](../docs/cli-reference.md) and
+  [README.md](../README.md); `test_machines.py` (the addressing
+  suite and the three in-band refusals, with the
+  exchange-drive-behind-`C:` case that used to be the refusal);
+  and the CHANGELOG's unreleased section.
+
 - D70 — THE BLUEPRINT SURFACE IS LOCATED; POSITIONS RIDE ON THE
   PARSED CONTAINERS — DECIDED (owner, 2026-07-28) and delivered the
   same day. Supports U4, U11; G6; P6, P8. Closes the small item

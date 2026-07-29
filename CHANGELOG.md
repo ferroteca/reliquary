@@ -13,6 +13,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **In-band file exchange reaches a drive at any letter.** A machine
+  with an installed `C:` and a directory-source drive for exchange
+  could not address the exchange drive at all: with any hard disk
+  declared, only `C:` was mapped and everything after it was
+  `drive.letter-undetermined`, because a disk the guest partitioned
+  in two shifts every later letter. The documented remedy was to put
+  the exchange drive in a floppy slot, which is 1.44 MB.
+
+  The letter map now places every drive — floppies at `A:`/`B:` by
+  slot, hard disks from `C:` in slot order, CD-ROMs after them — on
+  one stated assumption: **each hard disk holds one volume**. That is
+  true of every disk Reliquary materializes, and a guest that
+  repartitions can silently contradict it, so it is written into the
+  mapping's own documentation and filed as a defect rather than left
+  implied. Reading the real volume layout off the image is the work
+  that closes it.
+
+  ```powershell
+  rlq get-files "D:\OUT" .\results --machine rig-0   # the exchange disk, behind C:
+  ```
+
+
 - **A blueprint diagnostic cites a line and column.** A bad field in a
   `.rlqb` used to report the field and nothing more — `unknown media
   field: drives.hdd0.bogus`, with no hint which of the four `hdd0`
@@ -76,6 +98,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   not shipped behavior.
 
 ### Changed
+
+- **An image drive now answers "no capability" instead of "wrong kind
+  of drive".** With the letter resolving, `C:` really is the installed
+  disk and what is missing is the reader, so
+  `drive.not-a-host-directory` is retired for
+  **`drive.no-at-rest-access`**, which names the remedy: give the
+  machine a directory-source drive and have the guest copy to it.
+  At-rest access to a drive image — reading and writing a FAT volume
+  in an image while the machine is offline — stays unbuilt and stays
+  filed.
+
+  An **empty removable slot** was calling itself an image, which
+  nobody had met because such a drive was unaddressable; it now
+  answers **`drive.slot-empty`** and says to insert a medium.
 
 - **The recorded VM identity is generic, and machines carry no
   port.** A running machine's `vm` section now reads

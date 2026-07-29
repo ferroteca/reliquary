@@ -1845,11 +1845,12 @@ listings (D62) — twins `put_file` / `get_file` / `put_files` /
 the guest names it — `A:\TEST.EXE`, or `A:\OUT` and `A:\` for a
 directory, per **P17**, in force since D47, and not
 the `<drive-key>:<path>` form D5 had roughed — over a
-directory-source drive, stopped-only, with a non-vvfat target or an
-unmapped drive letter failing closed naming the gap (P11). The
+directory-source drive, stopped-only, with a non-vvfat target
+failing closed naming the gap (P11). The
 letter map is built from the machine's declared platform and
 reliquary's own drive assignment, never by inspecting a guest
-(P10). Future live guest-agent transfer would get its own
+(P10), and places every drive on the one-volume-per-disk assumption
+(D71). Future live guest-agent transfer would get its own
 distinct capability with an explicitly stronger guarantee. None of
 this lands in the *language*: the omission above stands, and
 reopening it is a language decision under the growth goals.

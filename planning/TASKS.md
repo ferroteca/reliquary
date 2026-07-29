@@ -95,21 +95,41 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **An image drive has no in-band route** (P16's residue, filed
-  with its arming — D62, 2026-07-27, per D48's bar). All five
-  in-band file verbs — `put-file` / `get-file` / `put-files` /
-  `get-files` / `list-files` — need a directory-source drive, and
-  refuse an image drive by name (`drive.not-a-host-directory`,
-  which is P11 doing its job). So a consumer whose results are on
-  an installed `C:` still has to reach around Reliquary with its
-  own image tooling, which is exactly what P16 now forbids
-  Reliquary to require. The fix is at-rest filesystem access
-  behind the adapter seam — read and write a FAT volume in a drive
-  image on the host, which is no more guest inspection than
-  reading an image's format is (P10 untouched, and the same
-  capability D56 named as the way to grow the letter map). It
+- **A drive image has no in-band route** (P16's residue, narrowed
+  by D71 to the capability it actually needs). All five in-band
+  file verbs — `put-file` / `get-file` / `put-files` /
+  `get-files` / `list-files` — reach a directory-source (vvfat)
+  drive only, and answer `drive.no-at-rest-access` for a drive
+  image, which is P11 doing its job. D71 made the *letter*
+  reachable, so the exchange-drive route works; what stays shut is
+  the disk itself, and a consumer whose results are on an
+  installed `C:` still needs the guest to copy them across.
+  **Every hard-disk image should be readable and writable while
+  the machine is offline** — which is when it is safe, the backend
+  holding no lock and the guest not running. The fix is at-rest
+  filesystem access behind the adapter seam: read and write a FAT
+  volume in a drive image on the host, which is no more guest
+  inspection than reading an image's format is (P10 untouched). It
   stays capability-honest per call: a filesystem the adapter
-  cannot read fails **by name**, never by guess. Related but not
-  this: the *letter* map's own gap (D56) is refusal for a
-  different reason, and a backend with no vvfat equivalent is the
-  second backend's.
+  cannot read fails **by name**, never by guess. DOS/FAT is the
+  delivered case to close; a backend with no vvfat equivalent is
+  the second backend's problem, not this one's.
+
+- **A hard disk is assumed to hold one volume** (D71's residue,
+  filed with the assumption per D48's bar). `platform_dos.drive_letters`
+  places disks from `C:` in slot order and CD-ROMs after them, on
+  the assumption that each disk carries exactly one volume. It is
+  true of every disk Reliquary materializes and it is not a fact:
+  a guest that repartitions `hdd0` into two volumes shifts every
+  letter after it, and the map then names **the wrong drive
+  silently** — it does not fail, which is what makes this a defect
+  rather than a stated limit. Reliquary needs a mechanism to
+  determine what volumes a hard-disk image really contains: the
+  partition table, and past it whatever volume manager the guest
+  layered on. That is host-side image reading and no more guest
+  inspection than probing an image's format is (P10 untouched),
+  and it shares its reader with the defect above. What stays
+  refused permanently is a *declared* volume count in the
+  blueprint (D56): the guest is the source of truth for its own
+  volumes, and a declaration would carry a spec's authority over
+  an assertion the guest can silently contradict.
