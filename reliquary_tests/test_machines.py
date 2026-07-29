@@ -29,7 +29,8 @@ from reliquary.machines import (apply_blueprint, create_machine,
                                 recreate_machine, resolve_machine,
                                 set_boot_order, set_machine_var,
                                 start_machine, stop_machine)
-from reliquary_tests import fake_backend
+from reliquary.backends import Capabilities
+from reliquary_tests import fake_backend, fat_image
 
 _BLANK = {"name": "blank", "materialize": "new", "size": "20M"}
 
@@ -1095,6 +1096,15 @@ class InBandFileTests(_HomeCase):
                     "location": {"local": exchange}}])
         return machine_id, exchange
 
+    #: What an installed C: holds, for the at-rest tests.
+    INSTALLED = {"AUTOEXEC.BAT": b"@ECHO OFF\r\n",
+                 "OUT": {"RESULT.LOG": b"pass\r\n"}}
+
+    def _image_rig(self):
+        """The same rig, with a real filesystem on the hard disk."""
+        self.backend.image_payload = fat_image.volume(self.INSTALLED)
+        return self._rig()
+
     def test_an_exchange_disk_behind_an_installed_c_is_addressable(self):
         # What D71 bought, and the shape P16 was failing on: results
         # live on an installed C: and the exchange drive is the second
@@ -1169,20 +1179,68 @@ class InBandFileTests(_HomeCase):
         self.assertEqual(caught.exception.rule_id, "drive.slot-empty")
         self.assertIn("cdrom0", str(caught.exception))
 
-    def test_an_image_drive_answers_no_capability(self):
-        # The letter now resolves — C: is hdd0 and reliquary says so —
-        # and what is missing is the reader, not the address (P11).
-        machine_id, _exchange = self._rig()
+    def test_an_image_drive_is_read_at_rest(self):
+        # P16's residue closing: the results are on the installed C:,
+        # the machine is stopped, and the disk is a file the host owns.
+        machine_id, _exchange = self._image_rig()
+        target = os.path.join(self.home, "got.txt")
+        self.assertEqual(
+            get_file(r"C:\OUT\RESULT.LOG", target, machine=machine_id,
+                     context=self.home), target)
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), b"pass\r\n")
+
+    def test_writing_to_an_image_drive_is_refused_by_name(self):
+        # The half that is not built: reading a FAT volume is one job
+        # and writing one back is a much less forgiving other, so the
+        # refusal names that rather than the whole capability (P11).
+        machine_id, _exchange = self._image_rig()
         source = os.path.join(self.home, "x.txt")
         with open(source, "w", encoding="ascii") as handle:
             handle.write("x")
         with self.assertRaises(PreflightError) as caught:
             put_file(source, r"C:\X.TXT", machine=machine_id,
                      context=self.home)
+        self.assertEqual(caught.exception.rule_id, "drive.no-at-rest-write")
+        self.assertIn("does not write one", str(caught.exception))
+
+    def test_a_backend_that_cannot_flatten_its_images_says_so(self):
+        # Capability honesty at the seam: an adapter reporting no
+        # at-rest access is refused before anything is copied, and the
+        # message names the backend (P11).
+        with fake_backend.installed(capabilities=Capabilities(
+                backend="qemu",
+                control_planes=("agentless-display",),
+                media=("floppy", "hdd", "cdrom"),
+                controllers=("ide",),
+                materialize=("new", "difference", "copy", "use"),
+                vvfat=True)) as adapter:
+            adapter.image_payload = fat_image.volume({"A.TXT": b"a"})
+            machine_id = self._create(
+                "opaque", {"platform": "dos", "drives": {"hdd0": "blank"}},
+                media=[_BLANK])
+            with self.assertRaises(PreflightError) as caught:
+                list_files("C:\\", machine=machine_id, context=self.home)
         self.assertEqual(caught.exception.rule_id, "drive.no-at-rest-access")
-        message = str(caught.exception)
-        self.assertIn("hdd0", message)
-        self.assertIn("no at-rest filesystem access", message)
+        self.assertIn("qemu", str(caught.exception))
+
+    def test_a_disk_holding_two_volumes_refuses_rather_than_picking(self):
+        # The one place D71's assumption is checkable. Two volumes on
+        # one disk means every letter after it is wrong, so answering
+        # for either would be confident and unfounded.
+        self.backend.image_payload = fat_image.partitioned([
+            fat_image.volume({"ONE.TXT": b"1"}, bits=16, sectors=20000,
+                             per_cluster=4),
+            fat_image.volume({"TWO.TXT": b"2"}, bits=16, sectors=20000,
+                             per_cluster=4)])
+        machine_id = self._create(
+            "two-volumes", {"platform": "dos", "drives": {"hdd0": "blank"}},
+            media=[_BLANK])
+        with self.assertRaises(PreflightError) as caught:
+            list_files("C:\\", machine=machine_id, context=self.home)
+        self.assertEqual(caught.exception.rule_id,
+                         "drive.volume-count-unsupported")
+        self.assertIn("2 volumes", str(caught.exception))
 
     def test_an_undeclared_letter_names_the_ones_that_exist(self):
         machine_id, _exchange = self._rig()
@@ -1341,24 +1399,36 @@ class InBandDirectoryTests(_HomeCase):
             list_files("A:\\", machine=machine_id, context=self.home)
         self.assertIn("must be stopped", str(caught.exception))
 
-    def test_an_image_drive_answers_no_capability(self):
-        # The standing P16 residue, narrowed by D71 to the reader it
-        # actually needs: the letter resolves and the image cannot be
-        # read at rest, so all three say so by name (P11).
+    def test_an_image_drive_lists_and_retrieves_at_rest(self):
+        # The two read verbs over a drive image, in guest terms: the
+        # listing's addresses are what get-files takes back.
+        self.backend.image_payload = fat_image.volume(
+            {"AUTOEXEC.BAT": b"@ECHO OFF\r\n",
+             "OUT": {"RESULT.LOG": b"pass\r\n"}})
         machine_id, _exchange = self._rig()
-        for call in (
-                lambda: list_files("C:\\", machine=machine_id,
-                                   context=self.home),
-                lambda: get_files("C:\\", os.path.join(self.home, "out"),
-                                  machine=machine_id, context=self.home),
-                lambda: put_files(self.home, "C:\\", machine=machine_id,
-                                  context=self.home)):
-            with self.assertRaises(PreflightError) as caught:
-                call()
-            self.assertEqual(caught.exception.rule_id,
-                             "drive.no-at-rest-access")
-            self.assertIn("no at-rest filesystem access",
-                          str(caught.exception))
+        listed = list_files("C:\\", machine=machine_id, context=self.home)
+        self.assertEqual([entry["address"] for entry in listed],
+                         [r"C:\AUTOEXEC.BAT", r"C:\OUT"])
+        self.assertEqual(listed[0]["size"], 11)
+        self.assertIsNone(listed[1]["size"])
+        deep = list_files("C:\\", recursive=True, machine=machine_id,
+                          context=self.home)
+        self.assertIn(r"C:\OUT\RESULT.LOG",
+                      [entry["address"] for entry in deep])
+        out = os.path.join(self.home, "retrieved")
+        written = get_files("C:\\", out, machine=machine_id,
+                            context=self.home)
+        self.assertEqual(
+            sorted(os.path.relpath(path, out) for path in written),
+            ["AUTOEXEC.BAT", os.path.join("OUT", "RESULT.LOG")])
+
+    def test_writing_a_tree_to_an_image_drive_is_refused_by_name(self):
+        self.backend.image_payload = fat_image.volume({"A.TXT": b"a"})
+        machine_id, _exchange = self._rig()
+        with self.assertRaises(PreflightError) as caught:
+            put_files(self.home, "C:\\", machine=machine_id,
+                      context=self.home)
+        self.assertEqual(caught.exception.rule_id, "drive.no-at-rest-write")
 
     def test_a_missing_host_directory_fails_closed(self):
         machine_id, _exchange = self._rig()

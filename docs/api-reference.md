@@ -186,13 +186,16 @@ inspecting a guest — and places every drive: floppies at `A:`/`B:`
 by slot, hard disks from `C:` in slot order, CD-ROMs after them.
 Disk letters rest on one stated assumption, **one volume per hard
 disk**, which a guest that repartitions can silently contradict.
-All five are **stopped-only**, and the addressed drive must be a
-directory-source drive: the
-backend snapshots that directory at attach, so a put made while the
-machine runs would be invisible and a guest write is not flushed
-until it stops. Anything else raises `PreflightError` naming the gap
-— an image drive included, which answers `drive.no-at-rest-access`
-until an adapter grows at-rest filesystem access.
+All five are **stopped-only**: the backend snapshots a
+directory-source drive at attach, so a put made while the machine
+runs would be invisible and a guest write is not flushed until it
+stops — and a drive image can only be read safely once nothing
+holds it open. `list_files`, `get_file` and `get_files` reach
+either kind of drive, mounting the image and reading its FAT
+volume where there is no host directory. `put_file` and
+`put_files` need a directory-source drive and raise
+`PreflightError` (`drive.no-at-rest-write`) against an image:
+writing a FAT volume back is unbuilt.
 
 The plural verbs move a tree's contents rather than nesting the
 source inside the destination, which is the only shape a drive root

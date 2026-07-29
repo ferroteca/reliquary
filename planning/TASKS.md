@@ -95,35 +95,26 @@ against a **shipped spec** is the same class and sits here too —
 where `docs/spec/` and the code disagree the spec is right and the
 code has the bug, so the norm is already the demand.
 
-- **A drive image has no in-band route** (P16's residue, narrowed
-  by D71 to the capability it actually needs). All five in-band
-  file verbs — `put-file` / `get-file` / `put-files` /
-  `get-files` / `list-files` — reach a directory-source (vvfat)
-  drive only, and answer `drive.no-at-rest-access` for a drive
-  image, which is P11 doing its job. D71 made the *letter*
-  reachable, so the exchange-drive route works; what stays shut is
-  the disk itself, and a consumer whose results are on an
-  installed `C:` still needs the guest to copy them across.
-  **Every hard-disk image should be readable and writable while
-  the machine is offline** — which is when it is safe, the backend
-  holding no lock and the guest not running. The fix is at-rest
-  filesystem access behind the adapter seam: **mount the drive
-  image on the host and interrogate it** — the partition table,
-  and past it the FAT volume — which is no more guest inspection
-  than reading an image's format is (P10's read-on-the-host
-  source). It stays capability-honest per call: a filesystem the
-  adapter cannot read fails **by name**, never by guess. DOS/FAT
-  is the delivered case to close; a backend with no vvfat
-  equivalent is the second backend's problem, not this one's.
+- **A drive image is read at rest but never written** (what is
+  left of P16's residue after D73). `list-files`, `get-file` and
+  `get-files` reach an installed `C:` now — the host mounts the
+  image and reads the FAT volume in it — so results leave a disk
+  without the guest's help, which is what P16 was failing on.
+  `put-file` and `put-files` still answer
+  `drive.no-at-rest-write`, and that is P11 doing its job rather
+  than a shape anyone wants.
 
-  **This is the general solution, and it subsumes the entry
-  below** (owner, 2026-07-28). One reader mounting the image
-  answers both questions — what volumes are on the disk, and what
-  files are in them — offline, with no guest running and nothing
-  to ask. The guest probe that ships today is the partial answer:
-  it needs a booted guest, it binds only the drives Reliquary can
-  already write to, and it is bounded by the boot it was taken in.
-  Whoever picks this up closes both.
+  **Writing is the harder half and was split on purpose** (D73):
+  free-cluster search, chain building, directory growth, and two
+  FAT copies to keep identical — where a reader that is wrong
+  reports nonsense and a writer that is wrong corrupts a disk the
+  user cannot rebuild. Closing it means the same seam in reverse,
+  with the same per-call honesty: a filesystem the adapter cannot
+  write fails **by name**, never by guess. It also wants the write
+  to be crash-safe, since the machine's disk is the only copy.
+  DOS/FAT is the delivered case; a backend that cannot flatten its
+  own format already answers `drive.no-at-rest-access` and stays
+  the second backend's problem.
 
 - **A hard disk is assumed to hold one volume** (D71's residue,
   filed with the assumption per D48's bar). `platform_dos.drive_letters`
@@ -136,17 +127,18 @@ code has the bug, so the norm is already the demand.
   rather than a stated limit — and, since P10 was sharpened, an
   outright violation of it: assuming is guessing.
 
-  **Partly answered already, and the rest wants the reader
-  above.** `determine-drive-letters` asks a booted guest which
-  letters it has and binds the directory-source drives exactly
-  (D73), so an address against one of those is observed rather
-  than assumed. What stays assumed is every letter the probe did
-  not bind — an image drive's, and any letter on a machine that
-  was never probed — and the durable fix is the same host-side
-  reader the defect above needs: mount the image, read the
-  partition table, and past it whatever volume manager the guest
-  layered on. That answers offline, for every disk, with no boot
-  required. What stays refused permanently is a *declared* volume
+  **The reader that answers it now exists, and is not wired to
+  it** (D73). `at_rest.Image` enumerates the volumes in a drive
+  image, and the file verbs already refuse
+  (`drive.volume-count-unsupported`) when a disk they were sent to
+  holds more than one — so the wrong-drive case is caught at the
+  one place it is reachable today. What is missing is the *map*
+  consulting it, and the reason is cost: resolving one address
+  would mean flattening every disk on the machine, where today it
+  flattens at most the one addressed. Whoever closes this decides
+  where that answer is cached — the natural home is the machine's
+  own state, recorded when a disk is materialized or adopted and
+  invalidated with it. What stays refused permanently is a *declared* volume
   count in the blueprint (D56): the guest is the source of truth
   for its own volumes, and a declaration would carry a spec's
   authority over an assertion the guest can silently contradict.

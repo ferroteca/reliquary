@@ -13,6 +13,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Results come off an installed disk directly.** `list-files`,
+  `get-file` and `get-files` now read a **drive image** while the
+  machine is stopped: the host mounts the disk, reads the partition
+  table and the FAT volume behind it, and hands the files back in the
+  guest's own terms. A consumer whose output landed on an installed
+  `C:` no longer has to reach around Reliquary with its own image
+  tooling — which is what P16 forbids Reliquary to require.
+
+  ```powershell
+  rlq get-files "C:\OUT" .\results --machine rig-0   # the installed disk
+  ```
+
+  FAT12, FAT16 and FAT32 are read, partitionless or behind an MBR,
+  logical drives in an extended partition included. Turning a
+  backend's own format into raw bytes is the adapter's job — QEMU
+  uses `qemu-img convert`, which resolves a differencing image's
+  whole backing chain and costs a temporary flattened copy for the
+  duration of the call.
+
+  **Writing into an image is not built**, and says so:
+  `put-file` and `put-files` answer `drive.no-at-rest-write` and
+  point at a directory-source drive. Reading a FAT volume and
+  writing one back are not the same job — a reader that is wrong
+  reports nonsense, and a writer that is wrong corrupts a disk you
+  cannot rebuild — so the halves shipped separately and the second
+  stays filed.
+
+  Three more refusals name themselves rather than answering as
+  though a drive were empty: `drive.no-at-rest-access` (the backend
+  cannot flatten its own image format), `drive.image-unreadable`
+  (the image or its filesystem is not one this build reads), and
+  `drive.volume-count-unsupported` (the disk holds more than one
+  volume, so the drive-letter map is wrong about it and reading
+  either would answer for a drive you did not address).
+
 - **In-band file exchange reaches a drive at any letter.** A machine
   with an installed `C:` and a directory-source drive for exchange
   could not address the exchange drive at all: with any hard disk

@@ -83,6 +83,12 @@ class Capabilities:
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
     vvfat: bool = False
+    #: Whether the adapter can hand back a drive image as raw bytes,
+    #: which is what at-rest reading of a stopped machine's disk
+    #: needs. Reported rather than assumed: an adapter whose format
+    #: nothing can flatten says so, and the file verbs refuse by name
+    #: instead of guessing at the drive's contents (P11).
+    at_rest: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -178,6 +184,22 @@ class BackendAdapter:
         so an adapter whose whole machine *is* that directory (QEMU)
         has nothing to do here.
         """
+
+    def raw_image(self, path, workspace):
+        """The drive image at ``path`` as raw bytes, for reading at rest.
+
+        Returns a path to a raw image: ``path`` itself when the
+        adapter's format already is raw, or a flattened copy inside
+        ``workspace``, which the caller owns and removes. The native
+        format is the adapter's choice (P12's twin at this seam), so
+        undoing it is the adapter's job and the portable FAT reader
+        above never learns what qcow2 is.
+
+        Only called for a **stopped** machine: a running backend may
+        hold the image open, and a copy taken under it would be a
+        torn one.
+        """
+        raise NotImplementedError
 
     # -- start, stop, liveness ------------------------------------
 

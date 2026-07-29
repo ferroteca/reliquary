@@ -289,14 +289,17 @@ class EveryDiagnosticNamesItsRuleTests(unittest.TestCase):
     #: is no rule a caller could act on. `RunCancelled` is not an error
     #: at all but an outcome. `_PropertyUnbound` is a private signal the
     #: statement dispatcher always catches and restates, and
-    #: `_Unreadable` is the same idiom in the JSONC position scanner:
+    #: `UnreadableImage` is the at-rest reader saying it cannot read
+    #: this image, always caught at the drive seam and restated as the
+    #: capability refusal the user sees. `_Unreadable` is the same
+    #: idiom in the JSONC position scanner:
     #: it means "stop recording positions here", is caught by the scan
     #: that started it, and reports to nobody — the document itself has
     #: already been judged by `json.loads`. A bare `NotImplementedError`
     #: is the abstract-method idiom, an invariant the language enforces
     #: rather than a report to anyone.
     EXEMPT = {"InternalError", "RunCancelled", "_PropertyUnbound",
-              "_Unreadable", "NotImplementedError"}
+              "_Unreadable", "UnreadableImage", "NotImplementedError"}
 
     #: Helpers that *return* a diagnostic for a caller to raise. The id
     #: lives at the construction, so the raise site has none to give —

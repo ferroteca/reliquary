@@ -8,8 +8,10 @@ import json
 import os
 import re
 import shutil
+import tempfile
 from datetime import datetime, timezone
 
+from . import at_rest
 from . import backends
 from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
@@ -1476,31 +1478,183 @@ def _resolve_address(machine_id, address, context, *, directory=False):
             f"{address}: drive {key} ({letter}:) is an empty removable "
             "slot — insert a medium before exchanging files through it",
             rule_id="drive.slot-empty")
-    if not root or not os.path.isdir(root):
-        # The capability, not the address: the drive is the right one
-        # and reliquary cannot read it. At-rest access to a drive image
-        # is unbuilt, so it is refused by name rather than guessed at
-        # (P11), and the gap is filed rather than implied.
+    if not root:
+        raise PreflightError(
+            f"{address}: drive {key} ({letter}:) has no realized medium "
+            "to exchange files through", rule_id="drive.slot-empty")
+    if os.path.isdir(root):
+        source = _HostDirectory(os.path.abspath(root))
+        resolved = source.path(segments)
+        if os.path.commonpath([source.root, resolved]) != source.root:
+            raise PreflightError(
+                f"{address} escapes drive {key}; a guest address stays "
+                "inside its own drive", rule_id="drive.address-escapes")
+    else:
+        source = _at_rest_volume(state, root, key, letter, address)
+    return source, letter, segments, platform
+
+
+class _HostDirectory:
+    """A directory-source (vvfat) drive: the host directory *is* it.
+
+    Readable and writable, because the backend snapshots the
+    directory at attach and flushes the guest's writes back to it —
+    which is why every in-band verb is stopped-only.
+    """
+
+    writable = True
+
+    def __init__(self, root):
+        self.root = root
+
+    def path(self, segments):
+        return os.path.abspath(os.path.join(self.root, *segments))
+
+    def kind(self, segments):
+        here = self.path(segments)
+        if os.path.isdir(here):
+            return "directory"
+        return "file" if os.path.isfile(here) else None
+
+    def entries(self, segments):
+        base = self.path(segments)
+        found = []
+        for name in sorted(os.listdir(base)):
+            here = os.path.join(base, name)
+            is_directory = os.path.isdir(here)
+            found.append((name, is_directory,
+                          None if is_directory else os.path.getsize(here)))
+        return found
+
+    def copy_out(self, segments, destination):
+        shutil.copyfile(self.path(segments), destination)
+
+    def close(self):
+        pass
+
+
+class _ImageVolume:
+    """A drive image, read where it lies: the FAT volume inside it.
+
+    **Read-only**, which is the honest half of at-rest access. Listing
+    and retrieval need only a reader; writing a FAT volume back needs
+    free-cluster search, chain building, directory growth and two FAT
+    copies kept identical, and a bug there corrupts a disk the user
+    cannot rebuild. So the write verbs refuse by name here rather than
+    landing half-built (P11), and the rest stays filed.
+
+    **Opened lazily**, because flattening a disk is not free: a verb
+    that turns out to be a write, or an address that turns out to be
+    malformed, should cost nothing. The capability is still settled
+    eagerly -- that refusal is the one a caller most needs early.
+    """
+
+    writable = False
+
+    def __init__(self, adapter, image_path, key, letter, address):
+        self.adapter = adapter
+        self.image_path = image_path
+        self.key = key
+        self.letter = letter
+        self.address = address
+        self._image = None
+        self._volume = None
+        self._workspace = None
+
+    def _opened(self):
+        if self._volume is not None:
+            return self._volume
+        self._workspace = tempfile.mkdtemp(prefix="rlq-at-rest-")
+        try:
+            raw = self.adapter.raw_image(self.image_path, self._workspace)
+            self._image = at_rest.Image(raw)
+        except (at_rest.UnreadableImage, OSError) as error:
+            self.close()
+            raise PreflightError(
+                f"{self.address}: drive {self.key} ({self.letter}:) cannot "
+                f"be read at rest — {error}",
+                rule_id="drive.image-unreadable") from error
+        except Exception:
+            self.close()
+            raise
+        if len(self._image.volumes) != 1:
+            # The one place D71's assumption is checkable, so it is
+            # checked: with two volumes on one disk every letter after
+            # it is wrong, and reading *this* one would answer
+            # confidently for a drive the caller did not address.
+            count = len(self._image.volumes)
+            self.close()
+            raise PreflightError(
+                f"{self.address}: drive {self.key} ({self.letter}:) holds "
+                f"{count} volumes, and reliquary's letter map assumes one "
+                "volume per disk — so which letter this volume took is "
+                "not something it can say. Address a directory-source drive "
+                "instead", rule_id="drive.volume-count-unsupported")
+        self._volume = self._image.volumes[0]
+        return self._volume
+
+    def path(self, segments):
+        del segments
+        raise InternalError(
+            "a drive image has no host path to hand out; the write "
+            "refusal is meant to have fired before this")
+
+    def kind(self, segments):
+        return self._opened().kind(segments)
+
+    def entries(self, segments):
+        return self._guarded(self._opened().entries, segments)
+
+    def copy_out(self, segments, destination):
+        self._guarded(self._opened().copy_to, segments, destination)
+
+    def _guarded(self, call, *arguments):
+        """Restate a reader complaint as the refusal a caller sees."""
+        try:
+            return call(*arguments)
+        except at_rest.UnreadableImage as error:
+            raise PreflightError(
+                f"{self.address}: {error}",
+                rule_id="drive.image-unreadable") from error
+
+    def close(self):
+        if self._image is not None:
+            self._image.close()
+            self._image = None
+        if self._workspace:
+            shutil.rmtree(self._workspace, ignore_errors=True)
+            self._workspace = None
+
+
+def _at_rest_volume(state, image_path, key, letter, address):
+    """The FAT volume inside a stopped machine's drive image.
+
+    The capability is settled here and the image is opened later: an
+    adapter that cannot flatten its own format says so before anything
+    is copied, which is the refusal a caller acts on (P11).
+    """
+    backend = state.get("backend") or "qemu"
+    adapter = backends.adapter(backend)
+    if not adapter.capabilities().at_rest:
         raise PreflightError(
             f"{address}: drive {key} ({letter}:) is a drive image, and "
-            "reliquary has no at-rest filesystem access — in-band file "
-            "exchange reaches a directory-source (vvfat) drive only. "
-            "Give the machine one for exchange, and have the guest copy "
-            f"to it; {letter}: itself needs the image reader that is "
-            "not built yet",
+            f"the {backend} adapter cannot read one at rest — give the "
+            "machine a directory-source drive for exchange, and have "
+            "the guest copy to it",
             rule_id="drive.no-at-rest-access")
-    resolved = os.path.abspath(os.path.join(root, *segments))
-    root = os.path.abspath(root)
-    if os.path.commonpath([root, resolved]) != root:
-        raise PreflightError(
-            f"{address} escapes drive {key}; a guest address stays "
-            "inside its own drive", rule_id="drive.address-escapes")
-    return resolved, letter, segments, platform
+    return _ImageVolume(adapter, image_path, key, letter, address)
 
 
-def _host_path(machine_id, address, context):
-    """The host path behind a guest **file** address."""
-    return _resolve_address(machine_id, address, context)[0]
+def _writable(source, address, verb):
+    """Refuse a write against a drive reliquary can only read."""
+    if source.writable:
+        return source
+    source.close()
+    raise PreflightError(
+        f"{address}: {verb} needs a directory-source (vvfat) drive — "
+        "reliquary reads a drive image at rest but does not write one, "
+        "so put a file where the guest can fetch it instead",
+        rule_id="drive.no-at-rest-write")
 
 
 def _guest_directory(machine_id, address, context, *, must_exist=True):
@@ -1513,20 +1667,24 @@ def _guest_directory(machine_id, address, context, *, must_exist=True):
     address names, and the plural verb would be arbitrary for
     refusing to.
     """
-    resolved, letter, segments, platform = _resolve_address(
+    source, letter, segments, platform = _resolve_address(
         machine_id, address, context, directory=True)
-    if os.path.isfile(resolved):
+    found = source.kind(segments)
+    if found == "file":
+        source.close()
         raise PreflightError(
             f"{address} is a file, not a directory; address its "
             "directory, or use get-file for the file itself",
             rule_id="drive.address-not-a-directory")
-    if not os.path.isdir(resolved):
+    if found is None:
         if must_exist:
+            source.close()
             raise PreflightError(
                 f"the guest has no directory at {address}",
                 rule_id="drive.guest-directory-missing")
-        os.makedirs(resolved)
-    return resolved, letter, segments, platform
+        _writable(source, address, "creating a guest directory")
+        os.makedirs(source.path(segments))
+    return source, letter, segments, platform
 
 
 def put_file(source, destination, *, machine=None, blueprint=None,
@@ -1545,9 +1703,15 @@ def put_file(source, destination, *, machine=None, blueprint=None,
         raise PreflightError(f"no such file: {origin}",
             rule_id="media.file-missing")
     with _machine_lock(machine_id, context):
-        target = _host_path(machine_id, destination, context)
-        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-        shutil.copyfile(origin, target)
+        source_drive, _letter, segments, _platform = _resolve_address(
+            machine_id, destination, context)
+        _writable(source_drive, destination, "put-file")
+        try:
+            target = source_drive.path(segments)
+            os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+            shutil.copyfile(origin, target)
+        finally:
+            source_drive.close()
     return destination
 
 
@@ -1564,26 +1728,28 @@ def get_file(source, destination, *, machine=None, blueprint=None,
         machine=machine, blueprint=blueprint, context=context)
     target = os.path.abspath(os.fspath(destination))
     with _machine_lock(machine_id, context):
-        origin = _host_path(machine_id, source, context)
-        if not os.path.isfile(origin):
-            raise PreflightError(
-                f"the guest has no file at {source}",
-                rule_id="drive.guest-file-missing")
-        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-        shutil.copyfile(origin, target)
+        drive, _letter, segments, _platform = _resolve_address(
+            machine_id, source, context)
+        try:
+            if drive.kind(segments) != "file":
+                raise PreflightError(
+                    f"the guest has no file at {source}",
+                    rule_id="drive.guest-file-missing")
+            os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+            drive.copy_out(segments, target)
+        finally:
+            drive.close()
     return target
 
 
-def _entries(root, letter, segments, platform, recursive):
+def _entries(drive, letter, segments, platform, recursive):
     """The listing under one guest directory, sorted by address."""
     found = []
-    pending = [(root, list(segments))]
+    pending = [list(segments)]
     while pending:
-        directory, prefix = pending.pop()
-        for name in sorted(os.listdir(directory)):
-            path = os.path.join(directory, name)
+        prefix = pending.pop()
+        for name, is_directory, size in drive.entries(prefix):
             here = prefix + [name]
-            is_directory = os.path.isdir(path)
             found.append({
                 "address": platform.join_address(letter, here),
                 "name": name,
@@ -1592,10 +1758,10 @@ def _entries(root, letter, segments, platform, recursive):
                 # report, so it is null rather than a host number
                 # dressed as a guest fact. Every entry keeps the same
                 # four fields either way (P7).
-                "size": None if is_directory else os.path.getsize(path),
+                "size": None if is_directory else size,
             })
             if is_directory and recursive:
-                pending.append((path, here))
+                pending.append(here)
     return sorted(found, key=lambda entry: entry["address"])
 
 
@@ -1618,9 +1784,12 @@ def list_files(address, *, recursive=False, machine=None, blueprint=None,
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
     with _machine_lock(machine_id, context):
-        root, letter, segments, platform = _guest_directory(
+        drive, letter, segments, platform = _guest_directory(
             machine_id, address, context)
-        return _entries(root, letter, segments, platform, recursive)
+        try:
+            return _entries(drive, letter, segments, platform, recursive)
+        finally:
+            drive.close()
 
 
 def put_files(source, destination, *, machine=None, blueprint=None,
@@ -1645,19 +1814,23 @@ def put_files(source, destination, *, machine=None, blueprint=None,
             rule_id="drive.host-directory-missing")
     written = []
     with _machine_lock(machine_id, context):
-        root, letter, segments, platform = _guest_directory(
+        drive, letter, segments, platform = _guest_directory(
             machine_id, destination, context, must_exist=False)
-        for directory, _subdirectories, files in os.walk(origin):
-            relative = os.path.relpath(directory, origin)
-            parts = ([] if relative == os.curdir
-                     else relative.split(os.sep))
-            target = os.path.join(root, *parts)
-            os.makedirs(target, exist_ok=True)
-            for name in sorted(files):
-                shutil.copyfile(os.path.join(directory, name),
-                                os.path.join(target, name))
-                written.append(
-                    platform.join_address(letter, segments + parts + [name]))
+        _writable(drive, destination, "put-files")
+        try:
+            for directory, _subdirectories, files in os.walk(origin):
+                relative = os.path.relpath(directory, origin)
+                parts = ([] if relative == os.curdir
+                         else relative.split(os.sep))
+                target = drive.path(segments + parts)
+                os.makedirs(target, exist_ok=True)
+                for name in sorted(files):
+                    shutil.copyfile(os.path.join(directory, name),
+                                    os.path.join(target, name))
+                    written.append(platform.join_address(
+                        letter, segments + parts + [name]))
+        finally:
+            drive.close()
     return sorted(written)
 
 
@@ -1682,17 +1855,22 @@ def get_files(source, destination, *, machine=None, blueprint=None,
             rule_id="drive.host-destination-not-a-directory")
     written = []
     with _machine_lock(machine_id, context):
-        root, _letter, _segments, _platform = _guest_directory(
+        drive, _letter, segments, _platform = _guest_directory(
             machine_id, source, context)
-        for directory, _subdirectories, files in os.walk(root):
-            relative = os.path.relpath(directory, root)
-            here = (target if relative == os.curdir
-                    else os.path.join(target, relative))
-            os.makedirs(here, exist_ok=True)
-            for name in sorted(files):
-                path = os.path.join(here, name)
-                shutil.copyfile(os.path.join(directory, name), path)
-                written.append(path)
+        try:
+            pending = [(list(segments), target)]
+            while pending:
+                here, destination_here = pending.pop()
+                os.makedirs(destination_here, exist_ok=True)
+                for name, is_directory, _size in drive.entries(here):
+                    path = os.path.join(destination_here, name)
+                    if is_directory:
+                        pending.append((here + [name], path))
+                        continue
+                    drive.copy_out(here + [name], path)
+                    written.append(path)
+        finally:
+            drive.close()
     return sorted(written)
 
 

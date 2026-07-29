@@ -557,12 +557,14 @@ the guest names it, never a host image path. One file moves with
 `get-files`, whose addresses name a directory the same way (`A:\` is
 the drive itself); `list-files` says what is over there, printing
 addresses the other four accept. All of them work while the machine is
-stopped, over a directory-source drive at whatever letter it lands on —
-including behind an installed `C:`; the
-backend snapshots that directory at attach, so a stopped machine is
-what makes a put visible and a guest write flushed. A drive *image*
-has no in-band route yet and says so rather than pretending, so an
-exchange drive is how results leave an installed disk.
+stopped, at whatever letter the drive lands on — including behind an
+installed `C:`. Over a directory-source drive the backend snapshots
+that directory at attach, so a stopped machine is what makes a put
+visible and a guest write flushed; over a **drive image** Reliquary
+mounts the disk on the host and reads the filesystem inside it, so
+results leave an installed `C:` with no guest running. Writing back
+into an image is not built yet, and says so rather than
+pretending.
 
 When a reboot per round costs too much, swap the medium instead:
 `insert-media --file` mounts an image you built, live, and ejecting

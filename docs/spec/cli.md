@@ -710,12 +710,21 @@ All five are **stopped-only**, and the addressed drive must be a
 directory-source drive: the backend snapshots that directory when
 it attaches, so a change made while the machine runs would be
 invisible to the guest and a guest write is not flushed until it
-stops. A non-directory target is a preflight error naming the gap
-(**P11**), raised before anything is transferred. An image drive
-is the standing instance: Reliquary has no at-rest filesystem
-access, so `drive.no-at-rest-access` says so by name rather than
-pretending, and the remedy is to give the machine a
-directory-source drive and have the guest copy to it.
+stops. A **drive image is read at rest**: with the machine
+stopped its disk is a file the host owns, so `list-files`,
+`get-file` and `get-files` reach an installed `C:` by mounting the
+image and reading the FAT volume in it — no guest, no boot, and
+no reaching around Reliquary. `put-file` and `put-files` do
+**not**: writing a FAT volume back is unbuilt, and
+`drive.no-at-rest-write` says so by name, the remedy being a
+directory-source drive the guest fetches from. A backend that
+cannot flatten its own image format answers
+`drive.no-at-rest-access`; a filesystem this build cannot read
+answers `drive.image-unreadable`; and a disk holding more than one
+volume answers `drive.volume-count-unsupported`, because the
+letter map assumes one volume per disk and reading either would
+answer for a drive the caller did not address. Every one of them
+is raised before anything is transferred (**P11**).
 
 **The letter map places every drive**, so a directory-source drive
 is addressable wherever it sits — including behind an installed

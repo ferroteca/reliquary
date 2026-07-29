@@ -54,10 +54,16 @@ class FakeAdapter(BackendAdapter):
     """An adapter that materializes nothing and launches nothing."""
 
     def __init__(self, name="qemu", *, available=True,
-                 capabilities=None, extension=".qcow2"):
+                 capabilities=None, extension=".qcow2",
+                 image_payload=None):
         self.name = name
         self.available = available
         self.extension = extension
+        #: Bytes to lay down when a per-machine image is created, so a
+        #: test can give a machine a disk that really holds a
+        #: filesystem. ``None`` keeps the old behaviour: the image is
+        #: recorded and no file appears.
+        self.image_payload = image_payload
         self.report = capabilities or Capabilities(
             backend=name,
             control_planes=("agentless-display",),
@@ -65,6 +71,7 @@ class FakeAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
+            at_rest=True,
         )
         self.images = []
         self.starts = []
@@ -97,7 +104,16 @@ class FakeAdapter(BackendAdapter):
 
     def create_image(self, path, *, mode, size=None, base=None):
         self.images.append((path, mode, size, base))
+        if self.image_payload is not None:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            with open(path, "wb") as handle:
+                handle.write(self.image_payload)
         return path
+
+    def raw_image(self, path, workspace):
+        """The fake's images are already raw, so they are read in place."""
+        del workspace
+        return os.path.abspath(os.fspath(path))
 
     def dispose(self, machine_dir):
         self.disposed.append(machine_dir)

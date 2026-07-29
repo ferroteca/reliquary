@@ -380,13 +380,15 @@ inspecting the guest. Every drive gets a letter — floppies `A:`/`B:`,
 hard disks from `C:` in slot order, CD-ROMs after them — on the stated
 assumption that each hard disk holds one volume.
 
-Both are **stopped-only**, and the addressed drive must be a
-directory-source drive: the backend snapshots that
-directory when the drive is attached, so a change made while the
-machine runs would be invisible to the guest, and a guest write is
-not flushed until it stops. An image drive has no in-band route and
-says so rather than pretending, so an exchange drive is how results
-leave an installed disk.
+Both are **stopped-only**: the backend snapshots a
+directory-source drive when it is attached, so a change made while
+the machine runs would be invisible to the guest and a guest write
+is not flushed until it stops — and a drive image is only safe to
+read once nothing holds it open. `get-file` reads either kind,
+mounting the image and reading its FAT volume where there is no
+host directory, so results leave an installed `C:` directly.
+`put-file` needs a directory-source drive and says so by name:
+writing a FAT volume back is unbuilt.
 
 `put-file` prints the guest address it wrote; `get-file` prints the
 host path.

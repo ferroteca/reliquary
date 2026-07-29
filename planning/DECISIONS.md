@@ -188,6 +188,104 @@ is waiting on an answer today.
 
 ## Decided
 
+- D73 — A DRIVE IMAGE IS READ AT REST; THE WRITE HALF IS SPLIT OFF
+  AND FILED — DECIDED (owner, 2026-07-28) and delivered the same
+  day. Supports U14, U20; P10, P11, P12, P16, P17. Closes the
+  reading half of P16's standing residue in [TASKS.md](TASKS.md),
+  and lands on the principle D72 sharpened rather than against the
+  one it replaced.
+
+  WHAT IT CLOSES. A consumer whose results were on an installed
+  `C:` had to reach around Reliquary with its own image tooling —
+  exactly what P16 forbids Reliquary to require. Now `list-files`,
+  `get-file` and `get-files` reach that disk directly: the machine
+  is stopped, its image is a file the host owns, and the host
+  mounts it and reads the FAT volume inside. No guest, no boot,
+  nothing asked of anyone.
+
+  TWO LAYERS, AND THE PORTABLE ONE IS THE BIGGER.
+  [at_rest.py](../reliquary/at_rest.py) reads **raw bytes**: the
+  partition table if there is one, the EBR chain behind an
+  extended partition, and past that a FAT12/16/32 volume, with the
+  width decided by cluster count because that is what the format
+  says decides it. Turning a backend's own image format into raw
+  bytes is the **adapter's** job, since the format is its choice —
+  `raw_image(path, workspace)`, which QEMU answers with `qemu-img
+  convert` and short-circuits when the image is already raw. The
+  portable reader never learns what qcow2 is, and the adapter
+  never learns what FAT is.
+
+  WHY `qemu-img convert` AND NOT A qcow2 READER. Writing one is
+  ~150 lines for the read path alone, and it would have to track
+  QEMU's format as it moves; `convert` is the tool QEMU ships for
+  exactly this, resolves a differencing image's whole backing
+  chain for free, and fails honestly on a format this build cannot
+  read. The cost is a temporary flattened copy, proportional to
+  the disk and gone with the call. **It is paid only for a read**,
+  which is also what makes it safe: converting to raw and back
+  would flatten a `difference` image's backing relationship, and
+  nothing here ever writes back.
+
+  READ-ONLY, DELIBERATELY, AND THE SPLIT IS THE DECISION.
+  Retrieval needs a reader; writing a FAT volume back needs
+  free-cluster search, chain building, directory growth and two
+  FAT copies kept identical. The asymmetry is not in the effort
+  but in the failure: a reader that is wrong reports nonsense, and
+  a writer that is wrong corrupts a disk the user cannot rebuild.
+  So `put-file` and `put-files` answer `drive.no-at-rest-write` —
+  the half that is missing, named as itself rather than as the
+  whole capability — and the rest is filed. **This is a narrowing
+  of scope and it is the owner's to widen**: the defect asked for
+  read *and* write, and what shipped is read.
+
+  THE REFUSALS ARE FOUR, EACH NAMING A DIFFERENT THING (P11).
+  `drive.no-at-rest-access` — the adapter cannot flatten its own
+  format, settled before anything is copied. `drive.image-unreadable`
+  — the image or its filesystem is not something this build reads.
+  `drive.volume-count-unsupported` — the disk holds more than one
+  volume, so D71's letter map is wrong about it and reading either
+  would answer confidently for a drive the caller did not address.
+  `drive.no-at-rest-write` — the capability that is not built.
+  Answering as though a drive were empty would have been available
+  for any of them and is the thing P11 exists to forbid.
+
+  THE ONE PLACE D71'S ASSUMPTION BECAME CHECKABLE. The reader can
+  count volumes, so the multi-volume disk that silently breaks the
+  letter map now fails loudly wherever a file verb meets it. That
+  does not close D71's defect — the *map* still assumes, and
+  wiring the reader into it would mean flattening every disk to
+  resolve one address — but it converts the silent case to a named
+  one at the point of use, which is the part that was dangerous.
+
+  P8 TRIAGE: an interface change, and an easy approval. Three
+  verbs reach drives they could not reach, two adapter surfaces
+  grow (`raw_image` and the `at_rest` capability), no id is
+  retired, and U14 and U20 are served where they were blocked. The
+  adapter API is INTERNAL by decision, so its growth is recorded
+  in [design/backend-adapter.md](design/backend-adapter.md) rather
+  than in the INTERFACES inventory.
+
+  FOLDED: this entry; [TASKS.md](TASKS.md) (P16's residue rewritten
+  to the write half; D71's entry updated — the reader exists and is
+  not wired to the map, with the caching question named);
+  [at_rest.py](../reliquary/at_rest.py) (new);
+  [backends.py](../reliquary/backends.py) (`raw_image`, the
+  `at_rest` capability); [backend_qemu.py](../reliquary/backend_qemu.py)
+  (both); [machines.py](../reliquary/machines.py) (the drive-source
+  seam: `_HostDirectory`, `_ImageVolume` opened lazily, and all five
+  verbs routed through it);
+  [design/backend-adapter.md](design/backend-adapter.md) (the API
+  listing); normative [cli.md](../docs/spec/cli.md) and
+  [script-spec.md](../docs/spec/script-spec.md);
+  [api-reference.md](../docs/api-reference.md),
+  [cli-reference.md](../docs/cli-reference.md),
+  [README.md](../README.md) and
+  [ARCHITECTURE.md](../ARCHITECTURE.md) (P16's residue note and
+  P17's two routes); `fat_image.py` and `test_at_rest.py` (new — the
+  builder is written from the format's layout, not from the reader,
+  so the two agree only where both are right); `test_machines.py`
+  and `fake_backend.py`; and the CHANGELOG's unreleased section.
+
 - D72 — P10 SHARPENS: GUESSING IS THE VIOLATION, AND A GUEST'S
   ANSWER ABOUT ITSELF IS AN OBSERVATION — DECIDED (owner,
   2026-07-28) and armed the same day. Supports U14, U20; P11, P16,

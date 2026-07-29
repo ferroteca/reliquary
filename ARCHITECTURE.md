@@ -415,11 +415,11 @@ differently under the new wording — is mere documentation work.
   authored input arrives (that is P15), or escape hatches no use
   case requires (`--display`, `hmp`). (Pledged by D57 and armed
   by D62, which delivered the two operations that were in
-  violation — listing and whole-tree transfer. Rests on U14 and
-  U20. Known residue, filed as a defect: a drive image has no
-  in-band route, Reliquary having no at-rest filesystem access,
-  and `drive.no-at-rest-access` names that gap rather than hiding
-  it (P11).)
+  violation — listing and whole-tree transfer, and reading a
+  drive image at rest. Rests on U14 and U20. Known residue, filed
+  as a defect: a drive image is read and not **written**, so
+  `drive.no-at-rest-write` names that half rather than hiding it
+  (P11).)
 - **P17 — Guest files are named in the guest's terms.** A
   file action against a machine addresses its target as the
   guest OS does — that system's paths, separators, and roots —
@@ -441,14 +441,17 @@ differently under the new wording — is mere documentation work.
   than a documented limit. A wrong address and an unknowable one
   remain different failures, and the refusals still say which.
   **The assumption is a placeholder for a fact, not a policy**,
-  and two routes replace it. The stronger is offline: mount the
-  drive image on the host and interrogate it — a partition table,
-  and past it the volume managers a guest may layer on top —
-  which is no more guest inspection than reading an image's
-  format is, and which answers file transfer and volume layout
-  with one reader. The partial one is online: ask the guest which
-  letters it has, an observation rather than an inference (P10),
-  bounded by the boot it was taken in. What may never grow is a
+  and two routes replace it. The stronger is offline and now half
+  built: the host mounts the drive image and reads it — the
+  partition table, and past it the FAT volume — which is no more
+  guest inspection than reading an image's format is. It already
+  answers *file transfer* out of an installed disk, and it
+  already refuses a disk holding two volumes rather than
+  answering for the wrong one; what it does not yet do is feed
+  the letter map, which would cost flattening every disk to
+  resolve one address. The partial route is online: ask the guest
+  which letters it has, an observation rather than an inference
+  (P10), bounded by the boot it was taken in. What may never grow is a
   *declaration* of the guest's own arrangement: a blueprint
   saying how a disk was partitioned would carry a spec's
   authority over an assertion the guest can silently contradict,
