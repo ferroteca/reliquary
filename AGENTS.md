@@ -125,7 +125,8 @@ workflow:
   (`platform_dos.split_address` / `split_directory_address` /
   `join_address`), and the letter
   map itself is `platform_dos.drive_letters`, built from declared
-  facts alone — P10;
+  facts and one stated assumption, one volume per hard disk —
+  P10, D71;
   ids are `<blueprint_name>-<machine_number>` with
   lowest-free reuse; a per-blueprint allocation lock serializes
   numbering and an exclusive per-machine operation lock

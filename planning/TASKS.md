@@ -107,13 +107,23 @@ code has the bug, so the norm is already the demand.
   **Every hard-disk image should be readable and writable while
   the machine is offline** — which is when it is safe, the backend
   holding no lock and the guest not running. The fix is at-rest
-  filesystem access behind the adapter seam: read and write a FAT
-  volume in a drive image on the host, which is no more guest
-  inspection than reading an image's format is (P10 untouched). It
-  stays capability-honest per call: a filesystem the adapter
-  cannot read fails **by name**, never by guess. DOS/FAT is the
-  delivered case to close; a backend with no vvfat equivalent is
-  the second backend's problem, not this one's.
+  filesystem access behind the adapter seam: **mount the drive
+  image on the host and interrogate it** — the partition table,
+  and past it the FAT volume — which is no more guest inspection
+  than reading an image's format is (P10's read-on-the-host
+  source). It stays capability-honest per call: a filesystem the
+  adapter cannot read fails **by name**, never by guess. DOS/FAT
+  is the delivered case to close; a backend with no vvfat
+  equivalent is the second backend's problem, not this one's.
+
+  **This is the general solution, and it subsumes the entry
+  below** (owner, 2026-07-28). One reader mounting the image
+  answers both questions — what volumes are on the disk, and what
+  files are in them — offline, with no guest running and nothing
+  to ask. The guest probe that ships today is the partial answer:
+  it needs a booted guest, it binds only the drives Reliquary can
+  already write to, and it is bounded by the boot it was taken in.
+  Whoever picks this up closes both.
 
 - **A hard disk is assumed to hold one volume** (D71's residue,
   filed with the assumption per D48's bar). `platform_dos.drive_letters`
@@ -123,13 +133,20 @@ code has the bug, so the norm is already the demand.
   a guest that repartitions `hdd0` into two volumes shifts every
   letter after it, and the map then names **the wrong drive
   silently** — it does not fail, which is what makes this a defect
-  rather than a stated limit. Reliquary needs a mechanism to
-  determine what volumes a hard-disk image really contains: the
+  rather than a stated limit — and, since P10 was sharpened, an
+  outright violation of it: assuming is guessing.
+
+  **Partly answered already, and the rest wants the reader
+  above.** `determine-drive-letters` asks a booted guest which
+  letters it has and binds the directory-source drives exactly
+  (D73), so an address against one of those is observed rather
+  than assumed. What stays assumed is every letter the probe did
+  not bind — an image drive's, and any letter on a machine that
+  was never probed — and the durable fix is the same host-side
+  reader the defect above needs: mount the image, read the
   partition table, and past it whatever volume manager the guest
-  layered on. That is host-side image reading and no more guest
-  inspection than probing an image's format is (P10 untouched),
-  and it shares its reader with the defect above. What stays
-  refused permanently is a *declared* volume count in the
-  blueprint (D56): the guest is the source of truth for its own
-  volumes, and a declaration would carry a spec's authority over
-  an assertion the guest can silently contradict.
+  layered on. That answers offline, for every disk, with no boot
+  required. What stays refused permanently is a *declared* volume
+  count in the blueprint (D56): the guest is the source of truth
+  for its own volumes, and a declaration would carry a spec's
+  authority over an assertion the guest can silently contradict.

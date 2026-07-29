@@ -326,9 +326,23 @@ differently under the new wording — is mere documentation work.
   bridged. Through beta and the rest of pre-1.0 a cushion may be
   granted when warranted and cheap — never promised, never
   accumulated. (AGENTS.md.)
-- **P10 — Nothing is inferred from guests.** Platform and
-  backend come from the blueprint; probes select among
-  configured control planes, never guess what is inside.
+- **P10 — Reliquary's configuration is never inferred from
+  guests, and nothing about a guest is ever guessed.** What a
+  machine *is* — platform, backend, control plane — comes from
+  the blueprint, and probes select among what is configured
+  rather than guessing what is inside. **Guessing is the
+  violation, and assuming is guessing**: the one-volume-per-disk
+  letter map (D71) is the standing instance, filed as a defect.
+  Three sources answer instead, and a fact from any of them is
+  known rather than guessed — what the blueprint **declares**,
+  what Reliquary can **read** on the host (an image's format, a
+  partition table in a drive it owns), and what the guest
+  **reports about itself** when asked, recorded verbatim and
+  valid for the boot it was taken in. The last is the black box
+  watched and typed at (G1), never configured, and it is a
+  remedy for a guess rather than an exception to the rule. What
+  may never carry the answer is a blueprint field asserting the
+  guest's own arrangement (D56).
   (AGENTS.md "Platform selection"; "The seams" above.)
 - **P11 — Capability honesty.** Backends and control planes
   report what they can do; nothing is emulated, and a
@@ -402,9 +416,10 @@ differently under the new wording — is mere documentation work.
   case requires (`--display`, `hmp`). (Pledged by D57 and armed
   by D62, which delivered the two operations that were in
   violation — listing and whole-tree transfer. Rests on U14 and
-  U20. Known residue, filed as a defect: an image drive has no
-  in-band route, the QEMU adapter having no at-rest filesystem
-  access, and P11 names that gap rather than hiding it.)
+  U20. Known residue, filed as a defect: a drive image has no
+  in-band route, Reliquary having no at-rest filesystem access,
+  and `drive.no-at-rest-access` names that gap rather than hiding
+  it (P11).)
 - **P17 — Guest files are named in the guest's terms.** A
   file action against a machine addresses its target as the
   guest OS does — that system's paths, separators, and roots —
@@ -416,24 +431,28 @@ differently under the new wording — is mere documentation work.
   assignment — never from inspecting a guest (P10). Where the
   declared facts leave an address ambiguous, the call fails
   closed naming the ambiguity (P11).
-  **Reliquary therefore addresses fewer locations than it has
-  facts for, and refuses the rest rather than guessing.** A disk
-  the guest partitioned in two shifts every address after it, and
-  what a drive was made into is not something a blueprint
-  declares — so today those addresses are refused, the refusal
-  naming the reason and never claiming the target is absent. A
-  wrong address and an unknowable one are different failures.
-  **This is an unbuilt capability, not a closed door.** Volume
-  layout is readable from the drive image on the host — a
-  partition table, and past it the volume managers a guest may
-  layer on top — which is no more guest inspection than reading
-  an image's format is. The facts a mapping may use can grow that
-  way, and the reason they have not is cost rather than
-  principle: each layout is its own reader, and the tail is long.
-  What may never grow is a *declaration* of the guest's own
-  arrangement: a blueprint saying how a disk was partitioned
-  would carry a spec's authority over an assertion the guest can
-  silently contradict, which is worse than the gap it closes.
+  **Every drive has a letter today, and one of them is a guess.**
+  Disks take letters from `C:` in slot order on the stated
+  assumption that each holds one volume (D71) — an assumption,
+  which is to say a P10 violation, filed as a defect. It was
+  worth making because refusing it left an exchange drive behind
+  an installed `C:` unaddressable at all, which P16 forbids; and
+  it is silent when wrong, which is what keeps it a defect rather
+  than a documented limit. A wrong address and an unknowable one
+  remain different failures, and the refusals still say which.
+  **The assumption is a placeholder for a fact, not a policy**,
+  and two routes replace it. The stronger is offline: mount the
+  drive image on the host and interrogate it — a partition table,
+  and past it the volume managers a guest may layer on top —
+  which is no more guest inspection than reading an image's
+  format is, and which answers file transfer and volume layout
+  with one reader. The partial one is online: ask the guest which
+  letters it has, an observation rather than an inference (P10),
+  bounded by the boot it was taken in. What may never grow is a
+  *declaration* of the guest's own arrangement: a blueprint
+  saying how a disk was partitioned would carry a spec's
+  authority over an assertion the guest can silently contradict,
+  which is worse than the gap it closes.
   `get-machine-dir` is the
   named exemption: the out-of-band door returns a host path by
   definition (D5). (docs/spec/script-spec.md, the in-band file

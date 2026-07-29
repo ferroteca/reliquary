@@ -188,6 +188,83 @@ is waiting on an answer today.
 
 ## Decided
 
+- D72 — P10 SHARPENS: GUESSING IS THE VIOLATION, AND A GUEST'S
+  ANSWER ABOUT ITSELF IS AN OBSERVATION — DECIDED (owner,
+  2026-07-28) and armed the same day. Supports U14, U20; P11, P16,
+  P17, P23. **Amends P10**, and is the gate D73's probe had to pass
+  before it could be built.
+
+  WHAT STARTED IT (owner): a proposal to add a verb that
+  interrogates a booted guest for its drive geometry and records
+  what it finds. Under P10 as written — *"Nothing is inferred from
+  guests"* — that reads as forbidden, and building it without
+  settling the principle would have been a feature quietly
+  overruling a norm, which is what P8 exists to prevent.
+
+  THE PRINCIPLE DID NOT DECIDE THE CASE, AND ITS TWO HALVES
+  DISAGREED. P10's citation is "Platform selection": it was written
+  about *Reliquary's own configuration* — what a machine is, and
+  which control plane drives it — and a guest's internal volume
+  layout is not that. Meanwhile its second clause, *"never guess
+  what is inside"*, was being violated by the shipped code:
+  **D71's one-volume-per-disk assumption is a guess about what is
+  inside**, made deliberately one commit earlier. So the project
+  held a principle whose plain words forbade what its code did and
+  forbade the remedy too. D68 is the shape and the precedent —
+  a principle whose shorthand does not decide the case in front of
+  it is sharpened, not worked around.
+
+  THE LINE IS GUESSING, NOT LOOKING. The amendment names three
+  sources a fact may come from, and forbids the fourth. **Declared**
+  — the blueprint. **Read on the host** — an image's format, a
+  partition table in a drive Reliquary owns; already legal and
+  already how P17 said the letter map would grow. **Reported by the
+  guest about itself** — asked and answered, recorded verbatim,
+  valid for the boot it was taken in. And **guessed**, which is the
+  violation, with assuming counted as guessing so D71's residue is
+  named rather than tolerated.
+
+  WHY THE GUEST'S ANSWER IS NOT AN INFERENCE. An inference is
+  Reliquary concluding something it was not told; an observation is
+  the guest saying it. G1 already has the guest "watched and typed
+  at", which is exactly the mechanism, and P2 is untouched: no
+  guest cooperation beyond what `exec` has always assumed, no agent
+  built, and a guest that will not answer leaves the map unbound
+  rather than breaking anything. **Deducing from an observation is
+  inference again** — computing letters from a partition table read
+  out of the guest would be — which is why D73 asks DOS for the
+  letters themselves rather than reconstructing them.
+
+  WHAT DID NOT MOVE. **P10 got stronger, not weaker.** Before, the
+  never-guess clause was a sentence with no instance named and a
+  violation shipping under it; now guessing is the stated violation,
+  the standing instance is cited by D-number, and the routes out are
+  enumerated. D56 also stands untouched: a *blueprint field*
+  asserting the guest's arrangement stays permanently refused,
+  because a document carries a spec's authority where an observation
+  carries only the boot's.
+
+  A STALE CLAIM CAME OUT WITH IT. P17's prose still said Reliquary
+  "addresses fewer locations than it has facts for, and refuses the
+  rest rather than guessing" — true until D71 and false the moment
+  it landed, which D71's sweep missed. It now states the assumption,
+  names it a P10 violation, and gives both routes that replace it:
+  the offline image reader as the general one and the online probe
+  as the partial (owner, 2026-07-28).
+
+  P8/P23 TRIAGE: a norm change, argued as the amendment it is
+  rather than as a feature's side effect. No interface moves in this
+  entry — no code changed — and what it buys is that D73 lands on a
+  principle that states the rule instead of one that contradicts it.
+
+  FOLDED: this entry; [ARCHITECTURE.md](../ARCHITECTURE.md) (P10's
+  entry rewritten; P17's letter-map prose corrected and given both
+  routes; P16's residue note renamed to `drive.no-at-rest-access`);
+  [AGENTS.md](../AGENTS.md) (the letter map is declared facts *and
+  one assumption*); [TASKS.md](TASKS.md) (the at-rest reader named
+  the general solution that subsumes the volume-enumeration entry,
+  per the owner). No CHANGELOG line: nothing release-facing moved.
+
 - D71 — ONE VOLUME PER HARD DISK, ASSUMED AND FILED; AN IMAGE DRIVE
   ANSWERS NO CAPABILITY — DECIDED (owner, 2026-07-28) and delivered
   the same day. Supports U14, U20; P11, P16, P17. **Amends D56's
