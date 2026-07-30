@@ -489,31 +489,37 @@ differently under the new wording — is mere documentation work.
   capability; docs/spec/api.md's transport table; D36, D37.)
 - **P18 — Mechanism, not content.** Reliquary provides
   mechanism — machines, drive and file transports, the value
-  channels in and out — and never standardized content. No
-  blessed scripts of any kind, no library of reusable authored
-  content. What it ships is a library of a different kind, and
-  ships it reachably from the app itself: **a library of
+  channels in and out — and **relies on no content of its own
+  to function**. Nothing it ships is load-bearing: every verb
+  works identically in a home holding not one codex file, and
+  no engine path reads a codex script. What it ships beside the
+  mechanism, reachably from the app itself, is **a library of
   examples** — the codex, blueprint and script examples
   searched and seeded through ordinary commands (U11), read and
   copied from rather than built on, and the copy is yours from
-  then on (P4). They are meant to **work**, and a codex example
-  that does not is a defect; what they are not is **stable**.
-  The library evolves, and evolves in a *point release* — a
-  script rewritten, a blueprint's disk resized, a pin moved, an
-  entry renamed or dropped — so neither a name nor what it holds
-  is fixed, and no release ever promises otherwise. That holds
-  permanently and on its own: the codex is content rather than
-  surface, so it stays outside whatever compatibility promise
-  the project comes to make. Nothing programmatic may depend on
-  it in place, and none is meant to; the codex is where a
-  consuming project's own assets *start*. Seed the copy, commit
-  it, and the stability is that project's to hold rather than
-  Reliquary's to promise (P4). The codex's *semantics* are an
-  application surface and are specified, its *content* is not, and
-  anything reusable is the consuming project's or another
-  project's to build. Reliquary attaches no meaning to what
-  runs through its mechanisms; computation and interpretation
-  live on the caller's side of the seam (G2).
+  then on (P4). **Every example is meant to work**, and one
+  that does not is a defect. What no example is, is **frozen**:
+  we improve the library over time — a script rewritten, a
+  blueprint's disk resized, a pin moved, an entry renamed or
+  dropped — and an improvement lands in an ordinary *point
+  release*, so neither a name nor what it holds is fixed and no
+  release promises otherwise. That is a statement about the
+  library's evolution and not about any example's quality: a
+  codex script is as good as the project can make it, and the
+  copy in your tree stops changing the moment you make it. That
+  holds permanently and on its own: the codex is content rather
+  than surface, so it stays outside whatever compatibility
+  promise the project comes to make. Nothing programmatic may
+  depend on it in place, and none is meant to; the codex is
+  where a consuming project's own assets *start* — copy it, use
+  it, change it however you see fit, commit the copy, and the
+  stability is that project's to hold rather than Reliquary's to
+  promise (P4). The codex's *semantics* are an application
+  surface and are specified, its *content* is not, and a
+  reusable library of authored content is the consuming
+  project's or another project's to build. Reliquary attaches no
+  meaning to what runs through its mechanisms; computation and
+  interpretation live on the caller's side of the seam (G2).
   (docs/spec/codex.md, docs/spec/cli.md,
   docs/spec/script-spec.md; AGENTS.md
   "The embedding surface"; D1, D36.)
