@@ -453,6 +453,27 @@ class BackendQuestionTests(_DryCase):
             self._dry(backend="vmware")
         self.assertIn("device 'virtio-rng'", str(caught.exception))
 
+    def test_a_narrowing_section_is_named_as_the_source(self):
+        machine = dict(self._mixed(),
+                       **{"backend-settings": {"qemu": {"machine": "pc"}}})
+        self._write("demo", machine, [self._livecd(), self._remote()])
+        self.backend.settings_keys = ("machine",)
+        plan = self._dry().plan
+        self.assertEqual("qemu", plan["backend"])
+        self.assertEqual("backend-settings", plan["backend-source"])
+        self.assertIn("backend: qemu (backend-settings)", self._dry().report)
+
+    def test_a_section_the_backend_cannot_honor_is_refused_dry(self):
+        # A dry run refuses what a create would refuse, and settings
+        # are authored input — judged the same on any host.
+        machine = dict(self._mixed(),
+                       **{"backend-settings": {"qemu": {"cpus": 2}}})
+        self._write("demo", machine, [self._livecd(), self._remote()])
+        with self.assertRaises(StaticError) as caught:
+            self._dry()
+        self.assertEqual("machine.settings-unknown-key",
+                         caught.exception.rule_id)
+
     def test_a_declared_backend_is_named_as_the_source(self):
         machine = dict(self._mixed(), backend="qemu")
         self._write("demo", machine, [self._livecd(), self._remote()])

@@ -502,17 +502,17 @@ states the split F27's decide-first asks to have stated.
 **The use case, step by step** — a precise recipe over
 Reliquary's application surfaces: a user should be able to follow it
 as written to accomplish the goal. Every spelling is the surface
-as it stands today, except where a step is marked **requires
-F28** — a pledged, undelivered piece, spelled in the form
-its feature is committed to deliver. At the proposed stage a gap
-is fine as long as it is flagged (owner, 2026-07-29): the marks
-are the flags, and what they cover is flushed out as the pieces
-settle — the case reads complete only when nothing marked remains
-open. **F26's mark cleared on 2026-07-30** (D89), leaving step 8 on
-the live surface, and **F27's cleared the same day** (D91), leaving
-the `devices` declaration in step 3 and the assignment axis in step
-5 both live. **One mark remains**: the escape hatch in step 3,
-which is F28's. API spellings shown;
+as it stands today. **No step carries a mark any more.** At the
+proposed stage a gap was fine as long as it was flagged (owner,
+2026-07-29): three steps carried **requires F26/F27/F28** marks —
+a pledged, undelivered piece, spelled in the form its feature was
+committed to deliver — and the case was to read complete only when
+nothing marked remained open. **All three cleared on 2026-07-30**:
+F26 (D89) freed step 8, F27 (D91) the `devices` declaration in
+step 3 and the assignment axis in step 5, and F28 (D92) the escape
+hatch in step 3. Every spelling below is now the surface as it
+stands, and the journey has been walked end to end in code rather
+than only argued. API spellings shown;
 every step has its CLI twin (U9).
 
 1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
@@ -581,7 +581,8 @@ every step has its CLI twin (U9).
    exercises.
 
    A device the vocabulary does not yet name takes the escape
-   hatch instead — **requires F28** (pledged) — two more fields on
+   hatch instead — live since 2026-07-30 (F28 delivered, D92) —
+   two more fields on
    the same machine, `backend` and `backend-settings` sitting
    beside `memory` and `drives` as first-class members of the
    blueprint rather than a mode the document switches into:
@@ -611,10 +612,14 @@ every step has its CLI twin (U9).
    backend-specific configuration may appear, which is exactly
    what makes a blueprint *without* it portable by construction.
    So the hatch costs portability and nothing else: the same
-   machine, on one engine, by that engine's own vocabulary. That
-   is the pressure that grows F27's curated names one at a time,
-   and a settings key in repeated use across blueprints is demand
-   arriving for one.
+   machine, on one engine, by that engine's own vocabulary — and
+   the keys are that adapter's own, so a key `qemu` does not
+   define is refused rather than carried and ignored, and an
+   argument restating `memory`, `drives`, `boot` or the recorded
+   identity is refused naming its owner (D92). That
+   is the pressure that grows the curated `devices` names one at a
+   time, and a settings key in repeated use across blueprints is
+   demand arriving for one.
 
 4. **Author `scripts\driver-ready.rlqs`** — the caller's own
    readiness protocol, because Reliquary ships no readiness

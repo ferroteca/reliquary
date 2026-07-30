@@ -101,7 +101,9 @@ workflow:
   refusal asks so it can name the seed command), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` — where **backend assignment** happens, before any image work: the
   blueprint's whole demand (control planes, devices, media kinds, controllers, materialization modes) becomes a
-  `backends.Requirements`, and a declared `backend` pins the choice while an absent one walks the priority
+  `backends.Requirements`, and a declared `backend` pins the choice — as does `backend-settings` for exactly
+  one backend, which **narrows** the walk to it (`_backend_choice`: declared, else a lone section, else the
+  walk; presence narrows, not content) — while an absent one walks the priority
   order (`backends.PRIORITY`, D66) and takes the first backend both available and capable. A requirement no
   candidate can honor fails closed naming the backend and the requirement, rather than recording a policy
   nothing can honor (P11). **The dry run is the same evaluation with nothing committed** —
@@ -182,7 +184,10 @@ workflow:
   (design: `planning/design/backend-adapter.md`), deliberately *not* one of the application surfaces:
   the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the
   carrier session), the `Availability` / `Capabilities` / `Requirements` vocabulary the report and the demand
-  share, `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
+  share, the `backend-settings` contract (`settings_keys` — the keys an adapter's section may carry, empty
+  being the honest default — and `validate_settings`, the shared unknown-key refusal an argv-shaped adapter
+  extends with its own overlap rule; only the *assigned* backend's section is ever judged, no adapter being
+  able to speak for another's vocabulary), `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
   per-start `token`, and an adapter-shaped `endpoint`), the registry (`adapter(name)`, `discover()`), and
   `assign()` — built over `evaluate(name, requirements)`, which reports availability and unmet
   requirements as **two answers rather than one verdict**, because whether this host has a backend and
@@ -191,7 +196,11 @@ workflow:
   `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the device,
   drive and boot rendering a machine's state lowers into (`DEVICE_MODELS` is where a portable device name
   becomes QEMU's own bus-qualified spelling, and the keys are exactly what `capabilities()` claims, because a
-  reported capability is one that renders), the owned launch with its identity verification, `Qmp`,
+  reported capability is one that renders), the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
+  `args`, `RESERVED_ARGUMENTS` = what a blueprint field or the VM identity owns — case-sensitively, `-m`
+  being memory and `-M` the machine type, and deliberately *not* `-device` or `-cpu`; `settings_args` both
+  validates and renders, which is what makes a section a create accepted one a start applies, and it renders
+  last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
   the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
   hatch `QemuSession.native()`, and **at-rest access** (`open_drive`): a qcow2 is served by `qemu-nbd` on
   the loopback interface and addressed through `nbd.NbdDevice` rather than copied, with a qcow2 internal
@@ -868,6 +877,10 @@ no unit test may probe or launch a real backend:
 - every device an adapter reports is one it renders — the QEMU claim and `DEVICE_MODELS`
   are asserted against each other, because a claim assignment honors and the launch
   cannot is a promise broken far from where it was made
+- a `backend-settings` key the assigned adapter does not define is refused at
+  materialization, an argument restating a first-class field or the VM identity is
+  refused naming its owner, and an inert section (another backend's) is preserved
+  without being judged
 - a declared `backend` skips the walk, and an unavailable or incapable one fails closed
 - a stub adapter claims no capability even where its backend is installed
 - the machine model hands the adapter a resolved state and gets an identity back: no

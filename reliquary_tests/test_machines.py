@@ -332,6 +332,81 @@ class MaterializationTests(_HomeCase):
         self.assertEqual(state["backend"], "qemu")
         self.assertEqual(state["devices"], ["virtio-rng"])
 
+    def test_a_settings_section_is_validated_against_the_assigned_backend(self):
+        # The seam is called with this backend's own section, and a key
+        # it does not define is refused before any image work.
+        with fake_backend.installed(settings_keys=("machine",)) as adapter:
+            self._write("hatch", {"platform": "dos",
+                                  "drives": {"hdd0": "blank"},
+                                  "backend-settings": {
+                                      "qemu": {"machine": "pc"}}},
+                       media=[_BLANK])
+            machine_id = create_machine("hatch", context=self.home)
+            self.assertEqual(adapter.validated, [{"machine": "pc"}])
+            self.assertEqual(
+                self._state(machine_id)["backend-settings"],
+                {"qemu": {"machine": "pc"}})
+
+            self._write("bad", {"platform": "dos",
+                                "drives": {"hdd0": "blank"},
+                                "backend-settings": {"qemu": {"cpus": 2}}},
+                       media=[_BLANK])
+            adapter.images.clear()
+            with self.assertRaises(StaticError) as caught:
+                create_machine("bad", context=self.home)
+            self.assertEqual(caught.exception.rule_id,
+                             "machine.settings-unknown-key")
+            self.assertEqual(adapter.images, [])
+            self.assertFalse(os.path.exists(
+                machine_dir_path("bad-0", self.home)))
+
+    def test_another_backends_section_is_inert_and_never_judged(self):
+        # Preserved verbatim and not validated: no adapter can speak
+        # for another's vocabulary, so judging an inert section would
+        # refuse a machine over configuration nothing will read.
+        with fake_backend.installed(settings_keys=()) as adapter:
+            machine_id = self._create(
+                "inert", {"platform": "dos", "backend": "qemu",
+                          "drives": {"hdd0": "blank"},
+                          "backend-settings": {"vmware": {"nonsense": True}}},
+                media=[_BLANK])
+            self.assertEqual(adapter.validated, [None])
+        self.assertEqual(self._state(machine_id)["backend-settings"],
+                         {"vmware": {"nonsense": True}})
+
+    def test_a_lone_settings_section_narrows_assignment_to_its_backend(self):
+        # No `backend` declared, one section: the blueprint has already
+        # said which backend it is written for.
+        with fake_backend.installed(name="vmware",
+                                    settings_keys=("machine",)) as vmware:
+            self._write("narrow", {"platform": "dos",
+                                   "drives": {"hdd0": "blank"},
+                                   "backend-settings": {
+                                       "vmware": {"machine": "x"}}},
+                       media=[_BLANK])
+            machine_id = create_machine("narrow", context=self.home)
+            self.assertEqual(vmware.validated, [{"machine": "x"}])
+        state = self._state(machine_id)
+        self.assertEqual(state["backend"], "vmware")
+        # And qemu — first in the priority order, available, capable —
+        # was passed over rather than winning the walk.
+        self.assertEqual(self.backend.images, [])
+
+    def test_two_sections_narrow_nothing_and_the_walk_decides(self):
+        machine_id = self._create(
+            "both", {"platform": "dos", "drives": {"hdd0": "blank"},
+                     "backend-settings": {"vmware": {}, "hyperv": {}}},
+            media=[_BLANK])
+        self.assertEqual(self._state(machine_id)["backend"], "qemu")
+
+    def test_a_declared_backend_outranks_a_narrowing_section(self):
+        machine_id = self._create(
+            "pinned", {"platform": "dos", "backend": "qemu",
+                       "drives": {"hdd0": "blank"},
+                       "backend-settings": {"vmware": {}}},
+            media=[_BLANK])
+        self.assertEqual(self._state(machine_id)["backend"], "qemu")
+
     def test_disabled_drive_excluded_from_state(self):
         machine_id = self._create(
             "disabled", {"platform": "dos",
@@ -769,6 +844,37 @@ class LifecycleTests(_HomeCase):
             apply_blueprint(machine=machine_id, context=self.home)
         self.assertIn("device 'virtio-rng'", str(caught.exception))
         self.assertEqual(self._state(machine_id)["devices"], [])
+
+    def test_apply_absorbs_a_settings_change_and_refuses_a_bad_one(self):
+        with fake_backend.installed(settings_keys=("machine",)) as adapter:
+            machine_id = self._create(
+                "sa", {"platform": "dos",
+                       "drives": {"hdd0": "blank", "hdd1": "big"}},
+                media=[_BLANK, {"name": "big", "materialize": "new",
+                                "size": "30M"}])
+            self._write("sa", {"platform": "dos", "backend": "qemu",
+                              "drives": {"hdd0": "blank", "hdd1": "big"},
+                              "backend-settings": {
+                                  "qemu": {"machine": "pc"}}},
+                       media=[_BLANK, {"name": "big", "materialize": "new",
+                                       "size": "30M"}])
+            apply_blueprint(machine=machine_id, context=self.home)
+            self.assertEqual(self._state(machine_id)["backend-settings"],
+                             {"qemu": {"machine": "pc"}})
+
+            # An edited section this backend cannot honor is refused
+            # with the capability gate, before a drive is touched.
+            self._write("sa", {"platform": "dos", "backend": "qemu",
+                              "drives": {"hdd0": "blank"},
+                              "backend-settings": {"qemu": {"cpus": 2}}},
+                       media=[_BLANK])
+            with self.assertRaises(StaticError) as caught:
+                apply_blueprint(machine=machine_id, context=self.home)
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.settings-unknown-key")
+        state = self._state(machine_id)
+        self.assertIn("hdd1", state["drives"])
+        self.assertEqual(state["backend-settings"], {"qemu": {"machine": "pc"}})
 
     def test_apply_requires_stopped(self):
         machine_id = self._ready()

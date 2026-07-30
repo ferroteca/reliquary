@@ -594,6 +594,14 @@ must contain the device and lets assignment find any backend that
 provides it, while a host where none does fails at `create`
 naming the device rather than something downstream of it.
 
+**`backend-settings` narrows the walk.** A blueprint with settings
+for exactly one backend has already said which backend it is
+written for, so assignment goes there instead of walking past it —
+and fails closed if that backend is unavailable or incapable,
+saying that the section narrowed it. Two or more sections narrow
+nothing: each stays inert until its backend wins the ordinary
+walk. Declaring `backend` outranks either way.
+
 The assignment is recorded in the state — the blueprint stays
 portable — and holds for the machine's life: backend disk formats,
 identifiers, and VM registration are not portable between

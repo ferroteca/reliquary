@@ -220,81 +220,41 @@ pattern, and why a reported device must be a renderable one — are
 [blueprint-model.md](../../docs/spec/blueprint-model.md)'s
 `devices` clause.*
 
-***U22's step 3 keeps one mark.*** The `devices` half is live;
-the escape-hatch half is **F28**, which remains here — so the
-case still cannot reach the root, and this is the same
-distinction F2 and F24 drew on delivery: what shipped is the
-axis, not everything the journey walks through.)*
+***U22's step 3 kept one mark for the rest of that day.*** The
+`devices` half was live; the escape-hatch half was **F28**, which
+cleared hours later — below.)*
 
-## F28 — Adapters honor `backend-settings`
+*(F28 — adapters honor `backend-settings` — delivered 2026-07-30
+(owner), the same day as F27 and immediately after it, so its
+number retires unreused and the work items go with it. The entry's
+strong preference is what was done: implement what was designed
+rather than re-scope the documents. QEMU's section is honored
+(`machine` becomes `-machine`, `args` are appended verbatim, both
+rendered last so a caller's own arguments are the tail of the
+logged command line), the adapter defines the keys its section may
+carry and refuses the rest, an argument restating a first-class
+field or the recorded VM identity is refused naming its owner, and
+`backend-settings` for exactly one backend narrows assignment to
+it where no `backend` is declared. The descriptive reference stops
+outrunning its norm in the same change, which was the one bug the
+entry said was the reference's whatever else got decided. The
+rulings the build produced — the renderer *is* the validator, why
+`-device` and `-cpu` stay the caller's while `-smp` is reserved
+over a gap the adapter has not closed, and why a narrowed backend
+must not be reported as a pinned one — are
+[D92](../DECISIONS.md); the surface is normative in
+[blueprint-model.md](../../docs/spec/blueprint-model.md)'s
+`backend-settings` clause.*
 
-> **Entered 2026-07-29** from a consuming project's proposal
-> (owner: admitted as a proposal). **No use case demands it**,
-> said plainly; what demands it is coherence. The blueprint
-> documents sanction the field as *the* escape hatch (the guide's
-> "one deliberate exception", the cookbook's worked recipe, the
-> http-serve spec's preflight reasoning about
-> `backend-settings.qemu.args`), an open question at the front of
-> [DECISIONS.md](../DECISIONS.md) already presumes its top-level
-> scope live, and **F27's closed vocabulary needs exactly this
-> hatch** for whatever it deliberately does not name — without a
-> working hatch, a caller needing an unnamed device has no path
-> through Reliquary at all until the vocabulary grows a name.
->
-> **Pledged 2026-07-29** (owner), citing **U22** through F27's
-> hatch clause — a device the vocabulary does not yet name is
-> reachable through the backend's own settings section — beside
-> the coherence argument above. F27 is pledged in the same act,
-> so the reference runs sideways.
->
-> **F27 delivered 2026-07-30** (D91), so that reference now runs
-> *down* the lifecycle and the clause it cites is live: the
-> curated vocabulary exists and carries exactly one name, which
-> makes this the only route to any other device — and the reason
-> D91 refused to point an author at it. Until this lands, the
-> refusal for an unadmitted device name deliberately says nothing
-> about `backend-settings`, because naming a section no adapter
-> reads would be the quiet lie P11 exists to prevent.
+***U22's marks are all clear now***, so the journey reads complete
+on the live surface. **Promoting it is a governed act and none of
+this delivery's business** (D43): the case sits in
+[proposed/USE-CASES.md](../proposed/USE-CASES.md) until the owner
+moves it.)*
 
-The field parses, validates its backend names, and persists into
-machine state verbatim — **and no adapter reads its section**. The
-QEMU launch renders memory, drives, and boot order, nothing else,
-and settings do not narrow assignment. The normative spec is
-honest about this — blueprint-model.md names both further rules
-"designed and unbuilt … carried through verbatim and none is
-validated yet" — but the descriptive reference asserts both as
-live ("each backend adapter validates its section and rejects
-overlap"; settings "narrow the assignment walk"), which is a
-descriptive document outrunning its norm: that class of bug is
-the reference's, whatever else is decided here.
-
-The ask, with a strong preference over re-scoping the documents —
-implement what is already designed:
-
-1. **QEMU honors its section.** The documented keys (`machine`,
-   `args`) render into the launch; the adapter defines and
-   validates its key set and rejects overlap with what Reliquary
-   owns through first-class fields (memory, drives, boot order,
-   CPU count, identity). The overlap rule needs no second backend
-   to be real for QEMU's own section.
-2. **Sections narrow assignment**, as designed: where no `backend`
-   is declared, settings for exactly one backend narrow the walk
-   to it.
-
-Re-scoping instead would not merely trim prose: it would delete
-the one documented in-Reliquary path for backend-specific need the
-portable vocabulary does not yet carry — and the standing
-constraint's demand that devices arrive as first-class vocabulary
-is tolerable only while the hatch exists for what has not arrived
-yet. The hatch must not become the standing *home* of device
-declarations; that is the constraint's whole point, and the
-pressure runs the other way by design: a settings key in repeated
-use across blueprints is demand arriving for a curated F27 name.
-
-Work:
-
-1. The entry's own two numbered items, in order — QEMU's section
-   honored (keys validated, overlap refused), then settings
-   narrowing assignment where no `backend` is declared.
-2. The descriptive reference realigned to the delivered truth in
-   the same change — its assertions stop outrunning the norm.
+**This shelf stands empty again** — F26, F27 and F28 all delivered
+on 2026-07-30, the three that arrived from outside on 2026-07-29.
+The project owes no unbuilt feature; [USE-CASES.md](USE-CASES.md)
+still owes **U7**, which none of the three met or claimed to. What
+fills this file next arrives the way they did: by someone deciding
+to build something argued in [proposed/](../proposed/).

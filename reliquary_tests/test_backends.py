@@ -65,6 +65,44 @@ class CapabilityReportTests(unittest.TestCase):
             ("device 'virtio-rng'",))
 
 
+class SettingsVocabularyTests(unittest.TestCase):
+    """A section is honored or refused — never carried and ignored.
+
+    The seam's own half: the key set. What an adapter does with the
+    keys it defines is its business (QEMU's is in
+    ``test_backend_qemu.py``); what the seam guarantees is that a key
+    no adapter defines never reaches a machine.
+    """
+
+    def test_an_adapter_reading_no_settings_refuses_every_key(self):
+        # The honest default, and the reason a stub needs no code: a
+        # section it cannot honor is refused rather than preserved as
+        # configuration nothing will apply (P11).
+        adapter = backend_stubs.VirtualBoxAdapter()
+        self.assertEqual(adapter.settings_keys, ())
+        with self.assertRaises(StaticError) as caught:
+            adapter.validate_settings({"machine": "pc"})
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.settings-unknown-key")
+        self.assertIn("reads no settings", str(caught.exception))
+        self.assertIn("virtualbox", str(caught.exception))
+
+    def test_a_key_outside_the_vocabulary_names_the_vocabulary(self):
+        adapter = fake_backend.FakeAdapter(settings_keys=("machine",))
+        with self.assertRaises(StaticError) as caught:
+            adapter.validate_settings({"cpus": 4})
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.settings-unknown-key")
+        self.assertIn("'cpus'", str(caught.exception))
+        self.assertIn("the qemu keys are machine", str(caught.exception))
+
+    def test_a_declared_key_and_an_empty_section_are_accepted(self):
+        adapter = fake_backend.FakeAdapter(settings_keys=("machine",))
+        for section in ({"machine": "pc"}, {}, None):
+            with self.subTest(section=section):
+                self.assertIsNone(adapter.validate_settings(section))
+
+
 class AssignmentTests(unittest.TestCase):
     """Assignment walks the priority order and takes the first fit."""
 
@@ -169,6 +207,36 @@ class AssignmentTests(unittest.TestCase):
                 declared="hyperv")
         self.assertIn("control plane 'agentless-display'",
                       str(caught.exception))
+
+    def test_a_narrowed_backend_skips_the_walk_like_a_declared_one(self):
+        qemu = fake_backend.FakeAdapter("qemu")
+        self._install(qemu=qemu,
+                      virtualbox=fake_backend.FakeAdapter("virtualbox"))
+        self.assertEqual(
+            backends.assign(_requirements(), narrowed="virtualbox"),
+            "virtualbox")
+
+    def test_a_narrowed_backend_that_cannot_serve_says_what_narrowed_it(self):
+        # The diagnostic has to distinguish the two ways a walk becomes
+        # a walk of one: this blueprint declared no backend, so telling
+        # the author it "pins" one would send them looking for a field
+        # that is not there.
+        self._install(vmware=fake_backend.FakeAdapter("vmware",
+                                                      available=False))
+        with self.assertRaises(PreflightError) as caught:
+            backends.assign(_requirements(), narrowed="vmware")
+        message = str(caught.exception)
+        self.assertIn("backend-settings", message)
+        self.assertIn("narrows assignment", message)
+        self.assertNotIn("pins", message)
+
+    def test_a_declared_backend_outranks_a_narrowing_section(self):
+        self._install(qemu=fake_backend.FakeAdapter("qemu"),
+                      virtualbox=fake_backend.FakeAdapter("virtualbox"))
+        self.assertEqual(
+            backends.assign(_requirements(), declared="qemu",
+                            narrowed="virtualbox"),
+            "qemu")
 
     def test_an_unknown_backend_name_is_a_static_error(self):
         with self.assertRaises(StaticError) as caught:

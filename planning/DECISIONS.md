@@ -134,7 +134,11 @@ what gates nothing in particular.
   permanently rejected. What stays open is only which constructs,
   and when one earns its keep.
 - **Per-drive backend settings**: whether they are ever needed
-  beyond the top-level `backend-settings` scope.
+  beyond the top-level `backend-settings` scope. Sharpened by D92,
+  which made that top-level scope real: adapters honor it now, so
+  the question is no longer about an unbuilt field — it is whether
+  a drive-scoped section has a case the machine-scoped one cannot
+  serve.
 - **Promoting runtime changes**: whether a convenience command
   copies a state-side runtime change (e.g. attached media) back
   into the blueprint, or users always edit the blueprint by hand.
@@ -203,6 +207,133 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D92 — THE HATCH IS HONORED, THE RENDERER IS THE VALIDATOR, AND A
+  LONE SECTION NARROWS — DECIDED (owner, 2026-07-30) and delivered the
+  same day, retiring F28 and emptying the pledged shelf. Supports U22
+  (proposed), U4; P6, P9, P11, and the standing growth constraint,
+  whose curated-vocabulary demand is only tolerable while this hatch
+  works. **The entry's strong preference is what was done**:
+  implement what was already designed rather than re-scope the
+  documents down to what the code did.
+
+  WHAT WAS ACTUALLY WRONG. The field parsed, validated its backend
+  names and persisted into the state verbatim, and no adapter read a
+  word of it — so a `qemu` section was carried faithfully into
+  `machine.json` and dropped at launch. blueprint-model.md was honest
+  about it ("designed and unbuilt"); the descriptive reference
+  asserted both rules as live, which is a descriptive document
+  outrunning its norm and the reference's own bug either way.
+
+  THE RENDERER IS THE VALIDATOR, and this is the ruling the rest hangs
+  on. `settings_args` validates and renders in one pass:
+  `validate_settings` calls it and discards the arguments, the launch
+  calls it for them. A separate checker would be free to drift, and
+  the drift's shape is nasty — configuration accepted at create time
+  and quietly missing at every start, discovered as a guest behaving
+  as though the setting were never written. It is D91's lesson one
+  field over: a claim honored by one half and not the other is a
+  promise broken far from where it was made.
+
+  THE KEY SET IS THE ADAPTER'S, AND EMPTY IS THE HONEST DEFAULT. The
+  seam carries the shared unknown-key refusal over
+  `BackendAdapter.settings_keys`; an argv-shaped adapter extends it
+  with the overlap rule, since what Reliquary owns is only expressible
+  in the backend's own language. A stub therefore needs no code to be
+  correct: it defines no keys and refuses every one, which is P11 at
+  this seam — a setting nothing will read is not preserved as
+  configuration, it is refused.
+
+  ONLY THE ASSIGNED BACKEND'S SECTION IS JUDGED. An inert section is
+  preserved exactly as written and never examined, because no adapter
+  can speak for another's vocabulary — judging one would refuse a
+  machine over configuration nothing is going to read. **The
+  consequence is stated rather than hidden**: validation follows
+  assignment, so on a host where the backend is absent the assignment
+  refusal is what a caller sees first, and the bad key surfaces on a
+  host that could have run it.
+
+  THE OVERLAP SET IS WHAT RELIQUARY RENDERS, PLUS IDENTITY. Memory,
+  cpus, boot order and every drive spelling (`-drive`, `-hda`…`-hdd`,
+  `-fda`, `-fdb`, `-cdrom`), the section's own `machine` key
+  (`-machine` and its legacy `-M`), and — not a first-class field but
+  owned just as hard — `-name`, `-uuid` and `-qmp`, which are how a
+  session verifies it is commanding *this* VM. Comparison is
+  **case-sensitive**: `-m` is memory and `-M` is the machine type, and
+  a rule that folded case would refuse the wrong one. An option
+  written with its value in one element (`"-m 64"`) is caught the same
+  way, because naming the actual mistake beats handing QEMU an
+  argument it cannot parse.
+
+  TWO ARGUMENTS ARE DELIBERATELY NOT RESERVED, and one of them is
+  load-bearing. **`-device`** is the documented route to a device the
+  curated `devices` vocabulary does not name yet: U22's step 3 spells
+  the hatch that way and D91 refused to point an author at it *only*
+  because it was unbuilt — reserving it here would have closed the
+  door the same day it opened. **`-cpu`** selects a CPU model, where
+  `cpus` owns the count alone; the cookbook's 486 recipe is exactly
+  that, and it works.
+
+  `-smp` IS RESERVED THOUGH NOTHING RENDERS IT, and the gap is named
+  rather than papered over: the QEMU adapter emits no `-smp` at all,
+  so a `cpus` above 1 is resolved into the state and not applied. The
+  count still belongs to the first-class field wherever it is honored
+  — admitting `-smp` into the hatch would create a second source that
+  has to be unpicked the day the adapter renders it, which is the
+  pre-1.0 break P9 lets us avoid by not making it. The reference says
+  so in the same breath as the refusal, and closing the gap is the
+  adapter's work, not the hatch's.
+
+  PRESENCE NARROWS, NOT CONTENT; EXACTLY ONE; DECLARED OUTRANKS. A
+  blueprint carrying one section has already said which backend it is
+  written for, so walking past it to another that could never honor
+  those settings would be assignment ignoring the blueprint. An empty
+  section names its backend just as a full one does — a second rule
+  for `{}` would be one more thing to remember for no gain. Two or
+  more sections narrow nothing, each staying inert until its backend
+  wins the ordinary walk. **The diagnostic distinguishes narrowed
+  from pinned**: telling an author their blueprint "pins" a backend it
+  never declared sends them looking for a field that is not there, so
+  the refusal names the section that narrowed it.
+
+  NO NEW ID FAMILY, the same question D90 asked and answered.
+  `machine.settings-unknown-key` and
+  `machine.settings-reserved-argument` join the `machine.` family that
+  already holds `machine.backend-unknown` and its neighbours, and the
+  shape errors reuse `value.not-a-string` / `value.not-an-array`
+  exactly as the parser does. Both are **`StaticError`s (exit 2)**
+  under D58's test — what decides them is the authored input alone,
+  wrong on every host — which is why being reached at materialization
+  does not make them preflight failures, precisely as
+  `machine.backend-unknown` is already raised from there.
+
+  P8 TRIAGE: no new syntax on S4 — two documented rules become live
+  and one descriptive document stops outrunning its norm — plus one
+  additional value (`backend-settings`) for the dry run's
+  `backend-source`. No numbered use case is cost. **U22's last mark
+  clears**, so the journey now reads complete on the live surface;
+  promoting it is a governed act and stays the owner's.
+
+  Folded: [backends.py](../reliquary/backends.py) (`settings_keys`,
+  `validate_settings`, `assign(narrowed=)`),
+  [backend_qemu.py](../reliquary/backend_qemu.py) (`SETTINGS_KEYS`,
+  `RESERVED_ARGUMENTS`, `settings_args`, the launch),
+  [machines.py](../reliquary/machines.py) (`_backend_choice`, and
+  validation at create, apply and the dry run);
+  [blueprint-model.md](../docs/spec/blueprint-model.md) (both rules
+  stated as live),
+  [instance-model.md](../docs/spec/instance-model.md),
+  [blueprint-reference.md](../docs/blueprint-reference.md) (the qemu
+  vocabulary, the reserved table, the `-smp` gap, the validation
+  summary), [blueprint-guide.md](../docs/blueprint-guide.md),
+  [blueprint-cookbook.md](../docs/blueprint-cookbook.md) (recipe 5's
+  optional pin), [api-reference.md](../docs/api-reference.md);
+  [AGENTS.md](../AGENTS.md);
+  [pledged/FEATURES.md](pledged/FEATURES.md) (F28 delivered, its
+  number retired, the shelf empty) and
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (U22's step 3);
+  `test_backends.py`, `test_backend_qemu.py`, `test_machines.py`,
+  `test_dry_run.py`; and the CHANGELOG's unreleased section.
 
 - D91 — A DEVICE IS A DECLARED MODEL, JUDGED AT ASSIGNMENT, AND THE
   VOCABULARY IS WHAT DEMAND HAS ASKED FOR — DECIDED (owner,

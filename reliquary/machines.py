@@ -89,6 +89,29 @@ def _resolve_control_planes(machine):
             or _default_control_planes(machine.platform))
 
 
+def _backend_choice(machine):
+    """Where the blueprint says this machine belongs, and how it said it.
+
+    Three answers, in the order they are consulted. A declared
+    ``backend`` **pins**. Failing that, ``backend-settings`` for
+    **exactly one** backend narrows assignment to it: sections are the
+    one place backend-specific configuration may appear, so a
+    blueprint carrying exactly one has already said which backend it is
+    written for, and walking past it to another that could never honor
+    those settings would be assignment ignoring the blueprint. Two or
+    more sections narrow nothing — each is inert until its backend
+    wins, and the ordinary walk decides. **Presence is what narrows**,
+    not content: an empty section names its backend just as a full one
+    does.
+    """
+    if machine.backend is not None:
+        return machine.backend, None, "declared"
+    sections = sorted(machine.backend_settings)
+    if len(sections) == 1:
+        return None, sections[0], "backend-settings"
+    return None, None, "priority walk"
+
+
 def _requirements(machine, namespace):
     """What this blueprint asks of a backend, in the seam's vocabulary.
 
@@ -405,9 +428,14 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
     # backend is fixed before the first image is written in its own
     # native format.
     control_planes = _resolve_control_planes(machine)
+    declared, narrowed, _source = _backend_choice(machine)
     backend = backends.assign(_requirements(machine, namespace),
-                              declared=machine.backend)
+                              declared=declared, narrowed=narrowed)
     adapter = backends.adapter(backend)
+    # The section that applies is the assigned backend's, so this
+    # follows assignment; the others are inert and stay unjudged, since
+    # no adapter can speak for another's vocabulary.
+    adapter.validate_settings(machine.backend_settings.get(backend))
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
         if not drive.enabled:
@@ -669,14 +697,16 @@ def _dry_backend(machine, namespace, backend):
     """The backend a create would land on, and why — plus its probe.
 
     With no ``backend`` this is assignment itself: a declared one
-    pins, otherwise the priority walk. With one it is the other
+    pins, a lone ``backend-settings`` section narrows, otherwise the
+    priority walk. With one it is the other
     question — whether the blueprint would work *there* — so
     availability is reported and only capability decides (P11).
     """
     requirements = _requirements(machine, namespace)
     if backend is None:
-        assigned = backends.assign(requirements, declared=machine.backend)
-        source = "declared" if machine.backend else "priority walk"
+        declared, narrowed, source = _backend_choice(machine)
+        assigned = backends.assign(requirements, declared=declared,
+                                   narrowed=narrowed)
         return assigned, source, None
     verdict = backends.evaluate(backend, requirements)
     if verdict.unmet:
@@ -705,6 +735,10 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         numbering = "pinned"
     assigned, chosen, verdict = _dry_backend(machine, namespace, backend)
     adapter = backends.adapter(assigned)
+    # A create would refuse an unhonorable section, so a dry run does
+    # too, and in the same place — the settings are authored input,
+    # judged identically whether or not the backend is on this host.
+    adapter.validate_settings(machine.backend_settings.get(assigned))
     media_root = _machine_media_dir(machine_id, context)
     entries = []
     drives = [
@@ -1021,6 +1055,10 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
                 f"machine {machine_id} is on backend {backend!r}, which "
                 f"cannot provide: {', '.join(missing)}",
                 rule_id="machine.backend-incapable")
+        # Checked here with the capability gate, before any drive is
+        # touched: an edited section this backend cannot honor leaves
+        # the machine exactly as it was.
+        adapter.validate_settings(parsed.backend_settings.get(backend))
 
         bound = _bind_location_properties(
             parsed, namespace, explicit=properties,

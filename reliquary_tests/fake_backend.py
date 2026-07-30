@@ -57,10 +57,19 @@ class FakeAdapter(BackendAdapter):
 
     def __init__(self, name="qemu", *, available=True,
                  capabilities=None, extension=".qcow2",
-                 image_payload=None):
+                 image_payload=None, settings_keys=()):
         self.name = name
         self.available = available
         self.extension = extension
+        #: The ``backend-settings`` vocabulary this double defines. The
+        #: seam's own unknown-key refusal is inherited rather than
+        #: reimplemented, and no QEMU key is assumed: a test that wants
+        #: a section accepted says which keys exist, so what is
+        #: asserted here is the machine model calling the seam and not
+        #: QEMU's answer.
+        self.settings_keys = tuple(settings_keys)
+        #: Every section this double was asked to validate, in order.
+        self.validated = []
         #: Bytes to lay down when a per-machine image is created, so a
         #: test can give a machine a disk that really holds a
         #: filesystem. ``None`` keeps the old behaviour: the image is
@@ -101,6 +110,10 @@ class FakeAdapter(BackendAdapter):
 
     def capabilities(self):
         return self.report
+
+    def validate_settings(self, settings):
+        self.validated.append(settings)
+        return super().validate_settings(settings)
 
     # -- materialize ----------------------------------------------
 

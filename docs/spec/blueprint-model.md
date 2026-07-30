@@ -196,17 +196,37 @@ cannot carry.
   without it portable by construction. One section per backend
   name; only the section matching the machine's backend applies,
   and the others are inert but preserved.
-  *Two further rules are designed and unbuilt, and are named here
-  rather than asserted*: that a section may not touch what
-  Reliquary owns through first-class fields (memory, drives, boot
-  order, CPU count, identity), with each adapter rejecting the
-  overlap in its own section; and that where a blueprint declares
-  no `backend`, sections for exactly one backend narrow the
-  default assignment to it. Both need a second backend to be real:
-  the adapter seam is built and assignment walks the priority
-  order, but the other three adapters claim no capability, so
-  sections are carried through verbatim and none is validated
-  yet.
+
+  **The applying section is honored, and three rules bound it.**
+  First, **the keys are the adapter's own vocabulary**: each
+  backend defines the keys its section may carry and refuses any
+  other by name, so a misspelled or invented key fails at
+  materialization rather than being carried into the state and
+  silently ignored (P11). An adapter that reads no settings
+  defines no keys, and therefore refuses every one. Second, **a
+  section may not touch what Reliquary owns** through first-class
+  fields (memory, drives, boot order, CPU count) or through the
+  recorded VM identity, and the adapter refuses the overlap in
+  its own configuration language — two sources for one fact is
+  the one thing the hatch must not become. Third, **the section
+  that validates is the section that renders**: what a create
+  accepts is what a start applies.
+
+  Only the assigned backend's section is judged, because no
+  adapter can speak for another's vocabulary — which is also why
+  an inert section is preserved unexamined.
+
+  **Sections narrow assignment.** Where a blueprint declares no
+  `backend`, sections for **exactly one** backend narrow the walk
+  to that backend, which then fails closed if it is unavailable
+  or incapable, naming what narrowed it. A blueprint carrying one
+  section has already said which backend it is written for, and
+  walking past it to another that could never honor those
+  settings would be assignment ignoring the blueprint. Two or
+  more sections narrow nothing: each stays inert until its
+  backend wins the ordinary walk. **Presence narrows, not
+  content** — an empty section names its backend just as a full
+  one does. A declared `backend` outranks any narrowing.
 
 ### media
 

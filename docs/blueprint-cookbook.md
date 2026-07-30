@@ -266,7 +266,16 @@ With `backend` declared, `create` fails if QEMU is unavailable
 rather than picking another backend (which couldn't honor the
 settings anyway). `backend-settings` may not restate what
 first-class fields own — putting `-m 32` in `args` is rejected;
-say `"memory": "32M"` instead.
+say `"memory": "32M"` instead. The keys are QEMU's own
+(`machine`, `args`, and nothing else); the values are yours, and
+QEMU is what refuses a machine type it does not have.
+
+**The `backend` line above is optional here.** One section names
+one backend, which is enough to narrow assignment to it — so
+dropping `"backend": "qemu"` from this recipe changes nothing
+about where the machine lands, only how loudly the blueprint says
+it. Keep it when the pin is the point; drop it when the settings
+already are.
 
 ---
 

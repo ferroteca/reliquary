@@ -6,9 +6,10 @@ The *provider* contract behind Reliquary's semantic surface
 (planning/pledged/design/backend-adapter.md). It is deliberately not
 one of the world-facing interfaces: no adapter operation appears on
 the CLI or in the embedding API, and consumers touch backends only
-through blueprint vocabulary (``backend``, ``backend-settings``,
-``control-planes``, ``devices``, drives and controllers) and through
-the capability failures preflight reports.
+through blueprint vocabulary (``backend``, ``backend-settings`` —
+whose keys each adapter defines and validates — ``control-planes``,
+``devices``, drives and controllers) and through the capability
+failures preflight reports.
 
 The constraint that governs here is honesty: **capabilities are
 reported, never emulated**. A backend that cannot provide a declared
@@ -154,6 +155,14 @@ class BackendAdapter:
     #: The blueprint's spelling of this backend.
     name = ""
 
+    #: The keys this backend's ``backend-settings`` section may carry.
+    #: The adapter owns this vocabulary because the section is written
+    #: in the backend's own configuration language and nothing above
+    #: the seam can judge it. **Empty is the honest default**: an
+    #: adapter that reads no settings refuses every key rather than
+    #: carrying configuration nothing will honor (P11).
+    settings_keys = ()
+
     # -- discovery and capability ---------------------------------
 
     def discover(self):
@@ -189,6 +198,40 @@ class BackendAdapter:
             if device not in report.devices:
                 missing.append(f"device {device!r}")
         return tuple(missing)
+
+    def validate_settings(self, settings):
+        """Refuse a ``backend-settings`` section this backend cannot honor.
+
+        Called with **this backend's own section** — the one the
+        machine's assigned backend matches, other sections being inert
+        — at materialization, and again when a changed blueprint is
+        applied. A section that validates is one the launch will
+        render: an adapter whose validation and rendering could
+        disagree would promise configuration at create time and drop
+        it at start.
+
+        The shared rule is the key set: anything outside
+        :attr:`settings_keys` is refused, naming the backend. An
+        adapter whose settings reach its backend as arguments extends
+        this with its own overlap rule, since what Reliquary owns
+        through first-class fields (memory, drives, boot order, CPU
+        count, identity) is only expressible in that backend's own
+        vocabulary.
+        """
+        unknown = sorted(key for key in (settings or ())
+                         if key not in self.settings_keys)
+        if not unknown:
+            return
+        if self.settings_keys:
+            known = ", ".join(self.settings_keys)
+            detail = f"the {self.name} keys are {known}"
+        else:
+            detail = (f"the {self.name} adapter reads no settings, so it "
+                      "defines no keys")
+        raise StaticError(
+            f"backend-settings.{self.name} does not define "
+            f"{unknown[0]!r}; {detail}",
+            rule_id="machine.settings-unknown-key")
 
     # -- materialize and dispose ----------------------------------
 
@@ -363,30 +406,39 @@ def evaluate(name, requirements):
                       unmet=found.unmet(requirements))
 
 
-def assign(requirements, *, declared=None):
+def assign(requirements, *, declared=None, narrowed=None):
     """Pick the backend a machine materializes on.
 
     A declared ``backend`` pins the choice and skips the walk: that
     backend alone is probed, and assignment fails closed if it is
-    unavailable or incapable. Otherwise Reliquary walks :data:`PRIORITY`
-    one by one, probing each for availability, and takes the first that
-    is available **and** capable of the whole blueprint. The result is
-    recorded in the machine state, so the machine stays on that backend
-    thereafter.
+    unavailable or incapable. A ``narrowed`` one is the same
+    walk-of-one reached differently — the blueprint declares no
+    backend and carries ``backend-settings`` for exactly one, so the
+    sections themselves say where this machine belongs — and it fails
+    closed the same way, naming what narrowed it. Otherwise Reliquary
+    walks :data:`PRIORITY` one by one, probing each for availability,
+    and takes the first that is available **and** capable of the whole
+    blueprint. The result is recorded in the machine state, so the
+    machine stays on that backend thereafter.
     """
-    if declared is not None:
-        verdict = evaluate(declared, requirements)
+    only = declared if declared is not None else narrowed
+    if only is not None:
+        subject = (f"the blueprint pins backend {only!r}"
+                   if declared is not None else
+                   "the blueprint's only backend-settings section "
+                   f"narrows assignment to backend {only!r}")
+        verdict = evaluate(only, requirements)
         if not verdict.available:
             raise PreflightError(
-                f"blueprint pins backend {declared!r}, which is not "
+                f"{subject}, which is not "
                 f"available on this host: {verdict.detail}",
                 rule_id="machine.backend-unavailable")
         if verdict.unmet:
             raise PreflightError(
-                f"blueprint pins backend {declared!r}, which cannot "
+                f"{subject}, which cannot "
                 f"provide: {', '.join(verdict.unmet)}",
                 rule_id="machine.backend-incapable")
-        return declared
+        return only
     refusals = []
     for name in PRIORITY:
         verdict = evaluate(name, requirements)

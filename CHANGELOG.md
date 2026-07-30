@@ -13,6 +13,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Adapters honor `backend-settings`** (D92, delivering F28). The
+  field parsed, validated its backend names, and persisted into the
+  machine state — and no adapter read a word of it. The documents
+  sanctioned it as *the* escape hatch while the launch rendered
+  memory, drives and boot order and nothing else, so a blueprint's
+  `qemu` section was carried faithfully into the state and silently
+  dropped at start. It applies now: QEMU's `machine` key becomes
+  `-machine`, its `args` are appended to the launch verbatim, and the
+  section renders **last**, so in the command line Reliquary logs your
+  own arguments are the tail.
+
+  **The keys are the adapter's vocabulary, and a key it does not
+  define is refused** when the machine is materialized — QEMU's are
+  `machine` and `args`, and nothing else. **Settings may not restate
+  what Reliquary owns**: `-m`, `-smp`, `-boot`, the drive arguments,
+  `-machine`/`-M`, and the identity and control-channel arguments are
+  refused naming the field that owns each, because two sources for one
+  fact is the one thing a hatch must not become. Deliberately still
+  yours: `-device`, the documented route to a device the curated
+  `devices` vocabulary does not yet name, and `-cpu`, which selects a
+  CPU model where `cpus` owns only the count. Only the *assigned*
+  backend's section is judged; another backend's is preserved as
+  written and never examined.
+
+- **`backend-settings` narrows backend assignment** (D92). A
+  blueprint that declares no `backend` but carries settings for
+  exactly one has already said which backend it is written for, so
+  assignment goes there rather than walking past it — and fails closed
+  if that backend is unavailable or incapable, saying that the section
+  narrowed it rather than claiming a pin the blueprint never wrote.
+  Two or more sections narrow nothing: each stays inert until its
+  backend wins the ordinary walk. A declared `backend` outranks either
+  way.
+
 - **A `devices` axis for the machine blueprint** (D91, delivering
   F27). A machine may now declare the hardware it must contain
   beyond its drives — `"devices": ["virtio-rng"]` — and that

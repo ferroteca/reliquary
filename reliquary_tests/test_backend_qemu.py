@@ -450,6 +450,111 @@ class DeviceRenderingTests(unittest.TestCase):
         self.assertEqual(args[args.index("-device") + 1], "virtio-rng-pci")
 
 
+class BackendSettingsTests(unittest.TestCase):
+    """The escape hatch: honored, bounded, and never a second source.
+
+    One function validates and renders, so every assertion here is
+    about both at once — what `create` accepts is what `start` puts on
+    the command line.
+    """
+
+    def test_the_documented_keys_render(self):
+        self.assertEqual(
+            qemu_module.settings_args({"machine": "pc",
+                                       "args": ["-cpu", "486"]}),
+            ["-machine", "pc", "-cpu", "486"])
+
+    def test_an_absent_or_empty_section_renders_nothing(self):
+        for section in (None, {}, {"args": []}):
+            with self.subTest(section=section):
+                self.assertEqual(qemu_module.settings_args(section), [])
+
+    def test_a_key_qemu_does_not_define_is_refused(self):
+        with self.assertRaises(StaticError) as caught:
+            qemu_module.settings_args({"cpus": 2})
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.settings-unknown-key")
+        self.assertIn("machine, args", str(caught.exception))
+
+    def test_the_key_shapes_are_checked(self):
+        for section, rule in (
+                ({"machine": ""}, "value.not-a-string"),
+                ({"machine": 42}, "value.not-a-string"),
+                ({"args": "-cpu 486"}, "value.not-an-array"),
+                ({"args": [486]}, "value.not-a-string")):
+            with self.subTest(section=section):
+                with self.assertRaises(StaticError) as caught:
+                    qemu_module.settings_args(section)
+                self.assertEqual(caught.exception.rule_id, rule)
+
+    def test_every_reliquary_owned_argument_is_refused_by_its_owner(self):
+        owners = {
+            "-m": "memory", "-smp": "cpus", "-boot": "boot",
+            "-drive": "drives", "-hda": "drives", "-fda": "drives",
+            "-cdrom": "drives", "-machine": "machine", "-M": "machine",
+            "-name": "identity", "-uuid": "identity",
+            "-qmp": "control channel", "-display": "display",
+            "-nographic": "display",
+        }
+        for argument, owner in owners.items():
+            with self.subTest(argument=argument):
+                with self.assertRaises(StaticError) as caught:
+                    qemu_module.settings_args({"args": [argument, "x"]})
+                self.assertEqual(caught.exception.rule_id,
+                                 "machine.settings-reserved-argument")
+                self.assertIn(owner, str(caught.exception))
+
+    def test_an_option_and_its_value_in_one_element_is_still_caught(self):
+        # `["-m 64"]` is not two arguments and QEMU would refuse it
+        # anyway; refusing it here names the actual mistake.
+        with self.assertRaises(StaticError) as caught:
+            qemu_module.settings_args({"args": ["-m 64"]})
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.settings-reserved-argument")
+
+    def test_the_hatch_still_passes_a_device_and_a_cpu_model(self):
+        # The two the reserved set must NOT catch. `-device` is the
+        # documented route to a device the curated vocabulary does not
+        # name yet (D91), and `-cpu` selects a model where `cpus` owns
+        # only the count — the cookbook's own 486 recipe.
+        self.assertEqual(
+            qemu_module.settings_args(
+                {"args": ["-device", "virtio-net-pci", "-cpu", "486"]}),
+            ["-device", "virtio-net-pci", "-cpu", "486"])
+
+    def test_a_value_that_merely_looks_like_an_option_passes(self):
+        self.assertEqual(
+            qemu_module.settings_args({"args": ["-cpu", "486", "-vga", "std"]}),
+            ["-cpu", "486", "-vga", "std"])
+
+    def test_validate_settings_is_the_renderer_and_returns_nothing(self):
+        adapter = qemu_module.QemuAdapter()
+        self.assertEqual(adapter.settings_keys, ("machine", "args"))
+        self.assertIsNone(adapter.validate_settings({"machine": "pc"}))
+        with self.assertRaises(StaticError):
+            adapter.validate_settings({"args": ["-boot", "d"]})
+
+    def test_start_renders_this_backends_section_last(self):
+        adapter = qemu_module.QemuAdapter()
+        state = {
+            "id": "hatch-0", "backend-id": "reliquary-hatch-0",
+            "memory": 32, "boot": [], "drives": {},
+            "backend-settings": {
+                "qemu": {"machine": "pc", "args": ["-cpu", "486"]},
+                # Another backend's section is inert, and reading it
+                # here would put VMware configuration on QEMU's line.
+                "vmware": {"nonsense": True},
+            },
+        }
+        with mock.patch.object(qemu_module, "find_qemu",
+                               return_value="qemu-system-i386"), \
+                mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+            adapter.start(state, machine_dir=".", backend_dir="qemu")
+        args = launch.call_args.args[0]
+        self.assertEqual(args[-4:], ["-machine", "pc", "-cpu", "486"])
+        self.assertNotIn("nonsense", args)
+
+
 class CarrierTests(unittest.TestCase):
     """The session's carriers, over a scripted monitor."""
 

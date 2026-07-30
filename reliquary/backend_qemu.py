@@ -43,6 +43,46 @@ _QEMU_NBD_BIN = "qemu-nbd.exe" if os.name == "nt" else "qemu-nbd"
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
+#: The keys ``backend-settings.qemu`` may carry. ``machine`` is a QEMU
+#: machine type, ``args`` a list of arguments appended to the launch
+#: verbatim — the documented escape hatch, and deliberately the whole
+#: of it: a second spelling for anything below would be a second
+#: source for one fact.
+SETTINGS_KEYS = ("machine", "args")
+
+#: QEMU arguments the escape hatch may not carry, each naming what
+#: owns it. Two populations, and the second is not a first-class field:
+#: what a blueprint declares through its own vocabulary, and what the
+#: **VM ownership doctrine** owns — the readable name, the per-start
+#: token and the QMP channel are how a session verifies it is talking
+#: to this machine, so a caller-supplied one is refused rather than
+#: silently overridden. Keys are compared **case-sensitively**, since
+#: ``-m`` (memory) and ``-M`` (machine type) are different options.
+#: NOT here, deliberately: ``-device`` — an unnamed device is exactly
+#: what this hatch is for while the curated ``devices`` vocabulary
+#: grows (D91) — and ``-cpu``, which selects a CPU *model* where
+#: ``cpus`` owns the count alone.
+RESERVED_ARGUMENTS = {
+    "m": "the machine's `memory`",
+    "smp": "the machine's `cpus`",
+    "boot": "the machine's `boot` order",
+    "drive": "the machine's `drives`",
+    "hda": "the machine's `drives`",
+    "hdb": "the machine's `drives`",
+    "hdc": "the machine's `drives`",
+    "hdd": "the machine's `drives`",
+    "fda": "the machine's `drives`",
+    "fdb": "the machine's `drives`",
+    "cdrom": "the machine's `drives`",
+    "machine": "this section's own `machine` key",
+    "M": "this section's own `machine` key",
+    "name": "the recorded VM identity",
+    "uuid": "the recorded VM identity",
+    "qmp": "reliquary's own control channel",
+    "display": "the display choice a start is given",
+    "nographic": "the display choice a start is given",
+}
+
 #: How QEMU spells each curated device. The blueprint names the model
 #: portably (``virtio-rng``) and this is where it becomes a QEMU
 #: argument: the PCI form is named explicitly rather than through
@@ -929,6 +969,7 @@ class QemuAdapter(BackendAdapter):
     """QEMU: the delivered backend, and the seam's source."""
 
     name = "qemu"
+    settings_keys = SETTINGS_KEYS
 
     # -- discovery and capability ---------------------------------
 
@@ -968,6 +1009,16 @@ class QemuAdapter(BackendAdapter):
             at_rest=True,
             at_rest_write=True,
         )
+
+    def validate_settings(self, settings):
+        """Judge this machine's ``qemu`` section, rendering nothing.
+
+        The renderer *is* the validator (:func:`settings_args`), so
+        what a create accepts is exactly what a start puts on the
+        command line — including the unknown-key rule, which is why
+        this does not defer to the seam's shared one.
+        """
+        settings_args(settings)
 
     # -- materialize and dispose ----------------------------------
 
@@ -1033,6 +1084,12 @@ class QemuAdapter(BackendAdapter):
         the declared devices, the drive arguments, and the firmware boot
         order are all rendered here, so no caller ever composes a
         backend argument.
+
+        **This machine's own ``backend-settings.qemu`` section renders
+        last**, after everything Reliquary owns: the hatch adds to the
+        configuration rather than sitting inside it, and reading the
+        logged command line, a caller's own arguments are the tail.
+        Sections for other backends are inert and never read.
         """
         memory = state.get("memory") or 16
         vm_name = state.get("backend-id") or f"reliquary-{state['id']}"
@@ -1042,6 +1099,8 @@ class QemuAdapter(BackendAdapter):
         boot = _boot_order(state.get("boot", []), state.get("drives", {}))
         if boot is not None:
             args += ["-boot", f"order={boot}"]
+        args += settings_args(
+            (state.get("backend-settings") or {}).get(self.name))
         return launch_owned_qemu(
             args, vm_name=vm_name, display=display, current_vm=current,
             log_dir=backend_dir)
@@ -1097,6 +1156,77 @@ def _boot_order(boot_keys, drives):
         if letter is not None and letter not in letters:
             letters.append(letter)
     return "".join(letters) or None
+
+
+def _reserved_argument(item):
+    """What owns ``item``'s option, or ``None`` if the caller does.
+
+    Reads the option name out of one argv element the way QEMU would:
+    leading dashes stripped, and anything past a ``=`` or a space
+    ignored — so ``-m 64`` written as a single element is caught here
+    rather than handed to QEMU as an argument it cannot parse.
+    """
+    if not item.startswith("-"):
+        return None
+    name = re.split(r"[=\s]", item.lstrip("-"), maxsplit=1)[0]
+    return RESERVED_ARGUMENTS.get(name) if name else None
+
+
+def settings_args(settings):
+    """Validate ``backend-settings.qemu`` and render it into arguments.
+
+    **One path, so a section that validates is a section that
+    renders**: :meth:`QemuAdapter.validate_settings` calls this and
+    discards the result, and the launch calls it for the arguments. A
+    separate checker would be free to drift from the renderer, and the
+    drift would surface as configuration accepted at create time and
+    quietly missing at start.
+
+    The section is the escape hatch, so its *values* are the caller's
+    own — QEMU refuses a machine type it does not have, and that
+    refusal is the caller's to read. What is judged here is the key
+    set, each key's shape, and **overlap**: an argument Reliquary owns
+    through a first-class field or through VM identity is refused
+    naming the owner, because two sources for one fact is the one
+    thing a hatch must not become.
+    """
+    settings = settings or {}
+    unknown = sorted(key for key in settings if key not in SETTINGS_KEYS)
+    if unknown:
+        raise StaticError(
+            f"backend-settings.qemu does not define {unknown[0]!r}; the "
+            f"qemu keys are {', '.join(SETTINGS_KEYS)}",
+            rule_id="machine.settings-unknown-key")
+    args = []
+    machine = settings.get("machine")
+    if machine is not None:
+        if not isinstance(machine, str) or not machine.strip():
+            raise StaticError(
+                "backend-settings.qemu.machine must be a non-empty "
+                f"string naming a QEMU machine type, got: {machine!r}",
+                rule_id="value.not-a-string")
+        args += ["-machine", machine]
+    extra = settings.get("args")
+    if extra is not None:
+        if not isinstance(extra, list):
+            raise StaticError(
+                "backend-settings.qemu.args must be an array of "
+                f"arguments, got: {extra!r}", rule_id="value.not-an-array")
+        for index, item in enumerate(extra):
+            if not isinstance(item, str) or not item:
+                raise StaticError(
+                    f"backend-settings.qemu.args[{index}] must be a "
+                    f"non-empty string, got: {item!r}",
+                    rule_id="value.not-a-string")
+            owner = _reserved_argument(item)
+            if owner is not None:
+                raise StaticError(
+                    f"backend-settings.qemu.args[{index}] is {item!r}, "
+                    f"which reliquary owns through {owner} — settings may "
+                    "not restate what the blueprint already says",
+                    rule_id="machine.settings-reserved-argument")
+            args.append(item)
+    return args
 
 
 def device_args(devices):

@@ -799,7 +799,58 @@ Rules:
   fields — memory, drives, boot order, CPU count, machine identity.
   Each backend adapter validates its section and rejects overlap.
 - The available keys in each backend's section are defined and
-  documented by that backend adapter.
+  documented by that backend adapter. A key the adapter does not
+  define is refused when the machine is materialized, naming the
+  keys that backend does define — settings are never carried into
+  the state and then ignored.
+- Only the **assigned** backend's section is validated. Another
+  backend's section is preserved as written and never examined:
+  no adapter can speak for another's vocabulary.
+- A section that validates is a section that renders. What
+  `create-machine` accepts is what every `start-machine` applies.
+
+### `qemu`
+
+The one built adapter's vocabulary:
+
+| key | value | becomes |
+|---|---|---|
+| `machine` | a QEMU machine type | `-machine <value>` |
+| `args` | array of arguments | appended verbatim |
+
+Values are yours: Reliquary does not check that QEMU has the
+machine type or understands the arguments — QEMU refuses what it
+does not know, and that refusal is yours to read. What *is*
+checked is the key set, each key's shape, and overlap. These
+arguments are refused, each naming its owner:
+
+| refused | owned by |
+|---|---|
+| `-m` | [`memory`](#memory) |
+| `-smp` | [`cpus`](#cpus) |
+| `-boot` | [`boot`](#boot) |
+| `-drive`, `-hda`…`-hdd`, `-fda`, `-fdb`, `-cdrom` | [`drives`](#drives) |
+| `-machine`, `-M` | this section's own `machine` key |
+| `-name`, `-uuid`, `-qmp` | the recorded VM identity |
+| `-display`, `-nographic` | the display choice a start is given |
+
+An option written with its value in one element (`"-m 64"`) is
+caught the same way. Two arguments people expect to be refused are
+**not**: `-device` is the documented route to a device the curated
+[`devices`](#devices) vocabulary does not yet name, and `-cpu`
+selects a CPU *model* where `cpus` owns only the count.
+
+One of those owners does not yet spend what it owns: the QEMU
+adapter renders **no** `-smp`, so a [`cpus`](#cpus) above 1 is
+resolved into the state and not applied at launch. `-smp` is
+refused all the same — the count belongs to the first-class field
+wherever it is honored, and a second source for it in the hatch
+would have to be unpicked the day the adapter renders it. The gap
+is the adapter's to close, not the hatch's to work around.
+
+This section renders **last**, after everything Reliquary owns, so
+in the launch command line Reliquary logs, your own arguments are
+the tail.
 
 ---
 
@@ -822,7 +873,6 @@ Format checks (reject the document):
 - a `media` name no media component provides (plus every media /
   source / archive rule in [the media spec](spec/media-spec.md));
 - a `cdrom` drive naming a media that is not read-only `use`;
-- `backend-settings` sections overlapping Reliquary-owned fields;
 - `parameters` values that are neither a string nor a
   `{"property": "<key>"}` object, or with invalid input or
   property names.
@@ -840,4 +890,6 @@ naming backend and capability):
 - control planes the backend cannot offer;
 - `devices` the backend cannot provide (named as the device, not
   as a symptom);
-- boot orders the backend cannot honor.
+- boot orders the backend cannot honor;
+- a `backend-settings` key the assigned backend does not define,
+  or one of its arguments restating a Reliquary-owned field.

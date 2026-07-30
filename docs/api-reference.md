@@ -507,7 +507,10 @@ for reading rather than driving:
   backends already available *and* capable.
 - `Availability` / `Capabilities` / `BackendAdapter` - The probe
   result, the named-vocabulary capability report, and the contract
-  itself.
+  itself. An adapter also owns the `backend-settings` keys its
+  section may carry (`settings_keys`) and refuses the rest
+  (`validate_settings`), since that section is written in the
+  backend's own configuration language.
 
 QEMU's own helpers (`find_qemu`, `create_hdd_image`, `Qmp`, the
 drive rendering) are adapter internals in `reliquary.backend_qemu`
