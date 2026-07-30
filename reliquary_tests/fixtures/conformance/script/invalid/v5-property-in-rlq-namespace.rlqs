@@ -1,0 +1,8 @@
+# invalid: the rlq namespace is reserved
+# rule: V5
+# id: name.property-reserved-namespace
+# spec: Syntactic restrictions
+
+platform dos
+property text rlq.mine
+wait "x"

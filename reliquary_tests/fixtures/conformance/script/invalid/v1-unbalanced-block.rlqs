@@ -1,0 +1,10 @@
+# invalid: no unbalanced blocks
+# rule: V1
+# id: syn.unexpected-end
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    finish

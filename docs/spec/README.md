@@ -6,19 +6,20 @@ SPDX-License-Identifier: GPL-3.0-only
 # Specifications
 
 **These documents are normative.** They define Reliquary's
-interfaces, and they are the authority the implementation answers
+application surfaces, and they are the authority the implementation answers
 to — not a description of it. Where a spec and the code disagree,
 **the spec is right and the code has a bug**, unless the spec
-itself is changed first through the interface-change rule
-([planning/INTERFACES.md](../../planning/INTERFACES.md)).
+itself is changed first through the surface-change rule
+([planning/SURFACES.md](../../planning/SURFACES.md)).
 
 These specs are one leg of the project's **vision** — with the use
 cases ([USE-CASES.md](../../USE-CASES.md)) and the architectural
 principles ([ARCHITECTURE.md](../../ARCHITECTURE.md)), the standing
 statement of what Reliquary is and is for. They are also **part of
 the architecture**, not documentation about it
-(ARCHITECTURE.md "The interfaces" names them as the norms): an
-edit that changes what a spec requires is an interface change,
+(ARCHITECTURE.md "The application surfaces" names them as the
+norms): an edit that changes what a spec requires is a surface
+change,
 proposed and gated before it lands (**P23**) — never
 housekeeping, and a change arriving already made is rejected by
 citing that principle. Only an edit that changes no rule is
@@ -27,8 +28,8 @@ documentation work.
 That direction matters, and it is the reason these live here rather
 than under `planning/`. Everything in `docs/` describes the live
 situation. A spec is the exact statement of that situation: what an
-interface *is*, in force today, citable in a bug report and binding
-on the next change. Speculative work — what an interface might
+surface *is*, in force today, citable in a bug report and binding
+on the next change. Speculative work — what a surface might
 become — is not here; it is argued in
 [planning/proposed/](../../planning/proposed/) and, once pledged
 but not yet built, in
@@ -36,7 +37,7 @@ but not yet built, in
 
 ## Spec, reference, guide
 
-Three kinds of document describe the same interfaces, and they are
+Three kinds of document describe the same surfaces, and they are
 not interchangeable:
 
 - **Specs** (this directory) — normative, maintainer-facing, and
@@ -57,7 +58,7 @@ defers to — so a document copied, excerpted, or moved still says
 what it is. Reclassifying a document is an edit to that statement
 first; relocating the file is tidiness, not the act.
 
-## The interfaces
+## The application surfaces
 
 | Spec | Interface |
 |---|---|
@@ -82,7 +83,7 @@ semantics a schema cannot express. The
 a disagreement with the schema or the model is their bug. The
 control-plane doctrine
 ([guest-communication.md](../../planning/design/guest-communication.md))
-is internal engineering design, not a world-facing interface
+is internal engineering design, not an application surface
 contract, and lives under `planning/`.
 
 ## Machine-readable schemas

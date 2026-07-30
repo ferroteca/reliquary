@@ -1,0 +1,9 @@
+# invalid: a property key is declared once per script
+# rule: V5
+# id: name.duplicate-property
+# spec: Syntactic restrictions
+
+platform dos
+property text owner
+property text owner
+wait "x"

@@ -10,8 +10,8 @@ SPDX-License-Identifier: GPL-3.0-only
 > and the specifications ([docs/spec/](docs/spec/)) it forms the
 > project's **vision** — the standing statement of what Reliquary
 > is and is for. Interface decisions are weighed against this list
-> and the pledged proposals under the interface-change rule
-> ([planning/INTERFACES.md](planning/INTERFACES.md)); proposed
+> and the pledged proposals under the surface-change rule
+> ([planning/SURFACES.md](planning/SURFACES.md)); proposed
 > changes are tracked in
 > [planning/proposed/USE-CASES.md](planning/proposed/USE-CASES.md) and
 > land here only when delivered — every use case here is met
@@ -25,8 +25,8 @@ Interface decisions are weighed against these. They are numbered
 so a decision, review, or spec section can cite the use case it
 serves — and so a proposed change can be rejected by naming the
 use case it costs. This list is the decision surface: significant
-interface changes arrive as proposed amendments to it (see the
-[interface-change rule](planning/INTERFACES.md#the-rule)),
+surface changes arrive as proposed amendments to it (see the
+[surface-change rule](planning/SURFACES.md#the-rule)),
 drafted and tracked in
 [planning/proposed/USE-CASES.md](planning/proposed/USE-CASES.md), and
 moved here when delivered — the move to
@@ -43,11 +43,11 @@ beside [ARCHITECTURE.md](ARCHITECTURE.md) rather than under
 plan.
 
 **The landing bar** (owner, 2026-07-29): a use case lands here
-fully flushed. Every interface it names is delivered exactly as
+fully flushed. Every surface it names is delivered exactly as
 written, and a case authored as a worked journey — a summary of
 what it achieves plus the numbered steps that achieve it — reads
 as a precise recipe: a user follows it as written, over public
-interfaces, to accomplish the goal. Nothing here may lean on an
+surfaces, to accomplish the goal. Nothing here may lean on an
 undelivered piece — a proposed or pledged case flags such steps
 by the pledged feature they require, and no flag can survive to
 this list, because the feature's handle evaporates on the very

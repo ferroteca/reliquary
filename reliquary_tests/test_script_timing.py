@@ -33,7 +33,7 @@ class DurationTests(unittest.TestCase):
                 parse_script(source)
             self.assertIn("must be a positive duration",
                           caught.exception.message)
-            self.assertEqual(RULE_OF[caught.exception.rule_id], "S5")
+            self.assertEqual(RULE_OF[caught.exception.rule_id], "V5")
 
 
 class PlacementMatrixTests(unittest.TestCase):
@@ -43,7 +43,7 @@ class PlacementMatrixTests(unittest.TestCase):
         with self.assertRaises(ScriptParseError, msg=source) as caught:
             parse_script(source)
         self.assertIn(reason, caught.exception.message, msg=source)
-        self.assertEqual(RULE_OF[caught.exception.rule_id], "S2",
+        self.assertEqual(RULE_OF[caught.exception.rule_id], "V2",
                          msg=source)
 
     def test_deadline_is_not_an_observation_bound(self):
@@ -248,14 +248,14 @@ class PacingPlanTests(unittest.TestCase):
 
 
 class CycleTests(unittest.TestCase):
-    """S12: a cyclable phase graph declares the run's backstop."""
+    """V12: a cyclable phase graph declares the run's backstop."""
 
     def rejects(self, source, route):
         with self.assertRaises(ScriptParseError, msg=source) as caught:
             parse_script(source)
         self.assertIn(f"the phase graph can cycle ({route})",
                       caught.exception.message)
-        self.assertEqual(RULE_OF[caught.exception.rule_id], "S12")
+        self.assertEqual(RULE_OF[caught.exception.rule_id], "V12")
         return caught.exception
 
     def test_a_self_loop_needs_a_deadline(self):

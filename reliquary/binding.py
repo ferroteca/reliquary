@@ -209,7 +209,7 @@ class _Binder:
     def _reference_value(self, key):
         """A derivation reference: a bound declared key, or an rlq fact.
 
-        Static validation (S6) guaranteed the key is one or the other,
+        Static validation (V6) guaranteed the key is one or the other,
         so a fact lookup here never raises. A declared key not yet in
         the bound set resolves to None — it did not answer — which the
         dependency ordering makes deterministic.
@@ -292,7 +292,7 @@ def _binding_order(declarations):
     A `default=` may reference another declared key's bound value, so
     that key must resolve first. The order is a stable topological
     sort over those edges — declaration order otherwise — and the
-    static acyclic guarantee (S6) means it always exists.
+    static acyclic guarantee (V6) means it always exists.
     """
     by_key = {d.key: d for d in declarations}
     ordered = []

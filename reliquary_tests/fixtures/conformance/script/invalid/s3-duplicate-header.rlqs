@@ -1,9 +1,0 @@
-# invalid: each header appears at most once
-# rule: S3
-# id: syn.duplicate-header
-# spec: Syntactic restrictions
-
-platform dos
-timeout 10s
-timeout 20s
-wait "x"

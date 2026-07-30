@@ -357,7 +357,7 @@ class DerivationTests(unittest.TestCase):
 
 
 class DerivationValidationTests(unittest.TestCase):
-    """The static derivation rules (S5, S6)."""
+    """The static derivation rules (V5, V6)."""
 
     def check(self, text):
         from reliquary.script_validation import validate

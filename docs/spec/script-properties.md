@@ -257,7 +257,7 @@ inserts one. The model still expands, on three designed routes
   configuration — and provenance is mandatory: a dry run
   and transcripts name the injected source like any built-in
   tier. The provider protocol will be Reliquary-defined and
-  flat (planning/INTERFACES.md — a shape every binding language
+  flat (planning/SURFACES.md — a shape every binding language
   can express), which is also why no existing settings library
   can own the public seam.
 

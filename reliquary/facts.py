@@ -105,7 +105,7 @@ def resolve(key):
     """Return a fact's value, or None when it is unavailable/empty.
 
     Raises KeyError for a key outside the known `rlq.*` catalog, which
-    the static reference check (S6) has already ruled out before a run.
+    the static reference check (V6) has already ruled out before a run.
     """
     if key in _CATALOG:
         return _CATALOG[key]()

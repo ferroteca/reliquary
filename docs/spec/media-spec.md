@@ -51,7 +51,7 @@ reconstructible**, without exception: nothing enters it except by
 download or extraction, so no payload there is irreplaceable and
 reclamation never has to ask where a file came from (D41). A bare
 file dropped into the directory does nothing: the cache is
-Reliquary's, not an interface.
+Reliquary's, not an application surface.
 
 ## The media component
 
@@ -217,7 +217,7 @@ tried.
 
 The embedding API counterpart is
 `fetch_media(name, context=None, on_mismatch="fail")` — the CLI and
-the API move together (planning/INTERFACES.md). `fetch_media` is the
+the API move together (planning/SURFACES.md). `fetch_media` is the
 blocking form: a typed result, errors raised by class. Its
 asynchronous twin `start_fetch(...)` is **backlog work** (D35 —
 the async pillar left the numbered arc for lack of a use case,

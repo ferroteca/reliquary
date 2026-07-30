@@ -20,14 +20,14 @@ SPDX-License-Identifier: GPL-3.0-only
 > only fixing. Below this list an entry is pledged vision and a
 > shortfall is work not yet done; here it is a claim, and a claim
 > can be false. Where the code and an entry disagree, **the entry
-> is right** unless it is changed first through the interface-change
+> is right** unless it is changed first through the surface-change
 > rule (P23).
 > Proposed architecture lives in
 > [planning/proposed/ARCHITECTURE.md](planning/proposed/ARCHITECTURE.md)
 > and pledged-but-undelivered architecture in
 > [planning/pledged/ARCHITECTURE.md](planning/pledged/ARCHITECTURE.md),
 > under the same global P-numbering, with no placeholder here;
-> amendments are argued like interface changes and recorded in
+> amendments are argued like surface changes and recorded in
 > [planning/DECISIONS.md](planning/DECISIONS.md).
 > Principles feed into the use cases
 > ([USE-CASES.md](USE-CASES.md)) and the decisions; use cases and
@@ -109,25 +109,54 @@ even where the backend is installed: the order's tail is intent
 recorded, not shipped behavior, and what changes when one is built
 is its capability report.
 
-## The interfaces
+## The application surfaces
 
 The seams are the inside; this is the outside boundary — the
-surfaces through which the world drives Reliquary. **This
-enumeration is normative**: housekeeping's first test and the
-interface-change rule
-([planning/INTERFACES.md](planning/INTERFACES.md)) both answer
-"does it change an interface?" by lookup against this list, and
-changing any surface named here follows that rule.
+**application surfaces**, through which the world drives
+Reliquary. **This enumeration is normative**: housekeeping's first
+test and the surface-change rule
+([planning/SURFACES.md](planning/SURFACES.md)) both answer "does
+it change an application surface?" by lookup against this list,
+and changing any surface named here follows that rule.
 
-Reliquary meets the world through its primary interfaces:
+**Each surface carries an S-number**, so a decision, a review, a
+commit or a spec section can name what it touches instead of
+describing it — and so the rule's first landing step ("name every
+surface it touches") resolves to handles rather than prose. The
+numbers run in one global sequence and are **permanent**: a
+surface is vision, not work, so its handle persists and is never
+reused even if the surface itself is retired
+([planning/DECISIONS.md](planning/DECISIONS.md) D42's handle
+classes). A drafted surface is numbered from the same sequence in
+[planning/proposed/ARCHITECTURE.md](planning/proposed/ARCHITECTURE.md)
+and a pledged one in
+[planning/pledged/ARCHITECTURE.md](planning/pledged/ARCHITECTURE.md),
+with no placeholder here.
 
-1. **The CLI** — the `rlq` / `reliquary` command.
-2. **The embedding API** — native language bindings (Python is
-   the first).
-3. **The scripting language** — `.rlqs` scripts.
-4. **The machine blueprint** — the authored `.rlqb` document: an
-   array of specs of two types, the machine and the `media` it draws
-   on.
+The first four are the **primary** surfaces — the ones a user
+drives directly:
+
+1. **S1 — The CLI** — the `rlq` / `reliquary` command.
+2. **S2 — The embedding API** — native language bindings (Python
+   is the first).
+3. **S3 — The scripting language** — `.rlqs` scripts.
+4. **S4 — The machine blueprint** — the authored `.rlqb` document:
+   an array of specs of two types, the machine and the `media` it
+   draws on.
+
+The remaining four are **supporting** world-facing contracts,
+which the rule covers exactly as it covers the primary four — the
+grouping describes how a user meets them, and confers no lesser
+standing:
+
+5. **S5 — The script properties** — the mechanism through which
+   scripts consume values.
+6. **S6 — The codex** — Reliquary's built-in seed content and its
+   index.
+7. **S7 — The run's returned output** — the event stream, the
+   `--json` documents, and the exit codes.
+8. **S8 — The working-directory layout** — the six placeable
+   directories.
 
 They are deliberately not independent designs. The CLI and
 the API are two presentations of one semantic surface: every
@@ -148,7 +177,7 @@ carries no JSON. A capability that appears
 on one surface appears on the others wherever it is meaningful;
 where it does not, the omission is a named decision, not drift.
 
-### The CLI
+### S1 — The CLI
 
 `rlq` (and its alias `reliquary`) is the human operator's surface:
 explicit `--blueprint` / `--machine` selection, the two-layer
@@ -167,7 +196,7 @@ program in any language must be able to invoke it, observe it,
 and parse what it prints cleanly (P7). Specification:
 [docs/spec/cli.md](docs/spec/cli.md).
 
-### The embedding API
+### S2 — The embedding API
 
 The embedding API is the first-class surface for consuming
 projects: test harnesses, CI drivers, and any orchestration that
@@ -189,7 +218,7 @@ implemented Python binding is documented in
 engineering contract in [AGENTS.md](AGENTS.md) "The runner
 surface".
 
-### The scripting language
+### S3 — The scripting language
 
 `.rlqs` scripts are the authored automation surface: declarative
 about resources, imperative about guest interaction, statically
@@ -199,7 +228,7 @@ language goals (G1–G7). Source of truth:
 [planning/design/script-examples/](planning/design/script-examples/)
 as reference material.
 
-### The machine blueprint
+### S4 — The machine blueprint
 
 A blueprint is a reusable, user-owned JSON description of a kind of
 machine: an array of specs of two types, `machine` and `media`
@@ -226,24 +255,25 @@ verification, and the cache. The
 [field reference](docs/blueprint-reference.md), and
 [cookbook](docs/blueprint-cookbook.md) are descriptive.
 
-### Supporting world-facing contracts
+### S5–S8 — The supporting contracts
 
-The primary interfaces do not exhaust what the world touches.
-These contracts are world-facing too, and the interface-change
-rule covers them equally:
+The primary surfaces do not exhaust what the world touches. These
+contracts are world-facing too, and the surface-change rule covers
+them equally:
 
-- **Script properties** — the mechanism through which scripts
+- **S5 — Script properties** — the mechanism through which scripts
   consume values. Its authored surfaces face the world without
-  passing through any primary interface: the user-owned
+  passing through any primary surface: the user-owned
   `user.properties` file, edited directly in an editor, and the
   `RELIQUARY_PROPERTY_*` environment spelling:
   [docs/spec/script-properties.md](docs/spec/script-properties.md).
-- **The codex** — Reliquary's built-in seed content and its
-  index: seed-not-a-resolution-tier semantics, never-overwrite,
+- **S6 — The codex** — Reliquary's built-in seed content and
+  its index: seed-not-a-resolution-tier semantics, never-overwrite,
   delete-to-refresh, provenance, and the licensing rule
   for shipped media URLs:
   [docs/spec/codex.md](docs/spec/codex.md).
-- **The run's returned output** — a run drives the machine and
+- **S7 — The run's returned output** — a run drives the machine
+  and
   returns its output to whoever started it, storing nothing (D36):
   the live event stream (rendered pretty or as `jsonl`, with the
   secret-redaction contract), `--json` documents, and exit codes
@@ -255,7 +285,7 @@ rule covers them equally:
   "Asynchronous runs"). A run's product is the consumer's, kept on
   its own side of the seam
   ([docs/spec/script-spec.md](docs/spec/script-spec.md)).
-- **The working-directory layout** — the six placeable
+- **S8 — The working-directory layout** — the six placeable
   directories, where users place payload files, find caches, and
   locate everything above:
   [docs/spec/asset-resolution.md](docs/spec/asset-resolution.md)
@@ -269,12 +299,12 @@ Each surface above names the artifact that norms it — a
 the blueprint's structure, and this enumeration itself. Those
 normative artifacts are not documentation *about* the
 architecture; they are architecture: each one is the exact
-statement of what an interface is, and the implementation answers
-to it. It follows that **changing what a norm requires is
-changing the interface** — proposed and gated first under the
-interface-change rule
-([planning/INTERFACES.md](planning/INTERFACES.md)) like any other
-interface change (**P23**), and never admissible as housekeeping
+statement of what an application surface is, and the
+implementation answers to it. It follows that **changing what a
+norm requires is changing the surface** — proposed and gated first
+under the surface-change rule
+([planning/SURFACES.md](planning/SURFACES.md)) like any other
+surface change (**P23**), and never admissible as housekeeping
 however small the diff. Only an edit that changes no rule — the
 clarify test: no past decision citing the norm would have come out
 differently under the new wording — is mere documentation work.
@@ -309,18 +339,18 @@ differently under the new wording — is mere documentation work.
   are twin presentations of one surface: every command is its
   API twin, nothing is CLI-only, and no capability is
   unreachable from the CLI. (AGENTS.md "CLI–API parity";
-  INTERFACES.)
+  SURFACES.)
 - **P7 — The binding constraint.** Nothing may be hard to
   express in a common binding language (C, Java), and the
   CLI — the fallback binding for every unbound language — must
-  never be hard to drive from a program. (INTERFACES.)
-- **P8 — Interface and principle changes are vetted.** Every
-  interface-changing decision triages by its impact on the use
+  never be hard to drive from a program. (SURFACES.)
+- **P8 — Surface and principle changes are vetted.** Every
+  surface-changing decision triages by its impact on the use
   cases *and the architectural principles*, under the
-  interface-change rule; a change misaligned with either is
+  surface-change rule; a change misaligned with either is
   argued as the amendment it requires — a principle amendment
   as vigorously as a use-case one — never as a feature on its
-  own merits. (INTERFACES.)
+  own merits. (SURFACES.)
 - **P9 — No backward compatibility before 1.0.** Changes land
   coherently and completely; the old shape is deleted, never
   bridged. Through beta and the rest of pre-1.0 a cushion may be
@@ -379,7 +409,7 @@ differently under the new wording — is mere documentation work.
   one at a time cannot take them back. When a ceiling binds
   the answer is a layer — arriving as its own kind, never as
   a wider dialect of the channel it feeds — argued under the
-  interface-change rule and chosen then, never pre-committed.
+  surface-change rule and chosen then, never pre-committed.
   Computation lives outside all three, in the caller's own
   language. A ceiling governs what a channel may *say*, never
   how widely an already-permitted form may be *used*. This is
@@ -473,13 +503,13 @@ differently under the new wording — is mere documentation work.
   entry renamed or dropped — so neither a name nor what it holds
   is fixed, and no release ever promises otherwise. That holds
   permanently and on its own: the codex is content rather than
-  interface, so it stays outside whatever compatibility promise
+  surface, so it stays outside whatever compatibility promise
   the project comes to make. Nothing programmatic may depend on
   it in place, and none is meant to; the codex is where a
   consuming project's own assets *start*. Seed the copy, commit
   it, and the stability is that project's to hold rather than
   Reliquary's to promise (P4). The codex's *semantics* are an
-  interface and are specified, its *content* is not, and
+  application surface and are specified, its *content* is not, and
   anything reusable is the consuming project's or another
   project's to build. Reliquary attaches no meaning to what
   runs through its mechanisms; computation and interpretation
@@ -518,7 +548,7 @@ differently under the new wording — is mere documentation work.
 - **P23 — The self-description changes by proposal, never by
   arrival.** What the project says it is and is for — the
   standing lists (this document and USE-CASES.md), the normative
-  artifacts (the specs, the published schemas, the interface
+  artifacts (the specs, the published schemas, the surface
   enumeration), and everything under `planning/` — changes only
   through a proposal that wins its gate first, entered through
   the queues (D39). These are one category because they are the
@@ -547,12 +577,12 @@ differently under the new wording — is mere documentation work.
   absence of governance — a false claim means an unapproved change
   landed. (Prose: "The norms are part of the
   architecture" above; the enforcement point is
-  planning/INTERFACES.md's housekeeping boundary. P8 says how
+  planning/SURFACES.md's housekeeping boundary. P8 says how
   the argument is weighed; this says it must happen first.)
 
-- **P24 — Every interface is tested against its
-  specification.** Each interface enumerated in "The interfaces"
-  above carries automated tests checking it against the norm that
+- **P24 — Every application surface is tested against its
+  specification.** Each surface enumerated in "The application
+  surfaces" above carries automated tests checking it against the norm that
   defines it, and the suite passes on every commit to `main`.
   There is no "to whatever extent possible" clause: the claim is
   stated so it can be *violated*, and a surface that genuinely

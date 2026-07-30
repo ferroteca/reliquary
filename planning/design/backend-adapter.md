@@ -8,8 +8,8 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** the design doctrine for Reliquary's backend adapter
 > seam (owner, 2026-07-21), **delivered 2026-07-28** as F2 — whose
 > number retires with it. It is an internal engineering contract,
-> deliberately **not** one of the world-facing interfaces
-> (planning/INTERFACES.md names those; the watch that would revisit
+> deliberately **not** one of the application surfaces
+> (planning/SURFACES.md names those; the watch that would revisit
 > this is recorded in planning/TASKS.md), which is why it stays here
 > rather than moving to `docs/spec/` on delivery. It travelled from
 > `pledged/design/` when F2 left the shelf: a delivered feature
@@ -29,7 +29,7 @@ Hyper-V ([ARCHITECTURE.md](../../ARCHITECTURE.md), "The seams"; the
 per-backend control-plane inventory is in
 [guest-communication.md](guest-communication.md)). It is the
 *provider* contract behind Reliquary's semantic surface, and it is
-none of the things the primary interfaces are:
+none of the things the primary surfaces are:
 
 - **Never a twin family.** No adapter operation appears on the CLI
   or in the embedding API. Consumers touch backends only through
@@ -46,8 +46,8 @@ none of the things the primary interfaces are:
 - **In-repo consumers only, for now.** All four adapters ship with
   Reliquary — one built and three stubs. If a third-party adapter
   story ever becomes real, the
-  seam is elevated into the INTERFACES inventory through the
-  interface-change rule — that elevation is the recorded watch,
+  seam is elevated into the SURFACES inventory through the
+  surface-change rule — that elevation is the recorded watch,
   not the default.
 
 ## The three layers

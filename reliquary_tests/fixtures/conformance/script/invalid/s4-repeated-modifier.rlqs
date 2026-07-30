@@ -1,7 +1,0 @@
-# invalid: a repeat is an error, never last-wins
-# rule: S4
-# id: node.duplicate-modifier
-# spec: Syntactic restrictions
-
-platform dos
-wait "x" timeout=1s timeout=2s

@@ -1,0 +1,8 @@
+# invalid: a $ reference names a declared property or an rlq fact
+# rule: V6
+# id: prop.undefined-reference
+# spec: Syntactic restrictions
+
+platform dos
+property text owner default="${nobody}"
+wait "x"

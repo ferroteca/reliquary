@@ -14,7 +14,7 @@ wrong reason being a false pass only a reviewer could catch.
 **The parent has caught up** (2026-07-27). Blueprint diagnostics
 carry ids now, so that corpus asserts its `// id:` line the same
 way and the harness catches the false pass there too. What remains
-different is the `# rule:` line: the script rules are S-numbered,
+different is the `# rule:` line: the script rules are V-numbered,
 so an id here can be checked against the rule it is *meant* to
 serve rather than only the one that fired. That is the assertion
 the blueprint corpus still cannot make, and the reason is its
@@ -24,7 +24,7 @@ The ids are the dotted scheme D55 required and the static rules
 now carry: a fixture names the diagnostic that must reject it —
 `obs.two-channels`, the spec's own example — and the harness
 compares it against the raised `rule_id`. It began as the
-S-numbers, which was weaker in a way worth recording: an S-number
+V-numbers, which was weaker in a way worth recording: a V-number
 names a *rule* and several diagnostics live under each, so
 asserting one could not tell six different failures apart.
 
@@ -36,9 +36,9 @@ diagnostics a class worth naming a rule for, so
 `invalid-at-preflight/` asserts a reason too rather than only
 "parses clean" — which is what the bucket was always for.
 
-One fixture carries `# caught-by:` instead. `s8-branching-with-a-
-condition` exercises S8 and is rejected by the *grammar*, so its
-id is `syn.unexpected-token` and the S8 arm in validation is
+One fixture carries `# caught-by:` instead. `v8-branching-with-a-
+condition` exercises V8 and is rejected by the *grammar*, so its
+id is `syn.unexpected-token` and the V8 arm in validation is
 unreachable. That is a defect the corpus found and now asserts
 rather than describes.
 
@@ -67,7 +67,7 @@ from reliquary.script_runner import _preflight_machine_rules
 
 _CORPUS = os.path.join(os.path.dirname(__file__), "fixtures",
                        "conformance", "script")
-_RULE = re.compile(r"^# rule: (S\d+)", re.M)
+_RULE = re.compile(r"^# rule: (V\d+)", re.M)
 _ID = re.compile(r"^# id: (\S+)", re.M)
 # The spec is source-tree only — `docs/` is not packaged — so the
 # four tests below that read it carry the sanctioned `skipUnless`
@@ -80,7 +80,7 @@ _SPEC = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "docs", "spec", "script-spec.md")
 _DOTTED = re.compile(r"`([a-z]+\.[a-z-]+)`")
-_CAUGHT_BY = re.compile(r"^# caught-by: (S\d+)", re.M)
+_CAUGHT_BY = re.compile(r"^# caught-by: (V\d+)", re.M)
 
 
 def _fixtures(bucket):
@@ -226,7 +226,7 @@ class InvalidCorpusTests(unittest.TestCase):
     def test_every_declared_id_is_listed_in_the_spec(self):
         """Every id the corpus names appears in the spec's rule list.
 
-        Ids are finer than the S-rules — S7 is one restriction and
+        Ids are finer than the V-rules — V7 is one restriction and
         `obs.two-channels` is one of six diagnostics under it — so
         the spec's rule list carries the mapping and this holds the
         two together. Without it the prefixes would drift into
@@ -234,7 +234,7 @@ class InvalidCorpusTests(unittest.TestCase):
         """
         with open(_SPEC, encoding="utf-8") as handle:
             spec = handle.read()
-        start = spec.index("- **S1** —")
+        start = spec.index("- **V1** —")
         end = spec.index("\nThe grammar is line-oriented", start)
         listed = set(_DOTTED.findall(spec[start:end]))
         for path in _fixtures("invalid"):
@@ -243,7 +243,7 @@ class InvalidCorpusTests(unittest.TestCase):
                 self.assertIn(
                     declared, listed,
                     f"{declared} rejects a corpus fixture and appears "
-                    "in no S-rule's id list in "
+                    "in no V-rule's id list in "
                     "docs/spec/script-spec.md.")
 
     @unittest.skipUnless(os.path.isfile(_SPEC),
@@ -315,7 +315,7 @@ class InvalidCorpusTests(unittest.TestCase):
         """The reverse: a listed id that nothing raises is fiction."""
         with open(_SPEC, encoding="utf-8") as handle:
             spec = handle.read()
-        start = spec.index("- **S1** —")
+        start = spec.index("- **V1** —")
         end = spec.index("\nThe grammar is line-oriented", start)
         listed = set(_DOTTED.findall(spec[start:end]))
         raised = set()
@@ -329,7 +329,7 @@ class InvalidCorpusTests(unittest.TestCase):
                                          handle.read()))
         self.assertEqual(
             sorted(listed - raised), [],
-            "these ids are listed under an S-rule and no diagnostic "
+            "these ids are listed under a V-rule and no diagnostic "
             "raises them. A rule list naming ids that cannot occur is "
             "the same defect as a spec naming a command that does not "
             "exist.")
@@ -344,11 +344,11 @@ class InvalidCorpusTests(unittest.TestCase):
 
         The three modules scanned are the **static tier**, and that
         is the whole map by construction: `RULE_OF` maps an id to
-        the S-numbered restriction it enforces, and S-numbers name
+        the V-numbered restriction it enforces, and V-numbers name
         syntactic restrictions only. A preflight or runtime id —
         `machine.slot-not-declared`, `media.unknown` — enforces a
         machine rule or the dynamic semantics, which have no
-        S-number to map to. Absent from `RULE_OF` is therefore
+        V-number to map to. Absent from `RULE_OF` is therefore
         correct for them rather than a gap, and widening this scan
         would demand entries that could only be invented.
         """

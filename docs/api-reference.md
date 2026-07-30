@@ -454,7 +454,7 @@ Module-level equivalents take `home=` directly: `send_keys`,
 ## Backends
 
 The adapter API is an **internal engineering contract**, not one of
-the world-facing interfaces: no adapter operation is a CLI command
+the application surfaces: no adapter operation is a CLI command
 or an API twin, and consumers reach backends through blueprint
 vocabulary (`backend`, `backend-settings`, `control-planes`, drives
 and controllers) and through the capability failures preflight

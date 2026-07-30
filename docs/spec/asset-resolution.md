@@ -9,8 +9,8 @@ SPDX-License-Identifier: GPL-3.0-only
 > axis, the extension-and-name identity rule, the recorded blueprint
 > source, and the default layout are implemented and are what the
 > code answers to; the layout is a world-facing contract, so changes
-> to it follow the interface-change rule
-> ([INTERFACES.md](../../planning/INTERFACES.md)). Two things
+> to it follow the surface-change rule
+> ([SURFACES.md](../../planning/SURFACES.md)). Two things
 > below are **reserved**, named so they are not mistaken for
 > today's behaviour: the `ObjectSource` fileless third source, and
 > landmark declarations (`.rlql`, the home `landmarks/` folder) —
@@ -195,5 +195,5 @@ of. The machine directory's own structure and ownership model are
 in [instance-model.md](instance-model.md).
 
 The working-directory layout is a world-facing contract
-([INTERFACES.md](../../planning/INTERFACES.md)): changes to it follow
-the interface-change rule.
+([SURFACES.md](../../planning/SURFACES.md)): changes to it follow
+the surface-change rule.

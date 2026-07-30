@@ -9,7 +9,7 @@ the lexical diagnostics; the grammar fixes node names and
 positional argument types; this module's transformer checks each
 node's modifiers against its signature and builds the typed tree.
 
-The S-numbered static rules live above this layer.
+The V-numbered static rules live above this layer.
 """
 
 import os
@@ -31,7 +31,7 @@ from .script_validation import validate
 # else naming the node and what it accepts. Observation nodes list
 # their timing modifiers only: every other modifier on an
 # observation names a channel (script-spec.md, "Channels"), which
-# S7 checks in the validation layer.
+# V7 checks in the validation layer.
 _SIGNATURES = {
     "wait_one": ("timeout", "stable"),
     "wait_branching": ("timeout",),
@@ -71,7 +71,7 @@ _DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable",
 
 # The placement matrix (script-spec.md, "Timing"): every timing
 # word the signatures above reject is rejected for a reason, and
-# S2 diagnostics give it rather than listing what fits instead.
+# V2 diagnostics give it rather than listing what fits instead.
 _PLACEMENT = {
     ("wait_one", "deadline"):
         "a budget bounds the wall clock of the construct it annotates, "
@@ -149,10 +149,10 @@ class Condition:
     """One observation condition on one channel.
 
     ``channel`` is ``None`` for a bare word, which spells no
-    condition at all; the parser types it anyway so S7 can name
+    condition at all; the parser types it anyway so V7 can name
     what the author wrote. ``named`` distinguishes a channel the
     author named with a modifier from the unprefixed screen
-    default, which S7 also checks.
+    default, which V7 also checks.
     """
 
     channel: Optional[str]        # "screen", "machine", or None
@@ -164,7 +164,7 @@ class Condition:
 
 
 class _Observed:
-    """The one-condition view S7 guarantees over the authored ones."""
+    """The one-condition view V7 guarantees over the authored ones."""
 
     @property
     def condition(self):
@@ -253,7 +253,7 @@ class Http:
 
 @dataclass(frozen=True)
 class Script:
-    """A parsed ``.rlqs`` document, before the S-rule checks."""
+    """A parsed ``.rlqs`` document, before the V-rule checks."""
 
     platform: Optional[str] = None
     description: Optional[StringLiteral] = None
@@ -379,7 +379,7 @@ def _observation(node, items):
 
     The timing set is closed, so every other modifier on an
     observation names a channel. Whether that channel exists and
-    carries a value of the right kind is S7's, in the validation
+    carries a value of the right kind is V7's, in the validation
     layer, where the diagnostic can say so.
     """
     timing = [item for item in items if item[0] in _DURATION_MODIFIERS]
@@ -653,7 +653,7 @@ class _Builder(Transformer):
                          _line(token), _column(token))
 
     def bare_condition(self, children):
-        # No channel: a bare word spells no condition at all. S7
+        # No channel: a bare word spells no condition at all. V7
         # names it, so the grammar admits it rather than failing
         # here with an unexpected-token diagnostic.
         token = children[0]
@@ -859,7 +859,7 @@ def parse_script(source, path="<script>"):
     """Parse and statically validate a ``.rlqs`` document.
 
     Applies the lexical rules, the node signatures, and header
-    uniqueness here, then the S-numbered rules over the typed tree
+    uniqueness here, then the V-numbered rules over the typed tree
     in :mod:`reliquary.script_validation` — script shape,
     observation channels, control flow.
     """
@@ -906,7 +906,7 @@ def _diagnose(error, source, path):
     coarsest ids in the scheme: the grammar knows a token is
     unexpected, never which rule the author was reaching for. That
     is the trade script-spec.md makes deliberately by keeping the
-    S-rules above the CFG — a named rule where validation can
+    V-rules above the CFG — a named rule where validation can
     reach, an unexpected token where only the parser can.
     """
     token = getattr(error, "token", None)

@@ -46,7 +46,7 @@ longer the check.
 
 That was worth having immediately. Three fixtures in the first
 draft were rejected by the wrong rule — `finish` inside a linear
-script trips S10 before the S8 or S9 clause under test — and the
+script trips V10 before the V8 or V9 clause under test — and the
 harness named all three. Under the blueprint corpus's assertion
 they would have passed, and gone on passing after the rules they
 claimed to exercise stopped working.
@@ -57,9 +57,9 @@ as much as the precision of the failure it can assert, and
 identifiers are what buy that precision.
 
 **The corpus came first, and it is why the ids are the shape they
-are.** Written against the S-numbers, it worked but blunted: an
-S-number names a *rule*, and S7 has six diagnostics under it, so
-a fixture asserting `S7` could not tell "no condition" from
+are.** Written against the V-numbers, it worked but blunted: an
+V-number names a *rule*, and V7 has six diagnostics under it, so
+a fixture asserting `V7` could not tell "no condition" from
 "unknown channel". That is the concrete argument for the dotted
 scheme being finer than the rules rather than a renaming of
 them — the question [D55](../../../../planning/DECISIONS.md)'s
@@ -73,16 +73,16 @@ corpus was written first and the ids followed, which is the order
 that made them right — see below.
 
 One fixture carries `# caught-by:` instead, and it records a
-defect the corpus found. `s8-branching-with-a-condition` —
-`wait "x" { … }` — exercises S8 and is rejected by the
+defect the corpus found. `v8-branching-with-a-condition` —
+`wait "x" { … }` — exercises V8 and is rejected by the
 **grammar**, so its id is `syn.unexpected-token` and the
 `wait.branching-condition` arm in `script_validation` is
 unreachable. `script_grammar.lark`'s own header says the
-S-numbered rules stay above it *"where a diagnostic can cite its
+V-numbered rules stay above it *"where a diagnostic can cite its
 id — encoding them here would trade named errors for 'unexpected
 token'"*; this clause is the trade it warns about. Two defensible
 fixes (loosen the production so validation sees it, or accept the
-parse error and delete the dead arm); the spec calling S8 a rule
+parse error and delete the dead arm); the spec calling V8 a rule
 "the grammar cannot carry" points at the first. The marker is
 asserted in both directions, so it retires itself when either
 lands.
@@ -111,7 +111,7 @@ own, and choosing them is that work.
 
 ```rlqs
 # invalid: an observation carries exactly one condition
-# rule: S7
+# rule: V7
 # id: obs.two-channels
 # spec: Syntactic restrictions
 ```

@@ -625,7 +625,7 @@ class ScriptDryRunTests(unittest.TestCase):
                 handle.write(_HEAD + "entry a\nphase a {\n    goto a\n}\n")
             with self.assertRaises(ScriptParseError) as caught:
                 self._dry("bad", context=home)
-            self.assertEqual("S12", RULE_OF[caught.exception.rule_id])
+            self.assertEqual("V12", RULE_OF[caught.exception.rule_id])
 
     def test_with_a_machine_media_slots_are_preflighted(self):
         with tempfile.TemporaryDirectory() as home:

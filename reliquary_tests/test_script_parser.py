@@ -333,7 +333,7 @@ class SignatureTests(unittest.TestCase):
 
     def test_a_wait_takes_the_timing_modifiers_that_are_its_own(self):
         # Only the timing set is a wait's own; every other modifier
-        # names a channel, and S7 owns that diagnostic.
+        # names a channel, and V7 owns that diagnostic.
         with self.assertRaises(ScriptParseError) as caught:
             parse_script(_HEAD + 'wait "x" exclude="y"\n')
         self.assertIn("unknown observation channel: exclude",

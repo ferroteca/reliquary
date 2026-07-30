@@ -73,13 +73,64 @@ that was closed or the [DECISIONS.md](DECISIONS.md) entry that
 argued it, that file already being the guard against
 re-litigating.
 
-The file is one section, [Pledged](#pledged) — the queue proper,
-grouped by kind because the actor and the gate differ, though the
-grouping is not a running order.
+The queue proper is [Pledged](#pledged) below — grouped by kind
+because the actor and the gate differ, though the grouping is not
+a running order.
 
 Standing questions to re-ask as the design hardens are not tasks
 and live with the decision record, under
 [DECISIONS.md](DECISIONS.md)'s open questions.
+
+## Every task is itemized
+
+**A task carries a T-number** (D86) — `T8 — Widen the drive report`,
+number and name together, the way an F-number reads, at whatever
+heading depth its group sits at. A
+task is an item like any other, and D42's rule reaches it for
+D42's reason: every item that can be depended on needs a handle,
+because a heading someone may reword is not something to point
+at. The number is what a commit cites, what another task points
+at, and what survives this file's own regrouping — the groups
+below are kinds rather than a running order, so an entry may move
+between them, and without a number its heading text is the whole
+of its identity.
+
+**The number is issued at entry**, which for a task is the pledge
+itself: a task has no proposed state under `planning/` (D43), so
+there is no earlier moment to issue one at, and the idea that
+preceded it carries the tracker's own issue number instead. That
+is the one asymmetry with an F-number, which is issued at
+proposal and travels into `pledged/` unchanged.
+
+**And it evaporates on delivery**, with the work rather than
+outliving it. That is D42's second handle class: a use case, a
+principle and a decision persist, so their numbers are permanent,
+while a feature names work not yet done and its handle goes when
+the work lands. A task is work, so a struck task takes its number
+with it (D52). **Evaporating is not reusable** — the number
+retires and is never issued again, so a T-number surviving in a
+commit message can never resolve to something else later, and
+gaps in the sequence are history rather than a promise.
+
+**The next number to issue is T8.** Tasks are the one handle class
+whose whole population can vanish: the queue empties, and a struck
+task's only record is its commit, so nothing else here would say
+what the highest number ever issued was. An F-number is covered
+incidentally — every retirement is named in a
+[DECISIONS.md](DECISIONS.md) entry — and D52 denies a task that
+same cover on purpose, which is why this sequence has to state its
+own high-water mark. **This line is not a status column** (D42): it
+records what the sequence has spent, and says nothing about what
+was done, by whom, or when.
+
+It starts at **T8** rather than T1 because T0–T7 were issued
+already, by an earlier per-list numbering that ran three separate
+times, and those mentions survive in
+[DECISIONS.md](DECISIONS.md) under the entries that landed them.
+Beginning above them is what keeps every T-number in the record
+resolving to exactly one thing — the property the never-reissue
+rule exists to buy, which starting at T1 would have spent on the
+first entry.
 
 ## Pledged
 

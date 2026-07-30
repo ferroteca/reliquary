@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only
 # The embedding API
 
 > **Status:** the end-goal design for Reliquary's embedding API —
-> the second primary interface (planning/INTERFACES.md). The
+> the second primary application surface, S2 (planning/SURFACES.md). The
 > implemented Python binding is documented in
 > [docs/api-reference.md](../../docs/api-reference.md); this page
 > consolidates the settled API design and conventions and is the
@@ -20,7 +20,7 @@ SPDX-License-Identifier: GPL-3.0-only
   one-to-one onto a public API call with the same semantics;
   nothing is CLI-only, and no public capability is unreachable
   from the CLI. A change lands on both presentations in the same
-  change, never deferred (planning/INTERFACES.md; AGENTS.md
+  change, never deferred (planning/SURFACES.md; AGENTS.md
   "CLI–API parity").
 - **Python is the first binding, not the definition.** The API
   expects native bindings in multiple languages, and no shape may
@@ -112,7 +112,7 @@ SPDX-License-Identifier: GPL-3.0-only
   exit codes and exceptions are one mapping under parity (script
   spec "Error classes and exit codes"). **The four are not the
   run surface's alone** (D58, 2026-07-27): they generalize
-  unchanged to every interface, because what decides them —
+  unchanged to every surface, because what decides them —
   settled by the authored input alone, the world not satisfying
   that input, the work itself failing — never mentions a script.
   A malformed blueprint raises `StaticError`; naming a machine
@@ -161,7 +161,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
 ## The surface
 
-Each family's normative contract lives with its interface spec;
+Each family's normative contract lives with its surface's spec;
 this table is the index.
 
 Under the identity rule the CLI column is the mechanical

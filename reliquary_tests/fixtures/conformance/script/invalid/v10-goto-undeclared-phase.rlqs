@@ -1,0 +1,12 @@
+# invalid: every goto names a declared phase
+# rule: V10
+# id: flow.goto-undeclared
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+deadline 5m
+
+phase a {
+    goto nowhere
+}

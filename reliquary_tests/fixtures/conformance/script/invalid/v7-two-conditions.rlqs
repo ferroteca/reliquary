@@ -1,0 +1,7 @@
+# invalid: an observation carries exactly one condition
+# rule: V7
+# id: obs.two-channels
+# spec: Syntactic restrictions
+
+platform dos
+wait "x" machine=stopped

@@ -1,0 +1,9 @@
+# invalid: a phased script declares its entry
+# rule: V3
+# id: flow.entry-missing
+# spec: Syntactic restrictions
+
+platform dos
+phase a {
+    finish
+}

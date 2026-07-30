@@ -12,13 +12,13 @@
 // Division of labour: this grammar fixes node names and the type and
 // arity of their POSITIONAL arguments. Modifiers are uniform here and
 // checked against each node's signature in the transformer, which can
-// name the node and list what it accepts. The S-numbered static rules
-// (S3 and S7-S12 especially) stay above the grammar, where a
+// name the node and list what it accepts. The V-numbered static rules
+// (V3 and V7-V12 especially) stay above the grammar, where a
 // diagnostic can cite its id -- encoding them here would trade named
 // errors for "unexpected token". That is why bodies below are
-// permissive: a phase takes statements and handlers in any mix (S9
-// splits them), a branching wait takes one or more handlers (S8
-// requires two), and a phase body need not terminate (S11).
+// permissive: a phase takes statements and handlers in any mix (V9
+// splits them), a branching wait takes one or more handlers (V8
+// requires two), and a phase body need not terminate (V11).
 
 script: header* property_def* http_def* body?
 
@@ -48,15 +48,15 @@ observation: KW_WAIT condition? modifier* _NL           -> wait_one
 
 // A handler's condition is optional here for the same reason a
 // wait's is: it may arrive as a named channel (on machine=stopped),
-// and S7 owns the count either way.
+// and V7 owns the count either way.
 ?handler: on_handler | always_handler
 on_handler: KW_ON condition? modifier* _open statement+ _close
 always_handler: KW_ALWAYS condition? modifier* _open statement+ _close
 
 // A bare string or regex is the screen observation -- its only
 // spelling. Every other channel arrives as a modifier (machine=),
-// and S7 checks that exactly one condition is present. A bare word
-// is admitted only so that S7 can say what is wrong with it (the
+// and V7 checks that exactly one condition is present. A bare word
+// is admitted only so that V7 can say what is wrong with it (the
 // superseded `wait stopped`): it names no channel and never
 // validates.
 condition: STRING                       -> screen_text

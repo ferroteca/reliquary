@@ -1,0 +1,11 @@
+# invalid: reserved node names are not identifiers
+# rule: V5
+# id: name.reserved-node
+# spec: Syntactic restrictions
+
+platform dos
+entry press
+
+phase press {
+    finish
+}

@@ -2,35 +2,35 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The static-validation layer of the reliquary script language.
 
-The S-numbered legality rules that the grammar deliberately does
+The V-numbered legality rules that the grammar deliberately does
 not carry (docs/spec/script-spec.md, "Syntactic
 restrictions"), checked over the typed tree so each diagnostic can
 name the offending construct and cite its rule:
 
-- **S3** — ``entry`` appears exactly in phased scripts;
-- **S5** — phase names are unique and durations are positive;
-- **S7** — an observation carries exactly one condition, on a
+- **V3** — ``entry`` appears exactly in phased scripts;
+- **V5** — phase names are unique and durations are positive;
+- **V7** — an observation carries exactly one condition, on a
   known channel, of the right kind;
-- **S8** — a branching ``wait`` carries no condition of its own,
+- **V8** — a branching ``wait`` carries no condition of its own,
   has at least two handlers, and never appears inside a handler
   body;
-- **S9** — ``on`` only inside a branching ``wait``, ``always``
+- **V9** — ``on`` only inside a branching ``wait``, ``always``
   only directly inside a reactive phase, and no hybrid phase;
-- **S10** — the two script shapes never mix, and every phase name
+- **V10** — the two script shapes never mix, and every phase name
   a script transfers to is declared;
-- **S11** — nothing follows a terminating statement, and a
+- **V11** — nothing follows a terminating statement, and a
   sequential phase's statement list terminates;
-- **S12** — a phased script whose transition graph can cycle
+- **V12** — a phased script whose transition graph can cycle
   declares a header ``deadline``, the backstop that bounds the
   run.
-- **S13** — a watch pattern is non-empty, and a regex compiles;
-- **S14** — every ``press`` key belongs to the language's closed
+- **V13** — a watch pattern is non-empty, and a regex compiles;
+- **V14** — every ``press`` key belongs to the language's closed
   portable vocabulary.
 
-The remaining rules belong to the layers around this one: S1, S2,
-and S4 are the lexer's and the parser's — the timing placement
-matrix is a node signature — and the remaining S14 vocabularies
-arrive with their owning features. S6 is split: the ``default=``
+The remaining rules belong to the layers around this one: V1, V2,
+and V4 are the lexer's and the parser's — the timing placement
+matrix is a node signature — and the remaining V14 vocabularies
+arrive with their owning features. V6 is split: the ``default=``
 derivation half is checked here, and the ``${key}`` references
 authored inside statement strings are still bound rather than
 validated. The timing *model* itself, which resolves the durations
@@ -49,7 +49,7 @@ _RESERVED = frozenset(KEYWORDS)
 
 
 def _not_reserved(name, what, line, column):
-    """Refuse a node name used as an author-chosen identifier (S5).
+    """Refuse a node name used as an author-chosen identifier (V5).
 
     script-spec.md, "Grammar": reserved node names cannot name
     phases or property keys. The lexer treats these words as
@@ -96,7 +96,7 @@ def validate(script):
         _linear(script)
 
 
-# -- durations (S5) ----------------------------------------------
+# -- durations (V5) ----------------------------------------------
 
 def _properties(script):
     """Property names are unique and outside reserved namespaces."""
@@ -113,7 +113,7 @@ def _properties(script):
 
 
 def _derivations(script):
-    """The `default=` derivation rules (S5, S6).
+    """The `default=` derivation rules (V5, V6).
 
     Static because a derivation is not an expression: its answer is
     knowable — or knowably unanswerable — before the run, so every
@@ -165,7 +165,7 @@ def _check_reference(prop, key, declared, facts):
 
 
 def _forbid_derivation_cycles(script, declared):
-    """A `${key}` chain among derivations must be acyclic (S6)."""
+    """A `${key}` chain among derivations must be acyclic (V6)."""
     edges = {}
     for prop in script.properties:
         targets = set()
@@ -383,7 +383,7 @@ def _durations(script):
     """Every written duration is positive.
 
     Where each may be written is the placement matrix, which the
-    node signatures enforce (S2); this is the value rule.
+    node signatures enforce (V2); this is the value rule.
 
     **`pacing` is deliberately absent from it.** A bound of zero
     asks for something that can never happen, which is why
@@ -431,7 +431,7 @@ def _timed(statements, handlers=()):
         yield from _timed((), statement.handlers)
 
 
-# -- portable keys (S14) -----------------------------------------
+# -- portable keys (V14) -----------------------------------------
 
 def _all_statements(script):
     """Every statement of a script, nested bodies included."""
@@ -523,7 +523,7 @@ def _keys(script):
                     rule_id="key.not-portable")
 
 
-# -- the two shapes (S3, S10) ------------------------------------
+# -- the two shapes (V3, V10) ------------------------------------
 
 def _linear(script):
     """Validate a linear script: no phase machinery reaches it."""
@@ -579,7 +579,7 @@ def _phased(script):
 
 
 def _cycles(script):
-    """A phase graph that can cycle declares a run deadline (S12).
+    """A phase graph that can cycle declares a run deadline (V12).
 
     Only phases reachable from ``entry`` are walked: a cycle among
     phases the run can never enter is unreachable code, which
@@ -647,7 +647,7 @@ def _phase(phase):
             rule_id="flow.phase-falls-through")
 
 
-# -- statement lists (S7, S8, S9, S11) ---------------------------
+# -- statement lists (V7, V8, V9, V11) ---------------------------
 
 def _body(statements, in_handler=False):
     """Validate one statement list and everything nested in it."""
@@ -705,7 +705,7 @@ def _handler(handler):
     _body(handler.statements, in_handler=True)
 
 
-# -- observation conditions (S7) ---------------------------------
+# -- observation conditions (V7) ---------------------------------
 
 def _condition(node, what):
     """Check that an observation carries exactly one good condition."""
@@ -763,10 +763,10 @@ def _channel(condition):
             rule_id="obs.wrong-kind")
 
 
-# -- watch patterns (S13) ----------------------------------------
+# -- watch patterns (V13) ----------------------------------------
 
 def _pattern(condition):
-    """A watch pattern is non-empty and a regex compiles (S13).
+    """A watch pattern is non-empty and a regex compiles (V13).
 
     Both halves are the same failure worn differently: a pattern
     that cannot say what it is waiting for. An empty one matches
@@ -804,7 +804,7 @@ def _pattern(condition):
                 rule_id="obs.uncompilable-regex") from None
 
 
-# -- terminating statements (S11) --------------------------------
+# -- terminating statements (V11) --------------------------------
 
 def _terminating(statement):
     """Whether a statement ends the flow through its list."""

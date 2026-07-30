@@ -8,7 +8,7 @@ Every line of a script is one node::
 
 This module implements the lexical rules and that shape only --
 what a line *looks like*. Typing (which node names exist, what
-arguments and modifiers each admits) and the S-numbered static
+arguments and modifiers each admits) and the V-numbered static
 rules belong to the layer above, in :mod:`reliquary.script`.
 The milestone-5 ``content`` declaration has one structural
 extension: a trailing ``\"\"\"`` opens a raw body that is skipped
@@ -40,7 +40,7 @@ _DELIMITERS = " \t{}#"
 # rather than with the parser because two layers need the same list
 # and neither may import the other -- the lexer recognizes them as
 # keywords in node-name position, and validation refuses them as
-# identifiers everywhere (S5).
+# identifiers everywhere (V5).
 #
 # The two jobs are separate on purpose. A word is a keyword only
 # where a node name may start, so `enter` is a verb at the head of a
@@ -58,18 +58,18 @@ KEYWORDS = (
 )
 
 
-#: Every id the script parser stack raises, and the S-numbered rule
+#: Every id the script parser stack raises, and the V-numbered rule
 #: it enforces.
 #:
-#: Ids are finer than the rules — S7 is one restriction and
+#: Ids are finer than the rules — V7 is one restriction and
 #: ``obs.two-channels`` is one of six diagnostics under it — so this
 #: is many-to-one by design.
 #:
 #: Its scope is this module, the grammar transformer and validation,
-#: and nothing beyond. An S-number names a syntactic restriction, so
+#: and nothing beyond. A V-number names a syntactic restriction, so
 #: an id raised elsewhere — ``media.unknown`` from resolution,
 #: ``machine.slot-not-declared`` from preflight — has none to map to
-#: and no entry here. Within the stack, an id no S-number covers maps
+#: and no entry here. Within the stack, an id no V-number covers maps
 #: to ``None`` rather than being left out, so the map answers for
 #: every id it can be asked about.
 #:
@@ -78,85 +78,85 @@ KEYWORDS = (
 #: prose; the spec's rule list carries the same mapping and a test
 #: holds the two together.
 RULE_OF = {
-    "node.duplicate-modifier": "S4",
-    "node.modifier-not-allowed": "S2",
-    "node.timing-placement": "S2",
-    "name.reserved-node": "S5",
-    "name.duplicate-phase": "S5",
-    "name.duplicate-property": "S5",
-    "name.property-is-a-kind": "S5",
-    "name.property-reserved-namespace": "S5",
-    "name.variable-reserved-namespace": "S5",
-    "time.non-positive": "S5",
-    "prop.secret-default": "S5",
-    "prop.dead-default": "S5",
-    "prop.undefined-reference": "S6",
-    "prop.secret-reference": "S6",
-    "prop.derivation-cycle": "S6",
-    "prop.http-without-block": "S6",
-    "obs.missing-condition": "S7",
-    "obs.two-channels": "S7",
-    "obs.not-a-condition": "S7",
-    "obs.unknown-channel": "S7",
-    "obs.screen-named": "S7",
-    "obs.wrong-kind": "S7",
-    "wait.branching-condition": "S8",
-    "wait.branching-in-handler": "S8",
-    "wait.too-few-handlers": "S8",
-    "handler.mixed-phase": "S9",
-    "handler.on-outside-branching-wait": "S9",
-    "handler.always-outside-reactive-phase": "S9",
-    "flow.entry-in-linear": "S3",
-    "flow.entry-missing": "S3",
-    "flow.entry-undeclared": "S10",
-    "flow.transfer-in-linear": "S10",
-    "flow.goto-undeclared": "S10",
-    "flow.unreachable-statement": "S11",
-    "flow.phase-falls-through": "S11",
-    "flow.cycle-without-deadline": "S12",
-    "obs.empty-pattern": "S13",
-    "obs.uncompilable-regex": "S13",
-    "key.not-portable": "S14",
+    "node.duplicate-modifier": "V4",
+    "node.modifier-not-allowed": "V2",
+    "node.timing-placement": "V2",
+    "name.reserved-node": "V5",
+    "name.duplicate-phase": "V5",
+    "name.duplicate-property": "V5",
+    "name.property-is-a-kind": "V5",
+    "name.property-reserved-namespace": "V5",
+    "name.variable-reserved-namespace": "V5",
+    "time.non-positive": "V5",
+    "prop.secret-default": "V5",
+    "prop.dead-default": "V5",
+    "prop.undefined-reference": "V6",
+    "prop.secret-reference": "V6",
+    "prop.derivation-cycle": "V6",
+    "prop.http-without-block": "V6",
+    "obs.missing-condition": "V7",
+    "obs.two-channels": "V7",
+    "obs.not-a-condition": "V7",
+    "obs.unknown-channel": "V7",
+    "obs.screen-named": "V7",
+    "obs.wrong-kind": "V7",
+    "wait.branching-condition": "V8",
+    "wait.branching-in-handler": "V8",
+    "wait.too-few-handlers": "V8",
+    "handler.mixed-phase": "V9",
+    "handler.on-outside-branching-wait": "V9",
+    "handler.always-outside-reactive-phase": "V9",
+    "flow.entry-in-linear": "V3",
+    "flow.entry-missing": "V3",
+    "flow.entry-undeclared": "V10",
+    "flow.transfer-in-linear": "V10",
+    "flow.goto-undeclared": "V10",
+    "flow.unreachable-statement": "V11",
+    "flow.phase-falls-through": "V11",
+    "flow.cycle-without-deadline": "V12",
+    "obs.empty-pattern": "V13",
+    "obs.uncompilable-regex": "V13",
+    "key.not-portable": "V14",
 }
 
-#: The lexical and structural tiers. S1 is "syntax is well formed:
+#: The lexical and structural tiers. V1 is "syntax is well formed:
 #: no unknown node names, no unbalanced blocks", which the lexer and
 #: the grammar enforce between them, so these are its diagnostics.
 #: ``lex.`` is what the tokenizer rejects while reading characters;
 #: ``syn.`` is line, block and document shape.
 RULE_OF.update({
-    "lex.unclosed-reference": "S1",
-    "lex.invalid-reference": "S1",
-    "lex.unterminated-string": "S1",
-    "lex.unterminated-regex": "S1",
-    "lex.unterminated-content": "S1",
-    "lex.invalid-token": "S1",
-    "lex.invalid-duration": "S1",
-    "lex.spaced-modifier": "S1",
-    "lex.modifier-missing-value": "S1",
-    "syn.brace-not-alone": "S1",
-    "syn.unmatched-close": "S1",
-    "syn.unclosed-block": "S1",
-    "syn.open-brace-position": "S1",
-    "syn.expected-node-name": "S1",
-    "syn.argument-after-modifier": "S1",
-    "syn.unexpected-token": "S1",
-    "syn.unexpected-end": "S1",
-    "syn.duplicate-header": "S3",
-    "node.modifier-not-a-duration": "S2",
-    "node.modifier-not-a-string": "S2",
-    "prop.unknown-kind": "S5",
+    "lex.unclosed-reference": "V1",
+    "lex.invalid-reference": "V1",
+    "lex.unterminated-string": "V1",
+    "lex.unterminated-regex": "V1",
+    "lex.unterminated-content": "V1",
+    "lex.invalid-token": "V1",
+    "lex.invalid-duration": "V1",
+    "lex.spaced-modifier": "V1",
+    "lex.modifier-missing-value": "V1",
+    "syn.brace-not-alone": "V1",
+    "syn.unmatched-close": "V1",
+    "syn.unclosed-block": "V1",
+    "syn.open-brace-position": "V1",
+    "syn.expected-node-name": "V1",
+    "syn.argument-after-modifier": "V1",
+    "syn.unexpected-token": "V1",
+    "syn.unexpected-end": "V1",
+    "syn.duplicate-header": "V3",
+    "node.modifier-not-a-duration": "V2",
+    "node.modifier-not-a-string": "V2",
+    "prop.unknown-kind": "V5",
 })
 
-#: Ids this stack raises that no S-number covers, mapped to None.
+#: Ids this stack raises that no V-number covers, mapped to None.
 #:
 #: Two reasons an id lands here. The http declaration's rules are
 #: static and legality-tier like the rest and simply predate the
-#: S-numbering. The last two are not legality rules at all: a
+#: V-numbering. The last two are not legality rules at all: a
 #: source that is not text and a script file that is not there,
 #: which the parser reports because it is the layer that looked.
 #: Either way a consumer asking what rule an id enforces gets a
-#: truthful None rather than an S-number invented to fill the map.
+#: truthful None rather than a V-number invented to fill the map.
 RULE_OF.update({
     "http.port-not-a-number": None,
     "http.indent-not-a-mode": None,
@@ -200,9 +200,9 @@ class ScriptParseError(StaticError):
     text baked into the message, so a consumer can switch on it
     without parsing prose and the beta id index can be generated
     rather than hand-kept. The rendering appends it in parentheses,
-    which is where the S-numbers used to sit.
+    which is where the V-numbers used to sit.
 
-    Ids are finer than the S-numbered rules they enforce: S7 is one
+    Ids are finer than the V-numbered rules they enforce: V7 is one
     restriction and ``obs.two-channels`` is one of the several
     diagnostics under it. The spec's rule list carries the mapping,
     and a test holds the two together.
@@ -520,8 +520,8 @@ def parse_nodes(source, path="<script>"):
     """Parse a script into its structural node tree.
 
     Enforces the lexical rules and the node shape only: balanced
-    blocks (S1), arguments before modifiers, and no modifier named
-    twice on one node (S4). Node names are not interpreted here.
+    blocks (V1), arguments before modifiers, and no modifier named
+    twice on one node (V4). Node names are not interpreted here.
     """
     if not isinstance(source, str):
         raise StaticError("script source must be text",

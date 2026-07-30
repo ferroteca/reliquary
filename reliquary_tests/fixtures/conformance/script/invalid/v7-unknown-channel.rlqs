@@ -1,0 +1,7 @@
+# invalid: the channel is known
+# rule: V7
+# id: obs.unknown-channel
+# spec: Syntactic restrictions
+
+platform dos
+wait serial="login:"

@@ -1,0 +1,7 @@
+# invalid: the screen channel has no named spelling
+# rule: V7
+# id: obs.screen-named
+# spec: Syntactic restrictions
+
+platform dos
+wait screen="x"

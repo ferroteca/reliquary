@@ -176,7 +176,7 @@ workflow:
   stopped-only (a launch-time firmware order); boot-order keys may name
   any declared drive; all three persist and survive stop/start),
   `backends.py` is **the backend adapter seam** — the provider contract behind the semantic surface
-  (design: `planning/design/backend-adapter.md`), deliberately *not* one of the world-facing interfaces:
+  (design: `planning/design/backend-adapter.md`), deliberately *not* one of the application surfaces:
   the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the
   carrier session), the `Availability` / `Capabilities` / `Requirements` vocabulary the report and the demand
   share, `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
@@ -224,7 +224,7 @@ workflow:
   and never from a guest; `split_address`). The
   `.rlqs` language is four layers: `script_nodes.py` (the lexer and its diagnostics),
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
-  `load_script`), `script_validation.py` (the S-numbered static rules, each diagnostic citing its id),
+  `load_script`), `script_validation.py` (the V-numbered static rules, each diagnostic citing its id),
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
   effective timeout and every guest-input verb's effective `pacing` — the settling gap before its first
   key event, D60 — each with the scope that supplied it; `format_plan` and
@@ -303,16 +303,18 @@ workflow:
   `planning/proposed/` is argued but not pledged, and nothing is worked from there; `planning/pledged/` is
   approved but not yet delivered. Promotion is by *moving* a document or an entry, and the commit is the
   pledge record. The **planning root** holds what never moves and so has no state — the map, the vetting
-  rule (`INTERFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, pledged, refused and
+  rule (`SURFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, pledged, refused and
   retired alike), and the task queue. Design sits with what it serves: `planning/proposed/design/` and
   `planning/pledged/design/` for a feature's own design, `planning/design/` for open design problems serving
   no single feature — the whole-system view itself (the seams model and the P-numbered principles) is root
-  `ARCHITECTURE.md`. Once an interface ships, its normative spec moves to `docs/spec/` — current truth does not
+  `ARCHITECTURE.md`. Once a surface ships, its normative spec moves to `docs/spec/` — current truth does not
   live under `planning/`.
 - **There is no roadmap** (D42): `pledged/` says the project will do it and nothing about when, so the absence
   of order in `TASKS.md` holds equally for pledged features, the only binding order running inside a feature.
-  **Features carry F-numbers** — the handle a dependency, commit or decision points at — which unlike U-, P- and
-  D-numbers **evaporate on delivery**, retiring unreused, gaps being history rather than a promise. Designs take
+  **Features carry F-numbers and tasks carry T-numbers** — the handle a dependency, commit or decision points
+  at — which unlike U-, P-, S- and D-numbers **evaporate on delivery**, retiring unreused, gaps being history
+  rather than a promise. A T-number is issued at entry to `TASKS.md` (a task has no proposed state), and that
+  file states the sequence's high-water mark because a struck task leaves no other record of it. Designs take
   no number. **A feature must fit in one sprint**, here minutes to hours, so a pledged feature is far smaller
   than "milestone" suggests; the bound bites at the pledge. References between items run **down the lifecycle or
   sideways, never up**. Full rules: `planning/README.md`.
@@ -331,10 +333,10 @@ workflow:
   with the issue tracker the one open door. Authority is the owner alone today. **Agents do not add tasks on
   their own initiative and ask before editing that file at all**; the gate is at entry only, so anyone may pick
   up what is already there.
-- `planning/INTERFACES.md` is the interface-change rule: how every interface-changing decision is weighed. The
-  interface inventory it scopes over (CLI, embedding API, scripting language, and machine blueprints — media,
+- `planning/SURFACES.md` is the surface-change rule: how every surface-changing decision is weighed. The
+  **application surface** inventory it scopes over (CLI, embedding API, scripting language, and machine blueprints — media,
   source, and archive are components inside the blueprint — plus the script properties, recorded outputs, and
-  the working-directory layout) lives in root `ARCHITECTURE.md` "The interfaces", where the housekeeping lookup answers by
+  the working-directory layout) lives in root `ARCHITECTURE.md` "The application surfaces", S-numbered S1–S8, where the housekeeping lookup answers by
   checklist. The use cases, the architectural principles, and the specs are together the project's **vision** —
   the standing statement of what Reliquary is and is for. The numbered use cases — the decision
   surface that rule weighs against — live in root `USE-CASES.md` (implemented-only: every use case there is
@@ -354,13 +356,13 @@ workflow:
   its media and archive components, and the install and verify scripts. It is the live, tested copy — seeded into
   a user's home on first reference — so there is no second copy to keep synchronized.
 - `docs/` describes the live situation. `docs/spec/` holds the
-  **normative specifications** of every interface — the CLI, the
+  **normative specifications** of every application surface — the CLI, the
   embedding API, the scripting language, the blueprint model, media,
   properties, asset resolution, the instance model, the codex, and
   the answer-file server. A spec is the authority
   the implementation answers to, not a report on it: where a spec and
   the code disagree, the spec is right and the code has a bug, unless
-  the spec is changed first through the interface-change rule. The
+  the spec is changed first through the surface-change rule. The
   rest of `docs/` is descriptive — user-facing references and guides,
   and a reference that contradicts a spec is the reference's bug.
   **The banner is the marker, the directory is shelving**: every
@@ -389,7 +391,7 @@ workflow:
   pattern.** `fixtures/conformance/script/` (`test_script_corpus.py`)
   does for `.rlqs` what the blueprint corpus does for `.rlqb`, and
   adds the assertion the first cannot make: an invalid fixture
-  declares the S-id that must reject it, and the harness checks the
+  declares the V-id that must reject it, and the harness checks the
   diagnostic cites it — so a fixture failing for the *wrong* reason
   is caught by the suite rather than by a reviewer. Where an id does
   not exist yet the fixture carries `# cites: no`, asserted in both
@@ -407,7 +409,7 @@ implementation.
 
 Reliquary is evolving rapidly and deliberately maintains **no backward compatibility of any kind** until a
 GA 1.0 release: no spec/config format versioning or migration, no API aliasing, no
-deprecated-name shims, no compatibility parsing. When an interface changes, change it coherently and
+deprecated-name shims, no compatibility parsing. When a surface changes, change it coherently and
 completely — update every caller, document, and test to the new shape and delete the old one. Do not add
 transition affordances "to be safe"; stale artifacts (old machine blueprints, homes, embeddings) may simply fail
 and users recreate them.
@@ -418,18 +420,18 @@ expectation of the next, and a clean break remains the default. Any cushion is a
 the owner's call, recorded in the CHANGELOG — never a shim left to accumulate. Compatibility guarantees
 proper are defined no earlier than 1.0.
 
-### Interface changes are vetted
+### Surface changes are vetted
 
 The CLI, the embedding API, the scripting language, and the machine blueprint (media, source, and archive
 components included) are
-Reliquary's primary interfaces to the world; the script properties, the run's returned output (the live
+Reliquary's primary **application surfaces** (S1–S4); the script properties, the run's returned output (the live
 event stream, `--json` documents, exit codes — persistence dropped with D36), and the working-directory layout are
-world-facing contracts alongside them. Any decision that
-changes one follows the rule in [planning/INTERFACES.md](planning/INTERFACES.md): requests triage by their impact on the
+the supporting ones (S5–S8), covered equally. Any decision that
+changes one follows the rule in [planning/SURFACES.md](planning/SURFACES.md): requests triage by their impact on the
 numbered use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
 easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
 work starting only after the amendment lands — then the change is named across every surface it touches
-and landed coherently on all of them. Where a docs/spec/ specification and planning/INTERFACES.md or
+and landed coherently on all of them. Where a docs/spec/ specification and planning/SURFACES.md or
 USE-CASES.md disagree, the principles and use cases govern; the design is realigned to them.
 
 ### CLI–API parity
@@ -650,7 +652,7 @@ Doctrine to preserve:
   external callers.
 - The project is pre-release; prefer a coherent interface over
   compatibility shims when its architecture changes. The embedding API
-  expects native bindings beyond Python (planning/INTERFACES.md;
+  expects native bindings beyond Python (planning/SURFACES.md;
   docs/spec/cli.md): never adopt a design that would be
   difficult to express in a common binding language such as C or Java,
   and hold the CLI to the same constraint as the fallback binding for

@@ -268,7 +268,7 @@ tiers:
 
 - **Legality rules** — checkable from the script text alone: the
   lexical rules, the grammar, and the
-  [syntactic restrictions](#syntactic-restrictions) (S-ids).
+  [syntactic restrictions](#syntactic-restrictions) (V-ids).
   Violations are STATIC ERRORs.
 - **Machine rules** — need something beyond the text in scope:
   the media namespace, the filesystem, a machine or
@@ -639,7 +639,7 @@ These are the legality rules the grammar cannot carry — enforced
 by static validation over the parse tree rather than encoded in
 the CFG. Each has a stable id; diagnostics cite them:
 
-- **S1** — syntax is well formed: no unknown node names, no
+- **V1** — syntax is well formed: no unknown node names, no
   unbalanced blocks.
   Ids: the lexer's — `lex.unterminated-string`,
   `lex.unterminated-regex`, `lex.unterminated-content`,
@@ -652,22 +652,22 @@ the CFG. Each has a stable id; diagnostics cite them:
   `syn.unexpected-token` and `syn.unexpected-end`, which are the
   grammar's own rejections and name a token rather than a rule.
 
-- **S2** — every argument, modifier, and block fits its node's
+- **V2** — every argument, modifier, and block fits its node's
   signature, including each timing modifier's placement per the
   [placement matrix](#timing).
   Ids: `node.modifier-not-allowed`, `node.timing-placement`,
   `node.modifier-not-a-duration`, `node.modifier-not-a-string`.
 
-- **S3** — each header appears at most once; `entry` appears
+- **V3** — each header appears at most once; `entry` appears
   exactly in phased scripts.
   Ids: `flow.entry-in-linear`, `flow.entry-missing`,
   `syn.duplicate-header`.
 
-- **S4** — no node carries the same modifier name twice; a
+- **V4** — no node carries the same modifier name twice; a
   repeat is an error, never a last-wins override.
   Id: `node.duplicate-modifier`.
 
-- **S5** — names are valid and unique in their namespaces:
+- **V5** — names are valid and unique in their namespaces:
   reserved node names are not identifiers, property keys are
   declared once per script and are not spelled `text`, `media`,
   or `secret`, user-declared property keys do not use the
@@ -679,14 +679,14 @@ the CFG. Each has a stable id; diagnostics cite them:
   `name.variable-reserved-namespace`, `time.non-positive`,
   `prop.secret-default`, `prop.dead-default`, `prop.unknown-kind`.
 
-- **S6** — every `$` reference names a declared property or a
+- **V6** — every `$` reference names a declared property or a
   Reliquary-owned run property in a reserved namespace made
   available by the script's declarations.
   Ids: `prop.undefined-reference`, `prop.secret-reference`,
   `prop.derivation-cycle`, `prop.http-without-block`. The
   `${key}`-in-a-statement half is unenforced (see below).
 
-- **S7** — an observation carries **exactly one** condition — a
+- **V7** — an observation carries **exactly one** condition — a
   bare string/regex beside a `machine=` modifier, or two
   `machine=` modifiers, are errors — the condition precedes any
   timing modifier, the channel is known, and its value is of the
@@ -695,7 +695,7 @@ the CFG. Each has a stable id; diagnostics cite them:
   `obs.not-a-condition`, `obs.unknown-channel`,
   `obs.screen-named`, `obs.wrong-kind`.
 
-- **S8** — a branching `wait` carries no condition of its own,
+- **V8** — a branching `wait` carries no condition of its own,
   has at least two handlers, and appears nowhere inside a
   handler body. The recursion `handler → statement →
   observation` is deliberate: the grammar stays context-free and
@@ -704,31 +704,31 @@ the CFG. Each has a stable id; diagnostics cite them:
   `wait.branching-condition` — the last unreachable today, the
   grammar rejecting that shape first.
 
-- **S9** — `on` appears only inside a branching `wait`, `always`
+- **V9** — `on` appears only inside a branching `wait`, `always`
   only directly inside a reactive phase, and a phase is
   sequential or reactive, never mixed.
   Ids: `handler.mixed-phase`, `handler.on-outside-branching-wait`,
   `handler.always-outside-reactive-phase`.
 
-- **S10** — the two script shapes never mix; `goto` and `finish`
+- **V10** — the two script shapes never mix; `goto` and `finish`
   are invalid in a linear script; every `goto` names a declared
   phase; `entry` names exactly one.
   Ids: `flow.transfer-in-linear`, `flow.goto-undeclared`,
   `flow.entry-undeclared`.
 
-- **S11** — the [terminating-statements rules](#terminating-statements):
+- **V11** — the [terminating-statements rules](#terminating-statements):
   nothing follows a terminating statement, and a sequential
   phase's statement list terminates.
   Ids: `flow.unreachable-statement`, `flow.phase-falls-through`.
 
-- **S12** — a phased script whose transition graph contains a
+- **V12** — a phased script whose transition graph contains a
   cycle declares a header `deadline`.
   Id: `flow.cycle-without-deadline`.
 
-- **S13** — watch patterns are non-empty and regexes compile.
+- **V13** — watch patterns are non-empty and regexes compile.
   Ids: `obs.empty-pattern`, `obs.uncompilable-regex`.
 
-- **S14** — closed vocabularies hold by name: key names are from
+- **V14** — closed vocabularies hold by name: key names are from
   the portable set, `insert`/`eject` name removable
   (floppy/cdrom) slots, `set-boot` names drive slots, and
   interpolation appears only where the argument accepts it.
@@ -760,7 +760,7 @@ against the core (G6):
   its entry, whose statement list ends in an implicit `finish`
   (end of file ⇒ `finish`). The implicit phase has no name and
   cannot be targeted; `goto` and `finish` stay illegal in the
-  authored linear surface (S10).
+  authored linear surface (V10).
 
 Desugaring is definitional, not observable: diagnostics, the
 transcript, and the run event stream always name the authored
@@ -1883,7 +1883,7 @@ reconciliation behavior visible.
 
 Parsing and static validation enforce the legality rules — the
 [lexical rules](#lexical-rules), the grammar, and the
-[syntactic restrictions](#syntactic-restrictions) S1–S14 — from
+[syntactic restrictions](#syntactic-restrictions) V1–V14 — from
 the script text alone, before the machine starts. With more in
 scope, preflight further rejects, naming what it needed:
 
@@ -1954,7 +1954,7 @@ surface's alone, as the generalization below sets out:
 
 | class | tier | exit code |
 |---|---|---|
-| STATIC ERROR | legality rules (S-ids) | 2 |
+| STATIC ERROR | legality rules (V-ids) | 2 |
 | PREFLIGHT ERROR | machine rules | 3 |
 | RUN FAILURE | dynamic semantics | 4 |
 
@@ -1971,7 +1971,7 @@ an error outside those four.
 
 **The classes are not this surface's alone** (D58). They are named
 for a run's enforcement tiers and hold unchanged on every
-interface, because the questions that decide them never mention a
+surface, because the questions that decide them never mention a
 script: is it settled by the authored input alone, does the world
 satisfy that input, did the work itself fail. So a malformed
 blueprint is a STATIC ERROR exactly as a malformed script is,
@@ -1996,8 +1996,8 @@ carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
 across the classes, and the full id index is deferred to beta.
 
-**Ids are finer than the S-numbered rules.** An S-number names a
-restriction; an id names one diagnostic under it — S7 is one rule
+**Ids are finer than the V-numbered rules.** A V-number names a
+restriction; an id names one diagnostic under it — V7 is one rule
 and `obs.two-channels` is one of the six ways to break it. The
 two are not competing schemes and a message carries only the id;
 the [syntactic restrictions](#syntactic-restrictions) list the
@@ -2090,7 +2090,7 @@ carries an id alone.
 The grammar's own rejections are the coarsest ids in the scheme:
 `syn.unexpected-token` and `syn.unexpected-end` name a token, not
 a rule, because that is all a parser knows. That is the cost this
-spec accepts by keeping the S-rules above the CFG, and it is
+spec accepts by keeping the V-rules above the CFG, and it is
 visible where it bites — a construct the grammar refuses cannot
 carry the id of the rule it violates.
 

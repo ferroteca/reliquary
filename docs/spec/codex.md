@@ -53,12 +53,12 @@ makes no backward-compatibility promise before 1.0 at all
 ([ARCHITECTURE.md](../../ARCHITECTURE.md) P9), but that licence
 is scaffolding and is expected to come down as the project
 matures. This rule is not: whatever promise the project comes to
-make about its interfaces, codex content stays outside it,
-because it is content rather than interface.
+make about its application surfaces, codex content stays outside
+it, because it is content rather than surface.
 
 What is specified is on this page — the seeding semantics, the
 never-overwrite rule, provenance, the media licensing rule — and
-*that* is the interface; the content it carries is not (root
+*that* is the surface; the content it carries is not (root
 [ARCHITECTURE.md](../../ARCHITECTURE.md) P18).
 
 None of which leaves you without stable assets — it locates them

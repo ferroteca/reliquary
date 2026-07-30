@@ -1,7 +1,0 @@
-# invalid: machine= takes a state word, never a string
-# rule: S7
-# id: obs.wrong-kind
-# spec: Syntactic restrictions
-
-platform dos
-wait machine="stopped"

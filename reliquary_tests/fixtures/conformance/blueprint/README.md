@@ -9,8 +9,9 @@ The shared valid/invalid corpus for the **composed blueprint model** —
 [docs/spec/blueprint-model.md](../../../../docs/spec/blueprint-model.md),
 which is normative for every fixture here.
 
-Written at milestone 7's **S2**, before the parser, so that S3 had an
-executable acceptance test from its first line rather than after it.
+Written at milestone 7's **second stage**, before the parser, so that
+the third had an executable acceptance test from its first line rather
+than after it.
 That ordering paid immediately: run against the first parser written to
 the spec, the corpus found the spec **contradicting itself** about
 whether a containment path lives inside the braces or after them —
@@ -48,8 +49,8 @@ where the rule lives:
 
 A `// warns:` line marks a fixture that is **valid but must emit a
 warning** — currently the one name-repair case. There is no warning
-assertion yet; adding one is part of S3, and the header is the record
-of what it must say.
+assertion yet; adding one is part of that third stage, and the header
+is the record of what it must say.
 
 **The headers are assertions now.** They were documentation, and this
 README said so, because an invalid fixture failing for the *wrong*
@@ -65,7 +66,7 @@ This is the assertion the script corpus was built with and called the
 stronger pattern, naming this corpus's inability to make it as the
 cost. That cost is paid off; what remains different is that corpus's
 `# rule:` line, which it can have because the script rules are
-S-numbered and these are not — so an id here cannot be checked against
+V-numbered and these are not — so an id here cannot be checked against
 the rule it is *meant* to serve, only against the one that fired.
 
 `// spec:` stays what it was: the section a reader goes to, not
@@ -84,7 +85,7 @@ covers three, for the same reason.
 ## What this corpus deliberately does not cover
 
 Single-document parse fixtures cannot reach these. They need unit tests
-at S3, and their absence here is not coverage:
+at that stage, and their absence here is not coverage:
 
 - **Cross-file identity** — dedup of canonically identical specs,
   collision of differing ones, and the origin-naming in both messages.

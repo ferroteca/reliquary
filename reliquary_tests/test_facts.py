@@ -25,7 +25,7 @@ class SpecifiedCatalogTests(unittest.TestCase):
     """The catalog the spec lists is the catalog `is_fact` admits.
 
     P24's inventory pass over the property facts. The hazard is
-    specific and one-directional: `is_fact` is what S6 consults, so
+    specific and one-directional: `is_fact` is what V6 consults, so
     a fact the spec documents and the catalog lacks makes a
     documented derivation fail static validation with a diagnostic
     saying the key is "neither a declared property nor an rlq.*
@@ -50,7 +50,7 @@ class SpecifiedCatalogTests(unittest.TestCase):
             if not facts.is_fact(key.replace("<NAME>", "PATH")))
         self.assertEqual(
             unknown, [],
-            f"{unknown} are documented facts that is_fact rejects. S6 "
+            f"{unknown} are documented facts that is_fact rejects. V6 "
             "consults it, so a script deriving from one would be "
             "refused for referencing a fact the spec told its author "
             "to use.")

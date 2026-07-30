@@ -68,7 +68,7 @@ and the gaps are the ordinary ones.
 **F18–F20 arrived from [TASKS.md](../TASKS.md)** (owner,
 2026-07-27), by the gate audit of that day. Each adds a CLI command
 or changes a CLI spelling — which is **no bar to being a task**
-(D45; the housekeeping boundary that excludes an interface change
+(D45; the housekeeping boundary that excludes a surface change
 is housekeeping's alone, and F16 below is where that misreading
 started). What holds all three here is the same thing: each
 carries an **open shape question** in its own text, and an argument
@@ -540,7 +540,7 @@ hidden prompt.
 
 > **Moved here from TASKS.md's legacy Proposed section** (owner,
 > 2026-07-26): argued but never approved, and a proposal belongs under
-> `proposed/`. Demanded by **P8** (interface and principle changes are
+> `proposed/`. Demanded by **P8** (surface and principle changes are
 > vetted): the audit checks that a design exists only where demand
 > does. No use case asks for it.
 
@@ -650,7 +650,7 @@ Raised 2026-07-24 as a suggestion, not a request.
 **The vision-utility audit — the reverse-citation check.**
 The traceability linter above verifies every *cited*
 identifier resolves; this is its mirror — every *defined*
-vision statement (a use case, principle, or interface) is
+vision statement (a use case, principle, or application surface) is
 cited or codified *somewhere*, or is surfaced as suspect. A
 statement nothing leans on is suspect of no utility:
 legislated but never used.
@@ -689,7 +689,7 @@ impossible by construction, which automates the apology the
 reference's banner already makes. The norm of the surface stays
 [docs/spec/api.md](../../docs/spec/api.md): code-as-norm would
 invert P8 — an unargued code change would *redefine* the
-interface rather than violate it — and the project has already
+surface rather than violate it — and the project has already
 lived the counterexample: the twin-name realignment settled
 names in the spec while the code still said
 `create_from_blueprint`, and the code was realigned to the doc.
@@ -941,10 +941,10 @@ and its inverse.
 > outside Reliquary because the public surface does not carry it.
 > **They are small but they are not housekeeping** — every one adds
 > to the embedding API, which the housekeeping boundary excludes
-> absolutely ([INTERFACES.md](../INTERFACES.md)). **That is not why
+> absolutely ([SURFACES.md](../SURFACES.md)). **That is not why
 > they sit here rather than in [TASKS.md](../TASKS.md)**, and this
 > entry is where that misreading began: the boundary is
-> housekeeping's alone, and a small interface change may be a task
+> housekeeping's alone, and a small surface change may be a task
 > (D45, which the 2026-07-27 gate audit cited this very sentence as
 > precedent for before the reading was caught). What holds them
 > here is that two of the three are **unsettled below** — item 2
@@ -1054,7 +1054,7 @@ column on the existing `list-*` commands.
 
 > Moved from [TASKS.md](../TASKS.md)'s Small items by the
 > 2026-07-27 gate audit. The diff is tiny and the CLI is an
-> interface, but neither fact bars it from the task queue (D45 —
+> surface, but neither fact bars it from the task queue (D45 —
 > the housekeeping boundary is housekeeping's alone). What moved it
 > is the P6 question below, which is the actual work and is
 > unsettled. Serves **P6**. No use case asks for it. Raised from

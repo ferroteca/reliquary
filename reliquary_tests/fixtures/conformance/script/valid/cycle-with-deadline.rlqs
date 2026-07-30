@@ -1,6 +1,6 @@
-# valid: a phase graph that can cycle, with the header deadline S12
+# valid: a phase graph that can cycle, with the header deadline V12
 #        requires
-# spec: Syntactic restrictions / S12
+# spec: Syntactic restrictions / V12
 
 platform dos
 entry a

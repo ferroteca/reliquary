@@ -1,0 +1,14 @@
+# invalid: always is only directly inside a reactive phase
+# rule: V9
+# id: handler.always-outside-reactive-phase
+# spec: Syntactic restrictions
+
+platform dos
+wait {
+    always "a" {
+        press enter
+    }
+    on "b" {
+        press enter
+    }
+}

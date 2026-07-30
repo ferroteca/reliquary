@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Tests for the static rules S3, S5, S7-S11 over the typed tree."""
+"""Tests for the static rules V3, V5, V7-V11 over the typed tree."""
 
 import unittest
 
@@ -14,17 +14,17 @@ class _ValidationCase(unittest.TestCase):
     def rejects(self, source, message, rule):
         """Assert that a script fails, naming its problem and rule.
 
-        ``rule`` is either the S-number a test was written against
-        or the diagnostic's own dotted id — the S-numbers where a
+        ``rule`` is either the V-number a test was written against
+        or the diagnostic's own dotted id — the V-numbers where a
         rule has several diagnostics and the test means any of
         them, the id where it means one exactly. The http rules are
-        static but predate the S-numbering and have no S-number to
+        static but predate the V-numbering and have no V-number to
         name, so they use ids.
 
         Either way the assertion goes through the diagnostic's
         ``rule_id`` rather than matching message text, which is
-        stronger than the substring check it replaced: `"S1"` used
-        to match a message that merely mentioned S12.
+        stronger than the substring check it replaced: `"V1"` used
+        to match a message that merely mentioned V12.
         """
         with self.assertRaises(ScriptParseError, msg=source) as caught:
             parse_script(source)
@@ -44,30 +44,30 @@ class _ValidationCase(unittest.TestCase):
 
 
 class ScriptShapeTests(_ValidationCase):
-    """S3 and S10: the two shapes, and what belongs to each."""
+    """V3 and V10: the two shapes, and what belongs to each."""
 
     def test_a_linear_script_cannot_declare_an_entry_phase(self):
         self.rejects(_HEAD + "entry somewhere\nstart\n",
-                     "entry is invalid in a linear script", "S3")
+                     "entry is invalid in a linear script", "V3")
 
     def test_a_phased_script_requires_an_entry_phase(self):
         self.rejects(_HEAD + "phase a {\n    finish\n}\n",
-                     "declares the entry phase", "S3")
+                     "declares the entry phase", "V3")
 
     def test_entry_names_a_declared_phase(self):
         self.rejects(_HEAD + "entry b\nphase a {\n    finish\n}\n",
-                     "entry names an undeclared phase: b", "S10")
+                     "entry names an undeclared phase: b", "V10")
 
     def test_goto_names_a_declared_phase(self):
         error = self.rejects(
             _HEAD + "entry a\nphase a {\n    goto elsewhere\n}\n",
-            "goto names an undeclared phase: elsewhere", "S10")
+            "goto names an undeclared phase: elsewhere", "V10")
         self.assertEqual(error.line, 4)
 
     def test_a_phase_name_is_declared_once(self):
         self.rejects(
             _HEAD + "entry a\nphase a {\n    finish\n}\n"
-            "phase a {\n    finish\n}\n", "duplicate phase: a", "S5")
+            "phase a {\n    finish\n}\n", "duplicate phase: a", "V5")
 
     def test_a_phase_may_not_be_named_a_node_name(self):
         # script-spec.md, "Grammar": reserved node names cannot name
@@ -80,13 +80,13 @@ class ScriptShapeTests(_ValidationCase):
                     _HEAD + f"entry {word}\nphase {word} {{\n"
                     "    finish\n}\n",
                     f"a phase may not be a reserved node name: {word}",
-                    "S5")
+                    "V5")
 
     def test_a_property_key_may_not_be_a_node_name(self):
         self.rejects(
             _HEAD + 'property text press\nwait "x"\n',
             "a property key may not be a reserved node name: press",
-            "S5")
+            "V5")
 
     def test_the_closed_vocabularies_stay_contextual(self):
         # D53 refused reserving key names and drive slots globally:
@@ -104,15 +104,15 @@ class ScriptShapeTests(_ValidationCase):
 
     def test_transfers_are_invalid_in_a_linear_script(self):
         self.rejects(_HEAD + 'wait "x"\nfinish\n',
-                     "finish is invalid in a linear script", "S10")
+                     "finish is invalid in a linear script", "V10")
         self.rejects(_HEAD + "goto a\n",
-                     "goto is invalid in a linear script", "S10")
+                     "goto is invalid in a linear script", "V10")
 
     def test_a_transfer_nested_in_a_linear_handler_is_found(self):
         self.rejects(
             _HEAD + 'wait {\n    on "a" {\n        finish\n    }\n'
             '    on "b" {\n        press enter\n    }\n}\n',
-            "finish is invalid in a linear script", "S10")
+            "finish is invalid in a linear script", "V10")
 
     def test_a_linear_script_needs_no_terminator(self):
         script = parse_script(_HEAD + 'wait "C:\\\\>"\nscreenshot booted\n')
@@ -121,31 +121,31 @@ class ScriptShapeTests(_ValidationCase):
 
 
 class PhaseShapeTests(_ValidationCase):
-    """S9 and S11: sequential or reactive, and how each ends."""
+    """V9 and V11: sequential or reactive, and how each ends."""
 
     def test_a_phase_may_not_mix_statements_with_handlers(self):
         error = self.rejects(
             _HEAD + "entry a\nphase a {\n    press enter\n"
             '    always "x" {\n        finish\n    }\n}\n',
-            "sequential or reactive, never both", "S9")
+            "sequential or reactive, never both", "V9")
         self.assertEqual(error.line, 5)
 
     def test_on_is_not_a_standing_rule(self):
         self.rejects(
             _HEAD + 'entry a\nphase a {\n    on "x" {\n        finish\n'
-            "    }\n}\n", "on is legal only inside a branching wait", "S9")
+            "    }\n}\n", "on is legal only inside a branching wait", "V9")
 
     def test_always_is_not_a_branch_of_a_wait(self):
         self.rejects(
             _HEAD + 'entry a\nphase a {\n    wait {\n'
             '        always "x" {\n            finish\n        }\n'
             '        on "y" {\n            finish\n        }\n    }\n}\n',
-            "always is legal only directly inside a reactive phase", "S9")
+            "always is legal only directly inside a reactive phase", "V9")
 
     def test_a_sequential_phase_ends_in_a_transfer(self):
         error = self.rejects(
             _HEAD + "entry a\nphase a {\n    press enter\n}\n",
-            "does not end in goto or finish", "S11")
+            "does not end in goto or finish", "V11")
         self.assertEqual(error.line, 4)
 
     def test_a_branching_wait_terminates_when_every_handler_does(self):
@@ -160,12 +160,12 @@ class PhaseShapeTests(_ValidationCase):
             _HEAD + "entry a\nphase a {\n    wait {\n"
             '        on "x" {\n            finish\n        }\n'
             '        on "y" {\n            press enter\n        }\n'
-            "    }\n}\n", "does not end in goto or finish", "S11")
+            "    }\n}\n", "does not end in goto or finish", "V11")
 
     def test_nothing_follows_a_terminating_statement(self):
         error = self.rejects(
             _HEAD + "entry a\nphase a {\n    finish\n    press enter\n}\n",
-            "unreachable statement: finish ends its statement list", "S11")
+            "unreachable statement: finish ends its statement list", "V11")
         self.assertEqual(error.line, 5)
 
     def test_a_reactive_phase_needs_no_terminator(self):
@@ -176,19 +176,19 @@ class PhaseShapeTests(_ValidationCase):
 
 
 class BranchingWaitTests(_ValidationCase):
-    """S8: what a branching wait is, and where it may stand."""
+    """V8: what a branching wait is, and where it may stand."""
 
     def test_a_branching_wait_requires_two_handlers(self):
         self.rejects(
             _HEAD + 'wait {\n    on "x" {\n        press enter\n    }\n}\n',
-            "at least two handlers", "S8")
+            "at least two handlers", "V8")
 
     def test_a_branching_wait_carries_no_condition_of_its_own(self):
         self.rejects(
             _HEAD + 'wait machine=stopped {\n'
             '    on "x" {\n        press enter\n    }\n'
             '    on "y" {\n        press enter\n    }\n}\n',
-            "carries no condition of its own", "S8")
+            "carries no condition of its own", "V8")
 
     def test_a_branching_wait_may_not_nest_in_a_handler(self):
         self.rejects(
@@ -198,7 +198,7 @@ class BranchingWaitTests(_ValidationCase):
             '            on "z" {\n                press enter\n'
             "            }\n        }\n    }\n"
             '    on "w" {\n        press enter\n    }\n}\n',
-            "may not appear inside a handler body", "S8")
+            "may not appear inside a handler body", "V8")
 
     def test_a_branching_wait_may_not_nest_in_a_standing_handler(self):
         self.rejects(
@@ -207,11 +207,11 @@ class BranchingWaitTests(_ValidationCase):
             '            on "y" {\n                finish\n            }\n'
             '            on "z" {\n                finish\n            }\n'
             "        }\n    }\n}\n",
-            "may not appear inside a handler body", "S8")
+            "may not appear inside a handler body", "V8")
 
     def test_an_empty_handler_body_is_not_a_shape_error(self):
         # The grammar requires a statement in a handler body; the
-        # explicit no-action branch is the spec's, not S8's.
+        # explicit no-action branch is the spec's, not V8's.
         with self.assertRaises(ScriptParseError):
             parse_script(
                 _HEAD + 'wait {\n    on "x" {\n    }\n'
@@ -219,51 +219,51 @@ class BranchingWaitTests(_ValidationCase):
 
 
 class ObservationChannelTests(_ValidationCase):
-    """S7: one condition, on a known channel, of the right kind."""
+    """V7: one condition, on a known channel, of the right kind."""
 
     def test_an_observation_carries_exactly_one_condition(self):
         self.rejects(_HEAD + 'wait "x" machine=stopped\n',
-                     "carries more than one condition", "S7")
+                     "carries more than one condition", "V7")
         self.rejects(_HEAD + "wait machine=stopped machine=stopped\n",
-                     "carries more than one condition", "S7")
+                     "carries more than one condition", "V7")
 
     def test_a_wait_requires_a_condition(self):
         self.rejects(_HEAD + "wait timeout=5m\n",
-                     "wait requires a condition", "S7")
+                     "wait requires a condition", "V7")
 
     def test_a_bare_state_word_is_not_a_condition(self):
         error = self.rejects(_HEAD + "wait stopped\n",
-                             "machine state is spelled machine=stopped", "S7")
+                             "machine state is spelled machine=stopped", "V7")
         self.assertIn("'stopped' is not a condition", error.message)
 
     def test_a_bare_word_is_not_a_screen_condition(self):
         self.rejects(_HEAD + "wait ready\n",
-                     "the screen is observed by a bare string or regex", "S7")
+                     "the screen is observed by a bare string or regex", "V7")
 
     def test_the_screen_channel_has_no_named_spelling(self):
         self.rejects(_HEAD + 'wait screen="C:\\\\>"\n',
-                     "the screen channel has no named spelling", "S7")
+                     "the screen channel has no named spelling", "V7")
 
     def test_an_unknown_channel_is_named(self):
         self.rejects(_HEAD + 'wait serial="login:"\n',
-                     "unknown observation channel: serial", "S7")
+                     "unknown observation channel: serial", "V7")
 
     def test_the_machine_channel_takes_a_state_word(self):
         self.rejects(_HEAD + 'wait machine="stopped"\n',
-                     "machine observes the state stopped", "S7")
+                     "machine observes the state stopped", "V7")
         self.rejects(_HEAD + "wait machine=running\n",
-                     "machine observes the state stopped", "S7")
+                     "machine observes the state stopped", "V7")
 
     def test_handler_conditions_take_the_same_channels(self):
         self.rejects(
             _HEAD + 'wait {\n    on "x" machine=stopped {\n'
             "        press enter\n    }\n"
             '    on "y" {\n        press enter\n    }\n}\n',
-            "on carries more than one condition", "S7")
+            "on carries more than one condition", "V7")
         self.rejects(
             _HEAD + "entry a\nphase a {\n"
             '    always disk=full {\n        finish\n    }\n}\n',
-            "unknown observation channel: disk", "S7")
+            "unknown observation channel: disk", "V7")
 
     def test_a_handler_names_a_non_default_channel(self):
         script = parse_script(
@@ -280,7 +280,7 @@ class ObservationChannelTests(_ValidationCase):
         self.rejects(
             _HEAD + "entry a\nphase a {\n"
             "    always stable=1s {\n        finish\n    }\n}\n",
-            "always requires a condition", "S7")
+            "always requires a condition", "V7")
 
     def test_the_screen_and_machine_channels_validate(self):
         script = parse_script(
@@ -293,7 +293,7 @@ class ObservationChannelTests(_ValidationCase):
 
 
 class WatchPatternTests(_ValidationCase):
-    """S13: a watch pattern is non-empty, and a regex compiles.
+    """V13: a watch pattern is non-empty, and a regex compiles.
 
     The rule was specified when the surface was adopted and
     enforced by nothing until the spec-inventory comparison found
@@ -307,15 +307,15 @@ class WatchPatternTests(_ValidationCase):
 
     def test_an_empty_string_condition_is_not_a_pattern(self):
         self.rejects(_HEAD + 'wait ""\n',
-                     "an empty watch pattern matches every screen", "S13")
+                     "an empty watch pattern matches every screen", "V13")
 
     def test_an_empty_regex_condition_is_not_a_pattern(self):
         self.rejects(_HEAD + "wait //\n",
-                     "an empty watch pattern matches every screen", "S13")
+                     "an empty watch pattern matches every screen", "V13")
 
     def test_a_malformed_regex_is_refused_before_the_run(self):
         error = self.rejects(_HEAD + "wait /a(b/\n",
-                             "the regex does not compile", "S13")
+                             "the regex does not compile", "V13")
         self.assertIn("Python's re syntax", error.message)
         self.assertEqual(error.line, 2)
 
@@ -323,11 +323,11 @@ class WatchPatternTests(_ValidationCase):
         self.rejects(
             _HEAD + 'wait {\n    on /x[/ {\n        press enter\n    }\n'
             '    on "y" {\n        press enter\n    }\n}\n',
-            "the regex does not compile", "S13")
+            "the regex does not compile", "V13")
         self.rejects(
             _HEAD + "entry a\nphase a {\n"
             '    always "" {\n        finish\n    }\n}\n',
-            "an empty watch pattern", "S13")
+            "an empty watch pattern", "V13")
 
     def test_an_interpolation_alone_is_a_pattern(self):
         # `${key}` is text the run binds, so the authored pattern
@@ -394,13 +394,13 @@ class HttpValidationTests(_ValidationCase):
 
     def test_reserved_property_namespaces_are_rejected(self):
         self.rejects(_HEAD + "property rlq.http.url\nstart\n",
-                     "rlq namespace", "S5")
+                     "rlq namespace", "V5")
         self.rejects(_HEAD + "property reliquary.http.url\nstart\n",
-                     "reliquary namespace", "S5")
+                     "reliquary namespace", "V5")
 
     def test_rlq_http_reference_requires_http_block(self):
         self.rejects(_HEAD + 'enter "${rlq.http.url}/answer.txt"\n',
-                     "rlq.http.* properties require an http block", "S6")
+                     "rlq.http.* properties require an http block", "V6")
 
     def test_http_start_requires_declared_content(self):
         self.rejects(_HEAD + "http start\n",
@@ -446,7 +446,7 @@ class HttpValidationTests(_ValidationCase):
 
 
 class PortableKeyTests(_ValidationCase):
-    """S14: ``press`` uses the language's closed portable key set."""
+    """V14: ``press`` uses the language's closed portable key set."""
 
     def test_every_portable_key_name_is_valid(self):
         names = (
@@ -465,15 +465,15 @@ class PortableKeyTests(_ValidationCase):
 
     def test_an_unknown_key_name_is_a_static_error(self):
         self.rejects(_HEAD + "press wingding\n",
-                     "'wingding' is not a portable key name", "S14")
+                     "'wingding' is not a portable key name", "V14")
 
     def test_a_bare_character_is_text_not_a_key_name(self):
         self.rejects(_HEAD + "press c\n",
-                     "'c' is not a portable key name", "S14")
+                     "'c' is not a portable key name", "V14")
 
     def test_an_empty_chord_member_is_invalid(self):
         self.rejects(_HEAD + "press ctrl++c\n",
-                     "'' is not a portable key name", "S14")
+                     "'' is not a portable key name", "V14")
 
 
 class MachineVariableTests(_ValidationCase):
@@ -484,16 +484,16 @@ class MachineVariableTests(_ValidationCase):
 
     def test_the_reserved_namespaces_are_refused(self):
         self.rejects(_HEAD + 'set rlq.ready "yes"\n',
-                     "rlq namespace are reserved", "S5")
+                     "rlq namespace are reserved", "V5")
         self.rejects(_HEAD + 'set reliquary "yes"\n',
-                     "reliquary namespace are reserved", "S5")
+                     "reliquary namespace are reserved", "V5")
 
     def test_a_reserved_key_inside_a_handler_is_found(self):
         self.rejects(
             _HEAD + 'wait {\n    on "a" {\n        set rlq.x "1"\n'
             "        finish\n    }\n"
             '    on "b" {\n        finish\n    }\n}\n',
-            "rlq namespace are reserved", "S5")
+            "rlq namespace are reserved", "V5")
 
 
 class DiagnosticContextTests(_ValidationCase):

@@ -648,7 +648,7 @@ names both causes and points at `--media-dir`, the flag that
 isolates one project's media cache from another's.
 
 **Content addressing was weighed and declined twice.** An opaque
-hash-named cache cuts against "the cache is not an interface",
+hash-named cache cuts against "the cache is not a surface",
 and the pinned hash already makes a silent collision impossible —
 detection was never what name-keying lacked. It stays the
 recorded escalation if collision friction ever proves real.
@@ -967,7 +967,7 @@ signal is all four of these holding at once.
 With all four holding, the answer is an evaluation step: a
 `freedos.rlqb.jsonnet` producing an ordinary `freedos.rlqb`, as
 its own file kind. Argued and recorded under the
-interface-change rule when it happens — never pre-committed
+surface-change rule when it happens — never pre-committed
 here, and never as a mode flag that makes the existing parser
 evaluate.
 

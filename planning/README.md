@@ -44,17 +44,19 @@ the record, and the queue are machinery rather than proposals, and
 none of them has a lifecycle state to be in:
 
 - [README.md](README.md) — this map.
-- [INTERFACES.md](INTERFACES.md) — the vetting rule. It governs
+- [SURFACES.md](SURFACES.md) — the vetting rule. It governs
   `proposed/` at least as much as `pledged/`; it is the test a
   proposal is judged by, not a thing that was proposed.
 - [DECISIONS.md](DECISIONS.md) — the adjudication record, which cuts
   across every state by design: open questions not yet adjudicated,
   decisions that pledged something, decisions that **refused** it
-  (TASKS.md's Rejected section is a thin index into this file), and
+  (this file is the whole record of a refusal — D52 deleted
+  TASKS.md's Rejected section, a queue holding only what waits), and
   a retired list binding nothing at all.
 - [TASKS.md](TASKS.md) — the queue, and **everything in it is
   already pledged**, so there is nothing to promote and no order to
-  work it in. Its state is the one `pledged/` names; the directory
+  work it in. Its entries are itemized, T-numbered like every other
+  item here (D86). Its state is the one `pledged/` names; the directory
   is not its home because `proposed/` and `pledged/` hold *demand
   and capability* — use cases, principles, and the features that
   deliver them — and a task is none of those. That kind distinction
@@ -80,8 +82,12 @@ as a pledge nobody means.
 handle for what depends on a feature, running in one sequence across
 both directories, recording order of issue and never priority; it
 **evaporates on delivery** and is never reused, so gaps are history
-rather than a promise. Designs take no number — a design serves one
-feature and is identified by its path. A feature must fit in one
+rather than a promise. **Tasks carry T-numbers on the same terms**
+(D86) — issued at entry, since a task has no proposed state here,
+and evaporating when the task is struck; the sequence states its own
+high-water mark in [TASKS.md](TASKS.md), tasks being the one class
+whose whole population can vanish. Designs take no number — a design
+serves one feature and is identified by its path. A feature must fit in one
 sprint, which here runs in minutes to hours; the bound bites at
 the pledge, so entries in `proposed/FEATURES.md` are each many
 sprints and cutting one up is part of pledging it.
@@ -125,8 +131,8 @@ only open design problems belonging to no single feature; the
 whole-system view itself is root
 [ARCHITECTURE.md](../ARCHITECTURE.md).
 
-**Nothing under `planning/` describes a delivered interface.** Once
-an interface ships, its normative spec is current truth and lives in
+**Nothing under `planning/` describes a delivered surface.** Once
+an application surface ships, its normative spec is current truth and lives in
 [`docs/spec/`](../docs/spec/), which is where the world looks for
 what Reliquary *is*. That is a one-way move: a spec never comes
 back here. Machine-readable schemas go further still — they ship
@@ -143,14 +149,14 @@ them, and `docs/spec/` refers to them.
 | [`pledged/USE-CASES.md`](pledged/USE-CASES.md) | Pledged use cases the code does not yet meet |
 | [`pledged/ARCHITECTURE.md`](pledged/ARCHITECTURE.md) | Pledged architecture the code does not yet honor — pledged vision, not yet armed |
 | [`pledged/FEATURES.md`](pledged/FEATURES.md) | Pledged-but-unbuilt capability (F-numbered), each within one sprint and carrying the work items that deliver it |
-| [`INTERFACES.md`](INTERFACES.md) | *(root)* The interface-change rule every interface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The interfaces" |
+| [`SURFACES.md`](SURFACES.md) | *(root)* The surface-change rule every surface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The application surfaces" (S1–S8) |
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
-| [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, in no particular order |
+| [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, T-numbered, in no particular order |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `landmarks.md` (F5), `recorder.md` (F1, U6) |
 | [`pledged/design/`](pledged/design/) | Design for pledged features — empty again since 2026-07-28, when F2 delivered and `backend-adapter.md` travelled to `design/`: a delivered feature leaves no feature for its design to sit with |
 | [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `backend-adapter.md` (the adapter seam's doctrine, delivered as F2 and internal by decision, so it does not move to `docs/spec/`), `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
 
-Not here, deliberately: the normative specs of shipped interfaces
+Not here, deliberately: the normative specs of shipped surfaces
 ([`docs/spec/`](../docs/spec/)) and the machine-readable schemas
 (`reliquary/schemas/`).
 
@@ -211,14 +217,14 @@ directly as housekeeping, or rejected with its reason recorded in
 [DECISIONS.md](DECISIONS.md). What keeps the third queue from being
 a hole in the vetting is **the gate at its door**: only authority
 writes to it, and entering an item *is* approving it (D43). It is
-**not** housekeeping's interface test — that boundary is
+**not** housekeeping's surface test — that boundary is
 housekeeping's alone (D45), compensating for a class nobody with
 authority ever reviews, and a queue only the owner can write to
-needs no such compensation. So **a small interface change may be a
+needs no such compensation. So **a small surface change may be a
 task**, admitted on size and kind and never refused for the surface
 it touches; what it may not do is skip the landing rules, which
 bind it exactly as they bind a feature. Composed that way the
-guarantee still holds — **no interface change without having passed
+guarantee still holds — **no surface change without having passed
 through a queue** — because passing through this one means an
 approval was given, not that the subject was safe.
 
@@ -230,10 +236,11 @@ qualifying item is approved on sight and needs no entry anywhere;
 whoever lands the work invokes the bucket by naming it in the
 commit, and the commit is the record.
 
-Refusing is half of both rules. Housekeeping's interface test is
+Refusing is half of both rules. Housekeeping's surface test is
 its first gate and it is a lookup, not a judgement — root
-ARCHITECTURE.md "The interfaces" enumerates them, and the rule that
-weighs a hit is [INTERFACES.md](INTERFACES.md). It governs that
+ARCHITECTURE.md "The application surfaces" enumerates them as
+S1–S8, and the rule that
+weighs a hit is [SURFACES.md](SURFACES.md). It governs that
 bucket only; the third queue's gate is authority at entry (above).
 A use-case or principle amendment and a design
 decision are never admissible to either bucket. Past that,
@@ -253,5 +260,5 @@ Every pledged item cites what demands it: a use case (its U-number,
 in force at the root or still drafted under `proposed/`) or a
 architectural principle (its P-number), which drives work just as well.
 When a proposal dies, the sweep — the removal rule in
-[INTERFACES.md](INTERFACES.md) — finds every item that
+[SURFACES.md](SURFACES.md) — finds every item that
 falls out with it.

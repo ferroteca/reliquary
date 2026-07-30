@@ -1,0 +1,12 @@
+# invalid: nothing follows a terminating statement
+# rule: V11
+# id: flow.unreachable-statement
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    finish
+    press enter
+}

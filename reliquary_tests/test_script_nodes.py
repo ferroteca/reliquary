@@ -179,7 +179,7 @@ class NodeShapeTests(unittest.TestCase):
 
     def test_diagnostics_render_with_a_caret(self):
         # The rendering ends with the diagnostic's id in parentheses,
-        # which is where the S-numbers used to sit: it is the stable
+        # which is where the V-numbers used to sit: it is the stable
         # handle a consumer switches on, where the wording is not.
         with self.assertRaises(ScriptParseError) as caught:
             parse_nodes("start\nwait 30\n", path="x.rlqs")

@@ -1,0 +1,7 @@
+# invalid: durations are positive
+# rule: V5
+# id: time.non-positive
+# spec: Syntactic restrictions
+
+platform dos
+wait "x" timeout=0s

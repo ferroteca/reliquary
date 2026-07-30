@@ -1,0 +1,7 @@
+# invalid: a modifier outside the node's signature
+# rule: V2
+# id: node.modifier-not-allowed
+# spec: Syntactic restrictions
+
+platform dos
+press enter stable=1s

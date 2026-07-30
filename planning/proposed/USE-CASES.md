@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** the staging ground for changes to the
 > use-case list. **Nothing here is pledged, and nothing is worked
 > from here.** A proposal is argued under the
-> [interface-change rule](../INTERFACES.md#the-rule),
+> [surface-change rule](../SURFACES.md#the-rule),
 > and **the move is the pledge**: it goes to
 > [pledged/USE-CASES.md](../pledged/USE-CASES.md), and the commit
 > that moves it is the record. It reaches the current list —
@@ -41,7 +41,7 @@ the only three:
   edit is a clarification, it is not one — it is a supersession
   and is argued like any other proposal.
 - **Add.** A new use case, drafted here, argued under the
-  interface-change rule, pledged, and moved to
+  surface-change rule, pledged, and moved to
   root USE-CASES.md when its delivery lands.
 - **Retire.** A use case leaves force: **retired** without
   replacement, or **superseded** by one or more successors that
@@ -54,7 +54,7 @@ the only three:
 A use case is written toward one destination shape: the summary
 of why it exists and what it achieves for the user, and — for a
 worked journey — the step-by-step a user follows over Reliquary's
-public interfaces, spelled exactly. **Proposed and pledged cases
+application surfaces, spelled exactly. **Proposed and pledged cases
 are not held to that bar; getting them there is the job** (owner,
 2026-07-29). At these stages a step may lean on an undelivered
 piece so long as it is clearly flagged — *requires F-number*, the
@@ -100,7 +100,7 @@ document, and its removal triggers a sweep of the planning
 docs: any downstream material predicated on it (a
 planning/design/ document, a planning section,
 TASKS entries) is removed or realigned in the same pass, per
-the land-coherently rule (INTERFACES.md). The death is
+the land-coherently rule (SURFACES.md). The death is
 recorded in DECISIONS.md with its reason, so it is not
 re-proposed blindly. Nothing downstream may keep citing a
 use case that never entered force. The sweep is findable by
@@ -500,7 +500,7 @@ states the split F27's decide-first asks to have stated.
 >   hardware; supplying the driver is the point of the exercise.
 
 **The use case, step by step** — a precise recipe over
-Reliquary's public interfaces: a user should be able to follow it
+Reliquary's application surfaces: a user should be able to follow it
 as written to accomplish the goal. Every spelling is the surface
 as it stands today, except where a step is marked **requires
 F26/F27/F28** — a pledged, undelivered piece, spelled in the form

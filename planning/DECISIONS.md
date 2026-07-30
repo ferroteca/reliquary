@@ -11,13 +11,13 @@ rounds and gap queues, moved out of [TASKS.md](TASKS.md)
 records what was decided, by whom and when, what was weighed and
 declined, and where it folded. The specs in
 [planning/design/](design/), and
-[INTERFACES.md](INTERFACES.md) / root
+[SURFACES.md](SURFACES.md) / root
 [USE-CASES.md](../USE-CASES.md), remain the
 normative homes — this file is the adjudication trail, and the
 guard against re-litigating: anything recorded here as killed,
 declined, or superseded is not revisited without new evidence,
-argued through the interface-change rule
-([INTERFACES.md](INTERFACES.md)). Entries keep the spellings of
+argued through the surface-change rule
+([SURFACES.md](SURFACES.md)). Entries keep the spellings of
 their time; mentions of "TASKS" records inside entries refer to
 entries now in this file, mentions of ROADMAP refer to the
 roadmap dissolved into these directories on 2026-07-26, and
@@ -35,6 +35,19 @@ schedules nothing now — what each milestone delivered is in the
 CHANGELOG, in the entries citing it, and in full at
 `git show 50b67b2:planning/ROADMAP.md`.
 
+**Three vocabularies below have since been reissued to something
+else, so they are decoded here** (2026-07-29). **"Interfaces"** —
+the world-facing boundary category, and `INTERFACES.md`, the rule
+governing it — is what D85 renamed the **application surfaces** and
+`SURFACES.md`; links repointed, words left standing. **An `S<n>` in
+any entry below is a script-validation rule**, which D84 renumbered
+to `V<n>` one for one, so an entry citing S6 means today's V6 —
+today's S-numbers are the application surfaces S1–S8, a different
+scheme no entry below can be referring to. And **`T0`–`T7` are the
+per-list task numbering** that ran three separate times before the
+task sequence was governed; D86 issues from T8 up, so every
+T-number from there on names exactly one task.
+
 Decisions are numbered in the order first recorded — D1 the
 earliest — and a number is never reused; the list reads
 newest-first, so the top entry carries the highest number and
@@ -42,7 +55,10 @@ a new entry prepends with the next free one. The D-number is
 the decision's citation handle everywhere: a decision
 generally supports use cases (U-numbers), governing principles
 ([PRINCIPLES.md](../ARCHITECTURE.md), P-numbers), or language goals
-(G-numbers), and names what it supports; and it is citable
+(G-numbers), and names what it supports; the other numbered kinds
+it may cite are the application surfaces (S-numbers), features
+(F-numbers), tasks (T-numbers) and the script-validation rules
+(V-numbers); and it is citable
 downstream — design docs, specs, and code commits justify
 choices by citing D-numbers. New entries carry their supports;
 retrofitting the older ones is a queued sweep (TASKS.md). An
@@ -187,6 +203,220 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D86 — TASKS ARE ITEMIZED; A T-NUMBER EVAPORATES, AND THE SEQUENCE
+  STATES ITS OWN HIGH-WATER MARK — DECIDED (owner, 2026-07-29).
+  Supports P23. **Applies D42's handle rule to the one work class it
+  had missed**, with D52's strike rule deciding the retirement.
+  Standing across every project the owner controls.
+
+  THE OMISSION, NOT A REFUSAL. D42 already stated the general
+  rule — *every item that can be depended on needs a handle,
+  because a heading someone may reword is not something to point
+  at* — and issued F-numbers under it. Tasks were simply never
+  given one. The record was searched before this act and holds no
+  argument either way: nothing declines numbering tasks, and D52
+  independently settled the second half by ruling that anything is
+  struck when it is done. So this finishes D42 rather than
+  reversing anything.
+
+  WHAT THE NUMBER DOES, AND WHEN IT GOES. A task carries a
+  T-number, issued **at entry** — which for a task is the pledge
+  itself, there being no proposed state under `planning/` (D43) and
+  so no earlier moment; the idea that preceded it carries the
+  tracker's own issue number. That is the one asymmetry with an
+  F-number, issued at proposal. It **evaporates when the task is
+  struck** (D42's work class; D52), retires, and is never reissued.
+  What the number buys is small and real: a commit citing it, since
+  a struck task's only record *is* its commit; another task pointing
+  at it; and an identity surviving this file's regrouping, the
+  queue's groups being kinds rather than a running order, so an
+  entry may move between them.
+
+  THE SEQUENCE STATES ITS NEXT NUMBER, WHICH IS NEW MACHINERY.
+  Tasks are the first handle class whose **whole population can
+  vanish** — the queue is empty today, and D52 deliberately leaves a
+  struck task no entry here. An F-number is covered incidentally,
+  every retirement being named in some entry below; a T-number has
+  no such cover, so nothing in the repository would say what the
+  highest ever issued was and the next entry would quietly reissue
+  one. [TASKS.md](TASKS.md) now carries one line naming the next
+  number to issue. **It is not the status column D42 forbade**: it
+  records what the sequence has spent, and says nothing about what
+  was done, by whom, or when.
+
+  IT STARTS AT T8, ABOVE THE HISTORY — and that is the ruling this
+  entry exists for. T0–T7 were issued already, by a per-list
+  numbering that ran three separate times (milestone 6's list from
+  T0; milestone 8's T1–T5; milestone 9's T1–T7), and those mentions
+  survive in the entries that landed them, so `T1` already resolved
+  to three different things. WEIGHED AND DECLINED: **starting at
+  T1** behind a glossary line, which would have minted a *fourth*
+  meaning for T1 inside the one file that is the citation trail —
+  spending the never-reissue guarantee on the very first entry to
+  save a sentence. Also declined: **reuse** (lowest-free, the way
+  machine ids work), which surrenders the guarantee outright and
+  bites hardest precisely here, where the commit message is the
+  whole record. A gap costs a sentence; an ambiguity cannot be
+  bought back.
+
+  SCOPE: FREE-STANDING WORK ONLY. A pledged feature's own work
+  items take no T-number — they are identified by the feature, and
+  numbering them would either rebuild the `F3a` hierarchy D42
+  refused or issue handles nothing outside the feature can point
+  at. Housekeeping (D38) takes none either, having no entry to
+  number.
+
+  FOLDED: this entry and the preamble's decoder for the historical
+  T-numbers; [TASKS.md](TASKS.md) (the new "Every task is
+  itemized" section and the register line);
+  [README.md](README.md) (the handle paragraph, the TASKS.md
+  bullet, the map row) and a stale cross-reference fixed in
+  passing there — it still named a Rejected section D52 deleted;
+  [AGENTS.md](../AGENTS.md); and the CHANGELOG's unreleased
+  section. The standing rule also landed in the owner's global
+  governance skill and its TASKS.md scaffold, outside this
+  repository.
+
+- D85 — THE WORLD-FACING BOUNDARIES ARE THE **APPLICATION
+  SURFACES**, ITEMIZED S1–S8 — DECIDED (owner, 2026-07-29).
+  Supports P8, P23, P24; builds on D42's handle classes and
+  **requires D84**, which freed the letter. Standing across every
+  project the owner controls.
+
+  THE TERM, AND WHY THE OLD ONE COULD NOT WORK. "Interface" is the
+  wrong word for this category and quietly always was: a codebase
+  calls every module boundary, every network device and every
+  duck-typed protocol an interface, and this is the one category a
+  governance rule has to resolve **by lookup rather than
+  judgement** — housekeeping's first test, asked first and answered
+  from the enumeration. A word shared with all of them cannot carry
+  that. So the category is now the **application surfaces** (the
+  critical application/user boundaries), the rule governing them is
+  the **surface-change rule**, and `planning/INTERFACES.md` was
+  *moved* to `planning/SURFACES.md` rather than aliased (P9). The
+  filename is fixed across the owner's projects, so the rename is a
+  standing one.
+
+  ITEMIZED, IN ONE FLAT SEQUENCE. Eight surfaces take S-numbers:
+  **S1** the CLI, **S2** the embedding API, **S3** the scripting
+  language, **S4** the machine blueprint, then the supporting
+  contracts — **S5** the script properties, **S6** the codex,
+  **S7** the run's returned output, **S8** the working-directory
+  layout. **One sequence, not two**: the rule covers the supporting
+  four exactly as it covers the primary four, so numbering them
+  separately would assert a hierarchy the rule denies; primary
+  versus supporting survives as prose about how a user meets them,
+  conferring no lesser standing. The handles are **vision handles**
+  under D42 — a surface persists, so its number is permanent and is
+  never reused even if the surface itself is retired — and a
+  drafted or pledged surface numbers from the same sequence under
+  `proposed/` and `pledged/`.
+
+  WHAT THE NUMBERS ARE *FOR*. The rule's first landing step is
+  "name every surface it touches", and it now resolves to handles
+  instead of prose: a decision, a review or a commit says S1 and S2
+  rather than describing which boundaries it means, and P24's
+  per-surface test claim gains something to hang on.
+
+  WHAT DID NOT MOVE, DELIBERATELY. The ordinary senses of the word
+  stay exactly as written — the hypervisor's **management
+  interface**, the adapter seam (which is deliberately *not* a
+  surface), a module's public interface, and P16's "Reliquary is
+  the only interface to a machine", whose subject is the access
+  path rather than the enumeration. The entries below keep their
+  spellings under the preamble's rule, decoded there; released
+  CHANGELOG sections are untouched.
+
+  P8 TRIAGE: **no use-case impact, strong alignment.** Nothing any
+  use case demands or any principle requires is altered — the
+  surfaces themselves, their specifications, and the rule's three
+  rungs are as they were; this is vocabulary plus handles. It is
+  nonetheless **not housekeeping**: it edits the enumeration, which
+  P23 names a normative artifact, so it is routed and recorded here
+  even though the owner compressed the steps into one change (D43).
+
+  FOLDED: this entry and the preamble's decoder;
+  [SURFACES.md](SURFACES.md) (moved from `INTERFACES.md`, retitled,
+  revocabularized); root [ARCHITECTURE.md](../ARCHITECTURE.md)
+  ("The application surfaces" with S1–S8, the per-surface
+  headings, P6/P7/P8/P23/P24's wording, the banner);
+  [README.md](README.md), [USE-CASES.md](../USE-CASES.md),
+  [proposed/USE-CASES.md](proposed/USE-CASES.md),
+  [proposed/FEATURES.md](proposed/FEATURES.md),
+  [design/backend-adapter.md](design/backend-adapter.md);
+  normative [docs/spec/README.md](../docs/spec/README.md),
+  [cli.md](../docs/spec/cli.md), [api.md](../docs/spec/api.md),
+  [asset-resolution.md](../docs/spec/asset-resolution.md),
+  [blueprint-model.md](../docs/spec/blueprint-model.md),
+  [codex.md](../docs/spec/codex.md),
+  [media-spec.md](../docs/spec/media-spec.md),
+  [script-spec.md](../docs/spec/script-spec.md);
+  [docs/api-reference.md](../docs/api-reference.md),
+  [AGENTS.md](../AGENTS.md),
+  `.agents/skills/documentation-rules.md`; and the CHANGELOG's
+  unreleased section. The term and the itemization rule also landed
+  in the owner's global vision and governance skills and their
+  `planning/` scaffolds, outside this repository.
+
+- D84 — THE SCRIPT-VALIDATION RULES MOVE OFF S: S1–S14 BECOME
+  V1–V14 — DECIDED (owner, 2026-07-29). Supports (none): a rule
+  id's letter is a vocabulary choice that no use case or principle
+  demands. Recorded because **D85 needed the letter** and because
+  the ids are world-facing, so the change is a break rather than a
+  tidy-up.
+
+  WHY THE RULES MOVED RATHER THAN THE SURFACES. D85 gives the
+  application surfaces the letter **S**, and S was taken: the
+  `.rlqs` static rules had held it since the dotted ids landed
+  (D55). Two live S-sequences was the one option refused outright —
+  `S6` would have named both the reference-check rule and the run's
+  returned output, with *this file* citing both — because that is
+  exactly the ambiguity the never-reuse discipline exists to
+  prevent. Of the two, the rules moved: the surfaces are the outer
+  boundary a governance lookup resolves against, while a validation
+  rule is language-internal.
+
+  V FOR VALIDATION, AND THE NUMBERS DO NOT MOVE. V1–V14 map one for
+  one onto S1–S14 — the letter changes, the number never does — so
+  every historical citation decodes mechanically (S6 is V6) and no
+  renumbering has to be looked up. The **S15 retired by D5** (the
+  `results` header, dropped with `stage`/`collect`) stays retired
+  and no V15 is ever issued, so a search for either still resolves
+  to one thing.
+
+  WHAT IT COST, ITEMIZED. Around 230 live references: the
+  diagnostic-id map in `script_nodes.py`, the rule citations in
+  `script_validation.py`, `script_parser.py`, `binding.py`,
+  `facts.py` and the grammar's comments, the normative rule list in
+  script-spec.md, 41 conformance fixtures (the `# rule:` header
+  *and* the filename prefix), four harness regexes, and the two
+  corpus READMEs. **The ids are world-facing** — a diagnostic cites
+  its rule and the corpus asserts on the id — so this is a clean
+  pre-1.0 break under P9: no alias, no dual spelling, every
+  reference moved in the one change and the suite green (1110
+  tests, the one sanctioned skip).
+
+  A THIRD MEANING FOUND IN PASSING, AND SPELLED OUT INSTEAD. The
+  blueprint corpus README's `S2`/`S3` are **milestone stages** —
+  vocabulary dead since D33 — not rule ids, and they were rewritten
+  in words ("the second stage") rather than renumbered: left alone
+  they would have read as application surfaces the moment D85
+  landed. Caught by auditing the pattern's matches before running
+  it, which is the reason to audit.
+
+  FOLDED: this entry and the preamble's decoder;
+  normative [script-spec.md](../docs/spec/script-spec.md) (the rule
+  list and the ids-are-finer section); `script_nodes.py`,
+  `script_validation.py`, `script_parser.py`, `script_grammar.lark`,
+  `binding.py`, `facts.py`; the script conformance corpus (41
+  fixtures renamed and rewritten, its README) and the blueprint
+  corpus README; `test_script_corpus.py`,
+  `test_script_spec_conformance.py`, `test_script_validation.py`,
+  `test_script_timing.py`, `test_script_nodes.py`,
+  `test_script_parser.py`, `test_binding.py`, `test_facts.py`,
+  `test_dry_run.py`; [AGENTS.md](../AGENTS.md); and the CHANGELOG's
+  unreleased section.
 
 - D83 — THE DRIVE REPORT: RECORDED AT MATERIALIZE, REFRESHED
   OFFLINE, STANDING WHILE RUNNING; THE RECOGNITION CLAIM NARROWS TO

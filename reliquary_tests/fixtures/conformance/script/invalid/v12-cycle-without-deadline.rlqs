@@ -1,0 +1,15 @@
+# invalid: a phase graph that can cycle declares a header deadline
+# rule: V12
+# id: flow.cycle-without-deadline
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    goto b
+}
+
+phase b {
+    goto a
+}

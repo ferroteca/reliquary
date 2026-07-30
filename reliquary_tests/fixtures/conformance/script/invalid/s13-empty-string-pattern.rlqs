@@ -1,7 +1,0 @@
-# invalid: watch patterns are non-empty
-# rule: S13
-# id: obs.empty-pattern
-# spec: Syntactic restrictions
-
-platform dos
-wait ""

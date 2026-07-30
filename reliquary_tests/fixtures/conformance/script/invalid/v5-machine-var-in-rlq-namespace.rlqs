@@ -1,0 +1,7 @@
+# invalid: machine-variable keys avoid rlq
+# rule: V5
+# id: name.variable-reserved-namespace
+# spec: Syntactic restrictions
+
+platform dos
+set rlq.result "x"

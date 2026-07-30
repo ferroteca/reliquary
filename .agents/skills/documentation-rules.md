@@ -22,9 +22,9 @@ Root-level documents (README.md, CONTRIBUTING.md, CHANGELOG.md, etc.) must descr
 - `USE-CASES.md` — the use cases in force (U-numbers): every entry is met by the code today, which is why it lives at the root beside ARCHITECTURE.md. Same three states: `planning/proposed/USE-CASES.md`, then `planning/pledged/USE-CASES.md`, then here on full delivery
 
 ### docs/ directory
-The `docs/` directory describes **the live situation** — functionality that exists and works in the current codebase. Design documents, planned features, and unimplemented interfaces belong elsewhere. It holds three kinds of document, and they are not interchangeable:
+The `docs/` directory describes **the live situation** — functionality that exists and works in the current codebase. Design documents, planned features, and unimplemented surfaces belong elsewhere. It holds three kinds of document, and they are not interchangeable:
 
-- `docs/spec/` — the **normative specifications** of Reliquary's interfaces. These are the authority the implementation answers to, not a description of it: where a spec and the code disagree, the spec is right and the code has a bug, unless the spec is changed first through the interface-change rule. Maintainer-facing and complete — they state every rule, including ones no user needs. **The banner is the marker, the directory is shelving**: every spec declares its standing in its own status banner, every descriptive document names the norm it defers to, and reclassifying is an edit to that statement first. One norm is split across artifact kinds: the blueprint's structure is normed by the published schema, its semantics by `docs/spec/blueprint-model.md` — the blueprint guide, field reference, and cookbook are descriptive. `docs/spec/README.md` says this in full
+- `docs/spec/` — the **normative specifications** of Reliquary's application surfaces. These are the authority the implementation answers to, not a description of it: where a spec and the code disagree, the spec is right and the code has a bug, unless the spec is changed first through the surface-change rule. Maintainer-facing and complete — they state every rule, including ones no user needs. **The banner is the marker, the directory is shelving**: every spec declares its standing in its own status banner, every descriptive document names the norm it defers to, and reclassifying is an edit to that statement first. One norm is split across artifact kinds: the blueprint's structure is normed by the published schema, its semantics by `docs/spec/blueprint-model.md` — the blueprint guide, field reference, and cookbook are descriptive. `docs/spec/README.md` says this in full
 - `docs/*-reference.md` — **descriptive**, user-facing documentation of the implemented surface. A reference that disagrees with a spec is the reference's bug
 - guides — task-shaped, teaching one job end to end, making no completeness claim
 
@@ -45,10 +45,10 @@ The `planning/` directory contains maintainer-facing design and planning documen
 The **planning root** holds what has no lifecycle state, because it never moves between the two directories:
 
 - `planning/README.md` — the map, and the authority on the machinery
-- `planning/INTERFACES.md` — governing document for world-facing interfaces and the interface-change rule. It is the test a proposal is judged *by*, so it governs `proposed/` as much as `pledged/`
+- `planning/SURFACES.md` — governing document for the application surfaces and the surface-change rule. It is the test a proposal is judged *by*, so it governs `proposed/` as much as `pledged/`
 - `planning/DECISIONS.md` — the adjudication record, spanning every state by design: open questions not yet adjudicated, decisions that pledged something, decisions that **refused** it (TASKS.md's Rejected section is a thin index into this file), and a Retired list binding nothing. Numbered D1…; each generally supports use cases or principles; D-numbers justify design choices and code commits
 - `planning/TASKS.md` — the third work input queue, beside GitHub issues and `proposed/`: small, **pre-approved** work (entering it is approving it), in no particular order, so anyone may pick up anything. Feature-specific work lives with its feature instead. Work small and obvious enough needs no entry at all (housekeeping, D38)
-- `planning/design/` — open design problems and internal engineering doctrine belonging to **no single feature** (the whole-system view itself is root `ARCHITECTURE.md`; the control-plane doctrine `guest-communication.md` lives here because the adapter seam is internal, not a world-facing interface). Feature-specific design does not live here — it lives with its feature, under `planning/proposed/design/` or `planning/pledged/design/`, so a design and the demand it serves move together and a design for a dead proposal is swept with it. Nothing here describes a delivered interface: once an interface ships, its spec is current truth and belongs in `docs/spec/`
+- `planning/design/` — open design problems and internal engineering doctrine belonging to **no single feature** (the whole-system view itself is root `ARCHITECTURE.md`; the control-plane doctrine `guest-communication.md` lives here because the adapter seam is internal, not an application surface). Feature-specific design does not live here — it lives with its feature, under `planning/proposed/design/` or `planning/pledged/design/`, so a design and the demand it serves move together and a design for a dead proposal is swept with it. Nothing here describes a delivered surface: once an application surface ships, its spec is current truth and belongs in `docs/spec/`
 
 ## The CHANGELOG
 
@@ -68,7 +68,7 @@ release. The unreleased section is freely editable until it ships.
 ## When writing or editing documentation
 
 1. **Ask yourself**: Does this describe what exists today, or what we plan to build?
-   - Exists today, and it is the **normative rule** an interface must obey → `docs/spec/`
+   - Exists today, and it is the **normative rule** an application surface must obey → `docs/spec/`
    - Exists today, and it teaches or describes it for a **user** → `docs/` or root
    - Planned, and it serves one feature → beside that feature, in `planning/proposed/design/` or `planning/pledged/design/`
    - Planned, and it serves no single feature → `planning/design/`
@@ -78,6 +78,6 @@ release. The unreleased section is freely editable until it ships.
 
 3. **Mark aspirations clearly**: When a root or docs/ document must mention future plans, mark it clearly (e.g., "Planned for milestone 3", "Not yet implemented").
 
-4. **Keep design separate**: Never mix design discussion into a document that states current truth. A spec says what an interface *is*; the argument for why, and the alternatives declined, belong in `planning/DECISIONS.md` under a D-number the spec can cite. Speculation about what an interface might become belongs under `planning/`, never in `docs/spec/`.
+4. **Keep design separate**: Never mix design discussion into a document that states current truth. A spec says what an application surface *is*; the argument for why, and the alternatives declined, belong in `planning/DECISIONS.md` under a D-number the spec can cite. Speculation about what a surface might become belongs under `planning/`, never in `docs/spec/`.
 
 5. **Normative direction is the point**: a spec binds the implementation, so it is written as a rule, not a report. Prefer "a missing slot fails before anything is touched" to "Reliquary currently fails when the slot is missing". If the code does not yet obey it, that is a bug to file — not a reason to soften the spec into a description.

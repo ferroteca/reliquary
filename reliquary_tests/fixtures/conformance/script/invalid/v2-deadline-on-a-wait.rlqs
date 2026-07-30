@@ -1,0 +1,7 @@
+# invalid: the placement matrix: a budget is not a wait's
+# rule: V2
+# id: node.timing-placement
+# spec: Syntactic restrictions
+
+platform dos
+wait "x" deadline=5m

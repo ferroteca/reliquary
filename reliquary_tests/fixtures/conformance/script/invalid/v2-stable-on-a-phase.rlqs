@@ -1,0 +1,11 @@
+# invalid: only a match can be required to hold
+# rule: V2
+# id: node.timing-placement
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a stable=1s {
+    finish
+}

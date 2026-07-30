@@ -83,7 +83,7 @@ docs/spec/cli.md):
 | `export`   | —                        | copies out                             | `export-drive` / `export_drive`; `export-machine` / `export_machine` |
 
 Every verb lands on the CLI and the embedding API together
-(planning/INTERFACES.md): the twins are flat functions — the
+(planning/SURFACES.md): the twins are flat functions — the
 shape every binding language can express — taking the same
 selectors the CLI takes (a machine id, or the
 blueprint/machine-number pair, with `resolve_machine()` the

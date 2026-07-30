@@ -1,0 +1,20 @@
+# invalid: a branching wait carries no condition of its own
+# rule: V8
+# id: syn.unexpected-token
+# caught-by: V1 -- the grammar rejects this shape before validation
+#            reaches it, so the wait.branching-condition arm in
+#            script_validation is unreachable and the diagnostic
+#            names a token rather than the rule. script_grammar.lark
+#            says the S-rules stay above it "where a diagnostic can
+#            cite its id"; this clause is the exception it warns of.
+# spec: Syntactic restrictions
+
+platform dos
+wait "x" {
+    on "a" {
+        finish
+    }
+    on "b" {
+        finish
+    }
+}

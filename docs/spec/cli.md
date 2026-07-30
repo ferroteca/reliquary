@@ -6,11 +6,12 @@ SPDX-License-Identifier: GPL-3.0-only
 # CLI
 
 > **Status:** normative. This is the specification of the CLI —
-> one of the four primary interfaces (root ARCHITECTURE.md, "The
-> interfaces") — and the implementation answers to it: where this
+> one of the four primary application surfaces, S1 (root
+> ARCHITECTURE.md, "The application surfaces") — and the
+> implementation answers to it: where this
 > document and the code disagree, the code has the bug unless the
-> document is changed first through the interface-change rule
-> ([planning/INTERFACES.md](../../planning/INTERFACES.md)).
+> document is changed first through the surface-change rule
+> ([planning/SURFACES.md](../../planning/SURFACES.md)).
 >
 > **Every command here exists.** Commands that do not are not
 > documented here at all, however settled their design: unbuilt

@@ -1,0 +1,11 @@
+# invalid: entry names exactly one declared phase
+# rule: V10
+# id: flow.entry-undeclared
+# spec: Syntactic restrictions
+
+platform dos
+entry nowhere
+
+phase a {
+    finish
+}

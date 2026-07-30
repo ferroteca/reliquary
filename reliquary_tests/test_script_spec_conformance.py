@@ -12,13 +12,13 @@ written from knowledge of the code.
 
 The same shape found six divergences in the CLI's command list
 (``reliquary_tests.test_cli.ClaimedCommandTests``); writing this
-module found S13, specified since the surface was adopted and
+module found V13, specified since the surface was adopted and
 enforced nowhere, so a malformed regex reached the guest loop and
 failed there as an untyped fault.
 
 Four inventories are compared here. What that leaves uncovered,
 named rather than exempted quietly (P24's own clause): the
-*content* of every rule — that S11 really is the terminating-
+*content* of every rule — that V11 really is the terminating-
 statement rule and not something else — which only conformance
 fixtures in the blueprint corpus's manner could check.
 """
@@ -36,7 +36,7 @@ _SPEC = os.path.join(_REPO_ROOT, "docs", "spec", "script-spec.md")
 _PACKAGE = os.path.join(_REPO_ROOT, "reliquary")
 
 _BACKTICKED = re.compile(r"`([^`]+)`")
-_RULE_BULLET = re.compile(r"^- \*\*(S\d+)\*\*", re.M)
+_RULE_BULLET = re.compile(r"^- \*\*(V\d+)\*\*", re.M)
 _CITATION = re.compile(r"\((S\d+)\)")
 _PYTHON_SPELLING = re.compile(r"Python spells it ((?:`\w+`(?: / )?)+)")
 _CAMEL_BREAK = re.compile(r"(?<!^)(?=[A-Z])")
@@ -99,9 +99,9 @@ class SpecInventoryCase(unittest.TestCase):
 
 
 class StaticRuleIdTests(SpecInventoryCase):
-    """The S-ids the spec defines are the S-ids diagnostics cite.
+    """The V-ids the spec defines are the V-ids diagnostics cite.
 
-    Not hypothetical: on 2026-07-27 this found **S13** — "watch
+    Not hypothetical: on 2026-07-27 this found **V13** — "watch
     patterns are non-empty and regexes compile" — defined by the
     spec and enforced by nothing. `wait //` parsed and then matched
     every screen; `wait /a(b/` parsed and raised `re.error` from
@@ -129,18 +129,18 @@ class StaticRuleIdTests(SpecInventoryCase):
         """Rules whose spec bullet says no id exists for them yet.
 
         Read from the spec rather than listed here, so the
-        exemption retires itself: the day S1's diagnostics gain
+        exemption retires itself: the day V1's diagnostics gain
         ids, its bullet loses that phrase and the rule rejoins the
         comparison below.
         """
         text = _spec_text()
-        start = text.index("- **S1** —")
+        start = text.index("- **V1** —")
         end = text.index("\nThe grammar is line-oriented", start)
         found = set()
         for para in text[start:end].split("\n- **"):
             match = re.match(r"(S\d+)\*\*", para.lstrip("- *"))
             # "No ids yet" (plural) marks a rule with none at all.
-            # S4 says "No id yet for the header form" and does have
+            # V4 says "No id yet for the header form" and does have
             # one for the node form, so the two must not read alike.
             if match and "No ids yet" in para:
                 found.add(match.group(1))

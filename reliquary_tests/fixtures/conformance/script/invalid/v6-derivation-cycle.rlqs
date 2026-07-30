@@ -1,0 +1,9 @@
+# invalid: derivations are acyclic
+# rule: V6
+# id: prop.derivation-cycle
+# spec: Syntactic restrictions
+
+platform dos
+property text a default="${b}"
+property text b default="${a}"
+wait "x"

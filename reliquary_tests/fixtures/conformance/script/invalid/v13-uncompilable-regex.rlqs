@@ -1,0 +1,7 @@
+# invalid: regexes compile
+# rule: V13
+# id: obs.uncompilable-regex
+# spec: Syntactic restrictions
+
+platform dos
+wait /a(b/

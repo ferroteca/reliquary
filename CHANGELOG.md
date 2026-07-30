@@ -60,6 +60,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   record are now part of `machine-state.schema.json`, and none of
   the three enters the blueprint digest.
 
+- **Script static-validation rule ids are now `V1`–`V14`, renamed
+  from `S1`–`S14`** (D84). The letter changes and the number never
+  does, so `S6` is now `V6`; the `S15` retired earlier stays retired
+  and no `V15` is issued. Diagnostics, the normative rule list in
+  `docs/spec/script-spec.md`, and the conformance corpus (fixture
+  `# rule:` headers and filenames alike) all move together — a clean
+  pre-1.0 break with no alias and no dual spelling. Anything pinned
+  to a rule id (a fixture header, a test, a note citing a rule)
+  needs the letter changed.
+
+- **Reliquary's world-facing boundaries are now called the
+  application surfaces, and they are itemized `S1`–`S8`** (D85).
+  `S1` the CLI, `S2` the embedding API, `S3` the scripting language,
+  `S4` the machine blueprint, `S5` the script properties, `S6` the
+  codex, `S7` the run's returned output, `S8` the working-directory
+  layout — one flat sequence, permanent handles, enumerated in root
+  `ARCHITECTURE.md` "The application surfaces". The governing rule
+  is the **surface-change rule** and has moved from
+  `planning/INTERFACES.md` to `planning/SURFACES.md`. Nothing about
+  the surfaces themselves, their specifications, or how a change to
+  one is weighed has changed; a change may now cite the surfaces it
+  touches by number. The word "interface" keeps its ordinary senses
+  throughout (the hypervisor's management interface, a module's
+  public interface).
+
+- **Tasks in `planning/TASKS.md` are itemized, carrying `T`-numbers**
+  (D86) — issued at entry, evaporating when the task is struck, and
+  never reissued. The sequence starts at `T8`, above the historical
+  per-list numbering, and that file states the next number to issue.
+  Maintainer-facing only; no shipped surface is affected.
+
 ## 0.1.0.dev5 - 2026-07-29
 
 ### Added

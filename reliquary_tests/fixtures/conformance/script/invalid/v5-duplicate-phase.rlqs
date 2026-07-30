@@ -1,0 +1,15 @@
+# invalid: phase names are unique
+# rule: V5
+# id: name.duplicate-phase
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+phase a {
+    finish
+}
+
+phase a {
+    finish
+}
