@@ -204,6 +204,287 @@ is waiting on an answer today.
 
 ## Decided
 
+- D88 — AUTOSEED IS DELETED; U1 IS TWO COMMANDS AND P4 IS ABSOLUTE
+  AGAIN — DECIDED (owner, 2026-07-30). Supports P4, P18, U11;
+  **supersedes U1's text** (reshaped in place under its own number,
+  as D61 did), **clarifies U11**, **amends D59** by retiring its
+  autoseed half, **narrows D80**'s dry-run clause, and **requires
+  D87**, which it completes: with the seeding verbs CLI-only and the
+  axis gone, the embedding API is wholly codex-blind.
+
+  THE OPTION D59 DID NOT HAVE. Autoseeding was never argued for on
+  its own — it is the leftover half of a knob D59 was retiring:
+  "`--assets` IS RETIRED, AND WITH IT ONE KNOB ANSWERING TWO
+  QUESTIONS… It also declared hermeticity, and that is now its own
+  axis." That round weighed one alternative, which "reproduces both
+  former modes with no new knob and **keeps P4 absolute**", and
+  declined it for making seeding "a silent consequence of an
+  unrelated choice". It then priced what it took: "Autoseeding now
+  follows the *surface* rather than the directory, so `rlq
+  --blueprints-dir ./project` in CI seeds where `--assets ./project`
+  did not. **That amends P4**, whose codex clause read *never feeds
+  automation*." Deleting the axis outright was unavailable to that
+  round for one reason: U1's one-command claim was fixed, and every
+  no-knob branch cost it. Unfix U1 and a third branch appears,
+  better than both of D59's — P4 absolute again with no silent
+  seeding anywhere, because no implicit seeding is left to be
+  silent.
+
+  P4 RETURNS TO AN ABSOLUTE: the codex does not feed automation,
+  full stop, with no default and no switch. D59's P12 amendment is
+  untouched; placeable roots are a different subject.
+
+  U1 IS SUPERSEDED, NOT CLARIFIED, by the list's own test — past
+  citations read differently. D61's description of U1 ("one short,
+  terse command from a clean home to a usable machine"), D66's "U1's
+  single command reaching a usable machine", and D12's "U1's
+  one-command path seeds three separate codex artifacts" all move.
+  The number is reshaped in place rather than replaced: the need and
+  the nature are unchanged, and what changes is the count and what
+  the first command means.
+
+  AND THE AMENDMENT IS NOT A CONCESSION. U1's own requirement is
+  that "the blueprint and install recipe are easy to find, point to,
+  and use", and a blueprint the user never saw, never named and
+  cannot point at fails that clause while satisfying a keystroke
+  count. Two commands makes the find step real and leaves the second
+  unchanged. What is genuinely lost is a one-line demo.
+
+  WHERE THE TEXT SITS UNTIL DELIVERY. The root list is an
+  implementation claim (the landing bar), so U1's replacement parks
+  in [proposed/USE-CASES.md](proposed/USE-CASES.md) and reaches the
+  root with the code that makes it true; the same holds for P4's
+  restored clause, P6's exception (D87) and P18's sentence, none of
+  which the code honors until the sweep lands. A use case or a
+  principle in the root list describing an undelivered surface is
+  the one thing those lists may not hold.
+
+  THE SEARCH FAMILY IS DELETED, AND THE CODEX BECOMES A NOUN LIKE
+  ANY OTHER. `search_blueprints` gated its codex tier on the axis
+  itself — present with autoseeding on, absent with it off, every
+  match reading `user` — so deleting the axis left no condition to
+  read and forced the column's rule to be restated either way. The
+  answer is smaller than a restatement: **the noun names the set,
+  and no verb spans two.** `list-blueprints` / `list-scripts` /
+  `list-media` / `list-machines` are yours, **`list-codex`** is the
+  library, and `search-blueprints` is deleted outright along with
+  the unbuilt `search-scripts` / `search-media` and the
+  `list_<noun>` / `search_<noun>` convention in
+  [api.md](../docs/spec/api.md)'s table. No term parameter replaces
+  them: filtering is the shell's job or the caller's, `--json`
+  already makes it trivial in any language (P7), and `list-machines`
+  keeps `--blueprint` because a selector is not a query. The
+  `PROVENANCE` column goes with the verb that printed it — **which
+  command you ran is the provenance** — and with it the
+  `yes` / `seeded` / `user` vocabulary, whose three values answered
+  three different question-shapes in one column.
+
+  `--builtin` GOES TOO, AND EACH HALF WAS BROKEN UNDER A DIFFERENT
+  RULE, which is why one deletion settles both.
+  `list-blueprints --builtin` was a CLI-only reach into the library
+  with no API twin — an unremarked P6 breach older than D87 — and
+  `list_media(builtin=True)` was a codex-listing capability sitting
+  in the embedding API, which is what D87 refuses. A listing of what
+  you have should not carry a flag that turns it into a listing of
+  what you do not. Nothing replaces the codex media listing: media
+  are components inside a `.rlqb` and there is no `seed-media`, so
+  it enumerated parts that cannot be ordered.
+
+  DESCRIPTION IS OMITTED FROM HUMAN OUTPUT AND KEPT IN `--json`.
+  `search-blueprints` was the only surface that showed a
+  description, and no `list-*` gains one: free text of unbounded
+  length dominates a fixed-width table, and how a person should see
+  a description — truncated column, wrapped, or a per-item detail
+  view instead of a column at all — is unspecified. The field stays
+  in the JSON, where there are no columns, so the data is reachable
+  while the display question waits. It waits as pledged work rather
+  than a watch: **T8** in [TASKS.md](TASKS.md), entered with the
+  delivery, resolving it in one of two directions — support it in
+  the CLI with the display specified, or drop it from every surface
+  including `--json`. Until then U11's "read a description" is met
+  only through `--json`, which is thin and is said here rather than
+  discovered later.
+
+  THE REFUSAL IS THE TEACHING. `rlq run-script install --blueprint
+  freedos` on a clean home raises `PreflightError` (exit 3) naming
+  the gap and the fix — no blueprint `freedos` in the blueprints
+  directory, the codex has one, `rlq seed-blueprint freedos` — which
+  is P11 with the remedy in the message, replacing deleted magic
+  with an instruction rather than a silence. The API raises the same
+  error and names the command, honest now that the verbs live there
+  alone (D87). `search-blueprints`' empty result carried the same
+  duty and is gone with it; `list-blueprints` on a clean home is
+  simply empty, and the pointer belongs wherever a first run is
+  taught rather than in a listing.
+
+  D80'S DRY RUN NARROWS. "A blueprint that lives only in the codex
+  is read where it lies rather than copied out" goes: with no
+  fallback there is nothing to read, and an unseeded name is refused
+  with the message above. The rest of D80 stands — the dry run still
+  writes nothing and still never prompts.
+
+  U11 IS CLARIFIED, NOT RETIRED, and composition is why. Its steps
+  would be a strict prefix of U1's, which under the new standard is
+  a stage rather than a journey — but U1 names it as a
+  **precondition** instead, so no step appears twice and U11 keeps
+  the goal U1 does not carry: a copy of a library blueprint, with no
+  install behind it. The edit is one word: "search or list the
+  codex" becomes "list the codex". P18's own "searched and seeded
+  through ordinary commands (U11)" needs nothing, because
+  `rlq list-codex | findstr dos` is searching the codex through
+  ordinary commands — **claims name capabilities, steps name
+  commands**, so a citation breaks when a capability goes and not
+  when a verb is renamed. U11's deeper rework into journey form is
+  owed and not attempted here, which is why U1's precondition line
+  carries the one command that satisfies it.
+
+  WEIGHED AND DECLINED: **retiring U11** as absorbed by U1 — its
+  content is U1's opening two steps, but the composition rule keeps
+  it cheaper than a retirement that would strand P18's citation and
+  drop the seed-without-installing goal, which nothing in force
+  would then carry. **`search-codex` as a verb**, and before it a
+  `search-blueprints` narrowed to your own tree with `search-codex`
+  beside it: both were argued and both fell to the same objection —
+  the second command a newcomer has no reason to know exists, and a
+  family whose only job is filtering. **Keeping `--no-autoseed` as
+  an accepted no-op** so existing invocations keep working: there
+  are no aliases before 1.0 (P9), and the purge sweep is where a
+  retired spelling is remembered. **Keeping the API's `autoseed=`
+  for the suite's convenience**: the suite is a consumer and seeds
+  explicitly like any other. **Renaming the provenance value** `yes`
+  to `codex`: the column is deleted, so the wart it carried is
+  moot.
+
+  P8 TRIAGE: a surface change on S1, S2 and S8 — the flags, the
+  `Context` record, the resolution rule, and the asset-listing
+  vocabulary — argued as the use-case amendment it requires. U11 is
+  served, its find step becoming visible; U4, U14 and U17 gain their
+  guarantee at the API unconditionally; the surface is strictly
+  smaller than before, six asset commands where there were eight;
+  and the cost is U1's keystroke count, paid deliberately above.
+
+  Folded, at delivery unless noted: root
+  [USE-CASES.md](../USE-CASES.md) (U11's clarify **now**; U1's
+  replacement at delivery),
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (the parked
+  replacement, **now**), root
+  [ARCHITECTURE.md](../ARCHITECTURE.md) (P4 restored to an absolute,
+  and its prose's autoseed paragraph),
+  [docs/spec/asset-resolution.md](../docs/spec/asset-resolution.md)
+  (normative: the working directories and the resolution rule),
+  [docs/spec/cli.md](../docs/spec/cli.md) (the flags, the listing
+  and searching section, and the dry run's codex bullet),
+  [docs/spec/api.md](../docs/spec/api.md) (the twin table and the
+  list/search convention),
+  [docs/spec/codex.md](../docs/spec/codex.md)
+  (seed-not-a-resolution-tier),
+  [docs/spec/blueprint-model.md](../docs/spec/blueprint-model.md),
+  [docs/spec/media-spec.md](../docs/spec/media-spec.md),
+  [docs/blueprint-guide.md](../docs/blueprint-guide.md),
+  [docs/cli-reference.md](../docs/cli-reference.md),
+  [docs/api-reference.md](../docs/api-reference.md),
+  [AGENTS.md](../AGENTS.md), [README.md](../README.md) (both
+  autoseed-teaching sections), [TASKS.md](TASKS.md) (T8);
+  `home.py`, `assets.py`, `library.py`, `media.py`, `machines.py`,
+  `cli.py`; `test_home.py`, `test_assets.py`, `test_library.py`,
+  `test_media.py`, `test_cli.py`, `test_dry_run.py`, both corpus
+  harnesses, `test_old_surface_purge.py`; and a new entry in the
+  CHANGELOG's unreleased section — released text keeps `--builtin`
+  and autoseed where it stands, which the documentation rules
+  forbid editing.
+
+- D87 — THE CODEX IS NOT AN API BINDING; P6 GAINS ITS FIRST NAMED
+  EXCEPTION — DECIDED (owner, 2026-07-30). Supports P4, P18, U11;
+  **amends P6**, clarifies P18, and applies **D24's asymmetry rule**
+  as the tie-break. **D88 completes it**, and its text lands with
+  that delivery for the same reason: a principle in the root list is
+  honored by the code today.
+
+  THE MOVE. The codex verbs live at the CLI alone. `seed_blueprint`
+  and `seed_script` leave the embedding API, and `list-codex` — the
+  library listing D88 adds — is born there with no twin. Everything
+  else stays: `list_blueprints`, `list_scripts`, `list_media` and
+  `list_machines` are codex-blind by their own contract and keep
+  theirs. `library.py` is unchanged and internal; what narrows is
+  the public import surface.
+
+  WHY P18 DECIDES IT RATHER THAN A PREFERENCE. The codex improves in
+  point releases, so a program that imported a codex verb would hold
+  a name whose meaning the next release may move — and an API is a
+  stability claim in a way a command typed once is not. P18 already
+  refused programmatic dependence "in place"; this makes the refusal
+  structural instead of exhortative, which is the move P11 makes
+  everywhere else. An example is copied by a person and committed; a
+  program binds to the copy, which is the consuming project's own
+  asset (P4).
+
+  P6 WAS NEVER BROKEN BEFORE THIS, WHICH IS WHY THE EXCEPTION IS
+  NAMED. Three tiers of CLI/API difference exist and only the third
+  touches parity. **Defaults**: the CLI assigns a home where the API
+  assigns nothing, and D59 settled that this is "a property of the
+  default, not an exemption" — `set_home_dir()` is in the API.
+  **Ambient acquisition**: a library must not read the developer's
+  shell, so `adopt_environment()` is the CLI's step; again the
+  capability is on both surfaces. **A capability absent from one
+  surface entirely**: this, and the first of its kind. Absorbing it
+  into the defaults tier would have been the quiet exemption P24's
+  discipline exists to refuse — a principle is stated so it can be
+  violated, so P6 says this about itself rather than having P18 say
+  it on P6's behalf.
+
+  THE CLAUSE STATES A TEST, NOT A LIST. P6 names **the codex
+  verbs** as its exception and leaves the spellings to
+  [api.md](../docs/spec/api.md)'s table, the test being whether a
+  capability reaches into the codex. So the exception decides the
+  next verb too, and P6 needs no edit when one lands — which it
+  already survived once: `list-codex` joined the family after the
+  clause was drafted.
+
+  THE TIE-BREAK IS D24'S. Where the base rule and another principle
+  conflict, the asymmetry decides: adding a twin later breaks
+  nothing, and removing one after callers bind cannot be undone, so
+  the burden falls on the crossing. That is D24's reference-reach
+  reasoning applied to parity rather than a new rule.
+
+  IT IS A PARTIAL SEAL AND SAYS SO. P7 makes the CLI the backstop
+  binding for every unbound language, so a determined program can
+  shell out to `rlq seed-blueprint`. What the move buys is that no
+  *in-language* dependency forms — no import, no name in `__all__`,
+  no entry in the API reference, no type a caller's code can hold —
+  and that shelling out is a visible, deliberate act. The same shape
+  as P4's autoseed default, which held for as long as it existed.
+
+  WEIGHED AND DECLINED: **a new precedence principle** saying that
+  principles may override one another. It would be the third
+  meta-rule after P8 and P23, its only content being that the others
+  may disagree, and it would invite that argument at every future
+  asymmetry where a closed exception forces each case through the
+  gate; precedence-at-the-point-of-bite is already the pattern, the
+  twin-name rule carrying two named exceptions of its own. It would
+  also half-answer the parked "two norms for one semantic surface"
+  question in passing. **AND: enumerating the verbs in P6** rather
+  than naming the family — the list changed twice during this round,
+  which is the argument.
+
+  P8 TRIAGE: a surface change on S2, shrinking it. No use case is
+  cost — U11's journey is a person at a keyboard, and no numbered
+  case reaches the codex from a program — while P4 and P18 are
+  directly served. A clean pre-1.0 break (P9): no alias, the
+  spellings retired tree-wide by the purge sweep.
+
+  Folded, at delivery: root [ARCHITECTURE.md](../ARCHITECTURE.md)
+  (P6 tempered; P18 gains the bind-against sentence),
+  [AGENTS.md](../AGENTS.md) ("CLI–API parity"),
+  [docs/spec/api.md](../docs/spec/api.md) (the twin table's seed
+  rows; the conventions list's third exception),
+  [docs/spec/codex.md](../docs/spec/codex.md),
+  [docs/api-reference.md](../docs/api-reference.md),
+  [README.md](../README.md),
+  [reliquary/__init__.py](../reliquary/__init__.py) (the seed names
+  out of the imports and `__all__`),
+  `test_old_surface_purge.py`; and the CHANGELOG's unreleased
+  section.
+
 - D86 — TASKS ARE ITEMIZED; A T-NUMBER EVAPORATES, AND THE SEQUENCE
   STATES ITS OWN HIGH-WATER MARK — DECIDED (owner, 2026-07-29).
   Supports P23. **Applies D42's handle rule to the one work class it

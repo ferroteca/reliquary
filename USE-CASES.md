@@ -152,10 +152,10 @@ number they superseded.
 
 - **U11 — Find and seed a codex blueprint, easily.** A user
   at the keyboard wants a starting point — freedos,
-  openbsd — and finds it with minimal effort: search or list
-  the codex, read a description, seed the blueprint (its
-  media and scripts included) into their own library as
-  ordinary files they own from then on.
+  openbsd — and finds it with minimal effort: list the codex,
+  read a description, seed the blueprint (its media and
+  scripts included) into their own library as ordinary files
+  they own from then on.
 
 - **U12 — An unattended install, end to end.** From standard
   vendor media, a script drives the installer the whole way —
