@@ -112,7 +112,7 @@ retires and is never issued again, so a T-number surviving in a
 commit message can never resolve to something else later, and
 gaps in the sequence are history rather than a promise.
 
-**The next number to issue is T9.** Tasks are the one handle class
+**The next number to issue is T10.** Tasks are the one handle class
 whose whole population can vanish: the queue empties, and a struck
 task's only record is its commit, so nothing else here would say
 what the highest number ever issued was. An F-number is covered
@@ -164,3 +164,38 @@ not keep.
   description surface and went with the search family (D88), and
   U11's "read a description" is met only through `--json` until
   this settles — the thin fulfilment that prompted the entry.
+
+### Codex content
+
+- **T9 — A readiness example in the codex.** The shipped library
+  holds two scripts and **both end with the machine powered off**
+  (`freedos-install` ejects and finishes; `freedos-verify` runs
+  `fdapm poweroff`), so nothing in it demonstrates the idiom U14
+  and U20 are built on: leave the machine running, ready for work,
+  and say so through a machine variable. U22's step 4 has to invent
+  one from scratch for exactly that reason.
+
+  Write `freedos-ready.rlqs` — boot the installed disk, wait for a
+  prompt, `set ready "yes"`, and **leave it running** — and wire it
+  into `freedos.rlqb`'s `scripts` map as `"ready"`, so the example
+  arrives complete rather than as a file a reader has to connect up.
+
+  Three constraints, each already decided and none of them
+  negotiable here:
+
+  - **The variable is plain `ready`, not `rlq.ready`.** V5 refuses a
+    script `set` in the `rlq` / `reliquary` namespaces
+    (`name.variable-reserved-namespace`), which is what those
+    namespaces are reserved for.
+  - **The name carries no `rlq.` prefix** either. P18's forbidden
+    property is *stability*, and a codex file spelled as Reliquary's
+    own would assert exactly the contract the codex does not hold.
+  - **It must work** (P18): a codex example that does not is a
+    defect, so it needs exercising rather than review alone. The
+    opt-in FreeDOS integration test is where that lands, and it
+    already boots the installed disk.
+
+  Not a feature: this is content, so it sits outside the
+  surface-change rule entirely — no new verb, no new field, nothing
+  for a spec to say. What it does need is a codex whose examples
+  demonstrate the whole of the idiom rather than half of it.
