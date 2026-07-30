@@ -174,76 +174,16 @@ pledging-outruns-the-design flaw the reference rule names. F28
 cites U22 through F27's hatch clause, F27 being pledged in the
 same act, so the reference runs sideways.
 
-## F26 — `exec` reports whether the command failed
-
-> **Entered 2026-07-29** from a consuming project's proposal
-> (owner: admitted as a proposal). Demanded by **U14** in force —
-> the caller "runs work, reads results back", and for a *setup*
-> command the result **is** whether it worked — with **P11**'s
-> reasoning beside it, on F14's exact footing: a channel that
-> cannot say "it failed" is a limit that does not name itself at
-> the point it bites. F14 touches the same return surface from the
-> other side (the output's head, this the outcome), so the two
-> should be weighed together at pledge.
->
-> **Pledged 2026-07-29** (owner). F14 was weighed as directed and
-> stays proposed: the surfaces are separable, and its own
-> decide-first is unsettled. The error-text refusal
-> recommendation below travels unresolved to delivery.
->
-> **The spelling is settled** (owner, 2026-07-29, in U22's
-> flush-out round): a parameter — `check=True` on the `exec`
-> twin, `--check` at the CLI — with a command that signalled
-> failure raising `RunFailure` naming the command (exit `4`) and
-> the row return unchanged. U22's step 8 is the worked spelling.
-
-`exec` returns the visible screen as rows and deliberately reads no
-meaning into it (P18, G2). That honesty leaves a caller running a
-setup command — one whose output is nothing and whose success is
-everything — with no channel at all: success and failure both come
-back as rows. The ask: an **opt-in** way for `exec` to report
-whether the command it ran signalled failure.
-
-The mechanism stays on Reliquary's side of its own doctrine. After
-the command, the interaction layer probes with `IF ERRORLEVEL 1`
-and a sentinel echo of its own composing, and reads its own
-sentinel back — `IF ERRORLEVEL` being portable across DOS shells
-in a way `%ERRORLEVEL%` expansion is not. That reads no meaning
-into the guest's output: the probe's answer is text Reliquary
-itself composed, exactly as prompt detection already reads the
-screen for Reliquary's own protocol and as the readiness idiom has
-a script set a variable and read it back. It belongs to Reliquary
-because the DOS interaction surface is Reliquary's — the same
-reasoning that moved drive-letter placement out of consumers (P17).
-
-Landing rule: **P6**. `exec` is a CLI command and an API function
-today, so the opt-in lands on both twins in one change.
-
-DECIDE FIRST:
-
-- **The spelling** — a parameter on `exec` or a sibling verb. The
-  source proposal offered either; one concept should get one
-  spelling (the G6 instinct, though `exec` is CLI/API surface
-  rather than script language). *Settled — a parameter,
-  `check=True` / `--check`; see the pledge annotation above.*
-- **The error-text supplement — and this entry argues a refusal.**
-  `COMMAND.COM` leaves ERRORLEVEL unchanged on `Bad command or
-  file name`, so a mistyped command escapes the probe. The
-  recommendation is to decline recognizing the shell's own error
-  text and to record the probe's limit honestly in the spec (P11)
-  instead: error-text recognition is curating guest output
-  spellings — a localized DOS prints localized messages, so the
-  set is unbounded — and matching them is P10-shaped guessing
-  about what the guest meant. A mistyped command is an authoring
-  error, caught in authoring; the probe's honest scope is commands
-  that ran and signalled failure.
-
-Work:
-
-1. Land `check=True` / `--check` on both twins in one change
-   (P6), the spelling settled above.
-2. The probe's honest scope recorded in the normative spec,
-   error-text supplement settled per the decide-first (P11).
+**F26 left by delivery on 2026-07-30** (owner), the ordinary exit,
+and its number retires with it: `exec` grew `check=True` / `--check`
+and the ERRORLEVEL probe behind them (D89). Its error-text refusal —
+the recommendation its entry said would travel unresolved to
+delivery — was adopted as recommended and is now stated in the
+normative spec rather than carried as a decide-first. **F14 stays
+proposed** and is untouched by this: an opt-in outcome channel does
+not reshape the row return, which is what the pledge round already
+found when it weighed the two. **F27 and F28 remain**, so U22 still
+cannot reach the root — its steps 3 and 5 carry their marks.
 
 ## F27 — A `devices` axis for the machine blueprint
 

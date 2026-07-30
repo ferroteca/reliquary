@@ -154,7 +154,8 @@ result out, iterate. Reliquary supplies the transports and attaches
 no meaning to what travels through them.
 
 - `exec(command, *, machine=None, blueprint=None, timeout=120,
-  context=None)` - Run one command in a running guest and return the
+  check=False, context=None)` - Run one command in a running guest
+  and return the
   text it produced, as a tuple of screen rows. The run family's
   one-shot member: it drives the machine and returns its output,
   storing nothing. Agentless capture, so the output is the visible
@@ -163,7 +164,15 @@ no meaning to what travels through them.
   Completion means *this* command finished rather than that a prompt
   is visible, so output that cannot be tied to the command raises
   `RunFailure` (`screen.no-echo`) instead of returning rows that
-  belong to something else.
+  belong to something else. `check=True` opts into the outcome: a
+  command that signalled failure raises `RunFailure`
+  (`command.signalled-failure`) naming it, with the row return
+  unchanged — the channel a setup command needs, whose output is
+  nothing and whose success is everything. On DOS the verdict comes
+  from an `IF ERRORLEVEL 1` probe Reliquary composes and reads back,
+  so it costs one extra command at the prompt and sees only commands
+  that *ran* and signalled failure; a mistyped one escapes it. CLI
+  twin: `exec --check`.
   Non-DOS platforms raise `NotImplementedError`. CLI twin: `exec`.
   (The name shadows the Python builtin where it is imported by name,
   which is the price of the twin-name identity rule; `builtins.exec`
@@ -449,9 +458,12 @@ Module-level equivalents take `home=` directly: `send_keys`,
 `screenshot(name="screen", home=None, directory=None)`.
 
 `GuestExec` is the capability protocol —
-`wait_ready(timeout=90)`, `execute(command, timeout=120)` — and
+`wait_ready(timeout=90)`, `execute(command, timeout=120, *,
+check=False)` — and
 `AgentlessGuestExec` is the concrete agentless DOS adapter over a
-`Machine`.
+`Machine`. How a platform answers `check` is its own business: DOS
+probes ERRORLEVEL, an agent would read an exit status, and what
+every adapter owes is the same answer.
 
 ## Backends
 

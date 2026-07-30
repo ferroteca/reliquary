@@ -87,6 +87,7 @@ _FLAG_ARITY = {
     "--platform": 1,
     "--timeout": 1,
     "--display": 0,
+    "--check": 0,
     "--secret": 0,
     "--json": 0,
     "--only": 0,
@@ -717,6 +718,10 @@ def main(argv=None):
     _add_selectors(command)
     command.add_argument("dos_command")
     command.add_argument("--timeout", type=int, default=None)
+    command.add_argument(
+        "--check", action="store_true",
+        help="fail (exit 4) if the command signalled failure; the "
+             "output is returned either way")
 
     command = subcommands.add_parser(
         "select", help="select a cursor-menu item")
@@ -1446,7 +1451,8 @@ def _dispatch(arguments):
             arguments.dos_command,
             machine=getattr(arguments, "machine", None),
             blueprint=getattr(arguments, "blueprint", None),
-            timeout=timeout or 120)
+            timeout=timeout or 120,
+            check=getattr(arguments, "check", False))
         rows = list(rows or ())
         return _emit(arguments, rows, lambda: print("\n".join(rows)))
     if arguments.command == "select":

@@ -1234,6 +1234,12 @@ The ask:
 Landing rule: **P6**. Whichever items land, they land on both twins
 in one change.
 
+> **The decide-firsts are settled** (owner, 2026-07-30), each as
+> recommended: **both halves**, the parameter is **`expect=`**, and
+> `value=` is **optional with absence meaning presence**. The entry
+> stays here rather than moving — settling how a feature would be
+> built is not pledging that it will be.
+
 DECIDE FIRST:
 
 - **Which of the two, and the recommendation is both.** (1) serves

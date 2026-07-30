@@ -11,6 +11,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **`exec --check` / `exec(check=True)`** (D89, delivering F26). The
+  one thing a command's output cannot tell you: whether it worked. A
+  setup command — loading a driver or a TSR — produces nothing worth
+  reading and its success is the whole point, so without this success
+  and failure come back looking identical and a refused loader
+  surfaces later as every subsequent command failing strangely. With
+  it, a command that signalled failure raises `RunFailure` naming the
+  command (exit `4`), and the row return is unchanged either way.
+
+  On DOS the verdict comes from an `IF ERRORLEVEL 1` probe with a
+  sentinel Reliquary composes and reads back — its own text, not the
+  guest's, so nothing here reads meaning into guest output. It is
+  opt-in because it costs one extra command at the prompt, and **its
+  scope is commands that ran and signalled failure**: `COMMAND.COM`
+  leaves ERRORLEVEL untouched when it cannot find a program, so a
+  mistyped command escapes the probe and reads as success. That limit
+  is stated in the spec rather than papered over with error-text
+  matching, which would mean curating guest message spellings a
+  localized DOS makes unbounded. A probe whose own answer cannot be
+  read reports `command.outcome-unreadable` rather than passing.
+
 ### Removed
 
 - **Autoseeding is gone, and nothing resolves out of the built-in

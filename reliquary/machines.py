@@ -1901,7 +1901,7 @@ def _compose_drive_report(machine_id, state, recorded):
 
 
 def exec(command, *, machine=None, blueprint=None, timeout=120,
-         context=None):
+         check=False, context=None):
     """Run one command in a running guest and return its output.
 
     The run family's one-shot member: like ``run_script`` it drives
@@ -1910,6 +1910,22 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
     guest's screen, as a tuple of rows — reliquary reads no meaning
     into it (G2), and a caller wanting structure retrieves a file
     instead (:func:`get_file`) or reads a machine variable.
+
+    ``check=True`` adds the channel the rows cannot carry: **whether
+    the command worked.** A setup command — load a driver, install a
+    TSR — produces no output worth reading and its success is the
+    whole point, so without this success and failure both come back
+    as rows and a refused loader is discovered later, as every
+    subsequent command failing strangely. With it, a command that
+    signalled failure raises :class:`RunFailure` naming the command
+    (exit ``4`` at the CLI) and the return is unchanged otherwise.
+
+    How the question is asked belongs to the platform workflow, and
+    on DOS it is an ERRORLEVEL probe reliquary composes and reads
+    back — text of its own, not the guest's, so the no-meaning rule
+    is untouched. Its scope is commands that *ran* and signalled
+    failure: a mistyped one leaves ERRORLEVEL alone and escapes the
+    probe (:meth:`AgentlessGuestExec._refuse_if_failed`).
 
     The platform workflow owns command syntax and completion
     detection, so anything but DOS fails closed rather than
@@ -1943,7 +1959,7 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
             f"machine {machine_id} is running but has no recorded VM "
             "identity", rule_id="machine.no-vm-identity")
     return AgentlessGuestExec(
-        Machine(machine_home)).execute(command, timeout)
+        Machine(machine_home)).execute(command, timeout, check=check)
 
 
 # -- in-band file exchange ---------------------------------------

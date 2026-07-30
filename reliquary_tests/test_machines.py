@@ -1061,7 +1061,9 @@ class ExecTests(_HomeCase):
             rows = machines_exec(
                 "DIR", machine=machine_id, timeout=30, context=self.home)
         self.assertEqual(rows, ("VOL SERIAL", "2 FILES"))
-        run.assert_called_once_with("DIR", 30)
+        # The outcome check is opt-in, so the twin passes it through
+        # explicitly rather than leaving the adapter to assume.
+        run.assert_called_once_with("DIR", 30, check=False)
 
 
 class CommandOutputTests(unittest.TestCase):
@@ -1177,6 +1179,86 @@ class CommandCompletionTests(unittest.TestCase):
             [self.PROMPT], ["C:\\>VER", "FreeCom version", self.PROMPT]]))
         guest.execute("VER", 1)
         self.assertEqual(guest._machine.console_double.sent, ["VER"])
+
+
+class CheckedCommandTests(unittest.TestCase):
+    """`check=True`: whether the command signalled failure (F26).
+
+    The rows a command leaves cannot answer "did it work?" — a setup
+    command's output is nothing and its success is everything — so the
+    verdict comes from a probe reliquary composes and reads back,
+    which is why this reads no meaning into the guest's own output
+    (G2, P18): the sentinel is a word reliquary said, not one the
+    command did.
+    """
+
+    PROMPT = "C:\\>"
+    PROBE = "IF ERRORLEVEL 1 ECHO RLQ-EXEC-FAILED"
+
+    def _guest(self, frames):
+        return AgentlessGuestExec(_ScriptedMachine(frames))
+
+    def _frames(self, *, failed):
+        """The screens for one command plus its probe.
+
+        Each `execute` opens its own console and the double replays one
+        sequence, so the probe's frames simply follow the command's.
+        """
+        probe_output = (["RLQ-EXEC-FAILED"] if failed else [])
+        return [
+            [self.PROMPT],
+            ["C:\\>DRIVER.EXE", "loading", self.PROMPT],
+            [self.PROMPT],
+            [f"C:\\>{self.PROBE}"] + probe_output + [self.PROMPT],
+        ]
+
+    def test_a_failing_command_raises_naming_it(self):
+        with self.assertRaises(RunFailure) as caught:
+            self._guest(self._frames(failed=True)).execute(
+                "DRIVER.EXE", 1, check=True)
+        self.assertEqual(caught.exception.rule_id,
+                         "command.signalled-failure")
+        self.assertIn("DRIVER.EXE", str(caught.exception))
+
+    def test_a_succeeding_command_returns_its_rows_unchanged(self):
+        rows = self._guest(self._frames(failed=False)).execute(
+            "DRIVER.EXE", 1, check=True)
+        self.assertEqual(rows, ("loading",))
+
+    def test_the_probe_is_asked_after_the_command_and_only_when_checked(self):
+        guest = self._guest(self._frames(failed=False))
+        guest.execute("DRIVER.EXE", 1, check=True)
+        self.assertEqual(guest._machine.console_double.sent,
+                         ["DRIVER.EXE", self.PROBE])
+
+        unchecked = self._guest(self._frames(failed=True))
+        unchecked.execute("DRIVER.EXE", 1)
+        self.assertEqual(unchecked._machine.console_double.sent,
+                         ["DRIVER.EXE"],
+                         "an unchecked exec must cost no extra command")
+
+    def test_the_sentinel_in_the_probes_own_echo_is_not_the_answer(self):
+        # The probe's echo contains the sentinel because the command
+        # text does. Reading the echo as output would make every
+        # checked command fail, so the answer is the rows *after* it.
+        rows = self._guest(self._frames(failed=False)).execute(
+            "DRIVER.EXE", 1, check=True)
+        self.assertEqual(rows, ("loading",))
+
+    def test_an_unreadable_probe_refuses_rather_than_passing(self):
+        # The probe never echoed, so its verdict cannot be read. An
+        # unknown outcome is not a success (P11).
+        frames = [
+            [self.PROMPT],
+            ["C:\\>DRIVER.EXE", "loading", self.PROMPT],
+            [self.PROMPT],
+            ["SOMETHING ELSE ENTIRELY", self.PROMPT],
+        ]
+        with self.assertRaises(RunFailure) as caught:
+            self._guest(frames).execute("DRIVER.EXE", 1, check=True)
+        self.assertEqual(caught.exception.rule_id,
+                         "command.outcome-unreadable")
+        self.assertIn("DRIVER.EXE", str(caught.exception))
 
 
 class InBandFileTests(_HomeCase):

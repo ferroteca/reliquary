@@ -2007,7 +2007,7 @@ the surface, because the namespace is shared across both: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
 `node.`, `http.`, `media.`, `machine.`, `platform.`, `progress.`,
 `store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`, `drive.`,
-`blueprint.`, `image.`, `screen.`, `script.`, `dir.`.
+`blueprint.`, `image.`, `screen.`, `script.`, `dir.`, `command.`.
 
 Every subject past the script language's own is a noun the rest of
 the model already uses, rather than a name invented for the
@@ -2020,7 +2020,14 @@ of the system: `image.` for a materialized disk image, `screen.` for
 what the guest displays, `script.` for a script file, `dir.` for one
 of the six working directories, `machine.` for a machine and its
 phases, `media.` for a media and its payload, `platform.`,
-`progress.`, `store.`.
+`progress.`, `store.`, and `command.` for one command sent to a
+guest — its outcome, and whether that outcome could be read at all.
+
+`command.` is the subject a *guest command* takes, where `screen.`
+is what the guest displayed: `screen.no-echo` says the rows cannot
+be attributed, and `command.signalled-failure` says the command
+itself reported failure. Two facts about two different things, which
+is why the second did not take the first's prefix.
 
 Two families the blueprint document could have taken new subjects
 for took existing ones instead: its name-charter rules are `name.`

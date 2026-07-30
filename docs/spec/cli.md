@@ -671,7 +671,8 @@ rlq press ctrl+alt+delete -m freedos-0
 ### Executing guest commands
 
 ```
-rlq exec <command> (--blueprint <name> | --machine <id>) [--timeout <duration>]
+rlq exec <command> (--blueprint <name> | --machine <id>)
+    [--timeout <duration>] [--check]
 ```
 
 `exec` is the composite convenience: `enter` plus the platform
@@ -697,6 +698,40 @@ rlq exec "ver" -b freedos
 # → FreeDOS kernel 2043 (Build 2043) [compiled Feb 26 2021]
 rlq exec "dir C:\*.exe" -b freedos --timeout 120
 ```
+
+**`--check` adds the one thing the rows cannot say: whether it
+worked.** A setup command — load a driver, install a TSR — produces
+no output worth reading and its success is the whole point, so
+without this success and failure come back looking identical and a
+refused loader is discovered later, as every subsequent command
+failing strangely. With it, a command that signalled failure raises
+`RunFailure` naming the command (exit `4`); the returned output is
+unchanged either way, so this adds a channel rather than
+reinterpreting the existing one. It is **opt-in** because reading a
+command's outcome costs a second command at the prompt.
+
+```powershell
+rlq exec "D:\DRIVER.EXE" --check -b driver-rig   # exit 4 if it refused
+```
+
+How the question is asked belongs to the platform workflow. On DOS
+it is an `IF ERRORLEVEL 1` probe with a sentinel Reliquary composes
+and reads back — `IF ERRORLEVEL` being portable across DOS shells
+where `%ERRORLEVEL%` expansion is not. That reads no meaning into
+the guest's output (**G2**, **P18**): the sentinel is a word
+Reliquary said, not one the command did, exactly as prompt
+detection already reads the screen for Reliquary's own protocol.
+
+**Its scope is commands that ran and signalled failure**, and the
+limit is stated rather than papered over (**P11**). `COMMAND.COM`
+leaves ERRORLEVEL untouched when it cannot find a program at all,
+so a mistyped command escapes the probe and reads as success —
+recognizing the shell's own "Bad command or file name" would mean
+curating guest output spellings, unbounded once a localized DOS
+prints localized messages, and is the guessing **P10** refuses. A
+mistyped command is an authoring error, caught in authoring. A
+probe whose own answer cannot be read is `command.outcome-unreadable`
+rather than a pass: an unknown outcome is not a success.
 
 ### Observing the screen
 

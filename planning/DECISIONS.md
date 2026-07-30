@@ -204,6 +204,86 @@ is waiting on an answer today.
 
 ## Decided
 
+- D89 — THE OUTCOME PROBE IS RELIQUARY'S OWN TEXT, AND ITS SCOPE IS
+  STATED — DECIDED (owner, 2026-07-30) and delivered the same day,
+  retiring F26. Supports U14, U22 (proposed); P6, P10, P11, G2.
+  **Adopts F26's own recommended refusal** rather than leaving it to
+  travel further. The delivery of F26 is a lifecycle act and is not
+  recorded here (D63); what follows is what the build had to decide.
+
+  WHAT THE PROBE IS, AND WHY IT READS NO MEANING. After a checked
+  command finishes, `exec` types one more: `IF ERRORLEVEL 1 ECHO
+  RLQ-EXEC-FAILED`, and looks for that word in the probe's *own*
+  output rows. `IF ERRORLEVEL` is portable across DOS shells where
+  `%ERRORLEVEL%` expansion is not, and the sentinel is a word
+  reliquary said rather than one the command did — which is what
+  keeps G2 and P18 intact: this attaches no meaning to guest output,
+  it reads back reliquary's own protocol, exactly as prompt detection
+  already does. A failing command prints the sentinel and a
+  succeeding one prints nothing, so the *absence* of reliquary's word
+  is the pass.
+
+  THE ECHO IS NOT THE ANSWER, which is the one trap in the design.
+  The probe's own echo contains the sentinel, because the command
+  text does. Reading the echoed line as output would fail every
+  checked command, so the verdict comes from the rows *after* the
+  echo — which is the discipline `_command_output` already enforced
+  for ordinary commands, reused rather than reinvented. A test
+  asserts it directly.
+
+  AN UNREADABLE PROBE IS NOT A PASS. Where the probe's own answer
+  cannot be located — no echo, so nothing on screen can be attributed
+  to it — the result is `command.outcome-unreadable` rather than
+  silence. An unknown outcome reported as success is the failure P11
+  exists to prevent, and the honest answer costs nothing.
+
+  THE ERROR-TEXT REFUSAL IS ADOPTED, as F26's entry recommended.
+  `COMMAND.COM` leaves ERRORLEVEL untouched on `Bad command or file
+  name`, so a mistyped command escapes the probe and reads as
+  success. Recognizing the shell's own error text would mean curating
+  guest output spellings — unbounded the moment a localized DOS
+  prints localized messages — and is the guessing P10 refuses. **The
+  limit is now stated in the normative spec** rather than carried as
+  an open item: the probe's scope is commands that ran and signalled
+  failure, and a mistyped command is an authoring error caught in
+  authoring.
+
+  `command.` IS A NEW ID SUBJECT, and the closed list grew by an edit
+  rather than by drift. `screen.` is what the guest displayed;
+  `command.` is one command sent to a guest — its outcome, and
+  whether that outcome could be read. Two facts about two different
+  things, so `command.signalled-failure` did not take `screen.`'s
+  prefix. The corpus test that holds the code and
+  [script-spec.md](../docs/spec/script-spec.md)'s prefix list to each
+  other caught the addition, which is the check working as designed.
+
+  IT IS OPT-IN BECAUSE IT COSTS A COMMAND. Reading an outcome is a
+  second round trip at the prompt, so an unchecked `exec` pays
+  nothing and sends exactly one command — asserted, so the cost
+  cannot creep into the default path.
+
+  P8 TRIAGE: a pure addition on S1 and S2, landed on both twins in
+  one change (P6). No use case is cost; U14 is served directly and
+  U22's step 8 is the worked spelling, whose **requires F26** mark
+  clears with this. F14 is untouched — the output's head and the
+  outcome are separable surfaces, which the pledge round already
+  found.
+
+  Folded: [interaction_agentless.py](../reliquary/interaction_agentless.py)
+  (the probe and its two refusals),
+  [interaction.py](../reliquary/interaction.py) (the capability
+  protocol grows `check`), [machines.py](../reliquary/machines.py)
+  (`exec(check=)`), [cli.py](../reliquary/cli.py) (`--check`),
+  [docs/spec/cli.md](../docs/spec/cli.md) (the flag, the probe, and
+  the stated scope), [docs/spec/script-spec.md](../docs/spec/script-spec.md)
+  (the `command.` subject), [docs/cli-reference.md](../docs/cli-reference.md),
+  [docs/api-reference.md](../docs/api-reference.md);
+  [pledged/FEATURES.md](pledged/FEATURES.md) (F26 removed with its
+  work items, the shelf narration recording the exit),
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (U22's step 8 mark
+  cleared); `test_machines.py`; and the CHANGELOG's unreleased
+  section.
+
 - D88 — AUTOSEED IS DELETED; U1 IS TWO COMMANDS AND P4 IS ABSOLUTE
   AGAIN — DECIDED (owner, 2026-07-30). Supports P4, P18, U11;
   **supersedes U1's text** (reshaped in place under its own number,

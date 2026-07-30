@@ -21,6 +21,16 @@ _ECHO_POLL = 0.1
 _ECHO_WINDOW = 3.0
 _PROMPT_POLL = 2.0
 
+#: The outcome probe, and the word it looks for. `IF ERRORLEVEL n` is
+#: true for *n or greater* and is portable across DOS shells in a way
+#: `%ERRORLEVEL%` expansion is not, so a failing command prints the
+#: sentinel and a succeeding one prints nothing at all. Both answers
+#: are text reliquary composed and reads back, which is why this
+#: attaches no meaning to the guest's own output (G2, P18): the
+#: sentinel is not a word the command said, it is a word we did.
+_PROBE_SENTINEL = "RLQ-EXEC-FAILED"
+_PROBE_COMMAND = f"IF ERRORLEVEL 1 ECHO {_PROBE_SENTINEL}"
+
 
 class AgentlessGuestExec:
     """Concrete GuestExec adapter for an agentless DOS guest."""
@@ -44,7 +54,8 @@ class AgentlessGuestExec:
             f"timed out after {timeout}s waiting for a DOS prompt",
             rule_id="screen.no-match")
 
-    def execute(self, command: str, timeout: float = 120):
+    def execute(self, command: str, timeout: float = 120, *,
+                check: bool = False):
         """Type a DOS command, wait for the prompt, and return its output.
 
         The output is what the command left on the visible screen —
@@ -53,6 +64,14 @@ class AgentlessGuestExec:
         scrolls more than a screenful leaves only its tail there.
         Reliquary attaches no meaning to any of it (G2); the text is
         the caller's to read.
+
+        ``check`` asks the one question the rows cannot answer: **did
+        it work?** A setup command's output is nothing and its success
+        is everything, so success and failure otherwise come back
+        looking identical. With ``check`` a command that signalled
+        failure raises :class:`RunFailure` naming it, and the row
+        return is unchanged either way — this adds a channel rather
+        than reinterpreting the existing one.
 
         **A prompt alone does not mean this command finished.**
         :meth:`wait_ready` returns *because* a prompt is on screen, so
@@ -63,6 +82,43 @@ class AgentlessGuestExec:
         echo, or failing that a screen that has changed since it was
         sent.
         """
+        rows = self._run(command, timeout)
+        if check:
+            self._refuse_if_failed(command, timeout)
+        return rows
+
+    def _refuse_if_failed(self, command, timeout):
+        """Ask the guest whether ``command`` signalled failure.
+
+        Opt-in, and asked *after* the command has finished, so the
+        ordinary path pays nothing. The probe is one more command at
+        the prompt, read back through the same echo discipline as any
+        other: its output is the sentinel or it is empty.
+
+        **Its honest scope is commands that ran and signalled
+        failure.** `COMMAND.COM` leaves ERRORLEVEL untouched when it
+        cannot find a program at all, so a mistyped command escapes
+        the probe and reads as success — recognizing the shell's own
+        "Bad command or file name" would mean curating guest output
+        spellings, which a localized DOS makes unbounded and which is
+        the guessing P10 refuses. That limit is stated rather than
+        papered over (P11), and a mistyped command is an authoring
+        error caught in authoring.
+        """
+        try:
+            output = self._run(_PROBE_COMMAND, timeout)
+        except RunFailure as unreadable:
+            raise RunFailure(
+                f"could not read the outcome of {command!r}: the "
+                f"ERRORLEVEL probe did not complete ({unreadable})",
+                rule_id="command.outcome-unreadable") from unreadable
+        if any(_PROBE_SENTINEL in row for row in output):
+            raise RunFailure(
+                f"command signalled failure: {command}",
+                rule_id="command.signalled-failure")
+
+    def _run(self, command, timeout):
+        """Type one command, wait for the prompt, return its rows."""
         with self._machine.console() as console:
             before = [row for row in console.screen_text() if row]
             console.send_text(command)

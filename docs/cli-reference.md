@@ -602,19 +602,37 @@ Type a line and press Enter.
 
 Send portable key names (and `+` chords) from the script vocabulary.
 
-### `rlq exec COMMAND [--timeout SECONDS]`
+### `rlq exec COMMAND [--timeout SECONDS] [--check]`
 
 Enter a command in a running guest, wait for the DOS prompt to
 return, and **print the text the command produced** — the run
 family's one-shot member, returning its output exactly as
 `run-script` does and storing nothing. Twin: `exec(command, *,
-machine=, blueprint=, timeout=120)`, which returns those rows.
+machine=, blueprint=, timeout=120, check=False)`, which returns
+those rows.
 
 The capture is agentless, so the output is what the command left on
 the visible 80x25 screen: a command that scrolls more than a
 screenful leaves only its tail. When you need more than that, have
 the guest write a file and take it with `get-file`, or set a machine
 variable. Reliquary reads no meaning into any of it.
+
+`--check` answers the question the output cannot: **did it work?**
+For a setup command — loading a driver or a TSR — the output is
+nothing and the success is everything, so without this both look
+the same. With it, a command that signalled failure exits `4`
+naming the command, and the output still prints:
+
+```powershell
+rlq exec "D:\DRIVER.EXE" --check --machine driver-rig-0
+```
+
+On DOS the question is an `IF ERRORLEVEL 1` probe with a sentinel
+Reliquary composes and reads back — its own text, not the guest's.
+It costs one extra command at the prompt, which is why it is opt-in,
+and it sees only commands that **ran** and signalled failure: a
+mistyped one leaves ERRORLEVEL alone and reads as success. Normative:
+[cli.md](spec/cli.md).
 
 ### `rlq select ITEM [--exclude TEXT]`
 

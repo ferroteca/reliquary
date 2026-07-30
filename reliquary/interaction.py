@@ -13,6 +13,14 @@ class GuestExec(Protocol):
         """Wait until the adapter can execute guest commands."""
         ...
 
-    def execute(self, command: str, timeout: float = 120) -> None:
-        """Execute one guest command and wait for completion."""
+    def execute(self, command: str, timeout: float = 120, *,
+                check: bool = False) -> None:
+        """Execute one guest command and wait for completion.
+
+        ``check`` opts into reporting whether the command signalled
+        failure, raising rather than returning the verdict — how a
+        platform asks is its own business (DOS probes ERRORLEVEL; an
+        agent would read an exit status), and what every adapter owes
+        is the same answer.
+        """
         ...

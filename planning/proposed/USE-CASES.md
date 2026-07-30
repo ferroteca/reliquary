@@ -503,12 +503,14 @@ states the split F27's decide-first asks to have stated.
 Reliquary's application surfaces: a user should be able to follow it
 as written to accomplish the goal. Every spelling is the surface
 as it stands today, except where a step is marked **requires
-F26/F27/F28** — a pledged, undelivered piece, spelled in the form
+F27/F28** — a pledged, undelivered piece, spelled in the form
 its feature is committed to deliver. At the proposed stage a gap
 is fine as long as it is flagged (owner, 2026-07-29): the marks
 are the flags, and what they cover is flushed out as the pieces
 settle — the case reads complete only when nothing marked remains
-open. API spellings shown; every step has its CLI twin (U9).
+open. **F26's mark cleared on 2026-07-30** (D89), leaving step 8 on
+the live surface; two remain, both in step 3. API spellings shown;
+every step has its CLI twin (U9).
 
 1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
    paravirtual device — with my host toolchain, and I want it
@@ -654,8 +656,8 @@ open. API spellings shown; every step has its CLI twin (U9).
 
 8. **Load the driver — setup whose output is nothing and whose
    success is everything.** In order, once per session, each
-   checked (**requires F26**; spelling settled in this round —
-   owner: a parameter, `check=True`, CLI `--check`):
+   checked — **delivered 2026-07-30** (D89), so this step's mark is
+   gone and its spelling is the live surface:
 
    ```python
    reliquary.exec(r"D:\TRANSPRT.EXE", check=True,
