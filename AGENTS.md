@@ -299,10 +299,10 @@ workflow:
   parsing, exit codes (`errors.exit_code` over one `ReliquaryError`
   arm), and the output discipline, and
   `__main__.py` preserves `python -m reliquary` execution.
-- `pyproject.toml` packages `reliquary` as the `reliquary` command. **The wheel is the runtime alone**: `reliquary_tests`
-  is excluded from it (the `reliquary*` glob would otherwise match it, so the exclude is load-bearing) and ships in the
-  sdist instead, via `MANIFEST.in`, together with `docs/` and `planning/design/`. A source package must be able to run
-  its own suite; an end user has no use for the fixtures.
+- `pyproject.toml` packages `reliquary` as the `reliquary` command. **Released artifacts are the runtime alone**:
+  `reliquary_tests` ships in neither the wheel nor the sdist (D96). The `packages.find` exclude keeps it out of the
+  wheel (the `reliquary*` glob would otherwise match it, so the exclude is load-bearing) and `MANIFEST.in` no longer
+  grafts it, which keeps it out of the sdist. `docs/` ships; `planning/` does not, being maintainer governance.
 - `reliquary_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
   media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
@@ -685,12 +685,12 @@ Doctrine to preserve:
   the parser and *not* the schema while claiming the two cannot drift.
   A missing dev dependency should stop the suite and name itself.
   `skipUnless` is for a resource that genuinely may be absent in a
-  supported configuration. **The bar is high, and it moved**: `docs/`
-  and `planning/design/` now ship in the sdist precisely so the
-  spec-conformance tests run there, so a guard on them fires nowhere
-  the suite is supposed to run. The suite skips exactly **one** test —
-  the opt-in FreeDOS integration run — in the source tree and in the
-  unpacked sdist alike; any other skip is a defect to fix, not a
+  supported configuration. **The bar is high, and the reason is
+  simpler than it was**: the suite runs from the repository and
+  nowhere else (D96), so every document a spec-conformance test reads
+  is always present and a guard on one fires nowhere the suite is
+  supposed to run. The suite skips exactly **one** test — the opt-in
+  FreeDOS integration run; any other skip is a defect to fix, not a
   configuration to tolerate. A guard that survives is one whose
   resource is genuinely optional, and it says which.
 - Pillow is the image library: screenshot conversion uses it, and the
@@ -845,10 +845,11 @@ script-example catalogue in the sdist — and that the wheel carries no tests. I
 ships in the wheel, so nothing running inside the wheel inspects it: package data is what disappears silently, and a
 missing `.lark` grammar breaks an installed Reliquary while every source-tree test still passes.
 
-For release-facing packaging changes, unpack the sdist outside the source tree and run `python -m unittest -v
-reliquary_tests` there: it must report one skip, the opt-in integration test. That is the run a downstream packager
-makes, and it is the one that proves the source package is complete. Install the wheel into a clean environment too, but
-check it by using it — `rlq --version` and an import — since it carries no suite to run.
+For release-facing packaging changes, **the sdist's completeness is proved by the build itself**: `uv build` builds the
+wheel *from* the sdist, so a source archive missing anything the build needs fails there rather than silently. That is
+what replaced unpacking the sdist and running the suite inside it — impossible since D96, because neither artifact
+carries the suite. Install the wheel into a clean environment and check it by using it — `rlq --version` and an
+import — since it carries no suite to run.
 
 **Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
 no CI (P22) there is no trusted-publishing path, so it takes a token

@@ -5,18 +5,16 @@ include reliquary/codex/codex.json
 include reliquary/codex/blueprints/*.rlqb
 include reliquary/codex/scripts/*.rlqs
 
-# The suite's spec-conformance tests read the normative documents and
-# compare them against the code, so a source package without them is
-# one a downstream packager cannot fully verify. `planning/design` is
-# here for the script-example catalogue alone, which the suite parses;
-# the rest of `planning/` is maintainer governance and is not shipped.
+# Documentation ships with the source package, as it conventionally
+# does. `planning/` does not: it is maintainer governance, and the
+# `planning/design` graft that used to sit here existed only so the
+# suite could parse the script-example catalogue out of an unpacked
+# sdist — which nothing does now that the suite is not shipped.
 graft docs
-graft planning/design
 
-# The suite itself is sdist-only: the wheel is the runtime, and a
-# packager verifying the source package needs the tests and their
-# fixtures. Without this graft they would vanish from both artifacts,
-# because excluding `reliquary_tests` from the wheel also removes it
-# from the packages setuptools would otherwise carry into the sdist.
-graft reliquary_tests
+# The suite ships in NEITHER artifact (D96): it is developed and run
+# from the repository, which is the only place it is complete. No
+# `prune` is needed to keep it out — the `packages.find` exclude in
+# pyproject keeps it out of the wheel, and with no graft here
+# setuptools does not carry it into the sdist either.
 global-exclude __pycache__/* *.py[co]

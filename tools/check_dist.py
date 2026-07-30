@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Assert the built artifacts carry what they must.
 
-The suite is sdist-only, so nothing running inside the wheel checks
-the wheel any more. That job moves here, and it is a better fit: this
-*names* what has to be present rather than inferring it from a suite
-that happened to pass.
+The suite ships in neither artifact (D96), so nothing inside a
+released artifact checks it. That job lives here, and it is a better
+fit: this *names* what has to be present rather than inferring it
+from a suite that happened to pass.
 
 What it guards is package data — the files setuptools ships only
 because `[tool.setuptools.package-data]` says so, and which therefore
@@ -41,15 +41,15 @@ WHEEL_REQUIRED_TREES = (
 # The wheel is the runtime: the suite is not in it.
 WHEEL_FORBIDDEN_TREES = ("reliquary_tests/",)
 
-# The sdist is the source package: a packager must be able to run the
-# whole suite from it, which needs the tests, their fixtures, and the
-# documents the spec-conformance tests read.
-SDIST_REQUIRED_TREES = (
-    "reliquary_tests/fixtures/conformance/blueprint/",
-    "reliquary_tests/fixtures/conformance/script/",
-    "docs/spec/",
-    "planning/design/script-examples/",
-)
+# The sdist is the source package: runtime and documentation, and no
+# suite (D96). Asserted in both directions — `docs/spec/` present
+# because the specifications are what make it a *source* package worth
+# reading, and the suite absent because it is developed and run from
+# the repository, not shipped.
+SDIST_REQUIRED_TREES = ("docs/spec/",)
+
+# Neither artifact carries the suite, so this is checked on both.
+SDIST_FORBIDDEN_TREES = ("reliquary_tests/", "planning/")
 
 
 def _wheel_names(path):
@@ -94,11 +94,17 @@ def main(directory="dist"):
         carried = [n for n in names["wheel"] if n.startswith(tree)]
         if carried:
             problems.append(
-                "wheel carries %d files under %s, which is sdist-only"
+                "wheel carries %d files under %s, which no artifact ships"
                 % (len(carried), tree))
     for tree in SDIST_REQUIRED_TREES:
         if not any(n.startswith(tree) for n in names["sdist"]):
             problems.append("sdist carries nothing under %s" % tree)
+    for tree in SDIST_FORBIDDEN_TREES:
+        carried = [n for n in names["sdist"] if n.startswith(tree)]
+        if carried:
+            problems.append(
+                "sdist carries %d files under %s, which no artifact ships"
+                % (len(carried), tree))
 
     print("wheel: %s (%d files)" % (os.path.basename(wheel),
                                     len(names["wheel"])))

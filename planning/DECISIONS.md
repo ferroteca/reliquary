@@ -228,6 +228,40 @@ is waiting on an answer today.
 
 ## Decided
 
+- D96 — RELEASED ARTIFACTS CARRY NO TESTS — DECIDED (owner,
+  2026-07-30). Supports P21's instinct applied to what is shipped
+  rather than what is depended on. The wheel already excluded the
+  suite; the sdist grafted it deliberately, and **that half was never
+  adjudicated** — it accreted through `MANIFEST.in`, and AGENTS.md
+  and `check_dist.py` then described it as settled, `check_dist`
+  going as far as to *require* it. Two-thirds of the source
+  distribution was tests: 187 of 280 files.
+
+  **The contested call is what replaces the sdist gate.** Shipping
+  the suite bought one real thing — "unpack the sdist outside the
+  tree and run the suite there," the check that the source package
+  was complete — and dropping it has to answer for that. It is
+  answered structurally rather than replaced: `uv build` builds the
+  wheel *from* the sdist, so an archive missing anything the build
+  needs fails at build time. The gate was never the tests passing;
+  it was the archive being complete, and the build proves that
+  without shipping 187 files to do it.
+
+  `PLANNING/DESIGN` WAS THE TELL (owner: "'planning' docs in
+  published test package is a solution to a problem, it's part of a
+  problem"). It was grafted so the suite could parse the
+  script-example catalogue out of an unpacked sdist — maintainer
+  governance shipped to a stranger to serve a test run nobody
+  performs. It goes with the suite, and `check_dist` now **forbids**
+  both trees in both artifacts rather than requiring them in one.
+  `docs/` stays: documentation in a source package is conventional
+  and is not a test.
+
+  Effective from the next release. **The 0.1.0.dev6 sdist on PyPI
+  carries the tests** and cannot be changed — a version is immutable
+  once published — so the record should not read as though this were
+  retroactive.
+
 - D95 — THE SUPPORTED FLOOR IS 3.12, AND IT IS DROPPED RATHER THAN
   FIXED — DECIDED (owner, 2026-07-30). Supports P11's reading, which
   AGENTS.md already applies to host platforms: an untested version is

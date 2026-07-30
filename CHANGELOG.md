@@ -11,6 +11,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Removed
+
+- **Released artifacts carry no tests** (D96). The wheel never did; the
+  sdist did, and two-thirds of it was the suite — 187 of 280 files. It
+  shipped so a downstream packager could unpack the archive and run the
+  suite from it, which is a real thing to want and a poor trade for
+  what it cost. The completeness that check bought is now proved
+  structurally: `uv build` builds the wheel *from* the sdist, so an
+  archive missing anything the build needs fails at build time.
+  `planning/design/` goes too — it was grafted only so the suite could
+  read the script-example catalogue out of an unpacked sdist, which
+  means maintainer governance was being shipped to strangers to serve
+  a test run nobody performed. `docs/` still ships. The sdist is 74
+  files where it was 280. **The published 0.1.0.dev6 sdist still
+  carries the tests** and cannot be changed; this takes effect from the
+  next release.
+
 ### Changed
 
 - **The supported Python floor is now 3.12** (D95), raised from `3.9`.
