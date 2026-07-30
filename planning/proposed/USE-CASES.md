@@ -519,14 +519,15 @@ open. API spellings shown; every step has its CLI twin (U9).
 
 2. **Pin the world to the project tree** (U17). The harness
    builds one context and passes it everywhere; nothing resolves
-   from the user's home or the codex:
+   from the user's home, and nothing resolves out of the codex on
+   any surface, so the checked-in files are the only source
+   (D88 — there is no axis to switch off):
 
    ```python
    ctx = reliquary.Context(
        home_dir=".rig",              # caches and machines land here
        blueprints_dir="blueprints",  # checked in, used in place
-       scripts_dir="scripts",
-       autoseed=False)
+       scripts_dir="scripts")
    ```
 
 3. **Author `blueprints\driver-rig.rlqb`**, checked in — the
@@ -571,21 +572,43 @@ open. API spellings shown; every step has its CLI twin (U9).
    directory, served to the guest as one FAT volume. The
    `devices` line **requires F27** (pledged): the field, its
    closed curated vocabulary, and the assignment axis step 5
-   exercises. A device the vocabulary does not yet name takes the
-   escape hatch instead — **requires F28** (pledged) — pinning
-   the backend and passing that backend's own arguments, the same
-   machine at the price of portability:
+   exercises.
+
+   A device the vocabulary does not yet name takes the escape
+   hatch instead — **requires F28** (pledged) — two more fields on
+   the same machine, `backend` and `backend-settings` sitting
+   beside `memory` and `drives` as first-class members of the
+   blueprint rather than a mode the document switches into:
 
    ```json
    {
+     "type": "machine",
+     "name": "driver-rig",
+     "platform": "dos",
+     "memory": "32M",
      "backend": "qemu",
      "backend-settings": {
        "qemu": {
          "args": ["-device", "virtio-rng-pci"]
        }
-     }
+     },
+     "boot": ["hdd0"],
+     "scripts": { "ready": "driver-ready" },
+     "drives": { "…": "as above" }
    }
    ```
+
+   **First-class is not the same as portable**, and the two are
+   easy to conflate. Both fields are ordinary machine fields —
+   parsed, validated, schema'd and recorded in the machine's state
+   like every other — while `backend-settings` is the one place
+   backend-specific configuration may appear, which is exactly
+   what makes a blueprint *without* it portable by construction.
+   So the hatch costs portability and nothing else: the same
+   machine, on one engine, by that engine's own vocabulary. That
+   is the pressure that grows F27's curated names one at a time,
+   and a settings key in repeated use across blueprints is demand
+   arriving for one.
 
 4. **Author `scripts\driver-ready.rlqs`** — the caller's own
    readiness protocol, because Reliquary ships no readiness

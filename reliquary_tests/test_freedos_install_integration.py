@@ -17,6 +17,7 @@ import tempfile
 import unittest
 
 from reliquary.backend_qemu import find_qemu, find_qemu_img
+from reliquary.library import seed_blueprint
 from reliquary.script_runner import run_script
 from reliquary_tests import live_external_effects
 
@@ -57,6 +58,11 @@ class FreeDOSInstallIntegrationTests(unittest.TestCase):
 
         try:
             with live_external_effects():
+                # The user's own first step, and now a required one:
+                # nothing resolves out of the codex, so the blueprint
+                # and the scripts it names are copied out by name
+                # before anything references them (U1, D88).
+                seed_blueprint("freedos", context=home)
                 installed = run_script(
                     "install",
                     blueprint="freedos",
