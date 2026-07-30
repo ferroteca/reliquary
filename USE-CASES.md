@@ -55,6 +55,41 @@ delivery that makes the case current. The implementation claim
 above is therefore step-checkable for a journey case: every
 call, field, and refusal it names exists as written.
 
+**The steps are the minimum, not the menu**: a journey lists the
+fewest steps that reach the goal, and a step that can be removed
+with the goal still met belongs in a guide instead. Options,
+alternatives, and the reasons behind each choice are a cookbook's
+job; the case states the claim and the shortest true path to it.
+A case never states its own success signal either — completing
+the path *is* success.
+
+**A use case is the happy path.** It describes the simple path a
+user follows to reach the goal, and nothing else: no branches, no
+failure handling, no recovery. A use case is not code, and the
+paths it omits are not paths the application may neglect — what a
+surface does when the happy path does not hold is specified
+elsewhere, and specified normatively. A deviation worth stating
+at this level has two homes. Where it is *itself a goal someone
+pursues*, it becomes **its own use case** — U1's "keeping the
+machine afterward" is U8. Where it is *a rule every surface
+obeys*, it becomes an **architectural principle** — P11, a gap
+names itself; P10, nothing about a guest is guessed — which is
+the usual home but not a required one: the four error classes are
+a normative spec (D58) rather than a P-number. What a deviation
+never becomes is a clause inside a use case.
+
+**Cases compose, through named preconditions.** A journey may
+start where another ends: it names the case that gets the user
+there — "Precondition: a seeded blueprint (U11)" — rather than
+repeating its steps, and the minimum test applies to what is
+left. A precondition is always a case in force, never a paragraph
+of narrative, and it may name the one command that satisfies it;
+if satisfying it takes more than one, that is a chain of cases
+rather than a precondition. Where the composite claims something
+no single case does — that the whole chain is short, say — the
+composing case's summary states it, because a claim no case's
+text carries is a claim the list does not make.
+
 A use case in force is never changed in nature (a proposed
 one may still be reshaped freely in the proposals doc). It
 may be
