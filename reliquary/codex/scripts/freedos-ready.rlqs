@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: GPL-3.0-only
+
+description "Boot the installed FreeDOS disk and report it ready"
+platform dos
+machine  stopped
+timeout  2m
+
+# The handoff idiom, and the one thing the other two examples do not
+# show: this script leaves the machine RUNNING.
+#
+# `freedos-install` and `freedos-verify` both end with the guest
+# powered off, because each has finished with it. A readiness script
+# has the opposite job — it hands a live machine to whatever comes
+# next, which is a harness driving `exec`, `put-file` and `get-file`
+# against a guest that is already at a prompt.
+#
+# What "ready" means is the workflow's own business, never
+# reliquary's, and this is the whole of what it means here: the
+# installed system reached a DOS prompt. A workflow needing more —
+# a TSR resident, a driver bound, a network stack answering — says so
+# by waiting for its own evidence and setting the variable after.
+start
+wait "C:\>"
+
+# The last step, deliberately: the variable is the promise, so it is
+# set only once everything above it has held. The host reads it with
+# `rlq get-machine-var ready`, or contracts the run on it in one call
+# with `rlq run-script ready --blueprint freedos --expect ready=yes`.
+#
+# The key is plain `ready` rather than `rlq.ready`: the `rlq` and
+# `reliquary` namespaces are reserved for reliquary's own names, and
+# a script setting one is a static error. Your variables are yours.
+set ready "yes"

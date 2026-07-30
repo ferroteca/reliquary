@@ -180,11 +180,17 @@ Installing registers two equivalent commands: `rlq` (the short form used through
 
 ```powershell
 rlq --help
+rlq list-codex
+rlq seed-blueprint freedos
 rlq run-script install --blueprint freedos
 ```
 
-From a clean home, that one command materializes a machine from the codex's `freedos` blueprint (seeding the
-blueprint — its LiveCD media rides inside it — and its scripts into your home as ordinary user-owned files), inserts the
+From a clean home that is **two commands** to a usable machine, and the first one is the point: `seed-blueprint`
+copies the codex's `freedos` blueprint — its LiveCD media rides inside it — and the scripts it names into your own
+directories, as ordinary files you own and can read before you run them. Nothing arrives from the built-in library
+unasked, so what the second command runs is a recipe you chose.
+
+That second command materializes a machine from your copy, inserts the
 fetched, hash-verified LiveCD to the blueprint's empty CD drive, boots it, and drives the FreeDOS installer end to end —
 language, partitioning, the reboot, the "Plain DOS system" package set — until the guest powers itself off and the
 script ejects the CD. The machine is left with FreeDOS installed on its hard disk; confirm it boots, then start and stop
@@ -194,6 +200,15 @@ it freely:
 rlq run-script verify --blueprint freedos
 rlq start-machine --blueprint freedos
 rlq stop-machine --blueprint freedos
+```
+
+The blueprint's third script is the one a program wants: `ready` boots the installed disk, waits for a DOS prompt, and
+**leaves the machine running** with a machine variable set, which is the handoff to whatever drives it next.
+`--expect` contracts the run on that variable, so one command either hands you a live guest or fails saying why:
+
+```powershell
+rlq run-script ready --blueprint freedos --expect ready=yes
+rlq exec "ver" --blueprint freedos
 ```
 
 To inspect a script without running it, `--dry-run` prints the

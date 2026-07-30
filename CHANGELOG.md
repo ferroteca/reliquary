@@ -13,6 +13,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A readiness example in the codex** (T9): `freedos-ready.rlqs`,
+  named by the `freedos` blueprint as its `ready` label, so
+  `rlq seed-blueprint freedos` brings it with the rest. It boots the
+  installed disk, waits for a DOS prompt, sets the machine variable
+  `ready`, and **leaves the machine running** — which is the point,
+  and the one thing the other two examples do not show: both of those
+  end with the guest powered off because each has finished with it,
+  while a readiness script hands a live guest to whatever drives it
+  next. `rlq run-script ready --blueprint freedos --expect ready=yes`
+  is the whole handoff in one command.
+
+  As always, the copy is yours: what "ready" means belongs to the
+  workflow being built, and this example's answer — the installed
+  system reached a prompt — is the simplest one there is. A workflow
+  needing a TSR resident or a driver bound waits for its own evidence
+  and sets the variable after.
+
 - **`run-script --expect key=value` / `run_script(expect=)`** (D90,
   delivering F30). Contracts a run on the machine variables it
   leaves: each key is read once the run completes, and one that is

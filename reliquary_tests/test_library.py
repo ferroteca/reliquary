@@ -20,11 +20,13 @@ from unittest import mock
 
 import reliquary
 from reliquary import document, jsonc
-from reliquary.errors import PreflightError
+from reliquary.errors import PreflightError, StaticError
 from reliquary.library import (codex_blueprint_available, list_codex,
                                list_builtin_blueprints, seed_blueprint,
                                seed_script)
-from reliquary.machines import create_machine, load_machine_state
+from reliquary.machines import (check_variable_key, create_machine,
+                                load_machine_state)
+from reliquary.script_parser import load_script
 from reliquary.resolve import load_namespace, resolve_media
 from reliquary_tests import fake_backend
 
@@ -207,6 +209,70 @@ class FirstReferenceTest(_HomeTest):
             create_machine(BLUEPRINT, context=self.home)
         self.assertIn(f"rlq seed-blueprint {BLUEPRINT}",
                       str(caught.exception))
+
+
+class CodexReadinessExampleTests(_HomeTest):
+    """The readiness example, and the property that makes it one (T9).
+
+    Every other codex script ends with the guest powered off, because
+    each has finished with it. A readiness example has the opposite
+    job — it hands a *live* machine to whatever comes next — and that
+    is the whole reason it exists, so it is what these guard. A
+    plausible example that quietly powered the machine off would
+    demonstrate nothing the other two do not.
+
+    Whether it *works* is the integration test's to prove (P18: a
+    codex example that does not is a defect). These are its shape.
+    """
+
+    LABEL = "ready"
+    STEM = "freedos-ready"
+
+    def _path(self):
+        seed_blueprint(BLUEPRINT, context=self.home)
+        return os.path.join(self.home, "scripts", f"{self.STEM}.rlqs")
+
+    def _script(self):
+        return load_script(self._path())
+
+    def _text(self):
+        with open(self._path(), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_the_blueprint_names_it_and_seeding_brings_it(self):
+        """Wired, not merely shipped: a file nothing names is inert."""
+        seed_blueprint(BLUEPRINT, context=self.home)
+        component = load_namespace(self.home).machines[BLUEPRINT]
+        self.assertEqual(component.scripts[self.LABEL], self.STEM)
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "scripts", f"{self.STEM}.rlqs")))
+
+    def test_it_leaves_the_machine_running(self):
+        script = self._script()
+        verbs = [statement.verb for statement in script.statements]
+        self.assertIn("start", verbs)
+        self.assertNotIn("stop", verbs)
+        # The codex's own idiom for "and now it is off" — waiting the
+        # machine down after a poweroff — is what this example must
+        # not do, and what `freedos-verify` does.
+        self.assertNotIn("machine=stopped", self._text())
+
+    def test_the_promise_is_the_last_step(self):
+        """Set only once everything it promises has held."""
+        last = self._script().statements[-1]
+        self.assertEqual(last.verb, "set")
+        self.assertEqual(last.arguments[0], self.LABEL)
+
+    def test_the_variable_is_outside_the_reserved_namespaces(self):
+        """`rlq.ready` would be a static error, not a nicer spelling.
+
+        The reserved namespaces are reliquary's own (V5), which is why
+        the example's key is plain — and why a reader copying it gets
+        something that parses.
+        """
+        check_variable_key(self._script().statements[-1].arguments[0])
+        with self.assertRaises(StaticError):
+            check_variable_key("rlq.ready")
 
 
 class CodexMediaTests(unittest.TestCase):

@@ -21,7 +21,10 @@
     "boot": ["hdd0", "cdrom0"],
     "scripts": {
       "install": "freedos-install",
-      "verify": "freedos-verify"
+      "verify": "freedos-verify",
+      // Boots the installed disk and leaves it running, with
+      // `ready` set — the handoff a driving program waits for.
+      "ready": "freedos-ready"
     }
   },
 
