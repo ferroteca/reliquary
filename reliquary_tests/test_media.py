@@ -23,8 +23,7 @@ def _home_with_media(home, media_entries):
     os.makedirs(bpdir, exist_ok=True)
     with open(os.path.join(bpdir, "lib.rlqb"), "w", encoding="utf-8") as h:
         json.dump(list(media_entries), h)
-    return Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
-                   autoseed=True)
+    return Context(home_dir=home, cache_dir=os.path.join(home, "cache"))
 
 
 class MediaModuleTests(unittest.TestCase):
@@ -53,8 +52,7 @@ class MediaModuleTests(unittest.TestCase):
 
     def test_clean_media_reclaims_the_one_cache(self):
         with tempfile.TemporaryDirectory() as home:
-            ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
-                          autoseed=True)
+            ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"))
             from reliquary.home import media_dir
             cache = media_dir(ctx)
             os.makedirs(cache, exist_ok=True)
@@ -69,8 +67,7 @@ class MediaModuleTests(unittest.TestCase):
         """Naming one leaves the rest of the cache alone."""
         from reliquary.home import media_dir
         with tempfile.TemporaryDirectory() as home:
-            ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
-                          autoseed=True)
+            ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"))
             cache = media_dir(ctx)
             os.makedirs(cache, exist_ok=True)
             for name in ("win.iso", "husk.zip"):
@@ -94,8 +91,7 @@ class PruneTests(unittest.TestCase):
         with open(os.path.join(bpdir, "lib.rlqb"), "w",
                   encoding="utf-8") as handle:
             json.dump(specs, handle)
-        ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"),
-                      autoseed=True)
+        ctx = Context(home_dir=home, cache_dir=os.path.join(home, "cache"))
         cache = media_dir(ctx)
         os.makedirs(cache, exist_ok=True)
         for filename in cached:
@@ -147,8 +143,7 @@ class AddMediaTests(unittest.TestCase):
     def _ctx(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        return Context(home_dir=tmp.name, cache_dir=os.path.join(tmp.name, "cache"),
-                       autoseed=True)
+        return Context(home_dir=tmp.name, cache_dir=os.path.join(tmp.name, "cache"))
 
     def _payload(self, ctx, body=b"ISO"):
         path = os.path.join(ctx.home_dir, "win98.iso")

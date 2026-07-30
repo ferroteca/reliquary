@@ -19,12 +19,11 @@ except importlib.metadata.PackageNotFoundError:
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .home import (DIRECTORIES, adopt_environment, default_home_dir,
-                   home_dir, is_assigned, set_autoseed,
+                   home_dir, is_assigned,
                    set_blueprints_dir, set_cache_dir, set_home_dir,
                    set_machines_dir, set_media_dir, set_scripts_dir)
-from .library import (list_blueprints, list_builtin_blueprints,
-                      list_builtin_media, list_scripts, locate_blueprint,
-                      locate_script, search_blueprints, seed_blueprint,
+from .library import (list_blueprints, list_codex, list_scripts,
+                      locate_blueprint, locate_script, seed_blueprint,
                       seed_script)
 from . import blueprint as blueprint_mod
 from .errors import (PreflightError, ReliquaryError, StaticError, UNEXPECTED,
@@ -61,9 +60,9 @@ _COMMANDS = frozenset({
     "get-machine-dir",
     "run-script", "fetch-media",
     "seed-blueprint", "seed-script", "new-blueprint",
-    "delete-blueprint", "search-blueprints",
+    "delete-blueprint",
     "get-property", "set-property", "unset-property",
-    "list-properties", "list-blueprints",
+    "list-properties", "list-blueprints", "list-codex",
     "list-machines", "list-scripts", "list-media",
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
@@ -83,14 +82,11 @@ _FLAG_ARITY = {
     "--cache-dir": 1,
     "--media-dir": 1,
     "--machines-dir": 1,
-    "--autoseed": 0,
-    "--no-autoseed": 0,
     "--blueprint": 1,
     "--machine": 1,
     "--platform": 1,
     "--timeout": 1,
     "--display": 0,
-    "--builtin": 0,
     "--secret": 0,
     "--json": 0,
     "--only": 0,
@@ -220,17 +216,6 @@ def _add_home(parser):
         parser.add_argument(
             "--%s-dir" % name, default=None, metavar="PATH",
             dest="%s_dir" % name, help=_DIRECTORY_HELP[name])
-    # Autoseeding is on at the CLI, so the switch that carries weight
-    # is the one that turns it off — `--autoseed` is here to say the
-    # default out loud, and to let a script state its assumption.
-    parser.add_argument(
-        "--autoseed", dest="autoseed", action="store_true", default=None,
-        help="copy a missing blueprint or script out of the built-in "
-             "codex (the default)")
-    parser.add_argument(
-        "--no-autoseed", dest="autoseed", action="store_false",
-        help="never fall back to the codex; the blueprints and scripts "
-             "directories are the sole sources")
     parser.add_argument(
         "--json", action="store_true",
         help="print the command's result as one JSON document")
@@ -259,9 +244,9 @@ def _configure_directories(arguments):
     list-machines`` keeps working with an explicit cache over a
     defaulted home.
 
-    Honouring the environment and autoseeding are CLI behaviours, not
-    the library's: a program embedding Reliquary gets neither unless
-    it asks (home.py).
+    Honouring the environment is a CLI behaviour, not the library's: a
+    program embedding Reliquary gets none of it unless it asks
+    (home.py).
     """
     for name, setter in _SETTERS.items():
         value = getattr(arguments, "%s_dir" % name, None)
@@ -271,7 +256,6 @@ def _configure_directories(arguments):
     if not is_assigned("home"):
         set_home_dir(default_home_dir())
         _narrate(f"using reliquary home: {home_dir()}")
-    set_autoseed(getattr(arguments, "autoseed", None) is not False)
 
 
 def _add_properties_file(parser):
@@ -534,14 +518,6 @@ def main(argv=None):
             "--only", action="store_true",
             help="copy just this file, not its closure")
 
-    # search-blueprints
-    command = subcommands.add_parser(
-        "search-blueprints",
-        help="search codex and home blueprints")
-    _add_home(command)
-    command.add_argument("term", nargs="?", default="",
-                         help="term matched against name/description/platform")
-
     # new-blueprint
     command = subcommands.add_parser(
         "new-blueprint", help="create new blueprint")
@@ -593,9 +569,12 @@ def main(argv=None):
 
     # list-*
     command = subcommands.add_parser(
-        "list-blueprints", help="list blueprint names")
+        "list-blueprints", help="list your blueprint names")
     _add_home(command)
-    command.add_argument("--builtin", action="store_true")
+
+    command = subcommands.add_parser(
+        "list-codex", help="list the built-in library's blueprints")
+    _add_home(command)
 
     command = subcommands.add_parser(
         "list-machines", help="list materialized machines")
@@ -609,9 +588,8 @@ def main(argv=None):
     _add_selectors(command)
 
     command = subcommands.add_parser(
-        "list-media", help="list media item names")
+        "list-media", help="list your media item names")
     _add_home(command)
-    command.add_argument("--builtin", action="store_true")
 
     # cache reclamation
     command = subcommands.add_parser(
@@ -904,16 +882,6 @@ def _script(arguments):
 
 
 def _list_blueprints(arguments):
-    if getattr(arguments, "builtin", False):
-        names = list(list_builtin_blueprints())
-
-        def render_builtin():
-            if not names:
-                print("(no built-in blueprints)")
-                return
-            for name in names:
-                print(name)
-        return _emit(arguments, names, render_builtin)
     rows = list_blueprints()
 
     def render():
@@ -927,6 +895,19 @@ def _list_blueprints(arguments):
     return _emit(arguments, rows, render)
 
 
+def _list_codex(arguments):
+    """The library's own listing — names to a person, records to --json.
+
+    A description would be the useful column and is deliberately not
+    printed: unbounded free text dominates a fixed-width table, and how
+    a person should see one is unsettled (T8). ``--json`` carries it.
+    """
+    rows = list_codex()
+    return _emit(arguments, rows,
+                 lambda: _print_names([row["name"] for row in rows],
+                                      "(no built-in blueprints)"))
+
+
 def _print_names(names, empty):
     if not names:
         print(empty)
@@ -936,10 +917,6 @@ def _print_names(names, empty):
 
 
 def _list_media(arguments):
-    if getattr(arguments, "builtin", False):
-        names = list(list_builtin_media())
-        return _emit(arguments, names,
-                     lambda: _print_names(names, "(no built-in media)"))
     names = list_media()
     return _emit(arguments, names,
                  lambda: _print_names(names, "(no media)"))
@@ -1015,17 +992,20 @@ def _list_scripts(arguments):
              "description": _script_description_by_stem(stem)}
             for label, stem in scripts.items()]
 
+        # The description stays in the record and out of the table:
+        # unbounded free text dominates a fixed-width column, and how
+        # a person should see one is unsettled (T8, D88).
         def render_labels():
             if not rows:
                 print(f"(blueprint {blueprint_name} declares no scripts)")
                 return
             width = max([5] + [len(row["label"]) for row in rows])
-            print(f"{'LABEL':<{width}}  DESCRIPTION")
+            print(f"{'LABEL':<{width}}  STEM")
             for row in rows:
-                print(f"{row['label']:<{width}}  {row['description']}")
+                print(f"{row['label']:<{width}}  {row['stem']}")
         return _emit(arguments, rows, render_labels)
 
-    rows = [{"name": row["name"],
+    rows = [{"name": row["name"], "path": row["path"],
              "description": _script_description(row["path"])}
             for row in list_scripts()]
 
@@ -1034,9 +1014,9 @@ def _list_scripts(arguments):
             print("(no scripts)")
             return
         width = max([4] + [len(row["name"]) for row in rows])
-        print(f"{'NAME':<{width}}  DESCRIPTION")
+        print(f"{'NAME':<{width}}  PATH")
         for row in rows:
-            print(f"{row['name']:<{width}}  {row['description']}")
+            print(f"{row['name']:<{width}}  {row['path']}")
     return _emit(arguments, rows, render_dir)
 
 
@@ -1060,26 +1040,6 @@ def _seed_blueprint(arguments):
 
 def _seed_script(arguments):
     return _seed(arguments, seed_script, "script")
-
-
-def _search_blueprints(arguments):
-    rows = search_blueprints(arguments.term)
-
-    def render():
-        if not rows:
-            print("(no matching blueprints)")
-            return
-        name_width = max([4] + [len(row["name"]) for row in rows])
-        prov_width = max([10] + [len(row["provenance"]) for row in rows])
-        print(f"{'NAME':<{name_width}}  {'PROVENANCE':<{prov_width}}  "
-              f"{'PLATFORM':<8}  DESCRIPTION")
-        for row in rows:
-            platform = row["platform"] or "-"
-            description = row["description"] or "-"
-            print(f"{row['name']:<{name_width}}  "
-                  f"{row['provenance']:<{prov_width}}  "
-                  f"{platform:<8}  {description}")
-    return _emit(arguments, rows, render)
 
 
 def _new_blueprint(arguments):
@@ -1397,8 +1357,6 @@ def _dispatch(arguments):
         return _seed_blueprint(arguments)
     if arguments.command == "seed-script":
         return _seed_script(arguments)
-    if arguments.command == "search-blueprints":
-        return _search_blueprints(arguments)
     if arguments.command == "new-blueprint":
         return _new_blueprint(arguments)
     if arguments.command == "delete-blueprint":
@@ -1413,6 +1371,8 @@ def _dispatch(arguments):
         return _list_properties(arguments)
     if arguments.command == "list-blueprints":
         return _list_blueprints(arguments)
+    if arguments.command == "list-codex":
+        return _list_codex(arguments)
     if arguments.command == "list-machines":
         return _list_machines(arguments)
     if arguments.command == "list-scripts":

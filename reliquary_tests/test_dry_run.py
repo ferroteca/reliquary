@@ -26,6 +26,7 @@ from reliquary import home as home_module
 from reliquary.backends import Capabilities
 from reliquary.errors import PreflightError, StaticError
 from reliquary.home import Context
+from reliquary.library import seed_blueprint
 from reliquary.machines import DryRun, create_machine, load_machine_state
 from reliquary.script_nodes import RULE_OF, ScriptParseError
 from reliquary.script_parser import load_script, parse_script
@@ -141,17 +142,19 @@ class LeavesNoStateTests(_DryCase):
         self._dry()
         self.assertEqual([], self.backend.images)
 
-    def test_a_codex_blueprint_is_read_where_it_lies(self):
-        # create_machine seeds a codex blueprint into the home on
-        # first reference; a dry run must not, a seeded file being
-        # state left behind. The home here has no blueprints at all.
-        context = Context(home_dir=self.home, autoseed=True)
-        result = create_machine("freedos", context=context, dry_run=True)
-        self.assertEqual("freedos-0", result.plan["machine"])
+    def test_a_codex_blueprint_is_refused_rather_than_read(self):
+        # This test used to assert the opposite: create_machine seeded a
+        # codex blueprint on first reference and a dry run read it where
+        # it lay, seeding nothing. Neither happens now (D88) — the
+        # blueprints directory is the sole source — so what a dry run
+        # must not do is unchanged and what it refuses has grown.
+        context = Context(home_dir=self.home)
+        with self.assertRaises(PreflightError) as caught:
+            create_machine("freedos", context=context, dry_run=True)
+        self.assertIn("rlq seed-blueprint freedos", str(caught.exception))
         self.assertFalse(
             os.path.exists(os.path.join(self.home, "blueprints")),
-            "a dry run seeded the codex blueprint")
-        self.assertEqual(["live.iso"], self._tree())
+            "a refused dry run wrote a blueprints directory")
 
     def test_nothing_is_hashed(self):
         # `cached` says the file is there, not that it is the right
@@ -539,12 +542,16 @@ class ScriptDryRunTests(unittest.TestCase):
     """run_script(dry_run=True): the check family's one spelling."""
 
     def _codex_context(self, home):
-        """A home with the codex behind it, as the CLI would have it.
+        """A home the codex blueprint has been seeded into.
 
-        Autoseeding is the CLI's default and never the library's, so
-        a test reading a codex script asks for it (home.py).
+        Nothing resolves out of the library any more (D88), so a test
+        wanting the shipped script asks for it by name first — which is
+        what a user does, `seed-blueprint` bringing the scripts the
+        blueprint names along with it.
         """
-        return Context(home_dir=home, autoseed=True)
+        context = Context(home_dir=home)
+        seed_blueprint("freedos", context=context)
+        return context
 
     def _dry(self, label, **kwargs):
         return run_script(label, dry_run=True, **kwargs)
@@ -557,15 +564,29 @@ class ScriptDryRunTests(unittest.TestCase):
         self.assertEqual("run-script", result.operation)
         self.assertIn("nothing was run.", result.report)
 
-    def test_a_bare_name_reads_a_builtin_without_writing(self):
+    def test_a_seeded_name_plans_without_writing(self):
         with tempfile.TemporaryDirectory() as home:
             result = self._dry("freedos-install",
                                context=self._codex_context(home))
             self.assertEqual(
                 "45m", result.plan["timing"]["run_deadline"]["spelling"])
-            self.assertFalse(os.path.isdir(os.path.join(home, "scripts")))
             self.assertIn("timing plan for", result.report)
             self.assertIn("45m", result.report)
+
+    def test_an_unseeded_name_is_refused_naming_the_fix(self):
+        """The dry run refuses where a live run refuses, and says how.
+
+        It used to read a codex script where it lay — the one way the
+        library reached a run without being asked. With the fallback
+        gone there is nothing to read, so the honest answer is the
+        refusal plus the command that fixes it (P11, D88).
+        """
+        with tempfile.TemporaryDirectory() as home:
+            with self.assertRaises(PreflightError) as caught:
+                self._dry("freedos-install", context=Context(home_dir=home))
+            self.assertIn("rlq seed-script freedos-install",
+                          str(caught.exception))
+            self.assertFalse(os.path.isdir(os.path.join(home, "scripts")))
 
     def test_without_a_selector_the_tier_is_static(self):
         with tempfile.TemporaryDirectory() as home:

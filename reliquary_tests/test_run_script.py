@@ -261,36 +261,11 @@ class RunScriptWiringTests(unittest.TestCase):
                 "extra", blueprint="plain", context=self.home)
         self.assertTrue(result.script_path.endswith("extra.rlqs"))
 
-    def test_run_script_seeds_missing_script(self):
-        os.remove(os.path.join(
-            self.home, "scripts", "install-script.rlqs"))
-
-        def fake_seed(stem, context=None):
-            path = os.path.join(self.home, "scripts", f"{stem}.rlqs")
-            with open(path, "w", encoding="utf-8") as handle:
-                handle.write("platform dos\n")
-            return True
-
-        with mock.patch(
-                    "reliquary.script_runner.seed_script",
-                    side_effect=fake_seed) as seed, \
-                mock.patch(
-                    "reliquary.script_runner.execute_script",
-                    return_value=("-", "ready")):
-            result = run_script(
-                "install", blueprint="plain", context=self.home)
-        seed.assert_called_once_with("install-script", context=self.home)
-        self.assertTrue(os.path.isfile(result.script_path))
-
     def test_run_script_missing_script_fails(self):
         os.remove(os.path.join(
             self.home, "scripts", "install-script.rlqs"))
-        with mock.patch(
-                    "reliquary.script_runner.seed_script",
-                    return_value=False):
-            with self.assertRaises(PreflightError) as caught:
-                run_script(
-                    "install", blueprint="plain", context=self.home)
+        with self.assertRaises(PreflightError) as caught:
+            run_script("install", blueprint="plain", context=self.home)
         self.assertIn("install-script.rlqs", str(caught.exception))
 
     def test_run_script_forwards_display(self):

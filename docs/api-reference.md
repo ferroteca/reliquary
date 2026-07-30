@@ -32,16 +32,16 @@ raises `StaticError` naming it.
   `set_media_dir(path)` / `set_machines_dir(path)` - Assign a leaf
   directly. Assigning one leaves its siblings where the rest of the
   resolution puts them.
-- `set_autoseed(enabled)` - Turn codex fallback on or off. **Off in
-  the embedding API**, on at the CLI.
 - `default_home_dir()` - The value the CLI assigns when nothing
   named a home: `Documents/reliquary`, falling back to
   `~/reliquary`. Computed, never assigned by the library.
 - `documents_dir()` - Resolve the user's platform Documents
   folder, or `None` when it cannot be determined.
 - `Context(home_dir=None, blueprints_dir=None, scripts_dir=None,
-  cache_dir=None, media_dir=None, machines_dir=None,
-  autoseed=None)` - A plain record scoping one call or a group of
+  cache_dir=None, media_dir=None, machines_dir=None)` - A plain
+  record of six directories and nothing else — there is no axis
+  deciding where a name may come from, the directories being the
+  sole sources — scoping one call or a group of
   calls, independent of the process-global assignments. Every
   function below that resolves a working directory accepts a
   `context=`: omit it (the common case) to use the globals; pass a
@@ -52,13 +52,14 @@ raises `StaticError` naming it.
   globals from its flags — scoped `Context` objects are an
   embedding-API-only capability.
 - Resolvers, each accepting `context=None`: `home_dir`,
-  `blueprints_dir`, `scripts_dir`, `cache_dir`, `media_dir`,
-  `machines_dir`, and `autoseed`.
+  `blueprints_dir`, `scripts_dir`, `cache_dir`, `media_dir`, and
+  `machines_dir`.
 
 **The embedding API assigns nothing.** A call that resolves a name
 with no directory assigned raises rather than reading the
-developer's home or a stray current directory, and autoseeding is
-off, so the built-in codex never feeds an automated run unasked. The
+developer's home or a stray current directory, and nothing resolves
+out of the built-in codex on any surface, so it never feeds an
+automated run at all. The
 environment (`RELIQUARY_HOME_DIR` and its five siblings) is honoured
 by the CLI and never by the library, for the same reason.
 
@@ -67,8 +68,10 @@ by the CLI and never by the library, for the same reason.
 - `create_machine(name, *, context=None, properties=None,
   properties_file=None, dry_run=False, backend=None)` - Materialize
   a new machine from a blueprint name; returns the machine id
-  (`<blueprint>-<n>`, lowest free number). Seeds codex content on
-  first reference. `properties` / `properties_file` bind any
+  (`<blueprint>-<n>`, lowest free number). The blueprints directory
+  is the sole source: nothing is seeded, and a name only the built-in
+  library holds is refused with the seed command named.
+  `properties` / `properties_file` bind any
   `${key}` a media location references. CLI twin: `create-machine`.
 - `create_machine(name, dry_run=True)` returns a `DryRun` instead —
   never a machine id, so misuse is a `TypeError` at the call site
@@ -294,9 +297,8 @@ nothing.
   delete-and-refetch checkpoint), or `"refetch"` (pre-approved
   deletion); a mismatched file whose media names no source is
   always kept. CLI twin: `fetch-media`.
-- `list_media(context=None, *, builtin=False)` - Sorted media names
-  from the namespace, or the package codex when ``builtin=True``.
-  CLI twin: `list-media`.
+- `list_media(context=None)` - Sorted media names from the
+  namespace — yours alone. CLI twin: `list-media`.
 - `clean_media(name=None, *, context=None)` - Reclaim cached
   payloads, returning the names reclaimed. Blunt with no name,
   skipping anything a running machine holds; targeted with one. The

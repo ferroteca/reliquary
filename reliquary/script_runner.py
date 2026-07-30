@@ -31,7 +31,7 @@ from urllib.parse import urlsplit
 from .binding import bind_properties, console_asker, describe_sources
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      RunFailure, StaticError)
-from .library import locate_script, seed_blueprint, seed_script
+from .library import locate_script
 from .control_display import char_keys
 from .machine import Machine, screenshot, validate_screenshot_name
 from .progress import interactive as _interactive, stream_for
@@ -1444,16 +1444,15 @@ def _existing_machine(*, machine=None, blueprint=None, context=None):
 
 
 def _blueprint_component(blueprint, context):
-    """The blueprint's machine component, seeding in home mode.
+    """The blueprint's machine component, from the blueprints directory.
 
     Mirrors ``create_machine``'s own resolution so the parameters and
     scripts map read here are exactly the ones a subsequent create
-    would use. Returns None when the name resolves to no component;
-    the eventual create then raises the missing-blueprint error.
+    would use — which now means seeding nothing (D88). Returns None
+    when the name resolves to no component; the eventual create then
+    raises the missing-blueprint error, naming the seed command where
+    the codex ships that name.
     """
-    from .assets import source_for
-    if source_for(context).seeds:
-        seed_blueprint(blueprint, context=context)
     namespace = load_namespace(context)
     return namespace.machines.get(blueprint)
 
@@ -1478,15 +1477,12 @@ def _resolve_script_stem(label, scripts_map):
 
 
 def _ensure_script_path(stem, context=None):
-    """Resolve ``stem``, copying it out of the codex if autoseeding.
+    """Resolve ``stem`` from the scripts directory, seeding nothing.
 
-    With autoseeding on the script copies out of the codex on first
-    reference; with it off the scripts directory is the sole source.
-    Resolution and its diagnostics come from ``locate_script``.
+    The directory is the sole source (D88); resolution and its
+    diagnostics come from ``locate_script``, which names the seed
+    command where the codex ships that script.
     """
-    from .assets import source_for
-    if source_for(context).seeds:
-        seed_script(stem, context=context)
     return locate_script(stem, context=context)
 
 

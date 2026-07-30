@@ -391,21 +391,23 @@ standard error.
 Blueprints (with their media/source/archive components) and scripts are
 read from the `blueprints` and `scripts` directories above, each walked
 recursively by file extension. A name those directories do not hold is
-taken from the **built-in codex** — convenient interactively, and the
-reason `freedos` works on a fresh install. For automation, point the
-directories at your project and turn that fallback off:
+**not** taken from anywhere else — the built-in codex is not a
+fallback tier, so a name they do not hold is refused rather than
+supplied (the refusal names `rlq seed-blueprint <name>` when the
+library has it). For a project, point the directories at your tree:
 
 ```powershell
-rlq --blueprints-dir .\vm --scripts-dir .\vm --no-autoseed run-script install --blueprint freedos
+rlq --blueprints-dir .\vm --scripts-dir .\vm run-script install --blueprint freedos
 ```
 
-Now your source-controlled files are the only source, so a run is
+Your source-controlled files are the only source, so a run is
 reproducible and never picks up whatever happens to be in your home.
-Seeding on request still works wherever you point it —
+Seeding works wherever you point it —
 `rlq --blueprints-dir .\vm seed-blueprint freedos` copies a first draft
 into your project, and you commit it. The embedding API is stricter
-still: it assigns no directory and never autoseeds, so a library call
-fails closed rather than reading a developer's home.
+still: it assigns no directory at all, so a library call fails closed
+rather than reading a developer's home — and it cannot reach the
+library either, the codex verbs being CLI-only.
 A machine records which blueprint file it was built from, so a
 `--blueprint <name>` selection only ever picks a machine built from the
 blueprint the current invocation resolves — two projects that share a
@@ -523,16 +525,16 @@ rlq list-machines --home-dir $scratch
 ### Media catalog
 
 ```text
-rlq list-media [--builtin]
+rlq list-media
 rlq fetch-media NAME
 rlq clean-media [NAME]
 rlq prune-media [--dry-run]
 rlq add-media NAME FILE
 ```
 
-`list-media` names the media resolvable from the active source (or the
-package codex with `--builtin`). `fetch-media` resolves one by name and
-warms its cached payload.
+`list-media` names the media resolvable from the active source —
+yours, and only yours. `fetch-media` resolves one by name and warms
+its cached payload.
 
 Everything cached lives in one place, `cache/media/`, keyed by the name
 of the media it is — a container is a media like any other, so there is

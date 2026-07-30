@@ -26,6 +26,11 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _OLD_CLI_COMMANDS = frozenset({
     "script", "keys", "menu", "text", "create", "destroy",
     "start", "stop", "list", "check-script",
+    # The search family, retired when the noun became the set: a
+    # listing per noun, and filtering left to the shell and to --json
+    # (D88). `search-scripts` and `search-media` never shipped and
+    # are retired unbuilt, so neither is planned under either name.
+    "search-blueprints", "search-scripts", "search-media",
 })
 
 # Superseded public API names.
@@ -48,14 +53,24 @@ _OLD_API_NAMES = (
     # all six working directories became placeable. `set_home` and
     # `set_cache` are the old spellings of `set_home_dir` /
     # `set_cache_dir`; `set_assets` / `HOME_ASSETS` answered
-    # placement and hermeticity with one word, and are now the
-    # directory flags and `autoseed` respectively.
+    # placement and hermeticity with one word, and the placement half
+    # is now the directory flags. The hermeticity half became
+    # `autoseed`, which D88 deleted outright rather than defaulting:
+    # nothing resolves out of the codex, so there is no axis to set.
     "set_home",
     "set_cache",
     "set_assets",
     "HOME_ASSETS",
     "media_cache_dir",
     "machines_cache_dir",
+    "set_autoseed",
+    "autoseed",
+    # The search family's API half, and the codex-mode listing the
+    # `--builtin` flag reached (D88). `search_blueprints` spanned two
+    # sets in one verb; `list_builtin_media` enumerated components
+    # that cannot be seeded on their own.
+    "search_blueprints",
+    "list_builtin_media",
 )
 
 # Live-tree paths scanned for superseded spellings.
@@ -77,6 +92,14 @@ _ALLOW_PATH_SUFFIXES = (
     # Same rationale: it asserts the retired `check-script` command
     # is gone, which it cannot do without naming it.
     os.path.join("reliquary_tests", "test_dry_run.py"),
+    # And the same again for D88's retirements. Each of these asserts
+    # a deleted spelling stays deleted — `--builtin` refused by the
+    # parser, `set_autoseed` absent from `home`, the docs-coverage
+    # check's own record of commands once specified and absent — none
+    # of which can be written without naming what is gone.
+    os.path.join("reliquary_tests", "test_cli.py"),
+    os.path.join("reliquary_tests", "test_home.py"),
+    os.path.join("reliquary_tests", "test_library.py"),
     # This module names the forbidden spellings.
     os.path.join("reliquary_tests", "test_old_surface_purge.py"),
     # The API spec's realignment section records a completed rename
@@ -115,6 +138,22 @@ _FORBIDDEN = (
      re.compile(r"(?<!_)\bcheck_key\b")),
     ("rlq check-script",
      re.compile(r"\bcheck-script\b")),
+    # D88's retirements. The word "autoseeding" survives in prose that
+    # records the deletion; the flag and the function may not.
+    ("--autoseed flag",
+     re.compile(r"--(?:no-)?autoseed\b")),
+    ("set_autoseed",
+     re.compile(r"\bset_autoseed\b")),
+    ("Context(autoseed=)",
+     re.compile(r"\bautoseed\s*=")),
+    ("--builtin flag",
+     re.compile(r"--builtin\b")),
+    ("list_builtin_media",
+     re.compile(r"\blist_builtin_media\b")),
+    ("rlq search-blueprints",
+     re.compile(r"\bsearch[-_]blueprints\b")),
+    ("search-scripts / search-media",
+     re.compile(r"\bsearch[-_](?:scripts|media)\b")),
     ("rlq keys",
      re.compile(r"\brlq\s+keys\b")),
     ("rlq menu",

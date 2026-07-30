@@ -6,9 +6,9 @@ from .blueprint import add_media, delete_blueprint, new_blueprint
 from .cli import main
 from .document import (BlueprintError, Document, load_document,
                        parse_document)
-from .home import (DIRECTORIES, Context, autoseed, blueprints_dir,
+from .home import (DIRECTORIES, Context, blueprints_dir,
                    cache_dir, default_home_dir, documents_dir, home_dir,
-                   machines_dir, media_dir, scripts_dir, set_autoseed,
+                   machines_dir, media_dir, scripts_dir,
                    set_blueprints_dir, set_cache_dir, set_home_dir,
                    set_machines_dir, set_media_dir, set_scripts_dir)
 from .interaction import GuestExec
@@ -16,8 +16,11 @@ from .interaction_agentless import AgentlessGuestExec
 from .backends import PRIORITY as BACKEND_PRIORITY
 from .backends import (Availability, BackendAdapter, Capabilities,
                        adapter, discover)
-from .library import (list_blueprints, list_scripts, search_blueprints,
-                     seed_blueprint, seed_script)
+# The codex verbs are not here: `seed-blueprint`, `seed-script` and
+# `list-codex` are CLI-only (D87). A library that changes in a point
+# release is not something a program may bind against, so reaching it
+# is a human act.
+from .library import list_blueprints, list_scripts
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .errors import (InternalError, PreflightError, ReliquaryError,
@@ -143,14 +146,9 @@ __all__ = [
     "screen_text",
     "screenshot",
     "scripts_dir",
-    "search_blueprints",
-    "seed_blueprint",
-    "seed_script",
     "send_keys",
     "send_text",
-    "autoseed",
     "default_home_dir",
-    "set_autoseed",
     "set_blueprints_dir",
     "set_boot_order",
     "set_cache_dir",

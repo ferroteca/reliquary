@@ -28,12 +28,12 @@ workflow:
   `describe` (the one human line per event both human modes share), and the `pretty` / `plain` / `jsonl` renderers,
   with the output discipline enforced there: human modes render everything to stderr and leave stdout empty, `jsonl`
   owns stdout alone; `home.py` owns the six placeable working
-  directories — assignment, the derivation cascade, the fail-closed unassigned error, the codex-autoseed axis, and the
+  directories — assignment, the derivation cascade, the fail-closed unassigned error, and the
   `Context` record every path-resolving function accepts; `assets.py` owns authored-asset residency: one resolution
-  source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, its `seeds`
-  following autoseed), `source_for`, and the
+  source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, and no
+  seeding axis behind it), `source_for`, and the
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API assigns no
-  directory and never autoseeds, so it fails closed rather than reading a home or CWD, and an `ObjectSource` of
+  directory, so it fails closed rather than reading a home or CWD, and an `ObjectSource` of
   JSON-imported objects is the planned third
   source, `document.py` is the `.rlqb` parser (normative spec: `docs/spec/blueprint-model.md`) —
   `parse_document` / `load_document` build a `Document` of `machines` / `media` from a root array of specs (a lone
@@ -93,9 +93,10 @@ workflow:
   (the layered sources, the derivation, the runtime secret rules) is
   the rest of milestone 8,
   `library.py` owns the codex — the built-in seed library
-  (`reliquary/codex/` package data: seed-on-first-reference copy-out, never overwriting home files;
-  `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `search_blueprints`
-  matches codex + home blueprints and reports provenance `yes`/`seeded`/`user`), `machines.py` owns machine materialization under
+  (`reliquary/codex/` package data: copy-out **on request only**, never overwriting home files;
+  `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `list_codex`
+  names what the library holds and reports nothing of yours, `codex_blueprint_available` is the question a
+  refusal asks so it can name the seed command), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` — where **backend assignment** happens, before any image work: the
   blueprint's whole demand (control planes, media kinds, controllers, materialization modes) becomes a
   `backends.Requirements`, and a declared `backend` pins the choice while an absent one walks the priority
@@ -485,7 +486,7 @@ exemption from the rule**, which is what keeps it true if the default ever chang
 nothing, and there the error is reachable; that is the whole safety of the design. Honouring the environment
 (`adopt_environment()`) is likewise the CLI's step and never the library's.
 
-`Context` is a **plain record** of the six optional paths plus `autoseed` — no methods, all resolution in `home.py`'s
+`Context` is a **plain record** of the six optional paths and nothing else — no methods, all resolution in `home.py`'s
 module functions — because six nullable strings bind cleanly from C or Java where six keyword arguments would not
 (P7). Every function resolving a working directory accepts `context=`: omit it for the globals, pass a bare string as
 shorthand for `Context(home_dir=...)`, or pass a `Context` to pin whatever slots it fills per call, unfilled slots
@@ -498,17 +499,21 @@ in for one), not a `Context`; they were deliberately left alone.
 what P12 now requires is that Reliquary **writes only where it was told to** — never beside the module and never into
 a source repository during normal use.
 
-**Autoseeding is its own axis** (`home.autoseed` / `Context(autoseed=)`; `--autoseed` / `--no-autoseed`), replacing
-the retired asset-root knob that answered placement and hermeticity with one word. On at the CLI, **off in the
-embedding API**: a resolution miss falls back to the built-in codex only when something asked for it, so automation
-never picks up the codex, a developer's home, or a stray CWD. `assets.py` is correspondingly one source
-(`DirectorySource`) reading each kind's own directory, walked recursively by extension, with `seeds` a live property
-rather than a per-source constant. An asset's identity is its declared `name` (id-safe) else its filename stem;
+**Nothing resolves out of the codex** (D88), on either surface and under no flag: the directories are the sole
+sources, a miss fails closed, and the refusal names `rlq seed-blueprint <name>` where the library holds that name.
+The seeding axis that once decided this — autoseeding, the surviving half of the retired asset-root knob — was
+deleted rather than defaulted, because a knob that can be turned on is one CI will turn on and a silently supplied
+blueprint is a bug that surfaces on someone else's machine. That restores **P4 to an absolute** and retires D59's
+amendment of it. `assets.py` is correspondingly one source
+(`DirectorySource`) reading each kind's own directory, walked recursively by extension, and carrying no seeding
+property at all. An asset's identity is its declared `name` (id-safe) else its filename stem;
 within-source effective-name collisions are errors. Selection scoping: `--blueprint <name>` matches only machines
 whose recorded `blueprint-source` equals this invocation's resolution (a sourceless machine matches by name alone).
-**Seeding on request is not what autoseed governs**: `seed-blueprint` / `seed-script` (there is no `seed-media`) write
+**Seeding is the one way the library reaches a tree**: `seed-blueprint` / `seed-script` (there is no `seed-media`) write
 into the assigned `blueprints` / `scripts` directory wherever it is, project tree or home alike — copy a first draft,
-commit the copy.
+commit the copy. All three codex verbs — those two plus `list-codex` — are **CLI-only under P6's named exception**
+(D87): a library that changes in a point release is not something a program may bind against, so `reliquary/__init__.py`
+exports none of them and the parity test reads the exception from `docs/spec/api.md`'s codex-family row.
 
 Default layout, with only the home assigned. A machine is wholly its materialization directory — there is
 no root-home machine model (the legacy root-home machine surface — a

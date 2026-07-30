@@ -33,11 +33,6 @@ flag winning; what none of them names derives from what does.
   `<cache>/media`)
 - `--machines-dir <path>` - Machine materializations (default:
   `<cache>/machines`)
-- `--no-autoseed` - Never fall back to the built-in codex; the
-  directories above are the sole sources. Use it with
-  `--blueprints-dir` / `--scripts-dir` for reproducible,
-  project-scoped automation. `--autoseed` states the CLI default
-  out loud
 - `--blueprint <name>` - Select a blueprint's sole machine, or
   name the blueprint for `create-machine` / `list-*`
 - `--machine <id>` - Select a machine by full id
@@ -196,17 +191,22 @@ nothing).
 
 List all machines, optionally filtered by blueprint.
 
-### `rlq list-blueprints [--builtin]`
+### `rlq list-blueprints`
 
-List blueprints. With `--builtin`, list only built-in blueprints.
+List your blueprints — the ones in the `blueprints` directory —
+with the path of each. Yours alone: the built-in library is a
+separate set with its own verb below, and no listing spans the two.
 
-### `rlq search-blueprints [TERM]`
+### `rlq list-codex`
 
-Search codex and home blueprints, printing name, provenance
-(`yes` = built-in and not seeded, `seeded` = built-in copied into
-the home, `user` = home-authored), platform, and description. The
-term is matched case-insensitively against name, description, and
-platform; omitted, everything is listed.
+List the built-in library's blueprints by name. Nothing of yours
+appears, so which command you ran is the provenance — there is no
+column saying where a row came from. Each entry's description rides
+the `--json` record rather than the printed table.
+
+Nothing resolves out of the library: a name your directories do not
+hold is refused, and the refusal names `rlq seed-blueprint <name>`
+where the library has it.
 
 ### `rlq (seed-blueprint | seed-script) <name> [--only]`
 
@@ -292,11 +292,13 @@ prints it and `--progress` and `--display` are refused.
 
 ## Media and cache
 
-### `rlq list-media [--builtin]`
+### `rlq list-media`
 
 List media names resolvable from the active source (the media specs
-across its `.rlqb` files). With ``--builtin``, list package codex
-media instead.
+across its `.rlqb` files) — yours alone. The library's media are
+components of blueprints you have not seeded, and there is no
+`seed-media`, so nothing lists parts that cannot be ordered on their
+own.
 
 ### `rlq fetch-media <name> [--progress MODE]`
 

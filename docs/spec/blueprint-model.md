@@ -330,8 +330,8 @@ Resolution reads **every `.rlqb` in the blueprints directory**,
 walked recursively — the home's folder by default, a project's own
 tree where `--blueprints-dir` says so — into one catalog, then binds
 every reference by name. The residency split is unchanged in
-substance: a miss falls back to the codex while autoseeding is on
-(the CLI), and never in the embedding API (P4).
+substance, and now absolute: a miss never falls back to the codex,
+on either surface (P4).
 
 Resolution is **order-independent** and forward references are
 legal. Containment cycles and a self-parent fail closed naming

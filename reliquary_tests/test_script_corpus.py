@@ -417,7 +417,7 @@ class PreflightCorpusTests(unittest.TestCase):
         script = load_script(path)
         with tempfile.TemporaryDirectory() as empty:
             context = Context(home_dir=empty, blueprints_dir=empty,
-                              scripts_dir=empty, autoseed=False)
+                              scripts_dir=empty)
             try:
                 _preflight_machine_rules(
                     script, self.MACHINE, path, context)

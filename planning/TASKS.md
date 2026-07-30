@@ -112,7 +112,7 @@ retires and is never issued again, so a T-number surviving in a
 commit message can never resolve to something else later, and
 gaps in the sequence are history rather than a promise.
 
-**The next number to issue is T8.** Tasks are the one handle class
+**The next number to issue is T9.** Tasks are the one handle class
 whose whole population can vanish: the queue empties, and a struck
 task's only record is its commit, so nothing else here would say
 what the highest number ever issued was. An F-number is covered
@@ -123,7 +123,7 @@ own high-water mark. **This line is not a status column** (D42): it
 records what the sequence has spent, and says nothing about what
 was done, by whom, or when.
 
-It starts at **T8** rather than T1 because T0–T7 were issued
+It started at **T8** rather than T1 because T0–T7 were issued
 already, by an earlier per-list numbering that ran three separate
 times, and those mentions survive in
 [DECISIONS.md](DECISIONS.md) under the entries that landed them.
@@ -140,4 +140,27 @@ violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
 
-The queue is empty.
+### Surface decisions
+
+- **T8 — Resolve description visibility in the list family.** The
+  `list-*` verbs print no `description` for any item, while
+  `--json` carries it in full, so a person cannot read what a
+  blueprint, script or media *is* from the CLI at all while the
+  data sits one flag away. The omission was deliberate (D88):
+  descriptions are unbounded free text and a column of them
+  dominates a fixed-width table. The deferral ends in one of two
+  places rather than standing indefinitely.
+
+  - **Support it in the CLI**, which means specifying the human
+    display rather than adding a column and hoping: truncation
+    width, wrapping, or a per-item detail view
+    (`show-blueprint <name>`-shaped) instead of a column at all —
+    and whether the answer is uniform across the family or per
+    noun.
+  - **Drop it entirely**, `--json` included, so no surface carries
+    a field none of them shows.
+
+  Context: `search-blueprints` was the only human-visible
+  description surface and went with the search family (D88), and
+  U11's "read a description" is met only through `--json` until
+  this settles — the thin fulfilment that prompted the entry.

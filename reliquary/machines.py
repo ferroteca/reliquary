@@ -19,7 +19,7 @@ from .acquire import fetch_media as _acquire_fetch
 from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError)
 from .home import machines_dir
-from .library import seed_blueprint
+from .library import codex_blueprint_available
 from .resolve import (load_namespace, location_property_keys,
                       resolve_media, resolve_media_plan)
 
@@ -519,29 +519,23 @@ class DryRun:
     plan: dict = dataclasses.field(default_factory=dict)
 
 
-def _dry_namespace(name, context):
-    """The resolution namespace a dry run reads, seeding nothing.
+def _seed_hint(name):
+    """The fix, where the shipped library holds this blueprint name.
 
-    ``create_machine`` copies a codex blueprint into the blueprints
-    directory on first reference; a dry run must not, a seeded file
-    being state left behind. So a codex blueprint is read where it
-    lies and merged in — the same fallback ``library.locate_blueprint``
-    already makes for a read-only check, for the same reason.
+    A deleted fallback should leave an instruction rather than a
+    silence (P11, D88): nothing resolves out of the codex any more, so
+    the refusal is where a user learns that seeding is the move. Empty
+    when the library has no such name, since inventing a suggestion
+    that would also fail is worse than saying nothing.
+
+    (A dry run needs no namespace of its own now. It used to read a
+    codex blueprint where it lay — the one path by which the library
+    reached an operation unasked — and with that gone the dry and live
+    halves resolve identically, which is what the rule always said.)
     """
-    from . import assets
-    from .library import locate_blueprint
-    from .resolve import build_namespace
-    paths = list(assets.source_for(context).document_files())
-    namespace = build_namespace(paths)
-    if name in namespace.machines:
-        return namespace
-    try:
-        path = locate_blueprint(name, context=context)
-    except PreflightError:
-        return namespace
-    if path in paths:
-        return namespace
-    return build_namespace(paths + [path])
+    if codex_blueprint_available(name):
+        return f"\nthe codex has one: rlq seed-blueprint {name}"
+    return ""
 
 
 def _describe_location_properties(machine, namespace, *, explicit=None,
@@ -822,7 +816,6 @@ def create_machine(name, *, context=None, number=None, properties=None,
     configuration, it is legal with ``dry_run`` alone — the machine's
     backend comes from its blueprint (P10).
     """
-    from .assets import source_for
     if backend is not None and not dry_run:
         raise StaticError(
             "--backend asks what another backend would do and means "
@@ -830,11 +823,11 @@ def create_machine(name, *, context=None, number=None, properties=None,
             "from its blueprint",
             rule_id="machine.backend-outside-dry-run")
     if dry_run:
-        namespace = _dry_namespace(name, context)
+        namespace = load_namespace(context)
         if name not in namespace.machines:
             raise PreflightError(
                 f"no machine blueprint named {name!r} in the resolution "
-                "source", rule_id="blueprint.unknown")
+                f"source{_seed_hint(name)}", rule_id="blueprint.unknown")
         machine = namespace.machines[name]
         return _dry_create(
             machine, namespace, context=context, blueprint_name=name,
@@ -843,16 +836,15 @@ def create_machine(name, *, context=None, number=None, properties=None,
                 machine, namespace, explicit=properties,
                 properties_file=properties_file, context=context),
             backend=backend)
-    # With autoseeding on, the blueprint (and the scripts it carries)
-    # copies out of the codex on first reference — idempotent, never
-    # overwriting. With it off nothing is seeded and the blueprints
-    # directory is the sole source.
-    if source_for(context).seeds:
-        seed_blueprint(name, context=context)
+    # The blueprints directory is the sole source: nothing is seeded on
+    # first reference, and the codex reaches a tree only when
+    # `seed-blueprint` is asked to put it there (D88). A name the codex
+    # ships is named in the refusal rather than quietly supplied.
     namespace = load_namespace(context)
     if name not in namespace.machines:
         raise PreflightError(
-            f"no machine blueprint named {name!r} in the resolution source",
+            f"no machine blueprint named {name!r} in the resolution "
+            f"source{_seed_hint(name)}",
             rule_id="blueprint.unknown")
     machine = namespace.machines[name]
     source = namespace.origin.get(("machine", name))

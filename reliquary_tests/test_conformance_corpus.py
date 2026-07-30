@@ -312,7 +312,7 @@ class MachineStateSchemaTests(unittest.TestCase):
                              '"drives": {"cdrom0": null}}]')
             context = Context(home_dir=os.path.join(tmp, "home"),
                               blueprints_dir=root,
-                              scripts_dir=root, autoseed=False)
+                              scripts_dir=root)
             with fake_backend.installed():
                 machine_id = create_machine("state-bp", context=context)
             state = load_machine_state(machine_id, context)

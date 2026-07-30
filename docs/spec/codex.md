@@ -5,10 +5,10 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # The codex
 
-> **Status:** the seeding core — the packaged tree, copy-out on
-> first reference, and the never-overwrite rule — is implemented,
-> and so are `seed-blueprint` / `seed-script`, `search-blueprints`,
-> and the provenance column that search reports. The index ships
+> **Status:** the seeding core — the packaged tree, seeding on
+> request, and the never-overwrite rule — is implemented, and so
+> are `seed-blueprint` / `seed-script` and `list-codex`, all three
+> CLI-only (D87). The index ships
 > for **blueprint names and descriptions only**: script and media
 > entries and the relationship data described below are still
 > planned, and nothing reads them, so the codex derives media from
@@ -18,26 +18,31 @@ SPDX-License-Identifier: GPL-3.0-only
 The codex is Reliquary's built-in seed content: a shipped
 collection of blueprints (their media, source, and archive
 components included) and scripts for
-popular open source operating systems, so the common case is one
-command from a clean home:
+popular open source operating systems, so the common case is two
+commands from a clean home:
 
 ```powershell
+rlq seed-blueprint freedos
 rlq run-script install --blueprint freedos
 ```
 
-That single command extracts the blueprint (its media ride inside
-it) and its scripts from the codex, creates a machine, fetches and
-verifies the installation media, and runs the scripted install.
+The first copies the blueprint (its media ride inside it) and the
+scripts it names into your own directories, where they are ordinary
+files you own. The second creates a machine from your copy, fetches
+and verifies the installation media, and runs the scripted install.
+**Two commands rather than one is the point** (U1): what runs is a
+file you asked for by name and can read before you run it, and
+nothing arrives from the library unasked.
 
 ## A library of examples
 
 The codex is a **library of examples**, and both words carry
 weight. It is a library: a curated collection, shipped with
-Reliquary, that you browse, search and seed from. What it is not
+Reliquary, that you list and seed from. What it is not
 is a library you build on — its entries are reference material, a
 starting point to copy rather than content to depend on in place.
 They are meant to work — a codex blueprint or script that does
-not is a defect, and the command above is the claim — but nothing
+not is a defect, and the commands above are the claim — but nothing
 about it is stable. The library evolves, and evolves in a
 **point release**: `freedos-install` may be rewritten between one
 and the next, the `freedos` blueprint's disk may change size, a
@@ -57,7 +62,7 @@ make about its application surfaces, codex content stays outside
 it, because it is content rather than surface.
 
 What is specified is on this page — the seeding semantics, the
-never-overwrite rule, provenance, the media licensing rule — and
+never-overwrite rule, the listing, the media licensing rule — and
 *that* is the surface; the content it carries is not (root
 [ARCHITECTURE.md](../../ARCHITECTURE.md) P18).
 
@@ -96,50 +101,48 @@ Two rules carry the model:
   extracts the current codex copy again. An orphaned reference — a
   blueprint naming a script you removed — re-seeds the same way.
 
-## The index and provenance
+## The index, and listing what the library holds
 
 The codex carries an index mapping every codex artifact to
 its `description` and relationships (which scripts a blueprint
-references; its media travel inside it). User-owned files
-are indexed by reading the same optional fields from the file.
-`search` queries both. Today the index carries blueprint names
-and descriptions and nothing else (see the banner); a media name
-is read from the blueprint that declares it, which is where media
-live (D30).
+references; its media travel inside it). Today the index carries
+blueprint names and descriptions and nothing else (see the banner);
+a media name is read from the blueprint that declares it, which is
+where media live (D30).
 
-Listings report provenance by name, in a `PROVENANCE` column
-whose value is one of three words — never blank, so a machine
-consumer of the `--json` form can switch on it:
+**`list-codex` is the one verb that reads the library**, and it
+reads nothing else: it names what the codex holds, never what your
+directories hold, and `list-blueprints` is its mirror image. So
+**which command you ran is the provenance** — there is no column,
+value or field reporting where a row came from, because no listing
+mixes the two sets (D88). It prints names alone; each entry's
+`description` rides the `--json` record, unbounded free text being
+a column a fixed-width table cannot hold.
 
-| PROVENANCE | meaning |
-|---|---|
-| `yes` | a codex entry not yet extracted into your home |
-| `seeded` | a user file whose name also exists in the codex |
-| `user` | a purely user-authored file, with no codex entry |
-
-Under `--no-autoseed` the codex is not a tier at all, so every
-match is `user`.
+There is no searching, of the codex or of your own assets.
+Filtering a listing is a pipe on a terminal and a comprehension in
+a program, so no `search-` verb exists for any noun.
 
 ## Extraction
 
-Extraction happens two ways:
+Extraction happens **one way: on request.**
 
-- **Implicitly, on first reference.** Any operation that resolves
-  a blueprint or script name checks the home
-  first, then the codex; a codex hit is copied out (a
-  blueprint brings its referenced scripts with it, and its media
-  ride inside it) and resolution proceeds against the new user file.
-- **Explicitly, with the `seed-` family.** `seed-blueprint
-  <name>` extracts
-  the blueprint and everything it references — the one-stop bridge
-  from "just use the codex's" to "I want to tweak it"
-  (`--only` restricts it to the blueprint file itself);
-  `seed-script <name>` extracts a single script (API twins
-  `seed_blueprint(name, only=)` / `seed_script`; there is no
-  `seed_media` — media are components inside a `.rlqb` and are
-  seeded with it, D30).
+`seed-blueprint <name>` extracts the blueprint and everything it
+references — the one-stop bridge from "just use the codex's" to "I
+want to tweak it" (`--only` restricts it to the blueprint file
+itself); `seed-script <name>` extracts a single script. There is no
+`seed-media`: media are components inside a `.rlqb` and are seeded
+with it (D30). All of it is CLI-only, with no API twins (D87).
 
-Both paths obey the never-overwrite rule.
+**Nothing is extracted implicitly.** Resolution reads your
+directories and stops there: a name they do not hold is not found,
+and the refusal names the seed command where the library has that
+name. A codex artifact reaches a tree because someone asked for it
+by name — which is what makes the copy legible, and what keeps
+automation from depending on content that moves in a point release
+(P4, P18).
+
+Seeding obeys the never-overwrite rule.
 
 Codex blueprints are JSONC
 documents (see

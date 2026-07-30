@@ -5,8 +5,9 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # Authored-asset resolution and the working directories
 
-> **Status:** normative. The six placeable directories, the autoseed
-> axis, the extension-and-name identity rule, the recorded blueprint
+> **Status:** normative. The six placeable directories, the
+> codex-is-not-a-tier rule, the extension-and-name identity rule,
+> the recorded blueprint
 > source, and the default layout are implemented and are what the
 > code answers to; the layout is a world-facing contract, so changes
 > to it follow the surface-change rule
@@ -64,22 +65,24 @@ like `.git`/`.venv` are pruned — and it is the **sole** file source
 for its kind. There is no shadow and no fallback between
 directories.
 
-Whether a miss may fall back to the shipped codex is the separate
-**autoseed** axis: `--autoseed` / `--no-autoseed`, API `autoseed=`.
+**A miss never falls back to the shipped codex**, on either surface
+and under no flag (D88). The directories are the sole sources, a
+missing name fails closed, and nothing outside your own tree reaches
+a run (U14, U4, P4).
 
-- **On** — the CLI default. A name the directory does not hold is
-  read from, or copied out of, the built-in codex, so a person
-  meeting Reliquary for the first time finds `freedos` already
-  there (U1, U5). Copy-out never overwrites.
-- **Off** — the embedding API default. The directories are the sole
-  sources and a missing name fails closed, so nothing outside
-  source control reaches the run (U14, U4).
+Where the library holds that name, the refusal names the command
+that fixes it — `rlq seed-blueprint <name>` — so the codex reaches a
+tree because someone asked, and the asking is legible in the shell
+history rather than implied by a default. An axis for this existed
+once, and turning it on meant an operation could quietly resolve
+content the next point release may change; it is deleted rather than
+defaulted.
 
 Neither axis implies the other. A project tree may keep the codex
 behind it and a home may refuse it. The single asset-root knob that
 once answered both questions at once — naming a project root *and*
 declaring hermeticity by the same word — is retired: placement is
-what the directory flags say, and hermeticity is what autoseed says.
+what the directory flags say, and hermeticity is unconditional.
 
 The **embedding API assigns nothing**: a bare call that resolves a
 name with no directory assigned fails closed, naming the directory
@@ -91,10 +94,11 @@ objects supplied in memory with no files at all (self-identifying by
 `name` — the fileless third source, landing just after the file
 modes).
 
-**Seeding on request is not what autoseed governs.** `seed-blueprint`
+**Seeding on request is the only way the codex reaches a tree.**
+`seed-blueprint`
 and `seed-script` write into the assigned `blueprints` / `scripts`
-directory wherever it is, project tree or home alike, whatever
-autoseed says: a caller asking for a first draft has named the codex
+directory wherever it is, project tree or home alike: a caller
+asking for a first draft has named the codex
 as its source, which is the use the codex is for — copy it, then
 commit the copy.
 
@@ -113,9 +117,8 @@ recorder ([recorder.md](../../planning/proposed/design/recorder.md)) emits its d
 script, its landmark declarations, and their variant renderings —
 into the directories the session ran with, as new source files their
 author commits. Nothing else writes an authored asset unasked: a
-script carries no definitions to install, so an ordinary run with
-autoseeding off leaves those directories untouched and a CI tree
-clean.
+script carries no definitions to install, so an ordinary run leaves
+those directories untouched and a CI tree clean.
 
 ## The working directories
 

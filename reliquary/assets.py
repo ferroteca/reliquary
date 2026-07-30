@@ -12,11 +12,10 @@ That is what retired the old asset-root knob: it existed to name a
 project root because ``blueprints``/``scripts`` could not be named
 directly, and now they can.
 
-The hermetic/convenient split it also carried is now its own axis,
-``home.autoseed`` — on at the CLI, off in the embedding API, either
-one overridable. So a directory decides *where* a name resolves and
-autoseed decides whether a miss may fall back to the shipped codex;
-one no longer implies the other.
+The hermetic/convenient split it also carried is gone rather than
+relocated: a directory decides where a name resolves, and a miss is
+a miss. Nothing falls back to the shipped codex, which reaches a
+tree only when ``seed-blueprint`` is asked to put it there (P4).
 
 An asset's identity is its ``name`` field when the authored file
 declares one, else its filename stem; two files of one kind claiming
@@ -33,7 +32,7 @@ this same seam.
 import os
 
 from .errors import PreflightError
-from .home import autoseed, blueprints_dir, scripts_dir
+from .home import blueprints_dir, scripts_dir
 
 
 # Authored-asset file extensions by kind. ``.json`` is the accepted
@@ -80,9 +79,6 @@ def _walk_files(root, extensions):
 class AssetSource:
     """Where a resolution looks for authored asset files."""
 
-    #: Whether a miss may fall back to the built-in codex.
-    seeds = False
-
     def candidate_files(self, kind):
         """Return candidate file paths of ``kind`` in this source."""
         raise NotImplementedError
@@ -120,11 +116,6 @@ class DirectorySource(AssetSource):
     def __init__(self, context=None):
         self._context = context
         self._cache = {}
-
-    @property
-    def seeds(self):
-        """Autoseeding is a live property, not a fixed one per source."""
-        return autoseed(self._context)
 
     def _dir(self, kind):
         resolver = self._DIRS.get(kind)

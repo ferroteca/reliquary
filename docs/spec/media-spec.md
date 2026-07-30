@@ -32,10 +32,10 @@ Resolution reads the whole source: every `.rlqb` in the blueprints
 directory, walked recursively, is parsed into one `(name, type)`
 catalog, and references bind by name. That directory is the home's
 `blueprints/` folder by default and a project's own tree where
-`--blueprints-dir` says so; a miss falls back to the codex only
-while autoseeding is on — the CLI's default and never the embedding
-API's, so nothing outside a project's source control reaches an
-automated run (the artifact-residency split, ARCHITECTURE.md P4).
+`--blueprints-dir` says so; a miss never falls back to the codex, on
+either surface, so nothing outside a project's source control
+reaches a run at all (the artifact-residency split,
+ARCHITECTURE.md P4).
 
 ```text
 <asset root>/…/freedos.rlqb        the machine and the media it draws on

@@ -107,17 +107,28 @@ full text survives in git history, and successors name the
 number they superseded.
 
 - **U1 — Install a sandbox VM from the CLI, easily.** A user
-  says, in effect, "I'd like to install FreeBSD" — and ends with
+  decides, in effect, "I'd like to install FreeDOS" — and ends with
   a usable sandbox machine. Easy is the requirement: the
-  command-line syntax stays terse and succinct, and the blueprint
-  and install recipe are easy to find, point to, and use. From a
-  clean home this is one short command
-  (`rlq run-script install --blueprint freedos`), and that one
-  command is the whole of the claim — it composes finding and
-  seeding the blueprint (U11), acquiring and verifying its media
-  (U13), and driving the installer end to end (U12) into a single
-  keystroke-free journey. Keeping the machine afterward is a
-  separate journey and a separate demand (U8).
+  command-line syntax stays terse, and the blueprint and install
+  recipe are easy to find, point to, and use. From a clean home
+  the whole journey is **two commands** — copy the blueprint out
+  (U11), then run its install script — and the install itself is
+  keystroke-free, composing the media acquisition (U13) and the
+  unattended install (U12) that the copied recipe describes.
+  **Nothing arrives from the built-in library without being asked
+  for by name** (P4, P18), so what runs is a file they chose and
+  own. Keeping the machine afterward is a separate journey and a
+  separate demand (U8).
+
+  Precondition: the blueprint copied out of the library —
+  `rlq seed-blueprint freedos` (U11).
+
+  1. **Install.** `rlq run-script install --blueprint freedos` —
+     creates the machine, fetches and hash-verifies the LiveCD,
+     drives the installer to completion, and powers the guest off.
+     No keystroke at any point.
+  2. **Use it.** `rlq start-machine --blueprint freedos --display`
+     — the sandbox on screen, FreeDOS installed and ready to go.
 
 - **U4 — A precisely defined test VM, shared through version
   control.** A developer is writing a program that cannot be

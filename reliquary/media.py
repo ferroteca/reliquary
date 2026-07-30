@@ -56,15 +56,14 @@ def fetch_media(name, context=None, on_mismatch="fail", progress="auto"):
         events.close()
 
 
-def list_media(context=None, *, builtin=False):
+def list_media(context=None):
     """Return sorted media names from the catalog.
 
-    The active resolution source by default; with ``builtin=True``, the
-    package codex (never seeds or writes).
+    Yours alone, from the active resolution source. There is no codex
+    mode: media are components inside a ``.rlqb`` and there is no
+    ``seed-media``, so listing the library's would enumerate parts
+    that cannot be ordered (D88).
     """
-    if builtin:
-        from .library import list_builtin_media
-        return list(list_builtin_media())
     return sorted(load_namespace(context).media)
 
 

@@ -49,11 +49,14 @@ SPDX-License-Identifier: GPL-3.0-only
   `run_script` — and the CLI command *is* the twin's name,
   dash-separated (`create-machine` ↔ `create_machine`), its
   flags mirroring the function's parameters. Naming a twin names
-  its command; drift is impossible by construction. Two named
+  its command; drift is impossible by construction. Three named
   exceptions, each an identity with a different home surface:
   the guest-console family spells as the script language's verbs
-  (its twins deferred to the control-plane design), and the
-  `run` family maps to the run handle's methods. The exceptions
+  (its twins deferred to the control-plane design), the
+  `run` family maps to the run handle's methods, and the **codex
+  family has no twins at all** — it is CLI-only under P6's named
+  exception, because a library that changes in a point release is
+  not something a program may bind against (D87). The exceptions
   cover command names only — flags mirror their function's or
   method's parameters everywhere, exception families included
   (`run cancel --stop-machine` ↔ `cancel(stop_machine=)`).
@@ -72,13 +75,14 @@ SPDX-License-Identifier: GPL-3.0-only
 - **Mirrored globals**: a `Context` of six directory slots —
   `home_dir=`, `blueprints_dir=`, `scripts_dir=`, `cache_dir=`,
   `media_dir=`, `machines_dir=` — mirrors the six `--*-dir` flags
-  one for one, and `autoseed=` mirrors `--autoseed`/`--no-autoseed`.
+  one for one, and carries nothing else.
   A `Context` is a plain record of nullable paths rather than a
   configured object, so it binds as six strings from C or Java. The
   embedding API **assigns nothing**: a bare call that resolves a
   name with no directory assigned fails closed naming that
-  directory, and autoseeding is off, so automation never picks up
-  the developer's home, a stray CWD, or the codex. The CLI's
+  directory, and nothing resolves out of the codex on any surface,
+  so automation never picks up the developer's home, a stray CWD,
+  or the library. The CLI's
   defaults are the CLI's, not the library's
   ([asset-resolution.md](asset-resolution.md#the-working-directories)).
 - **Returns mirror what the CLI prints**: `create_machine` and
@@ -174,7 +178,7 @@ carries the exceptions and each family's contract home.
 | `export-drive` / `export-machine` | `export_drive(key, destination)` / `export_machine(to=, destination=None)` — stream-bearing; `to=` names an exporter (a vocabulary decoupled from backends) and is required | blueprint guide |
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |
-| `seed-blueprint` / `seed-script` | `seed_blueprint(name, only=)` / `seed_script()` | [codex](codex.md) |
+| codex family (`seed-blueprint`, `seed-script`, `list-codex`) | **none — CLI-only** (D87). `seed-blueprint <name> [--only]` copies a library blueprint and the scripts it names into your `blueprints`/`scripts` directories; `seed-script <stem> [--only]` copies one script; `list-codex` names what the library holds (`--json` adds each entry's description). Reaching the shipped library is a human act: nothing programmatic may bind a name the next point release may move (P18) | [codex](codex.md) |
 | `run-script <label>` | `run_script()` returns the run's output, raises by error class (D36 — no stored record; the `exec` twin lands with it); `run_script(label, *, dry_run=False)` returns `ScriptRun \| DryRun`, and under `dry_run` the selector is optional because its presence chooses the checkable tier | [script spec](script-spec.md), [cli.md](cli.md#the-dry-run) |
 | the `run` family; `begin-run` / `end-run`; `list-runs` — all backlog (D35/D36) | the record model — persisted runs, `run status` / `run delete`, the async followers `run tail` / `run wait` / `run cancel` with the run handle (`start_script()` / `attach_run()` / `delete_run()`), and interaction runs (`begin_run` / `end_run`) — is async-backlog work; milestone 9 stores nothing | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle (backlog — D35) | [media spec](media-spec.md#fetch-progress) |
@@ -184,7 +188,7 @@ carries the exceptions and each family's contract home.
 | `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
 | `describe-drives` / `refresh-drives` | `describe_drives()` — the drive report (D83): declared and chosen facts per drive, the at-rest read per disk, and the platform's letter map over them, answered from the record (read at every start's first step; a disk never yet recorded is read once, machine down); `refresh_drives()` — the explicit stopped-only re-read, returning the same report fresh (U14; P11, P17) | [cli.md](cli.md#describing-drives) |
 | `put-file` / `get-file` / `put-files` / `get-files` / `list-files` | the same names with underscores; `list_files(address, recursive=False)` returns the flat entry array — guest-terms addressed (P17) in one vocabulary across all five, over a vvfat drive, stopped-only, non-vvfat fails closed by name (P11). Single files landed at milestone 9, the trees and the listing with D62 (U14, U20; P16) | [cli.md](cli.md) |
-| `list-machines` / `list-blueprints` / `list-scripts` / `list-media`; `search-blueprints` / `search-scripts` / `search-media` | `list_<noun>` / `search_<noun>` (`list_machines` today; the rest follow the pattern as they land) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |
+| `list-machines` / `list-blueprints` / `list-scripts` / `list-media` | `list_<noun>` — **one verb per noun, and the noun names the set**: each lists yours and none reports a codex entry (`list-codex` is the library's own, above). There is no `search-<noun>`: matching a term is filtering, which the shell does and `--json` makes trivial in any language (D88) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
 | guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
 

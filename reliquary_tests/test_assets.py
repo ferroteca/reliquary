@@ -16,8 +16,7 @@ from reliquary.assets import (KIND_EXTENSIONS, index_by_name,
                               source_for, stem)
 from reliquary.document import parse_document
 from reliquary.errors import PreflightError, StaticError
-from reliquary.library import (list_blueprints, locate_blueprint,
-                               search_blueprints)
+from reliquary.library import list_blueprints, list_codex, locate_blueprint
 from reliquary.machines import create_machine, resolve_machine
 from reliquary.resolve import load_namespace, resolve_media
 from reliquary_tests import fake_backend
@@ -133,14 +132,12 @@ class SpecConformanceTests(unittest.TestCase):
 
 
 class AssetSourceTests(unittest.TestCase):
-    """Where each kind resolves from, and whether the codex backs it.
+    """Where each kind resolves from, and nothing else.
 
-    Two axes now, where the asset-root knob answered both at once.
-    The
-    directory decides *where* a name resolves; autoseed decides
-    whether a miss may fall back to the shipped codex. Neither
-    implies the other, which is what lets a project tree keep the
-    codex and a home refuse it.
+    One axis, where the asset-root knob answered two questions and the
+    autoseed knob that replaced half of it answered the other. The
+    directory decides where a name resolves, and a miss is a miss: the
+    codex is not a tier behind it (D88).
     """
 
     def setUp(self):
@@ -149,9 +146,6 @@ class AssetSourceTests(unittest.TestCase):
         self.addCleanup(self.home_mod._globals.update, saved)
         for name in self.home_mod.DIRECTORIES:
             self.home_mod._globals[name] = None
-        self.addCleanup(self.home_mod.set_autoseed,
-                        self.home_mod._autoseed)
-        self.home_mod.set_autoseed(False)
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.root = self._tmp.name
@@ -185,15 +179,11 @@ class AssetSourceTests(unittest.TestCase):
         self.assertEqual(source.describe("script"),
                          os.path.join(os.path.abspath(home), "scripts"))
 
-    def test_seeding_follows_autoseed_not_the_directory(self):
-        proj = os.path.join(self.root, "proj")
-        self.assertFalse(source_for(Context(blueprints_dir=proj)).seeds)
-        self.assertTrue(
-            source_for(Context(blueprints_dir=proj, autoseed=True)).seeds)
-        self.home_mod.set_autoseed(True)
-        self.assertTrue(source_for(Context(blueprints_dir=proj)).seeds)
-        self.assertFalse(
-            source_for(Context(blueprints_dir=proj, autoseed=False)).seeds)
+    def test_a_source_has_no_seeding_axis_at_all(self):
+        """The knob is deleted, not defaulted, so nothing reports it."""
+        source = source_for(Context(
+            blueprints_dir=os.path.join(self.root, "proj")))
+        self.assertFalse(hasattr(source, "seeds"))
 
     def test_the_global_assignment_applies(self):
         proj = os.path.join(self.root, "proj")
@@ -243,7 +233,7 @@ class DirSourceResolutionTests(unittest.TestCase):
 
     def ctx(self):
         return Context(home_dir=self.home, blueprints_dir=self.root,
-                       scripts_dir=self.root, autoseed=False)
+                       scripts_dir=self.root)
 
     def test_walks_recursively_skipping_dotdirs(self):
         _write(os.path.join(self.root, "a.rlqb"),
@@ -279,11 +269,19 @@ class DirSourceResolutionTests(unittest.TestCase):
         names = {row["name"] for row in list_blueprints(self.ctx())}
         self.assertEqual(names, {"real"})
 
-    def test_dir_mode_is_hermetic_no_codex(self):
-        """A codex name never resolves in dir mode; search shows no codex."""
-        with self.assertRaises(PreflightError):
+    def test_a_codex_name_never_resolves_and_no_listing_shows_it(self):
+        """The directory is the sole source, and the sets never mix.
+
+        The refusal names the fix, because a deleted fallback should
+        leave an instruction rather than a silence (P11) — and
+        `list-codex` is the only verb that sees the library, so a
+        listing of yours reports nothing of its (D88).
+        """
+        with self.assertRaises(PreflightError) as caught:
             locate_blueprint("freedos", context=self.ctx())
-        self.assertEqual(search_blueprints("", context=self.ctx()), [])
+        self.assertIn("rlq seed-blueprint freedos", str(caught.exception))
+        self.assertEqual(list_blueprints(self.ctx()), [])
+        self.assertIn("freedos", [row["name"] for row in list_codex()])
 
     def test_media_resolves_from_the_project_root(self):
         _write(os.path.join(self.root, "lib.rlqb"),
@@ -316,7 +314,7 @@ class SelectionScopingTests(unittest.TestCase):
 
     def _ctx(self, root):
         return Context(home_dir=self.home, blueprints_dir=root,
-                       scripts_dir=root, autoseed=False)
+                       scripts_dir=root)
 
     def test_projects_do_not_adopt_each_others_machines(self):
         id_a = create_machine("shared", context=self._ctx(self.a))

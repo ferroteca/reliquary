@@ -677,44 +677,16 @@ Parked in-place edits — no argument needed, delivered when
 applied; each must pass the clarification test (no past
 citation reads differently under the new wording).
 
-- **U1 — the two-command journey** (recorded 2026-07-30, D88).
-  **A supersession rather than a clarification**, so it sits here
-  as a parked edit and not as one this section's test admits —
-  past citations read differently, itemized in D88. Parked rather
-  than applied because the root list is an implementation claim
-  and this journey is not true until autoseed is deleted: it
-  moves to the root with that delivery, reshaped in place under
-  its own number as D61's condense was. The replacement text:
-
-  > - **U1 — Install a sandbox VM from the CLI, easily.** A user
-  >   decides, in effect, "I'd like to install FreeDOS" — and ends
-  >   with a usable sandbox machine. Easy is the requirement: the
-  >   command-line syntax stays terse, and the blueprint and
-  >   install recipe are easy to find, point to, and use. From a
-  >   clean home the whole journey is **two commands** — copy the
-  >   blueprint out (U11), then run its install script — and the
-  >   install itself is keystroke-free, composing the media
-  >   acquisition (U13) and the unattended install (U12) that the
-  >   copied recipe describes. **Nothing arrives from the built-in
-  >   library without being asked for by name** (P4, P18), so what
-  >   runs is a file they chose and own. Keeping the machine
-  >   afterward is a separate journey and a separate demand (U8).
-  >
-  >   Precondition: the blueprint copied out of the library —
-  >   `rlq seed-blueprint freedos` (U11).
-  >
-  >   1. **Install.** `rlq run-script install --blueprint freedos`
-  >      — creates the machine, fetches and hash-verifies the
-  >      LiveCD, drives the installer to completion, and powers
-  >      the guest off. No keystroke at any point.
-  >   2. **Use it.** `rlq start-machine --blueprint freedos
-  >      --display` — the sandbox on screen, FreeDOS installed and
-  >      ready to go.
-
-  The opening wish reads **FreeDOS** where the standing text reads
-  FreeBSD — a system no codex blueprint provides, contradicted by
-  the case's own command, and under the landing bar a journey has
-  to be followable as written.
+- **U1 — the two-command journey** — **applied 2026-07-30** (D88),
+  and struck from this list. It went to the root with the delivery
+  that made it true, as a supersession rather than a clarification:
+  past citations read differently (D61's own description of U1,
+  D66's "single command", D12's "one-command path"), and the
+  number was reshaped in place exactly as D61's condense was. The
+  opening wish also went from FreeBSD to FreeDOS — a system no
+  codex blueprint provides, contradicted by the case's own
+  command, which the landing bar no longer tolerates now that a
+  journey must be followable as written.
 
 - **U1 — condense to the journey** — **applied 2026-07-27** (D61),
   and struck from this list. It ran without waiting on U8: the

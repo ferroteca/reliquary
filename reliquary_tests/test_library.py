@@ -21,8 +21,9 @@ from unittest import mock
 import reliquary
 from reliquary import document, jsonc
 from reliquary.errors import PreflightError
-from reliquary.library import (list_builtin_blueprints, search_blueprints,
-                               seed_blueprint, seed_script)
+from reliquary.library import (codex_blueprint_available, list_codex,
+                               list_builtin_blueprints, seed_blueprint,
+                               seed_script)
 from reliquary.machines import create_machine, load_machine_state
 from reliquary.resolve import load_namespace, resolve_media
 from reliquary_tests import fake_backend
@@ -40,11 +41,12 @@ _CODEX_SPEC = os.path.join(
 
 
 class _HomeTest(unittest.TestCase):
-    """A scratch home with the codex behind it.
+    """A scratch home the codex can be seeded into.
 
-    Autoseeding is on here because these are the codex's own tests —
-    seeding, first reference, provenance. It is the CLI's default and
-    not the library's, so a test that wants it says so (home.py).
+    These are the codex's own tests — seeding, the closure, the
+    never-overwrite rule — and every one of them asks for what it
+    wants by name, seeding being the only way the library reaches a
+    tree (D88).
     """
 
     def setUp(self):
@@ -53,8 +55,6 @@ class _HomeTest(unittest.TestCase):
         self.addCleanup(home_mod._globals.update, saved)
         for name in home_mod.DIRECTORIES:
             home_mod._globals[name] = None
-        self.addCleanup(home_mod.set_autoseed, home_mod._autoseed)
-        home_mod.set_autoseed(True)
         self._temp = tempfile.TemporaryDirectory()
         self.addCleanup(self._temp.cleanup)
         self.home = self._temp.name
@@ -121,22 +121,18 @@ class SeedingTest(_HomeTest):
         self.assertFalse(seed_script(SCRIPTS[0], context=self.home))
 
 
-class SearchBlueprintsTest(_HomeTest):
-    def test_codex_blueprint_is_available(self):
-        rows = search_blueprints("freedos", context=self.home)
+class ListCodexTest(_HomeTest):
+    """The library's own listing, and the only verb that reads it."""
+
+    def test_it_lists_the_shipped_blueprints_with_descriptions(self):
+        rows = list_codex()
         row = next(r for r in rows if r["name"] == BLUEPRINT)
-        self.assertEqual(row["provenance"], "yes")
-        self.assertEqual(row["platform"], "dos")
-        self.assertIsNone(row["path"])
+        self.assertIn("FreeDOS", row["description"])
+        self.assertEqual([r["name"] for r in rows],
+                         sorted(r["name"] for r in rows))
 
-    def test_seeded_blueprint_reports_seeded_provenance(self):
-        seed_blueprint(BLUEPRINT, context=self.home, only=True)
-        row = next(r for r in search_blueprints(BLUEPRINT, context=self.home)
-                   if r["name"] == BLUEPRINT)
-        self.assertEqual(row["provenance"], "seeded")
-        self.assertIsNotNone(row["path"])
-
-    def test_user_blueprint_matches_by_description(self):
+    def test_it_reports_nothing_of_yours(self):
+        """No provenance, no tiers: the command *is* the provenance."""
         bp_dir = os.path.join(self.home, "blueprints")
         os.makedirs(bp_dir)
         with open(os.path.join(bp_dir, "mine.rlqb"), "w",
@@ -145,18 +141,19 @@ class SearchBlueprintsTest(_HomeTest):
                         "platform": "dos",
                         "description": "bespoke widget rig",
                         "drives": {"cdrom0": None}}], handle)
-        rows = search_blueprints("bespoke", context=self.home)
-        self.assertEqual([r["name"] for r in rows], ["custom-rig"])
-        self.assertEqual(rows[0]["provenance"], "user")
-        self.assertEqual(rows[0]["description"], "bespoke widget rig")
+        names = [row["name"] for row in list_codex()]
+        self.assertNotIn("custom-rig", names)
+        self.assertIn(BLUEPRINT, names)
 
-    def test_empty_term_matches_all(self):
-        self.assertGreaterEqual(
-            len(search_blueprints("", context=self.home)), 2)
+    def test_seeding_does_not_change_what_it_reports(self):
+        before = list_codex()
+        seed_blueprint(BLUEPRINT, context=self.home, only=True)
+        self.assertEqual(before, list_codex())
 
-    def test_no_match_returns_empty(self):
-        self.assertEqual(
-            search_blueprints("zzzznomatch", context=self.home), [])
+    def test_availability_is_a_question_that_reads_nothing(self):
+        self.assertTrue(codex_blueprint_available(BLUEPRINT))
+        self.assertFalse(codex_blueprint_available("zzzznomatch"))
+        self.assertFalse(os.path.exists(self._path("blueprints")))
 
 
 class FirstReferenceTest(_HomeTest):
@@ -168,7 +165,16 @@ class FirstReferenceTest(_HomeTest):
         with self.assertRaises(PreflightError):
             resolve_media("no-such-media", load_namespace(self.home))
 
-    def test_create_machine_seeds_and_honors_edits(self):
+    def test_create_machine_honors_edits_to_the_seeded_copy(self):
+        """The copy is yours, and a create reads it rather than the codex.
+
+        This used to assert that `create_machine` seeded on first
+        reference. It does not (D88): the seed is the user's own step,
+        and what survives — the point the test was always making — is
+        that an edit to the copy reaches the next machine while the one
+        already built keeps what it was built from.
+        """
+        seed_blueprint(BLUEPRINT, context=self.home)
         machine_id = create_machine(BLUEPRINT, context=self.home)
         blueprint_path = os.path.join(
             self.home, "blueprints", f"{BLUEPRINT}{EXT}")
@@ -189,6 +195,18 @@ class FirstReferenceTest(_HomeTest):
     def test_create_machine_unknown_name_errors(self):
         with self.assertRaises(PreflightError):
             create_machine("no-such-blueprint", context=self.home)
+
+    def test_an_unseeded_codex_name_is_refused_with_the_fix(self):
+        """A name the library holds and your tree does not.
+
+        The interesting refusal, and the one a first-time user meets:
+        it must name the command that resolves it, or the deleted
+        fallback reads as the tool not knowing about `freedos` at all.
+        """
+        with self.assertRaises(PreflightError) as caught:
+            create_machine(BLUEPRINT, context=self.home)
+        self.assertIn(f"rlq seed-blueprint {BLUEPRINT}",
+                      str(caught.exception))
 
 
 class CodexMediaTests(unittest.TestCase):
@@ -248,23 +266,10 @@ class CodexSpecConformanceTests(_HomeTest):
                   encoding="utf-8") as handle:
             return jsonc.loads(handle.read())
 
-    @staticmethod
-    def _specified_provenance():
-        """The words the spec's provenance table admits."""
-        with open(_CODEX_SPEC, encoding="utf-8") as handle:
-            text = handle.read()
-        start = text.index("| PROVENANCE | meaning |")
-        words = set()
-        for line in text[start:].splitlines()[2:]:
-            if not line.startswith("|"):
-                break
-            words.update(re.findall(r"`([^`]+)`", line.split("|")[1]))
-        return words
-
     def test_every_codex_blueprint_is_indexed(self):
         # The reverse of test_builtin_blueprint_index_names_existing_files:
         # that one catches an index entry with no file, this one a file
-        # with no entry, which `--builtin` listings would skip silently.
+        # with no entry, which `list-codex` would skip silently.
         root = os.path.join(self._codex_root(), "blueprints")
         shipped = {name[:-len(EXT)] for name in os.listdir(root)
                    if name.endswith(EXT)}
@@ -287,21 +292,28 @@ class CodexSpecConformanceTests(_HomeTest):
 
     @unittest.skipUnless(os.path.isfile(_CODEX_SPEC),
                          "the codex spec is source-tree only")
-    def test_the_provenance_vocabulary_is_the_specified_one(self):
-        seed_blueprint(BLUEPRINT, context=self.home, only=True)
-        bp_dir = os.path.join(self.home, "blueprints")
-        with open(os.path.join(bp_dir, "mine.rlqb"), "w",
-                  encoding="utf-8") as handle:
-            json.dump([{"type": "machine", "name": "mine",
-                        "platform": "dos", "drives": {"cdrom0": None}}],
-                      handle)
-        emitted = {row["provenance"]
-                   for row in search_blueprints("", context=self.home)}
+    def test_the_spec_tabulates_no_provenance_vocabulary(self):
+        """No column means no vocabulary for one may be specified.
+
+        Its predecessor read the spec's provenance table and asserted
+        the emitted words against it, catching a real divergence. The
+        successor guards the other direction: with the sets unmixed
+        there is nothing to report (D88), so a table describing a
+        column would be a norm the code cannot honor. The *word* may
+        still appear — the spec uses it to say the command is the
+        provenance — which is why this looks for the table and for the
+        values, not for the noun.
+        """
+        with open(_CODEX_SPEC, encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertNotIn("| PROVENANCE |", text.upper())
+        for value in ("| `yes` |", "| `seeded` |", "| `user` |"):
+            self.assertNotIn(value, text)
+        emitted = set(list_codex()[0])
         self.assertEqual(
-            emitted, self._specified_provenance(),
-            "the provenance words search reports are not the ones "
-            "docs/spec/codex.md tabulates. The column is part of the "
-            "--json return, so its vocabulary is a machine contract.")
+            emitted, {"name", "description"},
+            "list_codex returns a field the spec does not describe; the "
+            "record is the --json contract.")
 
 
 class BuiltinCodexTests(unittest.TestCase):

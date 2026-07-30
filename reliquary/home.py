@@ -33,9 +33,8 @@ to be re-argued. The **embedding API** assigns nothing, so a library
 call never silently picks up the developer's home; there the error
 is reachable, and it is the whole safety of the design.
 
-Two further behaviours follow the same CLI-on/API-off split, for the
-same reason: honouring the environment (:func:`adopt_environment`)
-and codex autoseeding (:func:`autoseed`).
+One further behaviour follows the same CLI-only rule, for the same
+reason: honouring the environment (:func:`adopt_environment`).
 """
 
 import os
@@ -65,10 +64,6 @@ _DERIVED_FROM = {
 # it at import would make an embedding call's resolution depend on
 # the developer's shell — exactly what the API rule forbids.
 _globals = dict.fromkeys(DIRECTORIES)
-
-# Codex autoseeding, off until something turns it on. The CLI does;
-# an embedding caller must ask.
-_autoseed = False
 
 
 def environment_variable(name):
@@ -124,20 +119,6 @@ def is_assigned(name):
     named one.
     """
     return _globals[name] is not None
-
-
-def set_autoseed(enabled):
-    """Turn codex autoseeding on or off for this process.
-
-    Autoseeding copies a shipped codex asset out on a resolution miss.
-    It is on at the CLI and off in the embedding API: a person meeting
-    Reliquary for the first time wants ``freedos`` to exist, and a
-    program does not want its blueprint arriving from somewhere its
-    source tree does not record. Either surface may say otherwise —
-    the CLI with ``--no-autoseed``, a caller with ``autoseed=``.
-    """
-    global _autoseed
-    _autoseed = bool(enabled)
 
 
 def adopt_environment():
@@ -220,17 +201,14 @@ class Context:
     and then to derivation. The CLI never builds one — it drives the
     globals from its flags; scoped contexts are an embedding-API
     capability.
-
-    ``autoseed`` is the same tri-state: ``None`` inherits the
-    process-global, ``True``/``False`` pin it for this call.
     """
 
     __slots__ = ("home_dir", "blueprints_dir", "scripts_dir",
-                 "cache_dir", "media_dir", "machines_dir", "autoseed")
+                 "cache_dir", "media_dir", "machines_dir")
 
     def __init__(self, home_dir=None, blueprints_dir=None,
                  scripts_dir=None, cache_dir=None, media_dir=None,
-                 machines_dir=None, autoseed=None):
+                 machines_dir=None):
         self.home_dir = os.path.abspath(home_dir) if home_dir else None
         self.blueprints_dir = (os.path.abspath(blueprints_dir)
                                if blueprints_dir else None)
@@ -240,7 +218,6 @@ class Context:
         self.media_dir = os.path.abspath(media_dir) if media_dir else None
         self.machines_dir = (os.path.abspath(machines_dir)
                              if machines_dir else None)
-        self.autoseed = autoseed
 
     def __repr__(self):
         filled = ", ".join(
@@ -256,9 +233,7 @@ def _ctx(context):
     """Coerce ``None`` / a bare home string / a ``Context`` into one.
 
     A bare string assigns the home and nothing else, so the other
-    five derive from it. It carries no autoseed choice: seeding is
-    its own axis now, and a shorthand for one directory should not
-    quietly decide another question.
+    five derive from it.
     """
     if context is None:
         return _EMPTY
@@ -336,12 +311,6 @@ def media_dir(context=None):
 def machines_dir(context=None):
     """Return the machine-materialization directory."""
     return _resolve("machines", context)
-
-
-def autoseed(context=None):
-    """Whether a resolution miss may seed from the built-in codex."""
-    choice = _ctx(context).autoseed
-    return _autoseed if choice is None else bool(choice)
 
 
 def effective_home(explicit):

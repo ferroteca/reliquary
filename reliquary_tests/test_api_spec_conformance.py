@@ -56,6 +56,24 @@ _API_SPEC = os.path.join(_REPO_ROOT, "docs", "spec", "api.md")
 _BACKTICKED = re.compile(r"`([^`]+)`")
 _CONSOLE_ROW = re.compile(r"^\|\s*guest-console family\s*\(([^)]*)\)",
                           re.M)
+_CODEX_ROW = re.compile(r"^\|\s*codex family\s*\(([^)]*)\)", re.M)
+
+
+def _codex_family():
+    """The CLI verbs api.md exempts as P6's named codex exception.
+
+    The same discipline as the console family: read from the spec, not
+    listed here. These verbs reach into the shipped library, which a
+    program may not bind against because it changes in a point release
+    (D87), so they are CLI-only by principle rather than by omission —
+    and *which* verbs those are is the spec's answer to give.
+    """
+    row = _CODEX_ROW.search(_spec_text())
+    if row is None:
+        raise AssertionError(
+            "docs/spec/api.md no longer has a codex family row; the "
+            "parity test reads P6's named exception from that row.")
+    return set(_BACKTICKED.findall(row.group(1)))
 
 
 def _console_family():
@@ -94,7 +112,7 @@ class TwinNameIdentityTests(unittest.TestCase):
 
     def _twins(self):
         """Each command owing a twin, with the name that twin has."""
-        exempt = _console_family()
+        exempt = _console_family() | _codex_family()
         return {command: command.replace("-", "_")
                 for command in sorted(cli._COMMANDS)
                 if command not in exempt}
@@ -106,9 +124,27 @@ class TwinNameIdentityTests(unittest.TestCase):
         self.assertEqual(
             missing, [],
             f"{missing} are commands with no embedding-API twin. "
-            "Nothing is CLI-only: every command maps one-to-one onto "
-            "a public API call with the same semantics (AGENTS.md, "
-            "CLI-API parity).")
+            "Nothing is CLI-only outside P6's named exceptions: every "
+            "other command maps one-to-one onto a public API call with "
+            "the same semantics (AGENTS.md, CLI-API parity).")
+
+    def test_the_codex_exception_is_closed(self):
+        """Every exempt codex verb is absent from the API, not just
+        allowed to be.
+
+        The exemption is a claim in both directions (D87): a codex verb
+        that kept its twin would leave the API able to bind the library
+        while the principle says it cannot, and the exception would be
+        decoration.
+        """
+        present = sorted(
+            verb for verb in _codex_family()
+            if hasattr(reliquary, verb.replace("-", "_")))
+        self.assertEqual(
+            present, [],
+            f"{present} are exempt from the twin rule as codex verbs "
+            "and yet reachable from the embedding API. P6's exception "
+            "removes them; it does not merely excuse them.")
 
     def test_every_twin_is_in_the_declared_surface(self):
         undeclared = sorted(

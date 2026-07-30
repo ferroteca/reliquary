@@ -9,11 +9,12 @@ it out into the ``blueprints`` / ``scripts`` directory as an
 ordinary user-owned file. A file already present there is never
 overwritten — deleting a copy is how it is refreshed.
 
-Copy-out happens on a resolution miss only while autoseeding is on
-(``home.autoseed`` — the CLI, unless told otherwise), and on request
-at any time through ``seed_blueprint`` / ``seed_script``. Both write
-to the assigned directory wherever it is, so seeding a first draft
-straight into a project tree is now the ordinary way to do it.
+Copy-out happens **on request only** — ``seed_blueprint`` /
+``seed_script``, reached from the CLI alone (D87) — and writes to the
+assigned directory wherever it is, so seeding a first draft straight
+into a project tree is the ordinary way to do it. Nothing is ever
+seeded by a resolution miss: a miss is a miss, and the codex reaches
+a tree because someone asked for it by name (P4, D88).
 """
 
 import collections.abc
@@ -99,29 +100,6 @@ def list_builtin_blueprints():
             yield entry.name[:-5]
 
 
-def list_builtin_media():
-    """Yield media component names defined by the built-in codex blueprints.
-
-    Media are components inside the composed ``.rlqb`` blueprints now,
-    so this parses the codex blueprints and collects their media names.
-    """
-    root = _builtins_root() / "blueprints"
-    if not root.is_dir():
-        return
-    names = set()
-    for entry in sorted(root.iterdir(), key=lambda item: item.name):
-        if not entry.name.endswith(".rlqb"):
-            continue
-        try:
-            doc = document.parse_document(
-                jsonc.loads(entry.read_text(encoding="utf-8")))
-        except (StaticError, UnicodeDecodeError):
-            continue
-        names.update(doc.media)
-    for name in sorted(names):
-        yield name
-
-
 def _blueprint_meta(path):
     """Return ``{name, description, platform}`` for a blueprint, or None.
 
@@ -179,12 +157,22 @@ def _blueprint_index(source):
 def list_blueprints(context=None):
     """Return sorted ``[{name, path}]`` for the blueprints directory.
 
-    Unseeded codex entries are not listed — ``search_blueprints``
-    surfaces those.
+    Yours alone: the codex is a separate set with its own verb
+    (``list_codex``), and no listing spans the two (D88).
     """
     source = assets.source_for(context)
     return [{"name": name, "path": path}
             for name, path in sorted(_blueprint_index(source).items())]
+
+
+def codex_blueprint_available(name):
+    """Whether the shipped library holds a blueprint of this name.
+
+    A question, not a resolution: nothing is read, copied or resolved.
+    It exists so a refusal can name the fix — the codex has this one,
+    seed it — without the resolver gaining a fallback (D88, P11).
+    """
+    return _codex_blueprint_path(name) is not None
 
 
 def _codex_blueprint_path(name):
@@ -200,26 +188,29 @@ def locate_blueprint(name, context=None):
     """Resolve a blueprint by identity without seeding.
 
     Identity is the file's ``name`` field when declared, else its
-    stem. With autoseeding on, a miss falls back to reading the codex
-    file directly (no copy) so a read-only dry run never
-    writes; with it off the directory is the sole source. Copying a
-    codex file out on first reference is ``create_machine``'s job.
-    Raises :class:`PreflightError` when nothing resolves.
+    stem. The directory is the sole source: nothing falls back to the
+    codex, which reaches a tree only when ``seed_blueprint`` is asked
+    to put it there (D88). Raises :class:`PreflightError` when nothing
+    resolves — naming the fix where the codex has that name, since a
+    deleted fallback should leave an instruction rather than a silence
+    (P11).
     """
     source = assets.source_for(context)
     path = _blueprint_index(source).get(name)
-    if path is None and source.seeds:
-        path = _codex_blueprint_path(name)
     if path is None:
+        detail = ""
+        if _codex_blueprint_path(name) is not None:
+            detail = (f"\nthe codex has one: "
+                      f"rlq seed-blueprint {name}")
         raise PreflightError(
             f"blueprint not found: {name}\n"
-            f"expected under {source.describe('blueprint')}",
+            f"expected under {source.describe('blueprint')}{detail}",
             rule_id="blueprint.unknown")
     return path
 
 
 def _codex_blueprint_rows():
-    """Map codex identity name -> (path, meta) for search."""
+    """Map codex identity name -> (path, meta) for the codex listing."""
     rows = {}
     for name in list_builtin_blueprints():
         path = _codex_blueprint_path(name)
@@ -229,51 +220,23 @@ def _codex_blueprint_rows():
     return rows
 
 
-def search_blueprints(term, context=None):
-    """Search the blueprints directory (and codex) with provenance.
+def list_codex():
+    """Return sorted ``[{name, description}]`` for the shipped library.
 
-    Each match is a dict: ``name`` (the identity — the selection key),
-    ``description``, ``platform``, ``provenance``, and ``path``. With
-    autoseeding on, provenance is ``yes`` (codex, not seeded),
-    ``seeded`` (codex copied out), or ``user`` (authored, no codex),
-    and ``path`` is the copied-out file (``None`` for an unseeded
-    codex entry). With it off the codex is not a tier: every match is
-    ``user`` with its own path. The term matches case-insensitively
-    against name, description, and platform; empty matches everything.
-    Results are ordered by name.
+    The codex's own verb, and the only one that reads it: no listing
+    of yours reports a codex entry and this reports nothing of yours,
+    so **which command you ran is the provenance** (D88). It takes no
+    context, the library being the same wherever your directories
+    point, and no term — filtering is the shell's job or the
+    caller's.
+
+    ``description`` rides the record for ``--json`` while the CLI
+    prints names alone: unbounded free text dominates a fixed-width
+    table, and how a person should see one is unsettled (T8).
     """
-    term_l = (term or "").lower()
-    source = assets.source_for(context)
-    present = _blueprint_entries(source)
-    codex = _codex_blueprint_rows() if source.seeds else {}
-
-    results = []
-    for name in sorted(set(present) | set(codex)):
-        if name in codex and name in present:
-            provenance, (path, meta) = "seeded", present[name]
-        elif name in codex:
-            provenance, (_codex_path, meta) = "yes", codex[name]
-            path = None
-        else:
-            provenance, (path, meta) = "user", present[name]
-        results.append({
-            "name": name,
-            "description": meta.get("description"),
-            "platform": meta.get("platform"),
-            "provenance": provenance,
-            "path": path,
-        })
-    if not term_l:
-        return results
-
-    def matches(row):
-        hay = " ".join(
-            str(value) for value in (
-                row["name"], row["description"],
-                row["platform"]) if value).lower()
-        return term_l in hay
-
-    return [row for row in results if matches(row)]
+    return [{"name": name, "description": meta.get("description")}
+            for name, (_path, meta) in sorted(
+                _codex_blueprint_rows().items())]
 
 
 def seed_blueprint(name, context=None, *, only=False):
@@ -286,10 +249,10 @@ def seed_blueprint(name, context=None, *, only=False):
     just the single blueprint file, not its closure.
 
     The target is the assigned ``blueprints`` directory, project tree
-    or home alike. Seeding is an explicit act, so it is not what
-    autoseeding governs: a caller that asked for a first draft has
-    named the codex as its source, which is exactly the use the codex
-    is for — copy it, then commit the copy.
+    or home alike. Seeding is the only way the codex reaches a tree
+    (D88): a caller that asked for a first draft has named the codex
+    as its source, which is exactly the use the codex is for — copy
+    it, then commit the copy.
     """
     source = _builtins_root() / "blueprints" / f"{name}.rlqb"
     if not source.is_file():
@@ -367,20 +330,22 @@ def list_scripts(context=None):
 def locate_script(stem, context=None):
     """Return an existing ``.rlqs`` path without seeding.
 
-    Resolves from the scripts directory; with autoseeding on, a miss
-    falls back to the codex file directly (no copy), with it off the
-    directory is the sole source. Raises :class:`PreflightError` when
-    nothing resolves — a dry run uses this so it never writes.
+    Resolves from the scripts directory, which is the sole source:
+    nothing falls back to the codex (D88). Raises
+    :class:`PreflightError` when nothing resolves, naming the fix
+    where the codex ships that script — a blueprint's own
+    ``seed-blueprint`` brings its scripts too, so the usual answer is
+    to seed the blueprint that names it.
     """
     source = assets.source_for(context)
     path = _script_index(source).get(stem)
-    if path is None and source.seeds:
-        candidate = _builtins_root() / "scripts" / f"{stem}.rlqs"
-        if candidate.is_file():
-            path = os.fspath(candidate)
     if path is None:
+        detail = ""
+        if (_builtins_root() / "scripts" / f"{stem}.rlqs").is_file():
+            detail = (f"\nthe codex has one: "
+                      f"rlq seed-script {stem}")
         raise PreflightError(
             f"script not found: {stem}.rlqs\n"
-            f"expected under {source.describe('script')}",
+            f"expected under {source.describe('script')}{detail}",
             rule_id="script.unknown")
     return path

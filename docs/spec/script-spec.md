@@ -26,9 +26,9 @@ and machine state, supplies input, swaps media, and moves files
 across the VM seam. Scripts are authored assets — `.rlqs` files,
 identified by extension. They resolve from the `scripts` directory,
 walked recursively, which defaults to `<home>/scripts` and is
-placeable with `--scripts-dir`; a miss falls back to the built-in
-codex while autoseeding is on — the CLI default, and never the
-embedding API's (docs/spec/asset-resolution.md).
+placeable with `--scripts-dir`; a miss never falls back to the
+built-in codex, which reaches a tree only through `seed-script` or
+the blueprint that names it (docs/spec/asset-resolution.md).
 One `<name>.rlqs` file per script; a run selects its machine with
 `--machine <id>` or, when the
 blueprint has exactly one machine, `--blueprint <name>`:

@@ -324,22 +324,36 @@ differently under the new wording — is mere documentation work.
   below; D36, D68.)
 - **P4 — The artifact-residency split.** The home serves human
   CLI convenience; automation artifacts are source code in the
-  consuming project's tree and never live in the home; the codex
-  does not feed automation unless a caller asks it to — off by
-  default in the embedding API, and switchable on both surfaces.
-  (The last clause amended by D59: autoseeding became an
-  explicit axis, so the guarantee is a default rather than an
-  absolute. Prose below.)
+  consuming project's tree and never live in the home; **the
+  codex does not feed automation, full stop** — nothing resolves
+  out of it, on either surface, and it reaches a tree only when
+  someone asks for a copy by name. (D59 traded that absolute for
+  a default when autoseeding became an axis; D88 deleted the axis
+  and restored it, no default and no switch. Prose below.)
 - **P5 — The feedback split.** One run, two renderings: pretty
   and legible for a person, machine-readable and just as
   timely for a program — neither scraped from the other.
   (Prose below; docs/spec/script-spec.md "The run event
   stream"; D35, D36.)
-- **P6 — One semantic surface.** The CLI and the embedding API
-  are twin presentations of one surface: every command is its
-  API twin, nothing is CLI-only, and no capability is
-  unreachable from the CLI. (AGENTS.md "CLI–API parity";
-  SURFACES.)
+- **P6 — One semantic surface, and it is the base rule.** The
+  CLI and the embedding API are twin presentations of one
+  surface: every command is its API twin, nothing is CLI-only,
+  and no capability is unreachable from the CLI. **Differing
+  defaults are not a break** — the CLI assigns a home and adopts
+  the environment where the API assigns nothing, and the
+  capability behind each is present on both surfaces (D59). What
+  breaks parity is a capability absent from one surface
+  entirely, and that is refused **unless another principle in
+  force forbids it crossing** — argued as the exception it is,
+  named here, and the list closed rather than open. **One
+  exception stands: the codex verbs are CLI-only under P18** — a
+  library of examples that changes in a point release is not
+  something a program may bind against, so reaching it is a
+  human act. Where the base rule and another principle genuinely
+  conflict, the asymmetry decides (D24): adding a twin later
+  breaks nothing and removing one after callers bind cannot be
+  undone, so the burden falls on the crossing. (AGENTS.md
+  "CLI–API parity"; SURFACES; D24, D59, D87.)
 - **P7 — The binding constraint.** Nothing may be hard to
   express in a common binding language (C, Java), and the
   CLI — the fallback binding for every unbound language — must
@@ -514,7 +528,14 @@ differently under the new wording — is mere documentation work.
   where a consuming project's own assets *start* — copy it, use
   it, change it however you see fit, commit the copy, and the
   stability is that project's to hold rather than Reliquary's to
-  promise (P4). The codex's *semantics* are an application
+  promise (P4). **And it is not something to bind against.** A
+  program that imported a codex verb would hold a name whose
+  meaning the next point release may move, which is why the
+  codex's own verbs — listing it and seeding from it — are CLI
+  acts (P6's named exception, D87). An example is copied by a
+  person and committed; a program binds to the copy, which is
+  the consuming project's own asset and not this project's to
+  move. The codex's *semantics* are an application
   surface and are specified, its *content* is not, and a
   reusable library of authored content is the consuming
   project's or another project's to build. Reliquary attaches no
@@ -644,12 +665,15 @@ are source code artifacts — they belong to the consuming
 project, live in its source control, and never
 live in Reliquary's home (U14, U4). The codex does not feed machine
 automation — that would be a trap: a blueprint changing outside
-the project's source control breaks the project. So autoseeding is
-**off by default in the embedding API**, where a library silently
-reading the codex is a bug that only shows up on someone else's
-machine, and the CLI carries `--no-autoseed` for a project that
-wants the same guarantee from a command line. It is a default and
-not an absolute (D59): a caller may switch it on, having said so.
+the project's source control breaks the project. So **nothing
+resolves out of the codex at all**, on either surface and under no
+flag: a name your directories do not hold is not found, and the
+refusal names the seed command where the library has that name.
+There was a switch for this once — autoseeding, on at the CLI and
+off in the API — and D88 deleted it rather than defaulting it,
+because a library silently supplying a blueprint is a bug that
+only shows up on someone else's machine, and a knob that can be
+turned on is a knob CI will turn on.
 For automation the library is at most a place to copy a first draft
 from; the copy is committed into the project and evolves there —
 `seed-blueprint` writes into whichever blueprints directory the

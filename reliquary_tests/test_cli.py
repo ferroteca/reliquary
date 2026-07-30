@@ -442,11 +442,18 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(json.loads(out), {})
 
-    def test_json_search_blueprints_is_array(self):
-        result, out = self._json_out(["search-blueprints", "freedos"])
+    def test_json_list_codex_carries_the_description(self):
+        """The human table prints names; the record keeps the rest.
+
+        Which is the whole of the deferral (T8): a description is data
+        the JSON has always been able to carry, and only the column is
+        unspecified.
+        """
+        result, out = self._json_out(["list-codex"])
         self.assertEqual(result, 0)
         rows = json.loads(out)
-        self.assertTrue(any(r["name"] == "freedos" for r in rows))
+        row = next(r for r in rows if r["name"] == "freedos")
+        self.assertIn("FreeDOS", row["description"])
 
     def test_json_rejected_on_stream_command(self):
         stderr = io.StringIO()
@@ -494,15 +501,21 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("plain", output)
         self.assertIn("ready", output)
 
-    def test_search_blueprints(self):
+    def test_list_codex_names_the_library_and_nothing_of_yours(self):
+        """Which command you ran is the provenance, so no column is.
+
+        `plain` is this fixture's own blueprint; the library's listing
+        must not mention it, and there is no value anywhere saying
+        where a row came from.
+        """
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            result = cli.main(["--home-dir", self.home, "search-blueprints",
-                               "freedos"])
+            result = cli.main(["--home-dir", self.home, "list-codex"])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
-        self.assertIn("PROVENANCE", output)
         self.assertIn("freedos", output)
+        self.assertNotIn("plain", output)
+        self.assertNotIn("PROVENANCE", output.upper())
 
     def test_seed_blueprint_only_flag(self):
         stdout = io.StringIO()
@@ -514,20 +527,22 @@ class CliMachineLifecycleTests(unittest.TestCase):
             self.home, "blueprints", "freedos.rlqb")))
         self.assertFalse(os.path.isdir(os.path.join(self.home, "media")))
 
-    def test_list_blueprints_builtin(self):
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            result = cli.main([
-                "--home-dir", self.home, "list-blueprints",
-                "--builtin",
-            ])
-        self.assertEqual(result, 0)
-        output = stdout.getvalue().strip().splitlines()
-        self.assertTrue(output)
-        for name in output:
-            self.assertNotIn(
-                name, ["plain"],
-                "--builtin must not include local blueprints")
+    def test_the_builtin_flag_is_gone_from_both_listings(self):
+        """One verb, one set: `--builtin` no longer turns yours into its.
+
+        A flag that flipped a listing of what you have into a listing
+        of what you do not was the same mixing the provenance column
+        carried, one layer down (D88).
+        """
+        for command in ("list-blueprints", "list-media"):
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(SystemExit) as caught:
+                    cli.main([
+                        "--home-dir", self.home, command, "--builtin"])
+            self.assertEqual(caught.exception.code, 2, command)
+            self.assertIn("--builtin", stderr.getvalue(), command)
 
     def test_list_blueprints_default_is_local(self):
         """Default list-blueprints shows the local blueprint and its path."""
@@ -670,16 +685,12 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home-dir", self.home, "list-media"])
         self.assertEqual(result, 0)
-        # The namespace lists every media component in the source.
+        # The namespace lists every media component in the source —
+        # yours, and only yours. The codex's media are components of
+        # blueprints you have not seeded, and there is no `seed-media`,
+        # so nothing lists parts that cannot be ordered (D88).
         self.assertIn("livecd", stdout.getvalue())
-
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            result = cli.main([
-                "--home-dir", self.home, "list-media", "--builtin",
-            ])
-        self.assertEqual(result, 0)
-        self.assertIn("freedos-livecd", stdout.getvalue())
+        self.assertNotIn("freedos-livecd", stdout.getvalue())
 
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.
@@ -781,8 +792,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with open(os.path.join(scripts, "alpha.rlqs"), "w",
                   encoding="utf-8") as handle:
             handle.write(
-                'description: "Alpha script"\n'
-                'platform: dos\n'
+                'description "Alpha script"\n'
+                'platform dos\n'
                 'type "hello"\n'
             )
         stdout = io.StringIO()
@@ -793,9 +804,16 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         output = stdout.getvalue()
         self.assertIn("NAME", output)
-        self.assertIn("DESCRIPTION", output)
+        self.assertIn("PATH", output)
         self.assertIn("alpha", output)
-        self.assertIn("Alpha script", output)
+        # No description column on any noun; the field rides --json
+        # until T8 settles how a person should see one (D88).
+        self.assertNotIn("DESCRIPTION", output)
+        self.assertNotIn("Alpha script", output)
+        result, out = self._json_out(["list-scripts"])
+        self.assertEqual(result, 0)
+        self.assertEqual("Alpha script",
+                         json.loads(out)[0]["description"])
 
     def test_list_scripts_with_blueprint_uses_scripts_map(self):
         """list-scripts --blueprint reads the blueprint's scripts map."""
@@ -815,14 +833,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
         with open(os.path.join(scripts, "cust-setup.rlqs"), "w",
                   encoding="utf-8") as handle:
             handle.write(
-                'description: "Custom setup"\n'
-                'platform: dos\n'
+                'description "Custom setup"\n'
+                'platform dos\n'
                 'type "hello"\n'
             )
         with open(os.path.join(scripts, "cust-teardown.rlqs"), "w",
                   encoding="utf-8") as handle:
             handle.write(
-                'platform: dos\n'
+                'platform dos\n'
                 'type "bye"\n'
             )
         stdout = io.StringIO()
@@ -835,11 +853,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         output = stdout.getvalue()
         self.assertIn("LABEL", output)
-        self.assertIn("DESCRIPTION", output)
+        self.assertIn("STEM", output)
         self.assertIn("setup", output)
-        self.assertIn("Custom setup", output)
+        self.assertIn("cust-setup", output)
         self.assertIn("teardown", output)
-        self.assertIn("-", output)
+        # The label's own map is what this command answers; the
+        # description rides --json, on this noun as on every other.
+        self.assertNotIn("DESCRIPTION", output)
+        self.assertNotIn("Custom setup", output)
 
     def test_start_without_selector_errors(self):
         """The legacy root-home start path is gone: a selector is required."""

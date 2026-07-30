@@ -20,7 +20,6 @@ class _Isolated(unittest.TestCase):
         self.addCleanup(home._globals.update, saved)
         for name in home.DIRECTORIES:
             home._globals[name] = None
-        self.addCleanup(home.set_autoseed, home._autoseed)
 
 
 class UnassignedTests(_Isolated):
@@ -200,32 +199,23 @@ class ContextTests(_Isolated):
         self.assertIsNone(home.Context().media_dir)
 
 
-class AutoseedTests(_Isolated):
-    """Codex autoseeding is its own axis: off unless something says on."""
+class NoSeedingAxisTests(_Isolated):
+    """There is no seeding axis at all: a miss is a miss (D88).
 
-    def test_off_by_default_in_the_library(self):
-        home.set_autoseed(False)
-        self.assertFalse(home.autoseed())
+    The knob these tests used to exercise is deleted rather than
+    defaulted, so what is left to assert is its absence — a context
+    carries six directories and nothing that decides where a name may
+    come from.
+    """
 
-    def test_the_global_applies(self):
-        home.set_autoseed(True)
-        self.assertTrue(home.autoseed())
+    def test_the_record_carries_directories_alone(self):
+        self.assertEqual(
+            ("home_dir", "blueprints_dir", "scripts_dir", "cache_dir",
+             "media_dir", "machines_dir"), home.Context.__slots__)
 
-    def test_a_context_pins_it_per_call(self):
-        home.set_autoseed(True)
-        self.assertFalse(home.autoseed(home.Context(autoseed=False)))
-        home.set_autoseed(False)
-        self.assertTrue(home.autoseed(home.Context(autoseed=True)))
-
-    def test_a_bare_home_string_decides_nothing_about_seeding(self):
-        """One shorthand answers one question.
-
-        The bare string used to select home *mode*, which carried codex
-        seeding with it. Placement and seeding are separate axes now,
-        so it assigns the home and leaves seeding to whoever owns it.
-        """
-        home.set_autoseed(False)
-        self.assertFalse(home.autoseed(os.path.join("some", "home")))
+    def test_no_seeding_switch_survives(self):
+        for gone in ("autoseed", "set_autoseed", "_autoseed"):
+            self.assertFalse(hasattr(home, gone), gone)
 
 
 class DefaultHomeTests(unittest.TestCase):

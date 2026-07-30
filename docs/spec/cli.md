@@ -277,46 +277,50 @@ standalone `<name>` for one shared across scripts or blueprints. Both
 resolve through the same namespace; the naming convention identifies
 ownership, not a namespace.
 
-### Listing and searching blueprints
+### Listing blueprints, and listing the library
 
 ```
 rlq list-blueprints
-rlq search-blueprints <term>...
+rlq list-codex
 ```
 
-`list-blueprints` shows everything in `blueprints/`.
-`search-blueprints` queries the codex index and user blueprint files,
-matching terms against filename, `description`, and
-platform (the file stem is the blueprint's one name — there is no
-display-name field). Multiple terms are ANDed:
+**The noun names the set, and no verb spans two.**
+`list-blueprints` shows everything in `blueprints/` — yours, and only
+yours. `list-codex` shows what the shipped library holds, and nothing
+of yours. So which command you ran is the provenance: there is no
+column reporting where a row came from, because no listing mixes the
+two sets.
 
 ```powershell
-$ rlq search-blueprints dos
-BLUEPRINT              DESCRIPTION                              MACHINES  CODEX
-freedos      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
-test-rig                                                        0
-msdos-622              Installs MS-DOS 6.22 from three flop...  —         yes
+$ rlq list-blueprints
+NAME     PATH
+freedos  C:\Users\you\Documents\reliquary\blueprints\freedos.rlqb
+test-rig C:\Users\you\Documents\reliquary\blueprints\test-rig.rlqb
 
-$ rlq search-blueprints freedos install
-BLUEPRINT              DESCRIPTION                              MACHINES  CODEX
-freedos      Installs FreeDOS 1.4 onto a blank ha...  2         seeded
+$ rlq list-codex
+freedos
+openbsd
 ```
 
-The CODEX column tracks provenance by name: `yes` marks a
-library entry not yet in your home; `seeded` marks a user file
-whose name also exists in the library (it was extracted, or shares
-the name); blank marks a purely user-authored file.
+`list-codex` prints names alone. Each entry's `description` rides the
+`--json` record, which has no columns to overflow; how a description
+should reach a person is unsettled and deliberately unspecified rather
+than guessed at.
 
-`--verbose` shows the full record:
+Neither command filters, and **no noun has a search verb** — nor a
+term parameter: matching a term is filtering, which a shell does and
+`--json` makes trivial in any language, so a search verb per noun was
+surface without a job.
 
-```powershell
-$ rlq search-blueprints freedos --verbose
-BLUEPRINT              freedos
-DESCRIPTION            Installs FreeDOS 1.4 onto a blank hard disk. Selects the Plain DOS system package set.
-PLATFORM               dos
-SCRIPTS                install → freedos-install
-                       verify → freedos-verify
-MACHINES               2
+Nothing resolves out of the library. A name your directories do not
+hold is not found, and the refusal names the fix where the library
+has that name:
+
+```
+$ rlq run-script install --blueprint freedos
+rlq: blueprint not found: freedos
+expected under C:\Users\you\Documents\reliquary\blueprints
+the codex has one: rlq seed-blueprint freedos
 ```
 
 ### Deleting a blueprint
@@ -407,9 +411,10 @@ Two invariants define it:
 
 - **It leaves no state behind.** No machine directory, no
   `machine.json`, no image, no fetched payload, no lock file — and
-  no seeded blueprint: a blueprint that lives only in the codex is
-  read where it lies rather than copied out, exactly as a read-only
-  check does.
+  nothing seeded, which is now true of every operation rather than
+  a property this one has to keep (D88). A name that lives only in
+  the library is not read where it lies either: it is refused, with
+  the seed command named, exactly as a live run refuses it.
 - **Its return describes the run** and never impersonates the run's
   output. What comes back is a plan, a report and a verdict; a
   fabricated *guest* output would be the other thing entirely, and
@@ -1306,9 +1311,11 @@ blank is never listed: it belongs to no namespace and nothing
 can reference it (D30). `--verbose` adds the description and
 source URL.
 
-Searching media is unbuilt, like searching scripts: it would
-query the codex index, which is planned ([codex.md](codex.md)).
-`search-blueprints` is the one search that ships.
+**No noun has a search verb**, and none is planned: the family was
+deleted rather than completed (D88). Filtering a listing is the
+shell's job on a terminal and `--json`'s in a program, so a search
+verb per noun would be a second spelling of what a pipe already
+does.
 
 ### Fetching and cleaning
 
@@ -1436,15 +1443,16 @@ flag may appear before or after the command word —
 `rlq --blueprint freedos run-script install` are
 identical. Synopses canonically show flags after the command.
 
-Eight flags are accepted by every command, mirroring the API's
+Seven flags are accepted by every command, mirroring the API's
 shared keywords. Six place Reliquary's working directories —
 `--home-dir`, `--blueprints-dir`, `--scripts-dir`, `--cache-dir`,
 `--media-dir`, `--machines-dir` — each also settable by
 `RELIQUARY_<NAME>_DIR` in the environment; what none of them names
 derives, and a bare invocation places all six under the default home
-(`Documents/reliquary`). `--no-autoseed` (and its default-stating
-twin `--autoseed`) decides whether a name the directories do not
-hold may come from the built-in codex. `--json` is below. The full
+(`Documents/reliquary`). There is no flag deciding whether a name may
+come from the built-in library, because none may: the directories are
+the sole source, and the library reaches a tree only through
+`seed-blueprint` / `seed-script` (D88). `--json` is below. The full
 model is
 [asset-resolution.md](asset-resolution.md#the-working-directories).
 
