@@ -11,6 +11,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 0.1.0.dev6 - 2026-07-30
+
 ### Added
 
 - **Adapters honor `backend-settings`** (D92, delivering F28). The
@@ -114,58 +116,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   localized DOS makes unbounded. A probe whose own answer cannot be
   read reports `command.outcome-unreadable` rather than passing.
 
-### Removed
-
-- **Autoseeding is gone, and nothing resolves out of the built-in
-  codex** (D88). `--autoseed` / `--no-autoseed`, `set_autoseed()`,
-  `autoseed()` and `Context(autoseed=)` are deleted rather than
-  defaulted: the `blueprints` and `scripts` directories are the sole
-  sources on both surfaces, and a name they do not hold is refused —
-  naming `rlq seed-blueprint <name>` where the library has it, so a
-  deleted fallback leaves an instruction rather than a silence. **The
-  simplest journey is now two commands**: seed the blueprint, then
-  run it (U1). That restores **P4 to an absolute** — the codex does
-  not feed automation, no default and no switch — which D59 had
-  traded for a knob when it made hermeticity an axis.
-- **The search family is deleted** (D88). `search-blueprints` and its
-  `search_blueprints()` twin are gone, the unbuilt `search-scripts` /
-  `search-media` are retired unbuilt, and no term parameter replaces
-  them: filtering a listing is the shell's job and `--json`'s.
-  **`list-codex` is the new library-facing verb** — the noun names
-  the set, and no verb spans two, so `list-blueprints` /
-  `list-scripts` / `list-media` show yours alone and `list-codex`
-  shows the library's. Which command you ran is the provenance, so
-  the `PROVENANCE` column and its `yes` / `seeded` / `user`
-  vocabulary are deleted with it.
-- **`--builtin` is gone** from `list-blueprints` and `list-media`,
-  and `builtin=` from `list_media()` (D88): a listing of what you
-  have should not carry a flag that turns it into a listing of what
-  you do not. Nothing replaces the codex media listing — media are
-  components inside a `.rlqb` and there is no `seed-media`, so it
-  enumerated parts that cannot be ordered.
-- **No `list-*` prints a description**, on any noun. The field rides
-  the `--json` record instead: unbounded free text dominates a
-  fixed-width table, and how a person should see one is deliberately
-  unsettled (T8) rather than guessed at.
-
-### Changed
-
-- **The codex verbs are CLI-only** (D87). `seed_blueprint()` and
-  `seed_script()` leave the embedding API, `list-codex` arrives with
-  no twin, and `reliquary/__init__.py` exports none of the three. A
-  library that changes in a point release is not something a program
-  may bind against (P18), so reaching it is a human act — and **P6
-  gains its first named exception**, stated as a test rather than a
-  list: a capability whose subject is the codex is CLI-only, with the
-  asymmetry deciding conflicts (D24 — adding a twin later breaks
-  nothing; removing one after callers bind cannot be undone).
-- **A dry run refuses a library-only name** rather than reading it
-  where it lies, narrowing that clause of D80. With no fallback there
-  is nothing to read, so the dry and live halves now resolve
-  identically — which is what the rule always said.
-
-### Added
-
 - **`describe-drives` and `refresh-drives`, with twins
   `describe_drives()` / `refresh_drives()`** (D83). One
   machine-level report of what a machine's drives are and what they
@@ -197,6 +147,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   them. `--json` prints exactly what each twin returns.
 
 ### Changed
+
+- **The codex verbs are CLI-only** (D87). `seed_blueprint()` and
+  `seed_script()` leave the embedding API, `list-codex` arrives with
+  no twin, and `reliquary/__init__.py` exports none of the three. A
+  library that changes in a point release is not something a program
+  may bind against (P18), so reaching it is a human act — and **P6
+  gains its first named exception**, stated as a test rather than a
+  list: a capability whose subject is the codex is CLI-only, with the
+  asymmetry deciding conflicts (D24 — adding a twin later breaks
+  nothing; removing one after callers bind cannot be undone).
+- **A dry run refuses a library-only name** rather than reading it
+  where it lies, narrowing that clause of D80. With no fallback there
+  is nothing to read, so the dry and live halves now resolve
+  identically — which is what the rule always said.
 
 - **The at-rest recognition claim narrowed to FAT12, FAT16 and
   FAT16B over standard MBR primary/extended partitioning** (D83).
@@ -243,6 +207,60 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   never reissued. The sequence starts at `T8`, above the historical
   per-list numbering, and that file states the next number to issue.
   Maintainer-facing only; no shipped surface is affected.
+
+- **A first-class blueprint field must generalize across backends**
+  (D93), armed as **P25** in root `ARCHITECTURE.md`. The machine
+  blueprint's own vocabulary now carries only capability more than
+  one backend can honor; what a single backend alone provides
+  reaches a machine through that backend's `backend` pin and its
+  `backend-settings` section. Demand for a capability is necessary
+  and never sufficient — the bar is what stops the portable
+  blueprint becoming a union of backend vocabularies in portable
+  syntax, one sympathetic case at a time.
+
+  **This retires a `devices` axis that was added and removed inside
+  this same unreleased cycle** and therefore never shipped: it is
+  absent above rather than reversed, and no released version ever
+  carried it. Anyone who tracked `main` between the two commits
+  should move `"devices": ["virtio-rng"]` to `"backend": "qemu"`
+  with `"backend-settings": {"qemu": {"args": ["-device",
+  "virtio-rng-pci"]}}`, which is the spelling that survives.
+  `-device` stays deliberately unreserved in the hatch for exactly
+  this reason.
+
+### Removed
+
+- **Autoseeding is gone, and nothing resolves out of the built-in
+  codex** (D88). `--autoseed` / `--no-autoseed`, `set_autoseed()`,
+  `autoseed()` and `Context(autoseed=)` are deleted rather than
+  defaulted: the `blueprints` and `scripts` directories are the sole
+  sources on both surfaces, and a name they do not hold is refused —
+  naming `rlq seed-blueprint <name>` where the library has it, so a
+  deleted fallback leaves an instruction rather than a silence. **The
+  simplest journey is now two commands**: seed the blueprint, then
+  run it (U1). That restores **P4 to an absolute** — the codex does
+  not feed automation, no default and no switch — which D59 had
+  traded for a knob when it made hermeticity an axis.
+- **The search family is deleted** (D88). `search-blueprints` and its
+  `search_blueprints()` twin are gone, the unbuilt `search-scripts` /
+  `search-media` are retired unbuilt, and no term parameter replaces
+  them: filtering a listing is the shell's job and `--json`'s.
+  **`list-codex` is the new library-facing verb** — the noun names
+  the set, and no verb spans two, so `list-blueprints` /
+  `list-scripts` / `list-media` show yours alone and `list-codex`
+  shows the library's. Which command you ran is the provenance, so
+  the `PROVENANCE` column and its `yes` / `seeded` / `user`
+  vocabulary are deleted with it.
+- **`--builtin` is gone** from `list-blueprints` and `list-media`,
+  and `builtin=` from `list_media()` (D88): a listing of what you
+  have should not carry a flag that turns it into a listing of what
+  you do not. Nothing replaces the codex media listing — media are
+  components inside a `.rlqb` and there is no `seed-media`, so it
+  enumerated parts that cannot be ordered.
+- **No `list-*` prints a description**, on any noun. The field rides
+  the `--json` record instead: unbounded free text dominates a
+  fixed-width table, and how a person should see one is deliberately
+  unsettled (T8) rather than guessed at.
 
 ## 0.1.0.dev5 - 2026-07-29
 
