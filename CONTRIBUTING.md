@@ -38,16 +38,18 @@ Keep changes narrowly scoped and avoid unrelated cleanup.
 
 ## Development setup
 
-Reliquary supports Python 3.9 and newer. Create and use the project-local
-virtual environment:
+Reliquary supports Python 3.12 and newer. [uv](https://docs.astral.sh/uv/)
+provisions the environment — one command creates `.venv`, installs the
+project editable, and installs the development dependencies from the
+committed `uv.lock`:
 
 ```powershell
 cd reliquary
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --group dev
-python -m pip install -e .
+uv sync
 ```
+
+Run things with `uv run` (for example `uv run python -m unittest
+reliquary_tests`), which uses that environment without activating it.
 
 Runtime code is standard-library-only except for `qemu.qmp`. Please discuss a
 new dependency before adding it.

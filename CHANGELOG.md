@@ -11,6 +11,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- **The supported Python floor is now 3.12** (D95), raised from `3.9`.
+  This is a **breaking change for 3.9, 3.10 and 3.11 users**, and the
+  honest description is that those versions never worked: the floor was
+  published and had never been run. The first run failed on 3.9 and
+  3.10, where `keyring` reaches `platform.win32_ver()` — which shells
+  out on those versions — and on 3.11, where a `MappingProxyType`
+  dataclass default is rejected as unhashable, for 39 errors. 3.12,
+  3.13 and 3.14 pass. Fixing rather than dropping was weighed and
+  declined; both faults are cheap to fix if demand for a lower floor
+  appears. A floor run joins the required checks, so the claim is now
+  tested rather than asserted.
+
+- **uv provisions the development environment and publishes releases**
+  (D94). `uv sync` replaces the `venv` + `pip install` setup and
+  `uv.lock` is committed, so the environment the suite passes in is
+  reproducible — which matters because with no CI the local suite *is*
+  the gate. `uv build` and `uv publish` replace `python -m build` and
+  `twine`, both of which leave the development dependencies, reducing
+  them to `jsonschema` alone. `twine check` goes with them: its
+  rendering job is an RST problem and this readme is markdown, the
+  index validates and rejects bad metadata itself, and
+  `tools/check_dist.py` remains the real artifact gate. Maintainer-
+  facing apart from the floor above; no shipped surface changes.
+
 ## 0.1.0.dev6 - 2026-07-30
 
 ### Added

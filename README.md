@@ -1,7 +1,7 @@
 # Reliquary
 
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.12-blue.svg)](https://www.python.org/downloads/)
 
 Reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
 produce bootable disk images without manual interaction. It can help execute one-off commands and capture the results.
@@ -335,7 +335,7 @@ esult.txt`); a whole
 
 Reliquary requires:
 
-- Python 3.9 or newer
+- Python 3.12 or newer
 - QEMU with `qemu-system-i386` (and `qemu-img` to create hard-disk images)
 
 The Python package installs QEMU's official `qemu.qmp` library. QEMU itself is a separate application and must be

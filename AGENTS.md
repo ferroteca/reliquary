@@ -696,7 +696,10 @@ Doctrine to preserve:
 - Pillow is the image library: screenshot conversion uses it, and the
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.
-- Support Python 3.9 and newer.
+- Support Python 3.12 and newer, and **check it** — the floor run in
+  "Required checks" is what makes that a claim rather than a hope. It was
+  `>=3.9` until the check was first run and 3.9, 3.10 and 3.11 all failed
+  (D95).
 - **Windows is the delivered host platform.** It is the only one
   developed on, tested on, and claimed in the packaging classifiers.
   Write host code portably — the paths for other hosts exist and
@@ -795,34 +798,48 @@ Two conditions on tier 2 exist only because of the commercial-arm bar, and both 
 
 ## Development environment
 
-Use the project-local `.venv`; do not install development tools globally.
-
-On Windows:
+**uv provisions and owns the environment** (D94). One command creates
+`.venv`, installs the project editable, and installs the `dev` dependency
+group:
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --group dev
-python -m pip install -e .
+uv sync
 ```
 
-The `dev` dependency group contains repository tooling such as the `build`
-frontend. Runtime dependencies remain under `[project].dependencies`.
+`uv.lock` is committed, and it is what makes "the environment the suite
+passed in" reproducible — which matters here because under P22 the suite
+*is* the gate. `uv sync` reproduces the lock exactly; `uv lock` is what
+deliberately moves it. Do not install development tools globally, and do
+not hand-manage `.venv` — it is uv's.
+
+Runtime dependencies stay under `[project].dependencies`. The `dev` group
+is `jsonschema` alone: the build frontend and the upload tool both left it
+when uv absorbed their jobs.
 
 ## Required checks
 
-Run checks with the project virtual environment.
+Run checks through uv, which uses the locked environment.
 
 ```powershell
 $pythonFiles = (Get-ChildItem reliquary,reliquary_tests -Filter *.py).FullName
-.venv\Scripts\python.exe -m py_compile $pythonFiles
-.venv\Scripts\python.exe -m unittest -v reliquary_tests
-.venv\Scripts\python.exe -m build
+uv run python -m py_compile $pythonFiles
+uv run python -m unittest -v reliquary_tests
+uv run --python 3.12 python -m unittest reliquary_tests
+uv build
 ```
 
-`python -m build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
+**The third line is the floor check, and it is not optional.** The
+supported floor is a published claim (`requires-python`), so it is tested
+like any other — the same reading AGENTS.md already applies to host
+platforms, where an untested platform is an unclaimed capability rather
+than a quiet promise (P11). uv installs the interpreter itself, so the
+check costs one line. It was added when the floor turned out to be wrong:
+`>=3.9` was claimed and unexercised, and 3.9, 3.10 and 3.11 all failed
+(D95).
+
+`uv build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
 After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, and runtime
-dependencies in both built artifacts, then run `python tools/check_dist.py`, which asserts what each artifact must
+dependencies in both built artifacts, then run `uv run python tools/check_dist.py`, which asserts what each artifact must
 carry — the grammar, the schemas and the codex in the wheel; the suite, its fixtures, `docs/spec/` and the
 script-example catalogue in the sdist — and that the wheel carries no tests. It exists because the suite no longer
 ships in the wheel, so nothing running inside the wheel inspects it: package data is what disappears silently, and a
@@ -832,6 +849,15 @@ For release-facing packaging changes, unpack the sdist outside the source tree a
 reliquary_tests` there: it must report one skip, the opt-in integration test. That is the run a downstream packager
 makes, and it is the one that proves the source package is complete. Install the wheel into a clean environment too, but
 check it by using it — `rlq --version` and an import — since it carries no suite to run.
+
+**Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
+no CI (P22) there is no trusted-publishing path, so it takes a token
+(`UV_PUBLISH_TOKEN` or `--token`), and `uv publish --dry-run` walks the
+whole path without uploading. `twine check` is deliberately gone: its
+rendering job is an RST problem and the readme is markdown, the index
+validates and rejects bad metadata itself, a rejected upload does not
+consume the version, and `tools/check_dist.py` is this project's real
+artifact gate. Reopen that if the readme ever stops being markdown.
 
 Run `git diff --check` before handing work back.
 

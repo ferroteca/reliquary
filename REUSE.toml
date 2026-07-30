@@ -6,6 +6,7 @@ SPDX-PackageSupplier = "Paul Galbraith <paul@galbraiths.ca>"
 [[annotations]]
 path = [
     ".gitignore",
+    "uv.lock",
     "README.md",
     "AGENTS.md",
     "CHANGELOG.md",

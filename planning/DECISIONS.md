@@ -90,6 +90,26 @@ than the promotion around it. The promotion-genre entries below
 predate this rule and stand as written under the spellings
 rule: the record of their moment, not the pattern to follow.
 
+WHAT "SLIM" MEANS, because D63 said it and practice drifted
+anyway (owner, 2026-07-30). **Ask where the rule's normative
+home is before asking which D-number it takes.** A rule with a
+home — a principle, a use case, a specification, AGENTS.md — is
+*written there*, and the commit that writes it is the record:
+the vision item's existence documents the decision to adopt it,
+so an entry restating it is the second register this machinery
+refuses to keep. **Neither a decision to change the vision nor
+a decision to align with it earns an entry**; the change record
+cites the item, and the citation is the argument. What is left
+for an entry is the part with no home — a **contested call with
+a rejected alternative**, kept because the guard against
+re-litigating is real, plus the condition that would reopen it.
+That is a paragraph, not a page. The cost being guarded against
+is not hypothetical: this file passed 8,900 lines in its first
+ten days at a hundred-plus lines an entry, and a record too
+large to search stops being a guard against anything. Entries
+above this line predate the test; D94 and D95 are the first
+written to it.
+
 ## Open questions
 
 Questions awaiting adjudication — the front of this record rather
@@ -207,6 +227,42 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D95 — THE SUPPORTED FLOOR IS 3.12, AND IT IS DROPPED RATHER THAN
+  FIXED — DECIDED (owner, 2026-07-30). Supports P11's reading, which
+  AGENTS.md already applies to host platforms: an untested version is
+  an unclaimed capability, not a quiet promise. `>=3.9` was published
+  and had never been run; the first run failed on **3.9 and 3.10**
+  (`keyring` reaches `platform.win32_ver()`, which shells out on those
+  versions and trips the suite's own no-subprocess guard) and on
+  **3.11** (39 errors: a `MappingProxyType` dataclass default, which
+  3.11 rejects as unhashable). 3.12, 3.13 and 3.14 pass.
+  **Fixing rather than dropping was WEIGHED AND DECLINED** (owner:
+  "if there is *any* doubt, just drop"): 3.11 needs a `default_factory`
+  and 3.9/3.10 need the guard taught about `platform`'s internals,
+  both cheap, neither worth a support claim nothing was asking for.
+  Reopen by fixing those two and lowering the floor — the floor run in
+  AGENTS.md "Required checks" is what would keep it honest.
+
+- D94 — TWINE GOES WITH THE UV ADOPTION — DECIDED (owner,
+  2026-07-30). Supports P21, which binds infrastructure as well as
+  packages. The adoption itself needs no entry: uv owning the
+  environment and the release path is stated in AGENTS.md
+  "Development environment" and "Required checks", and the commit is
+  its record. **What earns this entry is one contested call.**
+  Keeping twine for `twine check` was weighed and declined: its
+  rendering job is an RST problem and `readme` is `README.md`, where
+  CommonMark has essentially no failing input; the index validates and
+  **rejects** bad metadata itself; a rejected upload does not consume
+  the version, so the cost of learning at upload is a retry; and
+  `tools/check_dist.py` remains the project's real artifact gate.
+  A pre-flight duplicate of a server-side check, against a format that
+  does not fail, is what P21 refuses. **Reopen if the readme stops
+  being markdown** — an RST description puts `twine check`'s original
+  purpose back in force. Poetry, PDM and Hatch were declined in
+  passing: each gives the lock, none gives interpreter provisioning,
+  and Poetry wants its own `pyproject.toml` dialect where this project
+  already writes PEP 621 and PEP 735.
 
 - D93 — FIRST-CLASS BLUEPRINT VOCABULARY REQUIRES GENERAL
   APPLICABILITY ACROSS BACKENDS, AND THE DEVICES AXIS GOES —

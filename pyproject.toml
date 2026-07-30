@@ -11,7 +11,7 @@ version = "0.1.0.dev6"
 description = "OS installation scripting over agentless QEMU guest automation"
 readme = "README.md"
 authors = [{ name = "Paul Galbraith", email = "paul@galbraiths.ca" }]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 keywords = ["qemu", "dos", "automation", "installation", "os"]
@@ -31,7 +31,7 @@ dependencies = ["keyring", "lark", "pillow", "qemu.qmp"]
 Homepage = "https://github.com/ferroteca/reliquary"
 
 [dependency-groups]
-dev = ["build", "twine", "jsonschema"]
+dev = ["jsonschema"]
 
 [project.scripts]
 rlq = "reliquary:main"
