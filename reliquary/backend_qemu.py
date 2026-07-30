@@ -43,6 +43,15 @@ _QEMU_NBD_BIN = "qemu-nbd.exe" if os.name == "nt" else "qemu-nbd"
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
+#: How QEMU spells each curated device. The blueprint names the model
+#: portably (``virtio-rng``) and this is where it becomes a QEMU
+#: argument: the PCI form is named explicitly rather than through
+#: QEMU's own ``virtio-rng`` alias, an alias being one more thing that
+#: could be re-pointed under a machine that was tested against it.
+#: Every entry here is a capability this adapter reports, and a
+#: reported capability is one that renders (P11).
+DEVICE_MODELS = {"virtio-rng": "virtio-rng-pci"}
+
 
 def _qemu_fallback_dirs():
     if os.name == "nt":
@@ -940,6 +949,13 @@ class QemuAdapter(BackendAdapter):
         blueprint vocabulary and unbuilt, so claiming them here would
         promise what nothing can honor (P11). The same reading governs
         controllers: the drive renderer wires ``ide`` alone.
+
+        ``devices`` reports exactly the keys of :data:`DEVICE_MODELS`,
+        because a claim here is a promise to render: ``virtio-rng`` is
+        in every QEMU x86 build the project has run and is checked
+        against ``-device help`` on the delivered host, and the day the
+        vocabulary grows a name QEMU does not carry, this list is where
+        it stays out.
         """
         return Capabilities(
             backend="qemu",
@@ -947,6 +963,7 @@ class QemuAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
+            devices=tuple(DEVICE_MODELS),
             vvfat=True,
             at_rest=True,
             at_rest_write=True,
@@ -1013,12 +1030,14 @@ class QemuAdapter(BackendAdapter):
         """Render the machine's state into a QEMU command line and launch.
 
         Reliquary drive vocabulary in, QEMU configuration out: memory,
-        the drive arguments, and the firmware boot order are all
-        rendered here, so no caller ever composes a backend argument.
+        the declared devices, the drive arguments, and the firmware boot
+        order are all rendered here, so no caller ever composes a
+        backend argument.
         """
         memory = state.get("memory") or 16
         vm_name = state.get("backend-id") or f"reliquary-{state['id']}"
         args = [find_qemu(), "-name", vm_name, "-m", str(memory)]
+        args += device_args(state.get("devices", ()))
         args += drive_args(state.get("drives", {}))
         boot = _boot_order(state.get("boot", []), state.get("drives", {}))
         if boot is not None:
@@ -1078,6 +1097,27 @@ def _boot_order(boot_keys, drives):
         if letter is not None and letter not in letters:
             letters.append(letter)
     return "".join(letters) or None
+
+
+def device_args(devices):
+    """Build QEMU ``-device`` arguments from a machine's ``devices``.
+
+    The declaration names the device *model* as the cross-hypervisor
+    standard spells it; the bus-qualified spelling QEMU wants is this
+    adapter's business and nobody else's, which is exactly what keeps
+    the blueprint portable. Only what :meth:`QemuAdapter.capabilities`
+    reports is renderable, so an unmapped name is a fault rather than
+    a caller's mistake: assignment refused it already.
+    """
+    args = []
+    for device in devices or ():
+        model = DEVICE_MODELS.get(device)
+        if model is None:
+            raise StaticError(
+                f"the qemu adapter cannot provide device {device!r}",
+                rule_id="machine.device-unsupported")
+        args += ["-device", model]
+    return args
 
 
 def drive_args(drives):

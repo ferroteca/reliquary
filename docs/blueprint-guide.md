@@ -585,7 +585,14 @@ first backend that is:
 1. **available** — actually installed and working on this host
    (backends are autodiscovered), and
 2. **capable** — able to provide everything the blueprint asks
-   for (its media, controllers, image formats, control planes).
+   for (its media, controllers, image formats, control planes,
+   and declared `devices`).
+
+That second point is what makes declaring a device better than
+pinning an engine: `"devices": ["virtio-rng"]` says the machine
+must contain the device and lets assignment find any backend that
+provides it, while a host where none does fails at `create`
+naming the device rather than something downstream of it.
 
 The assignment is recorded in the state — the blueprint stays
 portable — and holds for the machine's life: backend disk formats,
@@ -696,7 +703,7 @@ closed against operators.
 ## Where to next
 
 - [Field reference](blueprint-reference.md) — `platform`,
-  `backend`, `drives` (naming media components),
+  `backend`, `devices`, `drives` (naming media components),
   `boot`, `control-planes`, `parameters`, `backend-settings`, and
   the state-only fields, with every rule and per-field examples.
 - [Cookbook](blueprint-cookbook.md) — complete blueprints for

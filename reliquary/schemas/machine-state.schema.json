@@ -62,6 +62,11 @@
       "type": "integer",
       "minimum": 1
     },
+    "devices": {
+      "description": "The devices the blueprint declared, in declaration order — the portable need the assigned backend was judged against and renders at every start. An empty array where the blueprint declared none.",
+      "type": "array",
+      "items": {"enum": ["virtio-rng"]}
+    },
     "boot": {
       "description": "Resolved boot order: declared drive keys in order.",
       "type": "array",

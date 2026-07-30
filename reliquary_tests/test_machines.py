@@ -286,6 +286,52 @@ class MaterializationTests(_HomeCase):
         self.assertEqual(self._state(machine_id)["control-planes"],
                          ["agentless-display"])
 
+    def test_declared_devices_are_recorded_and_reach_the_launch(self):
+        # The declaration is a machine-level fact, so it lands in the
+        # state and the adapter renders it from there — nothing above
+        # the seam composes a device argument.
+        machine_id = self._create(
+            "rng", {"platform": "dos", "drives": {"hdd0": "blank"},
+                    "devices": ["virtio-rng"]},
+            media=[_BLANK])
+        self.assertEqual(self._state(machine_id)["devices"], ["virtio-rng"])
+        start_machine(machine_id, context=self.home)
+        self.assertEqual(self.backend.starts[0]["state"]["devices"],
+                         ["virtio-rng"])
+
+    def test_a_machine_declaring_no_device_records_the_empty_list(self):
+        machine_id = self._create("nodev", {"platform": "dos"})
+        self.assertEqual(self._state(machine_id)["devices"], [])
+
+    def test_a_device_no_backend_provides_fails_closed_naming_it(self):
+        # U22's up-front refusal: the need is named, not a symptom, and
+        # it is refused before any image work (P11).
+        report = Capabilities(
+            backend="qemu", control_planes=("agentless-display",),
+            media=("floppy", "hdd", "cdrom"), controllers=("ide",),
+            materialize=("new", "difference", "copy", "use"), vvfat=True)
+        with fake_backend.installed(capabilities=report) as adapter:
+            self._write("rng", {"platform": "dos",
+                                "drives": {"hdd0": "blank"},
+                                "devices": ["virtio-rng"]},
+                       media=[_BLANK])
+            with self.assertRaises(PreflightError) as caught:
+                create_machine("rng", context=self.home)
+            self.assertEqual(adapter.images, [])
+        self.assertIn("device 'virtio-rng'", str(caught.exception))
+        self.assertFalse(os.path.exists(
+            machine_dir_path("rng-0", self.home)))
+
+    def test_a_device_declaration_names_no_backend_of_its_own(self):
+        # The whole point of declaring the device instead of pinning
+        # the engine: the blueprint carries no backend, and assignment
+        # still lands on one that provides it.
+        machine_id = self._create(
+            "portable", {"platform": "dos", "devices": ["virtio-rng"]})
+        state = self._state(machine_id)
+        self.assertEqual(state["backend"], "qemu")
+        self.assertEqual(state["devices"], ["virtio-rng"])
+
     def test_disabled_drive_excluded_from_state(self):
         machine_id = self._create(
             "disabled", {"platform": "dos",
@@ -694,6 +740,35 @@ class LifecycleTests(_HomeCase):
         state = self._state(machine_id)
         self.assertIn("hdd1", state["drives"])
         self.assertEqual(state["control-planes"], ["agentless-display"])
+
+    def test_apply_absorbs_a_devices_change(self):
+        # A device is a launch argument and nothing materialized, so
+        # adding one to a stopped machine needs no recreate.
+        machine_id = self._create(
+            "dev", {"platform": "dos", "drives": {"hdd0": "blank"}},
+            media=[_BLANK])
+        self.assertEqual(self._state(machine_id)["devices"], [])
+        self._write("dev", {"platform": "dos",
+                           "drives": {"hdd0": "blank"},
+                           "devices": ["virtio-rng"]}, media=[_BLANK])
+        apply_blueprint(machine=machine_id, context=self.home)
+        self.assertEqual(self._state(machine_id)["devices"], ["virtio-rng"])
+
+    def test_apply_refuses_a_device_this_machines_backend_lacks(self):
+        machine_id = self._create(
+            "devx", {"platform": "dos", "drives": {"hdd0": "blank"}},
+            media=[_BLANK])
+        self._write("devx", {"platform": "dos",
+                            "drives": {"hdd0": "blank"},
+                            "devices": ["virtio-rng"]}, media=[_BLANK])
+        self.backend.report = Capabilities(
+            backend="qemu", control_planes=("agentless-display",),
+            media=("floppy", "hdd", "cdrom"), controllers=("ide",),
+            materialize=("new", "difference", "copy", "use"), vvfat=True)
+        with self.assertRaises(PreflightError) as caught:
+            apply_blueprint(machine=machine_id, context=self.home)
+        self.assertIn("device 'virtio-rng'", str(caught.exception))
+        self.assertEqual(self._state(machine_id)["devices"], [])
 
     def test_apply_requires_stopped(self):
         machine_id = self._ready()

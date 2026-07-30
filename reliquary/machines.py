@@ -92,10 +92,15 @@ def _resolve_control_planes(machine):
 def _requirements(machine, namespace):
     """What this blueprint asks of a backend, in the seam's vocabulary.
 
-    Read off the whole machine — its control-plane policy, the media
-    kinds and controllers its enabled drives declare, and the
-    materialization mode of every media they name — because a backend
-    is chosen for the machine and never for a drive.
+    Read off the whole machine — its control-plane policy, the devices
+    it declares, the media kinds and controllers its enabled drives
+    declare, and the materialization mode of every media they name —
+    because a backend is chosen for the machine and never for a drive.
+
+    A device is the axis that most needs this to be the whole machine:
+    "this machine must contain this device" is a fact about the
+    machine, so assignment finds any backend that provides it and a
+    host where none does refuses up front, naming the device.
     """
     planes = _resolve_control_planes(machine)
     media = []
@@ -115,7 +120,8 @@ def _requirements(machine, namespace):
             modes.append(item.materialize)
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
-        controllers=tuple(controllers), materialize=tuple(modes))
+        controllers=tuple(controllers), materialize=tuple(modes),
+        devices=tuple(machine.devices))
 
 
 def _blueprint_digest(resolved, drives):
@@ -420,6 +426,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "backend": backend,
         "memory": memory,
         "cpus": machine.cpus if machine.cpus is not None else 1,
+        "devices": list(machine.devices),
         "boot": list(machine.boot),
         "name": machine.name,
         "description": machine.description,
@@ -720,6 +727,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         "platform": machine.platform,
         "memory": memory,
         "cpus": machine.cpus if machine.cpus is not None else 1,
+        "devices": list(machine.devices),
         "boot": list(machine.boot),
         "control-planes": _resolve_control_planes(machine),
         "drives": drives,
@@ -775,6 +783,10 @@ def _dry_report(plan):
     lines.append(f"platform: {plan['platform']}")
     lines.append(f"memory: {plan['memory']}")
     lines.append(f"cpus: {plan['cpus']}")
+    if plan["devices"]:
+        # Only when declared: the empty line would read as a machine
+        # that asked for devices and got none.
+        lines.append("devices: " + ", ".join(plan["devices"]))
     if plan["boot"]:
         lines.append("boot: " + ", ".join(plan["boot"]))
     lines.append("control planes: " + ", ".join(plan["control-planes"]))
@@ -959,9 +971,12 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
     """Adopt the current blueprint into a stopped machine.
 
     Re-resolves the blueprint the machine was created from (never at
-    ``start``) and reconciles the machine to it: memory, cpus, boot,
-    control-planes, backend-settings, metadata, and the absorbable
-    drive changes are applied; a changed ``size`` or ``base`` on an
+    ``start``) and reconciles the machine to it: memory, cpus, devices,
+    boot, control-planes, backend-settings, metadata, and the absorbable
+    drive changes are applied — a device is a launch argument and
+    nothing materialized, so a changed list is absorbed, and one the
+    machine's own backend cannot provide refuses the apply by name
+    rather than moving the machine; a changed ``size`` or ``base`` on an
     already-materialized image fails closed (``recreate`` is the
     alternative). The new resolved snapshot becomes the baseline
     (``blueprint-digest`` / ``blueprint-source`` re-recorded).
@@ -1023,6 +1038,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "backend": backend,
             "memory": memory,
             "cpus": parsed.cpus if parsed.cpus is not None else 1,
+            "devices": list(parsed.devices),
             "boot": list(parsed.boot),
             "name": parsed.name,
             "description": parsed.description,

@@ -224,7 +224,7 @@ class BlueprintCorpusTests(unittest.TestCase):
         reference there (D26).
         """
         for name in ("platform", "backend", "materialize", "controller",
-                     "control-planes"):
+                     "control-planes", "devices"):
             path = os.path.join(_CORPUS, "invalid", f"ref-in-{name}.rlqb")
             with self.subTest(vocabulary=name):
                 self.assertTrue(os.path.exists(path), f"missing {path}")

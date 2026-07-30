@@ -1,0 +1,7 @@
+// valid: a machine declares a device from the curated vocabulary
+// spec: What the topology fields mean
+[
+  { "type": "machine", "name": "driver-rig", "platform": "dos",
+    "memory": "32M", "devices": ["virtio-rng"],
+    "drives": { "hdd0": { "size": "20M" } } }
+]

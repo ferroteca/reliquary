@@ -402,6 +402,54 @@ class DriveRenderingTests(unittest.TestCase):
                          os.path.join(self.root, "qemu"))
 
 
+class DeviceRenderingTests(unittest.TestCase):
+    """The portable device name becomes QEMU's own spelling here.
+
+    The one place the bus qualifier is allowed to exist: a blueprint
+    says ``virtio-rng`` and this adapter says ``virtio-rng-pci``, which
+    is what keeps the declaration portable and the rendering honest.
+    """
+
+    def test_a_declared_device_renders_qemus_own_model_name(self):
+        self.assertEqual(qemu_module.device_args(["virtio-rng"]),
+                         ["-device", "virtio-rng-pci"])
+
+    def test_no_devices_render_no_arguments(self):
+        for empty in ([], (), None):
+            with self.subTest(devices=empty):
+                self.assertEqual(qemu_module.device_args(empty), [])
+
+    def test_every_reported_device_renders(self):
+        # P11 at this seam, in the direction that actually rots: a
+        # capability claimed and not renderable would fail at launch,
+        # long after assignment promised it.
+        report = qemu_module.QemuAdapter().capabilities()
+        self.assertEqual(report.devices, ("virtio-rng",))
+        for device in report.devices:
+            with self.subTest(device=device):
+                self.assertEqual(len(qemu_module.device_args([device])), 2)
+
+    def test_a_device_qemu_has_no_model_for_is_refused_not_dropped(self):
+        # Unreachable through assignment, which is the point: if it
+        # ever fires, the vocabulary grew and this map did not.
+        with self.assertRaises(StaticError) as caught:
+            qemu_module.device_args(["virtio-net"])
+        self.assertEqual(caught.exception.rule_id,
+                         "machine.device-unsupported")
+        self.assertIn("virtio-net", str(caught.exception))
+
+    def test_start_renders_the_devices_it_was_given(self):
+        adapter = qemu_module.QemuAdapter()
+        state = {"id": "rig-0", "backend-id": "reliquary-rig-0",
+                 "memory": 32, "devices": ["virtio-rng"], "drives": {}}
+        with mock.patch.object(qemu_module, "find_qemu",
+                               return_value="qemu-system-i386"), \
+                mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+            adapter.start(state, machine_dir=".", backend_dir="qemu")
+        args = launch.call_args.args[0]
+        self.assertEqual(args[args.index("-device") + 1], "virtio-rng-pci")
+
+
 class CarrierTests(unittest.TestCase):
     """The session's carriers, over a scripted monitor."""
 
@@ -513,6 +561,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(report.controllers, ("ide",))
         self.assertTrue(report.vvfat)
         self.assertIn("floppy", report.media)
+        self.assertEqual(report.devices, tuple(qemu_module.DEVICE_MODELS))
 
 
 class _ExitedProcess:

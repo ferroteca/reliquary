@@ -196,96 +196,35 @@ delivery — was adopted as recommended and is now stated in the
 normative spec rather than carried as a decide-first. **F14 stays
 proposed** and is untouched by this: an opt-in outcome channel does
 not reshape the row return, which is what the pledge round already
-found when it weighed the two. **F27 and F28 remain**, so U22 still
-cannot reach the root — its steps 3 and 5 carry their marks.
+found when it weighed the two.
 
-## F27 — A `devices` axis for the machine blueprint
+*(F27 — a `devices` axis for the machine blueprint — delivered
+2026-07-30 (owner), so its number retires unreused and the work
+items go with it. A machine now declares the hardware it must
+contain beyond its drives (`"devices": ["virtio-rng"]`), the
+declaration reaches `assign()` as a `Requirements` axis judged in
+`unmet()` like every other, and the adapter that reported the
+device renders it (QEMU: `-device virtio-rng-pci`). What that
+buys is what the entry argued: a portable need rather than an
+engine pin, refused up front naming the device where no available
+backend provides it (P11). **Both decide-firsts were settled as
+the record already implied** rather than re-argued — the name is
+the device *model* spelled by its own cross-hypervisor standard,
+which is U22's own spelling, and the guest's driver stays the
+caller's business, as the entry recommended and the `controller`
+rule already words it. The rulings the build produced — why an
+abstract class was declined, why the vocabulary ships with one
+name instead of borrowing the `control-planes` accept-then-refuse
+pattern, and why a reported device must be a renderable one — are
+[D91](../DECISIONS.md); the surface is normative in
+[blueprint-model.md](../../docs/spec/blueprint-model.md)'s
+`devices` clause.*
 
-> **Entered 2026-07-29** from a consuming project's proposal
-> (owner: admitted as a proposal). **No use case names the guest's
-> hardware as the subject**, said plainly (the F12 posture): the
-> nearest are **U14**, whose consumers are exactly who this
-> serves, and **U4**/**U16**'s precisely-defined machine, and
-> neither reaches a machine whose *device model* is the point — a
-> driver under test drives one particular device, and the case
-> such a developer would state (the device's presence is the
-> machine's whole point, refused by name up front where no host
-> can provide it) is drafted nowhere. Pledging this means drafting
-> that case first (P8). What *shapes* it is already on the record:
-> the standing constraint (root ARCHITECTURE.md) that new devices
-> "extend the same convention — a new medium name — not appear as
-> opaque raw backend arguments", F5's blueprint-device-growth
-> bullet (agnostic vocabulary, capability-checked per backend),
-> and **P11**.
->
-> **Pledged 2026-07-29** (owner). The case this entry said must be
-> drafted first now is: **U22**
-> ([proposed/USE-CASES.md](../proposed/USE-CASES.md)), which this
-> feature cites as its demand.
-
-What a driver-testing caller means by "the engine must be QEMU" is
-not an engine preference — it is "**this machine must contain this
-device**", and the blueprint vocabulary cannot say that today.
-`Requirements` is closed over `control_planes` / `media` /
-`controllers` / `materialize`, so a device need can never reach
-`assign()` and can never influence which backend is chosen. The
-nearest live mechanism records the wrong fact and over-constrains:
-a `backend` pin binds and fails closed by name — correctly — but
-forecloses every other backend that could genuinely provide the
-device (VirtualBox offers virtio-net), and the device flags it
-implies belong in `backend-settings`, which is the wrong home for
-a portable need (and today does nothing — F28).
-
-The ask: a `devices` machine field — a **closed, curated
-vocabulary**, grown one name at a time as demand arrives, exactly
-as the standing constraint already grows media kinds and
-controllers — with `devices` tuples on `Requirements` and
-`Capabilities`, judged in `unmet()` like every other axis, at
-assignment, against the whole blueprint. Each adapter reports what
-it can provide and renders what it reported (QEMU: `-device
-virtio-rng-pci`); a stub reporting the empty tuple is honest and
-free. A machine declaring a device nothing available provides
-fails closed at preflight naming the device (P11) — an up-front,
-legible refusal — and the declaration keeps the blueprint portable
-where a pin cannot: it names the need, and assignment finds any
-backend that meets it.
-
-**Not adopted from the source proposal**: its reading of
-`Capabilities.vvfat` as "the failure mode to avoid". `vvfat` is
-judged where the drive is rendered because a directory-source
-media's realized shape is only knowable after resolution — the
-late judgment is deliberate, not a defect. Devices are declared
-facts, so assignment-time judgment is simply the right home for
-*this* axis, not a correction to that one.
-
-DECIDE FIRST:
-
-- **What the names name.** `virtio-rng` is the first name demand
-  has arrived for (virtio-console and virtio-net are visible
-  behind it) — but is the curated name the device model or an
-  abstract class (`rng`)? For driver testing the precise model is
-  the point — the driver binds to *that* device — which argues for
-  the model name; the standing constraint's "agnostic vocabulary"
-  pulls the other way. virtio is itself a cross-hypervisor
-  standard, which may dissolve the tension for the first names.
-- Whether a declared device the *guest* lacks a driver for is any
-  of Reliquary's business. It is not — the backend half is
-  checked, the driver half stays the caller's — but the controller
-  rule already states that split and this field should state it
-  the same way (U22's closing sentence states it as the case).
-
-Work:
-
-1. Settle what the names name (the decide-first above).
-2. The `devices` blueprint field: parse, validate against the
-   closed vocabulary, schema, machine state.
-3. `devices` tuples on `Requirements` / `Capabilities`, judged in
-   `unmet()` at assignment against the whole blueprint; a device
-   nothing available provides fails closed naming it (P11).
-4. QEMU renders what it reported; the stubs report the empty
-   tuple.
-5. Docs land coherently: blueprint model and reference, the
-   standing constraint's citation, tests over the fake adapter.
+***U22's step 3 keeps one mark.*** The `devices` half is live;
+the escape-hatch half is **F28**, which remains here — so the
+case still cannot reach the root, and this is the same
+distinction F2 and F24 drew on delivery: what shipped is the
+axis, not everything the journey walks through.)*
 
 ## F28 — Adapters honor `backend-settings`
 
@@ -307,6 +246,15 @@ Work:
 > reachable through the backend's own settings section — beside
 > the coherence argument above. F27 is pledged in the same act,
 > so the reference runs sideways.
+>
+> **F27 delivered 2026-07-30** (D91), so that reference now runs
+> *down* the lifecycle and the clause it cites is live: the
+> curated vocabulary exists and carries exactly one name, which
+> makes this the only route to any other device — and the reason
+> D91 refused to point an author at it. Until this lands, the
+> refusal for an unadmitted device name deliberately says nothing
+> about `backend-settings`, because naming a section no adapter
+> reads would be the quiet lie P11 exists to prevent.
 
 The field parses, validates its backend names, and persists into
 machine state verbatim — **and no adapter reads its section**. The

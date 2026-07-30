@@ -19,7 +19,8 @@ SPDX-License-Identifier: GPL-3.0-only
 > and exemplifies them rather than defining them.
 
 > **Status:** the full field reference is validated at parse time —
-> `platform`, `backend`, `memory`, `cpus`, `drives` (a media name,
+> `platform`, `backend`, `memory`, `cpus`, `devices`, `drives` (a media
+> name,
 > `null`, or an object with `controller`/`enabled`/`media`), `boot`,
 > `name`, `description`, `scripts`, `control-planes`,
 > `backend-settings`, and `parameters` — with JSONC acceptance and
@@ -112,14 +113,21 @@ availability on the host, and assigns the first entry that is
 available and capable of everything the blueprint asks for.
 Capability is judged against the whole blueprint — referenced
 media and image types the backend must be able to attach,
-required [`control-planes`](#control-planes), and
+declared [`devices`](#devices), required
+[`control-planes`](#control-planes), and
 [`backend-settings`](#backend-settings) — so a blueprint can
 dictate its backend without declaring one: a `backend-settings`
-section for exactly one backend, or a media type only one backend
-can consume, narrows the walk to that backend. Declared
+section for exactly one backend, or a device or media type only
+one backend can provide, narrows the walk to that backend.
+Declared
 explicitly, `backend` pins the choice — only that backend is
 probed, and `create` fails if it is unavailable or incapable,
 rather than falling back.
+
+**Prefer declaring what you need over pinning where to get it.**
+A backend pin is the right field when the *engine* is the
+requirement; where the requirement is hardware, `devices` says so
+portably and assignment finds any backend that provides it.
 
 Either way the resolved value is recorded in the state (an omitted
 blueprint stays portable), and the assignment holds for the
@@ -381,6 +389,59 @@ always carries the canonical integer-MiB form. Defaults by platform
 **blueprint (optional) · positive integer**
 
 Virtual CPU count. Default `1`.
+
+---
+
+## `devices`
+
+**blueprint (optional) · array of strings · always present in the
+state (empty where none was declared)**
+
+Devices the machine must contain, beyond the drives it declares.
+This is the field for "the driver under test binds *that* device,
+so the machine has to have it" — the case where the device's
+presence is the machine's whole point, and without it there is no
+test rather than a weaker one.
+
+| name | the device |
+|---|---|
+| `virtio-rng` | the virtio entropy source |
+
+It is a **portable** declaration, and that is the point of
+having it. The alternative spelling — pin
+[`backend`](#backend) and pass raw device arguments through
+[`backend-settings`](#backend-settings) — records the wrong fact
+(an engine, where what you meant was a device), forecloses every
+other backend that genuinely provides the device, and fails late
+or not at all. Declared here, the device is judged at
+**assignment**, against the whole blueprint, like every other
+capability: any available backend that reports the device may
+host the machine, and a host where none does refuses up front,
+**naming the device**. The resolved list is recorded in the state,
+and the assigned backend renders it at every start — QEMU turns
+`virtio-rng` into `-device virtio-rng-pci`, which is the only
+place a bus-qualified spelling exists.
+
+```json
+{"devices": ["virtio-rng"]}
+```
+
+The vocabulary is **closed and curated**: a name it does not carry
+is refused when the blueprint is read, and each name is the device
+model as the cross-hypervisor standard spells it rather than as one
+hypervisor does. It grows **one name at a time, as demand for a
+device arrives** — the same growth rule that governs media kinds
+and controllers, and the reason this field can never become a place
+to write backend arguments. A device the vocabulary does not yet
+name takes `backend-settings` instead, at the cost of portability;
+a settings key in repeated use across blueprints is demand
+arriving for a curated name here.
+
+**Whether the guest has a driver for the device is not
+Reliquary's business** — the same split as
+[`controller`](#controller--optional--string): the machine provides
+the hardware, and supplying the driver is yours. Frequently it is
+the very thing being tested.
 
 ---
 
@@ -753,7 +814,8 @@ Format checks (reject the document):
   `blueprint-source`) in a blueprint;
 - `boot` entries naming undeclared or disabled drives, or naming
   one slot twice (in either spelling), and duplicate
-  `control-planes` entries;
+  `control-planes` or `devices` entries;
+- a `devices` entry the curated vocabulary does not carry;
 - a drive object missing `media`, or carrying keys other than
   `media` / `controller` / `enabled`;
 - `null` (empty) values on non-removable (`hdd`) drives;
@@ -776,4 +838,6 @@ naming backend and capability):
 - directory-source media the backend cannot serve;
 - image formats the backend cannot attach;
 - control planes the backend cannot offer;
+- `devices` the backend cannot provide (named as the device, not
+  as a symptom);
 - boot orders the backend cannot honor.

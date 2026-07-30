@@ -503,13 +503,16 @@ states the split F27's decide-first asks to have stated.
 Reliquary's application surfaces: a user should be able to follow it
 as written to accomplish the goal. Every spelling is the surface
 as it stands today, except where a step is marked **requires
-F27/F28** — a pledged, undelivered piece, spelled in the form
+F28** — a pledged, undelivered piece, spelled in the form
 its feature is committed to deliver. At the proposed stage a gap
 is fine as long as it is flagged (owner, 2026-07-29): the marks
 are the flags, and what they cover is flushed out as the pieces
 settle — the case reads complete only when nothing marked remains
 open. **F26's mark cleared on 2026-07-30** (D89), leaving step 8 on
-the live surface; two remain, both in step 3. API spellings shown;
+the live surface, and **F27's cleared the same day** (D91), leaving
+the `devices` declaration in step 3 and the assignment axis in step
+5 both live. **One mark remains**: the escape hatch in step 3,
+which is F28's. API spellings shown;
 every step has its CLI twin (U9).
 
 1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
@@ -533,7 +536,7 @@ every step has its CLI twin (U9).
    ```
 
 3. **Author `blueprints\driver-rig.rlqb`**, checked in — the
-   device declared beside memory and drives (**F27**), the work
+   device declared beside memory and drives, the work
    drive pointing straight at the build output, relative
    locations resolving against the project's own directories so
    the file stays portable:
@@ -572,8 +575,9 @@ every step has its CLI twin (U9).
    checked-in installed base, so every machine boots the same
    bytes and the base is never written; `hdd1` *is* the build
    directory, served to the guest as one FAT volume. The
-   `devices` line **requires F27** (pledged): the field, its
-   closed curated vocabulary, and the assignment axis step 5
+   `devices` line is the live surface since 2026-07-30 (F27
+   delivered, D91): the field, its closed curated vocabulary —
+   `virtio-rng` is in it — and the assignment axis step 5
    exercises.
 
    A device the vocabulary does not yet name takes the escape
@@ -632,7 +636,7 @@ every step has its CLI twin (U9).
    `reliquary.create_machine("driver-rig", context=ctx)` — CLI
    twin `rlq create-machine --blueprint driver-rig` — returns
    `"driver-rig-0"`. Assignment reads the whole demand, `devices`
-   included (**requires F27**): the priority walk takes the first
+   included: the priority walk takes the first
    backend both available and capable of `virtio-rng`, and a host
    where none is refuses **now**, at preflight, naming the
    device — a `PreflightError`, exit `3` at the CLI — not

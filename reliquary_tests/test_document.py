@@ -351,6 +351,94 @@ class MediaFieldTests(unittest.TestCase):
                              "platform": "dos", "drives": {"hdd0": None}}])
 
 
+class SpecifiedDevicesTests(unittest.TestCase):
+    """The device vocabulary is one set in the spec and in the parser.
+
+    P24's inventory pass over the newest closed vocabulary, and the
+    one most certain to grow: every name arrives by demand, so every
+    name has to arrive in *both* places. A name in the table the
+    parser rejects is a documented device nobody can declare; one in
+    the parser and not the table is undocumented hardware.
+
+    Unguarded on purpose, unlike its `materialize` neighbour above:
+    `docs/` ships in the sdist precisely so these comparisons run
+    there, so a missing spec is a broken environment that should say
+    so rather than a skip.
+    """
+
+    _MODEL = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "docs", "spec", "blueprint-model.md")
+
+    @classmethod
+    def _tabulated(cls):
+        with open(cls._MODEL, encoding="utf-8") as handle:
+            text = handle.read()
+        start = text.index("- **`devices`**")
+        clause = text[start:text.index("- **`boot`**", start)]
+        return set(re.findall(r"^\s*\| `([^`]+)` \|", clause, re.M))
+
+    def test_the_table_and_the_parser_agree(self):
+        self.assertEqual(
+            self._tabulated(), document._DEVICES,
+            "the devices docs/spec/blueprint-model.md tabulates are "
+            "not the ones the parser accepts. It is a closed, curated "
+            "vocabulary: the table is what an author may write.")
+
+    def test_every_tabulated_device_parses(self):
+        for device in sorted(self._tabulated()):
+            with self.subTest(device=device):
+                doc = _parse([{"type": "machine", "name": "rig",
+                               "platform": "dos", "devices": [device]}])
+                self.assertEqual(doc.machines["rig"].devices, (device,))
+
+
+class MachineDeviceTests(unittest.TestCase):
+    """`devices` is a curated vocabulary, and the shape it parses to.
+
+    What the corpus asserts is accept-versus-reject; what these
+    assert is that the parsed machine carries the declaration in the
+    order it was written, and that the refusals say which name and
+    which vocabulary.
+    """
+
+    def _machine(self, devices):
+        return _parse([{"type": "machine", "name": "rig",
+                        "platform": "dos", "devices": devices}]).machines["rig"]
+
+    def test_no_declaration_is_the_empty_tuple(self):
+        doc = _parse([{"type": "machine", "name": "rig", "platform": "dos"}])
+        self.assertEqual(doc.machines["rig"].devices, ())
+
+    def test_a_declared_device_parses_in_declaration_order(self):
+        self.assertEqual(self._machine(["virtio-rng"]).devices,
+                         ("virtio-rng",))
+
+    def test_a_name_outside_the_vocabulary_names_the_vocabulary(self):
+        # The curated set grows one name at a time, so an unadmitted
+        # name is a refusal that has to read as more than a typo.
+        with self.assertRaises(StaticError) as caught:
+            self._machine(["virtio-net"])
+        self.assertEqual(caught.exception.rule_id, "machine.device-unknown")
+        self.assertIn("virtio-net", str(caught.exception))
+        self.assertIn("virtio-rng", str(caught.exception))
+
+    def test_a_device_declared_twice_is_refused(self):
+        with self.assertRaises(StaticError) as caught:
+            self._machine(["virtio-rng", "virtio-rng"])
+        self.assertEqual(caught.exception.rule_id, "machine.device-duplicate")
+
+    def test_devices_must_be_an_array(self):
+        with self.assertRaises(StaticError) as caught:
+            self._machine("virtio-rng")
+        self.assertEqual(caught.exception.rule_id, "value.not-an-array")
+
+    def test_a_reference_is_refused_in_the_closed_vocabulary(self):
+        with self.assertRaises(StaticError) as caught:
+            self._machine(["${device}"])
+        self.assertEqual(caught.exception.rule_id, "ref.not-allowed-here")
+
+
 class LocatedDiagnosticTests(unittest.TestCase):
     """A blueprint diagnostic cites a line and column (D70).
 

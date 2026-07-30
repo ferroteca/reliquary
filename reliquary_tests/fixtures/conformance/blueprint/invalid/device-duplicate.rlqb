@@ -1,0 +1,8 @@
+// invalid: a device declared twice - one machine contains it once
+// spec: What the topology fields mean
+// id: machine.device-duplicate
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "devices": ["virtio-rng", "virtio-rng"],
+    "drives": { "cdrom0": null } }
+]

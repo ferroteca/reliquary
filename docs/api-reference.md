@@ -493,9 +493,9 @@ every adapter owes is the same answer.
 The adapter API is an **internal engineering contract**, not one of
 the application surfaces: no adapter operation is a CLI command
 or an API twin, and consumers reach backends through blueprint
-vocabulary (`backend`, `backend-settings`, `control-planes`, drives
-and controllers) and through the capability failures preflight
-reports. What the package root exposes is the seam's vocabulary,
+vocabulary (`backend`, `backend-settings`, `control-planes`,
+`devices`, drives and controllers) and through the capability
+failures preflight reports. What the package root exposes is the seam's vocabulary,
 for reading rather than driving:
 
 - `adapter(name)` / `discover()` - The adapter for a backend name,

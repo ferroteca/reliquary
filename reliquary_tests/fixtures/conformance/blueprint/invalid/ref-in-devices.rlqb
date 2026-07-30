@@ -1,0 +1,8 @@
+// invalid: closed vocabulary: devices items
+// spec: Reach
+// schema: rejects
+// id: ref.not-allowed-here
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "devices": ["${device}"], "drives": { "cdrom0": null } }
+]

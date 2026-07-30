@@ -1,0 +1,9 @@
+// invalid: the device vocabulary is curated and closed - a name it
+//          does not carry is refused at parse, not at assignment
+// spec: What the topology fields mean
+// schema: rejects
+// id: machine.device-unknown
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "devices": ["virtio-net"], "drives": { "cdrom0": null } }
+]

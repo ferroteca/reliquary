@@ -177,7 +177,8 @@ state describes, never re-reading the current
 blueprint file. Adopting blueprint edits — and returning a
 diverged machine to its blueprint shape — is the explicit `apply`: with the
 machine stopped, it re-resolves the current blueprint and reconciles the
-machine to it — applicable differences (memory, boot order, drives
+machine to it — applicable differences (memory, devices, boot order,
+drives
 enabled or disabled, media changes) are applied and the recorded
 digest updated; contradictions the machine cannot absorb without
 regenerating (such as a changed `size` on an existing image) fail

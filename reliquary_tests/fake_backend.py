@@ -72,6 +72,7 @@ class FakeAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
+            devices=("virtio-rng",),
             vvfat=True,
             at_rest=True,
             at_rest_write=True,

@@ -93,9 +93,9 @@ required type is an error.
 ### machine
 
 Topology only — no content lives here. `platform` (required,
-never inferred — P10), `backend`, `memory`, `cpus`, `boot`,
-`control-planes`, `backend-settings`, `description`, `scripts`,
-`parameters`, and `name`.
+never inferred — P10), `backend`, `memory`, `cpus`, `devices`,
+`boot`, `control-planes`, `backend-settings`, `description`,
+`scripts`, `parameters`, and `name`.
 
 `drives` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, …) to one
 of:
@@ -141,6 +141,38 @@ cannot carry.
   attaches to the floppy controller implicitly and **rejects the
   key**. Omitted, it resolves to `ide`, recorded into the state at
   creation.
+- **`devices`** is the machine's hardware demand beyond its
+  drives: an array of curated device names, each declared once —
+  one listed twice fails validation. It states a **portable
+  need** — *this machine must contain this device* — so it is
+  judged at **assignment**, against the whole blueprint, like
+  every other capability axis: any backend that reports the
+  device may host the machine, and a host where none does fails
+  closed **naming the device** (P11) rather than naming a
+  symptom. That is what a `backend` pin cannot do — a pin
+  forecloses every other backend that would genuinely provide
+  the device — and the resolved list is recorded in the state,
+  where the assigned backend renders it at every start.
+
+  The vocabulary is **closed and curated**, and it is the
+  device *model* as its own cross-hypervisor standard spells it,
+  never as one backend does: `virtio-rng` is the declaration and
+  a bus-qualified spelling (QEMU's `virtio-rng-pci`) is the
+  adapter's rendering. A name outside the set is refused at
+  parse. The set grows **one name at a time, as demand for a
+  device arrives** — the same rule that grows media kinds and
+  controllers, and the reason the field cannot become a place to
+  write raw backend arguments. Today it is:
+
+  | name | the device |
+  |---|---|
+  | `virtio-rng` | the virtio entropy source |
+
+  **Whether the guest has a driver for the device is not
+  Reliquary's business**, exactly as it is not for a
+  `controller`: the machine provides the hardware, and supplying
+  the driver is the caller's — frequently the very thing under
+  test.
 - **`boot`** entries must each name a drive the machine
   **declares and has not disabled**, and are unique by slot: the
   same slot twice, in either spelling, fails validation. An empty
@@ -496,7 +528,8 @@ Two exclusions, and they have different grounds:
    reference. The catalog and the authored graph stay static
    (G3) — the same ground that killed the `children` glob.
 2. **Closed vocabularies.** `platform`, `backend`,
-   `materialize`, `controller`, and `control-planes` items never
+   `materialize`, `controller`, and the items of
+   `control-planes` and `devices` never
    take a reference. These are where a published schema's
    completion is most valuable and where a reference destroys
    it (U4, U5), and they have no named case asking for one.

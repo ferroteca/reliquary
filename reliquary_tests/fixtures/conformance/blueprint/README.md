@@ -57,7 +57,7 @@ README said so, because an invalid fixture failing for the *wrong*
 reason is a false pass and only a reviewer could catch it. Blueprint
 diagnostics carry stable ids since 2026-07-27, so a `// id:` line
 names the diagnostic that must reject each fixture and the harness
-compares it against the raised `rule_id`. All 47 carry one; none reads
+compares it against the raised `rule_id`. All 50 carry one; none reads
 `none`. That marker is asserted in both directions, so a fixture
 claiming `none` whose diagnostic has since gained an id fails until
 its header catches up — the marker cannot outlive the gap it records.
@@ -72,10 +72,10 @@ the rule it is *meant* to serve, only against the one that fired.
 `// spec:` stays what it was: the section a reader goes to, not
 something the harness checks.
 
-One id is deliberately coarse. `ref.not-allowed-here` rejects nine
+One id is deliberately coarse. `ref.not-allowed-here` rejects ten
 fixtures — a reference in `backend`, `control-planes`, `controller`,
-`materialize`, `platform`, `type`, a name, a drive key and a children
-path — from three raise sites, because those are one rule (D26/D27:
+`devices`, `materialize`, `platform`, `type`, a name, a drive key and a
+children path — from three raise sites, because those are one rule (D26/D27:
 references are refused in identity and graph positions and in closed
 vocabularies) and the message names the field. A consumer switching on
 the id learns the rule; a person reading the message learns the place.

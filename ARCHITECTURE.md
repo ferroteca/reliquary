@@ -777,6 +777,16 @@ machine blueprints and cached materializations. New media kinds,
 controllers, and USB devices must extend the same convention — a
 new medium name — not appear as opaque raw backend arguments.
 
+The blueprint's **`devices`** axis is that rule applied to
+hardware that is not a drive, and its shape is what the rule
+means in practice: a closed, curated vocabulary of device
+*models* spelled as their own cross-hypervisor standard spells
+them, judged at assignment like every other capability axis, each
+adapter rendering what it reports. The vocabulary grows **one
+name at a time as demand for a device arrives** — that pressure
+is the mechanism, and a `backend-settings` key in repeated use
+across blueprints is demand arriving for a curated name.
+
 Where a guest holds both control planes, the same suites should
 validate agentless and guest-agent operation with equivalent
 results.
