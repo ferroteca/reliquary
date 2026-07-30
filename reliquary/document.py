@@ -32,12 +32,6 @@ _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
-# The curated device vocabulary. A name here is the *device model* a
-# guest driver binds to, spelled as the cross-hypervisor standard
-# spells it and never as one backend does — the bus suffix QEMU wants
-# (`virtio-rng-pci`) is the adapter's rendering, not the declaration.
-# The set grows one name at a time, as demand for a device arrives.
-_DEVICES = {"virtio-rng"}
 _SPEC_TYPES = {"machine", "media"}
 # Retired with the first-round four-component model; named so a stale
 # document is diagnosed rather than merely rejected.
@@ -298,7 +292,6 @@ class Machine:
     backend: Optional[str] = None
     memory: Optional[Union[int, Deferred]] = None
     cpus: Optional[Union[int, Deferred]] = None
-    devices: Tuple[str, ...] = ()
     drives: Mapping[str, MachineDrive] = field(default_factory=dict)
     boot: Tuple[str, ...] = ()
     description: Optional[Union[str, Deferred]] = None
@@ -791,8 +784,8 @@ def _location(value, where, register):
 _MEDIA_FIELDS = {"type", "name", "materialize", "size", "location", "sha256",
                  "read-only", "extension", "description", "notes", "children"}
 _CHILD_FIELDS = (_MEDIA_FIELDS - {"location"}) | {"path"}
-_MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "devices",
-                       "drives", "boot", "scripts", "control-planes",
+_MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "drives",
+                       "boot", "scripts", "control-planes",
                        "backend-settings", "parameters"}
 
 
@@ -952,9 +945,9 @@ def _check_type_echo(value, expected, where):
 # --- machine ---------------------------------------------------------
 
 _MACHINE_FIELDS = {
-    "type", "name", "platform", "backend", "memory", "cpus", "devices",
-    "drives", "boot", "description", "scripts", "control-planes",
-    "backend-settings", "parameters",
+    "type", "name", "platform", "backend", "memory", "cpus", "drives", "boot",
+    "description", "scripts", "control-planes", "backend-settings",
+    "parameters",
 }
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
@@ -1118,42 +1111,6 @@ def _control_planes(value, where):
     return tuple(normalized)
 
 
-def _devices(value, where):
-    """Parse the ``devices`` list: curated names, each declared once.
-
-    The vocabulary is closed and small on purpose. A device is a
-    *portable need* — "this machine must contain this device" — so the
-    name is the device model as its own cross-hypervisor standard
-    spells it, and each backend renders that in its own terms. A name
-    nothing has asked for is not in the set: it grows one at a time,
-    as demand arrives.
-
-    Whether the *guest* has a driver for the device is not judged here
-    or anywhere: Reliquary provides the hardware, exactly as it does
-    for a ``controller``, and the driver half stays the caller's.
-    """
-    if not isinstance(value, list):
-        raise where.error("devices must be an array of strings",
-            rule_id="value.not-an-array")
-    normalized, seen = [], set()
-    for index, entry in enumerate(value):
-        site = where.at(value, index, f"devices[{index}]")
-        device = _text(entry, site, closed=True)
-        if device not in _DEVICES:
-            allowed = ", ".join(sorted(_DEVICES))
-            raise site.error(
-                f"unknown device {device!r}; the devices are {allowed} — "
-                "the vocabulary is curated and grows one name at a time, "
-                "as demand for a device arrives",
-                rule_id="machine.device-unknown")
-        if device in seen:
-            raise site.error(f"devices contains duplicate {device!r}",
-                rule_id="machine.device-duplicate")
-        seen.add(device)
-        normalized.append(device)
-    return tuple(normalized)
-
-
 def _backend_settings(value, where):
     if not isinstance(value, collections.abc.Mapping):
         raise where.error("backend-settings must be an object",
@@ -1241,8 +1198,6 @@ def _machine(value, register, *, where=_MACHINE):
         memory=_memory(value["memory"], at("memory"))
         if "memory" in value else None,
         cpus=_cpus(value["cpus"], at("cpus")) if "cpus" in value else None,
-        devices=_devices(value["devices"], at("devices"))
-        if "devices" in value else (),
         drives=drives,
         boot=_boot(value["boot"], drives, at("boot")) if "boot" in value
         else _default_boot(drives),

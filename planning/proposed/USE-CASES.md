@@ -515,6 +515,11 @@ stands, and the journey has been walked end to end in code rather
 than only argued. API spellings shown;
 every step has its CLI twin (U9).
 
+[D93, later the same day, removed the devices axis: the
+declaration re-landed on the backend pin and the D92 hatch, and
+steps 3 and 5 below were reworked to that spelling with D93's
+delivery.]
+
 1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
    paravirtual device — with my host toolchain, and I want it
    tested against the real device model, from my own harness."
@@ -536,10 +541,10 @@ every step has its CLI twin (U9).
    ```
 
 3. **Author `blueprints\driver-rig.rlqb`**, checked in — the
-   device declared beside memory and drives, the work
-   drive pointing straight at the build output, relative
-   locations resolving against the project's own directories so
-   the file stays portable:
+   backend pinned and the device asked for in that backend's own
+   section, the work drive pointing straight at the build output,
+   relative locations resolving against the project's own
+   directories so the file stays portable across checkouts:
 
    ```json
    [
@@ -548,7 +553,12 @@ every step has its CLI twin (U9).
        "name": "driver-rig",
        "platform": "dos",
        "memory": "32M",
-       "devices": ["virtio-rng"],
+       "backend": "qemu",
+       "backend-settings": {
+         "qemu": {
+           "args": ["-device", "virtio-rng-pci"]
+         }
+       },
        "boot": ["hdd0"],
        "scripts": {
          "ready": "driver-ready"
@@ -574,36 +584,13 @@ every step has its CLI twin (U9).
    `hdd0` materializes as a differencing image over the
    checked-in installed base, so every machine boots the same
    bytes and the base is never written; `hdd1` *is* the build
-   directory, served to the guest as one FAT volume. The
-   `devices` line is the live surface since 2026-07-30 (F27
-   delivered, D91): the field, its closed curated vocabulary —
-   `virtio-rng` is in it — and the assignment axis step 5
-   exercises.
-
-   A device the vocabulary does not yet name takes the escape
-   hatch instead — live since 2026-07-30 (F28 delivered, D92) —
-   two more fields on
-   the same machine, `backend` and `backend-settings` sitting
-   beside `memory` and `drives` as first-class members of the
-   blueprint rather than a mode the document switches into:
-
-   ```json
-   {
-     "type": "machine",
-     "name": "driver-rig",
-     "platform": "dos",
-     "memory": "32M",
-     "backend": "qemu",
-     "backend-settings": {
-       "qemu": {
-         "args": ["-device", "virtio-rng-pci"]
-       }
-     },
-     "boot": ["hdd0"],
-     "scripts": { "ready": "driver-ready" },
-     "drives": { "…": "as above" }
-   }
-   ```
+   directory, served to the guest as one FAT volume. The pin and
+   the section are the live surface since 2026-07-30 (F28
+   delivered, D92), and together they are the whole spelling of
+   the device: a driver under test binds one particular device on
+   one particular backend, and P25 (D93) keeps backend-specific
+   hardware out of the portable vocabulary, so the machine says
+   `qemu` and asks QEMU for the device in QEMU's own words.
 
    **First-class is not the same as portable**, and the two are
    easy to conflate. Both fields are ordinary machine fields —
@@ -616,10 +603,10 @@ every step has its CLI twin (U9).
    the keys are that adapter's own, so a key `qemu` does not
    define is refused rather than carried and ignored, and an
    argument restating `memory`, `drives`, `boot` or the recorded
-   identity is refused naming its owner (D92). That
-   is the pressure that grows the curated `devices` names one at a
-   time, and a settings key in repeated use across blueprints is
-   demand arriving for one.
+   identity is refused naming its owner (D92). A settings key in
+   repeated use across blueprints is demand arriving for a
+   first-class name — admitted under P25's bar, when more than
+   one backend can honor it, and never on demand alone (D93).
 
 4. **Author `scripts\driver-ready.rlqs`** — the caller's own
    readiness protocol, because Reliquary ships no readiness
@@ -640,13 +627,13 @@ every step has its CLI twin (U9).
 5. **Create the machine.**
    `reliquary.create_machine("driver-rig", context=ctx)` — CLI
    twin `rlq create-machine --blueprint driver-rig` — returns
-   `"driver-rig-0"`. Assignment reads the whole demand, `devices`
-   included: the priority walk takes the first
-   backend both available and capable of `virtio-rng`, and a host
-   where none is refuses **now**, at preflight, naming the
-   device — a `PreflightError`, exit `3` at the CLI — not
-   mid-boot as a driver that mysteriously would not load, and
-   never by silently landing on an engine without the device.
+   `"driver-rig-0"`. The pin decides: only `qemu` is probed, and
+   a host without it refuses **now**, at preflight, naming the
+   backend — a `PreflightError`, exit `3` at the CLI — not
+   mid-boot as a driver that mysteriously would not load. The
+   section's arguments were already judged at create (D92: the
+   renderer is the validator), so a machine that materializes is
+   one whose device argument renders at every start.
 
 6. **Learn the guest's own names.**
    `reliquary.describe_drives(machine="driver-rig-0",

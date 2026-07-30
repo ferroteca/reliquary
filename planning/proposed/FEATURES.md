@@ -399,14 +399,13 @@ Decide first:
   multi-device controllers (additive change); and how Hyper-V
   generations surface (a backend setting vs. inferred from
   declared capabilities).
-  **The mechanism for the plain cases now exists** (F27, delivered
-  2026-07-30, D91): `devices` is the curated, capability-checked
-  vocabulary a device name arrives in, so a new *device* is one
-  entry plus one adapter mapping rather than a design round. What
-  stays on this bullet is what a name in a list cannot express —
-  configuration (a NIC's network mode, a display's resolution), a
-  device that must be *addressed* rather than merely present, and
-  the firmware and slot questions above.
+  **Admission is gated by P25** (D93, 2026-07-30, which removed
+  D91's single-backend `devices` axis): a device or adapter name
+  becomes a first-class field only with general applicability
+  across multiple backends — what one backend alone provides
+  stays behind that backend's pin in `backend-settings`. So this
+  bullet's entries each carry two questions now: the design
+  itself, and whether the capability clears the bar at all.
   **A second controller type unfixes every disk letter**, which
   is the one constraint this bullet carries rather than merely
   lists. Slot order is authoritative only within a type; across

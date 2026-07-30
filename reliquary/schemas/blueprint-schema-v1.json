@@ -47,14 +47,6 @@
           "type": ["string", "integer"]
         },
         "cpus": {"type": ["string", "integer"]},
-        "devices": {
-          "description": "Devices the machine must contain, as a portable declared fact: assignment finds a backend that provides every one, and a host where none can refuses naming the device. The vocabulary is curated and grows one name at a time, as demand for a device arrives.",
-          "type": "array",
-          "items": {
-            "description": "A closed vocabulary: never widened to admit a reference pattern.",
-            "enum": ["virtio-rng"]
-          }
-        },
         "drives": {
           "type": "object",
           "propertyNames": {

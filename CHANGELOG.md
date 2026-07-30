@@ -31,8 +31,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `-machine`/`-M`, and the identity and control-channel arguments are
   refused naming the field that owns each, because two sources for one
   fact is the one thing a hatch must not become. Deliberately still
-  yours: `-device`, the documented route to a device the curated
-  `devices` vocabulary does not yet name, and `-cpu`, which selects a
+  yours: `-device`, the documented route to a QEMU device —
+  backend-specific hardware has no first-class blueprint spelling
+  (P25) — and `-cpu`, which selects a
   CPU model where `cpus` owns only the count. Only the *assigned*
   backend's section is judged; another backend's is preserved as
   written and never examined.
@@ -46,37 +47,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Two or more sections narrow nothing: each stays inert until its
   backend wins the ordinary walk. A declared `backend` outranks either
   way.
-
-- **A `devices` axis for the machine blueprint** (D91, delivering
-  F27). A machine may now declare the hardware it must contain
-  beyond its drives — `"devices": ["virtio-rng"]` — and that
-  declaration is a **portable need**, not an engine preference.
-  Backend assignment judges it like every other capability: any
-  available backend that reports the device may host the machine,
-  and a host where none does fails at `create-machine` **naming the
-  device** rather than something downstream of it. The resolved list
-  is recorded in the state, and the assigned backend renders it at
-  every start (QEMU: `-device virtio-rng-pci`).
-
-  Until now the only way to say "this machine must contain this
-  device" was to pin `backend` and pass raw device arguments through
-  `backend-settings` — which records the wrong fact, forecloses
-  every other backend that genuinely provides the device, and fails
-  late or not at all. This is the field for the case where a
-  device's presence is the machine's whole point: a guest driver
-  under test binds *that* device, and without it there is no test
-  rather than a weaker one.
-
-  The vocabulary is **closed and curated**, and each name is the
-  device model as its own cross-hypervisor standard spells it — the
-  bus-qualified spelling is the adapter's business, which is what
-  keeps the blueprint portable. It starts at `virtio-rng`, the one
-  name demand has arrived for, and grows **one name at a time** as
-  more does; a name it does not carry is refused when the blueprint
-  is read. Whether the *guest* has a driver for the device is not
-  Reliquary's business, exactly as it is not for a `controller`: the
-  machine provides the hardware, and supplying the driver is
-  frequently the very thing being tested.
 
 - **A readiness example in the codex** (T9): `freedos-ready.rlqs`,
   named by the `freedos` blueprint as its `ready` label, so

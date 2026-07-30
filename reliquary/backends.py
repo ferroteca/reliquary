@@ -8,12 +8,12 @@ one of the world-facing interfaces: no adapter operation appears on
 the CLI or in the embedding API, and consumers touch backends only
 through blueprint vocabulary (``backend``, ``backend-settings`` —
 whose keys each adapter defines and validates — ``control-planes``,
-``devices``, drives and controllers) and through the capability
-failures preflight reports.
+drives and controllers) and through the capability failures preflight
+reports.
 
 The constraint that governs here is honesty: **capabilities are
 reported, never emulated**. A backend that cannot provide a declared
-drive, controller, materialization mode, control plane or device fails
+drive, controller, materialization mode or control plane fails
 capability preflight by name; nothing is silently approximated.
 
 Three things live in this module because none of them is any one
@@ -71,15 +71,11 @@ class Capabilities:
     """A backend's named-vocabulary capability report.
 
     The vocabulary is the blueprint's own (docs/spec/blueprint-model.md):
-    control planes, drive media kinds, controller types, media
-    materialization modes, and the curated ``devices``. ``vvfat``
-    reports the host-directory drive QEMU alone provides — a
-    directory-source media's realized shape, which is only knowable
-    after resolution, so it is judged where the drive is rendered
-    rather than at assignment. **A device is not like that**: it is a
-    declared fact from the moment the blueprint is read, so it is
-    judged at assignment with the rest of the demand, and an adapter
-    that reports one must render it.
+    control planes, drive media kinds, controller types, and media
+    materialization modes. ``vvfat`` reports the host-directory drive
+    QEMU alone provides — a directory-source media's realized shape,
+    which is only knowable after resolution, so it is judged where the
+    drive is rendered rather than at assignment.
     """
 
     backend: str
@@ -87,7 +83,6 @@ class Capabilities:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
-    devices: Tuple[str, ...] = ()
     vvfat: bool = False
     #: Whether the adapter can present a drive image as an addressable
     #: device, which is what at-rest reading of a stopped machine's
@@ -134,7 +129,6 @@ class Requirements:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
-    devices: Tuple[str, ...] = ()
 
 
 class BackendAdapter:
@@ -194,9 +188,6 @@ class BackendAdapter:
         for mode in requirements.materialize:
             if mode not in report.materialize:
                 missing.append(f"media materialize {mode!r}")
-        for device in requirements.devices:
-            if device not in report.devices:
-                missing.append(f"device {device!r}")
         return tuple(missing)
 
     def validate_settings(self, settings):

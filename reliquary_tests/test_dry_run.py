@@ -94,7 +94,6 @@ class _DryCase(unittest.TestCase):
         """A machine touching every materialization path at once."""
         return {
             "platform": "dos",
-            "devices": ["virtio-rng"],
             "drives": {
                 "hdd0": {"type": "media", "size": "20M"},
                 "cdrom0": "livecd",
@@ -221,7 +220,6 @@ class PredictsTheCreateTests(_DryCase):
         self.assertEqual(plan["cpus"], state["cpus"])
         self.assertEqual(plan["boot"], state["boot"])
         self.assertEqual(plan["control-planes"], state["control-planes"])
-        self.assertEqual(plan["devices"], state["devices"])
 
         predicted = {drive["key"]: drive for drive in plan["drives"]}
         self.assertEqual(sorted(predicted), sorted(state["drives"]))
@@ -233,18 +231,6 @@ class PredictsTheCreateTests(_DryCase):
                 self.assertEqual(
                     built[field], predicted[key].get(field),
                     f"drive {key} field {field} was mispredicted")
-
-    def test_the_report_names_the_declared_devices(self):
-        self._write("demo", self._mixed(), [self._livecd(),
-                                            self._remote()])
-        self.assertIn("devices: virtio-rng", self._dry().report)
-
-    def test_a_machine_declaring_no_device_says_nothing_about_devices(self):
-        # An empty line would read as a machine that asked for devices
-        # and was given none.
-        self._write("plain", {"platform": "dos",
-                              "drives": {"cdrom0": None}})
-        self.assertNotIn("devices:", self._dry("plain").report)
 
     def test_the_predicted_number_is_the_lowest_free(self):
         self._write("demo", self._mixed(), [self._livecd(),
@@ -438,20 +424,6 @@ class BackendQuestionTests(_DryCase):
             self._dry()
         self.assertEqual("machine.no-capable-backend",
                          caught.exception.rule_id)
-
-    def test_a_device_is_judged_for_the_host_you_are_not_on(self):
-        # The U22 question asked about somewhere else: would this
-        # blueprint's device work *there*? Capability alone decides,
-        # and a backend that provides no device is refused by name.
-        self._write("demo", self._mixed(), [self._livecd(),
-                                            self._remote()])
-        self._install("vmware", available=False, capabilities=Capabilities(
-            backend="vmware", control_planes=("agentless-display",),
-            media=("floppy", "hdd", "cdrom"), controllers=("ide",),
-            materialize=("new", "difference", "copy", "use"), vvfat=True))
-        with self.assertRaises(PreflightError) as caught:
-            self._dry(backend="vmware")
-        self.assertIn("device 'virtio-rng'", str(caught.exception))
 
     def test_a_narrowing_section_is_named_as_the_source(self):
         machine = dict(self._mixed(),

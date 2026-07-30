@@ -224,6 +224,12 @@ pattern, and why a reported device must be a renderable one — are
 `devices` half was live; the escape-hatch half was **F28**, which
 cleared hours later — below.)*
 
+*[D93 overruled this the same day it landed: the axis is removed,
+admission to the blueprint's first-class vocabulary is gated by
+P25 (root ARCHITECTURE.md), and U22's route is the backend pin
+plus F28's hatch. The `devices` clause this note points at is
+gone with it.]*
+
 *(F28 — adapters honor `backend-settings` — delivered 2026-07-30
 (owner), the same day as F27 and immediately after it, so its
 number retires unreused and the work items go with it. The entry's

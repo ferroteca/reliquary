@@ -50,20 +50,6 @@ class CapabilityReportTests(unittest.TestCase):
         self.assertEqual(adapter.unmet(_requirements(media=("floppy",))),
                          ("floppy drives",))
 
-    def test_a_device_the_backend_provides_leaves_nothing_unmet(self):
-        self.assertEqual(
-            self.adapter.unmet(_requirements(devices=("virtio-rng",))),
-            ())
-
-    def test_a_device_the_backend_lacks_is_named_as_the_device(self):
-        # The need, not a symptom: what the caller declared is what
-        # the refusal quotes (P11, U22).
-        report = Capabilities(backend="vmware", devices=())
-        adapter = fake_backend.FakeAdapter("vmware", capabilities=report)
-        self.assertEqual(
-            adapter.unmet(_requirements(devices=("virtio-rng",))),
-            ("device 'virtio-rng'",))
-
 
 class SettingsVocabularyTests(unittest.TestCase):
     """A section is honored or refused — never carried and ignored.
@@ -153,33 +139,6 @@ class AssignmentTests(unittest.TestCase):
             self.assertIn(name, message)
         self.assertIn("floppy drives", message)
 
-    def test_a_declared_device_finds_whichever_backend_provides_it(self):
-        # U22's payoff, and the whole reason the need is declared
-        # rather than pinned: the caller says which device, not which
-        # engine, and the walk goes wherever that device is.
-        self._install(
-            qemu=fake_backend.FakeAdapter(
-                "qemu", capabilities=Capabilities(
-                    backend="qemu", media=("hdd",),
-                    control_planes=("agentless-display",),
-                    materialize=("new",))),
-            virtualbox=fake_backend.FakeAdapter("virtualbox"))
-        self.assertEqual(
-            backends.assign(_requirements(devices=("virtio-rng",))),
-            "virtualbox")
-
-    def test_a_device_nothing_available_provides_names_the_device(self):
-        self._install(
-            qemu=fake_backend.FakeAdapter(
-                "qemu", capabilities=Capabilities(backend="qemu")),
-            virtualbox=fake_backend.FakeAdapter("virtualbox",
-                                                available=False),
-            vmware=fake_backend.FakeAdapter("vmware", available=False),
-            hyperv=fake_backend.FakeAdapter("hyperv", available=False))
-        with self.assertRaises(PreflightError) as caught:
-            backends.assign(_requirements(devices=("virtio-rng",)))
-        self.assertIn("device 'virtio-rng'", str(caught.exception))
-
     def test_a_declared_backend_pins_the_choice_and_skips_the_walk(self):
         qemu = fake_backend.FakeAdapter("qemu")
         self._install(qemu=qemu,
@@ -265,15 +224,10 @@ class DiscoveryTests(unittest.TestCase):
         self.assertTrue(probe.available)
         self.assertIn("unbuilt", probe.detail)
         self.assertEqual(adapter.capabilities().control_planes, ())
-        # Including devices: the empty tuple is honest and free, so a
-        # stub never has to be taught the vocabulary to stay out of a
-        # walk it cannot serve.
-        self.assertEqual(adapter.capabilities().devices, ())
         self.assertEqual(
             adapter.unmet(_requirements(
-                control_planes=("agentless-display",),
-                devices=("virtio-rng",))),
-            ("control plane 'agentless-display'", "device 'virtio-rng'"))
+                control_planes=("agentless-display",))),
+            ("control plane 'agentless-display'",))
 
     def test_an_absent_stub_backend_says_what_it_looked_for(self):
         adapter = backend_stubs.VMwareAdapter()

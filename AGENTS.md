@@ -46,8 +46,6 @@ workflow:
   case-insensitively, and the reference grammar is closed at two productions — the character class screens, the
   productions decide — refusing references in identity/graph positions and the closed vocabularies; it validates the
   full field reference (`platform`, `backend`, `memory`, `cpus`,
-  `devices` — the curated device vocabulary, a portable "this machine must contain this device" judged at
-  assignment and rendered by the adapter that reported it, grown one name at a time as demand arrives,
   `drives` — a media name, `null`, `{media, controller, enabled}`, or an inline media (the anonymous blank included) —
   `boot`, `name` (the id-safe identity, not a
   display label), `description`, `scripts`, `control-planes`, `backend-settings`, `parameters`),
@@ -100,7 +98,7 @@ workflow:
   names what the library holds and reports nothing of yours, `codex_blueprint_available` is the question a
   refusal asks so it can name the seed command), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` — where **backend assignment** happens, before any image work: the
-  blueprint's whole demand (control planes, devices, media kinds, controllers, materialization modes) becomes a
+  blueprint's whole demand (control planes, media kinds, controllers, materialization modes) becomes a
   `backends.Requirements`, and a declared `backend` pins the choice — as does `backend-settings` for exactly
   one backend, which **narrows** the walk to it (`_backend_choice`: declared, else a lone section, else the
   walk; presence narrows, not content) — while an absent one walks the priority
@@ -193,10 +191,8 @@ workflow:
   requirements as **two answers rather than one verdict**, because whether this host has a backend and
   whether that backend could build this machine are two questions and a dry run asks only the second.
   `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
-  `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the device,
-  drive and boot rendering a machine's state lowers into (`DEVICE_MODELS` is where a portable device name
-  becomes QEMU's own bus-qualified spelling, and the keys are exactly what `capabilities()` claims, because a
-  reported capability is one that renders), the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
+  `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
+  and boot rendering a machine's state lowers into, the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
   `args`, `RESERVED_ARGUMENTS` = what a blueprint field or the VM identity owns — case-sensitively, `-m`
   being memory and `-M` the machine type, and deliberately *not* `-device` or `-cpu`; `settings_args` both
   validates and renders, which is what makes a section a create accepted one a start applies, and it renders
@@ -872,11 +868,6 @@ no unit test may probe or launch a real backend:
   requirement, before any image work
 - the priority walk takes the first backend both available and capable, so availability
   alone never wins and the order never stands in for a capability check
-- a declared `devices` entry is a portable need: assignment lands on whichever backend
-  reports the device, and a host where none does fails closed naming the *device*
-- every device an adapter reports is one it renders — the QEMU claim and `DEVICE_MODELS`
-  are asserted against each other, because a claim assignment honors and the launch
-  cannot is a promise broken far from where it was made
 - a `backend-settings` key the assigned adapter does not define is refused at
   materialization, an argument restating a first-class field or the VM identity is
   refused naming its owner, and an inert section (another backend's) is preserved

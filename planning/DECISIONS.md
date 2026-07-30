@@ -208,6 +208,99 @@ is waiting on an answer today.
 
 ## Decided
 
+- D93 — FIRST-CLASS BLUEPRINT VOCABULARY REQUIRES GENERAL
+  APPLICABILITY ACROSS BACKENDS, AND THE DEVICES AXIS GOES —
+  DECIDED (owner, 2026-07-30), overruling D91 the day it was
+  decided and delivered. **The removal is owed and not yet
+  landed**: this entry is the adjudication, the delivering commit
+  cites it, and until that commit the code and the norms still
+  carry the axis D91 built. Supports P8 and the standing growth
+  rule (root ARCHITECTURE.md, which the delivery amends to carry
+  the bar); U4 and U14 stand undisturbed, both met before the
+  axis existed; U22 (proposed) keeps its journey and changes
+  route, below. [Delivered 2026-07-30, the same day, with the bar
+  armed as **P25 — The portable surface generalizes** (root
+  ARCHITECTURE.md), owner-directed; the delivering commit is the
+  record.]
+
+  THE BAR: A FIRST-CLASS NODE IN THE BLUEPRINT SPEC MUST HAVE
+  GENERAL APPLICABILITY ACROSS MULTIPLE BACKENDS. Demand arriving
+  stays necessary and stops being sufficient. D91's growth rule —
+  one name at a time, as demand for a device arrives — admitted
+  any demanded name, and that is the door closed here: a
+  backend-unique capability admitted as a portable field is the
+  precedent by which every unique parameter of every backend
+  claims first-class standing, one sympathetic case at a time,
+  until the blueprint is a union of backend vocabularies wearing
+  portable syntax. A capability one backend alone provides
+  reaches a machine through that backend's pin and its
+  `backend-settings` section (D92) — not a lesser route but the
+  honest one: the pin records a real constraint of the machine
+  being described.
+
+  VIRTIO-RNG FAILS THE BAR. D91's naming argument — the model
+  name is agnostic because virtio is a cross-hypervisor
+  standard — is true of the spelling and answered here: the bar
+  tests availability, not spelling. Among the four declared
+  backends the device is QEMU's alone. VirtualBox implements
+  virtio-net and virtio-scsi and no RNG device of any kind;
+  VMware and Hyper-V offer no declarable RNG device at all.
+  Latent reach — some backend could implement the standard some
+  day — is a promise the portable field makes that no assignment
+  on any real host can keep: the quiet lie P11 polices in a
+  capability report, moved into the schema.
+
+  THE AXIS GOES WHOLE, NOT JUST THE NAME. **Retaining the emptied
+  axis was WEIGHED AND DECLINED**: a closed vocabulary with no
+  admissible name is a field no document can use — dead surface,
+  machinery kept ahead of demand, the same sin D91 itself refused
+  when it declined seeding `virtio-console` and `virtio-net`.
+  **Waiting for repeated hatch use before ruling was WEIGHED AND
+  DECLINED too**: that signal measures demand, and demand no
+  longer admits a name by itself. The axis returns the day a
+  device with genuine multi-backend availability arrives, judged
+  against this bar; the assignment-time design D91 worked out is
+  on the record, retired below, for that day.
+
+  U22 KEEPS ITS JOURNEY AND LOSES ITS ROUTE. The driver under
+  test binds one particular device on one particular backend, and
+  the pin plus `-device` through the hatch — `-device` is
+  deliberately unreserved for exactly this — becomes the one
+  spelling of that fact. The draft's "records the wrong fact"
+  argument re-reads under the bar: for a driver exercised against
+  QEMU's device model the qemu pin records the right fact, and a
+  portable declaration only one backend could ever satisfy
+  recorded the wrong one. Steps 3 and 5 of the drafted journey
+  await the owner's rework; the draft's status paragraph carries
+  the pointer.
+
+  THE REMOVAL FOLDS ACROSS D91's own fold list, in reverse:
+  [document.py](../reliquary/document.py),
+  [backends.py](../reliquary/backends.py) (the requirement and
+  capability axis),
+  [backend_qemu.py](../reliquary/backend_qemu.py)
+  (`DEVICE_MODELS`, `device_args`, the report, the launch, and
+  the `RESERVED_ARGUMENTS` comment that cites D91),
+  [machines.py](../reliquary/machines.py) (state, `apply`, the
+  dry run), both schemas;
+  [blueprint-model.md](../docs/spec/blueprint-model.md),
+  [instance-model.md](../docs/spec/instance-model.md),
+  [blueprint-reference.md](../docs/blueprint-reference.md),
+  [blueprint-guide.md](../docs/blueprint-guide.md),
+  [api-reference.md](../docs/api-reference.md); root
+  [ARCHITECTURE.md](../ARCHITECTURE.md) (the devices paragraph
+  under Standing constraints, replaced by the bar) and
+  [AGENTS.md](../AGENTS.md);
+  [proposed/FEATURES.md](proposed/FEATURES.md) (F5's
+  device-growth bullet) and
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (U22, annotated
+  with this ruling now, reworked by the owner later);
+  `test_document.py`, `test_backends.py`, `test_backend_qemu.py`,
+  `test_machines.py`, `test_dry_run.py` and the four corpus
+  fixtures; and the CHANGELOG's unreleased section, where the
+  axis entry is struck rather than reversed, having never
+  shipped.
+
 - D92 — THE HATCH IS HONORED, THE RENDERER IS THE VALIDATOR, AND A
   LONE SECTION NARROWS — DECIDED (owner, 2026-07-30) and delivered the
   same day, retiring F28 and emptying the pledged shelf. Supports U22
@@ -312,7 +405,9 @@ is waiting on an answer today.
   additional value (`backend-settings`) for the dry run's
   `backend-source`. No numbered use case is cost. **U22's last mark
   clears**, so the journey now reads complete on the live surface;
-  promoting it is a governed act and stays the owner's.
+  promoting it is a governed act and stays the owner's. [D93
+  reopens steps 3 and 5: the devices axis goes, and the journey
+  re-lands on this entry's hatch.]
 
   Folded: [backends.py](../reliquary/backends.py) (`settings_keys`,
   `validate_settings`, `assign(narrowed=)`),
@@ -334,130 +429,6 @@ is waiting on an answer today.
   [proposed/USE-CASES.md](proposed/USE-CASES.md) (U22's step 3);
   `test_backends.py`, `test_backend_qemu.py`, `test_machines.py`,
   `test_dry_run.py`; and the CHANGELOG's unreleased section.
-
-- D91 — A DEVICE IS A DECLARED MODEL, JUDGED AT ASSIGNMENT, AND THE
-  VOCABULARY IS WHAT DEMAND HAS ASKED FOR — DECIDED (owner,
-  2026-07-30) and delivered the same day, retiring F27. Supports U22
-  (proposed), U4, U14; P8, P10, P11, and the standing growth
-  constraint (root ARCHITECTURE.md) this axis is the first
-  application of beyond drives. **Both of F27's decide-firsts were
-  settled as the record already implied** rather than re-argued: the
-  pledged journey's own spelling answers the first, and the entry
-  answers the second in its own words. What follows is that
-  settlement and what the build then decided.
-
-  THE NAME IS THE DEVICE MODEL, SPELLED BY THE STANDARD AND NOT BY A
-  BACKEND. `virtio-rng` — the first decide-first, and the tension the
-  entry named dissolves exactly where it predicted. **An abstract
-  class (`rng`) was WEIGHED AND DECLINED**: a driver under test binds
-  one particular device, so a class name cannot say the one thing
-  U22 exists to say, and a machine built to exercise a virtio driver
-  would be satisfiable by any entropy source at all. **The backend's
-  own spelling was declined too** — `virtio-rng-pci` is QEMU's bus
-  qualifier, and putting it in the blueprint would move
-  non-portability into the portable field and make every later
-  adapter translate backwards out of QEMU's vocabulary. The model
-  name is the *agnostic* name here because virtio is itself a
-  cross-hypervisor standard; the bus suffix lives in
-  `backend_qemu.DEVICE_MODELS` and nowhere else.
-
-  ONE NAME, BECAUSE ONE NAME IS WHAT DEMAND ARRIVED FOR. The
-  vocabulary ships as `{virtio-rng}`. **Seeding `virtio-console` and
-  `virtio-net` beside it was WEIGHED AND DECLINED**, and the
-  `control-planes` precedent is the argument that had to be answered:
-  there the parser accepts the model's whole set and materialization
-  refuses what is unbuilt. That works because the planes are a
-  designed, closed family — four of them, with defaults and a
-  preference order. Devices are an open world with no completion
-  point, so the only rule that stays honest is that the vocabulary is
-  what has been asked for; a name admitted ahead of demand teaches an
-  author to write a declaration no host on earth can satisfy, and
-  P11 reads the same on a vocabulary as on a capability report.
-
-  THE DRIVER HALF IS NOT RELIQUARY'S, stated where the `controller`
-  rule states it — the second decide-first, adopted as the entry
-  recommended. The machine provides the hardware; supplying the
-  driver is the caller's, and frequently the very thing under test.
-  Nothing checks it, and nothing should: a check would need to know
-  what is installed inside a guest, which is the inference P10
-  refuses.
-
-  ASSIGNMENT-TIME JUDGMENT IS RIGHT FOR *THIS* AXIS, which is the
-  distinction F27's entry drew against the source proposal's reading
-  of `Capabilities.vvfat`. A directory-source media's realized shape
-  is knowable only after resolution, so vvfat is judged where the
-  drive is rendered — deliberately, not as a defect. A device is a
-  declared fact from the moment the blueprint parses, so it joins
-  `Requirements`/`Capabilities` and is judged in `unmet()` with every
-  other axis, against the whole machine.
-
-  A REPORTED DEVICE IS ONE THAT RENDERS, and this is the P11
-  direction that actually rots. QEMU's reported `devices` is
-  literally the key set of its render map, asserted by test in both
-  directions: a capability claimed and not renderable would be
-  honored by assignment and then fail at launch, a promise broken far
-  from where it was made. An unmapped name reaching the renderer is
-  therefore a fault (`machine.device-unsupported`), not a caller's
-  mistake — assignment refused it already.
-
-  APPLY ABSORBS A DEVICES CHANGE. A device is a launch argument and
-  nothing materialized, so adding or dropping one on a stopped
-  machine needs no `recreate`; and a device the machine's *own*
-  backend cannot provide refuses the apply by name, because a
-  machine keeps the backend its images are in the format of. The
-  resolved list enters the blueprint digest like every other resolved
-  field, so a device added to the blueprint reads as drift, and the
-  state carries `[]` where none was declared rather than omitting the
-  key.
-
-  THE REFUSAL POINTS AT NO HATCH YET, deliberately. An unadmitted
-  name is refused naming the vocabulary and its growth rule, and says
-  nothing about `backend-settings` — the hatch F27's entry and U22
-  both name is F28's, still unbuilt, and a diagnostic that sent an
-  author to a section no adapter reads would be the quiet lie P11
-  exists to prevent. The docs state the hatch's status honestly
-  instead; F28 is what makes the pointer true.
-
-  NO CLI FLAG OF ITS OWN, and P6 is not strained by that: `devices`
-  is blueprint vocabulary reached identically from both
-  presentations, and `new-blueprint`'s scaffolder covers a subset of
-  the format by design — it has no `controller` flag either, and the
-  spec already says to edit the JSON for what it does not cover. No
-  semantic verb was added, so there is nothing to keep in parity.
-
-  P8 TRIAGE: additive on S4 (one optional machine field, one new
-  closed vocabulary) and on the recorded shapes S4 also norms (the
-  state's `devices`, the dry run's plan key and report line). No
-  numbered use case is cost; U22's step 3 loses its **requires F27**
-  mark, U4 keeps a shareable checked-in blueprint that now says what
-  hardware it needs, and U14's consumers are who the axis serves. An
-  easy approval under the rule.
-
-  Folded: [document.py](../reliquary/document.py) (`_DEVICES`,
-  `_devices`, the `Machine` field, the did-you-mean vocabulary),
-  [backends.py](../reliquary/backends.py) (`devices` on
-  `Requirements`/`Capabilities`, judged in `unmet`),
-  [backend_qemu.py](../reliquary/backend_qemu.py) (`DEVICE_MODELS`,
-  `device_args`, the report, the launch),
-  [machines.py](../reliquary/machines.py) (the requirement, the
-  state, `apply`, the dry-run plan and report), both schemas;
-  [blueprint-model.md](../docs/spec/blueprint-model.md) (the field
-  and the reach clause),
-  [instance-model.md](../docs/spec/instance-model.md) (what `apply`
-  absorbs), [blueprint-reference.md](../docs/blueprint-reference.md)
-  (the `devices` section, the assignment paragraph, the validation
-  summary), [blueprint-guide.md](../docs/blueprint-guide.md),
-  [api-reference.md](../docs/api-reference.md); root
-  [ARCHITECTURE.md](../ARCHITECTURE.md) (the standing constraint's
-  citation), [AGENTS.md](../AGENTS.md);
-  [pledged/FEATURES.md](pledged/FEATURES.md) (F27 delivered, its
-  number retired), [proposed/FEATURES.md](proposed/FEATURES.md)
-  (F5's device-growth bullet), and
-  [proposed/USE-CASES.md](proposed/USE-CASES.md) (U22's step 3);
-  `test_document.py`, `test_backends.py`, `test_backend_qemu.py`,
-  `test_machines.py`, `test_dry_run.py`, four corpus fixtures and
-  the closed-vocabulary schema assertion; and the CHANGELOG's
-  unreleased section.
 
 - D90 — A RUN'S OUTCOME IS A POSTCONDITION, A WAIT IS A POLL, AND AN
   EXPIRED WAIT IS BOTH A FAILURE AND A TIMEOUT — DECIDED (owner,
@@ -8554,6 +8525,133 @@ spellings of their time); each retirement note names what
 overruled it. A retired decision binds nothing but remains the
 record — and the guard against re-litigating still applies:
 reopening one is argued through the interface-change rule.
+
+- D91 — RETIRED (overruled by D93, the multi-backend applicability
+  bar, the same day D91 was decided and delivered; the removal it
+  owes is D93's to land) — A DEVICE IS A DECLARED MODEL, JUDGED AT
+  ASSIGNMENT, AND THE VOCABULARY IS WHAT DEMAND HAS ASKED FOR —
+  DECIDED (owner, 2026-07-30) and delivered the same day, retiring
+  F27. Supports U22
+  (proposed), U4, U14; P8, P10, P11, and the standing growth
+  constraint (root ARCHITECTURE.md) this axis is the first
+  application of beyond drives. **Both of F27's decide-firsts were
+  settled as the record already implied** rather than re-argued: the
+  pledged journey's own spelling answers the first, and the entry
+  answers the second in its own words. What follows is that
+  settlement and what the build then decided.
+
+  THE NAME IS THE DEVICE MODEL, SPELLED BY THE STANDARD AND NOT BY A
+  BACKEND. `virtio-rng` — the first decide-first, and the tension the
+  entry named dissolves exactly where it predicted. **An abstract
+  class (`rng`) was WEIGHED AND DECLINED**: a driver under test binds
+  one particular device, so a class name cannot say the one thing
+  U22 exists to say, and a machine built to exercise a virtio driver
+  would be satisfiable by any entropy source at all. **The backend's
+  own spelling was declined too** — `virtio-rng-pci` is QEMU's bus
+  qualifier, and putting it in the blueprint would move
+  non-portability into the portable field and make every later
+  adapter translate backwards out of QEMU's vocabulary. The model
+  name is the *agnostic* name here because virtio is itself a
+  cross-hypervisor standard; the bus suffix lives in
+  `backend_qemu.DEVICE_MODELS` and nowhere else.
+
+  ONE NAME, BECAUSE ONE NAME IS WHAT DEMAND ARRIVED FOR. The
+  vocabulary ships as `{virtio-rng}`. **Seeding `virtio-console` and
+  `virtio-net` beside it was WEIGHED AND DECLINED**, and the
+  `control-planes` precedent is the argument that had to be answered:
+  there the parser accepts the model's whole set and materialization
+  refuses what is unbuilt. That works because the planes are a
+  designed, closed family — four of them, with defaults and a
+  preference order. Devices are an open world with no completion
+  point, so the only rule that stays honest is that the vocabulary is
+  what has been asked for; a name admitted ahead of demand teaches an
+  author to write a declaration no host on earth can satisfy, and
+  P11 reads the same on a vocabulary as on a capability report.
+
+  THE DRIVER HALF IS NOT RELIQUARY'S, stated where the `controller`
+  rule states it — the second decide-first, adopted as the entry
+  recommended. The machine provides the hardware; supplying the
+  driver is the caller's, and frequently the very thing under test.
+  Nothing checks it, and nothing should: a check would need to know
+  what is installed inside a guest, which is the inference P10
+  refuses.
+
+  ASSIGNMENT-TIME JUDGMENT IS RIGHT FOR *THIS* AXIS, which is the
+  distinction F27's entry drew against the source proposal's reading
+  of `Capabilities.vvfat`. A directory-source media's realized shape
+  is knowable only after resolution, so vvfat is judged where the
+  drive is rendered — deliberately, not as a defect. A device is a
+  declared fact from the moment the blueprint parses, so it joins
+  `Requirements`/`Capabilities` and is judged in `unmet()` with every
+  other axis, against the whole machine.
+
+  A REPORTED DEVICE IS ONE THAT RENDERS, and this is the P11
+  direction that actually rots. QEMU's reported `devices` is
+  literally the key set of its render map, asserted by test in both
+  directions: a capability claimed and not renderable would be
+  honored by assignment and then fail at launch, a promise broken far
+  from where it was made. An unmapped name reaching the renderer is
+  therefore a fault (`machine.device-unsupported`), not a caller's
+  mistake — assignment refused it already.
+
+  APPLY ABSORBS A DEVICES CHANGE. A device is a launch argument and
+  nothing materialized, so adding or dropping one on a stopped
+  machine needs no `recreate`; and a device the machine's *own*
+  backend cannot provide refuses the apply by name, because a
+  machine keeps the backend its images are in the format of. The
+  resolved list enters the blueprint digest like every other resolved
+  field, so a device added to the blueprint reads as drift, and the
+  state carries `[]` where none was declared rather than omitting the
+  key.
+
+  THE REFUSAL POINTS AT NO HATCH YET, deliberately. An unadmitted
+  name is refused naming the vocabulary and its growth rule, and says
+  nothing about `backend-settings` — the hatch F27's entry and U22
+  both name is F28's, still unbuilt, and a diagnostic that sent an
+  author to a section no adapter reads would be the quiet lie P11
+  exists to prevent. The docs state the hatch's status honestly
+  instead; F28 is what makes the pointer true.
+
+  NO CLI FLAG OF ITS OWN, and P6 is not strained by that: `devices`
+  is blueprint vocabulary reached identically from both
+  presentations, and `new-blueprint`'s scaffolder covers a subset of
+  the format by design — it has no `controller` flag either, and the
+  spec already says to edit the JSON for what it does not cover. No
+  semantic verb was added, so there is nothing to keep in parity.
+
+  P8 TRIAGE: additive on S4 (one optional machine field, one new
+  closed vocabulary) and on the recorded shapes S4 also norms (the
+  state's `devices`, the dry run's plan key and report line). No
+  numbered use case is cost; U22's step 3 loses its **requires F27**
+  mark, U4 keeps a shareable checked-in blueprint that now says what
+  hardware it needs, and U14's consumers are who the axis serves. An
+  easy approval under the rule.
+
+  Folded: [document.py](../reliquary/document.py) (`_DEVICES`,
+  `_devices`, the `Machine` field, the did-you-mean vocabulary),
+  [backends.py](../reliquary/backends.py) (`devices` on
+  `Requirements`/`Capabilities`, judged in `unmet`),
+  [backend_qemu.py](../reliquary/backend_qemu.py) (`DEVICE_MODELS`,
+  `device_args`, the report, the launch),
+  [machines.py](../reliquary/machines.py) (the requirement, the
+  state, `apply`, the dry-run plan and report), both schemas;
+  [blueprint-model.md](../docs/spec/blueprint-model.md) (the field
+  and the reach clause),
+  [instance-model.md](../docs/spec/instance-model.md) (what `apply`
+  absorbs), [blueprint-reference.md](../docs/blueprint-reference.md)
+  (the `devices` section, the assignment paragraph, the validation
+  summary), [blueprint-guide.md](../docs/blueprint-guide.md),
+  [api-reference.md](../docs/api-reference.md); root
+  [ARCHITECTURE.md](../ARCHITECTURE.md) (the standing constraint's
+  citation), [AGENTS.md](../AGENTS.md);
+  [pledged/FEATURES.md](pledged/FEATURES.md) (F27 delivered, its
+  number retired), [proposed/FEATURES.md](proposed/FEATURES.md)
+  (F5's device-growth bullet), and
+  [proposed/USE-CASES.md](proposed/USE-CASES.md) (U22's step 3);
+  `test_document.py`, `test_backends.py`, `test_backend_qemu.py`,
+  `test_machines.py`, `test_dry_run.py`, four corpus fixtures and
+  the closed-vocabulary schema assertion; and the CHANGELOG's
+  unreleased section.
 
 - D17 — RETIRED (superseded by D22, the blueprint revision
   round, before any of it was implemented) — COMPOSED BLUEPRINT

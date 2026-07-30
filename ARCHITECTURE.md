@@ -621,6 +621,19 @@ differently under the new wording — is mere documentation work.
   corpus, `reliquary_tests/test_conformance_corpus.py`, is the
   pattern the rest is measured against; D49.)
 
+- **P25 — The portable surface generalizes.** A first-class node
+  in the machine blueprint carries only capability with general
+  applicability across multiple backends. What one backend alone
+  provides reaches a machine through that backend's pin and its
+  `backend-settings` section, never as portable vocabulary.
+  Demand is necessary and never sufficient: a name enters the
+  portable spec when more than one backend can honor it, and a
+  proposal that cannot meet the bar is refused citing this
+  number. (D93, which removed the single-backend `devices` axis
+  D91 had admitted; the working rule reaches authors in
+  [docs/blueprint-reference.md](docs/blueprint-reference.md)
+  `backend-settings`.)
+
 
 ## The cross-cutting prose
 
@@ -765,27 +778,22 @@ the permanent base no work may weaken.
 
 ## Standing constraints
 
-Two are principles, cited rather than restated: no backward
-compatibility before 1.0 (P9), and agentless DOS operation on
+Three are principles, cited rather than restated: no backward
+compatibility before 1.0 (P9), agentless DOS operation on
 QEMU as the permanent base nothing may weaken (P2; its bootstrap
 direction — agentless operation is how a machine reaches the
-point where a guest agent exists inside it — is P3's arc).
+point where a guest agent exists inside it — is P3's arc), and
+the multi-backend bar on the blueprint's first-class vocabulary
+(P25).
 
 One is the model's own growth rule. The declared-media convention
 (drives named by medium, slot, and format) carries over into
 machine blueprints and cached materializations. New media kinds,
 controllers, and USB devices must extend the same convention — a
 new medium name — not appear as opaque raw backend arguments.
-
-The blueprint's **`devices`** axis is that rule applied to
-hardware that is not a drive, and its shape is what the rule
-means in practice: a closed, curated vocabulary of device
-*models* spelled as their own cross-hypervisor standard spells
-them, judged at assignment like every other capability axis, each
-adapter rendering what it reports. The vocabulary grows **one
-name at a time as demand for a device arrives** — that pressure
-is the mechanism, and a `backend-settings` key in repeated use
-across blueprints is demand arriving for a curated name.
+Admission runs under P25's bar: a `backend-settings` key in
+repeated use across blueprints is demand arriving for a
+first-class name, and demand alone never admits one.
 
 Where a guest holds both control planes, the same suites should
 validate agentless and guest-agent operation with equivalent
