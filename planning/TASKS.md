@@ -112,7 +112,7 @@ retires and is never issued again, so a T-number surviving in a
 commit message can never resolve to something else later, and
 gaps in the sequence are history rather than a promise.
 
-**The next number to issue is T10.** Tasks are the one handle class
+**The next number to issue is T11.** Tasks are the one handle class
 whose whole population can vanish: the queue empties, and a struck
 task's only record is its commit, so nothing else here would say
 what the highest number ever issued was. An F-number is covered
@@ -139,6 +139,56 @@ is mechanical, a defect needs no pledge because the norm it
 violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
+
+### Mechanical
+
+- **T10 — Move to the src layout, and rename the suite to `tests`.**
+  `reliquary/` becomes `src/reliquary/` and `reliquary_tests/`
+  becomes `tests/`, which is the layout a Python developer expects
+  and neither of which the project can adopt for free until now.
+
+  **D96 is what unblocks the rename.** `reliquary_tests` was named
+  that for collision safety: it shipped in the sdist as an
+  importable top-level package, and a package called `tests` in
+  `site-packages` collides with every other project that did the
+  same. Now that released artifacts carry no suite it is installed
+  nowhere and cannot collide, so the prefix guards nothing.
+
+  **The src layout buys something structural, not cosmetic.** Flat,
+  a suite run from the repository root imports the local
+  `reliquary/` directory — grammar and schemas sitting right
+  beside it — so a missing `[tool.setuptools.package-data]` entry
+  is invisible to every test. Under `src/` that import cannot
+  happen: the package must be installed to be imported, and a
+  package-data omission fails immediately. That is the exact
+  failure class `tools/check_dist.py` was written to catch, so
+  this replaces a bespoke guard with a structural one rather than
+  duplicating it. Keep `check_dist.py`: it also asserts what the
+  artifacts must *not* carry, which no layout enforces.
+
+  Mechanical, and measured: 40 test modules under 458 files, and
+  `reliquary_tests` appears 56 times across 29 files. `git mv`,
+  rewrite `reliquary_tests.*` imports to `tests.*`, then:
+
+  - `[tool.setuptools.packages.find]` gains `where = ["src"]`, and
+    its `exclude = ["reliquary_tests*"]` **becomes dead and should
+    go** — with only `src/` scanned a top-level `tests/` cannot be
+    found at all. That exclude is commented in place as "required,
+    not decorative"; the layout is what makes it genuinely
+    unnecessary, which is the change proving itself.
+  - `MANIFEST.in` include paths gain the `src/` prefix.
+  - `tools/check_dist.py`: `SDIST_FORBIDDEN_TREES` renames
+    `reliquary_tests/` to `tests/`. Wheel paths are unaffected —
+    they are package-relative and the package name does not change.
+  - AGENTS.md, CONTRIBUTING.md and the required-checks commands,
+    where `-m unittest reliquary_tests` becomes `-m unittest tests`.
+
+  **One thing to verify rather than assume**: at least one test
+  walks up from its own `__file__` to read `docs/spec/` (the
+  device/materialize spec-table inventories). `reliquary_tests/` and
+  `tests/` sit at the same depth so it should survive untouched,
+  but a layout change that silently repoints a spec reader is
+  exactly the kind of thing that passes locally and rots.
 
 ### Surface decisions
 
