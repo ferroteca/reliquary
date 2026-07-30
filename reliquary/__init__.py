@@ -24,12 +24,12 @@ from .library import list_blueprints, list_scripts
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .errors import (InternalError, PreflightError, ReliquaryError,
-                     RunCancelled, RunFailure, StaticError)
+                     RunCancelled, RunFailure, StaticError, WaitExpired)
 from .events import Event, EventStream
 from .machines import (DryRun, apply_blueprint, create, create_machine,
                        describe_drives,
                        destroy_machine, eject_media, get_file, get_files,
-                       get_machine_dir, get_machine_var,
+                       get_machine_dir, get_machine_var, wait_machine_var,
                        insert_media, list_files, list_machines,
                        refresh_drives,
                        load_machine_state,
@@ -76,6 +76,7 @@ __all__ = [
     "ReliquaryError",
     "RunCancelled",
     "RunFailure",
+    "WaitExpired",
     "StaticError",
     "Phase",
     "Property",
@@ -104,6 +105,7 @@ __all__ = [
     "get_files",
     "get_machine_dir",
     "get_machine_var",
+    "wait_machine_var",
     "insert_media",
     "list_files",
     "put_file",

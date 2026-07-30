@@ -174,6 +174,20 @@ pledging-outruns-the-design flaw the reference rule names. F28
 cites U22 through F27's hatch clause, F27 being pledged in the
 same act, so the reference runs sideways.
 
+**F30 passed straight through on 2026-07-30** (owner) — pledged out
+of [proposed/](../proposed/FEATURES.md) and delivered in the same
+act, so this shelf never held it and its number retires unreused
+(D90). Its three decide-firsts were settled as recommended first:
+both halves rather than either alone, `expect=` for the parameter,
+and an optional `value=` whose absence means presence. What it
+delivered: `run_script(expect=)` / `--expect key=value`, contracting
+a run on the machine variables it leaves, and `wait_machine_var` /
+`wait-machine-var`, the poll for a variable another actor sets. The
+build's own finding is the interesting part and is in D90 — the
+async design's builtin-`TimeoutError` rule collided with the armed
+invariant that no deliberate raise is a bare builtin, and
+`WaitExpired` is what honoring both looks like.
+
 **F26 left by delivery on 2026-07-30** (owner), the ordinary exit,
 and its number retires with it: `exec` grew `check=True` / `--check`
 and the ERRORLEVEL probe behind them (D89). Its error-text refusal —

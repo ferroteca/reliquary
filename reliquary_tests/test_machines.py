@@ -17,7 +17,9 @@ import unittest
 from unittest import mock
 
 from reliquary import platform_dos
-from reliquary.errors import PreflightError, RunFailure, StaticError
+from reliquary import machines as machines_module
+from reliquary.errors import (PreflightError, RunFailure, StaticError,
+                              WaitExpired, exit_code)
 from reliquary.interaction_agentless import (AgentlessGuestExec,
                                              _command_output)
 from reliquary.machines import exec as machines_exec
@@ -31,7 +33,8 @@ from reliquary.machines import (apply_blueprint, create_machine,
                                 recreate_machine, refresh_drives,
                                 resolve_machine,
                                 set_boot_order, set_machine_var,
-                                start_machine, stop_machine)
+                                start_machine, stop_machine,
+                                wait_machine_var)
 from reliquary.backends import Capabilities
 from reliquary_tests import fake_backend, fat_image
 
@@ -1036,6 +1039,99 @@ class MachineVariableTests(_HomeCase):
         machine_id = self._rig()
         with self.assertRaises(StaticError):
             set_machine_var(machine_id, "count", 3, context=self.home)
+
+
+class WaitMachineVarTests(_HomeCase):
+    """The polling half, for a variable another actor sets (F30).
+
+    Every case here uses a tiny interval and a tiny timeout: what is
+    under test is the loop's logic and its refusals, not how long a
+    real wait takes.
+    """
+
+    def _rig(self):
+        return self._create(
+            "rig", {"platform": "dos", "drives": {"hdd0": "blank"}},
+            media=[_BLANK])
+
+    def test_a_value_already_there_returns_at_once(self):
+        machine_id = self._rig()
+        set_machine_var(machine_id, "ready", "yes", context=self.home)
+        self.assertEqual(
+            wait_machine_var("ready", machine=machine_id, timeout=0.2,
+                             interval=0.01, context=self.home),
+            "yes")
+
+    def test_without_a_value_any_value_will_do(self):
+        """What the readiness idiom actually wants: presence."""
+        machine_id = self._rig()
+        set_machine_var(machine_id, "ready", "whatever", context=self.home)
+        self.assertEqual(
+            wait_machine_var("ready", machine=machine_id, timeout=0.2,
+                             interval=0.01, context=self.home),
+            "whatever")
+
+    def test_a_different_value_is_not_the_one_waited_for(self):
+        machine_id = self._rig()
+        set_machine_var(machine_id, "ready", "no", context=self.home)
+        with self.assertRaises(WaitExpired) as caught:
+            wait_machine_var("ready", "yes", machine=machine_id,
+                             timeout=0.05, interval=0.01,
+                             context=self.home)
+        # The diagnostic says what it found, not just what it wanted:
+        # "still 'no'" and "never arrived" are different situations.
+        self.assertIn("'no'", str(caught.exception))
+
+    def test_a_variable_arriving_mid_wait_is_returned(self):
+        machine_id = self._rig()
+        state = {"reads": 0}
+        real = machines_module.get_machine_var
+
+        def arrive_on_third_read(key, **keywords):
+            state["reads"] += 1
+            if state["reads"] >= 3:
+                set_machine_var(machine_id, key, "yes", context=self.home)
+            return real(key, **keywords)
+
+        with mock.patch.object(machines_module, "get_machine_var",
+                               side_effect=arrive_on_third_read):
+            value = wait_machine_var(
+                "ready", "yes", machine=machine_id, timeout=2,
+                interval=0.01, context=self.home)
+        self.assertEqual(value, "yes")
+        self.assertGreaterEqual(state["reads"], 3)
+
+    def test_an_expired_wait_is_a_failure_and_a_timeout_at_once(self):
+        """Both readings are true, which is why it has both bases.
+
+        A caller holding the loop catches `TimeoutError` and asks
+        again; the CLI's taxonomy arm sees a `RunFailure` and exits 4.
+        A bare builtin would have exited 1 and blamed reliquary.
+        """
+        machine_id = self._rig()
+        with self.assertRaises(RunFailure):
+            wait_machine_var("ready", machine=machine_id, timeout=0.05,
+                             interval=0.01, context=self.home)
+        with self.assertRaises(TimeoutError):
+            wait_machine_var("ready", machine=machine_id, timeout=0.05,
+                             interval=0.01, context=self.home)
+        self.assertEqual(exit_code(WaitExpired("x")), 4)
+
+    def test_a_nonpositive_bound_is_refused_before_any_read(self):
+        machine_id = self._rig()
+        for timeout, interval in ((0, 1), (1, 0), (-1, 1)):
+            with self.subTest(timeout=timeout, interval=interval):
+                with self.assertRaises(StaticError):
+                    wait_machine_var("ready", machine=machine_id,
+                                     timeout=timeout, interval=interval,
+                                     context=self.home)
+
+    def test_the_reserved_namespaces_are_refused_here_too(self):
+        machine_id = self._rig()
+        with self.assertRaises(StaticError):
+            wait_machine_var("rlq.ready", machine=machine_id,
+                             timeout=0.05, interval=0.01,
+                             context=self.home)
 
 
 class ExecTests(_HomeCase):

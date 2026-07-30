@@ -11,7 +11,8 @@ import unittest
 from unittest import mock
 
 from reliquary import cli
-from reliquary.errors import PreflightError, StaticError
+from reliquary.errors import PreflightError, RunFailure, StaticError
+from reliquary.machines import set_machine_var
 from reliquary.events import RUN_END, RUN_START
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (
@@ -216,6 +217,58 @@ class RunScriptWiringTests(unittest.TestCase):
             handle.write("platform dos\n")
             handle.write('wait "ready" timeout=1s\n')
 
+    def _run_setting(self, variable, value, **keywords):
+        """Run the script, having it `set` a variable as scripts do."""
+        def execute(script, *, machine_id, **rest):
+            del script, rest
+            if variable is not None:
+                set_machine_var(machine_id, variable, value,
+                                context=self.home)
+            return ("-", "ready")
+
+        with mock.patch("reliquary.script_runner.execute_script",
+                        side_effect=execute):
+            return run_script("install", blueprint="plain",
+                             context=self.home, progress="plain",
+                             **keywords)
+
+    def test_expect_passes_when_the_run_left_the_value(self):
+        result = self._run_setting(
+            "ready", "yes", expect={"ready": "yes"})
+        self.assertEqual(result.machine_phase, "ready")
+
+    def test_expect_fails_when_the_value_differs(self):
+        with self.assertRaises(RunFailure) as caught:
+            self._run_setting("ready", "no", expect={"ready": "yes"})
+        message = str(caught.exception)
+        self.assertIn("'yes'", message)
+        self.assertIn("'no'", message)
+
+    def test_expect_fails_when_the_script_never_set_it(self):
+        """The silence this exists to break.
+
+        An unset variable and a machine that never ran read alike, so
+        without a contract a script that failed to reach its `set` is
+        indistinguishable from one that never had one.
+        """
+        with self.assertRaises(RunFailure) as caught:
+            self._run_setting(None, None, expect={"ready": "yes"})
+        self.assertIn("unset", str(caught.exception))
+
+    def test_expect_is_refused_on_a_dry_run(self):
+        # A plan runs nothing, so there is no variable to contract.
+        with self.assertRaises(StaticError) as caught:
+            run_script("install", blueprint="plain", context=self.home,
+                       dry_run=True, expect={"ready": "yes"})
+        self.assertEqual(caught.exception.rule_id,
+                         "progress.expect-on-a-dry-run")
+
+    def test_no_expect_reads_no_variable(self):
+        """The default path pays nothing: no contract, no read."""
+        with mock.patch("reliquary.machines.get_machine_var") as read:
+            self._run_setting("ready", "yes")
+        read.assert_not_called()
+
     def test_run_script_resolves_label_and_returns_its_output(self):
         with mock.patch(
                     "reliquary.script_runner.execute_script",
@@ -305,6 +358,11 @@ class RunScriptWiringTests(unittest.TestCase):
             properties_file=None,
             progress="auto",
             dry_run=False,
+            # No --expect given, so no contract: the CLI passes the
+            # absence through rather than inventing an empty mapping,
+            # which would make "expected nothing" and "expected
+            # nothing in particular" the same value.
+            expect=None,
         )
         # A stream-bearing command's human modes leave stdout empty:
         # the outcome travels by exit code.

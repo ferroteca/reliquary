@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import time
 from datetime import datetime, timezone
 
 from . import acquire
@@ -17,7 +18,7 @@ from . import backends
 from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
 from .errors import (InternalError, PreflightError, ReliquaryError,
-                     StaticError)
+                     StaticError, WaitExpired)
 from .home import machines_dir
 from .library import codex_blueprint_available
 from .resolve import (load_namespace, location_property_keys,
@@ -1706,12 +1707,66 @@ def set_machine_var(machine_id, key, value, *, context=None):
         _write_state(machine_id, state, context)
 
 
+#: How often :func:`wait_machine_var` re-reads, and how long it waits
+#: by default. The read is a small JSON file under no lock, so the
+#: interval is about not spinning rather than about cost.
+_VAR_POLL = 1.0
+_VAR_TIMEOUT = 120.0
+
+
+def wait_machine_var(key, value=None, *, machine=None, blueprint=None,
+                     timeout=_VAR_TIMEOUT, interval=_VAR_POLL,
+                     context=None):
+    """Wait until a machine variable arrives, and return it.
+
+    The polling half of the value channel, for the case
+    ``run_script(expect=)`` cannot serve: **the setter is somebody
+    else.** A blocking run leaves its variables final by the time it
+    returns, so a wait after one can never poll — but a caller running
+    that same blocking form on another thread, or following a run it
+    did not start, has a variable that genuinely arrives later, and
+    the loop it would otherwise write by hand is this (D90).
+
+    ``value`` is the value to wait *for*; omitted, any value will do,
+    so the readiness idiom — a script whose last step is ``set
+    ready``, and a driver that waits for it — says only what it means.
+
+    Expiry raises :class:`~reliquary.errors.WaitExpired`, which is a
+    ``RunFailure`` *and* a ``TimeoutError``: the wait not finishing is
+    the work not happening (exit ``4`` at the CLI), while nothing about
+    the machine went wrong and the value may still arrive, so a caller
+    holding the loop catches the ordinary ``TimeoutError`` and asks
+    again (D90).
+    """
+    check_variable_key(key)
+    machine_id = resolve_machine(
+        machine=machine, blueprint=blueprint, context=context)
+    if timeout <= 0 or interval <= 0:
+        raise StaticError(
+            "a wait needs a positive timeout and interval, got "
+            f"timeout={timeout!r} interval={interval!r}",
+            rule_id="time.non-positive")
+    deadline = time.monotonic() + timeout
+    while True:
+        current = get_machine_var(key, machine=machine_id, context=context)
+        if current is not None and (value is None or current == value):
+            return current
+        if time.monotonic() >= deadline:
+            raise WaitExpired(
+                f"{key!r} did not "
+                + ("arrive" if value is None else f"reach {value!r}")
+                + f" on {machine_id} within {timeout}s"
+                + ("" if current is None else f" (it is {current!r})"),
+                rule_id="script.wait-expired")
+        time.sleep(min(interval, max(0.0, deadline - time.monotonic())))
+
+
 def get_machine_var(key, *, machine=None, blueprint=None, context=None):
     """Read one machine variable — ``None`` when it is not set.
 
     A query: valid in any phase, touching nothing. An unset variable
-    and a machine that never ran read the same, which is what makes
-    polling a consumer-authored readiness script (P18) a plain loop.
+    and a machine that never ran read the same, which is what keeps
+    :func:`wait_machine_var` a plain loop over this.
     """
     check_variable_key(key)
     machine_id = resolve_machine(

@@ -153,6 +153,18 @@ The mechanics of the automating loop: put work in, run it, read the
 result out, iterate. Reliquary supplies the transports and attaches
 no meaning to what travels through them.
 
+- `wait_machine_var(key, value=None, *, machine=None, blueprint=None,
+  timeout=120, interval=1, context=None)` - Read a machine variable
+  on a loop until it arrives, and return it. For the case a plain
+  read cannot serve: **another actor sets it** — a run on another
+  thread, or one being followed rather than driven. A blocking
+  `run_script` leaves its variables final by the time it returns, so
+  contract those with `expect=` instead of waiting on them. `value`
+  omitted waits for any value, which is what the readiness idiom
+  wants. Expiry raises `WaitExpired`, deliberately both a
+  `RunFailure` (exit `4` at the CLI — the work did not happen) and a
+  Python `TimeoutError` (nothing broke, ask again). CLI twin:
+  `wait-machine-var`.
 - `exec(command, *, machine=None, blueprint=None, timeout=120,
   check=False, context=None)` - Run one command in a running guest
   and return the
@@ -377,7 +389,7 @@ an ordinary `set_property` on that key refuses to overwrite.
   `Script`; errors raise `ScriptParseError` with source locations.
 - `run_script(label, *, blueprint=None, machine=None, context=None,
   display=False, properties=None, properties_file=None,
-  progress="auto")` - Resolve the
+  progress="auto", expect=None)` - Resolve the
   label through the blueprint's `scripts` map, create a machine when
   the blueprint has none, honor the script's `machine` header,
   statically preflight insert/eject/set-boot targets, bind every
@@ -394,6 +406,15 @@ an ordinary `set_property` on that key refuses to overwrite.
   stream as plain dicts, in order, the terminal event last. Keep it
   if you want a record; Reliquary keeps none. Failures raise by error
   class (below). CLI twin: `run-script`.
+
+  `expect={"ready": "yes"}` (CLI: repeated `--expect ready=yes`)
+  **contracts the run on the machine variables it leaves.** Each key
+  is read once the run completes, and one that is unset or holds
+  something else raises `RunFailure` naming key, wanted and got —
+  which turns a script that never reached its `set` from silence into
+  a failure. It is a postcondition and not a wait: this call blocks,
+  so the values are final when it returns. When the setter is
+  somebody else, that is `wait_machine_var`.
 - `run_script(label, dry_run=True, ...)` returns a `DryRun` instead
   of a `ScriptRun`: it parses and statically checks the script and
   reports the timing plan, each declared property's supplying source,
@@ -401,8 +422,10 @@ an ordinary `set_property` on that key refuses to overwrite.
   without prompting, starting a machine, running a guest step or
   reading a secret's value. **The selector is optional in this mode
   alone**, its presence choosing which of the two checkable tiers
-  applies. `display=` and a non-default `progress=` are refused with
-  it. Normative: [cli.md](spec/cli.md#the-dry-run).
+  applies. `display=`, a non-default `progress=` and `expect=` are
+  refused with it — a plan has no window, no stream, and no run whose
+  outcome could be contracted. Normative:
+  [cli.md](spec/cli.md#the-dry-run).
 - `execute_script(script, *, machine_id, context=None,
   display=False, script_path=None, bindings=None, events=None)` -
   Execute an already-parsed script against a specific machine.

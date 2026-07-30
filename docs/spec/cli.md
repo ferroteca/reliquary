@@ -944,21 +944,39 @@ rlq list-files "A:\" --recursive --machine freedos-0
 rlq get-files "A:\OUT" .\results --machine freedos-0
 ```
 
-### Reading a machine variable
+### Reading and waiting on a machine variable
 
 ```
 rlq get-machine-var <key> (--blueprint <name> | --machine <id>)
+rlq wait-machine-var <key> [<value>] (--blueprint <name> | --machine <id>)
+    [--timeout <seconds>] [--interval <seconds>]
 ```
 
 Twin `get_machine_var`. Reads one machine variable — the script
 `set` verb's channel back to the host — from the machine's state.
 It works while the run is still going or long after it ends, and
-from any process, which is what makes it a readiness poll: a
-consumer's own ready script `set`s a variable as its last step
-and the driving program polls for it. Variables are cleared at
+from any process. Variables are cleared at
 each `start`, so a value always reports the current boot. There
 is no `set-machine-var` command: writing is the script verb's,
 and the host side only reads.
+
+`wait-machine-var` (twin `wait_machine_var`) is the same read on a
+loop, and it exists for the one case a read cannot serve: **the
+setter is somebody else.** A `run-script` run holds the caller until
+it finishes, so by the time it returns every variable it was going
+to set is set and there is nothing to wait for — use `--expect`
+there. A wait is for a variable another actor produces: a run driven
+from another thread, or one being followed rather than owned.
+Omitting `<value>` waits for any value at all, which is what the
+readiness idiom wants.
+
+**An expired wait exits `4`.** The API twin raises `WaitExpired`,
+which is deliberately both a `RunFailure` and Python's own
+`TimeoutError`: the wait not finishing is the work not happening, so
+the exit code is the ordinary failure one — while nothing about the
+machine went wrong and the value may still arrive, so a caller
+holding the loop catches `TimeoutError` and asks again. Exit `1` is
+reserved for Reliquary's own faults and a timeout is never one.
 
 ### Describing drives
 

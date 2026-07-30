@@ -26,12 +26,13 @@ from .library import (list_blueprints, list_codex, list_scripts,
                       locate_blueprint, locate_script, seed_blueprint,
                       seed_script)
 from . import blueprint as blueprint_mod
-from .errors import (PreflightError, ReliquaryError, StaticError, UNEXPECTED,
-                     exit_code)
+from .errors import (PreflightError, ReliquaryError, StaticError,
+                     UNEXPECTED, exit_code)
 from .machines import (apply_blueprint, create_machine, describe_drives,
                        destroy_machine,
                        eject_media, get_file, get_files, get_machine_dir,
                        get_machine_var, insert_media, list_files,
+                       wait_machine_var,
                        list_machines, load_machine_state, machine_dir_path,
                        put_file, put_files, read_vm_state, recreate_machine,
                        refresh_drives,
@@ -66,7 +67,8 @@ _COMMANDS = frozenset({
     "list-machines", "list-scripts", "list-media",
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
-    "get-machine-var", "describe-drives", "refresh-drives",
+    "get-machine-var", "wait-machine-var",
+    "describe-drives", "refresh-drives",
     "put-file", "get-file",
     "list-files", "put-files", "get-files",
     "type", "enter", "press", "exec", "select", "screen", "wait",
@@ -86,6 +88,7 @@ _FLAG_ARITY = {
     "--machine": 1,
     "--platform": 1,
     "--timeout": 1,
+    "--interval": 1,
     "--display": 0,
     "--check": 0,
     "--secret": 0,
@@ -299,6 +302,32 @@ def _explicit_properties(arguments):
     return explicit
 
 
+def _expectations(arguments):
+    """Parse repeated --expect KEY=VALUE into a mapping, or None.
+
+    The same spelling as ``--property``, deliberately: one shape for
+    "a key and a value on the command line" rather than a second
+    mini-format for a reader to learn.
+    """
+    pairs = getattr(arguments, "expect", None)
+    if not pairs:
+        return None
+    expected = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep:
+            raise StaticError(
+                f"--expect expects KEY=VALUE, got: {pair!r}",
+                rule_id="prop.flag-not-key-value")
+        key = key.strip()
+        if key in expected:
+            raise StaticError(
+                f"--expect {key} given more than once",
+                rule_id="prop.flag-repeated")
+        expected[key] = value
+    return expected
+
+
 def _emit(arguments, value, render):
     """Render a command result as JSON or human text.
 
@@ -493,6 +522,10 @@ def main(argv=None):
         help="show the backend's own display window while the script "
              "runs (input through it is invisible to reliquary)")
     command.add_argument(
+        "--expect", action="append", default=None, metavar="KEY=VALUE",
+        help="require the run to leave this machine variable at this "
+             "value; a run that does not fails (exit 4). Repeatable")
+    command.add_argument(
         "--dry-run", action="store_true",
         help="report what the run would do and run none of it: no "
              "machine is started and no statement reaches a guest. "
@@ -641,6 +674,19 @@ def main(argv=None):
         help="read a machine variable a script set")
     _add_selectors(command)
     command.add_argument("key", help="the variable's key")
+
+    command = subcommands.add_parser(
+        "wait-machine-var",
+        help="wait for a machine variable another actor sets")
+    _add_selectors(command)
+    command.add_argument("key", help="the variable's key")
+    command.add_argument(
+        "value", nargs="?", default=None,
+        help="the value to wait for; omitted, any value will do")
+    command.add_argument("--timeout", type=float, default=None,
+                         help="seconds to wait (default 120)")
+    command.add_argument("--interval", type=float, default=None,
+                         help="seconds between reads (default 1)")
 
     command = subcommands.add_parser(
         "describe-drives",
@@ -876,6 +922,7 @@ def _script(arguments):
         properties_file=_properties_file(arguments),
         progress=arguments.progress,
         dry_run=dry_run,
+        expect=_expectations(arguments),
     )
     if dry_run:
         # Under --dry-run the twin returns a document, so --json is
@@ -1208,6 +1255,31 @@ def _get_machine_var(arguments):
                  lambda: None if value is None else print(value))
 
 
+def _wait_machine_var(arguments):
+    """Wait for a variable another actor sets, and print it.
+
+    No special handling for an expired wait: the twin raises
+    ``WaitExpired``, which is a ``RunFailure``, so the ordinary
+    taxonomy arm reports it as exit 4 — the work asked for did not
+    happen. A bare builtin here would have exited 1 and claimed
+    reliquary's own fault (D90).
+
+    Only the flags the caller actually gave are forwarded, so the
+    twin's defaults stay the twin's and are documented in one place.
+    """
+    keywords = {}
+    if getattr(arguments, "timeout", None) is not None:
+        keywords["timeout"] = arguments.timeout
+    if getattr(arguments, "interval", None) is not None:
+        keywords["interval"] = arguments.interval
+    value = wait_machine_var(
+        arguments.key, arguments.value,
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None),
+        **keywords)
+    return _emit(arguments, value, lambda: print(value))
+
+
 def _describe_drives(arguments):
     report = describe_drives(
         machine=getattr(arguments, "machine", None),
@@ -1398,6 +1470,8 @@ def _dispatch(arguments):
         return _set_boot_order(arguments)
     if arguments.command == "get-machine-var":
         return _get_machine_var(arguments)
+    if arguments.command == "wait-machine-var":
+        return _wait_machine_var(arguments)
     if arguments.command == "describe-drives":
         return _describe_drives(arguments)
     if arguments.command == "refresh-drives":

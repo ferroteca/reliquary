@@ -372,6 +372,21 @@ These are the mechanics for the loop an automating program runs:
 put work in, run it, read the result out, iterate. Reliquary supplies
 the transports and attaches no meaning to what travels through them.
 
+### `rlq wait-machine-var <key> [<value>] (--blueprint NAME | --machine ID)`
+
+Read the same variable on a loop until it arrives, and print it.
+`--timeout SECONDS` (default 120) and `--interval SECONDS` (default
+1) bound the wait; omitting `<value>` waits for any value at all.
+
+For the case a plain read cannot serve: **another actor sets it.**
+A `run-script` run blocks until it finishes, so its variables are
+already final when it returns — contract those with
+`rlq run-script … --expect key=value` instead. A wait is for a
+variable produced by a run on another thread, or one you are
+following rather than driving. An expired wait exits `4`; the twin
+raises `WaitExpired`, which is both a `RunFailure` and a Python
+`TimeoutError`, so a caller holding the loop can simply ask again.
+
 ### `rlq get-machine-var <key> (--blueprint NAME | --machine ID)`
 
 Read a machine variable a script set with the `set` verb — the

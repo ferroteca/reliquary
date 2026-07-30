@@ -95,6 +95,27 @@ class RunCancelled(ReliquaryError):
     """
 
 
+class WaitExpired(RunFailure, TimeoutError):
+    """A wait for something another actor would do ran out of time.
+
+    **Two base classes, deliberately, because two true things are
+    being said at once** (D90). A wait that expired is the work not
+    happening, so it *is* a :class:`RunFailure` and exits ``4`` — and
+    ``except ReliquaryError`` stays the catch-all it is contracted to
+    be, which a bare builtin would have broken. But nothing about the
+    machine went wrong and the thing waited for may still arrive, so a
+    Python caller holding the loop wants the ordinary
+    ``except TimeoutError`` and gets it.
+
+    That reconciles two positions the record held separately: the
+    async design's "expiry raises outside the taxonomy, the call
+    repeats" (api.md, the run handle) and the standing invariant that
+    no deliberate raise is a bare builtin — `TimeoutError` being named
+    in the forbidden set by name. The first was written when nothing
+    raised it yet; this is what honoring both looks like.
+    """
+
+
 class InternalError(ReliquaryError):
     """An invariant reliquary detected in its own state.
 

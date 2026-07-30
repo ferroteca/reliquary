@@ -108,9 +108,14 @@ unsettled.
 
 **F30 arrived the same way one round later** (owner, 2026-07-30):
 reviewing U22 turned up an ask its own step 7 makes visible — a
-run's scalar outcome takes two calls and carries no contract — and
-it is entered here rather than pledged, its decide-firsts recorded
-with recommendations. The same review round produced no other
+run's scalar outcome takes two calls and carries no contract. It was
+entered here with its decide-firsts recorded, settled the same day,
+then **pledged and delivered the same day too** (D90), so its number
+retires unreused and the record of it is
+[pledged/FEATURES.md](../pledged/FEATURES.md)'s. Entry, settlement,
+pledge and delivery inside one round is the compression P23 permits
+authority — every step taken, none skipped, and each one written
+down. The same review round produced no other
 feature: the readiness verb it also considered was refused on the
 argument that a DOS-only, agentless-only "ready" would cement one
 definition of the word into the surface, and what survives of that
@@ -1180,98 +1185,6 @@ absolute. The model is normative in
 [docs/spec/asset-resolution.md](../../docs/spec/asset-resolution.md).
 U17 stays pledged: this serves it and does not on its own
 complete it.)*
-
-## F30 — A run's scalar outcome, in one call
-
-> **Entered 2026-07-30** (owner, in the U22 review round, which is
-> where the ask arrived). Demanded by **U14** in force — the caller
-> "runs work, reads results back" — and by **U22**'s step 7, where
-> reading one scalar back from a run takes two calls and carries no
-> contract at all. The record's nearest neighbour is the
-> asynchronous-run family (**F6**, backlogged behind U19), whose
-> `run wait` and `handle.wait(timeout=)` wait on a *run's outcome*
-> rather than on a value; nothing in the record covers this, and
-> nothing bearing on it is recorded as killed or declined.
-
-`run_script` returns, and whatever the script `set` on the way is
-read afterwards by `get_machine_var`. Two calls, and the join
-between them is the caller's to get right: nothing says the run was
-*supposed* to produce that value, so a script that failed to reach
-its `set` is indistinguishable from one that never had it — an unset
-variable and a machine that never ran read alike, which is
-deliberate and is exactly what makes the two-call form silent.
-
-The readiness idiom is where it bites hardest, and the spec
-currently answers it with a loop the caller writes:
-"A consumer's own ready script `set`s a variable as its last step,
-and the driving program polls `get-machine-var` until it appears"
-([script-spec.md](../../docs/spec/script-spec.md)). That is a poll
-loop specified as a user-facing instruction.
-
-**What the surface can honestly offer is two different things, and
-only one of them polls.** `run_script` blocks, and only a running
-script's `set` writes a machine variable, so when the call returns
-the value is *final*: a wait after it either succeeds on its first
-read or spins to a timeout for nothing. The interval has work only
-where the setter is someone else — another thread running the
-blocking form, or a detached run once U19 schedules F6.
-
-The ask:
-
-1. **A postcondition on the run.** `run_script(label,
-   expect={"ready": "yes"})` — the run is contracted to leave that
-   variable at that value, and a run that does not raises
-   `RunFailure` naming key, wanted and got (exit `4`). One call, no
-   interval, and the same shape F26 settled for `exec`: an opt-in
-   outcome contract as a parameter rather than a sibling verb. The
-   CLI twin is `--expect ready=yes`, repeatable, mirroring the
-   established `--property key=value`.
-2. **A standalone wait.** `wait_machine_var(key, value=,
-   timeout=, interval=)` / `rlq wait-machine-var` — a real poll with
-   a real interval, for the case the postcondition cannot serve
-   because the setter is another actor.
-
-Landing rule: **P6**. Whichever items land, they land on both twins
-in one change.
-
-> **The decide-firsts are settled** (owner, 2026-07-30), each as
-> recommended: **both halves**, the parameter is **`expect=`**, and
-> `value=` is **optional with absence meaning presence**. The entry
-> stays here rather than moving — settling how a feature would be
-> built is not pledging that it will be.
-
-DECIDE FIRST:
-
-- **Which of the two, and the recommendation is both.** (1) serves
-  U22's journey and is what the ask literally described; (2) is the
-  more primitive mechanism and the only one where the requested
-  polling interval means anything. G6 does not bite: a primitive
-  beside a composition is the established pattern
-  (`create_machine` / `start_machine` exist beside `run_script`
-  doing create-if-none-and-start). Taking (1) alone ships the
-  convenience without the general mechanism; taking (2) alone
-  leaves U22's two-call join uncontracted.
-- **`expect=` or `require=`.** Recommended `expect=`: `check=` is
-  spoken for by F26 on the neighbouring verb, and "expect" reads as
-  the postcondition it is.
-- **Whether (2) waits on a value or on presence.** `value=`
-  defaulting to "any value at all" covers both, and the readiness
-  idiom only ever needed presence. Recommended: optional `value=`,
-  absent meaning presence, so the common case says less.
-
-Work:
-
-1. The decide-firsts above, then `expect=` on `run_script` and its
-   `--expect` twin, raising `RunFailure` naming key/wanted/got.
-2. `wait_machine_var` and its twin, if taken: a deadline, an
-   interval, and a `TimeoutError` outside the taxonomy on expiry —
-   nothing failed, the call repeats (F6's own rule for
-   `handle.wait`).
-3. The spec's readiness paragraph rewritten off the hand-written
-   poll loop and onto whichever of these lands.
-4. Tests over both, including the case that motivated the analysis:
-   a blocking run's variable is final when it returns, so the
-   postcondition never polls.
 
 ## Horizon — smaller and later
 

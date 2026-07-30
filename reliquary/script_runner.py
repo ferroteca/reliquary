@@ -1512,7 +1512,7 @@ def _blueprint_parameters(state, context):
 
 def run_script(label, *, blueprint=None, machine=None, context=None,
                display=False, properties=None, properties_file=None,
-               progress="auto", dry_run=False):
+               progress="auto", dry_run=False, expect=None):
     """Resolve ``label``, ensure a machine, run it, and return its output.
 
     Looks up ``label`` in the machine's blueprint ``scripts`` map
@@ -1531,14 +1531,39 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     at the next event boundary and raises
     :class:`~reliquary.errors.RunCancelled`.
 
+    ``expect`` **contracts the run on what it leaves behind**: a
+    mapping of machine-variable key to the value the run is expected
+    to have `set`. Every key is read once the run completes, and one
+    that is unset or holds something else raises
+    :class:`~reliquary.errors.RunFailure` naming key, wanted and got.
+    Without it the caller reads the variable afterwards and the join
+    is theirs to get right — an unset variable and a machine that
+    never ran read alike, deliberately, so a script that failed to
+    reach its `set` is silent. This makes that silence loud, in one
+    call rather than two.
+
+    It is a **postcondition and not a wait**, which is what the
+    surface can honestly offer: this function blocks and only a
+    running script's `set` writes a variable, so by the time it
+    returns the value is final and there is nothing left to poll. A
+    wait belongs where the setter is somebody else — another thread
+    running this same call, or a detached run — which is
+    :func:`~reliquary.machines.wait_machine_var`.
+
     ``dry_run=True`` returns a :class:`~reliquary.machines.DryRun`
     instead — a document, not a stream — having started no machine
     and delivered no guest input. It is the only mode in which the
     selector is optional, because its presence chooses which tier is
-    checked; ``display`` and a non-default ``progress`` are refused
-    with it, a plan having no window to show and no stream to render.
+    checked; ``display``, a non-default ``progress`` and ``expect``
+    are refused with it — a plan has no window to show, no stream to
+    render, and no run whose outcome could be contracted.
     """
     if dry_run:
+        if expect:
+            raise StaticError(
+                "--expect contracts what a run leaves behind, and "
+                "--dry-run runs nothing; there is no variable to read",
+                rule_id="progress.expect-on-a-dry-run")
         if display:
             raise StaticError(
                 "--display shows a running machine's window, and "
@@ -1588,6 +1613,7 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
         final_phase, machine_phase = execute_script(
             script, machine_id=machine_id, context=context, display=display,
             script_path=script_path, bindings=bindings, events=events)
+        _check_expectations(expect, machine_id, context)
         return ScriptRun(
             machine_id=machine_id,
             script_path=script_path,
@@ -1598,6 +1624,31 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
         )
     finally:
         events.close()
+
+
+def _check_expectations(expect, machine_id, context):
+    """Hold the finished run to what it was expected to leave.
+
+    Read once each, in the caller's own key order so a diagnostic is
+    reproducible, and the *first* mismatch raises: a run that missed
+    its first postcondition has already gone wrong, and listing the
+    rest would report consequences beside the cause.
+
+    Nothing polls. The run is over, so every variable it was going to
+    set is set (D90) — an unset key here means the script never
+    reached that `set`, which is exactly the silence this exists to
+    break.
+    """
+    for key, wanted in (expect or {}).items():
+        got = _machines.get_machine_var(
+            key, machine=machine_id, context=context)
+        if got == wanted:
+            continue
+        raise RunFailure(
+            f"the run did not leave {key!r} as expected: wanted "
+            f"{wanted!r}, "
+            + ("it is unset" if got is None else f"got {got!r}"),
+            rule_id="script.expectation-unmet")
 
 
 def _redactor(bindings):

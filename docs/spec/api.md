@@ -131,6 +131,18 @@ SPDX-License-Identifier: GPL-3.0-only
   lands in the hierarchy, which is what keeps
   `except ReliquaryError` the catch-all promised above.
   Other bindings spell the same classes natively.
+
+  **A wait that expires is the one class with two bases** (D90):
+  `WaitExpired` subclasses `RunFailure` *and* the host language's own
+  timeout type — Python's `TimeoutError` — because two true things
+  are being said at once. The work asked for did not happen, so the
+  exit code is `4`; nothing about the machine went wrong and the
+  thing waited for may still arrive, so a caller holding the loop
+  uses the ordinary timeout handler and asks again. This is how the
+  async design's "expiry raises outside the taxonomy, the call
+  repeats" is honored without a bare builtin escaping the hierarchy,
+  which the rule above forbids. A binding without exception
+  inheritance spells it as its own timeout error carrying exit `4`.
 - **Async starters — sync is async plus attach** (owner,
   2026-07-21; backlogged 2026-07-24, D35/D36 — no use case,
   drafted as U19; milestone 9 keeps only the blocking twins,
@@ -179,13 +191,14 @@ carries the exceptions and each family's contract home.
 | `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
 | `new-blueprint` | `new_blueprint()` | blueprint guide |
 | codex family (`seed-blueprint`, `seed-script`, `list-codex`) | **none — CLI-only** (D87). `seed-blueprint <name> [--only]` copies a library blueprint and the scripts it names into your `blueprints`/`scripts` directories; `seed-script <stem> [--only]` copies one script; `list-codex` names what the library holds (`--json` adds each entry's description). Reaching the shipped library is a human act: nothing programmatic may bind a name the next point release may move (P18) | [codex](codex.md) |
-| `run-script <label>` | `run_script()` returns the run's output, raises by error class (D36 — no stored record; the `exec` twin lands with it); `run_script(label, *, dry_run=False)` returns `ScriptRun \| DryRun`, and under `dry_run` the selector is optional because its presence chooses the checkable tier | [script spec](script-spec.md), [cli.md](cli.md#the-dry-run) |
+| `run-script <label>` | `run_script()` returns the run's output, raises by error class (D36 — no stored record; the `exec` twin lands with it); `run_script(label, *, dry_run=False)` returns `ScriptRun \| DryRun`, and under `dry_run` the selector is optional because its presence chooses the checkable tier. `expect={key: value}` (`--expect key=value`, repeatable) contracts the run on the machine variables it leaves — a postcondition rather than a wait, since a blocking run's variables are final when it returns — and is refused under `dry_run`, which runs nothing | [script spec](script-spec.md), [cli.md](cli.md#the-dry-run) |
 | the `run` family; `begin-run` / `end-run`; `list-runs` — all backlog (D35/D36) | the record model — persisted runs, `run status` / `run delete`, the async followers `run tail` / `run wait` / `run cancel` with the run handle (`start_script()` / `attach_run()` / `delete_run()`), and interaction runs (`begin_run` / `end_run`) — is async-backlog work; milestone 9 stores nothing | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle (backlog — D35) | [media spec](media-spec.md#fetch-progress) |
 | `clean-media` / `prune-media` / `add-media` | `clean_media(name=None)` / `prune_media(dry_run=)` / `add_media(name, path)` | media spec |
 | `insert-media` / `eject-media` / `set-boot-order` | `insert_media(slot, media=None, file=None)` (`--file` mounts an anonymous `local`+`use` image, U20) / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the out-of-band door | [instance model](instance-model.md) |
 | `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
+| `wait-machine-var` | `wait_machine_var(key, value=None, *, timeout=120, interval=1)` — the same read on a loop, for a variable **another actor** sets (a run on another thread, or one being followed): a blocking `run_script` leaves its variables final, so contract those with its `expect=` instead. `value=None` waits for any value. Expiry raises `WaitExpired`, both a `RunFailure` (exit `4`) and a Python `TimeoutError`, so a caller holding the loop asks again | [cli.md](cli.md) |
 | `describe-drives` / `refresh-drives` | `describe_drives()` — the drive report (D83): declared and chosen facts per drive, the at-rest read per disk, and the platform's letter map over them, answered from the record (read at every start's first step; a disk never yet recorded is read once, machine down); `refresh_drives()` — the explicit stopped-only re-read, returning the same report fresh (U14; P11, P17) | [cli.md](cli.md#describing-drives) |
 | `put-file` / `get-file` / `put-files` / `get-files` / `list-files` | the same names with underscores; `list_files(address, recursive=False)` returns the flat entry array — guest-terms addressed (P17) in one vocabulary across all five, over a vvfat drive, stopped-only, non-vvfat fails closed by name (P11). Single files landed at milestone 9, the trees and the listing with D62 (U14, U20; P16) | [cli.md](cli.md) |
 | `list-machines` / `list-blueprints` / `list-scripts` / `list-media` | `list_<noun>` — **one verb per noun, and the noun names the set**: each lists yours and none reports a codex entry (`list-codex` is the library's own, above). There is no `search-<noun>`: matching a term is filtering, which the shell does and `--json` makes trivial in any language (D88) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |

@@ -13,6 +13,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`run-script --expect key=value` / `run_script(expect=)`** (D90,
+  delivering F30). Contracts a run on the machine variables it
+  leaves: each key is read once the run completes, and one that is
+  unset or holds something else raises `RunFailure` naming key,
+  wanted and got. Without it, reading a run's scalar outcome took two
+  calls with the join left to the caller — and because an unset
+  variable and a machine that never ran read alike, a script that
+  failed to reach its `set` was silent. It is a **postcondition, not
+  a wait**: the run blocks, so its variables are final when it
+  returns. Refused under `--dry-run`, which runs nothing.
+
+- **`wait-machine-var` / `wait_machine_var()`** (D90). The polling
+  half, for the case a postcondition cannot serve: **another actor
+  sets the variable** — a run driven from another thread, or one
+  being followed rather than owned. Omitting the value waits for any
+  value, which is what the readiness idiom wants. `--timeout`
+  (default 120s) and `--interval` (default 1s) bound the wait.
+
+  An expired wait exits `4`, and the twin raises **`WaitExpired`,
+  deliberately both a `RunFailure` and Python's `TimeoutError`**: the
+  work asked for did not happen, while nothing about the machine went
+  wrong and the value may still arrive, so a caller holding the loop
+  catches the ordinary timeout and asks again. That reconciles the
+  async design's "expiry raises outside the taxonomy" rule with the
+  standing invariant that no deliberate raise is a bare builtin —
+  two positions the record had held separately since they could not
+  yet collide.
+
 - **`exec --check` / `exec(check=True)`** (D89, delivering F26). The
   one thing a command's output cannot tell you: whether it worked. A
   setup command — loading a driver or a TSR — produces nothing worth

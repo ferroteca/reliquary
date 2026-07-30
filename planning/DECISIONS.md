@@ -204,6 +204,97 @@ is waiting on an answer today.
 
 ## Decided
 
+- D90 — A RUN'S OUTCOME IS A POSTCONDITION, A WAIT IS A POLL, AND AN
+  EXPIRED WAIT IS BOTH A FAILURE AND A TIMEOUT — DECIDED (owner,
+  2026-07-30) and delivered the same day, retiring F30. Supports U14,
+  U22 (proposed); P6, P7, P11. **Reconciles api.md's async-handle
+  timeout rule with the standing no-bare-builtin invariant**, which
+  had never met each other because nothing raised the one yet. F30's
+  entry, its settlement, its pledge and its delivery all fall inside
+  one round — the compression P23 permits authority — so the pledge
+  is a lifecycle act recorded in the two FEATURES files (D63) and
+  what follows is what the build decided.
+
+  TWO MECHANISMS, BECAUSE ONLY ONE OF THEM CAN POLL. `run_script`
+  blocks, and only a running script's `set` writes a machine
+  variable, so by the time the call returns every value it was going
+  to leave is left: a wait after it cannot poll more than once. So
+  the ask splits by *who sets the variable*. Where the run is the
+  setter, `expect={key: value}` is a **postcondition** — read once,
+  no interval, raising `RunFailure` naming key, wanted and got. Where
+  the setter is somebody else — a run driven from another thread, or
+  one being followed — `wait_machine_var` is a **poll**, and that is
+  the only place an interval means anything. Shipping only the first
+  would have left U22's two-call join uncontracted; only the second,
+  a convenience missing from the journey that asked for it.
+
+  THE FIRST MISMATCH RAISES, AND THE READ IS ONCE PER KEY. A run that
+  missed its first postcondition has already gone wrong, so listing
+  the rest would report consequences beside the cause. Keys are read
+  in the caller's own order, which makes the diagnostic reproducible.
+
+  `--expect` IS REFUSED UNDER `--dry-run`, joining `--display` and
+  `--progress` there: a plan runs nothing, so there is no variable to
+  contract and no outcome to name. Accepting and ignoring it would
+  have been the quiet lie P11 refuses at the flag level, which is the
+  same ruling D79 made for the other two.
+
+  AN EXPIRED WAIT IS BOTH THINGS AT ONCE, and this is the ruling
+  worth the entry. [api.md](../docs/spec/api.md) has said since
+  2026-07-21 that a handle wait's expiry "raises outside the error
+  taxonomy (Python: the builtin `TimeoutError`)" — nothing failed,
+  the call repeats. The code has said since D58 that **no deliberate
+  raise is a bare builtin**, `except ReliquaryError` being contracted
+  as the catch-all, with `TimeoutError` named in the forbidden set by
+  name and a test walking every `raise` in the package. Both are
+  right, and they had never collided because F6 is backlogged and
+  nothing raised a timeout yet; F30 is the first thing to try.
+
+  **`WaitExpired` subclasses `RunFailure` and `TimeoutError`.** The
+  work asked for did not happen, so it exits `4` through the ordinary
+  taxonomy arm and needs no special case at the CLI — where exit `1`
+  is reserved for reliquary's own faults and a timeout is never one.
+  And nothing about the machine went wrong, so a caller holding the
+  loop writes `except TimeoutError` and asks again. WEIGHED AND
+  DECLINED: **returning `None` on expiry** (a silent sentinel, the
+  classic footgun, and it makes "not yet" and "unset" the same
+  answer); **a plain `RunFailure`**, which would have quietly
+  overruled api.md's rule rather than honoring it; and **amending
+  api.md to drop the builtin**, which discards a real property — a
+  Python caller wanting the ordinary timeout handler — to avoid a
+  two-base class. A binding without exception inheritance spells it
+  as its own timeout error carrying exit `4`, which is stated in the
+  spec.
+
+  THE DEFAULT PATH PAYS NOTHING, asserted rather than assumed: with
+  no `expect`, no variable is read at all. The same discipline as
+  D89's probe one verb over.
+
+  P8 TRIAGE: additive on S1, S2 and S7 — a parameter, a command, and
+  one new error class mapping to an existing exit code. No use case
+  is cost; U14 is served and U22's step 7 collapses from two calls to
+  one. The `command.`-style question does not arise: `script.` and
+  `progress.` already cover the three new ids
+  (`script.expectation-unmet`, `script.wait-expired`,
+  `progress.expect-on-a-dry-run`).
+
+  Folded: [errors.py](../reliquary/errors.py) (`WaitExpired`),
+  [machines.py](../reliquary/machines.py) (`wait_machine_var`),
+  [script_runner.py](../reliquary/script_runner.py) (`expect=` and
+  its check), [cli.py](../reliquary/cli.py) (`--expect`,
+  `wait-machine-var`), [__init__.py](../reliquary/__init__.py);
+  [docs/spec/api.md](../docs/spec/api.md) (the twin table, the
+  taxonomy's two-base clause),
+  [docs/spec/cli.md](../docs/spec/cli.md) (the wait command and its
+  exit code), [docs/spec/script-spec.md](../docs/spec/script-spec.md)
+  (the readiness paragraph, off the hand-written poll loop),
+  [docs/cli-reference.md](../docs/cli-reference.md),
+  [docs/api-reference.md](../docs/api-reference.md);
+  [proposed/FEATURES.md](proposed/FEATURES.md) and
+  [pledged/FEATURES.md](pledged/FEATURES.md) (F30 through both, its
+  number retired); `test_machines.py`, `test_run_script.py`; and the
+  CHANGELOG's unreleased section.
+
 - D89 — THE OUTCOME PROBE IS RELIQUARY'S OWN TEXT, AND ITS SCOPE IS
   STATED — DECIDED (owner, 2026-07-30) and delivered the same day,
   retiring F26. Supports U14, U22 (proposed); P6, P10, P11, G2.

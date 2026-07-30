@@ -1815,12 +1815,27 @@ values: reliquary stores them and reads no meaning into either
 (G2, P18).
 
 **Readiness rides this channel.** reliquary ships no readiness
-script of any kind — what "ready" means belongs to the workflow
-being built, not to reliquary (P18). A consumer's own ready script
-`set`s a variable as its last step, and the driving program polls
-`get-machine-var` until it appears. An unset variable and a machine
-that never ran read alike, which is what keeps the poll a plain
-loop.
+*policy* — what "ready" means belongs to the workflow being built,
+not to reliquary (P18) — and a consumer's own ready script `set`s a
+variable as its last step to say so.
+
+How the host reads it back depends on who is doing the setting, and
+there are two shapes rather than one hand-written loop:
+
+- **The run that sets it is the one you are waiting on.**
+  `run-script <label> --expect ready=yes` contracts the run on the
+  variable: the run blocks, so by the time it returns the value is
+  final, and a run that did not leave it raises rather than being
+  discovered later by a caller who read `get-machine-var` and found
+  nothing. One call, and a failure that names key, wanted and got.
+- **Somebody else sets it** — a run driven from another thread, or
+  one being followed rather than owned. `wait-machine-var ready`
+  polls until it arrives, which is the only case where an interval
+  means anything.
+
+An unset variable and a machine that never ran still read alike
+through `get-machine-var`, deliberately; what the two verbs above
+add is a way to say that the silence was not expected.
 
 ### File exchange — a named omission
 
