@@ -54,6 +54,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tools/check_dist.py` remains the real artifact gate. Maintainer-
   facing apart from the floor above; no shipped surface changes.
 
+### Fixed
+
+- **A relative `local` media path now anchors to the referencing
+  file**, as the blueprint model has always specified — the
+  implementation resolved it against the process working directory
+  instead, so the same blueprint found its file or not depending on
+  where the caller happened to stand. `load_document` is the anchor
+  point: it has the file, so every relative `local` rung is made
+  absolute against that file's directory at load, before any
+  cross-document work. A bare value through `parse_document` keeps its
+  paths as authored — there is no file to anchor to. One consequence
+  is deliberate: two same-named specs carrying one relative spelling
+  in two different directories now **collide** as differing specs
+  instead of deduping, because anchored they name different bytes —
+  the dedup that lets a self-contained blueprint be pasted around
+  still holds within a directory and for URL locations. Found wiring
+  remanence-lib's FreeDOS rig to a local ISO, where the blueprint's
+  documented relative path only worked because the caller chdir'd to
+  the blueprints directory first.
+
 ## 0.1.0.dev6 - 2026-07-30
 
 ### Added

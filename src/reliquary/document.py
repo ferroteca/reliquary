@@ -21,7 +21,7 @@ import os
 import re
 import types
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping, Optional, Tuple, Union
 
 from . import jsonc
@@ -222,7 +222,8 @@ class Location:
     """One rung of a media's location. Exactly one ``kind``.
 
     ``url`` — a download; ``local`` — a host path relative to the
-    referencing file; ``parent`` — a member of another media (the
+    referencing file (made absolute when the document is loaded from
+    one); ``parent`` — a member of another media (the
     containment edge, ``path`` optional: absent means the parent's own
     bytes); ``property`` — supplied by a property; ``deferred`` — a
     string whose references must resolve before it can be dispatched.
@@ -1325,6 +1326,12 @@ def load_document(path):
     the one that asks for positions and hands the diagnostic its source
     line. ``parse_document`` on a bare value stays exactly as it was:
     there is nothing to cite, and citing nothing is honest.
+
+    Having the file also makes this the anchor point: every relative
+    ``local`` location is made absolute against the file's own
+    directory, which is what "relative to the referencing file" means.
+    A bare value parsed through ``parse_document`` keeps its paths as
+    authored — there is no file to anchor to.
     """
     path = os.path.abspath(os.fspath(path))
     if not os.path.exists(path):
@@ -1334,7 +1341,53 @@ def load_document(path):
         text = handle.read()
     value = jsonc.loads(text, positions=True)
     try:
-        return parse_document(value)
+        parsed = parse_document(value)
     except BlueprintError as error:
         error._set_context(path, text.split("\n"))
         raise
+    return _anchored_document(parsed, os.path.dirname(path))
+
+
+def _anchored_document(doc, base):
+    """The document with every relative ``local`` path made absolute.
+
+    Anchoring happens at load, before any cross-document work, so
+    downstream layers only ever see what a spec actually points at.
+    That includes the namespace's identity dedup: two same-named specs
+    carrying one relative spelling in two directories are different
+    media, and they collide instead of silently resolving through
+    whichever file was read first.
+    """
+    media = {name: _anchored_media(spec, base)
+             for name, spec in doc.media.items()}
+    machines = {name: _anchored_machine(spec, base)
+                for name, spec in doc.machines.items()}
+    return Document(machines=types.MappingProxyType(machines),
+                    media=types.MappingProxyType(media))
+
+
+def _anchored_machine(machine, base):
+    """The machine with its drives' inline media anchored."""
+    if not any(drive.inline is not None
+               for drive in machine.drives.values()):
+        return machine
+    drives = {key: (replace(drive, inline=_anchored_media(drive.inline, base))
+                    if drive.inline is not None else drive)
+              for key, drive in machine.drives.items()}
+    return replace(machine, drives=types.MappingProxyType(drives))
+
+
+def _anchored_media(media, base):
+    """The media with each relative ``local`` rung made absolute."""
+    location = tuple(_anchored_location(rung, base)
+                     for rung in media.location)
+    if location == media.location:
+        return media
+    return replace(media, location=location)
+
+
+def _anchored_location(rung, base):
+    if rung.kind != "local" or os.path.isabs(rung.local):
+        return rung
+    return replace(rung,
+                   local=os.path.normpath(os.path.join(base, rung.local)))

@@ -10,6 +10,7 @@ sugar desugars to the thing it claims to, that identity lands where the
 model says, and that a repair says what it repaired.
 """
 
+import json
 import os
 import re
 import tempfile
@@ -269,6 +270,62 @@ class LocationTests(unittest.TestCase):
                          "path": "cd.iso"}}])
         self.assertEqual(set(doc.media), {"outer", "cd"})
         self.assertEqual(doc.media["cd"].location[0].parent, "outer")
+
+
+class LocalAnchorTests(unittest.TestCase):
+    """A relative ``local`` path is relative to the referencing file.
+
+    ``load_document`` is the entry point with a file to anchor to, so
+    it is where the authored spelling becomes absolute; a bare value
+    parsed through ``parse_document`` has no file and keeps its paths
+    as authored.
+    """
+
+    def _load(self, root, value, name="b.rlqb"):
+        path = os.path.join(root, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(value, handle)
+        return document.load_document(path)
+
+    def test_a_relative_local_anchors_to_the_files_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            doc = self._load(
+                root, [{"name": "iso", "location": "../isos/x.iso"}])
+            (rung,) = doc.media["iso"].location
+            self.assertEqual(rung.local, os.path.normpath(
+                os.path.join(root, "..", "isos", "x.iso")))
+            self.assertTrue(os.path.isabs(rung.local))
+
+    def test_an_absolute_local_is_untouched(self):
+        with tempfile.TemporaryDirectory() as root:
+            absolute = os.path.join(root, "elsewhere", "x.iso")
+            doc = self._load(root, [{"name": "iso", "location": absolute}])
+            self.assertEqual(doc.media["iso"].location[0].local, absolute)
+
+    def test_only_local_rungs_anchor_in_a_mirror_list(self):
+        with tempfile.TemporaryDirectory() as root:
+            doc = self._load(root, [{
+                "name": "iso", "sha256": SHA,
+                "location": ["https://x.test/p.iso", "vendor/p.iso"]}])
+            url, local = doc.media["iso"].location
+            self.assertEqual(url.url, "https://x.test/p.iso")
+            self.assertEqual(local.local,
+                             os.path.join(root, "vendor", "p.iso"))
+
+    def test_an_inline_drive_media_anchors(self):
+        with tempfile.TemporaryDirectory() as root:
+            doc = self._load(root, [{
+                "type": "machine", "name": "rig", "platform": "dos",
+                "drives": {"cdrom0": {"type": "media", "name": "cd",
+                                      "location": "cd.iso"}}}])
+            anchored = os.path.join(root, "cd.iso")
+            self.assertEqual(doc.media["cd"].location[0].local, anchored)
+            inline = doc.machines["rig"].drives["cdrom0"].inline
+            self.assertEqual(inline.location[0].local, anchored)
+
+    def test_a_bare_value_keeps_the_authored_spelling(self):
+        doc = _parse([{"name": "iso", "location": "x.iso"}])
+        self.assertEqual(doc.media["iso"].location[0].local, "x.iso")
 
 
 class ReferenceTests(unittest.TestCase):

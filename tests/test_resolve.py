@@ -76,6 +76,58 @@ class BuildNamespaceTests(unittest.TestCase):
             self.assertIn("case", str(caught.exception))
 
 
+class LocalAnchorResolutionTests(unittest.TestCase):
+    """Local media resolve against the referencing file, never the CWD."""
+
+    def _write(self, root, name, text):
+        path = os.path.join(root, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        return path
+
+    def test_the_plan_is_cwd_independent(self):
+        with tempfile.TemporaryDirectory() as root, \
+                tempfile.TemporaryDirectory() as elsewhere:
+            blueprint = self._write(
+                root, "b.rlqb", '[{"name": "iso", "location": "x.iso"}]')
+            saved = os.getcwd()
+            os.chdir(elsewhere)
+            try:
+                ns = resolve.build_namespace([blueprint])
+                plan = resolve.resolve_media_plan(
+                    resolve.resolve_media("iso", ns), ns)
+            finally:
+                os.chdir(saved)
+            self.assertIsInstance(plan, LocalFile)
+            self.assertEqual(plan.path, os.path.join(root, "x.iso"))
+
+    def test_one_relative_spelling_in_two_directories_collides(self):
+        """Anchored, the two specs name different bytes: different
+        media, so they collide rather than silently resolving through
+        whichever file was read first."""
+        spec = '[{"name": "iso", "location": "x.iso"}]'
+        with tempfile.TemporaryDirectory() as root:
+            os.mkdir(os.path.join(root, "a"))
+            os.mkdir(os.path.join(root, "b"))
+            a = self._write(os.path.join(root, "a"), "a.rlqb", spec)
+            b = self._write(os.path.join(root, "b"), "b.rlqb", spec)
+            with self.assertRaises(PreflightError) as caught:
+                resolve.build_namespace([a, b])
+            message = str(caught.exception)
+            self.assertIn("a.rlqb", message)
+            self.assertIn("b.rlqb", message)
+
+    def test_one_relative_spelling_in_one_directory_still_dedups(self):
+        spec = '[{"name": "iso", "location": "x.iso"}]'
+        with tempfile.TemporaryDirectory() as root:
+            a = self._write(root, "a.rlqb", spec)
+            b = self._write(root, "b.rlqb", spec)
+            ns = resolve.build_namespace([a, b])
+            self.assertEqual(set(ns.media), {"iso"})
+            rung = ns.media["iso"].location[0]
+            self.assertEqual(rung.local, os.path.join(root, "x.iso"))
+
+
 class FetchPlanTests(unittest.TestCase):
     def _ns(self, value):
         return resolve.namespace_of(parse_document(value))
