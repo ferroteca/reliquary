@@ -38,14 +38,8 @@ rlq = "reliquary:main"
 reliquary = "reliquary:main"
 
 [tool.setuptools.packages.find]
-# Released artifacts carry the runtime only. `reliquary_tests` ships
-# in neither the wheel nor the sdist (D96): the suite is developed and
-# run from the repository, which is the only place it is complete.
-# This exclude is required, not decorative — the `reliquary*` glob
-# would otherwise match `reliquary_tests` too — and MANIFEST.in keeps
-# it out of the sdist by no longer grafting it.
+where = ["src"]
 include = ["reliquary*"]
-exclude = ["reliquary_tests*"]
 
 [tool.setuptools.package-data]
 reliquary = [

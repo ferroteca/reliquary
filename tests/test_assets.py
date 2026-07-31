@@ -11,6 +11,7 @@ import unittest
 
 import re
 
+import reliquary
 from reliquary import Context
 from reliquary.assets import (KIND_EXTENSIONS, index_by_name,
                               source_for, stem)
@@ -19,7 +20,7 @@ from reliquary.errors import PreflightError, StaticError
 from reliquary.library import list_blueprints, list_codex, locate_blueprint
 from reliquary.machines import create_machine, resolve_machine
 from reliquary.resolve import load_namespace, resolve_media
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 SHA256 = "1" * 64
 _SPEC = os.path.join(
@@ -76,9 +77,7 @@ class SpecConformanceTests(unittest.TestCase):
         # library.py is the only caller; a kind nothing asks for
         # cannot resolve and only advertises that it could.
         requested = set()
-        package = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "reliquary")
+        package = os.path.dirname(os.path.abspath(reliquary.__file__))
         for name in sorted(os.listdir(package)):
             if not name.endswith(".py") or name == "assets.py":
                 continue

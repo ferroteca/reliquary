@@ -16,7 +16,7 @@ from reliquary import binding, credentials, properties
 from reliquary.binding import (BoundProperties, PropertyBindingError,
                                bind_properties, describe_sources)
 from reliquary.script_parser import parse_script
-from reliquary_tests.test_credentials import FakeStore
+from tests.test_credentials import FakeStore
 
 
 def script(text):

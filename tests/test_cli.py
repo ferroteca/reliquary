@@ -17,7 +17,7 @@ import importlib
 home = importlib.import_module("reliquary.home")
 from reliquary import cli
 from reliquary import backends
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SPEC_DIR = os.path.join(_REPO_ROOT, "docs", "spec")

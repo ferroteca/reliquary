@@ -33,7 +33,7 @@ from reliquary.script_parser import load_script, parse_script
 from reliquary.script_runner import run_script
 from reliquary.script_timing import format_plan, resolve as resolve_timing
 from reliquary.script_validation import reach
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 
 class _DryCase(unittest.TestCase):

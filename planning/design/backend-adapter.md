@@ -283,9 +283,9 @@ settled in this extraction and are recorded below.
 ## The signatures, as extracted
 
 Recorded here on delivery (2026-07-28), from the working code
-rather than ahead of it. `reliquary/backends.py` holds the
-contract; `reliquary/backend_qemu.py` implements it;
-`reliquary/backend_stubs.py` holds the three that do not.
+rather than ahead of it. `src/reliquary/backends.py` holds the
+contract; `src/reliquary/backend_qemu.py` implements it;
+`src/reliquary/backend_stubs.py` holds the three that do not.
 
 **The vocabulary.** Three frozen records, all plain data:
 
@@ -370,6 +370,6 @@ rendered. Both are named rather than hidden (P11).
 
 **The test seam** is `backends._set_adapter(name, instance)`,
 mirroring `credentials._set_provider`: the suite drives the machine
-model against a double (`reliquary_tests/fake_backend.py`) rather
+model against a double (`tests/fake_backend.py`) rather
 than a hypervisor, so no unit test probes or launches a real
 backend.

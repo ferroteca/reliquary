@@ -39,7 +39,7 @@ WHEEL_REQUIRED_TREES = (
 )
 
 # The wheel is the runtime: the suite is not in it.
-WHEEL_FORBIDDEN_TREES = ("reliquary_tests/",)
+WHEEL_FORBIDDEN_TREES = ("tests/",)
 
 # The sdist is the source package: runtime and documentation, and no
 # suite (D96). Asserted in both directions — `docs/spec/` present
@@ -49,7 +49,7 @@ WHEEL_FORBIDDEN_TREES = ("reliquary_tests/",)
 SDIST_REQUIRED_TREES = ("docs/spec/",)
 
 # Neither artifact carries the suite, so this is checked on both.
-SDIST_FORBIDDEN_TREES = ("reliquary_tests/", "planning/")
+SDIST_FORBIDDEN_TREES = ("tests/", "planning/")
 
 
 def _wheel_names(path):

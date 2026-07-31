@@ -13,7 +13,7 @@ from unittest import mock
 from reliquary import backend_stubs, backends
 from reliquary.backends import Capabilities, Requirements
 from reliquary.errors import PreflightError, StaticError
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 
 def _requirements(**kwargs):

@@ -298,7 +298,7 @@ class MachineStateSchemaTests(unittest.TestCase):
         import tempfile
         from reliquary import Context
         from reliquary.machines import create_machine, load_machine_state
-        from reliquary_tests import fake_backend
+        from tests import fake_backend
         schema = jsonc.loads(
             (resources.files("reliquary") / "schemas"
              / "machine-state.schema.json").read_text(encoding="utf-8"))

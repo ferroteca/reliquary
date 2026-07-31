@@ -13,7 +13,7 @@ examples with commentary. These are not runnable scripts: some
 lines are deliberately illegal (always commented and marked), and
 the themes matter more than end-to-end coherence. The surface's
 *reference* script is a shipped builtin,
-`reliquary/codex/scripts/freedos-install.rlqs` — the
+`src/reliquary/codex/scripts/freedos-install.rlqs` — the
 `design-install.rlqs` that used to sit here retired into it when
 the implementation caught up (milestone 4).
 

@@ -74,7 +74,7 @@ first; relocating the file is tidiness, not the act.
 | [http-serve.md](http-serve.md) | The local answer-file server |
 
 The authored `.rlqb` document's **norm is split**: the published
-schema (`reliquary/schemas/blueprint-schema-v1.json`) is normative
+schema (`src/reliquary/schemas/blueprint-schema-v1.json`) is normative
 for structure, and [blueprint-model.md](blueprint-model.md) for the
 semantics a schema cannot express. The
 [guide](../blueprint-guide.md),
@@ -89,13 +89,13 @@ contract, and lives under `planning/`.
 ## Machine-readable schemas
 
 The schemas are **not** here. They ship inside the package, at
-`reliquary/schemas/`, because they are consumed by code — the test
+`src/reliquary/schemas/`, because they are consumed by code — the test
 suite validates against them, and editors bind them by file
 association:
 
-- `reliquary/schemas/blueprint-schema-v1.json` — the composed
+- `src/reliquary/schemas/blueprint-schema-v1.json` — the composed
   blueprint, versioned so editors can bind it today.
-- `reliquary/schemas/machine-state.schema.json` — the machine state
+- `src/reliquary/schemas/machine-state.schema.json` — the machine state
   document.
 
 **For the blueprint, the schema is the structural norm** — and only
@@ -104,7 +104,7 @@ express, so schema validity never implies document validity, and
 [blueprint-model.md](blueprint-model.md) is normative for the
 semantics beyond it. Reliquary's own parser is the validator of
 both halves. Prose and schema are kept honest by the shared
-conformance corpus (`reliquary_tests/fixtures/conformance/`), which
+conformance corpus (`tests/fixtures/conformance/`), which
 runs every fixture against both, so neither can drift from the
 other unnoticed.
 

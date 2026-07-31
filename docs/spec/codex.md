@@ -79,7 +79,7 @@ answer P4 gives automation, arrived at from the other side.
 ## A seed, not a resolution tier
 
 The codex ships inside the Reliquary package as ordinary files
-under `reliquary/codex/` (`blueprints/`, `scripts/`),
+under `src/reliquary/codex/` (`blueprints/`, `scripts/`),
 so it travels with every distribution form, including zip-bundled
 installs. Wherever it lives, the codex is
 never consulted at run time as a fallback layer. Instead, when you

@@ -21,7 +21,7 @@ from reliquary.library import seed_blueprint
 from reliquary.machines import (get_machine_var, load_machine_state,
                                 stop_machine)
 from reliquary.script_runner import run_script
-from reliquary_tests import live_external_effects
+from tests import live_external_effects
 
 
 def _integration_enabled():

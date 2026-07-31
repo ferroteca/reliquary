@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only
 # Blueprint guide
 
 > **Descriptive.** The format's norm is the published schema
-> (`reliquary/schemas/blueprint-schema-v1.json`, structure) plus
+> (`src/reliquary/schemas/blueprint-schema-v1.json`, structure) plus
 > [the composed blueprint model](spec/blueprint-model.md)
 > (semantics); where this guide disagrees with either, this guide
 > has the bug.
@@ -664,11 +664,11 @@ by silently dropping or emulating the feature.
 
 The format checks have a machine-checkable companion: the
 published JSON Schema
-([blueprint-schema-v1.json](../reliquary/schemas/blueprint-schema-v1.json))
+([blueprint-schema-v1.json](../src/reliquary/schemas/blueprint-schema-v1.json))
 — one schema for the whole composed document, covering the machine,
 media, source, and archive components — captures their per-document
 structural subset, for editor completion and validation while
-authoring (U4, U5). It is published under `reliquary/schemas/` and
+authoring (U4, U5). It is published under `src/reliquary/schemas/` and
 versioned as v1 so editors can bind it today; it will keep evolving
 as v1, additively where it can. The prose reference remains
 normative, and schema validity never implies blueprint validity:

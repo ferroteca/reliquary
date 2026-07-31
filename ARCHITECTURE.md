@@ -96,7 +96,7 @@ backend; neither is ever inferred from an image or a running guest.
 
 QEMU is the delivered backend, and **the adapter seam is built**:
 every backend operation goes through one adapter API
-(`reliquary/backends.py`; design:
+(`src/reliquary/backends.py`; design:
 [planning/design/backend-adapter.md](planning/design/backend-adapter.md)),
 extracted from the working QEMU implementation rather than
 designed ahead of one. Assignment happens at materialization — a
@@ -245,7 +245,7 @@ and pin it: where a payload may be acquired, and the hashes that
 verify the exact build the scripts target — what lets a repository
 refer precisely to media it cannot distribute (U4). The format's
 **norm is two artifacts**: the published schema
-(`reliquary/schemas/blueprint-schema-v1.json`) for structure, and
+(`src/reliquary/schemas/blueprint-schema-v1.json`) for structure, and
 [the composed blueprint model](docs/spec/blueprint-model.md) for
 the semantics a schema cannot express — identity, the location
 grammar, the reference closure; the
@@ -618,7 +618,7 @@ differently under the new wording — is mere documentation work.
   machinery — the project runs no CI (**P22**), so the suite is a
   gate whoever lands the work walks through. (AGENTS.md
   "Required checks" and "Test expectations"; the conformance
-  corpus, `reliquary_tests/test_conformance_corpus.py`, is the
+  corpus, `tests/test_conformance_corpus.py`, is the
   pattern the rest is measured against; D49.)
 
 - **P25 — The portable surface generalizes.** A first-class node

@@ -136,7 +136,7 @@ an application surface ships, its normative spec is current truth and lives in
 [`docs/spec/`](../docs/spec/), which is where the world looks for
 what Reliquary *is*. That is a one-way move: a spec never comes
 back here. Machine-readable schemas go further still — they ship
-inside the package at `reliquary/schemas/`, because code consumes
+inside the package at `src/reliquary/schemas/`, because code consumes
 them, and `docs/spec/` refers to them.
 
 ## The map
@@ -158,10 +158,10 @@ them, and `docs/spec/` refers to them.
 
 Not here, deliberately: the normative specs of shipped surfaces
 ([`docs/spec/`](../docs/spec/)) and the machine-readable schemas
-(`reliquary/schemas/`).
+(`src/reliquary/schemas/`).
 
 The worked FreeDOS example is not here: it is the shipped codex
-(`reliquary/codex/`), which is the live, tested copy and needs no
+(`src/reliquary/codex/`), which is the live, tested copy and needs no
 second one.
 
 ## How an idea enters

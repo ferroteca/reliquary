@@ -58,6 +58,7 @@ import re
 import tempfile
 import unittest
 
+import reliquary
 from reliquary.binding import bind_properties
 from reliquary.errors import PreflightError, ReliquaryError
 from reliquary.home import Context
@@ -94,8 +95,7 @@ def _header(path):
 
 def _package_ids():
     """Every `rule_id="..."` in the package, with its occurrence count."""
-    root = os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "reliquary")
+    root = os.path.dirname(os.path.abspath(reliquary.__file__))
     counts = collections.Counter()
     for folder, _dirs, names in os.walk(root):
         for name in sorted(names):
@@ -319,11 +319,10 @@ class InvalidCorpusTests(unittest.TestCase):
         end = spec.index("\nThe grammar is line-oriented", start)
         listed = set(_DOTTED.findall(spec[start:end]))
         raised = set()
-        package = os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))
+        package = os.path.dirname(os.path.abspath(reliquary.__file__))
         for name in ("script_validation.py", "script_parser.py",
                      "script_nodes.py"):
-            with open(os.path.join(package, "reliquary", name),
+            with open(os.path.join(package, name),
                       encoding="utf-8") as handle:
                 raised.update(re.findall(r'rule_id\s*=\s*"([^"]+)"',
                                          handle.read()))
@@ -353,8 +352,7 @@ class InvalidCorpusTests(unittest.TestCase):
         would demand entries that could only be invented.
         """
         raised = set()
-        package = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "reliquary")
+        package = os.path.dirname(os.path.abspath(reliquary.__file__))
         for name in ("script_validation.py", "script_parser.py",
                      "script_nodes.py"):
             with open(os.path.join(package, name),

@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only
 # Blueprint — field reference
 
 > **Descriptive.** The format's norm is the published schema
-> (`reliquary/schemas/blueprint-schema-v1.json`, structure) plus
+> (`src/reliquary/schemas/blueprint-schema-v1.json`, structure) plus
 > [the composed blueprint model](spec/blueprint-model.md)
 > (semantics); where this reference disagrees with either, this
 > reference has the bug.
@@ -59,7 +59,7 @@ dialect — per the same section; the state is strict canonical
 JSON, always.
 
 The machine-checkable companion is the one published
-[blueprint-schema-v1.json](../reliquary/schemas/blueprint-schema-v1.json)
+[blueprint-schema-v1.json](../src/reliquary/schemas/blueprint-schema-v1.json)
 (machine, media, source, and archive components in one schema) —
 the structural subset of the format checks only; this reference
 is normative.

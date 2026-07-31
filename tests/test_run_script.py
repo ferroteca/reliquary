@@ -19,7 +19,7 @@ from reliquary.script_runner import (
     ScriptRun, _ScriptEngine,
     _existing_machine, _resolve_script_stem, run_script,
 )
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 
 class ResolveScriptStemTests(unittest.TestCase):

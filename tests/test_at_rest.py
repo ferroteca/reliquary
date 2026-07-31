@@ -14,7 +14,7 @@ import tempfile
 import unittest
 
 from reliquary import at_rest
-from reliquary_tests import fat_image
+from tests import fat_image
 
 TREE = {
     "AUTOEXEC.BAT": b"@ECHO OFF\r\n",

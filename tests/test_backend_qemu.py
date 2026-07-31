@@ -32,7 +32,7 @@ except ModuleNotFoundError:
 import reliquary
 from reliquary import backend_qemu as qemu_module
 from reliquary.errors import PreflightError, RunFailure, StaticError
-from reliquary_tests import fat_image
+from tests import fat_image
 
 
 class _FakeProcess:

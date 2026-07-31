@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
 
-include reliquary/codex/codex.json
-include reliquary/codex/blueprints/*.rlqb
-include reliquary/codex/scripts/*.rlqs
+include src/reliquary/codex/codex.json
+include src/reliquary/codex/blueprints/*.rlqb
+include src/reliquary/codex/scripts/*.rlqs
 
 # Documentation ships with the source package, as it conventionally
 # does. `planning/` does not: it is maintainer governance, and the
@@ -13,8 +13,9 @@ include reliquary/codex/scripts/*.rlqs
 graft docs
 
 # The suite ships in NEITHER artifact (D96): it is developed and run
-# from the repository, which is the only place it is complete. No
-# `prune` is needed to keep it out — the `packages.find` exclude in
-# pyproject keeps it out of the wheel, and with no graft here
-# setuptools does not carry it into the sdist either.
+# from the repository, which is the only place it is complete.
+# Package discovery is confined to src/ for the wheel; setuptools'
+# sdist file discovery recognizes a root tests/ directory, so prune
+# it explicitly there.
+prune tests
 global-exclude __pycache__/* *.py[co]

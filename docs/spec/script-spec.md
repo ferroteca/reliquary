@@ -14,7 +14,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > planned. The parser, the static rules, the timing plan, and the
 > runtime speak this surface, and so do the shipped built-in and
 > example scripts:
-> `reliquary/codex/scripts/freedos-install.rlqs` is
+> `src/reliquary/codex/scripts/freedos-install.rlqs` is
 > the reference script, and the files under
 > `planning/design/script-examples/` catalog known residual rough
 > edges in this surface. Properties and their binding and the full
@@ -2076,7 +2076,7 @@ node signatures, the static rules, and — since the error classes
 generalized to every surface (D58) — the preflight and runtime
 tiers too, property binding and media resolution included. The
 script conformance corpus
-(`reliquary_tests/fixtures/conformance/script/`) holds it there by
+(`tests/fixtures/conformance/script/`) holds it there by
 refusing to let a fixture claim an id that is absent, or omit one
 that has arrived.
 

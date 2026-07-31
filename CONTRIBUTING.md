@@ -49,7 +49,7 @@ uv sync
 ```
 
 Run things with `uv run` (for example `uv run python -m unittest
-reliquary_tests`), which uses that environment without activating it.
+tests`), which uses that environment without activating it.
 
 Runtime code is standard-library-only except for `qemu.qmp`. Please discuss a
 new dependency before adding it.
@@ -64,9 +64,9 @@ new dependency before adding it.
 Run the required checks from the project virtual environment:
 
 ```powershell
-$pythonFiles = (Get-ChildItem reliquary,reliquary_tests -Filter *.py).FullName
+$pythonFiles = (Get-ChildItem src/reliquary,tests -Filter *.py).FullName
 .venv\Scripts\python.exe -m py_compile $pythonFiles
-.venv\Scripts\python.exe -m unittest -v reliquary_tests
+.venv\Scripts\python.exe -m unittest -v tests
 .venv\Scripts\python.exe -m build
 git diff --check
 ```

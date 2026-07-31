@@ -11,7 +11,7 @@ states and the code never implemented — because nothing here is
 written from knowledge of the code.
 
 The same shape found six divergences in the CLI's command list
-(``reliquary_tests.test_cli.ClaimedCommandTests``); writing this
+(``tests.test_cli.ClaimedCommandTests``); writing this
 module found V13, specified since the surface was adopted and
 enforced nowhere, so a malformed regex reached the guest loop and
 failed there as an untyped fault.

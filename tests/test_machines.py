@@ -36,7 +36,7 @@ from reliquary.machines import (apply_blueprint, create_machine,
                                 start_machine, stop_machine,
                                 wait_machine_var)
 from reliquary.backends import Capabilities
-from reliquary_tests import fake_backend, fat_image
+from tests import fake_backend, fat_image
 
 _BLANK = {"name": "blank", "materialize": "new", "size": "20M"}
 

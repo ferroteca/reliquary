@@ -300,6 +300,6 @@ validation the parser's and a shared valid/invalid fixture corpus —
 run against both parser and schema at realignment — keeping the two
 honest against each other. The machine-state schema is authored
 beside this spec
-([machine-state.schema.json](../../reliquary/schemas/machine-state.schema.json)); the schema
+([machine-state.schema.json](../../src/reliquary/schemas/machine-state.schema.json)); the schema
 version tracks the Reliquary release, not a version field in user
 documents before 1.0.

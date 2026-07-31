@@ -34,7 +34,7 @@ from reliquary import machine as machine_module
 from reliquary import machines as machines_module
 from reliquary.errors import InternalError, PreflightError, RunFailure, StaticError
 from reliquary import platform_dos as platform_dos_module
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 
 @contextlib.contextmanager

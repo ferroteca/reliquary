@@ -10,7 +10,7 @@ Reliquary is an OS installation scripter built on its own generic QEMU
 runner, with DOS as the default and currently only complete platform
 workflow:
 
-- `reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `errors.py` owns the
+- `src/reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `errors.py` owns the
   error taxonomy — `ReliquaryError` the root every deliberate error subclasses, with
   `StaticError` (exit 2) / `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5, a sibling of `RunFailure`,
   never a subclass) and the `exit_code` / `outcome` mapping both the CLI and the terminal event read. **Those four
@@ -93,7 +93,7 @@ workflow:
   (the layered sources, the derivation, the runtime secret rules) is
   the rest of milestone 8,
   `library.py` owns the codex — the built-in seed library
-  (`reliquary/codex/` package data: copy-out **on request only**, never overwriting home files;
+  (`src/reliquary/codex/` package data: copy-out **on request only**, never overwriting home files;
   `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `list_codex`
   names what the library holds and reports nothing of yours, `codex_blueprint_available` is the question a
   refusal asks so it can name the seed command), `machines.py` owns machine materialization under
@@ -300,10 +300,10 @@ workflow:
   arm), and the output discipline, and
   `__main__.py` preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command. **Released artifacts are the runtime alone**:
-  `reliquary_tests` ships in neither the wheel nor the sdist (D96). The `packages.find` exclude keeps it out of the
-  wheel (the `reliquary*` glob would otherwise match it, so the exclude is load-bearing) and `MANIFEST.in` no longer
-  grafts it, which keeps it out of the sdist. `docs/` ships; `planning/` does not, being maintainer governance.
-- `reliquary_tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
+  `tests` ships in neither the wheel nor the sdist (D96). The src-only package search keeps the repository-root suite
+  out of the wheel, and `MANIFEST.in` does not graft it into the sdist. `docs/` ships; `planning/` does not, being
+  maintainer governance.
+- `tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
   media acquisition, blueprints, machines, and scripts.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
@@ -362,7 +362,7 @@ workflow:
   bug. Decisions in `planning/DECISIONS.md` carry
   permanent D-numbers, generally support use cases or principles, and are the citation handle for design choices
   and code commits — overruled decisions sit in that file's Retired list.
-- The worked FreeDOS example is the shipped codex itself (`reliquary/codex/`): the `freedos.rlqb` blueprint with
+- The worked FreeDOS example is the shipped codex itself (`src/reliquary/codex/`): the `freedos.rlqb` blueprint with
   its media and archive components, and the install and verify scripts. It is the live, tested copy — seeded into
   a user's home on first reference — so there is no second copy to keep synchronized.
 - `docs/` describes the live situation. `docs/spec/` holds the
@@ -386,14 +386,14 @@ workflow:
   `planning/proposed/design/` or `planning/pledged/design/`, or in
   `planning/design/` when it serves no single feature.
 - **Machine-readable schemas ship inside the package**, at
-  `reliquary/schemas/`, because code consumes them:
+  `src/reliquary/schemas/`, because code consumes them:
   `blueprint-schema-v1.json` (versioned v1 so editors can bind it
   today) and `machine-state.schema.json`. `docs/spec/` refers to
   them rather than holding them. Both must stay synchronized with the
   prose specs, **which are normative** — a schema captures only the
   structural subset JSON Schema can express, and schema validity
   never implies document validity. The shared valid/invalid
-  conformance corpus (`reliquary_tests/fixtures/conformance/blueprint/`,
+  conformance corpus (`tests/fixtures/conformance/blueprint/`,
   `test_conformance_corpus.py`) runs every fixture against both the
   parser and the schema so the two cannot drift. Placement rules
   are in `.agents/skills/documentation-rules.md`.
@@ -521,7 +521,7 @@ whose recorded `blueprint-source` equals this invocation's resolution (a sourcel
 **Seeding is the one way the library reaches a tree**: `seed-blueprint` / `seed-script` (there is no `seed-media`) write
 into the assigned `blueprints` / `scripts` directory wherever it is, project tree or home alike — copy a first draft,
 commit the copy. All three codex verbs — those two plus `list-codex` — are **CLI-only under P6's named exception**
-(D87): a library that changes in a point release is not something a program may bind against, so `reliquary/__init__.py`
+(D87): a library that changes in a point release is not something a program may bind against, so `src/reliquary/__init__.py`
 exports none of them and the parity test reads the exception from `docs/spec/api.md`'s codex-family row.
 
 Default layout, with only the home assigned. A machine is wholly its materialization directory — there is
@@ -821,10 +821,10 @@ when uv absorbed their jobs.
 Run checks through uv, which uses the locked environment.
 
 ```powershell
-$pythonFiles = (Get-ChildItem reliquary,reliquary_tests -Filter *.py).FullName
+$pythonFiles = (Get-ChildItem src/reliquary,tests -Filter *.py).FullName
 uv run python -m py_compile $pythonFiles
-uv run python -m unittest -v reliquary_tests
-uv run --python 3.12 python -m unittest reliquary_tests
+uv run python -m unittest -v tests
+uv run --python 3.12 python -m unittest tests
 uv build
 ```
 
@@ -872,7 +872,7 @@ default suite; needs network for the LiveCD on a cold home):
 $env:RELIQUARY_INTEGRATION = "1"
 # optional: reuse a home so cache/media survives reruns
 # $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
-.venv\Scripts\python.exe -m unittest -v reliquary_tests.test_freedos_install_integration
+.venv\Scripts\python.exe -m unittest -v tests.test_freedos_install_integration
 ```
 
 ## Test expectations
@@ -888,7 +888,7 @@ Lifecycle changes need focused tests, especially for failure paths. Preserve cov
 - stale state produces clear diagnostics and cannot target another VM
 
 Adapter-seam guarantees, which the suite exercises against a **double** rather than a
-hypervisor (`reliquary_tests/fake_backend.py`, installed with `backends._set_adapter`) —
+hypervisor (`tests/fake_backend.py`, installed with `backends._set_adapter`) —
 no unit test may probe or launch a real backend:
 
 - a requirement no candidate can honor fails closed naming the backend *and* the

@@ -62,7 +62,7 @@ def live_external_effects():
 
 
 def load_tests(loader, standard_tests, pattern):
-    """Discover the package's test modules for `unittest reliquary_tests`."""
+    """Discover the package's test modules for `unittest tests`."""
     this_dir = os.path.dirname(__file__)
     standard_tests.addTests(loader.discover(
         start_dir=this_dir, pattern=pattern or "test_*.py",

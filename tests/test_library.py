@@ -28,7 +28,7 @@ from reliquary.machines import (check_variable_key, create_machine,
                                 load_machine_state)
 from reliquary.script_parser import load_script
 from reliquary.resolve import load_namespace, resolve_media
-from reliquary_tests import fake_backend
+from tests import fake_backend
 
 BLUEPRINT = "freedos"
 MEDIA = "freedos-livecd"

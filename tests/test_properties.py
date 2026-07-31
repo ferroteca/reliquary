@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from reliquary import credentials, properties
 from reliquary.properties import PropertiesError
-from reliquary_tests.test_credentials import FakeStore
+from tests.test_credentials import FakeStore
 
 _provider = None
 

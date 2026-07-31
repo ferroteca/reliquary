@@ -8,12 +8,11 @@ import os
 import re
 import unittest
 
+import reliquary
 from reliquary import events, progress
 from reliquary.errors import StaticError
 
-_PACKAGE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "reliquary")
+_PACKAGE = os.path.dirname(os.path.abspath(reliquary.__file__))
 # Every consumer spells the module `_events` (`from . import events
 # as _events`); the optional underscore keeps the plain spelling
 # working too, and the uppercase tail keeps `.events.emit` out.

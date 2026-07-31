@@ -13,7 +13,7 @@ path = [
     "CONTRIBUTING.md",
     "TRADEMARKS.md",
     "reliquary/schemas/*.json",
-    "reliquary_tests/fixtures/**",
+    "tests/fixtures/**",
     "reliquary/codex/**/*.json",
     "reliquary/codex/**/*.rlqb",
 ]

@@ -76,7 +76,7 @@ _OLD_API_NAMES = (
 # Live-tree paths scanned for superseded spellings.
 _SWEEP_ROOTS = (
     "reliquary",
-    "reliquary_tests",
+    "tests",
     "docs",
     "README.md",
     "AGENTS.md",
@@ -87,21 +87,21 @@ _SWEEP_ROOTS = (
 # Files that may quote the old surface deliberately.
 _ALLOW_PATH_SUFFIXES = (
     # Negative tests: old spellings must fail to parse.
-    os.path.join("reliquary_tests", "test_script_parser.py"),
-    os.path.join("reliquary_tests", "test_script_validation.py"),
+    os.path.join("tests", "test_script_parser.py"),
+    os.path.join("tests", "test_script_validation.py"),
     # Same rationale: it asserts the retired `check-script` command
     # is gone, which it cannot do without naming it.
-    os.path.join("reliquary_tests", "test_dry_run.py"),
+    os.path.join("tests", "test_dry_run.py"),
     # And the same again for D88's retirements. Each of these asserts
     # a deleted spelling stays deleted — `--builtin` refused by the
     # parser, `set_autoseed` absent from `home`, the docs-coverage
     # check's own record of commands once specified and absent — none
     # of which can be written without naming what is gone.
-    os.path.join("reliquary_tests", "test_cli.py"),
-    os.path.join("reliquary_tests", "test_home.py"),
-    os.path.join("reliquary_tests", "test_library.py"),
+    os.path.join("tests", "test_cli.py"),
+    os.path.join("tests", "test_home.py"),
+    os.path.join("tests", "test_library.py"),
     # This module names the forbidden spellings.
-    os.path.join("reliquary_tests", "test_old_surface_purge.py"),
+    os.path.join("tests", "test_old_surface_purge.py"),
     # The API spec's realignment section records a completed rename
     # and names the spellings it replaced. Historical prose, not a
     # surface anyone can reach: the names it quotes are exactly the
