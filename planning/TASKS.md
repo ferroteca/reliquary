@@ -112,25 +112,13 @@ retires and is never issued again, so a T-number surviving in a
 commit message can never resolve to something else later, and
 gaps in the sequence are history rather than a promise.
 
-**The next number to issue is T11.** Tasks are the one handle class
-whose whole population can vanish: the queue empties, and a struck
-task's only record is its commit, so nothing else here would say
-what the highest number ever issued was. An F-number is covered
-incidentally — every retirement is named in a
-[DECISIONS.md](DECISIONS.md) entry — and D52 denies a task that
-same cover on purpose, which is why this sequence has to state its
-own high-water mark. **This line is not a status column** (D42): it
-records what the sequence has spent, and says nothing about what
-was done, by whom, or when.
-
-It started at **T8** rather than T1 because T0–T7 were issued
-already, by an earlier per-list numbering that ran three separate
-times, and those mentions survive in
-[DECISIONS.md](DECISIONS.md) under the entries that landed them.
-Beginning above them is what keeps every T-number in the record
-resolving to exactly one thing — the property the never-reissue
-rule exists to buy, which starting at T1 would have spent on the
-first entry.
+**T-numbers are issued against the sequence ledger**
+([SEQUENCES.md](SEQUENCES.md); owner, 2026-07-31), which holds the
+high-water mark this file used to state — take the next number
+there and advance it in the same edit. The reasons the mark must
+be stated at all — the queue empties, a struck task's only record
+is its commit (D52), and a search sees only the branch it stands
+on — live with the ledger, along with the sequence's T8 start.
 
 ## Pledged
 

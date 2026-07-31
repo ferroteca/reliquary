@@ -40,8 +40,8 @@ of what the directories mean: a thing in `proposed/` moves to
 `pledged/`, and the commit that moves it is the record.
 
 **The planning root holds what does not move.** The map, the rule,
-the record, and the queue are machinery rather than proposals, and
-none of them has a lifecycle state to be in:
+the record, the queue, and the ledger are machinery rather than
+proposals, and none of them has a lifecycle state to be in:
 
 - [README.md](README.md) — this map.
 - [SURFACES.md](SURFACES.md) — the vetting rule. It governs
@@ -61,6 +61,12 @@ none of them has a lifecycle state to be in:
   and capability* — use cases, principles, and the features that
   deliver them — and a task is none of those. That kind distinction
   is the distinguisher, not size alone.
+- [SEQUENCES.md](SEQUENCES.md) — the sequence ledger: the next
+  number to issue for **every** handle class (D, F, G, P, S, T, U,
+  V), stated in one file on `main` because a search sees only the
+  branch it stands on and a number issued on an unmerged branch is
+  visible from nowhere else (owner, 2026-07-31). Issue from it and
+  advance the mark in the same edit.
 
 One exception cuts the other way: work that only makes sense as part
 of one pledged feature lives **with that feature**, under
@@ -84,9 +90,9 @@ both directories, recording order of issue and never priority; it
 **evaporates on delivery** and is never reused, so gaps are history
 rather than a promise. **Tasks carry T-numbers on the same terms**
 (D86) — issued at entry, since a task has no proposed state here,
-and evaporating when the task is struck; the sequence states its own
-high-water mark in [TASKS.md](TASKS.md), tasks being the one class
-whose whole population can vanish. Designs take no number — a design
+and evaporating when the task is struck; every handle sequence
+issues against the ledger ([SEQUENCES.md](SEQUENCES.md)), which
+states the high-water marks. Designs take no number — a design
 serves one feature and is identified by its path. A feature must fit in one
 sprint, which here runs in minutes to hours; the bound bites at
 the pledge, so entries in `proposed/FEATURES.md` are each many
@@ -152,6 +158,7 @@ them, and `docs/spec/` refers to them.
 | [`SURFACES.md`](SURFACES.md) | *(root)* The surface-change rule every surface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The application surfaces" (S1–S8) |
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
 | [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, T-numbered, in no particular order |
+| [`SEQUENCES.md`](SEQUENCES.md) | *(root)* The sequence ledger: the high-water marks every handle sequence (D, F, G, P, S, T, U, V) issues against — one counter per class, advanced in the issuing entry's own edit |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `landmarks.md` (F5), `recorder.md` (F1, U6) |
 | [`pledged/design/`](pledged/design/) | Design for pledged features — empty again since 2026-07-28, when F2 delivered and `backend-adapter.md` travelled to `design/`: a delivered feature leaves no feature for its design to sit with |
 | [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `backend-adapter.md` (the adapter seam's doctrine, delivered as F2 and internal by decision, so it does not move to `docs/spec/`), `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |

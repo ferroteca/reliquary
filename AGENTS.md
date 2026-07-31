@@ -314,7 +314,9 @@ workflow:
   approved but not yet delivered. Promotion is by *moving* a document or an entry, and the commit is the
   pledge record. The **planning root** holds what never moves and so has no state — the map, the vetting
   rule (`SURFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, pledged, refused and
-  retired alike), and the task queue. Design sits with what it serves: `planning/proposed/design/` and
+  retired alike), the task queue, and the sequence ledger (`SEQUENCES.md` — the high-water marks every
+  handle sequence issues against, one file on `main` because a search sees only the branch it
+  stands on). Design sits with what it serves: `planning/proposed/design/` and
   `planning/pledged/design/` for a feature's own design, `planning/design/` for open design problems serving
   no single feature — the whole-system view itself (the seams model and the P-numbered principles) is root
   `ARCHITECTURE.md`. Once a surface ships, its normative spec moves to `docs/spec/` — current truth does not
@@ -323,8 +325,9 @@ workflow:
   of order in `TASKS.md` holds equally for pledged features, the only binding order running inside a feature.
   **Features carry F-numbers and tasks carry T-numbers** — the handle a dependency, commit or decision points
   at — which unlike U-, P-, S- and D-numbers **evaporate on delivery**, retiring unreused, gaps being history
-  rather than a promise. A T-number is issued at entry to `TASKS.md` (a task has no proposed state), and that
-  file states the sequence's high-water mark because a struck task leaves no other record of it. Designs take
+  rather than a promise. A T-number is issued at entry to `TASKS.md` (a task has no proposed state), and every
+  handle sequence issues against `planning/SEQUENCES.md`'s high-water marks, a struck task or an unmerged
+  branch leaving the searchable record incomplete. Designs take
   no number. **A feature must fit in one sprint**, here minutes to hours, so a pledged feature is far smaller
   than "milestone" suggests; the bound bites at the pledge. References between items run **down the lifecycle or
   sideways, never up**. Full rules: `planning/README.md`.

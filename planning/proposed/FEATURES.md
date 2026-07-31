@@ -9,7 +9,10 @@ Large unbuilt capabilities — each a milestone's worth of work,
 **design settled and intact**, waiting on the demand that schedules
 it. Nothing here is worked ([README.md](../README.md)); the move to
 [pledged/FEATURES.md](../pledged/FEATURES.md) is the pledge,
-and the commit that makes it is the record.
+and the commit that makes it is the record. An entry here takes
+its F-number from the sequence ledger
+([SEQUENCES.md](../SEQUENCES.md)) — issue from there and advance
+the mark in the same edit.
 
 F2–F6 left the numbered arc for the same reason (D33, owner,
 2026-07-23): **no in-force or pledged use case demands it**. The
