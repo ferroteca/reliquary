@@ -11,6 +11,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 0.1.0a1 - 2026-07-31
+
 ### Removed
 
 - **Released artifacts carry no tests** (D96). The wheel never did; the
