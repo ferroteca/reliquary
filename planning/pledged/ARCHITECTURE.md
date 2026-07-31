@@ -45,19 +45,51 @@ SPDX-License-Identifier: GPL-3.0-only
 > [DECISIONS.md](../DECISIONS.md) and triggers the planning-doc sweep,
 > its P-number the search key.
 
-*(Empty again since 2026-07-27, and empty is the healthy state: a
-principle sits here only in the window between the project owing
-it and the code honoring it, and that window is meant to be
-short. A long occupancy is the thing to be uncomfortable about.*
+- **P26 — The session layer is the only door.** All consumer API
+  interaction passes through a **`Session`**, opened on — at the
+  minimum — a home directory; the consumer interacts with the
+  session and never the underlying implementations. The CLI is
+  the session layer's first consumer: every invocation opens one,
+  assigning the default home (`Documents/reliquary`, falling back
+  to `~/reliquary`) whenever neither a flag nor the environment
+  named one, exactly as the existing default-directory mechanism
+  has it (D59's defaulting rule, relocated intact). The session
+  carries the ambient state every call is handed today, and
+  carries it once — the six placeable directories and the
+  selected properties file — so the per-call `context=` and
+  `properties_file=` threading and the module-level directory
+  globals are superseded, and two sessions in one process are
+  unremarkable, which the globals could never say. The boundary
+  is ambient state, and it is named: whatever resolves a
+  directory, touches machine or media state, or reads ambient
+  configuration is reachable only through a session, while pure
+  data-in/data-out work — parsing and validating a document or
+  script handed to it — stays a free function, so tooling never
+  invents a home to parse a string. The vocabulary stays
+  importable: the types, the errors, the `Context` record (now
+  the session's initialization value), and `default_home_dir()`,
+  which is what keeps the CLI's defaulting a capability present
+  on both surfaces (P6, D87) after `set_*_dir()` and
+  `adopt_environment()` leave the public surface — environment
+  adoption becomes the CLI's private construction step. The rest
+  of D59 stands: all six directories remain individually
+  placeable at the session's door, derivation reaches only what
+  is still unassigned, and the API assigns no default — demanding
+  the home at construction is the same fail-closed safety moved
+  to the door, refusing earlier and still naming what is missing,
+  and it retires first-use `dir.unassigned` outright, an assigned
+  home reaching all six by derivation. (P6's differing-defaults
+  tier is preserved — the CLI assigns, the API demands. P7 shapes
+  the object: opened on the plain record D59 settled and
+  thereafter an opaque handle every verb hangs off, the shape
+  that binds from C where per-call keyword threading does not.
+  The carrier session — `Machine.session()`, a live connection to
+  a running machine — is a different stratum and keeps its name.
+  Supersedes D59's carrier mechanism — per-call `context=`, the
+  directory globals, first-use `dir.unassigned` — and none of its
+  placement, derivation, or defaulting decisions.)
 
-*P16 — Reliquary is the only interface to a machine — was the last
-occupant and held the shelf for a single day: pledged by D57 in
-the morning and armed by D62 the same day, when F23 delivered the
-two operations that were in violation. It is the shelf working as
-designed, and the only entry so far to have been promoted by the
-work D34 says rides it rather than by someone noticing later. P5
-and P14 were the previous entries and both promoted that other
-way: each had stated its own delivery condition — P5 when
-milestone 9 landed, P14 when milestone 7's parser refused an
-operator-bearing reference — and both conditions were met without
-anyone making the move.)*
+*(The shelf reopened 2026-07-31 for P26, after four days empty.
+Empty remains the healthy state: a principle sits here only in the
+window between the project owing it and the code honoring it, and
+that window is meant to be short.)*
