@@ -36,6 +36,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   family (`Machine` and its module functions, addressed by a
   machine's own directory) remain importable as before.
 
+### Removed
+
+- **`Session.set_machine_var` is gone** — removed as a defect,
+  not deprecated. Machine variables are the guest's report
+  channel: the script `set` verb writes and the host reads
+  (`get-machine-var` / `wait-machine-var`), which the CLI spec
+  has stated all along — "writing is the script verb's, and the
+  host side only reads." The session method was host-side
+  writing into that channel, wider than the verb it mirrored: it
+  could write outside any run and forge what a boot reported,
+  and no script can observe a variable, so it could trigger
+  nothing. The engine keeps its internal writer for the runner;
+  no public surface writes a machine variable.
+
 ## 0.1.0a1 - 2026-07-31
 
 ### Removed

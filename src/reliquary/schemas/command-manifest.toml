@@ -1,0 +1,205 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: GPL-3.0-only
+
+# The command manifest — the normative inventory of the command
+# surfaces (P6: one semantic surface). Each capability is
+# declared exactly once; the dash-separated CLI word and the
+# underscored API twin both derive from the one name, so a twin
+# mismatch cannot be expressed here. The suite enforces every
+# entry in both directions: a capability missing from either
+# surface, a command registered but not declared here, or a
+# public name this file does not classify all fail the
+# conformance test.
+#
+# This file is a norm. Editing it is a surface change, vetted
+# under planning/SURFACES.md before it lands (P23) — the diff of
+# this file is the inventory change, argued line by line. What
+# each capability *does* is prose's job: docs/spec/cli.md and
+# docs/spec/api.md, which defer to this file for what exists.
+
+# Plain twins: the command word is the whole declaration.
+# `add-media` is the CLI face; `add_media` on Session is the
+# twin, derived, never restated.
+twins = [
+  "add-media",
+  "apply-blueprint",
+  "clean-media",
+  "create-machine",
+  "delete-blueprint",
+  "describe-drives",
+  "destroy-machine",
+  "eject-media",
+  "exec",
+  "fetch-media",
+  "get-file",
+  "get-files",
+  "get-machine-dir",
+  "get-machine-var",
+  "get-property",
+  "insert-media",
+  "list-blueprints",
+  "list-files",
+  "list-machines",
+  "list-media",
+  "list-properties",
+  "list-scripts",
+  "new-blueprint",
+  "prune-media",
+  "put-file",
+  "put-files",
+  "recreate-machine",
+  "refresh-drives",
+  "run-script",
+  "set-boot-order",
+  "set-property",
+  "start-machine",
+  "stop-machine",
+  "unset-property",
+  "wait-machine-var",
+]
+
+# Session methods that are not command twins: the ambient
+# machinery an embedder drives directly — session state,
+# resolution, credentials. Not capabilities, so no CLI face is
+# owed (P6's reverse direction is judged here, once, in this
+# list).
+session-lifecycle = [
+  "bind_properties",
+  "describe_sources",
+  "has_credential",
+  "load_machine_state",
+  "load_namespace",
+  "machine_dir_path",
+  "mark_stopped",
+  "resolve_machine",
+]
+
+# Families: commands whose API face is a named module function
+# rather than a derived Session method. The guest-console verbs
+# keep the script language's spellings on the CLI (the
+# script-language-identity exception); their module-level faces
+# are today's API, and true twins land with the control-plane
+# design (docs/spec/api.md, guest-console family).
+[families.guest-console]
+press = "send_keys"
+type = "send_text"
+screen = "screen_text"
+wait = "wait_text"
+select = "cursor_menu_select"
+screenshot = "screenshot"
+
+# Deliberate breaks in parity, each carrying its reason —
+# absence from this list is what makes a break a bug.
+
+[[exceptions]]
+name = "enter"
+missing = "api"
+reason = """a composite console verb — one line typed, Enter \
+pressed; the embedder composes send_text and send_keys, and the \
+console family's true twins land with the control-plane design \
+(docs/spec/api.md, guest-console family)"""
+
+[[exceptions]]
+name = "hmp"
+missing = "api"
+reason = """the QEMU human-monitor escape hatch; its twin lands \
+with the control-plane design (docs/spec/api.md, guest-console \
+family)"""
+
+[[exceptions]]
+name = "seed-blueprint"
+missing = "api"
+reason = """CLI-only by decision (D87): reaching the shipped \
+library is a human act, and nothing programmatic may bind a \
+name the next point release may move (P18)"""
+
+[[exceptions]]
+name = "seed-script"
+missing = "api"
+reason = """CLI-only by decision (D87): reaching the shipped \
+library is a human act, and nothing programmatic may bind a \
+name the next point release may move (P18)"""
+
+[[exceptions]]
+name = "list-codex"
+missing = "api"
+reason = """CLI-only by decision (D87): reaching the shipped \
+library is a human act, and nothing programmatic may bind a \
+name the next point release may move (P18)"""
+
+# The embedding surface that is legitimately not a command:
+# every public name appears in exactly one class, so a new
+# export is classified here or the suite fails.
+
+[embedding-surface]
+
+# The nouns: what calls return and consumers type-check against.
+# Session leads the list because it is the one door (P26).
+types = [
+  "Session",
+  "AgentlessGuestExec",
+  "BoundProperties",
+  "Condition",
+  "Context",
+  "Document",
+  "DryRun",
+  "Event",
+  "EventStream",
+  "GuestExec",
+  "Handler",
+  "Machine",
+  "Phase",
+  "Property",
+  "Script",
+  "ScriptRun",
+  "Statement",
+]
+
+# The error taxonomy, ReliquaryError at its root.
+errors = [
+  "ReliquaryError",
+  "BlueprintError",
+  "CredentialError",
+  "InternalError",
+  "PreflightError",
+  "PropertiesError",
+  "PropertyBindingError",
+  "RunCancelled",
+  "RunFailure",
+  "ScriptParseError",
+  "ScriptRuntimeError",
+  "StaticError",
+  "WaitExpired",
+]
+
+# Parsing and loading without a session: the static half of the
+# embedding API.
+parsers = [
+  "load_document",
+  "load_script",
+  "parse_document",
+  "parse_script",
+]
+
+# The backend adapter seam (U7): what a third-party backend
+# implements and how discovery ranks it.
+backend-seam = [
+  "Availability",
+  "BACKEND_PRIORITY",
+  "BackendAdapter",
+  "Capabilities",
+  "adapter",
+  "discover",
+]
+
+# Small standalone helpers.
+helpers = [
+  "default_home_dir",
+  "is_secret",
+  "secret_marker",
+]
+
+# The CLI's own programmatic entry.
+entry-points = [
+  "main",
+]

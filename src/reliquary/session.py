@@ -209,12 +209,10 @@ class Session:
             address, recursive=recursive, machine=machine,
             blueprint=blueprint, context=self._context)
 
-    # The machine-variable family.
-
-    def set_machine_var(self, machine_id, key, value):
-        """Record a machine variable on a machine, in any phase."""
-        return machines.set_machine_var(machine_id, key, value,
-                                        context=self._context)
+    # The machine-variable family. Read-only by design: the script
+    # `set` verb is the channel's only writer (docs/spec/cli.md,
+    # "the host side only reads"), so the session carries no
+    # setter.
 
     def get_machine_var(self, key, *, machine=None, blueprint=None):
         """Read a machine variable a script ``set``."""

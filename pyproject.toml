@@ -45,6 +45,7 @@ include = ["reliquary*"]
 reliquary = [
     "*.lark",
     "schemas/*.json",
+    "schemas/*.toml",
     "codex/codex.json",
     "codex/blueprints/*.rlqb",
     "codex/scripts/*.rlqs",

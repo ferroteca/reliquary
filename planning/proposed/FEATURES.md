@@ -1148,3 +1148,59 @@ answer is still free.
   currently unjustified: adjacent to the U14/U15 drafts at
   best, and test-framework semantics belong to consumers (the
   doctrine boundary).
+
+## F39 — The machine-variable channel, both directions
+
+> **Demand: none known — and entered saying so** (owner,
+> 2026-08-01). No use case asks for this and none is drafted;
+> the owner suspects one will turn up, and this entry holds the
+> design questions so the argument is ready when it does.
+> Nothing is worked from here, and this proposal in particular
+> waits on a demand before pledging is even arguable.
+> Provenance: the `Session.set_machine_var` removal — the
+> method fell to cli.md's "the host side only reads", and this
+> is the capability it gestured at, argued properly instead of
+> arriving by stray method.
+
+**The idea.** Machine variables run host→script as well as
+script→host: an orchestrator sets a value mid-run
+(`set-machine-var`, twin `set_machine_var`), and a running
+script retrieves or waits on it. The motivating shape is the
+trigger: a long-running script holds at a wait until another
+process supplies the go signal.
+
+**The design load**, named now so the eventual round starts
+ahead:
+
+- **Two one-way channels, never one shared map.** Guest-set
+  variables are the report channel and stay host-read-only —
+  "a value is what the current boot produced" is a provenance
+  guarantee, and a host writer sharing that namespace could
+  forge guest reports. Host-set variables take their own
+  namespace or map, invisible to the report readers. The
+  symmetry is in the mechanics, never the store.
+- **Script-side retrieval is cheap; the surface is not.** The
+  runner is host-side, so reading the state document is
+  trivial — but a wait channel or interpolation source is
+  language surface, governed by the goals and the V-rules, and
+  it is the part the round is really about.
+- **P19 binds.** Run-specific data never selects a branch, a
+  phase, or a path. A host signal may *gate* progress — that is
+  what a wait is — but a value that picks a path is refused
+  already, and the design must not become the flag-channel P19
+  exists to prevent.
+- **Properties are bound once, deliberately.** A run today is a
+  function of its bound inputs: dry-run's plan, the run record,
+  and the replay ambitions (F13) all lean on that. A mid-run
+  host input makes outcomes timing-dependent. Screen waits
+  already admit timing, but a value channel is a bigger step
+  than a signal, and the round prices it or narrows to the
+  signal.
+- **P6 lands every face together**: the CLI command, the
+  session twin, and the script-side read or wait arrive in one
+  change, and the command manifest gains the capability in the
+  same commit.
+- **cli.md's sentence is the gate.** "Writing is the script
+  verb's, and the host side only reads" is in force; this
+  proposal is an argued amendment of it and lands only through
+  the surface-change rule (P23), never by arrival.

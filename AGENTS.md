@@ -130,13 +130,12 @@ workflow:
   stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
   already-materialized media image) / `get_machine_dir` (the out-of-band door) /
   `list_machines` /
-  `resolve_machine` / the exec-run family — `set_machine_var` /
-  `get_machine_var` (the script→host scalar channel: a `machine.json`
-  `variables` map under the op lock, cleared at `start` so a variable
-  always reports the current boot, the `rlq`/`reliquary` key
-  namespaces reserved; the setter's world-facing spelling is the
-  script `set` verb, which is how the capability reaches the CLI
-  without a command of its own) and the in-band file family —
+  `resolve_machine` / the exec-run family — `get_machine_var`
+  (the script→host scalar channel: a `machine.json` `variables`
+  map under the op lock, cleared at `start` so a variable always
+  reports the current boot, the `rlq`/`reliquary` key namespaces
+  reserved; the script `set` verb is the channel's only writer —
+  the host side only reads, per the CLI spec) and the in-band file family —
   `put_file` / `get_file`, `put_files` / `get_files` (a tree's
   contents, recursive, a copy and never a mirror) and `list_files`
   (one level or `recursive=`, returning a flat array of

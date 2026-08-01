@@ -212,12 +212,6 @@ no meaning to what travels through them.
   out-of-band edit — without waiting for the next start.
   Stopped-only: a running guest owns its disks. CLI twin:
   `refresh-drives`.
-- `set_machine_var(machine_id, key, value)` - Record
-  one. Its world-facing spelling is the script `set` verb, so the
-  capability reaches the CLI through the scripting language rather
-  than a command of its own. Variables are cleared at each `start`,
-  so one always reports what the current boot produced; the `rlq` and
-  `reliquary` key namespaces are reserved.
 - `put_file(source, destination, *, machine=None, blueprint=None)` -
   Copy a host file into the guest, `destination`
   addressed **as the guest names it** (`"A:\TEST.EXE"`). Returns

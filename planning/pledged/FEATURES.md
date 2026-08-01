@@ -188,30 +188,16 @@ script language its corpus, and each surface gets the machine
 artifact that fits its shape, never one format stretched over
 all of them.
 
-**Known authoring verdicts**, found by enumeration while
-drafting this and unverified against the specs (a finding is
-not a fact until re-tested): `set_machine_var` ships on Session
-with no CLI command while its get/wait siblings carry both
-faces; `seed-blueprint` and `seed-script` show no API face by
-name; `list-codex`'s API face is not derivable. Each resolves
-at authoring into a twin, a family mapping, an exception with
-its reason — or a filed P6 defect.
-
 Work items:
 
-1. **Author the manifest whole** —
-   `src/reliquary/schemas/command-manifest.toml`: every
-   command, every family mapping, every exception with its
-   reason, every `__all__` name classified. The verdicts above
-   are settled here, each either encoded or filed as a defect.
-2. **The conformance test** — the four assertions, replacing
+1. **The conformance test** — the four assertions, replacing
    the api.md table reads and the docs/spec command sweep
    ([F37](#f37--the-prose-parser-migration) items 2 and 3,
    which point here and land after it).
-3. **The prose deferral** — cli.md and api.md stop enumerating
+2. **The prose deferral** — cli.md and api.md stop enumerating
    the inventory and cite the manifest; a norm edit, landing
    under the surface-change rule with this feature.
-4. **The audits narrowed** — R1 and R2
+3. **The audits narrowed** — R1 and R2
    ([RECURRING.md](../RECURRING.md)) shed their inventory half;
    their Check lines are edited to the judgment half in the
    same change.

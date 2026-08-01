@@ -248,7 +248,10 @@ class VeneerTests(_SessionCase):
             self.assertEqual(
                 session.load_machine_state(machine_id)["id"],
                 machine_id)
-            session.set_machine_var(machine_id, "step", "created")
+            # The channel's only writer is the script `set` verb;
+            # simulate its write through the engine.
+            machines.set_machine_var(machine_id, "step", "created",
+                                     context=self.home)
             self.assertEqual(
                 session.get_machine_var("step", machine=machine_id),
                 "created")
@@ -294,7 +297,6 @@ _VENEERS = {
     "put_files": machines.put_files,
     "get_files": machines.get_files,
     "list_files": machines.list_files,
-    "set_machine_var": machines.set_machine_var,
     "get_machine_var": machines.get_machine_var,
     "wait_machine_var": machines.wait_machine_var,
     "fetch_media": media.fetch_media,
