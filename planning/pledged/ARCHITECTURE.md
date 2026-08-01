@@ -65,13 +65,14 @@ SPDX-License-Identifier: GPL-3.0-only
   backing relationship survives a write, work is proportional to
   touched data, contention fails by name, and an interrupted write
   is reconciled on the next access. This principle is pledged, not
-  armed: the current `remanence==0.0.1a1` release is evidence for
-  the direction but not a candidate, because it refuses qcow2
-  backing files, treats a blank newly materialized disk as an
-  unreadable filesystem, silently omits unreadable partitions from
-  `geometry()`, lacks a stable volume identity shared by geometry
-  and file operations, and does not yet establish D77's
-  crash-recovery guarantee. Implementation waits for a later
-  Remanence release that satisfies those acceptance conditions on
-  the delivered Windows host (P11), and that exact release is
-  pinned.
+  armed: the pinned candidate is `remanence==0.0.1a2`, which meets
+  the acceptance gate this pledge set — backing chains compose for
+  reading and writing with every backing file claimed immutable, a
+  blank newly materialized disk is an answer rather than an error,
+  a partition that cannot be read stays in `geometry()` carrying
+  its issue, one stable volume identity is shared by geometry and
+  every file verb, and an interrupted commit is reconciled on the
+  next open, which is D77's crash-recovery guarantee — verified
+  against the published wheel on the delivered Windows host (P11).
+  That exact release is pinned; a different release is a fresh
+  verification, never a substitution.
