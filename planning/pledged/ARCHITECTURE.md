@@ -56,10 +56,10 @@ SPDX-License-Identifier: GPL-3.0-only
 > clause's *instrument*: which checks may live in the
 > every-commit suite, and where enforcement of the rest moves.
 > Demanded by P24's own collision with the norms it enforces; no
-> use case asks for it.
-> [F36](FEATURES.md#f36--the-recurring-register) and
-> [F37](FEATURES.md#f37--the-prose-parser-migration) carry the
-> work.
+> use case asks for it. The register stands
+> ([RECURRING.md](../RECURRING.md));
+> [F37](FEATURES.md#f37--the-prose-parser-migration) carries the
+> migration.
 
 **The enforcement instrument follows the artifact kind.** A norm
 is enforced by the every-commit suite where it is

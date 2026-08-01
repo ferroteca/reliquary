@@ -32,41 +32,14 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
-## F36 — The recurring register
-
-> Delivers half of the **P24 amendment**
-> ([ARCHITECTURE.md](ARCHITECTURE.md), beside this file): the
-> enforcement instrument prose norms move to. Cut from F35 at
-> pledge with [F37](#f37--the-prose-parser-migration), the
-> split retiring F35's number (D42).
-
-Work items:
-
-1. **`planning/RECURRING.md`**, its preamble stating the
-   semantics the amendment argues: marks are state and never
-   diary, a staleness bound is a ceiling and never an
-   appointment, overdue is a signal and never a defect, findings
-   are filed where findings go, and the run's record is the
-   commit that advances the mark. The R-mark enters
-   [SEQUENCES.md](../SEQUENCES.md) in the same commit, and
-   [README.md](../README.md)'s map gains the file.
-2. **The initial obligations**, each with its own staleness
-   bound: one prose-norm audit **per spec document** — the ten
-   in [docs/spec/](../../docs/spec/); per-norm rather than
-   grouped, decided at pledge, because per-entry bounds want
-   per-norm marks, so auditing one spec advances exactly that
-   spec's line — and a dependency-freshness check (P21's
-   rhythm: are the pins stale, does each dependency still pull
-   its weight).
-
 ## F37 — The prose-parser migration
 
-> Delivers the other half of the **P24 amendment**
-> ([ARCHITECTURE.md](ARCHITECTURE.md)): the bright line — no
-> test parses the structure of a normative prose document. Needs
-> [F36](#f36--the-recurring-register) first: the obligations
-> must stand before the checks they inherit are deleted. Cut
-> from F35 at pledge, the split retiring F35's number (D42).
+> Delivers the remaining half of the **P24 amendment**
+> ([ARCHITECTURE.md](ARCHITECTURE.md), beside this file): the
+> bright line — no test parses the structure of a normative
+> prose document. The audit obligations that inherit the deleted
+> checks stand in [RECURRING.md](../RECURRING.md). Cut from F35
+> at pledge, the split retiring F35's number (D42).
 
 Each check migrates under the amendment's no-second-registers
 rule — the corpus or a shipped schema where the machine artifact
@@ -95,7 +68,7 @@ Work items:
    read.
 9. `test_library.py` — the codex.md inventory read.
 
-Landing the last item, with F36 standing, is delivering the
+Landing the last item, the register standing, is delivering the
 amendment: that change amends root P24's text and deletes the
 pledged entry with it — D34's automatic move, named here so the
 piece that lands last knows it closes the arc.

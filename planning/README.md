@@ -61,12 +61,18 @@ proposals, and none of them has a lifecycle state to be in:
   and capability* — use cases, principles, and the features that
   deliver them — and a task is none of those. That kind distinction
   is the distinguisher, not size alone.
+- [RECURRING.md](RECURRING.md) — the recurring register: standing
+  obligations the every-commit suite cannot discharge — prose-norm
+  audits, dependency freshness — each R-numbered, carrying its own
+  staleness bound and the mark of its last run. An obligation is
+  never done, only current or overdue, which is why it lives here
+  rather than in the queue.
 - [SEQUENCES.md](SEQUENCES.md) — the sequence ledger: the next
-  number to issue for **every** handle class (D, F, G, P, S, T, U,
-  V), stated in one file on `main` because a search sees only the
-  branch it stands on and a number issued on an unmerged branch is
-  visible from nowhere else (owner, 2026-07-31). Issue from it and
-  advance the mark in the same edit.
+  number to issue for **every** handle class (D, F, G, P, R, S, T,
+  U, V), stated in one file on `main` because a search sees only
+  the branch it stands on and a number issued on an unmerged branch
+  is visible from nowhere else (owner, 2026-07-31). Issue from it
+  and advance the mark in the same edit.
 
 One exception cuts the other way: work that only makes sense as part
 of one pledged feature lives **with that feature**, under
@@ -170,7 +176,8 @@ them, and `docs/spec/` refers to them.
 | [`SURFACES.md`](SURFACES.md) | *(root)* The surface-change rule every surface-changing decision follows; the inventory it scopes over is root ARCHITECTURE.md "The application surfaces" (S1–S8) |
 | [`DECISIONS.md`](DECISIONS.md) | *(root)* Open questions, the adjudicated decision record (D-numbers), and the retired list — every state, by design |
 | [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, T-numbered, in no particular order |
-| [`SEQUENCES.md`](SEQUENCES.md) | *(root)* The sequence ledger: the high-water marks every handle sequence (D, F, G, P, S, T, U, V) issues against — one counter per class, advanced in the issuing entry's own edit |
+| [`RECURRING.md`](RECURRING.md) | *(root)* The recurring register: R-numbered standing obligations — prose-norm audits, dependency freshness — each with its own staleness bound and last-performed mark |
+| [`SEQUENCES.md`](SEQUENCES.md) | *(root)* The sequence ledger: the high-water marks every handle sequence (D, F, G, P, R, S, T, U, V) issues against — one counter per class, advanced in the issuing entry's own edit |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `landmarks.md` (F5), `recorder.md` (F1, U6) |
 | [`pledged/design/`](pledged/design/) | Design for pledged features — a delivered feature leaves no feature for its design to sit with, so its design travels out with the delivery |
 | [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `backend-adapter.md` (the adapter seam's doctrine, delivered as F2 and internal by decision, so it does not move to `docs/spec/`), `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
