@@ -272,8 +272,8 @@ class Session:
         return resolve.load_namespace(self._context)
 
     def list_blueprints(self):
-        """Return sorted ``[{name, path}]`` for the blueprints
-        directory."""
+        """Return sorted ``[{name, path, description, platform}]``
+        for the blueprints directory."""
         return library.list_blueprints(self._context)
 
     def list_scripts(self):

@@ -155,14 +155,21 @@ def _blueprint_index(source):
 
 
 def list_blueprints(context=None):
-    """Return sorted ``[{name, path}]`` for the blueprints directory.
+    """Return sorted ``[{name, path, description, platform}]`` for
+    the blueprints directory.
 
     Yours alone: the codex is a separate set with its own verb
     (``list_codex``), and no listing spans the two (D88).
+    ``description`` and ``platform`` are the blueprint's own declared
+    words, ``None`` where it declares none — in the record so
+    ``--json`` carries what the human listing shows (D97; P6).
     """
     source = assets.source_for(context)
-    return [{"name": name, "path": path}
-            for name, path in sorted(_blueprint_index(source).items())]
+    return [{"name": name, "path": path,
+             "description": meta.get("description"),
+             "platform": meta.get("platform")}
+            for name, (path, meta) in sorted(
+                _blueprint_entries(source).items())]
 
 
 def codex_blueprint_available(name):
@@ -230,9 +237,9 @@ def list_codex():
     point, and no term — filtering is the shell's job or the
     caller's.
 
-    ``description`` rides the record for ``--json`` while the CLI
-    prints names alone: unbounded free text dominates a fixed-width
-    table, and how a person should see one is unsettled (T8).
+    ``description`` rides the record for ``--json``; the CLI prints
+    it beneath its name, indented and wrapped (D97) — the column
+    D88 refused stays refused.
     """
     return [{"name": name, "description": meta.get("description")}
             for name, (_path, meta) in sorted(

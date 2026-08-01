@@ -25,6 +25,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Listings show their descriptions** (D97, resolving the
+  deferral D88 parked as T8). Wherever a listing's noun carries a
+  `description` — `list-codex`, both `list-scripts` forms,
+  `list-blueprints` — the human listing prints it beneath its
+  entry, indented and wrapped, never as a column; an entry
+  without one contributes no line. `list-blueprints` rows now
+  carry `description` and `platform` in `--json`, so the record
+  holds what the human view shows. U11's "read a description" is
+  met at the keyboard again, not only through `--json`.
+
 - **Remanence owns at-rest disk access** (P27, armed with this
   change). The `remanence` dependency, pinned at `==0.0.1a2`, is
   now the one deep module for reading and writing a stopped

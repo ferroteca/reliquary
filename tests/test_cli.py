@@ -339,12 +339,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(json.loads(out), {})
 
     def test_json_list_codex_carries_the_description(self):
-        """The human table prints names; the record keeps the rest.
-
-        Which is the whole of the deferral (T8): a description is data
-        the JSON has always been able to carry, and only the column is
-        unspecified.
-        """
+        """The record carries the field the human listing wraps (D97):
+        the two presentations show one surface."""
         result, out = self._json_out(["list-codex"])
         self.assertEqual(result, 0)
         rows = json.loads(out)
@@ -455,6 +451,58 @@ class CliMachineLifecycleTests(unittest.TestCase):
         header = output.splitlines()[0]
         self.assertTrue(header.startswith("NAME"))
         self.assertTrue(header.endswith("PATH"))
+
+    def test_list_blueprints_shows_a_description_beneath_its_row(self):
+        """The display D97 settled: never a column — an indented,
+        wrapped line beneath the entry, and a row without one
+        contributes no line."""
+        with open(os.path.join(self.home, "blueprints", "told.rlqb"),
+                  "w", encoding="utf-8") as handle:
+            json.dump([
+                {"type": "machine", "name": "told", "platform": "dos",
+                 "description": (
+                     "A described machine whose text is long enough "
+                     "that the listing has to wrap it across more "
+                     "than one indented line beneath the row"),
+                 "drives": {"hdd0": "blank-20m"}},
+                {"type": "media", "name": "blank-20m",
+                 "materialize": "new", "size": "20M"},
+            ], handle)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home-dir", self.home,
+                               "list-blueprints"])
+        self.assertEqual(result, 0)
+        lines = stdout.getvalue().splitlines()
+        wrapped = [line for line in lines if line.startswith("  ")]
+        self.assertGreater(len(wrapped), 1)     # it wrapped
+        self.assertIn("A described machine", wrapped[0])
+        self.assertTrue(all(len(line) <= 72 for line in wrapped))
+        # The undescribed row contributes no line: `plain` sorts
+        # first, and the line after its row is `told`'s row.
+        plain_at = next(index for index, line in enumerate(lines)
+                        if line.startswith("plain"))
+        self.assertFalse(lines[plain_at + 1].startswith("  "))
+
+    def test_json_list_blueprints_carries_description_and_platform(self):
+        """The record holds what the human view shows (D97; P6)."""
+        result, out = self._json_out(["list-blueprints"])
+        self.assertEqual(result, 0)
+        row = next(r for r in json.loads(out) if r["name"] == "plain")
+        self.assertIn("description", row)
+        self.assertIsNone(row["description"])
+        self.assertEqual(row["platform"], "dos")
+
+    def test_list_codex_prints_the_description_beneath_the_name(self):
+        """U11's "read a description", at the keyboard (D97)."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["--home-dir", self.home, "list-codex"])
+        self.assertEqual(result, 0)
+        lines = stdout.getvalue().splitlines()
+        at = lines.index("freedos")
+        self.assertTrue(lines[at + 1].startswith("  "))
+        self.assertIn("FreeDOS", lines[at + 1])
 
     def test_list_blueprints_empty_has_no_column_headers(self):
         """An empty home reports absence, not a headerless table."""
@@ -696,10 +744,10 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("NAME", output)
         self.assertIn("PATH", output)
         self.assertIn("alpha", output)
-        # No description column on any noun; the field rides --json
-        # until T8 settles how a person should see one (D88).
+        # Never a column (D97): the description prints beneath its
+        # row, indented and wrapped.
         self.assertNotIn("DESCRIPTION", output)
-        self.assertNotIn("Alpha script", output)
+        self.assertIn("\n  Alpha script", output)
         result, out = self._json_out(["list-scripts"])
         self.assertEqual(result, 0)
         self.assertEqual("Alpha script",
@@ -747,10 +795,15 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("setup", output)
         self.assertIn("cust-setup", output)
         self.assertIn("teardown", output)
-        # The label's own map is what this command answers; the
-        # description rides --json, on this noun as on every other.
+        # Never a column (D97): the described label carries its
+        # indented line, and the undescribed one contributes none.
         self.assertNotIn("DESCRIPTION", output)
-        self.assertNotIn("Custom setup", output)
+        self.assertIn("\n  Custom setup", output)
+        lines = output.splitlines()
+        teardown_at = next(index for index, line in enumerate(lines)
+                           if line.startswith("teardown"))
+        self.assertTrue(teardown_at == len(lines) - 1
+                        or not lines[teardown_at + 1].startswith("  "))
 
     def test_start_without_selector_errors(self):
         """The legacy root-home start path is gone: a selector is required."""

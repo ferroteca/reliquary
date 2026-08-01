@@ -299,17 +299,26 @@ two sets.
 $ rlq list-blueprints
 NAME     PATH
 freedos  C:\Users\you\Documents\reliquary\blueprints\freedos.rlqb
+  Plain FreeDOS 1.4 system installed from the LiveCD
 test-rig C:\Users\you\Documents\reliquary\blueprints\test-rig.rlqb
 
 $ rlq list-codex
 freedos
+  Plain FreeDOS 1.4 system installed from the LiveCD
 openbsd
+  OpenBSD 7.9 amd64 installed from install79.iso using autoinstall over
+  reliquary's run-scoped HTTP server
 ```
 
-`list-codex` prints names alone. Each entry's `description` rides the
-`--json` record, which has no columns to overflow; how a description
-should reach a person is unsettled and deliberately unspecified rather
-than guessed at.
+**A description is never a column** (D97). Wherever a listing's noun
+carries one — `list-codex`, `list-scripts`, `list-blueprints` — the
+human listing prints it beneath its entry, indented and wrapped to a
+fixed width, and an entry without one contributes no line: free text
+of unbounded length is shown whole rather than truncated to fit a
+table it would otherwise dominate. The `--json` record carries the
+same field — `list-blueprints` rows carry `description` and
+`platform` beside `name` and `path` — so the two presentations show
+one surface.
 
 Neither command filters, and **no noun has a search verb** — nor a
 term parameter: matching a term is filtering, which a shell does and
@@ -1190,7 +1199,9 @@ bracket returns if the async work schedules.
 rlq list-scripts
 ```
 
-`list-scripts` shows everything in `scripts/`. Searching scripts
+`list-scripts` shows everything in `scripts/`. A script's
+`description` header prints beneath its row, indented and wrapped —
+the one display every listing uses (D97). Searching scripts
 is unbuilt — the codex index it would query is itself planned
 ([codex.md](codex.md)).
 

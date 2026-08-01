@@ -9,6 +9,7 @@ import importlib.metadata
 import json
 import os
 import sys
+import textwrap
 import traceback
 
 try:
@@ -916,6 +917,23 @@ def _script(arguments, session):
     return 0
 
 
+#: The display D97 settled: a description is **never a column**. It
+#: prints beneath its entry, indented clear of the names and wrapped
+#: to a fixed width, and an entry without one contributes no line.
+_DESCRIPTION_INDENT = "  "
+_DESCRIPTION_WIDTH = 72
+
+
+def _description_lines(text):
+    """A description as its indented, wrapped display lines (D97)."""
+    if not text or text == "-":
+        return []
+    return textwrap.wrap(
+        text, width=_DESCRIPTION_WIDTH,
+        initial_indent=_DESCRIPTION_INDENT,
+        subsequent_indent=_DESCRIPTION_INDENT)
+
+
 def _list_blueprints(arguments, session):
     rows = session.list_blueprints()
 
@@ -927,20 +945,29 @@ def _list_blueprints(arguments, session):
         print(f"{'NAME':<{name_width}}  PATH")
         for row in rows:
             print(f"{row['name']:<{name_width}}  {row['path']}")
+            for line in _description_lines(row["description"]):
+                print(line)
     return _emit(arguments, rows, render)
 
 
 def _list_codex(arguments):
     """The library's own listing — names to a person, records to --json.
 
-    A description would be the useful column and is deliberately not
-    printed: unbounded free text dominates a fixed-width table, and how
-    a person should see one is unsettled (T8). ``--json`` carries it.
+    The description prints beneath its name, indented and wrapped
+    (D97): the column D88 refused stays refused, and the field a
+    person scans the library for is on the screen (U11).
     """
     rows = list_codex()
-    return _emit(arguments, rows,
-                 lambda: _print_names([row["name"] for row in rows],
-                                      "(no built-in blueprints)"))
+
+    def render():
+        if not rows:
+            print("(no built-in blueprints)")
+            return
+        for row in rows:
+            print(row["name"])
+            for line in _description_lines(row["description"]):
+                print(line)
+    return _emit(arguments, rows, render)
 
 
 def _print_names(names, empty):
@@ -1027,9 +1054,6 @@ def _list_scripts(arguments, session, context):
              "description": _script_description_by_stem(stem, context)}
             for label, stem in scripts.items()]
 
-        # The description stays in the record and out of the table:
-        # unbounded free text dominates a fixed-width column, and how
-        # a person should see one is unsettled (T8, D88).
         def render_labels():
             if not rows:
                 print(f"(blueprint {blueprint_name} declares no scripts)")
@@ -1038,6 +1062,8 @@ def _list_scripts(arguments, session, context):
             print(f"{'LABEL':<{width}}  STEM")
             for row in rows:
                 print(f"{row['label']:<{width}}  {row['stem']}")
+                for line in _description_lines(row["description"]):
+                    print(line)
         return _emit(arguments, rows, render_labels)
 
     rows = [{"name": row["name"], "path": row["path"],
@@ -1052,6 +1078,8 @@ def _list_scripts(arguments, session, context):
         print(f"{'NAME':<{width}}  PATH")
         for row in rows:
             print(f"{row['name']:<{width}}  {row['path']}")
+            for line in _description_lines(row["description"]):
+                print(line)
     return _emit(arguments, rows, render_dir)
 
 
