@@ -694,6 +694,43 @@ differently under the new wording — is mere documentation work.
   session respell is deferred to the control-plane design, and
   [docs/spec/api.md](docs/spec/api.md)'s guest-console row is the
   deferral's record.)
+- **P27 — Remanence owns at-rest disk access.** Direct disk-image
+  access belongs to Remanence, not to Reliquary: the `remanence`
+  dependency — pinned to one exact release, `0.0.1a2` today — is
+  the one deep module for opening raw and qcow2 drive images at
+  rest. An image is opened where it lies, a backing chain is
+  composed with every backing file claimed immutable, complete
+  partition and volume geometry is discovered with a blank disk
+  an answer, files in FAT volumes are read and written by a
+  stable volume identity the geometry report shares, and every
+  commit stands on a durable undo journal — an interrupted write
+  is reconciled on the next access, work is proportional to
+  touched data, and contention fails by name (D77's guarantees,
+  now the dependency's to keep). Reliquary keeps the policy
+  Remanence cannot own: the DOS-only FAT12/FAT16/FAT16B
+  recognition claim and its refusal vocabulary, the
+  whole-disk-or-none rule, guest-address mapping, rule ids, and
+  translation into the recorded drive report (D83). The
+  dependency earns the whole layer or none of it: a hybrid that
+  keeps an NBD client, a `qemu-nbd` lifecycle, qcow2 snapshot
+  orchestration, staged raw access, an MBR reader, or a FAT
+  reader/writer as a fallback is refused, because it leaves two
+  authorities for the same disk facts (P21; D83). D73's refusal
+  to write and maintain a qcow2 reader inside Reliquary is
+  honored by the declared dependency, whose standing under the
+  licence tiers is first-party ownership (D82; AGENTS.md
+  "Dependency licence tiers"). A different Remanence release is a
+  fresh verification against this principle's guarantees on the
+  delivered host (P11), never a substitution. **Two known
+  residues, named rather than hidden (D48):** a volume's label no
+  longer falls back to the BPB's copy when the root directory
+  carries no label entry, because the dependency's report does
+  not yet carry the BPB label — closable upstream; and an image
+  in a format neither raw nor qcow2 is refused as unreadable raw
+  bytes rather than by the retired format probe, an accurate
+  refusal that no longer names the format or the remedy.
+  (`at_rest.py` is the translation layer; `test_at_rest.py`
+  pins the policy; delivered as F40.)
 
 
 ## The cross-cutting prose

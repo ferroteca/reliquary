@@ -25,6 +25,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Remanence owns at-rest disk access** (P27, armed with this
+  change). The `remanence` dependency, pinned at `==0.0.1a2`, is
+  now the one deep module for reading and writing a stopped
+  machine's disks: a raw or qcow2 image is opened where it lies,
+  a qcow2 backing chain composes with every backing file claimed
+  immutable, a blank disk is an answer rather than an error, and
+  every write stands on a durable undo journal — an interrupted
+  commit is reconciled at the image's next open, wholly the old
+  image or wholly the new one (D77). Reliquary keeps its policy:
+  the DOS-only recognition claim and its refusal wording, the
+  whole-disk-or-none rule, guest-address (8.3) validation, the
+  recorded drive report's shape, and the rule ids. On the host,
+  **`qemu-nbd` is no longer used**: the NBD client, the at-rest
+  qcow2 snapshot, and the staged raw copy left with the transport
+  they served. A drive image something else holds is still
+  refused by name (`image.locked`), and two readers may now share
+  a disk where each used to exclude the other. Three recorded
+  facts moved in the details: the drive record's `cylinders` is
+  now the BPB's own answer, present only where the stated track
+  geometry divides the volume's sector count exactly (previously
+  derived by dividing the disk size); a volume's label no longer
+  falls back to the BPB's copy when the root directory carries no
+  label entry; and an image in a format that is neither raw nor
+  qcow2 now reads as raw bytes and is refused as unreadable
+  (`drive.image-unreadable`) rather than by the retired
+  `image.format-not-at-rest` probe.
+
 - **The session is the only door** (P26). All embedding-API
   interaction now passes through `reliquary.Session`, opened on a
   home path or a `Context` — which now also carries the selected

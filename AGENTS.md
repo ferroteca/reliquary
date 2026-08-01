@@ -205,26 +205,23 @@ workflow:
   validates and renders, which is what makes a section a create accepted one a start applies, and it renders
   last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
   the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
-  hatch `QemuSession.native()`, and **at-rest access** (`open_drive`): a qcow2 is served by `qemu-nbd` on
-  the loopback interface and addressed through `nbd.NbdDevice` rather than copied, with a qcow2 internal
-  snapshot as the commit point a write is undone from; an image already raw keeps the staged copy, having
-  nowhere else to stand an undo. Only qcow2 and raw are claimed — any other format QEMU could read is
-  refused (`image.format-not-at-rest`) rather than served untested. `nbd.py` is the **NBD client** — the
-  fixed-newstyle handshake and the four commands at-rest access uses, exposing an export as the byte device
-  `at_rest` reads through. It knows nothing of qcow2 and nothing of FAT; **the reply handle is checked on
-  every command**, because a stream out of step would otherwise hand a caller another request's sector.
-  `at_rest.py` is **the portable half of at-rest access** and never learns what qcow2 is: it reads a
-  *device* (`size` / `read_at` / `write_at` / `flush` / `close`), finding the partition table if there is
-  one and a FAT12 or FAT16 volume past it, with the width decided by cluster count because that is what the
-  format says decides it. **The recognition claim stops there** (D83): FAT12, FAT16 and FAT16B over
-  standard MBR primary/extended partitioning, and everything else — FAT32 included — is a named refusal. `LocalDevice` is the one device it owns — an image already raw, opened where it
-  lies under the advisory host lock. **The lock sits one byte past any image** (`_LOCK_OFFSET`): a lock
-  over the image's own content is one the *server* trips on, since QEMU reads the header of a qcow2 it is
-  serving, so the claim is placed where nothing reads. QEMU's own image locking is not the mechanism —
-  it lives in QEMU's POSIX file driver and the Windows one implements none. **Partition types are pinned
-  value by value** and an unreadable one is refused rather than skipped, because skipping renumbers every
-  volume after it; `geometry()` reports the drive's shape (partitions with their declared types, volume
-  count, and the BPB's own CHS where it states one) as P10's *read on the host* source.
+  hatch `QemuSession.native()`. At-rest access is **not** this adapter's: opening a stopped machine's disk
+  belongs to `at_rest.py`, and the adapter contributes only its `capabilities().at_rest` declaration.
+  `at_rest.py` is **the at-rest translation layer** over the `remanence` dependency (P27), which is the one
+  deep module for direct disk access: Remanence opens a raw or qcow2 image where it lies (the format decided
+  by the bytes), claims it for the length of the access under its declared intent, composes and claims a
+  backing chain immutable, discovers geometry, reads and writes FAT volumes by a stable volume id shared
+  with its geometry report, and stands a durable undo journal beneath `commit()` so an interrupted commit is
+  reconciled at the image's next open (D77). What `at_rest.py` keeps is reliquary's policy: **the
+  recognition claim** (D83) — FAT12, FAT16 and FAT16B over standard MBR primary/extended partitioning,
+  everything else, FAT32 included, a named refusal in reliquary's own vocabulary, **partition types pinned
+  value by value**; **the whole-disk rule** — a partition Remanence reports as unreadable refuses the disk,
+  because a disk with a partition reliquary cannot account for is one whose volume ordering it cannot vouch
+  for; **guest-address validation** — a name a DOS guest could not type is refused, never mangled; and the
+  error vocabulary — Remanence's stable categories restated as `UnreadableImage` / `ImageLocked`, which the
+  drive seam maps onto the standing rule ids. `geometry()` reports the drive's shape (partitions with their
+  declared types, volume count, and the BPB's own CHS where it states one) as P10's *read on the host*
+  source, blank-as-an-answer included.
   `backend_stubs.py` holds the three unbuilt adapters (VirtualBox, VMware
   Workstation, Hyper-V): their host probe is real, they claim **no capability**, so assignment passes over
   them even where the backend is installed, and a pinned one fails preflight naming the gap.
@@ -811,7 +808,16 @@ most likely to cost the project something it cannot get back.
 Build-time and development dependencies are **out of scope entirely** — they are not distributed, so their licences
 impose nothing. The tiers govern what a `pip install reliquary` pulls in.
 
-The current runtime closure is tier 1 throughout except `qemu.qmp`, which is tier 2 and discussed under prior art
+**A first-party dependency sits outside the tiers.** `remanence` is GPL-3.0-only and imported, which the table would
+refuse — but the tiers exist to protect the relicensing reservation from code the project cannot acquire title to,
+and remanence is the owner's own work: copyright held whole by Paul Galbraith, contributions assigned under that
+project's own CLA, published from `ferroteca/remanence-lib`. Exercising the reservation relicenses both works
+together, so nothing is forfeited. The qualifying test is **ownership, not licence**, and it is conditional:
+first-party standing holds only while the dependency's copyright stays whole in the same hands, and one that stops
+qualifying reverts to the table — where GPL-imported is tier 3.
+
+The current runtime closure is tier 1 throughout except `remanence` (first-party, above) and `qemu.qmp`, which is
+tier 2 and discussed under prior art
 below. Verify a new dependency's whole transitive closure, not just the package named — a tier-1 package that pulls a
 tier-3 one is a tier-3 problem.
 

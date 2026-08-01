@@ -335,6 +335,7 @@ dependencies = [
     { name = "lark" },
     { name = "pillow" },
     { name = "qemu-qmp" },
+    { name = "remanence" },
 ]
 
 [package.dev-dependencies]
@@ -348,10 +349,20 @@ requires-dist = [
     { name = "lark" },
     { name = "pillow" },
     { name = "qemu-qmp" },
+    { name = "remanence", specifier = "==0.0.1a2" },
 ]
 
 [package.metadata.requires-dev]
 dev = [{ name = "jsonschema" }]
+
+[[package]]
+name = "remanence"
+version = "0.0.1a2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/8f/3b6b68dc2146138c7df9e684733d03fa60817dbcab3e52221bdf8b400913/remanence-0.0.1a2.tar.gz", hash = "sha256:cbac73b68c1b6433229db450901c923b2afc49a4cf0d5ab42b410e2ea8172518", size = 112073, upload-time = "2026-08-01T07:15:25.987Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/bd/cb6b74198309018772df890e14399686617f58375f355786f838915a8893/remanence-0.0.1a2-cp310-abi3-win_amd64.whl", hash = "sha256:51e561c89e9b414c2d6f4e71a4a3e8605c7ac0f16cef0679f9bf4c29e018d299", size = 342078, upload-time = "2026-08-01T07:15:24.779Z" },
+]
 
 [[package]]
 name = "rpds-py"

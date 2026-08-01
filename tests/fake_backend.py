@@ -12,10 +12,8 @@ test module; QEMU's own adapter is exercised in
 
 import contextlib
 import os
-import shutil
-import tempfile
 
-from reliquary import at_rest, backends
+from reliquary import backends
 from reliquary.backends import Availability, BackendAdapter, Capabilities
 
 
@@ -86,7 +84,6 @@ class FakeAdapter(BackendAdapter):
             at_rest_write=True,
         )
         self.images = []
-        self.imported = []
         self.starts = []
         self.stops = []
         self.disposed = []
@@ -127,13 +124,6 @@ class FakeAdapter(BackendAdapter):
                 handle.write(self.image_payload)
         return path
 
-    def open_drive(self, path, *, writable=False):
-        """The fake's images are already raw, so the access is the
-        staged one QEMU uses for a raw image -- the same commit point
-        and the same undo, without a server in the way."""
-        path = os.path.abspath(os.fspath(path))
-        return _FakeAccess(self, path, writable=writable)
-
     def dispose(self, machine_dir):
         self.disposed.append(machine_dir)
 
@@ -164,56 +154,6 @@ class FakeAdapter(BackendAdapter):
         open_session = FakeSession(self, vm, rows=self.session_rows)
         self.sessions.append(open_session)
         yield open_session
-
-
-class _FakeAccess:
-    """A staged at-rest access over a plain file.
-
-    Written from the seam's contract rather than from QEMU's
-    implementation of it, so a machine-model test that only passes
-    against QEMU's particular staging is caught here.
-    """
-
-    #: The seam's ``backing`` fact: the fake's images are raw files.
-    format = "raw"
-
-    def __init__(self, adapter, path, *, writable=False):
-        self.adapter = adapter
-        self.path = path
-        self.writable = writable
-        self.device = None
-        self._workspace = None
-        self._scratch = None
-        if not writable:
-            self.device = at_rest.LocalDevice(path)
-            return
-        self._workspace = tempfile.mkdtemp(prefix="fake-at-rest-")
-        self._scratch = os.path.join(self._workspace, "raw.img")
-        shutil.copyfile(path, self._scratch)
-        self.device = at_rest.LocalDevice(self._scratch, writable=True)
-
-    def commit(self):
-        if self._scratch is None:
-            return
-        self.device.flush()
-        self.device.close()
-        self.device = None
-        os.replace(self._scratch, self.path)
-        self._scratch = None
-        self.adapter.imported.append(self.path)
-        self._clean()
-
-    def close(self):
-        if self.device is not None:
-            self.device.close()
-            self.device = None
-        self._scratch = None
-        self._clean()
-
-    def _clean(self):
-        if self._workspace:
-            shutil.rmtree(self._workspace, ignore_errors=True)
-            self._workspace = None
 
 
 @contextlib.contextmanager

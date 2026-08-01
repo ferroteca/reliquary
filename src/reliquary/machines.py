@@ -2279,16 +2279,15 @@ def _read_drive_record(backend, drive, key):
             "cannot read one at rest — give the machine a "
             "directory-source drive for exchange, and have the guest "
             "copy to it")
-    access = None
+    image = None
     try:
-        access = adapter.open_drive(root)
-        image = at_rest.Image(access.device)
+        image = at_rest.Image(root)
         geometry = image.geometry()
         volumes = [_volume_facts(index, volume)
                    for index, volume in enumerate(image.volumes)]
         return {
             "read-at": stamp,
-            "backing": getattr(access, "format", None),
+            "backing": image.format,
             "partitioned": geometry.partitioned,
             "partitions": [
                 {"number": entry.number,
@@ -2305,8 +2304,8 @@ def _read_drive_record(backend, drive, key):
             stamp, "drive.image-unreadable",
             f"drive {key} cannot be read at rest — {error}")
     finally:
-        if access is not None:
-            access.close()
+        if image is not None:
+            image.close()
 
 
 def _volume_facts(index, volume):
@@ -2319,7 +2318,7 @@ def _volume_facts(index, volume):
     """
     return {
         "index": index,
-        "filesystem": f"FAT{volume.bits}",
+        "filesystem": volume.filesystem,
         "label": volume.volume_label(),
         "size": volume.length,
         "heads": volume.heads,
@@ -2396,16 +2395,15 @@ class _ImageVolume:
     settled eagerly -- that refusal is the one a caller most needs
     early.
 
-    **The image is never copied to be read.** The adapter presents its
-    own format as an addressable device and this reads through it, so
+    **The image is never copied to be read.** Remanence opens it
+    where it lies -- raw or qcow2 decided by the bytes (P27) -- so
     the cost of a listing is the sectors the listing touches. The
-    image is locked for the length of the access, and an uncommitted
+    image is claimed for the length of the access, and an uncommitted
     write is undone when it closes.
     """
 
-    def __init__(self, adapter, image_path, key, letter, address,
+    def __init__(self, image_path, key, letter, address,
                  writable, volume_index=0):
-        self.adapter = adapter
         self.image_path = image_path
         self.key = key
         self.letter = letter
@@ -2415,7 +2413,6 @@ class _ImageVolume:
         #: letter map counted the volumes to place the letter, so this
         #: is that count's other half rather than a second guess.
         self.volume_index = volume_index
-        self._access = None
         self._image = None
         self._volume = None
         self._written = False
@@ -2424,10 +2421,13 @@ class _ImageVolume:
         if self._volume is not None:
             return self._volume
         try:
-            self._access = self.adapter.open_drive(
-                self.image_path, writable=self.writable)
-            self._image = at_rest.Image(self._access.device,
+            self._image = at_rest.Image(self.image_path,
                                         writable=self.writable)
+        except at_rest.ImageLocked as error:
+            self.close()
+            raise PreflightError(
+                f"{self.address}: drive {self.key} ({self.letter}:) is "
+                f"in use — {error}", rule_id="image.locked") from error
         except (at_rest.UnreadableImage, OSError) as error:
             self.close()
             raise PreflightError(
@@ -2484,15 +2484,15 @@ class _ImageVolume:
         """Keep the writes: the last step, and the only one that is
         not undoable.
 
-        Everything before it stands on the adapter's own commit point
-        — a snapshot for a served image, a staged copy for a raw one —
-        so a refusal or a crash between the first write and this leaves
-        the disk exactly as it was.
+        Everything before it stands on Remanence's own commit point —
+        a durable undo journal beneath the write-through (D77) — so a
+        refusal or a crash between the first write and this leaves
+        the disk exactly as it was, and a crash *during* the commit
+        is reconciled at the image's next open.
         """
         if not self._written:
             return
-        self._image.flush()
-        self._access.commit()
+        self._guarded(self._image.commit)
         self._written = False
 
     def _guarded(self, call, *arguments):
@@ -2505,12 +2505,11 @@ class _ImageVolume:
                 rule_id="drive.image-unreadable") from error
 
     def close(self):
-        """Release the access, undoing a write that never committed."""
-        self._image = None
+        """Release the image, undoing a write that never committed."""
         self._volume = None
-        if self._access is not None:
-            self._access.close()
-            self._access = None
+        if self._image is not None:
+            self._image.close()
+            self._image = None
 
 
 def _at_rest_volume(state, image_path, key, letter, address,
@@ -2518,8 +2517,9 @@ def _at_rest_volume(state, image_path, key, letter, address,
     """The FAT volume inside a stopped machine's drive image.
 
     The capability is settled here and the image is opened later: an
-    adapter that cannot flatten its own format says so before anything
-    is copied, which is the refusal a caller acts on (P11).
+    adapter whose image format is outside the at-rest claim says so
+    before anything is opened, which is the refusal a caller acts on
+    (P11).
     """
     backend = state.get("backend") or "qemu"
     adapter = backends.adapter(backend)
@@ -2531,7 +2531,7 @@ def _at_rest_volume(state, image_path, key, letter, address,
             "machine a directory-source drive for exchange, and have "
             "the guest copy to it",
             rule_id="drive.no-at-rest-access")
-    return _ImageVolume(adapter, image_path, key, letter, address,
+    return _ImageVolume(image_path, key, letter, address,
                         report.at_rest_write, volume_index)
 
 

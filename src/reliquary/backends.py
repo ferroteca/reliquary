@@ -84,16 +84,17 @@ class Capabilities:
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
     vvfat: bool = False
-    #: Whether the adapter can present a drive image as an addressable
-    #: device, which is what at-rest reading of a stopped machine's
-    #: disk needs. Reported rather than assumed: an adapter whose
-    #: format nothing can open says so, and the file verbs refuse by
-    #: name instead of guessing at the drive's contents (P11).
+    #: Whether the adapter's drive images are within the at-rest
+    #: claim — raw or qcow2, the formats Remanence opens where they
+    #: lie (P27). A declaration rather than a service: opening the
+    #: image is the machine model's business, and an adapter whose
+    #: native format is beyond the claim says so here, so the file
+    #: verbs refuse by name instead of guessing at the drive's
+    #: contents (P11).
     at_rest: bool = False
-    #: Whether that access can also be writable, with a commit point
-    #: behind it. Split from ``at_rest`` because reading and writing a
-    #: disk are different promises: an adapter may be able to open its
-    #: own format and have nowhere to stand an undo.
+    #: Whether those images may also be written at rest. Split from
+    #: ``at_rest`` because reading and writing a disk are different
+    #: promises.
     at_rest_write: bool = False
 
 
@@ -251,39 +252,6 @@ class BackendAdapter:
         so an adapter whose whole machine *is* that directory (QEMU)
         has nothing to do here.
         """
-
-    def open_drive(self, path, *, writable=False):
-        """The drive image at ``path`` as an at-rest **access**.
-
-        The native format is the adapter's choice (P12's twin at this
-        seam), so presenting it as addressable bytes is the adapter's
-        job and the portable FAT reader above never learns what qcow2
-        is. What comes back answers:
-
-        ``device``
-            The byte device :mod:`reliquary.at_rest` reads and writes
-            through -- ``size`` / ``read_at`` / ``write_at`` /
-            ``flush`` / ``close``.
-        ``commit()``
-            Make the writes permanent. **Atomic from the caller's
-            side**: the image is the old one or the new one, never a
-            half-written third thing. An adapter whose format carries
-            a backing relationship keeps it -- a differencing image is
-            still a difference over the same base afterwards.
-        ``close()``
-            Release everything. A writable access closed **without**
-            ``commit()`` puts the image back as it was, so a refused,
-            interrupted or crashed write costs nothing.
-
-        **The image is locked for the length of the access**, so
-        nothing else writes the disk part-way through. An image
-        another process holds is refused by name rather than waited
-        for.
-
-        Only called for a **stopped** machine: a running backend holds
-        its own lock on the image, and this would be refused by it.
-        """
-        raise NotImplementedError
 
     # -- start, stop, liveness ------------------------------------
 

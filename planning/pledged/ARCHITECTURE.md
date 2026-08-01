@@ -44,35 +44,3 @@ SPDX-License-Identifier: GPL-3.0-only
 > in the same edit. A dead proposal is recorded in
 > [DECISIONS.md](../DECISIONS.md) and triggers the planning-doc sweep,
 > its P-number the search key.
-
-- **P27 — Remanence owns at-rest disk access.** Direct disk-image
-  access belongs to Remanence, not to Reliquary. Reliquary consumes
-  Remanence as the one deep module for opening raw and qcow2 drive
-  images at rest, claiming the image and any backing chain,
-  discovering complete partition and volume geometry, reading and
-  changing files in FAT volumes, and committing or rolling back
-  mutations. Reliquary keeps the policy Remanence cannot own: the
-  DOS-only FAT12/FAT16/FAT16B recognition claim, guest-address
-  mapping, rule ids, and translation into the recorded drive report.
-  The dependency earns the whole layer or none of it: a hybrid that
-  keeps Reliquary's NBD client, `qemu-nbd` lifecycle, qcow2 snapshot
-  orchestration, staged raw access, MBR reader, or FAT reader/writer
-  as a fallback is refused, because it leaves two authorities for
-  the same disk facts (P21; D83). D73's refusal to write and
-  maintain a qcow2 reader inside Reliquary is honored by making the
-  format implementation a declared dependency (D82), and D77's
-  guarantees remain binding: an image is opened where it lies, a
-  backing relationship survives a write, work is proportional to
-  touched data, contention fails by name, and an interrupted write
-  is reconciled on the next access. This principle is pledged, not
-  armed: the pinned candidate is `remanence==0.0.1a2`, which meets
-  the acceptance gate this pledge set — backing chains compose for
-  reading and writing with every backing file claimed immutable, a
-  blank newly materialized disk is an answer rather than an error,
-  a partition that cannot be read stays in `geometry()` carrying
-  its issue, one stable volume identity is shared by geometry and
-  every file verb, and an interrupted commit is reconciled on the
-  next open, which is D77's crash-recovery guarantee — verified
-  against the published wheel on the delivered Windows host (P11).
-  That exact release is pinned; a different release is a fresh
-  verification, never a substitution.
