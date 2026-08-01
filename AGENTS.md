@@ -36,7 +36,8 @@ workflow:
   once at construction from that record alone (no module-global state read or written, so two
   sessions in one process are unremarkable), and forwarding one thin veneer method per
   ambient-state verb to the engine modules; the codex verbs (CLI-only, D87) and the pure
-  parsers take no veneer, and `Session` stays unexported until the public surface moves once; `assets.py` owns authored-asset residency: one resolution
+  parsers take no veneer, `Session` stays unexported until the public surface moves once, and
+  the CLI is its first consumer; `assets.py` owns authored-asset residency: one resolution
   source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, and no
   seeding axis behind it), `source_for`, and the
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API assigns no
@@ -304,7 +305,11 @@ workflow:
   with an input delivery already in flight completed — never
   wherever the interrupt happened to land. `cli.py` owns command
   parsing, exit codes (`errors.exit_code` over one `ReliquaryError`
-  arm), and the output discipline, and
+  arm), and the output discipline; it is the session layer's first
+  consumer — one `Context` built per invocation (flags, then
+  environment, then the default home), one `Session` opened on it,
+  every command driven through session methods, the codex and
+  locate seam taking the record directly (D87) — and
   `__main__.py` preserves `python -m reliquary` execution.
 - `pyproject.toml` packages `reliquary` as the `reliquary` command. **Released artifacts are the runtime alone**:
   `tests` ships in neither the wheel nor the sdist (D96). The src-only package search keeps the repository-root suite
@@ -500,20 +505,24 @@ so `cache` alone conjures no home and `machines` alone leaves `media` where the 
 at `Context` construction, so the diagnostic names what was actually needed and a context may be built before it is
 filled.
 
-The surfaces differ only in whether an assignment is made for the caller. **The CLI** assigns `home` its default
+The surfaces differ only in whether an assignment is made for the caller. **The CLI** gives `home` its default
 (`Documents/reliquary`, falling back to `~/reliquary`) whenever neither a flag nor the environment named one, so one
 assignment reaches all six and the error is unreachable at the keyboard — **a property of that default, not an
 exemption from the rule**, which is what keeps it true if the default ever changes. **The embedding API** assigns
-nothing, and there the error is reachable; that is the whole safety of the design. Honouring the environment
-(`adopt_environment()`) is likewise the CLI's step and never the library's.
+nothing, and there the error is reachable; that is the whole safety of the design. Honouring the environment is
+likewise the CLI's step and never the library's — since the session's first landing, a private construction step
+inside `cli.py` (`adopt_environment()` remains public, uncalled in-tree, until the surface moves).
 
 `Context` is a **plain record** of the six optional directory paths plus the selected properties file (P26's cargo
 ruling) and nothing else — no methods, all resolution in `home.py`'s module functions — because a handful of nullable
 strings binds cleanly from C or Java where keyword arguments would not
 (P7). Every function resolving a working directory accepts `context=`: omit it for the globals, pass a bare string as
 shorthand for `Context(home_dir=...)`, or pass a `Context` to pin whatever slots it fills per call, unfilled slots
-falling through to the globals and then to derivation. The CLI only ever drives the globals — scoped `Context` objects
-are an embedding-API-only capability. `machine.py`'s and the adapters' own `home=` parameters are a different,
+falling through to the globals and then to derivation. The CLI drives the globals no more: it builds **one `Context`
+per invocation** — flags, then the environment, then the default home — and opens the unexported `Session` on it,
+driving only session methods (the codex family and the locate seam, veneerless by D87, take the same record
+directly); the globals and `set_*_dir()` stay present and public with **no in-tree driver** until the surface moves
+once. `machine.py`'s and the adapters' own `home=` parameters are a different,
 narrower concept — an already-resolved plain directory (sometimes a machine's own materialization directory standing
 in for one), not a `Context`; they were deliberately left alone.
 

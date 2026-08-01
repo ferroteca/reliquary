@@ -36,40 +36,23 @@ to this file on pledge.
 only door ([pledged/ARCHITECTURE.md](ARCHITECTURE.md)) — whose
 respell is too large for D42's bound, each piece landing
 coherently on its own: the session built (**F32, delivered
-2026-07-31**), the CLI on it (F33), the door closed and the
-principle armed (F34). The cut is staged so the public surface
-moves **once**: F32 was and F33 is internal work a consumer never
-sees, and F34 is the one landing that changes the surface, which
-is where P9's coherent-and-complete rule bites — no interval in
-which two public doors stand open.
-
-## F33 — The CLI opens a session
-
-> Pledged 2026-07-31 (owner), cut from **P26**; depends on
-> **F32** — delivered 2026-07-31, so that reference now runs
-> *down* the lifecycle: `session.py`'s unexported `Session` is
-> built, pinned on its record, veneered verb for verb, and
-> exercised by the suite.
-> The CLI becomes the session layer's first consumer
-> with **no observable change**: same flags, same environment
-> honoring, same default home, same exit codes — which is what
-> makes it its own sprint, verifiable by the existing CLI suite
-> alone. No application surface moves and no spec is touched.
-
-1. `cli.py` builds the `Context` from its flags, the environment
-   (`adopt_environment` becoming the CLI's private construction
-   step), and the default home whenever neither named one —
-   D59's defaulting rule relocated intact — then opens **one
-   `Session` per invocation** and drives only session methods.
-2. The module-level directory globals lose their last in-tree
-   driver; they stay present and public until F34 deletes them,
-   because deleting them is a surface change and this feature
-   makes none.
+2026-07-31**), the CLI on it (**F33, delivered 2026-07-31**), the
+door closed and the principle armed (F34). The cut is staged so
+the public surface moves **once**: F32 and F33 were internal work
+a consumer never saw, and F34 is the one landing that changes the
+surface, which is where P9's coherent-and-complete rule bites —
+no interval in which two public doors stand open.
 
 ## F34 — The door closes
 
 > Pledged 2026-07-31 (owner), cut from **P26**; depends on
-> **F33**. The one landing that changes what a consumer sees,
+> **F33** — delivered 2026-07-31, so that reference now runs
+> *down* the lifecycle: the CLI builds one `Context` per
+> invocation, opens one `Session` on it, drives only session
+> methods (the codex family and the locate seam taking the
+> record directly, D87), and the directory globals have no
+> in-tree driver left.
+> The one landing that changes what a consumer sees,
 > and the whole surface change lands in it coherently and
 > completely (P9, P8 triage: S2 respelled, S1 unchanged in
 > behavior, both named). **Delivery arms P26** — the same change

@@ -334,7 +334,7 @@ class RunScriptWiringTests(unittest.TestCase):
         """rlq run-script install --blueprint … wires through."""
         stdout = io.StringIO()
         with mock.patch(
-                    "reliquary.cli.run_script",
+                    "reliquary.session.Session.run_script",
                     return_value=ScriptRun(
                         machine_id="abcd" * 8,
                         script_path=os.path.join(
@@ -355,7 +355,8 @@ class RunScriptWiringTests(unittest.TestCase):
             machine=None,
             display=False,
             properties=None,
-            properties_file=None,
+            # No properties_file: the selection rides in the record
+            # the session was opened on (P26's cargo), not per call.
             progress="auto",
             dry_run=False,
             # No --expect given, so no contract: the CLI passes the
@@ -430,7 +431,7 @@ class RunScriptWiringTests(unittest.TestCase):
 
     def test_cli_script_forwards_display_and_progress(self):
         with mock.patch(
-                "reliquary.cli.run_script",
+                "reliquary.session.Session.run_script",
                 return_value=ScriptRun(
                     machine_id="abcd" * 8,
                     script_path="/tmp/x.rlqs",

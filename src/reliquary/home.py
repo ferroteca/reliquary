@@ -24,17 +24,21 @@ later, and the diagnostic names the directory actually needed rather
 than the root of a cascade nobody asked about.
 
 The two surfaces differ only in whether an assignment is made on the
-caller's behalf. The **CLI** assigns ``home`` its default unless
-``--home-dir`` was given, so one assignment reaches all six and the
-error is unreachable at the keyboard — a property of that default
-rather than an exemption from the rule, which matters because a
-property survives the default changing and an exemption would have
-to be re-argued. The **embedding API** assigns nothing, so a library
-call never silently picks up the developer's home; there the error
-is reachable, and it is the whole safety of the design.
+caller's behalf. The **CLI** gives ``home`` its default whenever
+neither a flag nor the environment named one — since the session's
+first landing (P26), in the per-invocation ``Context`` it opens its
+session on, never in this module's globals — so one assignment
+reaches all six and the error is unreachable at the keyboard: a
+property of that default rather than an exemption from the rule,
+which matters because a property survives the default changing and
+an exemption would have to be re-argued. The **embedding API**
+assigns nothing, so a library call never silently picks up the
+developer's home; there the error is reachable, and it is the whole
+safety of the design.
 
 One further behaviour follows the same CLI-only rule, for the same
-reason: honouring the environment (:func:`adopt_environment`).
+reason: honouring the environment, which the CLI does in that same
+private construction step.
 """
 
 import os
@@ -114,9 +118,10 @@ def is_assigned(name):
     """Whether directory ``name`` has a process-global assignment.
 
     Assignment, not resolvability: a derived directory answers False
-    here while resolving perfectly well. The CLI asks so it can
-    default the home only when neither a flag nor the environment
-    named one.
+    here while resolving perfectly well. The CLI used to ask so it
+    could default the home only when nothing named one; that check
+    now lives in its private construction step, so nothing in-tree
+    asks any more.
     """
     return _globals[name] is not None
 
@@ -124,10 +129,12 @@ def is_assigned(name):
 def adopt_environment():
     """Assign whatever the environment names, filling unassigned slots.
 
-    A CLI step, never the API's. Explicit assignment wins: this only
-    fills what is still unassigned, and it runs when the CLI
-    configures itself rather than at import, so a test that sets a
-    variable and then calls in gets the behaviour it wrote.
+    A CLI behaviour, never the API's — though since the session's
+    first landing (P26) the CLI honours the environment in its own
+    construction step and no longer calls this. It stays present and
+    public, with the globals it fills, until the surface moves once.
+    Explicit assignment wins: this only fills what is still
+    unassigned.
     """
     for name in DIRECTORIES:
         if _globals[name] is None:
@@ -198,9 +205,10 @@ class Context:
     passing a plain string is sugar for ``Context(home_dir=...)``;
     passing a ``Context`` pins whatever slots it fills, per call and
     independent of the globals, with the rest falling through to them
-    and then to derivation. The CLI never builds one — it drives the
-    globals from its flags; scoped contexts are an embedding-API
-    capability.
+    and then to derivation. The CLI builds exactly one per
+    invocation — from its flags, the environment, and the default
+    home — and opens its session on it (P26); scoped contexts remain
+    an embedding capability.
 
     ``properties_file`` rides beside the six (P26): the selected
     properties file is ambient state exactly as the directories are,

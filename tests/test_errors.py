@@ -99,7 +99,8 @@ class CliExitCodeTests(unittest.TestCase):
 
     def _run(self, error):
         stderr = io.StringIO()
-        with mock.patch("reliquary.cli.run_script", side_effect=error), \
+        with mock.patch("reliquary.session.Session.run_script",
+                        side_effect=error), \
                 contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(stderr):
             code = cli.main([

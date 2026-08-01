@@ -695,15 +695,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.
 
-        The process-global home is pointed elsewhere before each call:
-        a global --home-dir must overwrite it via set_home_dir()
-        before dispatch, not leave a stale global in place — a
-        dropped --home-dir must never let stop target a machine in
-        another home (the identity name alone cannot tell
-        same-numbered machines of two homes apart). The CLI drives
-        the process-global assignments only (never a per-call
-        context= override), so the guarantee now rests on
-        set_home_dir() actually having run.
+        The process-global home is pointed elsewhere before each
+        call: the CLI resolves against the record built from its own
+        flags — one session per invocation (P26) — so the decoy must
+        neither supply the home nor be overwritten. A dropped
+        --home-dir must never let stop target a machine in another
+        home (the identity name alone cannot tell same-numbered
+        machines of two homes apart); the guarantee now rests on the
+        session's record, not on set_home_dir() having run.
         """
         with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
@@ -713,7 +712,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         decoy = os.path.join(self.home, "elsewhere")
         home.set_home_dir(decoy)
-        with mock.patch("reliquary.cli.start_machine") as start, \
+        with mock.patch(
+                "reliquary.session.Session.start_machine") as start, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home-dir", self.home,
@@ -721,13 +721,15 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
+        # The selector resolved live, under --home-dir, despite the
+        # decoy global: the record is the carrier.
         start.assert_called_once()
-        self.assertNotIn("home", start.call_args.kwargs)
-        self.assertNotIn("context", start.call_args.kwargs)
-        self.assertEqual(home.home_dir(), self.home)
+        self.assertEqual(start.call_args.args, ("plain-0",))
+        # The globals lost their in-tree driver: the decoy survives.
+        self.assertEqual(home.home_dir(), decoy)
 
-        home.set_home_dir(decoy)
-        with mock.patch("reliquary.cli.stop_machine") as stop, \
+        with mock.patch(
+                "reliquary.session.Session.stop_machine") as stop, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home-dir", self.home,
@@ -735,10 +737,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
-        stop.assert_called_once()
-        self.assertNotIn("home", stop.call_args.kwargs)
-        self.assertNotIn("context", stop.call_args.kwargs)
-        self.assertEqual(home.home_dir(), self.home)
+        stop.assert_called_once_with("plain-0")
+        self.assertEqual(home.home_dir(), decoy)
 
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""
@@ -750,7 +750,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--blueprint", "plain",
             ])
         machine_id = stdout.getvalue().split()[-1].strip()
-        with mock.patch("reliquary.cli.destroy_machine") as destroy, \
+        with mock.patch(
+                "reliquary.session.Session.destroy_machine") as destroy, \
                 contextlib.redirect_stdout(io.StringIO()):
             result = cli.main([
                 "--home-dir", self.home,
@@ -914,7 +915,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertTrue(machine_home.endswith("plain-0"))
 
     def test_clean_media_passes_an_optional_name(self):
-        with mock.patch("reliquary.cli.clean_media",
+        with mock.patch("reliquary.session.Session.clean_media",
                         return_value=[]) as clean, \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(
@@ -926,7 +927,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
             clean.assert_called_once_with("livecd")
 
     def test_prune_media_dry_run_reports_without_pruning(self):
-        with mock.patch("reliquary.cli.prune_media",
+        with mock.patch("reliquary.session.Session.prune_media",
                         return_value=["husk"]) as prune, \
                 contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(
@@ -1102,6 +1103,67 @@ class CliExecRunTests(unittest.TestCase):
                          os.path.normpath(image))
 
 
+class CliContextConstructionTests(unittest.TestCase):
+    """The invocation's record: flags, then environment, then default.
+
+    ``adopt_environment()`` no longer runs on the CLI path — the CLI
+    builds one ``Context`` per invocation and opens a session on it
+    (P26) — so the environment honoring the suite used to certify
+    through home.py is stated here, against ``main()`` itself.
+    """
+
+    def setUp(self):
+        saved = dict(home._globals)
+        self.addCleanup(home._globals.update, saved)
+        for name in home.DIRECTORIES:
+            home._globals[name] = None
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+
+    def _pin_env(self, variable, value):
+        saved = os.environ.get(variable)
+
+        def restore():
+            if saved is None:
+                os.environ.pop(variable, None)
+            else:
+                os.environ[variable] = saved
+
+        self.addCleanup(restore)
+        os.environ[variable] = value
+
+    def test_the_environment_names_the_home(self):
+        self._pin_env("RELIQUARY_HOME_DIR", self.home)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["list-blueprints"])
+        self.assertEqual(result, 0)
+        self.assertIn("(no blueprints)", stdout.getvalue())
+
+    def test_a_flag_beats_the_environment(self):
+        decoy = os.path.join(self.home, "env-home")
+        self._pin_env("RELIQUARY_HOME_DIR", decoy)
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = cli.main(["--home-dir", self.home,
+                               "new-blueprint", "flagged"])
+        self.assertEqual(result, 0)
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "blueprints", "flagged.rlqb")))
+        self.assertFalse(os.path.exists(decoy))
+
+    def test_the_environment_selects_the_properties_file(self):
+        selected = os.path.join(self.home, "proj.properties")
+        self._pin_env("RELIQUARY_PROPERTIES", selected)
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = cli.main(["--home-dir", self.home, "set-property",
+                               "env.selected", "yes"])
+        self.assertEqual(result, 0)
+        self.assertTrue(os.path.isfile(selected))
+        self.assertFalse(os.path.isfile(
+            os.path.join(self.home, "user.properties")))
+
+
 class CliProgressTests(unittest.TestCase):
     """--progress selects the rendering; jsonl owns stdout alone."""
 
@@ -1116,7 +1178,7 @@ class CliProgressTests(unittest.TestCase):
         self.backend = stack.enter_context(fake_backend.installed())
 
     def test_fetch_media_forwards_the_mode(self):
-        with mock.patch("reliquary.cli.fetch_media") as fetch, \
+        with mock.patch("reliquary.session.Session.fetch_media") as fetch, \
                 contextlib.redirect_stdout(io.StringIO()):
             code = cli.main(["--home-dir", self.home, "fetch-media", "livecd",
                              "--progress", "jsonl"])

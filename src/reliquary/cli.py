@@ -18,38 +18,23 @@ except importlib.metadata.PackageNotFoundError:
 
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
-from .home import (DIRECTORIES, adopt_environment, default_home_dir,
-                   home_dir, is_assigned,
-                   set_blueprints_dir, set_cache_dir, set_home_dir,
-                   set_machines_dir, set_media_dir, set_scripts_dir)
-from .library import (list_blueprints, list_codex, list_scripts,
-                      locate_blueprint, locate_script, seed_blueprint,
+from .home import (Context, DIRECTORIES, default_home_dir,
+                   environment_variable)
+# The codex family and the locate seam are the CLI's own (D87): no
+# session veneer exists for them, so they take the invocation's
+# Context directly.
+from .library import (list_codex, locate_script, seed_blueprint,
                       seed_script)
-from . import blueprint as blueprint_mod
 from .errors import (PreflightError, ReliquaryError, StaticError,
                      UNEXPECTED, exit_code)
-from .machines import (apply_blueprint, create_machine, describe_drives,
-                       destroy_machine,
-                       eject_media, get_file, get_files, get_machine_dir,
-                       get_machine_var, insert_media, list_files,
-                       wait_machine_var,
-                       list_machines, load_machine_state, machine_dir_path,
-                       put_file, put_files, read_vm_state, recreate_machine,
-                       refresh_drives,
-                       resolve_machine, set_boot_order, split_machine_id,
-                       start_machine, stop_machine)
-# Aliased on import: the twin is named for its command under the
-# identity rule, and the builtin stays reachable here.
-from .machines import exec as exec_guest
-from .media import fetch_media, clean_media, list_media, prune_media
+from .machines import read_vm_state, split_machine_id
 from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
-from .properties import (get_property, has_credential, set_property,
-                         unset_property, list_properties, is_secret)
-from .script_runner import (ScriptRuntimeError, run_script,
-                            _resolve_key)
+from .properties import is_secret
+from .script_runner import _resolve_key
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
+from .session import Session
 
 
 # Command words recognised when rewriting leading flags so that
@@ -158,25 +143,26 @@ def _reorder_argv(argv):
     return list(argv)
 
 
-def _require_machine_selector(arguments):
+def _require_machine_selector(arguments, session):
     """Return a resolved machine id from selectors.
 
-    Relies on the process-global directory assignments (made from the
-    ``--*-dir`` flags in main() before dispatch) rather than threading
-    them through — the CLI only ever drives the globals.
+    Resolution runs through the invocation's session — the record
+    built from the ``--*-dir`` flags, the environment, and the
+    default home in main() — never through the process globals,
+    which the CLI no longer drives (P26).
     """
     if not getattr(arguments, "blueprint", None) and not getattr(
             arguments, "machine", None):
         raise StaticError(
             "select a machine with --blueprint or --machine",
             rule_id="machine.no-selector")
-    return resolve_machine(
+    return session.resolve_machine(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None),
     )
 
 
-def _interaction_target(arguments):
+def _interaction_target(arguments, session):
     """Resolve the machine directory a guest-console command drives.
 
     The directory is the whole address: it is where the machine's
@@ -184,14 +170,14 @@ def _interaction_target(arguments):
     the endpoint and verifies it. There is no port to pass — that is
     QEMU's own detail, on the far side of the adapter seam.
     """
-    machine_id = _require_machine_selector(arguments)
-    state = load_machine_state(machine_id)
+    machine_id = _require_machine_selector(arguments, session)
+    state = session.load_machine_state(machine_id)
     if state.get("phase") != "running":
         raise PreflightError(
             f"machine {machine_id} is not running "
             f"(phase: {state.get('phase')})",
             rule_id="machine.not-running")
-    machine_home = machine_dir_path(machine_id)
+    machine_home = session.machine_dir_path(machine_id)
     if read_vm_state(machine_home) is None:
         raise PreflightError(
             f"machine {machine_id} is running but has no "
@@ -226,40 +212,40 @@ def _add_home(parser):
     return parser
 
 
-_SETTERS = {
-    "home": set_home_dir,
-    "blueprints": set_blueprints_dir,
-    "scripts": set_scripts_dir,
-    "cache": set_cache_dir,
-    "media": set_media_dir,
-    "machines": set_machines_dir,
-}
-
-
-def _configure_directories(arguments):
-    """Apply this invocation's directory assignments to the globals.
+def _invocation_context(arguments):
+    """Build the one Context this invocation opens its session on.
 
     The order is the precedence: flags, then the environment for what
     no flag named, then the default home for what neither did. That
     last step is what makes the fail-closed error unreachable at the
     keyboard — one home assignment reaches all six through derivation
-    — and it happens whenever the home is still unassigned, not only
+    — and it happens whenever the home is still unnamed, not only
     when nothing at all was given, so ``rlq --cache-dir D:\\c
     list-machines`` keeps working with an explicit cache over a
     defaulted home.
 
-    Honouring the environment is a CLI behaviour, not the library's: a
-    program embedding Reliquary gets none of it unless it asks
-    (home.py).
+    Honouring the environment is the CLI's private construction step,
+    never the library's: a program embedding Reliquary gets none of
+    it unless it asks (home.py). The selected properties file rides
+    in the same record (P26's cargo): ``--properties``, else
+    ``RELIQUARY_PROPERTIES``, else the home's file by way of an
+    empty slot.
     """
-    for name, setter in _SETTERS.items():
-        value = getattr(arguments, "%s_dir" % name, None)
+    slots = {}
+    for name in DIRECTORIES:
+        value = (getattr(arguments, "%s_dir" % name, None)
+                 or os.environ.get(environment_variable(name)) or None)
         if value:
-            setter(value)
-    adopt_environment()
-    if not is_assigned("home"):
-        set_home_dir(default_home_dir())
-        _narrate(f"using reliquary home: {home_dir()}")
+            slots["%s_dir" % name] = value
+    defaulted = "home_dir" not in slots
+    if defaulted:
+        slots["home_dir"] = default_home_dir()
+    properties_file = (getattr(arguments, "properties", None)
+                       or os.environ.get("RELIQUARY_PROPERTIES") or None)
+    context = Context(properties_file=properties_file, **slots)
+    if defaulted:
+        _narrate(f"using reliquary home: {context.home_dir}")
+    return context
 
 
 def _add_properties_file(parser):
@@ -797,10 +783,11 @@ def main(argv=None):
     command.add_argument("line")
 
     arguments = parser.parse_args(argv)
-    _configure_directories(arguments)
+    context = _invocation_context(arguments)
+    session = Session(context)
     try:
         try:
-            return _dispatch(arguments)
+            return _dispatch(arguments, session, context)
         except ConnectionError as error:
             # An unreachable management endpoint is a machine rule, not
             # a fault: the command is legal and the VM is not there.
@@ -842,19 +829,18 @@ def main(argv=None):
         return UNEXPECTED
 
 
-def _create(arguments):
+def _create(arguments, session):
     if getattr(arguments, "machine", None):
         raise StaticError(
             "create-machine allocates the machine number; "
             "do not pass --machine",
             rule_id="machine.selector-not-allowed")
     dry_run = getattr(arguments, "dry_run", False)
-    result = create_machine(
+    result = session.create_machine(
         arguments.blueprint,
         dry_run=dry_run,
         backend=getattr(arguments, "backend", None),
-        properties=_explicit_properties(arguments),
-        properties_file=_properties_file(arguments))
+        properties=_explicit_properties(arguments))
     if dry_run:
         # The twin returns a DryRun, so that is what --json prints;
         # the pretty form is its own report, which is the same
@@ -864,31 +850,29 @@ def _create(arguments):
     return _emit(arguments, result, lambda: print(result))
 
 
-def _recreate_machine(arguments):
-    machine_id = recreate_machine(
+def _recreate_machine(arguments, session):
+    machine_id = session.recreate_machine(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None),
-        properties=_explicit_properties(arguments),
-        properties_file=_properties_file(arguments))
+        properties=_explicit_properties(arguments))
     return _emit(arguments, machine_id, lambda: print(machine_id))
 
 
-def _get_machine_dir(arguments):
-    machine_id = _require_machine_selector(arguments)
-    path = get_machine_dir(machine=machine_id)
+def _get_machine_dir(arguments, session):
+    machine_id = _require_machine_selector(arguments, session)
+    path = session.get_machine_dir(machine=machine_id)
     return _emit(arguments, path, lambda: print(path))
 
 
-def _apply_blueprint(arguments):
-    machine_id = apply_blueprint(
+def _apply_blueprint(arguments, session):
+    machine_id = session.apply_blueprint(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None),
-        properties=_explicit_properties(arguments),
-        properties_file=_properties_file(arguments))
+        properties=_explicit_properties(arguments))
     return _emit(arguments, machine_id, lambda: print(machine_id))
 
 
-def _script(arguments):
+def _script(arguments, session):
     """Run a script live and exit by outcome, or report a dry run.
 
     Stream-bearing: the run's output is the event stream, which
@@ -913,13 +897,12 @@ def _script(arguments):
             raise StaticError(
                 "run-script requires --blueprint or --machine",
                 rule_id="machine.no-selector")
-    result = run_script(
+    result = session.run_script(
         arguments.label,
         blueprint=blueprint_name,
         machine=machine_selector,
         display=arguments.display,
         properties=_explicit_properties(arguments),
-        properties_file=_properties_file(arguments),
         progress=arguments.progress,
         dry_run=dry_run,
         expect=_expectations(arguments),
@@ -933,8 +916,8 @@ def _script(arguments):
     return 0
 
 
-def _list_blueprints(arguments):
-    rows = list_blueprints()
+def _list_blueprints(arguments, session):
+    rows = session.list_blueprints()
 
     def render():
         if not rows:
@@ -968,15 +951,15 @@ def _print_names(names, empty):
         print(name)
 
 
-def _list_media(arguments):
-    names = list_media()
+def _list_media(arguments, session):
+    names = session.list_media()
     return _emit(arguments, names,
                  lambda: _print_names(names, "(no media)"))
 
 
-def _list_machines(arguments):
+def _list_machines(arguments, session):
     filter_blueprint = getattr(arguments, "blueprint", None)
-    machines = list_machines(blueprint=filter_blueprint)
+    machines = session.list_machines(blueprint=filter_blueprint)
     return _emit(arguments, machines,
                  lambda: _render_machines(machines, filter_blueprint))
 
@@ -1025,23 +1008,23 @@ def _script_description(script_path):
         return f"(error: {error})"
 
 
-def _script_description_by_stem(stem):
+def _script_description_by_stem(stem, context):
     """A script's one-line description, resolved through the seam."""
     try:
-        return _script_description(locate_script(stem))
+        return _script_description(locate_script(stem, context))
     except FileNotFoundError as error:
         return f"(error: {error})"
 
 
-def _list_scripts(arguments):
+def _list_scripts(arguments, session, context):
     blueprint_name = getattr(arguments, "blueprint", None)
     if blueprint_name:
-        from .resolve import load_namespace
-        machine_component = load_namespace().machines.get(blueprint_name)
+        namespace = session.load_namespace()
+        machine_component = namespace.machines.get(blueprint_name)
         scripts = dict(machine_component.scripts) if machine_component else {}
         rows = [
             {"label": label, "stem": stem,
-             "description": _script_description_by_stem(stem)}
+             "description": _script_description_by_stem(stem, context)}
             for label, stem in scripts.items()]
 
         # The description stays in the record and out of the table:
@@ -1059,7 +1042,7 @@ def _list_scripts(arguments):
 
     rows = [{"name": row["name"], "path": row["path"],
              "description": _script_description(row["path"])}
-            for row in list_scripts()]
+            for row in session.list_scripts()]
 
     def render_dir():
         if not rows:
@@ -1072,36 +1055,37 @@ def _list_scripts(arguments):
     return _emit(arguments, rows, render_dir)
 
 
-def _fetch_media(arguments):
+def _fetch_media(arguments, session):
     """Fetch a media live; the transfer events are the output."""
     _reject_stream_json(arguments, "fetch-media")
-    fetch_media(arguments.name, progress=arguments.progress)
+    session.fetch_media(arguments.name, progress=arguments.progress)
     return 0
 
 
-def _seed(arguments, seeder, kind):
-    seeded = seeder(arguments.name, only=getattr(arguments, "only", False))
+def _seed(arguments, seeder, kind, context):
+    seeded = seeder(arguments.name, context,
+                    only=getattr(arguments, "only", False))
     message = (f"seeded {kind} {arguments.name}" if seeded
                else f"{kind} {arguments.name} already exists or not found")
     return _emit(arguments, seeded, lambda: _narrate(message))
 
 
-def _seed_blueprint(arguments):
-    return _seed(arguments, seed_blueprint, "blueprint")
+def _seed_blueprint(arguments, context):
+    return _seed(arguments, seed_blueprint, "blueprint", context)
 
 
-def _seed_script(arguments):
-    return _seed(arguments, seed_script, "script")
+def _seed_script(arguments, context):
+    return _seed(arguments, seed_script, "script", context)
 
 
-def _new_blueprint(arguments):
-    path = blueprint_mod.new_blueprint(
+def _new_blueprint(arguments, session):
+    path = session.new_blueprint(
         arguments.name, platform=arguments.platform or "dos")
     return _emit(arguments, path, lambda: print(path))
 
 
-def _delete_blueprint(arguments):
-    path = blueprint_mod.delete_blueprint(arguments.name)
+def _delete_blueprint(arguments, session):
+    path = session.delete_blueprint(arguments.name)
     return _emit(arguments, path, lambda: print(path))
 
 
@@ -1110,11 +1094,7 @@ def _property_text(value):
     return "@secret" if is_secret(value) else value
 
 
-def _properties_file(arguments):
-    return getattr(arguments, "properties", None)
-
-
-def _warn_missing_credentials(arguments, keys):
+def _warn_missing_credentials(session, keys):
     """Warn on stderr for secrets whose credential is absent.
 
     The *result* is the properties projection — a secret is its
@@ -1124,8 +1104,7 @@ def _warn_missing_credentials(arguments, keys):
     """
     try:
         missing = [key for key in keys
-                   if not has_credential(
-                       key, properties_file=_properties_file(arguments))]
+                   if not session.has_credential(key)]
     except CredentialError as error:
         print(f"reliquary: warning: {error}", file=sys.stderr)
         return
@@ -1159,11 +1138,10 @@ def _read_secret_value(key):
     return value
 
 
-def _get_property(arguments):
-    value = get_property(
-        arguments.key, properties_file=_properties_file(arguments))
+def _get_property(arguments, session):
+    value = session.get_property(arguments.key)
     if is_secret(value):
-        _warn_missing_credentials(arguments, [arguments.key])
+        _warn_missing_credentials(session, [arguments.key])
 
     def render():
         if value is not None:
@@ -1171,7 +1149,7 @@ def _get_property(arguments):
     return _emit(arguments, value, render)
 
 
-def _set_property(arguments):
+def _set_property(arguments, session):
     if arguments.secret:
         if arguments.value is not None:
             raise StaticError(
@@ -1187,24 +1165,21 @@ def _set_property(arguments):
                 "set-property needs a value (or --secret)",
                 rule_id="prop.set-needs-a-value")
         value = arguments.value
-    set_property(arguments.key, value, secret=arguments.secret,
-                 properties_file=_properties_file(arguments))
+    session.set_property(arguments.key, value, secret=arguments.secret)
     return _emit(arguments, {}, lambda: None)
 
 
-def _unset_property(arguments):
-    unset_property(
-        arguments.key, properties_file=_properties_file(arguments))
+def _unset_property(arguments, session):
+    session.unset_property(arguments.key)
     return _emit(arguments, {}, lambda: None)
 
 
-def _list_properties(arguments):
-    properties = list_properties(
-        getattr(arguments, "prefix", None),
-        properties_file=_properties_file(arguments))
+def _list_properties(arguments, session):
+    properties = session.list_properties(
+        getattr(arguments, "prefix", None))
     secrets = [key for key, value in properties.items() if is_secret(value)]
     if secrets:
-        _warn_missing_credentials(arguments, secrets)
+        _warn_missing_credentials(session, secrets)
 
     def render():
         if not properties:
@@ -1215,30 +1190,31 @@ def _list_properties(arguments):
     return _emit(arguments, properties, render)
 
 
-def _clean_media(arguments):
-    reclaimed = clean_media(getattr(arguments, "name", None))
+def _clean_media(arguments, session):
+    reclaimed = session.clean_media(getattr(arguments, "name", None))
     return _emit(
         arguments, reclaimed,
         lambda: _print_names(reclaimed, "(nothing to reclaim)"))
 
 
-def _prune_media(arguments):
-    pruned = prune_media(dry_run=arguments.dry_run)
+def _prune_media(arguments, session):
+    pruned = session.prune_media(dry_run=arguments.dry_run)
     verb = "would prune" if arguments.dry_run else "pruned"
     return _emit(
         arguments, pruned,
         lambda: _print_names(pruned, f"({verb} nothing)"))
 
 
-def _add_media(arguments):
-    path = blueprint_mod.add_media(arguments.name, arguments.file)
+def _add_media(arguments, session):
+    path = session.add_media(arguments.name, arguments.file)
     return _emit(arguments, path, lambda: print(path))
 
 
-def _insert_media(arguments):
-    machine_id = _require_machine_selector(arguments)
+def _insert_media(arguments, session):
+    machine_id = _require_machine_selector(arguments, session)
     file = getattr(arguments, "file", None)
-    insert_media(machine_id, arguments.slot, arguments.media, file=file)
+    session.insert_media(machine_id, arguments.slot, arguments.media,
+                         file=file)
     what = file if file else arguments.media
     return _emit(
         arguments, {},
@@ -1246,8 +1222,8 @@ def _insert_media(arguments):
                          f"on {machine_id}"))
 
 
-def _get_machine_var(arguments):
-    value = get_machine_var(
+def _get_machine_var(arguments, session):
+    value = session.get_machine_var(
         arguments.key,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
@@ -1255,7 +1231,7 @@ def _get_machine_var(arguments):
                  lambda: None if value is None else print(value))
 
 
-def _wait_machine_var(arguments):
+def _wait_machine_var(arguments, session):
     """Wait for a variable another actor sets, and print it.
 
     No special handling for an expired wait: the twin raises
@@ -1272,7 +1248,7 @@ def _wait_machine_var(arguments):
         keywords["timeout"] = arguments.timeout
     if getattr(arguments, "interval", None) is not None:
         keywords["interval"] = arguments.interval
-    value = wait_machine_var(
+    value = session.wait_machine_var(
         arguments.key, arguments.value,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None),
@@ -1280,15 +1256,15 @@ def _wait_machine_var(arguments):
     return _emit(arguments, value, lambda: print(value))
 
 
-def _describe_drives(arguments):
-    report = describe_drives(
+def _describe_drives(arguments, session):
+    report = session.describe_drives(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
     return _emit(arguments, report, lambda: _render_drive_report(report))
 
 
-def _refresh_drives(arguments):
-    report = refresh_drives(
+def _refresh_drives(arguments, session):
+    report = session.refresh_drives(
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
     return _emit(arguments, report, lambda: _render_drive_report(report))
@@ -1351,24 +1327,24 @@ def _render_drive_report(report):
         print(f"?: {entry['drive']} — {entry['id']}: {entry['reason']}")
 
 
-def _put_file(arguments):
-    address = put_file(
+def _put_file(arguments, session):
+    address = session.put_file(
         arguments.source, arguments.destination,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
     return _emit(arguments, address, lambda: print(address))
 
 
-def _get_file(arguments):
-    path = get_file(
+def _get_file(arguments, session):
+    path = session.get_file(
         arguments.source, arguments.destination,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
     return _emit(arguments, path, lambda: print(path))
 
 
-def _list_files(arguments):
-    entries = list_files(
+def _list_files(arguments, session):
+    entries = session.list_files(
         arguments.address, recursive=arguments.recursive,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
@@ -1386,8 +1362,8 @@ def _list_files(arguments):
     return _emit(arguments, entries, render)
 
 
-def _put_files(arguments):
-    addresses = put_files(
+def _put_files(arguments, session):
+    addresses = session.put_files(
         arguments.source, arguments.destination,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
@@ -1395,8 +1371,8 @@ def _put_files(arguments):
                  lambda: _print_names(addresses, "(no files)"))
 
 
-def _get_files(arguments):
-    paths = get_files(
+def _get_files(arguments, session):
+    paths = session.get_files(
         arguments.source, arguments.destination,
         machine=getattr(arguments, "machine", None),
         blueprint=getattr(arguments, "blueprint", None))
@@ -1404,110 +1380,116 @@ def _get_files(arguments):
                  lambda: _print_names(paths, "(no files)"))
 
 
-def _eject_media(arguments):
-    machine_id = _require_machine_selector(arguments)
-    eject_media(machine_id, arguments.slot)
+def _eject_media(arguments, session):
+    machine_id = _require_machine_selector(arguments, session)
+    session.eject_media(machine_id, arguments.slot)
     return _emit(
         arguments, {},
         lambda: _narrate(f"ejected {arguments.slot} on {machine_id}"))
 
 
-def _set_boot_order(arguments):
-    machine_id = _require_machine_selector(arguments)
-    set_boot_order(machine_id, arguments.keys)
+def _set_boot_order(arguments, session):
+    machine_id = _require_machine_selector(arguments, session)
+    session.set_boot_order(machine_id, arguments.keys)
     return _emit(
         arguments, {},
         lambda: _narrate(f"boot order on {machine_id}: "
                          f"{' '.join(arguments.keys)}"))
 
 
-def _dispatch(arguments):
+def _dispatch(arguments, session, context):
+    """Route one parsed invocation onto the session it opened.
+
+    ``session`` carries the ambient state (P26); ``context`` is the
+    same record, handed directly to the codex family and the locate
+    seam — the CLI-only capabilities no veneer covers (D87).
+    """
     timeout = getattr(arguments, "timeout", None)
 
     if arguments.command == "create-machine":
-        return _create(arguments)
+        return _create(arguments, session)
     if arguments.command == "run-script":
-        return _script(arguments)
+        return _script(arguments, session)
     if arguments.command == "fetch-media":
-        return _fetch_media(arguments)
+        return _fetch_media(arguments, session)
     if arguments.command == "seed-blueprint":
-        return _seed_blueprint(arguments)
+        return _seed_blueprint(arguments, context)
     if arguments.command == "seed-script":
-        return _seed_script(arguments)
+        return _seed_script(arguments, context)
     if arguments.command == "new-blueprint":
-        return _new_blueprint(arguments)
+        return _new_blueprint(arguments, session)
     if arguments.command == "delete-blueprint":
-        return _delete_blueprint(arguments)
+        return _delete_blueprint(arguments, session)
     if arguments.command == "get-property":
-        return _get_property(arguments)
+        return _get_property(arguments, session)
     if arguments.command == "set-property":
-        return _set_property(arguments)
+        return _set_property(arguments, session)
     if arguments.command == "unset-property":
-        return _unset_property(arguments)
+        return _unset_property(arguments, session)
     if arguments.command == "list-properties":
-        return _list_properties(arguments)
+        return _list_properties(arguments, session)
     if arguments.command == "list-blueprints":
-        return _list_blueprints(arguments)
+        return _list_blueprints(arguments, session)
     if arguments.command == "list-codex":
         return _list_codex(arguments)
     if arguments.command == "list-machines":
-        return _list_machines(arguments)
+        return _list_machines(arguments, session)
     if arguments.command == "list-scripts":
-        return _list_scripts(arguments)
+        return _list_scripts(arguments, session, context)
     if arguments.command == "list-media":
-        return _list_media(arguments)
+        return _list_media(arguments, session)
     if arguments.command == "clean-media":
-        return _clean_media(arguments)
+        return _clean_media(arguments, session)
     if arguments.command == "prune-media":
-        return _prune_media(arguments)
+        return _prune_media(arguments, session)
     if arguments.command == "add-media":
-        return _add_media(arguments)
+        return _add_media(arguments, session)
     if arguments.command == "insert-media":
-        return _insert_media(arguments)
+        return _insert_media(arguments, session)
     if arguments.command == "eject-media":
-        return _eject_media(arguments)
+        return _eject_media(arguments, session)
     if arguments.command == "set-boot-order":
-        return _set_boot_order(arguments)
+        return _set_boot_order(arguments, session)
     if arguments.command == "get-machine-var":
-        return _get_machine_var(arguments)
+        return _get_machine_var(arguments, session)
     if arguments.command == "wait-machine-var":
-        return _wait_machine_var(arguments)
+        return _wait_machine_var(arguments, session)
     if arguments.command == "describe-drives":
-        return _describe_drives(arguments)
+        return _describe_drives(arguments, session)
     if arguments.command == "refresh-drives":
-        return _refresh_drives(arguments)
+        return _refresh_drives(arguments, session)
     if arguments.command == "put-file":
-        return _put_file(arguments)
+        return _put_file(arguments, session)
     if arguments.command == "get-file":
-        return _get_file(arguments)
+        return _get_file(arguments, session)
     if arguments.command == "list-files":
-        return _list_files(arguments)
+        return _list_files(arguments, session)
     if arguments.command == "put-files":
-        return _put_files(arguments)
+        return _put_files(arguments, session)
     if arguments.command == "get-files":
-        return _get_files(arguments)
+        return _get_files(arguments, session)
     if arguments.command == "start-machine":
-        machine_id = _require_machine_selector(arguments)
-        started = start_machine(
+        machine_id = _require_machine_selector(arguments, session)
+        started = session.start_machine(
             machine_id, display=getattr(arguments, "display", False))
         return _emit(arguments, started, lambda: print(started))
     if arguments.command == "stop-machine":
-        machine_id = _require_machine_selector(arguments)
-        stop_machine(machine_id)
+        machine_id = _require_machine_selector(arguments, session)
+        session.stop_machine(machine_id)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "destroy-machine":
-        machine_id = _require_machine_selector(arguments)
-        destroy_machine(machine_id)
+        machine_id = _require_machine_selector(arguments, session)
+        session.destroy_machine(machine_id)
         return _emit(arguments, {},
                      lambda: _narrate(f"destroyed machine {machine_id}"))
     if arguments.command == "recreate-machine":
-        return _recreate_machine(arguments)
+        return _recreate_machine(arguments, session)
     if arguments.command == "apply-blueprint":
-        return _apply_blueprint(arguments)
+        return _apply_blueprint(arguments, session)
     if arguments.command == "get-machine-dir":
-        return _get_machine_dir(arguments)
+        return _get_machine_dir(arguments, session)
 
-    machine_home = _interaction_target(arguments)
+    machine_home = _interaction_target(arguments, session)
     if arguments.command == "type":
         send_text(arguments.text, enter=False, home=machine_home)
         return _emit(arguments, {}, lambda: None)
@@ -1521,7 +1503,7 @@ def _dispatch(arguments):
     if arguments.command == "exec":
         # The twin resolves the selector, the platform, and the VM
         # identity itself, and returns the command's output.
-        rows = exec_guest(
+        rows = session.exec(
             arguments.dos_command,
             machine=getattr(arguments, "machine", None),
             blueprint=getattr(arguments, "blueprint", None),
