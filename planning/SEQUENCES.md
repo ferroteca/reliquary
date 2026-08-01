@@ -36,7 +36,7 @@ nothing is ever reissued.
 
 ## The marks
 
-- **The next D-number to issue is D97** — decisions, recorded in
+- **The next D-number to issue is D98** — decisions, recorded in
   [DECISIONS.md](DECISIONS.md).
 - **The next F-number to issue is F41** — features, drafted in
   [proposed/FEATURES.md](proposed/FEATURES.md) or cut straight to

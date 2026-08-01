@@ -127,25 +127,17 @@ not keep.
 
 ### Surface decisions
 
-- **T8 — Resolve description visibility in the list family.** The
-  `list-*` verbs print no `description` for any item, while
-  `--json` carries it in full, so a person cannot read what a
-  blueprint, script or media *is* from the CLI at all while the
-  data sits one flag away. The omission was deliberate (D88):
-  descriptions are unbounded free text and a column of them
-  dominates a fixed-width table. The deferral ends in one of two
-  places rather than standing indefinitely.
-
-  - **Support it in the CLI**, which means specifying the human
-    display rather than adding a column and hoping: truncation
-    width, wrapping, or a per-item detail view
-    (`show-blueprint <name>`-shaped) instead of a column at all —
-    and whether the answer is uniform across the family or per
-    noun.
-  - **Drop it entirely**, `--json` included, so no surface carries
-    a field none of them shows.
-
-  Context: `search-blueprints` was the only human-visible
-  description surface and went with the search family (D88), and
-  U11's "read a description" is met only through `--json` until
-  this settles — the thin fulfilment that prompted the entry.
+- **T8 — Land the list family's description display.** The
+  `list-*` verbs print no `description` for any item while
+  `--json` carries it (D88's deferral). **The display is settled
+  (D97)**: an indented, wrapped description line beneath each
+  entry — never a column — as a uniform rule wherever a listing's
+  noun carries a description: `list-codex`, both `list-scripts`
+  forms, and `list-blueprints`, whose record also gains
+  `description` and `platform` so `--json` carries what the human
+  view shows (P6). The drop exit is declined while U11 stands
+  (D97). Remaining work is the landing: the renderers, the
+  `list_blueprints` record, docs/spec/cli.md's list-family rows
+  and prose that read "names alone", the same notes in
+  `library.list_codex` and `cli._list_codex` / `_list_scripts`,
+  and the strike of this entry.

@@ -228,6 +228,30 @@ is waiting on an answer today.
 
 ## Decided
 
+- D97 — THE LIST FAMILY SHOWS ITS DESCRIPTIONS; THE DROP EXIT IS
+  DECLINED — DECIDED (owner, 2026-08-01). Supports U11; P6, P11.
+  Resolves the deferral D88 parked as T8.
+
+  T8 offered two exits: specify the human display, or drop
+  `description` from every surface, `--json` included. Dropping is
+  **declined while U11 stands** — "read a description" is a
+  use-case clause in force, so that exit is an amendment of the
+  use-case list dressed as a display cleanup, and it reopens only
+  by winning that amendment first. The display settled: **an
+  indented, wrapped description line beneath each entry**, never a
+  column — a fixed-width column of unbounded free text is exactly
+  what D88 refused, and truncation loses the words being read
+  for — applied as a uniform rule wherever a listing's noun
+  carries a description (`list-codex`, both `list-scripts` forms,
+  `list-blueprints`), with `list-blueprints`' record gaining
+  `description` and `platform` so `--json` carries what the human
+  view shows (P6). A `describe-*` detail verb was weighed and
+  declined: full text at one command per entry read is the wrong
+  ergonomics for scanning a library, and a new command family
+  needs a demand a wrapped line already meets. The normative
+  wording lands in docs/spec/cli.md with the implementation that
+  strikes T8.
+
 - D96 — RELEASED ARTIFACTS CARRY NO TESTS — DECIDED (owner,
   2026-07-30). Supports P21's instinct applied to what is shipped
   rather than what is depended on. The wheel already excluded the
