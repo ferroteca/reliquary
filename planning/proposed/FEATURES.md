@@ -14,117 +14,6 @@ its F-number from the sequence ledger
 ([SEQUENCES.md](../SEQUENCES.md)) — issue from there and advance
 the mark in the same edit.
 
-F2–F6 left the numbered arc for the same reason (D33, owner,
-2026-07-23): **no in-force or pledged use case demands it**. The
-numbered arc ran 1 through 9 and ended there, carrying text-mode
-DOS on QEMU end to end; generalizing beyond that one vertical is
-what waits here. Each names the use case that would schedule it,
-and each of those was a draft when this paragraph was written.
-
-**F2 left on 2026-07-28**, the first of the five to go, pledged
-together with its demand U7 — which is the shape the paragraph
-above describes working — and **delivered the same day**, so its
-number retires unreused ([pledged/FEATURES.md](../pledged/FEATURES.md)
-carries the record). It settles what a pledged demand does and
-does not do: F3 and F5 cite U7 as well and both stay here, because
-a pledged use case makes a feature *pledgeable* and pledges
-nothing itself. Each feature is still moved by its own decision.
-And a delivered seam is not the capability the seam serves: the
-adapter API exists now, U7 stays pledged, and F3 below is what
-would meet it.
-
-**F7–F10 never were on the arc.** They are governance and tooling
-proposals moved out of TASKS.md's legacy Proposed section (D43), and
-they cite **principles** rather than use cases, which drive work
-just as well. What they share with the rest is the only thing that
-matters here: argued, unpledged, and not worked from.
-
-**F11–F16 arrived from outside** (owner, 2026-07-27): one consuming
-project's proposal, admitted to this document and nothing further —
-entry grants a live argument, exactly as it does for anything else
-here. They differ from everything above in where the demand comes
-from: an embedding caller reporting what the surface costs it,
-rather than the project's own arc. The consumer is not named, per
-the doctrine that the machine layer stays ignorant of who builds on
-it; its arguments are kept, generalized to "a caller". Several cite
-no use case at all, which each entry says plainly rather than
-papering over. The source proposal offered its own suggested
-delivery order; that order has no standing here (D42 — `proposed/`
-is not a queue), and what survives of it is the dependency each
-entry records in its own text.
-
-**F11 was the first of the six to go, on 2026-07-29** — and it went
-by an exit no entry here had used before. It was not pledged: it
-was **cut**, failing D42's one-sprint bound, so its number retired
-unreused and F24 and F25 carry the halves to
-[pledged/FEATURES.md](../pledged/FEATURES.md). The lesson is about
-this file rather than about that feature. An entry here is sized by
-nobody — "size is no bar to sitting here" is the rule four
-paragraphs down — so what one costs is discovered at the pledge, by
-reading the shipped surface it would change. F11 read as a rename
-with a new command beside it; the reading found a flag it assumed
-into existence, an output discipline that inverts, and a normative
-mode the rename would have deleted in silence (D79). Arriving from
-outside made none of that worse: the entry was argued in good faith
-and the gaps are the ordinary ones.
-
-**F18–F20 arrived from [TASKS.md](../TASKS.md)** (owner,
-2026-07-27), by the gate audit of that day. Each adds a CLI command
-or changes a CLI spelling — which is **no bar to being a task**
-(D45; the housekeeping boundary that excludes a surface change
-is housekeeping's alone, and F16 below is where that misreading
-started). What holds all three here is the same thing: each
-carries an **open shape question** in its own text, and an argument
-still to finish is what `proposed/` is for. F17 made the same
-journey to `pledged/`, on its size rather than its surface.
-
-**F1 came back from [pledged/FEATURES.md](../pledged/FEATURES.md)**
-(owner, 2026-07-27; D61) — the first withdrawal, and the reverse of
-every arrival above. It was never pledged by anyone's decision: the
-2026-07-26 restructure housed it there because feature-bound work
-items had nowhere else to live, and D44's rename then changed what
-that shelf claims without re-testing its occupants. **U6**, the use
-case it delivers, and **U2** came back to
-[USE-CASES.md](USE-CASES.md) in the same round.
-
-**F26–F28 arrived from outside** (owner, 2026-07-29): a consuming
-project's proposal — the second arrival by that door — admitted to
-this document and nothing further, exactly as F11–F16 were: entry
-grants a live argument. The consumer is not named, per the doctrine
-that the machine layer stays ignorant of who builds on it; its
-arguments are kept, generalized to "a caller", and the use they
-serve — testing a device driver inside a guest — is described as a
-use. Every code claim the source proposal made was re-verified
-against the tip on admission and held. It asked no sequencing and
-no date, so there is no order to record; what one entry needs of
-another sits in that entry's own text (F28 is F27's escape hatch).
-One sub-item arrives with an argued refusal recommended rather than
-adopted (F26's error-text supplement), and one reading was
-corrected rather than kept (F27 on `vvfat`) — both recorded in the
-entries themselves. **All three were pledged the same day**
-(owner, 2026-07-29) and moved to
-[pledged/FEATURES.md](../pledged/FEATURES.md), **U22** drafted in
-the same act ([USE-CASES.md](USE-CASES.md)) as the case F27's
-admission required; F14, which F26's entry directs be weighed at
-that pledge, was — and stays here, its own decide-first
-unsettled.
-
-**F30 arrived the same way one round later** (owner, 2026-07-30):
-reviewing U22 turned up an ask its own step 7 makes visible — a
-run's scalar outcome takes two calls and carries no contract. It was
-entered here with its decide-firsts recorded, settled the same day,
-then **pledged and delivered the same day too** (D90), so its number
-retires unreused and the record of it is
-[pledged/FEATURES.md](../pledged/FEATURES.md)'s. Entry, settlement,
-pledge and delivery inside one round is the compression P23 permits
-authority — every step taken, none skipped, and each one written
-down. The same review round produced no other
-feature: the readiness verb it also considered was refused on the
-argument that a DOS-only, agentless-only "ready" would cement one
-definition of the word into the surface, and what survives of that
-idea is content (a codex example, [TASKS.md](../TASKS.md) T9) rather
-than capability.
-
 A feature that is pledged but not yet built moves to
 [pledged/FEATURES.md](../pledged/FEATURES.md) and carries its work
 breakdown with it. Small work that is not a feature at all goes
@@ -142,8 +31,8 @@ Cutting one into implementable pieces is part of pledging it.
 > **Withdrawn from [pledged/FEATURES.md](../pledged/FEATURES.md)**
 > (owner, 2026-07-27; D61), with **U6** — the use case it delivers
 > — in the same round. What is withdrawn is the promise, not the
-> design, which stands as written; the preamble above records how
-> the pledge arrived without anyone making it.
+> design, which stands as written; D61 records how the pledge
+> arrived without anyone making it.
 >
 > Serves **U6** ([USE-CASES.md](USE-CASES.md)); design in
 > [design/recorder.md](design/recorder.md). The one capability the
@@ -740,18 +629,6 @@ Raised 2026-07-26 in the spec/descriptive round; **the owner agreed
 it needs to win this argument, not that it has** — so unlike F7–F9
 this one was asked for, and still waits on its own case.
 
-*(F11 — `--dry-run`, and the end of the check family — was
-**cut on pledge** on 2026-07-29, so its number retires unreused
-(D42) and a fresh one came to each piece:
-[F24](../pledged/FEATURES.md) is `create-machine --dry-run`, the
-gap this entry called worth filling first, and
-[F25](../pledged/FEATURES.md) is `run-script --dry-run` with the
-check family's end. Both are pledged. This is the first use of
-D42's cut-on-pledge rule — D65 weighed F2 for the same cut a day
-earlier and pledged it whole — and the rulings the cut produced,
-including three surface collisions this entry never named, are in
-[D79](../DECISIONS.md).)*
-
 ## F12 — The `simulator` backend
 
 > **Entered 2026-07-27** from a consuming project's proposal
@@ -1184,18 +1061,6 @@ work item: it may be that the honest answer is no change at all,
 and the finding's value was in forcing the question while the
 answer is still free.
 
-*(F22 — every working directory is placeable — was entered and
-delivered on 2026-07-27, so its number retires unreused. The six
-`--*-dir` flags, the derivation cascade, the fail-closed
-unassigned error, and the seeding axis that replaced
-`--assets` are recorded in [D59](../DECISIONS.md), which also
-carries the P12 and P4 amendments it required; that axis was
-itself deleted by [D88](../DECISIONS.md) and P4 restored to an
-absolute. The model is normative in
-[docs/spec/asset-resolution.md](../../docs/spec/asset-resolution.md).
-U17 stays pledged: this serves it and does not on its own
-complete it.)*
-
 ## Horizon — smaller and later
 
 > **Not a feature, and so unnumbered.** This is a holding list of
@@ -1271,14 +1136,6 @@ complete it.)*
 - Bounded `guest-file-*` operations through a native guest
   agent — distinct verbs, never bundled into a console
   abstraction.
-*(The in-band directory operations that sat here left on
-2026-07-27 and are done: D57 promoted them to F23, being the two
-places the shipped workflow failed P16's test, and D62 delivered
-them the same day as `list-files` / `get-files` / `put-files`.
-Their sequencing against the second backend was cut with the
-promotion — P16 did not wait on it, and the wait would have been
-the whole cost.)*
-
 - Media commands beyond `fetch-media` (verify, remove) —
   **split by D46** (2026-07-27), which put U13 in force:
   `verify` now stands on a use case in force ("verifies it is
