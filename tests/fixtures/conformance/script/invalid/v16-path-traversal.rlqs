@@ -1,0 +1,17 @@
+# invalid: a content path may not traverse
+# rule: V16
+# id: http.path-traversal
+# spec: Syntactic restrictions
+
+platform openbsd
+entry begin
+
+http {
+    content answer "/../etc/answer" """
+        x
+    """
+}
+
+phase begin {
+    finish
+}

@@ -684,7 +684,7 @@ the CFG. Each has a stable id; diagnostics cite them:
   available by the script's declarations.
   Ids: `prop.undefined-reference`, `prop.secret-reference`,
   `prop.derivation-cycle`, `prop.http-without-block`. The
-  `${key}`-in-a-statement half is unenforced (see below).
+  `${key}`-in-a-statement half is unenforced — a named gap.
 
 - **V7** — an observation carries **exactly one** condition — a
   bare string/regex beside a `machine=` modifier, or two
@@ -734,6 +734,27 @@ the CFG. Each has a stable id; diagnostics cite them:
   interpolation appears only where the argument accepts it.
   Id: `key.not-portable` (the `press` vocabulary; the
   insert/eject and set-boot vocabularies are preflight's).
+
+- **V16** — the `http` declaration and its `content` entries are
+  well formed: the port range is sane, content names are unique
+  and their guest paths absolute, normalized and unique, a body
+  is inline or `from` a readable relative file — never both,
+  never neither — and `http start`/`stop` name declared content.
+  The semantic detail is [http-serve.md](http-serve.md)'s; this
+  rule is its static face. (V15 was never issued; the gap is
+  history, not a rule.)
+  Ids: `http.content-no-body`, `http.content-two-bodies`,
+  `http.duplicate-content-name`, `http.duplicate-content-path`,
+  `http.duplicate-declaration`, `http.empty-body`,
+  `http.from-missing`, `http.from-not-relative`,
+  `http.from-reference`, `http.from-traversal`,
+  `http.from-unreadable`, `http.indent-not-a-mode`,
+  `http.indent-on-file-body`, `http.no-content`,
+  `http.path-not-absolute`, `http.path-traversal`,
+  `http.port-not-a-number`, `http.port-out-of-range`,
+  `http.port-range-inverted`, `http.reference-in-path`,
+  `http.start-without-content`, `http.stop-takes-nothing`,
+  `http.undeclared-content`, `http.unknown-action`.
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
@@ -808,6 +829,9 @@ deadline    45m
   without it, and validation rejects the script rather than let
   the backstop be forgotten. Acyclic and linear scripts may omit
   it.
+- `pacing` optionally sets the script-wide gap before guest
+  input, which phases and input verbs may narrow. See
+  [timing](#timing).
 
 Each header may appear at most once. The file name supplies the
 script name. There is no format-version field before 1.0 because
@@ -1898,7 +1922,7 @@ reconciliation behavior visible.
 
 Parsing and static validation enforce the legality rules — the
 [lexical rules](#lexical-rules), the grammar, and the
-[syntactic restrictions](#syntactic-restrictions) V1–V14 — from
+[syntactic restrictions](#syntactic-restrictions) V1–V16 — from
 the script text alone, before the machine starts. With more in
 scope, preflight further rejects, naming what it needed:
 

@@ -1,0 +1,17 @@
+# invalid: the port range runs backwards
+# rule: V16
+# id: http.port-range-inverted
+# spec: Syntactic restrictions
+
+platform openbsd
+entry begin
+
+http port-min=9000 port-max=8000 {
+    content answer "/a.conf" """
+        x
+    """
+}
+
+phase begin {
+    finish
+}

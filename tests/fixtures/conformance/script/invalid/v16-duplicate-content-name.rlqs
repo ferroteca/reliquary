@@ -1,0 +1,20 @@
+# invalid: content names are unique in their declaration
+# rule: V16
+# id: http.duplicate-content-name
+# spec: Syntactic restrictions
+
+platform openbsd
+entry begin
+
+http {
+    content answer "/a.conf" """
+        x
+    """
+    content answer "/b.conf" """
+        y
+    """
+}
+
+phase begin {
+    finish
+}

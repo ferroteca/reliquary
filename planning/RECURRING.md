@@ -91,7 +91,7 @@ discharge is judgment work, never a script's verdict alone.
   signatures, error classes, and the content of every V-rule:
   that each is enforced, and enforced as stated.
 - **Stale after**: one month.
-- **Last performed**: never.
+- **Last performed**: 2026-08-01.
 
 ### R4 — Audit docs/spec/blueprint-model.md
 
