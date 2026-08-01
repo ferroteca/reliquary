@@ -67,18 +67,21 @@ discharge is judgment work, never a script's verdict alone.
 ### R1 — Audit docs/spec/cli.md
 
 - **Check**: [cli.md](../docs/spec/cli.md) against the `rlq`
-  command the package ships — the command inventory both ways,
-  the flags, and the output and exit-code claims.
+  command the package ships — behavior only: flag semantics,
+  output and exit-code claims, per-command rules. The command
+  inventory is the manifest's, checked every commit
+  (`tests/test_command_manifest.py`).
 - **Stale after**: one month.
 - **Last performed**: never.
 
 ### R2 — Audit docs/spec/api.md
 
 - **Check**: [api.md](../docs/spec/api.md) against the package's
-  declared surface. The spec declares itself end-goal design, so
-  the audit reads only its claims about today — the twin-name
-  identity rule first (the CLI command *is* the twin's name,
-  nothing CLI-only), present-tense capability second.
+  declared surface. The spec declares itself end-goal design, and
+  the inventory and twin-identity halves are the manifest's,
+  checked every commit — the audit reads what remains: behavior
+  asserted in present tense, and the design's claims about
+  today.
 - **Stale after**: one month.
 - **Last performed**: never.
 

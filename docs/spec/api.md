@@ -198,7 +198,13 @@ SPDX-License-Identifier: GPL-3.0-only
 ## The surface
 
 Each family's normative contract lives with its surface's spec;
-this table is the index.
+this table is the index. **What ships today is not read from
+here**: the command manifest
+(`src/reliquary/schemas/command-manifest.toml`) is the normative
+inventory of the shipped command surfaces, enforced every commit
+(`tests/test_command_manifest.py`) — so this table stays free to
+carry the end-goal design, and where it names capability that
+does not exist yet, the manifest is what says so.
 
 Under the identity rule the CLI column is the mechanical
 transform of the twin column (dash ↔ underscore); the table
@@ -227,7 +233,7 @@ appears in none of them.
 | `put-file` / `get-file` / `put-files` / `get-files` / `list-files` | the same names with underscores; `list_files(address, recursive=False)` returns the flat entry array — guest-terms addressed (P17) in one vocabulary across all five, over a vvfat drive, stopped-only, non-vvfat fails closed by name (P11). Single files landed at milestone 9, the trees and the listing with D62 (U14, U20; P16) | [cli.md](cli.md) |
 | `list-machines` / `list-blueprints` / `list-scripts` / `list-media` | `list_<noun>` — **one verb per noun, and the noun names the set**: each lists yours and none reports a codex entry (`list-codex` is the library's own, above). There is no `search-<noun>`: matching a term is filtering, which the shell does and `--json` makes trivial in any language (D88) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
-| guest-console family (`type` / `enter` / `press` / `exec` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21) | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
+| guest-console family (`type` / `enter` / `press` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21). `exec` has left the deferral: its session twin shipped with the exec-run landing (D36), so it rides the identity rule like any twin | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
 
 `import-vm`'s twin is `import_vm` — a bare `import` is a Python
 keyword, and under the identity rule the CLI simply adopts the

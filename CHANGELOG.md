@@ -11,6 +11,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **The command manifest.** The package ships
+  `schemas/command-manifest.toml`, the normative inventory of the
+  command surfaces (P6): every capability declared once, the CLI
+  word and the session twin derived from the one name, the
+  families and the reasoned parity exceptions as data, every
+  public name classified. The suite holds both surfaces to it in
+  both directions (`tests/test_command_manifest.py`), and the
+  prose specs defer to it for what exists — cli.md and api.md
+  stay normative for behavior and design.
+
 ### Changed
 
 - **The session is the only door** (P26). All embedding-API

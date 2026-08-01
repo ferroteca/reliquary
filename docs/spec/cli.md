@@ -17,9 +17,13 @@ SPDX-License-Identifier: GPL-3.0-only
 > documented here at all, however settled their design: unbuilt
 > capability lives in
 > [planning/proposed/FEATURES.md](../../planning/proposed/FEATURES.md).
-> A test enforces both directions (`ClaimedCommandTests`), because
-> until 2026-07-27 this document specified five commands the CLI
-> did not have and omitted five it did.
+> **The inventory itself is normed elsewhere**: the command
+> manifest (`src/reliquary/schemas/command-manifest.toml`)
+> declares what exists — every command, twin, family mapping and
+> exception — and the suite holds both surfaces to it on every
+> commit (`tests/test_command_manifest.py`). This document is
+> normative for behavior: what each command does, its flags, its
+> output and its exit codes.
 >
 > Concepts introduced here are documented durably in
 > [codex.md](codex.md) (the codex,
@@ -31,14 +35,14 @@ Every command maps one-to-one onto a public API call — and is
 **named by it**: a command is its twin's name, dash-separated
 (`create-machine` ↔ `create_machine`), and its flags mirror the
 twin's parameters (`--hdd-images` ↔ `hdd_images=`). Naming the
-twin names the command; the presentations cannot drift. Two named
-exceptions, each an identity with a different home surface: the
-guest-console family spells as the script language's verbs
-(`type`, `enter`, `press`, `select`, `wait`, `screen`,
-`screenshot`, `exec`, `hmp`), and the `run` family maps to the
-API's run-handle methods. The CLI resolves `--blueprint` and
+twin names the command; the presentations cannot drift. The
+declared exceptions — the guest-console family spelling as the
+script language's verbs, and the codex family, CLI-only by
+decision (D87) — live in the command manifest with their
+reasons, one entry each. The CLI resolves `--blueprint` and
 `--machine` selectors; the API takes the same identifiers.
-Nothing is CLI-only.
+Nothing is CLI-only undeclared: a parity break absent from the
+manifest is a bug.
 
 **Selection.** Machine-level verbs take a target selector:
 
