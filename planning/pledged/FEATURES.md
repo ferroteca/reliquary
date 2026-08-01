@@ -53,13 +53,14 @@ Work items:
    fixtures, the natural machine home for rule coverage.
 2. `test_api_spec_conformance.py` — the api.md table-row reads,
    superseded by [F38](#f38--the-command-manifest)'s conformance
-   test, which lands first; the twin-parity half (`cli._COMMANDS`
-   against `__all__`) goes with them, the manifest asserting
+   test (`tests/test_command_manifest.py`, landed); the
+   twin-parity half (`cli._COMMANDS` against `__all__`) goes
+   with them, the manifest asserting
    both directions of P6 where it asserted one.
 3. `test_cli.py` `ClaimedCommandTests` — the docs/spec command
    sweep, superseded by [F38](#f38--the-command-manifest)'s
-   conformance test, which lands first; the rest of the module
-   stays.
+   conformance test (`tests/test_command_manifest.py`,
+   landed); the rest of the module stays.
 4. `test_script_corpus.py` — the script-spec.md prefix-list
    read.
 5. `test_conformance_corpus.py` — the instance-model.md
@@ -113,61 +114,11 @@ across the project — was the close second; a bespoke line format
 was refused under P21, a parser nobody else maintains with no
 editor support.
 
-The intended shape, real names throughout — authoring the whole
-artifact is work item 1:
-
-```toml
-# The command manifest — the normative inventory of the
-# command surfaces (P6). Each capability is declared once;
-# the CLI word and the API twin both derive from the one
-# name. The suite enforces every entry in both directions:
-# a capability missing from either surface, a command
-# registered but not declared here, or a public name this
-# file does not classify all fail the conformance test.
-
-# Plain twins: the command word is the whole declaration.
-# `add-media` is the CLI face; `add_media` on Session is
-# the twin, derived, never restated.
-twins = [
-  "add-media",
-  "apply-blueprint",
-  "create-machine",
-  "fetch-media",
-  "list-machines",
-  "run-script",
-  "start-machine",
-  "stop-machine",
-  # … the full command list continues; one line each.
-]
-
-# Families: commands whose API face is a named module
-# function rather than a derived Session method. The
-# mapping is data here, not a prose table.
-[families.guest-console]
-press = "send_keys"
-type = "send_text"
-screen = "screen_text"
-wait = "wait_text"
-# … the remaining console verbs, settled at authoring.
-
-# Deliberate breaks in parity, each carrying its reason —
-# absence from this list is what makes a break a bug. None
-# is settled today; the shape an entry takes:
-#   [[exceptions]]
-#   name = "…"
-#   missing = "cli"            # or "api"
-#   reason = "one sentence, citing its decision"
-
-# The embedding surface that is legitimately not a command:
-# every public name appears in exactly one class, so a new
-# export is classified or the suite fails.
-[embedding-surface]
-types = ["Machine", "Document", "Script", "ScriptRun"]
-errors = ["ReliquaryError", "BlueprintError", "StaticError"]
-parsers = ["parse_document", "parse_script", "load_script"]
-session-lifecycle = ["bind_properties", "resolve_machine"]
-# … every remaining `__all__` name, classified at authoring.
-```
+The artifact is authored and shipped —
+`src/reliquary/schemas/command-manifest.toml` — and is its own
+best example: grouped by class, commented where the reviewer
+reads, one line per capability. The conformance test holding
+the code to it is `tests/test_command_manifest.py`.
 
 **What the suite asserts**, all of it machine against machine:
 every declared capability ships both faces; every registered
@@ -190,14 +141,10 @@ all of them.
 
 Work items:
 
-1. **The conformance test** — the four assertions, replacing
-   the api.md table reads and the docs/spec command sweep
-   ([F37](#f37--the-prose-parser-migration) items 2 and 3,
-   which point here and land after it).
-2. **The prose deferral** — cli.md and api.md stop enumerating
+1. **The prose deferral** — cli.md and api.md stop enumerating
    the inventory and cite the manifest; a norm edit, landing
    under the surface-change rule with this feature.
-3. **The audits narrowed** — R1 and R2
+2. **The audits narrowed** — R1 and R2
    ([RECURRING.md](../RECURRING.md)) shed their inventory half;
    their Check lines are edited to the judgment half in the
    same change.
