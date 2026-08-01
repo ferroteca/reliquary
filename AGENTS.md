@@ -399,7 +399,9 @@ workflow:
   conformance corpus (`tests/fixtures/conformance/blueprint/`,
   `test_conformance_corpus.py`) runs every fixture against both the
   parser and the schema so the two cannot drift. Placement rules
-  are in `.agents/skills/documentation-rules.md`.
+  live with the documents they govern: `planning/README.md` for the
+  planning machinery, `docs/spec/README.md` for spec, reference,
+  and guide.
 - **Two conformance corpora, and the second is the stronger
   pattern.** `fixtures/conformance/script/` (`test_script_corpus.py`)
   does for `.rlqs` what the blueprint corpus does for `.rlqb`, and
@@ -931,10 +933,13 @@ it.
 When Packer and Vagrant are mentioned together in prose, name Packer first and Vagrant second.
 
 After changing commands, flags, paths, behavior, or Python interfaces, update README.md, CHANGELOG.md, and this file
-wherever affected. CHANGELOG updates land under the unreleased section only: released history is never retroactively
-edited — not even for stale paths or renamed concepts (the sole exception, minimal privacy/legal redaction, and the
-full rule live in `.agents/skills/documentation-rules.md`). Validate documented CLI syntax with `reliquary --help` and
-subcommand help.
+wherever affected. The CHANGELOG is history, not documentation: everything under a released version header records
+what was true at release time and stays byte-for-byte as released — stale paths, broken links, renamed concepts, and
+superseded wording included; they are the historical record, and "fixing" them falsifies it. Corrections and
+follow-ups get new entries under the unreleased section, never edits to released text. The one exception is removing
+private or legally problematic content: redact minimally — replace or drop the problematic text, never reword or
+modernize around it — and record the redaction as an entry of its own release. The unreleased section is freely
+editable until it ships. Validate documented CLI syntax with `reliquary --help` and subcommand help.
 
 ## Architecture and prior art
 

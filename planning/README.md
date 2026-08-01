@@ -84,6 +84,18 @@ what lets the shelf be **wrong**: an item nobody intends to deliver
 is withdrawn to `proposed/` or rejected outright, never left sitting
 as a pledge nobody means.
 
+**These documents keep no diary either.** The move is the act and
+the commit is its record, so a standing document never narrates
+its own history: no chronicle of shelf fills and empties; no
+"empty today" notes — emptiness is self-evident, and git history
+records when; no death records behind retired numbers (no stub,
+D23 — the gap in a sequence is the history); and no entry kept
+after being applied or struck — done work leaves by deletion. A
+live entry's own provenance and argument are not diary; they are
+the argument. [DECISIONS.md](DECISIONS.md) is the one exception,
+being the record itself: its entries keep the spellings of their
+time, annotated and never rewritten.
+
 **Features carry F-numbers and a size bound** (D42). The number is a
 handle for what depends on a feature, running in one sequence across
 both directories, recording order of issue and never priority; it

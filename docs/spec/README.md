@@ -58,6 +58,13 @@ defers to — so a document copied, excerpted, or moved still says
 what it is. Reclassifying a document is an edit to that statement
 first; relocating the file is tidiness, not the act.
 
+**A spec is written as a rule, not a report.** It binds the
+implementation, so it states what must hold — "a missing slot
+fails before anything is touched", never "Reliquary currently
+fails when the slot is missing". Where the code does not yet obey
+a clause, that is a bug to file, not a reason to soften the spec
+into a description.
+
 ## The application surfaces
 
 | Spec | Interface |
