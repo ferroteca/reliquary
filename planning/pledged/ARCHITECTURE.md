@@ -89,6 +89,37 @@ SPDX-License-Identifier: GPL-3.0-only
   directory globals, first-use `dir.unassigned` — and none of its
   placement, derivation, or defaulting decisions.)
 
+- **P27 — Remanence owns at-rest disk access.** Direct disk-image
+  access belongs to Remanence, not to Reliquary. Reliquary consumes
+  Remanence as the one deep module for opening raw and qcow2 drive
+  images at rest, claiming the image and any backing chain,
+  discovering complete partition and volume geometry, reading and
+  changing files in FAT volumes, and committing or rolling back
+  mutations. Reliquary keeps the policy Remanence cannot own: the
+  DOS-only FAT12/FAT16/FAT16B recognition claim, guest-address
+  mapping, rule ids, and translation into the recorded drive report.
+  The dependency earns the whole layer or none of it: a hybrid that
+  keeps Reliquary's NBD client, `qemu-nbd` lifecycle, qcow2 snapshot
+  orchestration, staged raw access, MBR reader, or FAT reader/writer
+  as a fallback is refused, because it leaves two authorities for
+  the same disk facts (P21; D83). D73's refusal to write and
+  maintain a qcow2 reader inside Reliquary is honored by making the
+  format implementation a declared dependency (D82), and D77's
+  guarantees remain binding: an image is opened where it lies, a
+  backing relationship survives a write, work is proportional to
+  touched data, contention fails by name, and an interrupted write
+  is reconciled on the next access. This principle is pledged, not
+  armed: the current `remanence==0.0.1a1` release is evidence for
+  the direction but not a candidate, because it refuses qcow2
+  backing files, treats a blank newly materialized disk as an
+  unreadable filesystem, silently omits unreadable partitions from
+  `geometry()`, lacks a stable volume identity shared by geometry
+  and file operations, and does not yet establish D77's
+  crash-recovery guarantee. Implementation waits for a later
+  Remanence release that satisfies those acceptance conditions on
+  the delivered Windows host (P11), and that exact release is
+  pinned.
+
 *(The shelf reopened 2026-07-31 for P26, after four days empty.
 Empty remains the healthy state: a principle sits here only in the
 window between the project owing it and the code honoring it, and

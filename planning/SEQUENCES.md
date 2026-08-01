@@ -43,7 +43,7 @@ nothing is ever reissued.
   [pledged/FEATURES.md](pledged/FEATURES.md) on pledge.
 - **The next G-number to issue is G8** — the authored language's
   goals ([docs/spec/script-spec.md](../docs/spec/script-spec.md)).
-- **The next P-number to issue is P27** — architectural
+- **The next P-number to issue is P28** — architectural
   principles, one namespace across proposed, pledged, and the root
   list.
 - **The next S-number to issue is S9** — application surfaces
