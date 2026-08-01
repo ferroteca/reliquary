@@ -38,7 +38,7 @@ nothing is ever reissued.
 
 - **The next D-number to issue is D98** — decisions, recorded in
   [DECISIONS.md](DECISIONS.md).
-- **The next F-number to issue is F41** — features, drafted in
+- **The next F-number to issue is F42** — features, drafted in
   [proposed/FEATURES.md](proposed/FEATURES.md) or cut straight to
   [pledged/FEATURES.md](pledged/FEATURES.md) on pledge.
 - **The next G-number to issue is G8** — the authored language's

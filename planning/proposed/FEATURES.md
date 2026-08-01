@@ -1204,3 +1204,113 @@ ahead:
   verb's, and the host side only reads" is in force; this
   proposal is an argued amendment of it and lands only through
   the surface-change rule (P23), never by arrival.
+## F41 — The drive-determination handover
+
+> **Entered 2026-08-01** from the owner's direction after F40
+> landed: an inventory of what the at-rest translation still holds
+> that Remanence could own, written whole so the upstream ask and
+> the downstream consequences are argued from one document. Serves
+> **U14** and **U20** through **P10**, **P11**, **P16** and
+> **P17**; extends in-force **P27**'s one-deep-module logic the
+> rest of the way down. Its delivery needs the **P27 amendment**
+> argued in [ARCHITECTURE.md](ARCHITECTURE.md) beside this file,
+> and reopens **D83**'s report semantics under the surface rule.
+> The gate mirrors the one P27's own pledge carried: a Remanence
+> release satisfying the acceptance conditions below on the
+> delivered Windows host, pinned exact — a different release is a
+> fresh verification, never a substitution.
+
+**What Reliquary still holds today**, each with its current home —
+the complete inventory this feature would retire:
+
+1. **The recognition claim's enforcement.** `at_rest.py` pins the
+   partition-type vocabulary value by value — `_FAT_TYPES`,
+   `_EXTENDED`, `_KNOWN_FOREIGN` — and `_describe` composes the
+   refusals ("partition 2 holds NTFS or exFAT, and reliquary's DOS
+   workflow reads FAT12 and FAT16 partitions and DOS extended
+   containers only").
+2. **The whole-disk-or-none rule.** A partition row Remanence
+   reports with an issue refuses the entire disk, on the ordering
+   argument in-force P27 records — an argument Remanence's
+   proposed F20 dissolves outright ("an unreadable region retains
+   its identity and position, so a failure cannot renumber objects
+   which follow it").
+3. **Sector-0 classification.** The `partitioned` flag is derived
+   locally — `bool(partitions) or (not blank and not volumes)` — a
+   policy reconstruction of outcomes the disk itself distinguishes.
+4. **Disk-level `cylinders` selection.** The record's value is the
+   first volume's BPB answer, chosen by reliquary rather than
+   stated by the report.
+5. **Positional volume identity.** The letter map and drive record
+   store volume *indexes*; the index is resolved to Remanence's id
+   at open, and the volume-vanished guard compares counts rather
+   than identities.
+6. **Label policy.** The "NO NAME"-reads-as-unlabeled rule is
+   applied here, and the BPB-label fallback is the residue named
+   in root P27 — lost because the dependency's report does not
+   carry the boot record's label field.
+7. **Guest-name policy.** `_validated_short_name` and `_ILLEGAL`
+   enforce 8.3 validity with named reasons, and segments are
+   uppercased here because Remanence's matching is exact.
+8. **The letter algorithm.** `platform_dos.drive_letters` assigns
+   A:/B: by floppy slot and C: onward one letter per volume across
+   disks — DOS's own assignment, reimplemented host-side.
+
+**The asks on Remanence.** Five are already inside its pledged F19
+and proposed F20, and this feature registers the consumer demand
+for them rather than restating their design: stable region and
+volume identities with the no-renumbering guarantee; the four
+distinct sector-0 outcomes (blank, schema with no volumes, direct
+volume, unknown nonblank); filesystem-declared geometry kept at
+the filesystem seam; the partial-read report; and declared-type
+readings — **with one quality bar stated as a demand, because F20
+does not commit to it**: the reading must be quotable in a refusal
+a user sees. A user meeting type byte `0x07` is owed "NTFS or
+exFAT", `0xEE` is owed "a GPT protective partition — this disk is
+GPT, not MBR"; a type byte with a kind tag does not retire item 1.
+
+Three asks are beyond what Remanence has proposed anywhere:
+
+- **FAT label semantics owned at the filesystem seam.** "NO NAME"
+  is the format's own spelling of unlabeled and reads as absent,
+  and the boot record's label field is carried as evidence beside
+  the root entry's — closing item 6 without reliquary reading a
+  sector.
+- **DOS name semantics at the file-access seam.**
+  Case-insensitive matching, normalization to the stored short
+  name, and an invalid name refused with a named reason — which
+  rule of 8.3 it broke — rather than a generic refusal. Closes
+  item 7; reliquary keeps only address parsing (`A:\OUT\X.TXT`
+  into letter and segments) and rule-id restatement.
+- **A DOS namespace composer that *produces* the letter mapping.**
+  One step past Remanence's P19 wording, which consumes explicit
+  drive mappings: given disks in attachment order, letters are
+  assigned by DOS's own algorithm over the composed volumes, so
+  the caller holds letters as answers. Closes item 8; which image
+  sits in which slot stays the machine model's fact.
+
+**What leaves on delivery**: the type tables and `_describe`; the
+whole-disk refusal loop; the `partitioned` and `cylinders`
+derivations; `_validated_short_name`, `_ILLEGAL`, and the
+uppercasing; the "NO NAME" rule; the letter algorithm; positional
+identity everywhere — the letter map and drive record store
+Remanence's identities, and the volume-vanished guard becomes an
+identity miss answered by name.
+
+**What stays regardless**: the rule ids and the error-category
+mapping (`UnreadableImage` / `ImageLocked` onto
+`drive.image-unreadable` / `image.locked`); the recorded report's
+serialization and its read-at lifecycle (D83); the machine model's
+own facts — slots, stopped-only access, operation locks; and the
+decision to run under the DOS claim at all, expressed as which
+report outcomes reliquary accepts rather than as re-derived facts.
+
+**The two amendments delivery requires**, argued before any pledge:
+in-force **P27's "Reliquary keeps" clause shrinks** to
+guest-address parsing, rule ids, and the recorded report — the
+amendment beside this file; and **D83's report gains partial
+reads** — a disk with an unreadable partition records the readable
+volumes beside the issue-carrying row instead of one unread
+refusal, and the letter map places what is placeable — a surface
+change for the vetting rule, named here so the pledge that cuts
+this feature weighs it rather than discovering it.
