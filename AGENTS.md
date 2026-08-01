@@ -715,7 +715,7 @@ Doctrine to preserve:
   `skipUnless` is for a resource that genuinely may be absent in a
   supported configuration. **The bar is high, and the reason is
   simpler than it was**: the suite runs from the repository and
-  nowhere else (D96), so every document a spec-conformance test reads
+  nowhere else (D96), so every document a docs-reading test consumes
   is always present and a guard on one fires nowhere the suite is
   supposed to run. The suite skips exactly **one** test — the opt-in
   FreeDOS integration run; any other skip is a defect to fix, not a

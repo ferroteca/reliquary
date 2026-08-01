@@ -12,13 +12,12 @@ promoted; it stands until it is retired by deletion, and the
 commit is the record ([README.md](README.md)).
 
 **Why**: the every-commit suite enforces only what is
-machine-readable — a shipped schema, the conformance corpus, the
-code's own enumerations, a fenced example block (**P24** as
-amended; [pledged/ARCHITECTURE.md](pledged/ARCHITECTURE.md)
-until the migration delivers). The prose norms bind just as
-hard, and this register is their enforcement instrument: what
-the suite cannot check on every commit is checked here on a
-stated rhythm instead.
+machine-readable — a shipped schema, a conformance corpus, the
+command manifest, the code's own enumerations, a fenced example
+block (**P24**, root [ARCHITECTURE.md](../ARCHITECTURE.md)). The
+prose norms bind just as hard, and this register is their
+enforcement instrument: what the suite cannot check on every
+commit is checked here on a stated rhythm instead.
 
 **The semantics**, stated once so no entry restates them:
 

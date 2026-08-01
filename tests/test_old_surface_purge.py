@@ -77,8 +77,9 @@ _OLD_API_NAMES = (
     # outright; the resolvers, the directory vocabulary, the
     # Documents lookup and the non-twin engine doors left the
     # package root (every session-method twin's root spelling is
-    # policed mechanically by test_api_spec_conformance.py, so the
-    # twins are not repeated here).
+    # policed mechanically by test_command_manifest.py — a root
+    # twin would be an unclassified public name — so the twins
+    # are not repeated here).
     "set_home_dir",
     "set_blueprints_dir",
     "set_scripts_dir",

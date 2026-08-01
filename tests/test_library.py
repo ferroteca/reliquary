@@ -36,9 +36,6 @@ OPENBSD_BLUEPRINT = "openbsd"
 OPENBSD_MEDIA = "openbsd-installer"
 OPENBSD_SCRIPT = "openbsd-install"
 EXT = ".rlqb"
-_CODEX_SPEC = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "docs", "spec", "codex.md")
 
 
 class _HomeTest(unittest.TestCase):
@@ -294,26 +291,13 @@ class CodexMediaTests(unittest.TestCase):
             "cf8a5130449f")
 
 
-class CodexSpecConformanceTests(_HomeTest):
-    """The codex against docs/spec/codex.md.
+class CodexIndexTests(_HomeTest):
+    """The shipped codex against its own index.
 
-    P24's inventory pass over the codex. Its checkable claims are
-    the index (a set the spec scopes and the tree fills) and the
-    provenance vocabulary (a closed table the `--json` form of
-    `search-blueprints` emits). The tests above assert each
-    provenance value one at a time, which is the pattern P24
-    names: they would all still pass if the spec said something
-    else entirely, because none of them reads it.
-
-    The banner was the gate, and it was wrong: it called
-    `search-`, `seed-` and the provenance column "still planned"
-    while all three shipped, so by the banner-is-the-marker rule
-    those sections were not claims and nothing could be tested
-    against them. Corrected 2026-07-27, which is what let the
-    provenance divergence below become visible: the spec's table
-    was headed `CODEX` and gave a **blank** third value where the
-    code emits the word `user`, so a consumer switching on the
-    field would have matched nothing.
+    Machine against machine: `codex.json` is the index the listing
+    reads, and the tree beside it is what actually ships. Whether
+    docs/spec/codex.md describes both truthfully is R9's audit
+    (planning/RECURRING.md).
     """
 
     @staticmethod
@@ -350,30 +334,12 @@ class CodexSpecConformanceTests(_HomeTest):
             "banner scopes the index to blueprint names and "
             "descriptions; widening it means widening that first.")
 
-    @unittest.skipUnless(os.path.isfile(_CODEX_SPEC),
-                         "the codex spec is source-tree only")
-    def test_the_spec_tabulates_no_provenance_vocabulary(self):
-        """No column means no vocabulary for one may be specified.
-
-        Its predecessor read the spec's provenance table and asserted
-        the emitted words against it, catching a real divergence. The
-        successor guards the other direction: with the sets unmixed
-        there is nothing to report (D88), so a table describing a
-        column would be a norm the code cannot honor. The *word* may
-        still appear — the spec uses it to say the command is the
-        provenance — which is why this looks for the table and for the
-        values, not for the noun.
-        """
-        with open(_CODEX_SPEC, encoding="utf-8") as handle:
-            text = handle.read()
-        self.assertNotIn("| PROVENANCE |", text.upper())
-        for value in ("| `yes` |", "| `seeded` |", "| `user` |"):
-            self.assertNotIn(value, text)
+    def test_list_codex_emits_names_and_descriptions_only(self):
         emitted = set(list_codex()[0])
         self.assertEqual(
             emitted, {"name", "description"},
-            "list_codex returns a field the spec does not describe; the "
-            "record is the --json contract.")
+            "list_codex grew a field; the record is the --json "
+            "contract, and widening it is a surface change.")
 
 
 class BuiltinCodexTests(unittest.TestCase):

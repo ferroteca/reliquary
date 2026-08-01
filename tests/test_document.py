@@ -22,63 +22,29 @@ from reliquary.errors import StaticError
 from reliquary.document import parse_document
 
 SHA = "a" * 64
-_MEDIA_SPEC = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "docs", "spec", "media-spec.md")
-
-
 def _parse(value):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", document.BlueprintWarning)
         return parse_document(value)
 
 
-@unittest.skipUnless(os.path.isfile(_MEDIA_SPEC),
-                     "the media spec is source-tree only")
-class SpecifiedMaterializeModesTests(unittest.TestCase):
-    """`materialize` accepts exactly the modes the spec tabulates.
+class MaterializeModesTests(unittest.TestCase):
+    """Every mode in the parser's closed vocabulary parses.
 
-    P24's inventory pass over media. `materialize` is a closed
-    vocabulary the spec gives as a table and the parser gives as a
-    set, which is the cheap comparison in its purest form — a mode
-    in the table and not the set is a documented value the parser
-    rejects; one in the set and not the table is undocumented
-    behaviour.
-
-    **What resisted mechanizing, named rather than skipped
-    quietly**: the media *field* vocabulary. `_MEDIA_FIELDS` has
-    eleven entries and media-spec.md gives seven of them their own
-    `###` section; the other four — `type`, `children`,
-    `description`, `notes` — belong to blueprint-model.md, which
-    specifies them in prose rather than under headings. Comparing
-    against the union would mean hardcoding which four live
-    elsewhere, and a hardcoded exemption is the thing P24's clause
-    warns about, so the field set stays uncompared until one of the
-    two documents enumerates its own.
+    `_MATERIALIZE` is the closed set an author may write, and each
+    member must actually parse — a declared mode the parser then
+    rejects is a vocabulary entry that cannot occur. Whether the
+    spec's table names the same modes is R5's audit
+    (planning/RECURRING.md).
     """
 
-    @staticmethod
-    def _tabulated():
-        with open(_MEDIA_SPEC, encoding="utf-8") as handle:
-            text = handle.read()
-        start = text.index("### `materialize`")
-        table = text[start:text.index("### `size`", start)]
-        return set(re.findall(r"^\| `([a-z]+)` \|", table, re.M))
-
-    def test_the_table_and_the_parser_agree(self):
-        self.assertEqual(
-            self._tabulated(), document._MATERIALIZE,
-            "the materialize modes docs/spec/media-spec.md tabulates "
-            "are not the ones the parser accepts. It is a closed "
-            "vocabulary: the table is what an author may write.")
-
-    def test_every_tabulated_mode_parses(self):
-        for mode in sorted(self._tabulated()):
+    def test_every_declared_mode_parses(self):
+        for mode in sorted(document._MATERIALIZE):
             with self.subTest(materialize=mode):
-                spec = {"type": "media", "name": "m", "materialize": mode}
-                # `new` is the one that forbids a location and needs a
-                # size; the rest require a location. The table's own
-                # "needs" column is what says so.
+                spec = {"type": "media", "name": "m",
+                        "materialize": mode}
+                # `new` is the one that forbids a location and needs
+                # a size; the rest require a location.
                 if mode == "new":
                     spec["size"] = "20M"
                 else:

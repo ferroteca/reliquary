@@ -3,7 +3,6 @@
 """Tests for authored-asset residency: the resolution source seam."""
 
 import contextlib
-import importlib
 import json
 import os
 import tempfile
@@ -23,55 +22,20 @@ from reliquary.resolve import load_namespace, resolve_media
 from tests import fake_backend
 
 SHA256 = "1" * 64
-_SPEC = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "docs", "spec", "asset-resolution.md")
-
-
 def _write(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(obj, handle)
 
 
-@unittest.skipUnless(os.path.isfile(_SPEC),
-                     "the asset-resolution spec is source-tree only")
-class SpecConformanceTests(unittest.TestCase):
-    """The asset kinds and home folders the spec names are the real ones.
+class KindTableTests(unittest.TestCase):
+    """The extension vocabulary against what the code asks for.
 
-    P24's inventory pass over asset resolution, and the interface
-    where the banner rule paid most directly. This spec carried no
-    status banner at all until 2026-07-27 — the one document in
-    `docs/spec/` breaking the rule its own directory states, that
-    the banner is the marker and shelving proves nothing — and it
-    had drifted in six places behind it, including a `.rlqm` media
-    kind retired with the composed model and a home `media/`
-    folder its own layout diagram did not show.
-
-    Two things are compared. The **kind table** is the extension
-    vocabulary a source walks by, which the spec enumerates in
-    prose; a kind declared and never requested is the shape of
-    defect this sweep has now found four times, so the check runs
-    against what the code actually asks for rather than what it
-    declares. The **home layout** is a world-facing contract
-    (INTERFACES.md), and its folder list is a set on both sides.
-
-    Reserved names are read out of the banner, so a thing that is
-    designed but unbuilt stays documented without becoming a claim
-    — `.rlql` and `landmarks/` today.
+    Code against code: `KIND_EXTENSIONS` declares the asset kinds
+    and `candidate_files(...)` call sites are what actually request
+    them. Whether the spec's prose names the same kinds and home
+    folders is R7's audit (planning/RECURRING.md).
     """
-
-    @staticmethod
-    def _spec_text():
-        with open(_SPEC, encoding="utf-8") as handle:
-            return handle.read()
-
-    @classmethod
-    def _reserved(cls):
-        """The names the banner marks as designed but not built."""
-        text = cls._spec_text()
-        banner = text[text.index("> **Status:**"):text.index("\nWhere ")]
-        return set(re.findall(r"`([^`]+)`", banner))
 
     def test_the_kind_table_holds_only_requested_kinds(self):
         # library.py is the only caller; a kind nothing asks for
@@ -92,42 +56,6 @@ class SpecConformanceTests(unittest.TestCase):
             "asked for. An unrequested kind cannot resolve, so "
             "declaring it advertises a resolution that cannot happen; "
             "reserve it in docs/spec/asset-resolution.md instead.")
-
-    def test_the_reserved_extensions_are_not_declared(self):
-        reserved = {token for token in self._reserved()
-                    if token.startswith(".rlq")}
-        self.assertTrue(
-            reserved, "the banner no longer reserves any extension; "
-            "this test reads them from it.")
-        declared = {ext for exts in KIND_EXTENSIONS.values()
-                    for ext in exts}
-        self.assertEqual(
-            sorted(reserved & declared), [],
-            f"{sorted(reserved & declared)} are reserved by the spec's "
-            "banner and declared in KIND_EXTENSIONS. Reserved means "
-            "designed and unbuilt; declaring one makes the banner "
-            "false.")
-
-    def test_the_home_layout_names_the_folders_the_home_has(self):
-        text = self._spec_text()
-        block = text[text.index("<reliquary_home>/"):]
-        block = block[:block.index("```")]
-        # Top level only: nested entries (cache/media, cache/machines)
-        # are indented, and belong to the cache, not the home.
-        top = set(re.findall(r"^[├└]── ([a-z_.]+)/", block, re.M))
-        reserved = {token.rstrip("/") for token in self._reserved()}
-        home_mod = importlib.import_module("reliquary.home")
-        with tempfile.TemporaryDirectory() as home:
-            actual = {
-                os.path.basename(home_mod.blueprints_dir(home)),
-                os.path.basename(home_mod.scripts_dir(home)),
-                os.path.basename(home_mod.cache_dir(home)),
-            }
-        self.assertEqual(
-            sorted(top - reserved), sorted(actual),
-            "the spec's home-layout diagram and the folders home.py "
-            "resolves disagree. The home layout is a world-facing "
-            "contract, so the diagram is the contract's text.")
 
 
 class AssetSourceTests(unittest.TestCase):

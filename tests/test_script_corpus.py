@@ -70,17 +70,6 @@ _CORPUS = os.path.join(os.path.dirname(__file__), "fixtures",
                        "conformance", "script")
 _RULE = re.compile(r"^# rule: (V\d+)", re.M)
 _ID = re.compile(r"^# id: (\S+)", re.M)
-# The spec is source-tree only — `docs/` is not packaged — so the
-# four tests below that read it carry the sanctioned `skipUnless`
-# guard (AGENTS.md, "Dependencies and style"). The guard is per
-# method rather than on the class on purpose: every other test in
-# `InvalidCorpusTests` reads the fixtures, which *are* packaged, and
-# must keep running against an installed artifact. Skipping the
-# class would take the corpus itself down with the spec checks.
-_SPEC = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "docs", "spec", "script-spec.md")
-_DOTTED = re.compile(r"`([a-z]+\.[a-z-]+)`")
 _CAUGHT_BY = re.compile(r"^# caught-by: (V\d+)", re.M)
 
 
@@ -113,16 +102,6 @@ def _raised_counts():
 
 def _raised_subjects():
     return {rule_id.split(".", 1)[0] for rule_id in _package_ids()}
-
-
-def _spec_subjects():
-    """The subjects the spec's prefix list declares."""
-    with open(_SPEC, encoding="utf-8") as handle:
-        spec = handle.read()
-    start = spec.index("The prefix is the subject")
-    end = spec.index("**This list is closed and enforced.**", start)
-    return set(re.findall(r"`([a-z]+)\.`", spec[start:end]))
-
 
 
 class ValidCorpusTests(unittest.TestCase):
@@ -221,65 +200,45 @@ class InvalidCorpusTests(unittest.TestCase):
                         "is a `# caught-by:` finding, not a mismatch "
                         "to shrug at.")
 
-    @unittest.skipUnless(os.path.isfile(_SPEC),
-                         "the script spec is source-tree only")
-    def test_every_declared_id_is_listed_in_the_spec(self):
-        """Every id the corpus names appears in the spec's rule list.
+    def test_every_enforced_rule_has_a_fixture_exercising_it(self):
+        """Rule coverage, measured from the corpus rather than the spec.
 
-        Ids are finer than the V-rules — V7 is one restriction and
-        `obs.two-channels` is one of six diagnostics under it — so
-        the spec's rule list carries the mapping and this holds the
-        two together. Without it the prefixes would drift into
-        whatever each new diagnostic felt like.
+        `RULE_OF`'s range is the static tier's rule universe: every
+        V-number some diagnostic enforces. A rule with no invalid
+        fixture is enforcement nothing exercises — the V13 class,
+        which reached the guest loop as an untyped fault because
+        nothing had ever driven the rule it violated. (Whether the
+        code enforces every rule the *prose spec* states is R3's
+        audit, planning/RECURRING.md.)
         """
-        with open(_SPEC, encoding="utf-8") as handle:
-            spec = handle.read()
-        start = spec.index("- **V1** —")
-        end = spec.index("\nThe grammar is line-oriented", start)
-        listed = set(_DOTTED.findall(spec[start:end]))
+        exercised = {_RULE.search(_header(path)).group(1)
+                     for path in _fixtures("invalid")}
+        served = {rule for rule in RULE_OF.values() if rule}
+        unexercised = sorted(served - exercised)
+        self.assertEqual(
+            unexercised, [],
+            f"{unexercised} are enforced rules no invalid fixture "
+            "exercises. Add one per rule — a rejection nothing "
+            "drives is enforcement only by reading the code.")
+
+    def test_every_exercised_rule_is_one_the_code_enforces(self):
+        """The reverse: a fixture may not exercise a phantom rule.
+
+        A `# rule:` naming a V-number nothing serves is either a
+        typo or a rule whose enforcement was deleted; `# caught-by:`
+        is the one sanctioned exception, asserted above.
+        """
+        served = {rule for rule in RULE_OF.values() if rule}
         for path in _fixtures("invalid"):
-            declared = _ID.search(_header(path)).group(1)
-            with self.subTest(id=declared):
+            text = _header(path)
+            rule = _RULE.search(text).group(1)
+            if _CAUGHT_BY.search(text):
+                continue
+            with self.subTest(fixture=os.path.basename(path)):
                 self.assertIn(
-                    declared, listed,
-                    f"{declared} rejects a corpus fixture and appears "
-                    "in no V-rule's id list in "
-                    "docs/spec/script-spec.md.")
-
-    @unittest.skipUnless(os.path.isfile(_SPEC),
-                         "the script spec is source-tree only")
-    def test_every_subject_the_code_uses_is_one_the_spec_lists(self):
-        """The prefix list is closed, and this is what closes it.
-
-        The spec says the prefix is the subject, never the error
-        class or the surface, and gives the list. Without holding
-        the code to it, a new diagnostic gets whatever prefix its
-        author felt like and the namespace stops being one — which
-        is the failure the subject rule exists to prevent, since a
-        rule spanning two surfaces can only keep one id if both
-        surfaces reach for the same subject.
-
-        Asserted in both directions: an unlisted subject fails here,
-        and a listed subject nothing raises fails below.
-        """
-        listed, used = _spec_subjects(), _raised_subjects()
-        self.assertEqual(
-            sorted(used - listed), [],
-            "these id subjects appear in the code and not in "
-            "docs/spec/script-spec.md's prefix list. Add them there "
-            "or reuse an existing subject — the list is the closed "
-            "vocabulary, not a sample of it.")
-
-    @unittest.skipUnless(os.path.isfile(_SPEC),
-                         "the script spec is source-tree only")
-    def test_the_spec_lists_no_subject_the_code_does_not_use(self):
-        """A listed subject nothing raises is a namespace of nothing."""
-        listed, used = _spec_subjects(), _raised_subjects()
-        self.assertEqual(
-            sorted(listed - used), [],
-            "these subjects are listed in the spec's prefix list and "
-            "no diagnostic uses them, which is the same defect as a "
-            "spec naming a command that does not exist.")
+                    rule, served,
+                    f"{rule} is exercised here and no diagnostic "
+                    "serves it.")
 
     def test_one_rule_keeps_one_id_across_surfaces(self):
         """The subject rule's payoff, asserted rather than described.
@@ -308,30 +267,6 @@ class InvalidCorpusTests(unittest.TestCase):
                     f"place(s) and should reach at least {least}. If a "
                     "site was renamed to its own id, one rule now has "
                     "two names.")
-
-    @unittest.skipUnless(os.path.isfile(_SPEC),
-                         "the script spec is source-tree only")
-    def test_the_spec_lists_no_id_the_code_does_not_raise(self):
-        """The reverse: a listed id that nothing raises is fiction."""
-        with open(_SPEC, encoding="utf-8") as handle:
-            spec = handle.read()
-        start = spec.index("- **V1** —")
-        end = spec.index("\nThe grammar is line-oriented", start)
-        listed = set(_DOTTED.findall(spec[start:end]))
-        raised = set()
-        package = os.path.dirname(os.path.abspath(reliquary.__file__))
-        for name in ("script_validation.py", "script_parser.py",
-                     "script_nodes.py"):
-            with open(os.path.join(package, name),
-                      encoding="utf-8") as handle:
-                raised.update(re.findall(r'rule_id\s*=\s*"([^"]+)"',
-                                         handle.read()))
-        self.assertEqual(
-            sorted(listed - raised), [],
-            "these ids are listed under a V-rule and no diagnostic "
-            "raises them. A rule list naming ids that cannot occur is "
-            "the same defect as a spec naming a command that does not "
-            "exist.")
 
     def test_rule_of_holds_exactly_the_ids_the_static_tier_raises(self):
         """The id-to-rule map is neither short nor imaginary.

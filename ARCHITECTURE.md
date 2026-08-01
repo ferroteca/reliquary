@@ -609,17 +609,26 @@ differently under the new wording — is mere documentation work.
 
 - **P24 — Every application surface is tested against its
   specification.** Each surface enumerated in "The application
-  surfaces" above carries automated tests checking it against the norm that
-  defines it, and the suite passes on every commit to `main`.
-  There is no "to whatever extent possible" clause: the claim is
-  stated so it can be *violated*, and a surface that genuinely
-  cannot be tested names the gap rather than being quietly
-  exempted. What enforces it is discipline rather than
-  machinery — the project runs no CI (**P22**), so the suite is a
-  gate whoever lands the work walks through. (AGENTS.md
-  "Required checks" and "Test expectations"; the conformance
-  corpus, `tests/test_conformance_corpus.py`, is the
-  pattern the rest is measured against; D49.)
+  surfaces" above is held to the norm that defines it, and the
+  suite passes on every commit to `main`. **The enforcement
+  instrument follows the artifact kind**: where the norm is
+  machine-readable — a shipped schema, a conformance corpus, the
+  command manifest, the code's own enumerations, a fenced example
+  block — the every-commit suite consumes it, and **no test
+  parses the structure of a normative prose document**: regexes
+  welded to headings and tables freeze the prose's form, and the
+  form is the reader's. The prose norms bind undiminished — a
+  divergence is still a bug — and are exercised by the standing
+  audit obligations in planning/RECURRING.md, each with its own
+  staleness bound and last-performed mark. There is no "to
+  whatever extent possible" clause: the claim is stated so it can
+  be *violated*, and a surface that genuinely cannot be tested
+  names the gap rather than being quietly exempted. What enforces
+  the every-commit half is discipline rather than machinery — the
+  project runs no CI (**P22**), so the suite is a gate whoever
+  lands the work walks through. (AGENTS.md "Required checks" and
+  "Test expectations"; the conformance corpora and
+  `src/reliquary/schemas/`; D49.)
 
 - **P25 — The portable surface generalizes.** A first-class node
   in the machine blueprint carries only capability with general
