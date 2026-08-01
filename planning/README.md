@@ -160,7 +160,7 @@ them, and `docs/spec/` refers to them.
 | [`TASKS.md`](TASKS.md) | *(root)* The third input queue: small work, already pledged, T-numbered, in no particular order |
 | [`SEQUENCES.md`](SEQUENCES.md) | *(root)* The sequence ledger: the high-water marks every handle sequence (D, F, G, P, S, T, U, V) issues against — one counter per class, advanced in the issuing entry's own edit |
 | [`proposed/design/`](proposed/design/) | Design for proposed features — `landmarks.md` (F5), `recorder.md` (F1, U6) |
-| [`pledged/design/`](pledged/design/) | Design for pledged features — empty again since 2026-07-28, when F2 delivered and `backend-adapter.md` travelled to `design/`: a delivered feature leaves no feature for its design to sit with |
+| [`pledged/design/`](pledged/design/) | Design for pledged features — a delivered feature leaves no feature for its design to sit with, so its design travels out with the delivery |
 | [`design/`](design/) | *(root)* Open design problems and internal doctrine belonging to no single feature — `backend-adapter.md` (the adapter seam's doctrine, delivered as F2 and internal by decision, so it does not move to `docs/spec/`), `guest-communication.md` (the control-plane doctrine; the seam is internal, not world-facing), `audits.md` (suggestions for checking the project's own claims — ideas only, nothing enforced), and the script-language residual problems in `script-examples/` |
 
 Not here, deliberately: the normative specs of shipped surfaces

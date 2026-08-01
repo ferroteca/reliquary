@@ -159,15 +159,7 @@ against it.
 section must never do is assert one ground for all of them: that is
 how the shelf went wrong in the first place — a category claim
 extended to its members without re-testing each, D61's own closing
-lesson — and the two grounds so far are opposites. **U2 and U6**
-arrived together on 2026-07-27 (owner; D61) because their pledges
-were never made: the 2026-07-26 restructure filed them by the status
-word each carried, when *accepted* still meant only that the
-argument had won, and D44's rename the next day converted the
-shelf's claim to **a commitment to deliver** while clearing its
-occupants in a sentence rather than re-testing them. Re-tested,
-neither had any delivery behind it. **U5** arrived on 2026-07-28
-(owner; D64) because its pledge was real and was paid.
+lesson.
 
 **U2 — Import an existing VM as a blueprint** — withdrawn
 (2026-07-27; pledged 2026-07-26 by the restructure, settled as
@@ -295,14 +287,7 @@ Two 2026-07-23 sweeps. The mapping sweep (U7–U10) closes
 named coverage gaps — roadmap work standing on demand no use
 case writes down. The decomposition sweep (U11–U17) executes
 the owner's directive: break the dense cases into much
-smaller chunks where possible. **U9 and the U11–U13 chunk trio
-left in force** (D46, 2026-07-27): all four were delivered
-already, so the pledge and the promotion ran as one act and no
-stub stays behind — which is why both sweep ranges now read
-with holes in them. **U7 left for
-[pledged/USE-CASES.md](../pledged/USE-CASES.md)** on 2026-07-28,
-the ordinary move, alongside the adapter seam it schedules; the
-mapping sweep's first gap is closed. The calibrating example
+smaller chunks where possible. The calibrating example
 (owner): "a user at the keyboard should be able to easily
 find a codex blueprint, for example for freedos or openbsd,
 with minimal effort, and seed it into their library." People
@@ -502,23 +487,9 @@ states the split F27's decide-first asks to have stated.
 **The use case, step by step** — a precise recipe over
 Reliquary's application surfaces: a user should be able to follow it
 as written to accomplish the goal. Every spelling is the surface
-as it stands today. **No step carries a mark any more.** At the
-proposed stage a gap was fine as long as it was flagged (owner,
-2026-07-29): three steps carried **requires F26/F27/F28** marks —
-a pledged, undelivered piece, spelled in the form its feature was
-committed to deliver — and the case was to read complete only when
-nothing marked remained open. **All three cleared on 2026-07-30**:
-F26 (D89) freed step 8, F27 (D91) the `devices` declaration in
-step 3 and the assignment axis in step 5, and F28 (D92) the escape
-hatch in step 3. Every spelling below is now the surface as it
-stands, and the journey has been walked end to end in code rather
-than only argued. API spellings shown;
-every step has its CLI twin (U9).
-
-[D93, later the same day, removed the devices axis: the
-declaration re-landed on the backend pin and the D92 hatch, and
-steps 3 and 5 below were reworked to that spelling with D93's
-delivery.]
+as it stands today — no step carries a mark, and the journey has
+been walked end to end in code rather than only argued. API
+spellings shown; every step has its CLI twin (U9).
 
 1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
    paravirtual device — with my host toolchain, and I want it
@@ -585,9 +556,8 @@ delivery.]
    checked-in installed base, so every machine boots the same
    bytes and the base is never written; `hdd1` *is* the build
    directory, served to the guest as one FAT volume. The pin and
-   the section are the live surface since 2026-07-30 (F28
-   delivered, D92), and together they are the whole spelling of
-   the device: a driver under test binds one particular device on
+   the section together are the whole spelling of the device
+   (D92): a driver under test binds one particular device on
    one particular backend, and P25 (D93) keeps backend-specific
    hardware out of the portable vocabulary, so the machine says
    `qemu` and asks QEMU for the device in QEMU's own words.
@@ -639,7 +609,7 @@ delivery.]
    `reliquary.describe_drives(machine="driver-rig-0",
    context=ctx)` — `rlq describe-drives -m driver-rig-0` — and
    the report's mapping says the work drive is one FAT volume at
-   `D:` (delivered, D83). That letter is the address every later
+   `D:` (D83). That letter is the address every later
    step speaks (P17); nothing is inferred from a boot screen.
 
 7. **Boot, and let the guest say ready.**
@@ -652,8 +622,7 @@ delivery.]
 
 8. **Load the driver — setup whose output is nothing and whose
    success is everything.** In order, once per session, each
-   checked — **delivered 2026-07-30** (D89), so this step's mark is
-   gone and its spelling is the live surface:
+   checked (D89):
 
    ```python
    reliquary.exec(r"D:\TRANSPRT.EXE", check=True,
@@ -698,31 +667,6 @@ Parked in-place edits — no argument needed, delivered when
 applied; each must pass the clarification test (no past
 citation reads differently under the new wording).
 
-- **U1 — the two-command journey** — **applied 2026-07-30** (D88),
-  and struck from this list. It went to the root with the delivery
-  that made it true, as a supersession rather than a clarification:
-  past citations read differently (D61's own description of U1,
-  D66's "single command", D12's "one-command path"), and the
-  number was reshaped in place exactly as D61's condense was. The
-  opening wish also went from FreeBSD to FreeDOS — a system no
-  codex blueprint provides, contradicted by the case's own
-  command, which the landing bar no longer tolerates now that a
-  journey must be followable as written.
-
-- **U1 — condense to the journey** — **applied 2026-07-27** (D61),
-  and struck from this list. It ran without waiting on U8: the
-  contingency existed to keep the export clause owned by something,
-  and withdrawing rather than pledging is the other way to settle
-  who owns it. U1 is now the composed journey it uniquely owns —
-  one short, terse command from a clean home to a usable machine,
-  easy-is-the-requirement included — citing U11 (find and seed),
-  U13 (media) and U12 (the install) for what it composes, and U8
-  for the export exit it no longer claims. **It went in as a
-  supersession, not a clarification**: the clarification test is
-  that no past citation reads differently, and one did —
-  blueprint-guide's "you export it (U1)" now points at U8. With the
-  export clause gone every remaining word was delivered, so D34
-  promoted it to the current list in the same act.
 - **U2 — condense** (recorded 2026-07-23; U2 is withdrawn as of
   D61, which does not disturb this — a proposed use case may be
   reshaped freely, and this edit was always a trim rather than a
@@ -735,15 +679,6 @@ citation reads differently under the new wording).
 
 ### Tracked
 
-- **Break U5 into finer pieces** — **executed 2026-07-28** (D64),
-  and closed. Recorded 2026-07-23 by the decomposition sweep with
-  three candidate cuts; two of them — parameterization's two
-  bindings (in-blueprint values vs externally defined) and secret
-  custody (never in source control) — went as one to the current
-  list as **U21**, met by milestone 8's machinery, and the third —
-  the seed-and-customize journey — is what U5 now is. The trigger
-  it named fired on its second clause: an argument needed the
-  finer citation.
 - **Break U6 into finer use cases** — tracked (recorded
   2026-07-23; previously an expectation noted inside U6
   itself). Candidate cuts per the recorder design

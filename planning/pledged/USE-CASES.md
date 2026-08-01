@@ -45,40 +45,6 @@ SPDX-License-Identifier: GPL-3.0-only
 > [proposed/USE-CASES.md](../proposed/USE-CASES.md); its U-number is
 > the search key.
 
-**Three entries left this shelf on 2026-07-27** (owner; D61) — the
-first use of the withdrawal remedy D44 wrote. **U1** condensed to
-the journey it uniquely owns and went **up**, to the current list:
-its export clause is now U8's, and with that clause gone every
-remaining word of it is delivered. **U2** and **U6** went **back**,
-to [proposed/USE-CASES.md](../proposed/USE-CASES.md); neither had
-any delivery behind it, and both reached this shelf by D44's rename
-rather than by a decision to build them. U5 is what survived that
-re-test, and it survived on substance — milestone 8's
-parameterization machinery is real, shipped, U5-citing work.
-
-**U5 left the next day, and this shelf is now empty** (owner; D64,
-2026-07-28). It left by the substance that had saved it: that
-machinery was cut out as **U21** and promoted to the current list,
-which is what the pledge had bought, and the residue — the
-seed-and-customize journey, whose seam is compositional and whose
-only carrier is the unpledged GUI era (F5) — went back to
-[proposed/USE-CASES.md](../proposed/USE-CASES.md). Not a pledge
-broken but a pledge paid, with the unpaid remainder returned to
-where unpledged demand lives.
-
-**Both pledged shelves stood empty for the rest of that day** —
-this one and [pledged/FEATURES.md](FEATURES.md). The project owed
-no undelivered use case and no unbuilt feature, which was a state
-rather than a defect: `proposed/` held the argued demand, and what
-this file held next would arrive by someone deciding to build it.
-
-**U7 is that arrival** (owner, 2026-07-28), pledged in the same act
-as the feature that delivers its first half — the backend adapter
-seam, **F2** ([FEATURES.md](FEATURES.md)). The pairing is not a
-convenience: a feature may not be pledged ahead of the demand that
-justifies it, and this pillar is where that rule was learned. F2
-sat in `proposed/` for five days on exactly this lack.
-
 **U7 — Materialize on the hypervisor the host provides** — pledged
 2026-07-28 (owner). Drafted 2026-07-23 by the mapping sweep, which
 found the multi-backend pillar demand-free: no use case in force

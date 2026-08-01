@@ -119,8 +119,3 @@ SPDX-License-Identifier: GPL-3.0-only
   Remanence release that satisfies those acceptance conditions on
   the delivered Windows host (P11), and that exact release is
   pinned.
-
-*(The shelf reopened 2026-07-31 for P26, after four days empty.
-Empty remains the healthy state: a principle sits here only in the
-window between the project owing it and the code honoring it, and
-that window is meant to be short.)*

@@ -30,16 +30,3 @@ SPDX-License-Identifier: GPL-3.0-only
 > full-delivery bar a use case answers to. A dead proposal is recorded in
 > [DECISIONS.md](../DECISIONS.md) and triggers the same
 > planning-doc sweep, its P-number the search key.
-
-## Open proposals
-
-### Drafted
-
-*(**Empty today.** P16 — the last drafted principle — left on
-2026-07-27 and travelled the whole ladder that day: D57
-adjudicated the four questions it left open and moved it to
-[pledged/ARCHITECTURE.md](../pledged/ARCHITECTURE.md), the move
-being the pledge, and D62 delivered the two operations it named
-and moved it to the standing list, where it now binds. No stub is
-left behind at either step — one global P-namespace, and the file
-an entry sits in says its state.)*

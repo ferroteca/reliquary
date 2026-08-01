@@ -32,21 +32,16 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
-**It refilled on 2026-07-31** (owner) with **F32–F34**, the first
-fill cut from a principle rather than a use case: **P26** — the
-session layer is the only door
-([pledged/ARCHITECTURE.md](ARCHITECTURE.md)) — was pledged the
-same day, and the respell it demands is too large for D42's bound,
-so it was cut on pledge the way F11 was, each piece landing
+**F32–F34 are one cut** from **P26** — the session layer is the
+only door ([pledged/ARCHITECTURE.md](ARCHITECTURE.md)) — whose
+respell is too large for D42's bound, each piece landing
 coherently on its own: the session built (F32), the CLI on it
 (F33), the door closed and the principle armed (F34). The cut is
 staged so the public surface moves **once**: F32 and F33 are
 internal work a consumer never sees, and F34 is the one landing
 that changes the surface, which is where P9's
 coherent-and-complete rule bites — no interval in which two public
-doors stand open. No `proposed/` stop was skipped that was owed:
-the demand is already pledged, and the owner cut the sprints
-directly (D43's compression).
+doors stand open.
 
 ## F32 — The `Session` object
 
