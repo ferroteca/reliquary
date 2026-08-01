@@ -140,11 +140,6 @@ class AssetSourceTests(unittest.TestCase):
     """
 
     def setUp(self):
-        self.home_mod = importlib.import_module("reliquary.home")
-        saved = dict(self.home_mod._globals)
-        self.addCleanup(self.home_mod._globals.update, saved)
-        for name in self.home_mod.DIRECTORIES:
-            self.home_mod._globals[name] = None
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.root = self._tmp.name
@@ -184,14 +179,9 @@ class AssetSourceTests(unittest.TestCase):
             blueprints_dir=os.path.join(self.root, "proj")))
         self.assertFalse(hasattr(source, "seeds"))
 
-    def test_the_global_assignment_applies(self):
-        proj = os.path.join(self.root, "proj")
-        self.home_mod.set_blueprints_dir(proj)
-        self.assertEqual(source_for(Context()).describe("blueprint"),
-                         os.path.abspath(proj))
-
-    def test_a_per_call_directory_wins_over_the_global(self):
-        self.home_mod.set_blueprints_dir(os.path.join(self.root, "g"))
+    def test_a_record_slot_places_the_source(self):
+        # The record is the only assignment there is (P26): a slot
+        # places the source, and nothing ambient stands behind it.
         scoped = os.path.join(self.root, "s")
         self.assertEqual(
             source_for(Context(blueprints_dir=scoped)).describe("blueprint"),

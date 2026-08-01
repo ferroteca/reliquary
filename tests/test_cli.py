@@ -12,9 +12,6 @@ import tempfile
 import unittest
 from unittest import mock
 
-import importlib
-
-home = importlib.import_module("reliquary.home")
 from reliquary import cli
 from reliquary import backends
 from tests import fake_backend
@@ -120,8 +117,6 @@ class CliEmptyListingTests(unittest.TestCase):
     """list-* report absence, not a bare header."""
 
     def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -289,8 +284,6 @@ class CliMachineLifecycleTests(unittest.TestCase):
     """create-machine / start-machine / stop-machine / destroy-machine."""
 
     def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -695,14 +688,12 @@ class CliMachineLifecycleTests(unittest.TestCase):
     def test_start_and_stop_via_blueprint_selector(self):
         """--blueprint start/stop resolve the sole machine.
 
-        The process-global home is pointed elsewhere before each
-        call: the CLI resolves against the record built from its own
-        flags — one session per invocation (P26) — so the decoy must
-        neither supply the home nor be overwritten. A dropped
-        --home-dir must never let stop target a machine in another
-        home (the identity name alone cannot tell same-numbered
-        machines of two homes apart); the guarantee now rests on the
-        session's record, not on set_home_dir() having run.
+        The CLI resolves against the record built from its own flags
+        — one session per invocation (P26), no process globals left
+        to consult — so a dropped --home-dir can never let stop
+        target a machine in another home (the identity name alone
+        cannot tell same-numbered machines of two homes apart): the
+        guarantee rests on the session's record alone.
         """
         with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
@@ -710,8 +701,6 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "create-machine",
                 "--blueprint", "plain",
             ])
-        decoy = os.path.join(self.home, "elsewhere")
-        home.set_home_dir(decoy)
         with mock.patch(
                 "reliquary.session.Session.start_machine") as start, \
                 contextlib.redirect_stdout(io.StringIO()):
@@ -721,12 +710,10 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--blueprint", "plain",
             ])
         self.assertEqual(result, 0)
-        # The selector resolved live, under --home-dir, despite the
-        # decoy global: the record is the carrier.
+        # The selector resolved live, under --home-dir: the record
+        # is the carrier.
         start.assert_called_once()
         self.assertEqual(start.call_args.args, ("plain-0",))
-        # The globals lost their in-tree driver: the decoy survives.
-        self.assertEqual(home.home_dir(), decoy)
 
         with mock.patch(
                 "reliquary.session.Session.stop_machine") as stop, \
@@ -738,7 +725,6 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         stop.assert_called_once_with("plain-0")
-        self.assertEqual(home.home_dir(), decoy)
 
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""
@@ -955,8 +941,6 @@ class CliExecRunTests(unittest.TestCase):
     """The exec-run commands: machine variables and file exchange."""
 
     def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -1113,10 +1097,6 @@ class CliContextConstructionTests(unittest.TestCase):
     """
 
     def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
-        for name in home.DIRECTORIES:
-            home._globals[name] = None
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -1168,8 +1148,6 @@ class CliProgressTests(unittest.TestCase):
     """--progress selects the rendering; jsonl owns stdout alone."""
 
     def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name

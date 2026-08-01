@@ -371,12 +371,9 @@ folder can be determined, it falls back to `~/reliquary`.
 
 A flag beats the environment, and both beat the default. Assigning the cache moves media and machines with it unless you
 have placed those too, so `--cache-dir D:\reliquary-cache` is enough to keep the bulk off a synced Documents folder. From
-Python the twins are `reliquary.set_home_dir()`, `set_cache_dir()`, `set_blueprints_dir()`, and so on — or a
-`reliquary.Context(...)` to scope a single call.
-
-The platform Documents lookup itself is available as
-`reliquary.documents_dir()`, returning the folder path or `None` when it cannot be determined, for callers that want to
-anchor their own directories the same way.
+Python the same record is explicit: open your session on a `reliquary.Context(...)` filling any of the slots — or on a
+bare home path — and the rest derive the same way. The library honours no environment and picks no default: the session
+demands its home at the door.
 
 The layout is:
 
@@ -708,18 +705,21 @@ Run `reliquary --help` or `reliquary COMMAND --help` for the complete current sy
 ## Python usage
 
 The CLI is a thin veneer over the embedding API: every command maps
-one-to-one onto a Python call with the same semantics. To run a whole
-script, `reliquary.run_script("install", blueprint="freedos")`
-is the one call. To drive a machine directly, create and start it, then
-attach the interaction adapter to the machine's own directory — that is
-where its recorded identity lives, so ownership is verified against it:
+one-to-one onto a session method with the same semantics — the
+session is the only door, and the library assigns no default home,
+so you open one on yours. To run a whole script,
+`session.run_script("install", blueprint="freedos")` is the one call.
+To drive a machine directly, create and start it, then attach the
+interaction adapter to the machine's own directory — that is where
+its recorded identity lives, so ownership is verified against it:
 
 ```python
 import reliquary
 
-machine_id = reliquary.create_machine("freedos")
-reliquary.start_machine(machine_id)
-home = reliquary.machine_dir_path(machine_id)
+session = reliquary.Session(r"C:\path\to\your\reliquary-home")
+machine_id = session.create_machine("freedos")
+session.start_machine(machine_id)
+home = session.machine_dir_path(machine_id)
 machine = reliquary.Machine(home)
 guest = reliquary.AgentlessGuestExec(machine)
 
@@ -729,7 +729,7 @@ try:
     print("\n".join(machine.screen_text()))
     machine.screenshot("after-test")
 finally:
-    reliquary.stop_machine(machine_id)
+    session.stop_machine(machine_id)
 ```
 
 `Machine` also exposes the VGA text screen directly: `machine.screen_text()`
@@ -756,8 +756,8 @@ machine.cursor_menu_select("Use FreeDOS 1.4 in Live Environment mode")
 
 These screen and keyboard operations live on the platform-neutral
 `Machine`, so they work on any guest displaying through VGA text mode — boot menus and loaders included, before any
-operating system is up. Module-level conveniences (`reliquary.cursor_menu_select(item, port=port)`,
-`reliquary.screen_text(port=port)`, ...) wrap the same methods.
+operating system is up. Module-level conveniences (`reliquary.cursor_menu_select(item, home=machine_dir)`,
+`reliquary.screen_text(home=machine_dir)`, ...) wrap the same methods.
 
 `Machine.qmp()` exposes the identity-verified QMP session when a caller needs raw monitor access. The yielded QEMU
 session provides both `cmd()` for QMP and

@@ -11,6 +11,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- **The session is the only door** (P26). All embedding-API
+  interaction now passes through `reliquary.Session`, opened on a
+  home path or a `Context` — which now also carries the selected
+  properties file — and refusing construction without a home.
+  **This is a breaking change for every embedder, with no aliases
+  or shims** (no backward compatibility before 1.0): the
+  module-level verbs (`create_machine`, `run_script`,
+  `fetch_media`, the property verbs, the listings, …) left the
+  package root and are methods of the session; the directory
+  globals with their `set_*_dir()` setters and
+  `adopt_environment()` are deleted; per-call `context=` and
+  `properties_file=` left every public signature for the record
+  the session is opened on; and the library reads no environment —
+  the CLI honours `RELIQUARY_*_DIR` and `RELIQUARY_PROPERTIES` in
+  its own construction step, so programs select everything
+  explicitly. First-use `dir.unassigned` retired for the
+  construction-time refusal, the id intact. **The CLI is
+  unchanged**: same flags, same environment honoring, same default
+  home, same exit codes. The types, the errors, `Context`,
+  `default_home_dir()`, the free parsers, and the guest-console
+  family (`Machine` and its module functions, addressed by a
+  machine's own directory) remain importable as before.
+
 ## 0.1.0a1 - 2026-07-31
 
 ### Removed

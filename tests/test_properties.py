@@ -355,13 +355,15 @@ class SelectedFileTests(unittest.TestCase):
         self.assertFalse(os.path.exists(
             os.path.join(self.home, "slot.properties")))
 
-    def test_the_context_slot_beats_the_environment(self):
+    def test_the_environment_is_never_read(self):
+        # RELIQUARY_PROPERTIES arrives through the record's slot,
+        # honoured in the CLI's construction step and nowhere in the
+        # engine: with no slot, the home's file is the selection.
         self._pin_env(os.path.join(self.home, "env.properties"))
-        selected = os.path.join(self.home, "project.properties")
-        context = home.Context(home_dir=self.home,
-                               properties_file=selected)
+        context = home.Context(home_dir=self.home)
         properties.set_property("key", "value", context=context)
-        self.assertTrue(os.path.isfile(selected))
+        self.assertTrue(os.path.isfile(
+            properties._properties_path(context=self.home)))
         self.assertFalse(os.path.exists(
             os.path.join(self.home, "env.properties")))
 

@@ -19,7 +19,7 @@ import os
 import tempfile
 import unittest
 
-from reliquary import (binding, blueprint, credentials, home, library,
+from reliquary import (binding, blueprint, credentials, library,
                        machines, media, properties, resolve,
                        script_runner)
 from reliquary.errors import StaticError
@@ -58,13 +58,9 @@ def _write_blueprint(home_dir, name):
 
 
 class _SessionCase(unittest.TestCase):
-    """A temp home and clean directory globals for every test."""
+    """A temp home for every test."""
 
     def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
-        for name in home.DIRECTORIES:
-            home._globals[name] = None
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name
@@ -104,24 +100,6 @@ class ConstructionTests(_SessionCase):
                 self.assertIn("home", str(caught.exception))
                 self.assertEqual(caught.exception.rule_id,
                                  "dir.unassigned")
-
-    def test_construction_reads_no_global_assignment(self):
-        # A globally assigned home is not this session's home: the
-        # door demands its own, so an embedding never silently adopts
-        # process state.
-        home.set_home_dir(self.home)
-        with self.assertRaises(StaticError) as caught:
-            Session(Context(cache_dir=self.home))
-        self.assertEqual(caught.exception.rule_id, "dir.unassigned")
-
-    def test_resolution_never_reads_the_globals(self):
-        elsewhere = os.path.join(self.home, "elsewhere")
-        home.set_home_dir(elsewhere)
-        home.set_machines_dir(os.path.join(elsewhere, "vms"))
-        session = Session(self.home)
-        self.assertEqual(
-            session.machine_dir_path("bp-1"),
-            os.path.join(self.home, "cache", "machines", "bp-1"))
 
     def test_an_explicit_slot_pins_and_the_rest_derive(self):
         fast = os.path.join(self.home, "fast")
@@ -206,13 +184,16 @@ class CargoTests(_SessionCase):
                                   properties_file=self._selected()))
         self.assertIsNone(session.get_property("only.home"))
 
-    def test_the_carried_selection_beats_the_environment(self):
+    def test_the_environment_is_never_read(self):
+        # RELIQUARY_PROPERTIES is the CLI's construction step; a
+        # session with no selection uses the home's file, whatever
+        # the shell exports.
         env_file = os.path.join(self.home, "env.properties")
         self._pin_env("RELIQUARY_PROPERTIES", env_file)
-        session = Session(Context(home_dir=self.home,
-                                  properties_file=self._selected()))
-        session.set_property("which.file", "the selected one")
-        self.assertTrue(os.path.isfile(self._selected()))
+        session = Session(self.home)
+        session.set_property("which.file", "the home's own")
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.home, "user.properties")))
         self.assertFalse(os.path.exists(env_file))
 
     def test_a_secret_scopes_to_the_selected_file(self):

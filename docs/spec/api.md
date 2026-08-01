@@ -31,8 +31,8 @@ SPDX-License-Identifier: GPL-3.0-only
   Reliquary attaches no meaning to guest output; result
   interpretation and test-framework semantics live in consuming
   projects. In-repo consumers (the media layer, the script
-  runtime) drive the same public surface available to external
-  callers.
+  runtime) drive the same engine seam the session's veneer
+  drives, nothing deeper.
 - **The blessed sync divergence.** Blocking API forms return
   typed results and raise by error class; the CLI speaks streams,
   documents (`--json`), and exit codes. Twins in capability,
@@ -44,11 +44,27 @@ SPDX-License-Identifier: GPL-3.0-only
 
 ## Conventions
 
+- **The session is the only door** (P26): every ambient-state
+  twin is a method of the one exported `Session`, opened on — at
+  the minimum — a home directory. `Session(context)` takes a bare
+  home string or a `Context`, refuses construction without a home
+  — `dir.unassigned`, the first-use rule moved to the door, where
+  an assigned home reaches all six directories by derivation —
+  and pins the record once, from that record alone, so two
+  sessions in one process are unremarkable. The vocabulary stays
+  importable beside it: the types, the errors, `Context`,
+  `default_home_dir()`, and the free parsers, because parsing and
+  validating a document handed to you is pure data-in/data-out
+  work and tooling never invents a home to parse a string. The
+  guest-console family stays module-level at the carrier stratum
+  (its row below); the carrier session — `Machine.session()`, a
+  live connection to a running machine — is a different stratum
+  and keeps its name.
 - **Naming — the twin-name identity rule** (owner, 2026-07-21):
-  flat verb-noun functions — `create_machine`, `fetch_media`,
+  verb-noun session methods — `create_machine`, `fetch_media`,
   `run_script` — and the CLI command *is* the twin's name,
   dash-separated (`create-machine` ↔ `create_machine`), its
-  flags mirroring the function's parameters. Naming a twin names
+  flags mirroring the method's parameters. Naming a twin names
   its command; drift is impossible by construction. Three named
   exceptions, each an identity with a different home surface:
   the guest-console family spells as the script language's verbs
@@ -72,18 +88,22 @@ SPDX-License-Identifier: GPL-3.0-only
   prefix matching and no bare-number form (the id *is* the
   (blueprint, number) pair composed), so the selectors bind
   cleanly in any language.
-- **Mirrored globals**: a `Context` of six directory slots —
-  `home_dir=`, `blueprints_dir=`, `scripts_dir=`, `cache_dir=`,
-  `media_dir=`, `machines_dir=` — mirrors the six `--*-dir` flags
-  one for one, and carries nothing else.
-  A `Context` is a plain record of nullable paths rather than a
-  configured object, so it binds as six strings from C or Java. The
-  embedding API **assigns nothing**: a bare call that resolves a
-  name with no directory assigned fails closed naming that
-  directory, and nothing resolves out of the codex on any surface,
-  so automation never picks up the developer's home, a stray CWD,
-  or the library. The CLI's
-  defaults are the CLI's, not the library's
+- **The record — the session's initialization value**: a `Context`
+  of six directory slots — `home_dir=`, `blueprints_dir=`,
+  `scripts_dir=`, `cache_dir=`, `media_dir=`, `machines_dir=` —
+  mirrors the six `--*-dir` flags one for one, and carries the
+  selected properties file beside them (`properties_file=`, the
+  CLI's `--properties`): the ambient state, once, and nothing
+  else. A `Context` is a plain record of nullable paths rather
+  than a configured object, so it binds as strings from C or
+  Java. The embedding API **assigns nothing**: a session refuses
+  construction without a home, naming it, and nothing resolves
+  out of the codex on any surface, so automation never picks up
+  the developer's home, a stray CWD, or the library. The CLI's
+  defaults are the CLI's, not the library's — it builds one
+  record per invocation from its flags, the environment (its own
+  private construction step; the library reads no environment),
+  and the default home
   ([asset-resolution.md](asset-resolution.md#the-working-directories)).
 - **Returns mirror what the CLI prints**: `create_machine` and
   `clone_machine` return the new machine id; `import_vm` returns
@@ -182,7 +202,11 @@ this table is the index.
 
 Under the identity rule the CLI column is the mechanical
 transform of the twin column (dash ↔ underscore); the table
-carries the exceptions and each family's contract home.
+carries the exceptions and each family's contract home. Every
+twin below is a method of the one `Session` (P26) — the per-call
+`context=` / `properties_file=` threading the signatures once
+carried rides in the record the session was opened on, so it
+appears in none of them.
 
 | CLI | API twin | contract home |
 |---|---|---|
@@ -243,6 +267,15 @@ async-starter convention above), and it rejects
 hidden prompt. Contract: [media spec](media-spec.md#fetch-progress).
 
 ## Realignment of the implemented binding
+
+**The session realignment (P26, 2026-07-31)** closed the door in
+one landing: the twins became methods of the exported `Session`,
+the module-level verbs went internal, the directory globals with
+their `set_*_dir()` setters and `adopt_environment()` were
+deleted, and per-call `context=` / `properties_file=` left every
+public signature for the record the session is opened on.
+First-use `dir.unassigned` retired for the construction-time
+refusal, the id intact.
 
 The implemented binding uses the settled family:
 `create_machine`, `start_machine`, `stop_machine`, and

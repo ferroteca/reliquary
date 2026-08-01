@@ -1452,9 +1452,10 @@ API twins `get_property`, `set_property`, `unset_property`,
 `list_properties` under the identity rule.
 Ordinary values are strings; secret values live only in the host's
 protected credential store, with a marker in the file. Every
-property command accepts `--properties <path>` (twin parameter
-`properties_file=`), selecting the file it maintains in place of
-the home's `user.properties` — so a project-controlled file's
+property command accepts `--properties <path>` (API: the
+`properties_file` slot of the record the session is opened on —
+P26's cargo), selecting the file it maintains in place of the
+home's `user.properties` — so a project-controlled file's
 secret markers are provisioned like any other.
 
 ```powershell

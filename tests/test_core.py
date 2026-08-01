@@ -51,17 +51,8 @@ def _over(console):
 
 class HomeTests(unittest.TestCase):
     def setUp(self):
-        # Save the assignments, not the resolved value: with nothing
-        # assigned there is no resolved value to save, and restoring
-        # one would leave a home behind for the next test.
-        home_mod = importlib.import_module("reliquary.home")
-        saved = dict(home_mod._globals)
-        self.addCleanup(home_mod._globals.update, saved)
-        for name in home_mod.DIRECTORIES:
-            home_mod._globals[name] = None
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
-        reliquary.set_home_dir(self.tempdir.name)
 
     def test_screenshot_rejects_names_that_are_paths(self):
         invalid_names = ("", ".", "..", "../outside", "..\\outside",
@@ -71,7 +62,7 @@ class HomeTests(unittest.TestCase):
             for name in invalid_names:
                 with self.subTest(name=name):
                     with self.assertRaisesRegex(StaticError, "not a path"):
-                        reliquary.screenshot(name)
+                        reliquary.screenshot(name, home=self.tempdir.name)
 
         # The name is judged before any session is opened.
         self.assertEqual(adapter.sessions, [])
@@ -87,42 +78,46 @@ class HomeTests(unittest.TestCase):
         with fake_backend.installed() as adapter, \
                 mock.patch.object(machines_module, "read_vm_state",
                                   return_value=vm):
-            written = reliquary.screenshot("release-smoke")
+            written = reliquary.screenshot("release-smoke",
+                                           home=self.tempdir.name)
 
         self.assertEqual(written, expected)
         self.assertEqual(adapter.sessions[-1].screenshots, [expected])
         self.assertTrue(os.path.isfile(expected))
     def test_planned_layout_paths_are_contained_by_configured_home(self):
+        from reliquary import home
         root = self.tempdir.name
         cache = os.path.join(root, "cache")
-        self.assertEqual(reliquary.blueprints_dir(),
+        self.assertEqual(home.blueprints_dir(root),
                          os.path.join(root, "blueprints"))
-        self.assertEqual(reliquary.scripts_dir(),
+        self.assertEqual(home.scripts_dir(root),
                          os.path.join(root, "scripts"))
-        self.assertEqual(reliquary.cache_dir(), cache)
-        self.assertEqual(reliquary.media_dir(),
+        self.assertEqual(home.cache_dir(root), cache)
+        self.assertEqual(home.media_dir(root),
                          os.path.join(cache, "media"))
-        self.assertEqual(reliquary.machines_dir(),
+        self.assertEqual(home.machines_dir(root),
                          os.path.join(cache, "machines"))
 
     def test_planned_layout_paths_honor_explicit_home(self):
+        from reliquary import home
         other = tempfile.TemporaryDirectory()
         self.addCleanup(other.cleanup)
         root = other.name
         cache = os.path.join(root, "cache")
-        self.assertEqual(reliquary.blueprints_dir(context=root),
+        self.assertEqual(home.blueprints_dir(context=root),
                          os.path.join(root, "blueprints"))
-        self.assertEqual(reliquary.scripts_dir(context=root),
+        self.assertEqual(home.scripts_dir(context=root),
                          os.path.join(root, "scripts"))
-        self.assertEqual(reliquary.cache_dir(context=root), cache)
-        self.assertEqual(reliquary.media_dir(context=root),
+        self.assertEqual(home.cache_dir(context=root), cache)
+        self.assertEqual(home.media_dir(context=root),
                          os.path.join(cache, "media"))
-        self.assertEqual(reliquary.machines_dir(context=root),
+        self.assertEqual(home.machines_dir(context=root),
                          os.path.join(cache, "machines"))
 
-    def test_documents_dir_is_public_and_absolute_or_none(self):
-        """documents_dir() reports the platform Documents folder."""
-        documents = reliquary.documents_dir()
+    def test_documents_dir_is_absolute_or_none(self):
+        """The platform Documents lookup behind the default home."""
+        from reliquary import home
+        documents = home.documents_dir()
         if documents is not None:
             self.assertTrue(os.path.isabs(documents))
 
@@ -691,20 +686,6 @@ class RunCommandTests(unittest.TestCase):
 
         console.send_text.assert_called_once_with("dir")
         self.assertEqual(rows, ("2 FILE(S)",))
-
-class ScreenshotTests(unittest.TestCase):
-    def setUp(self):
-        # Save the assignments, not the resolved value: with nothing
-        # assigned there is no resolved value to save, and restoring
-        # one would leave a home behind for the next test.
-        home_mod = importlib.import_module("reliquary.home")
-        saved = dict(home_mod._globals)
-        self.addCleanup(home_mod._globals.update, saved)
-        for name in home_mod.DIRECTORIES:
-            home_mod._globals[name] = None
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tempdir.cleanup)
-        reliquary.set_home_dir(self.tempdir.name)
 
 if __name__ == "__main__":
     unittest.main()

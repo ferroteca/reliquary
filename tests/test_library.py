@@ -9,7 +9,6 @@ separate media definition to copy out, and no ``seed_media`` verb
 """
 
 import contextlib
-import importlib
 import json
 import os
 import re
@@ -52,11 +51,6 @@ class _HomeTest(unittest.TestCase):
     """
 
     def setUp(self):
-        home_mod = importlib.import_module("reliquary.home")
-        saved = dict(home_mod._globals)
-        self.addCleanup(home_mod._globals.update, saved)
-        for name in home_mod.DIRECTORIES:
-            home_mod._globals[name] = None
         self._temp = tempfile.TemporaryDirectory()
         self.addCleanup(self._temp.cleanup)
         self.home = self._temp.name

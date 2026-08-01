@@ -1,168 +1,96 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""OS installation scripting over agentless QEMU guest automation."""
+"""OS installation scripting over agentless QEMU guest automation.
 
-from .blueprint import add_media, delete_blueprint, new_blueprint
+The session is the only door (P26): all consumer interaction with
+ambient state — whatever resolves a working directory, touches
+machine or media state, or reads ambient configuration — passes
+through a :class:`Session`, opened on at minimum a home directory.
+What the root exports beside it is the vocabulary: the types, the
+errors, the ``Context`` record the session is opened on,
+``default_home_dir()``, and the free parsers — pure
+data-in/data-out work, so tooling never invents a home to parse a
+string. Two families stay module-level by name: the guest-console
+family (the carrier stratum — ``Machine`` and its functions
+address a machine's own directory, their session respell deferred
+to the control-plane design), and the backend seam's read-only
+vocabulary. The codex verbs are CLI-only (D87) and appear on no
+surface here.
+"""
+
+from .session import Session
 from .cli import main
+from .home import Context, default_home_dir
 from .document import (BlueprintError, Document, load_document,
                        parse_document)
-from .home import (DIRECTORIES, Context, blueprints_dir,
-                   cache_dir, default_home_dir, documents_dir, home_dir,
-                   machines_dir, media_dir, scripts_dir,
-                   set_blueprints_dir, set_cache_dir, set_home_dir,
-                   set_machines_dir, set_media_dir, set_scripts_dir)
 from .interaction import GuestExec
 from .interaction_agentless import AgentlessGuestExec
 from .backends import PRIORITY as BACKEND_PRIORITY
 from .backends import (Availability, BackendAdapter, Capabilities,
                        adapter, discover)
-# The codex verbs are not here: `seed-blueprint`, `seed-script` and
-# `list-codex` are CLI-only (D87). A library that changes in a point
-# release is not something a program may bind against, so reaching it
-# is a human act.
-from .library import list_blueprints, list_scripts
 from .machine import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .errors import (InternalError, PreflightError, ReliquaryError,
                      RunCancelled, RunFailure, StaticError, WaitExpired)
 from .events import Event, EventStream
-from .machines import (DryRun, apply_blueprint, create, create_machine,
-                       describe_drives,
-                       destroy_machine, eject_media, get_file, get_files,
-                       get_machine_dir, get_machine_var, wait_machine_var,
-                       insert_media, list_files, list_machines,
-                       refresh_drives,
-                       load_machine_state,
-                       machine_dir_path, mark_stopped,
-                       put_file, put_files, recreate_machine, resolve_machine,
-                       set_boot_order, set_machine_var, start_machine,
-                       stop_machine)
-# The one-shot member of the run family; named for its command under
-# the twin-name identity rule (the builtin stays reachable as
-# ``builtins.exec``).
-from .machines import exec  # noqa: A001
-from .media import fetch_media, clean_media, list_media, prune_media
-from .resolve import load_namespace
-from .binding import (BoundProperties, PropertyBindingError,
-                      bind_properties, describe_sources)
+from .machines import DryRun
+from .binding import BoundProperties, PropertyBindingError
 from .credentials import CredentialError
-from .properties import (PropertiesError, get_property,
-                         has_credential, is_secret, list_properties,
-                         secret_marker, set_property, unset_property)
+from .properties import PropertiesError, is_secret, secret_marker
 from .script_nodes import ScriptParseError
 from .script_parser import (Condition, Handler, Phase, Property, Script,
                             Statement, load_script, parse_script)
-from .script_runner import (ScriptRun, ScriptRuntimeError,
-                            execute_script, run_script)
+from .script_runner import ScriptRun, ScriptRuntimeError
 
 __all__ = [
-    "Condition",
-    "Document",
-    "Event",
-    "EventStream",
-    "Handler",
-    "Machine",
-    "Script",
-    "ScriptParseError",
-    "ScriptRun",
-    "ScriptRuntimeError",
-    "BlueprintError",
-    "BoundProperties",
-    "CredentialError",
-    "InternalError",
-    "PreflightError",
-    "PropertiesError",
-    "PropertyBindingError",
-    "ReliquaryError",
-    "RunCancelled",
-    "RunFailure",
-    "WaitExpired",
-    "StaticError",
-    "Phase",
-    "Property",
-    "Statement",
+    "Session",
     "AgentlessGuestExec",
     "Availability",
     "BACKEND_PRIORITY",
     "BackendAdapter",
+    "BlueprintError",
+    "BoundProperties",
     "Capabilities",
+    "Condition",
     "Context",
-    "DIRECTORIES",
+    "CredentialError",
+    "Document",
     "DryRun",
+    "Event",
+    "EventStream",
     "GuestExec",
+    "Handler",
+    "InternalError",
+    "Machine",
+    "Phase",
+    "PreflightError",
+    "PropertiesError",
+    "Property",
+    "PropertyBindingError",
+    "ReliquaryError",
+    "RunCancelled",
+    "RunFailure",
+    "Script",
+    "ScriptParseError",
+    "ScriptRun",
+    "ScriptRuntimeError",
+    "StaticError",
+    "Statement",
+    "WaitExpired",
     "adapter",
-    "discover",
-    "apply_blueprint",
-    "create",
-    "create_machine",
     "cursor_menu_select",
-    "delete_blueprint",
-    "describe_drives",
-    "destroy_machine",
-    "eject_media",
-    "exec",
-    "get_file",
-    "get_files",
-    "get_machine_dir",
-    "get_machine_var",
-    "wait_machine_var",
-    "insert_media",
-    "list_files",
-    "put_file",
-    "put_files",
-    "refresh_drives",
-    "set_machine_var",
-    "blueprints_dir",
-    "cache_dir",
-    "bind_properties",
-    "describe_sources",
-    "has_credential",
+    "default_home_dir",
+    "discover",
     "is_secret",
-    "secret_marker",
-    "add_media",
-    "clean_media",
-    "documents_dir",
-    "fetch_media",
-    "get_property",
-    "home_dir",
-    "list_blueprints",
-    "list_machines",
-    "list_media",
-    "list_properties",
-    "list_scripts",
     "load_document",
-    "load_namespace",
     "load_script",
-    "load_machine_state",
-    "machine_dir_path",
-    "machines_dir",
     "main",
-    "mark_stopped",
-    "media_dir",
-    "new_blueprint",
     "parse_document",
-    "prune_media",
     "parse_script",
-    "recreate_machine",
-    "resolve_machine",
     "screen_text",
     "screenshot",
-    "scripts_dir",
+    "secret_marker",
     "send_keys",
     "send_text",
-    "default_home_dir",
-    "set_blueprints_dir",
-    "set_boot_order",
-    "set_cache_dir",
-    "set_home_dir",
-    "set_machines_dir",
-    "set_media_dir",
-    "set_scripts_dir",
-    "set_property",
-    "start_machine",
-    "stop_machine",
-    "unset_property",
     "wait_text",
-    "execute_script",
-    "run_script",
 ]

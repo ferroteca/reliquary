@@ -71,11 +71,45 @@ _OLD_API_NAMES = (
     # that cannot be seeded on their own.
     "search_blueprints",
     "list_builtin_media",
+    # The module-level carrier, retired when the session became the
+    # only door (P26). The directory globals' setters, the
+    # environment adoption and the assignment probe are deleted
+    # outright; the resolvers, the directory vocabulary, the
+    # Documents lookup and the non-twin engine doors left the
+    # package root (every session-method twin's root spelling is
+    # policed mechanically by test_api_spec_conformance.py, so the
+    # twins are not repeated here).
+    "set_home_dir",
+    "set_blueprints_dir",
+    "set_scripts_dir",
+    "set_cache_dir",
+    "set_media_dir",
+    "set_machines_dir",
+    "adopt_environment",
+    "is_assigned",
+    "home_dir",
+    "blueprints_dir",
+    "scripts_dir",
+    "cache_dir",
+    "media_dir",
+    "machines_dir",
+    "DIRECTORIES",
+    "documents_dir",
+    "create",
+    "execute_script",
+    "load_namespace",
+    "bind_properties",
+    "describe_sources",
+    "resolve_machine",
+    "load_machine_state",
+    "machine_dir_path",
+    "mark_stopped",
+    "has_credential",
 )
 
 # Live-tree paths scanned for superseded spellings.
 _SWEEP_ROOTS = (
-    "reliquary",
+    os.path.join("src", "reliquary"),
     "tests",
     "docs",
     "README.md",
@@ -182,6 +216,14 @@ _FORBIDDEN = (
     ("retired --assets flag", re.compile(r"--assets\b")),
     ("old set_home", re.compile(r"\bset_home(?!_dir)\b")),
     ("old set_cache", re.compile(r"\bset_cache(?!_dir)\b")),
+    # P26's retirements: the module-level carrier's spellings. The
+    # `--*-dir` flags and the Context keywords survive; the setter
+    # functions and the environment adoption do not.
+    ("retired set_*_dir setter",
+     re.compile(r"\bset_(?:home|blueprints|scripts|cache|media"
+                r"|machines)_dir\b")),
+    ("retired adopt_environment",
+     re.compile(r"\badopt_environment\b")),
     ("retired set_assets", re.compile(r"\bset_assets\b")),
     ("retired HOME_ASSETS", re.compile(r"\bHOME_ASSETS\b")),
     ("old media_cache_dir", re.compile(r"\bmedia_cache_dir\b")),
@@ -240,7 +282,7 @@ def _iter_sweep_files():
                 if name.endswith((
                         ".py", ".md", ".rlqs", ".lark", ".json")):
                     yield os.path.join(dirpath, name)
-    codex = os.path.join(_REPO_ROOT, "reliquary", "codex")
+    codex = os.path.join(_REPO_ROOT, "src", "reliquary", "codex")
     if os.path.isdir(codex):
         for dirpath, _, filenames in os.walk(codex):
             for name in filenames:

@@ -633,6 +633,58 @@ differently under the new wording — is mere documentation work.
   D91 had admitted; the working rule reaches authors in
   [docs/blueprint-reference.md](docs/blueprint-reference.md)
   `backend-settings`.)
+- **P26 — The session layer is the only door.** All consumer API
+  interaction passes through a **`Session`**, opened on — at the
+  minimum — a home directory; the consumer interacts with the
+  session and never the underlying implementations. The CLI is
+  the session layer's first consumer: every invocation opens one,
+  assigning the default home (`Documents/reliquary`, falling back
+  to `~/reliquary`) whenever neither a flag nor the environment
+  named one, exactly as the existing default-directory mechanism
+  had it (D59's defaulting rule, relocated intact). The session
+  carries the ambient state every call was once handed per call,
+  and carries it once — the six placeable directories and the
+  selected properties file — so the per-call `context=` and
+  `properties_file=` threading and the module-level directory
+  globals are superseded, and two sessions in one process are
+  unremarkable, which the globals could never say. The boundary
+  is ambient state, and it is named: whatever resolves a
+  directory, touches machine or media state, or reads ambient
+  configuration is reachable only through a session, while pure
+  data-in/data-out work — parsing and validating a document or
+  script handed to it — stays a free function, so tooling never
+  invents a home to parse a string. The vocabulary stays
+  importable: the types, the errors, the `Context` record (now
+  the session's initialization value), and `default_home_dir()`,
+  which is what keeps the CLI's defaulting a capability present
+  on both surfaces (P6, D87) after the directory setters and the
+  environment adoption left the public surface — environment
+  honoring is the CLI's private construction step. The rest
+  of D59 stands: all six directories remain individually
+  placeable at the session's door, derivation reaches only what
+  is still unassigned, and the API assigns no default — demanding
+  the home at construction is the same fail-closed safety moved
+  to the door, refusing earlier and still naming what is missing,
+  and it retired first-use `dir.unassigned` outright, an assigned
+  home reaching all six by derivation. (P6's differing-defaults
+  tier is preserved — the CLI assigns, the API demands. P7 shapes
+  the object: opened on the plain record D59 settled and
+  thereafter an opaque handle every verb hangs off, the shape
+  that binds from C where per-call keyword threading does not.
+  The carrier session — `Machine.session()`, a live connection to
+  a running machine — is a different stratum and keeps its name.
+  Supersedes D59's carrier mechanism — per-call `context=`, the
+  directory globals, first-use `dir.unassigned` — and none of its
+  placement, derivation, or defaulting decisions. Pledged
+  2026-07-31 and delivered the same day in three cuts — the
+  session built, the CLI on it, the door closed — which armed
+  this principle (D34). **One known residue, named rather than
+  hidden (D48):** the guest-console family — `Machine` and its
+  module-level functions — still binds at the carrier stratum, by
+  a machine's own directory rather than through the session; its
+  session respell is deferred to the control-plane design, and
+  [docs/spec/api.md](docs/spec/api.md)'s guest-console row is the
+  deferral's record.)
 
 
 ## The cross-cutting prose

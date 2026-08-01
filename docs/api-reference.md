@@ -16,63 +16,66 @@ spec, this reference has the bug.
 Reliquary attaches no meaning to guest output; interpreting
 results belongs to the caller.
 
-## The working directories and Context
+## The session
 
-Reliquary has six working directories — `home`, `blueprints`,
-`scripts`, `cache`, `media`, `machines` — and every one is
-placeable. Each starts **unassigned**; the rest derive from what is
-assigned, and a directory with no value when resolution needs it
-raises `StaticError` naming it.
+**The session is the only door** (P26). Every call that resolves a
+working directory, touches machine or media state, or reads
+ambient configuration is a method of one `Session`:
 
-- `set_home_dir(path)` - Assign the home; `blueprints`, `scripts`
-  and `cache` derive under it.
-- `set_cache_dir(path)` - Assign the cache root, explicitly or over
-  the derived one; `media` and `machines` derive under it.
-- `set_blueprints_dir(path)` / `set_scripts_dir(path)` /
-  `set_media_dir(path)` / `set_machines_dir(path)` - Assign a leaf
-  directly. Assigning one leaves its siblings where the rest of the
-  resolution puts them.
-- `default_home_dir()` - The value the CLI assigns when nothing
-  named a home: `Documents/reliquary`, falling back to
-  `~/reliquary`. Computed, never assigned by the library.
-- `documents_dir()` - Resolve the user's platform Documents
-  folder, or `None` when it cannot be determined.
+```python
+import reliquary
+
+session = reliquary.Session(r"D:\my-project-home")
+machine_id = session.create_machine("freedos")
+```
+
+- `Session(context)` - Open a session on a bare home path, or on a
+  `Context` pinning any of the working directories and the
+  selected properties file. Construction **refuses without a
+  home** (`StaticError`, `dir.unassigned`), and pins the whole
+  record once, from that record alone — an assigned home reaches
+  every directory by derivation, so nothing a session does can
+  find one unassigned, and two sessions in one process are
+  unremarkable.
 - `Context(home_dir=None, blueprints_dir=None, scripts_dir=None,
-  cache_dir=None, media_dir=None, machines_dir=None)` - A plain
-  record of six directories and nothing else — there is no axis
-  deciding where a name may come from, the directories being the
-  sole sources — scoping one call or a group of
-  calls, independent of the process-global assignments. Every
-  function below that resolves a working directory accepts a
-  `context=`: omit it (the common case) to use the globals; pass a
-  bare string as shorthand for `Context(home_dir=that_string)`;
-  pass a `Context` to pin whatever slots it fills, per call, safe to
-  vary within one process. Unfilled slots fall through to the
-  globals and then to derivation. The CLI only ever drives the
-  globals from its flags — scoped `Context` objects are an
-  embedding-API-only capability.
-- Resolvers, each accepting `context=None`: `home_dir`,
-  `blueprints_dir`, `scripts_dir`, `cache_dir`, `media_dir`, and
-  `machines_dir`.
+  cache_dir=None, media_dir=None, machines_dir=None,
+  properties_file=None)` - The session's initialization value: a
+  plain record of the six directory slots (mirroring the six
+  `--*-dir` flags) and the selected properties file (mirroring
+  `--properties`), and nothing else — there is no axis deciding
+  where a name may come from, the directories being the sole
+  sources. Unfilled directory slots derive: `blueprints`,
+  `scripts` and `cache` under the home, `media` and `machines`
+  under the cache.
+- `default_home_dir()` - The value the CLI gives its record when
+  nothing named a home: `Documents/reliquary`, falling back to
+  `~/reliquary`. Computed, never assigned by the library.
 
-**The embedding API assigns nothing.** A call that resolves a name
-with no directory assigned raises rather than reading the
-developer's home or a stray current directory, and nothing resolves
-out of the built-in codex on any surface, so it never feeds an
-automated run at all. The
-environment (`RELIQUARY_HOME_DIR` and its five siblings) is honoured
-by the CLI and never by the library, for the same reason.
+**The embedding API assigns nothing.** A session without a home
+refuses at the door rather than reading the developer's home or a
+stray current directory, and nothing resolves out of the built-in
+codex on any surface, so it never feeds an automated run at all.
+The environment (`RELIQUARY_HOME_DIR` and its siblings,
+`RELIQUARY_PROPERTIES`) is honoured by the CLI's own construction
+of its record and never by the library, for the same reason.
+
+Every method below is a `Session` method, shown without its
+`session.` receiver. The exceptions are marked where they occur:
+the free parsers and value helpers (plain functions — pure
+data-in/data-out), the guest-interaction family (module-level,
+addressing a machine's own directory), and the backend seam's
+read-only vocabulary.
 
 ## Cached machines (the blueprint lifecycle)
 
-- `create_machine(name, *, context=None, properties=None,
-  properties_file=None, dry_run=False, backend=None)` - Materialize
-  a new machine from a blueprint name; returns the machine id
-  (`<blueprint>-<n>`, lowest free number). The blueprints directory
-  is the sole source: nothing is seeded, and a name only the built-in
-  library holds is refused with the seed command named.
-  `properties` / `properties_file` bind any
-  `${key}` a media location references. CLI twin: `create-machine`.
+- `create_machine(name, *, properties=None, dry_run=False,
+  backend=None)` - Materialize a new machine from a blueprint
+  name; returns the machine id (`<blueprint>-<n>`, lowest free
+  number). The blueprints directory is the sole source: nothing is
+  seeded, and a name only the built-in library holds is refused
+  with the seed command named. `properties` — with the record's
+  selected properties file — binds any `${key}` a media location
+  references. CLI twin: `create-machine`.
 - `create_machine(name, dry_run=True)` returns a `DryRun` instead —
   never a machine id, so misuse is a `TypeError` at the call site
   rather than a confusing failure three layers down. It materializes
@@ -88,64 +91,57 @@ by the CLI and never by the library, for the same reason.
 - `DryRun` - `operation` (the verb described), `report` (the
   printable rendering) and `plan` (the operation's own document,
   which is what `--json` serializes).
-- `create(machine, namespace, *, context=None, blueprint_name="")` -
-  The same, from an already-parsed machine component and the
-  resolution namespace (`load_namespace`).
-- `list_machines(context=None, blueprint=None)` - List machines.
+- `list_machines(blueprint=None)` - List machines.
   CLI twin: `list-machines`.
-- `resolve_machine(*, machine=None, blueprint=None, context=None)` -
+- `resolve_machine(*, machine=None, blueprint=None)` -
   Resolve CLI-style selectors to exactly one machine id. The
   selectors are mutually exclusive: `machine=` is the full id
   (`<blueprint>-<n>`) exactly, or `blueprint=` selects that
   blueprint's sole machine. No prefix matching and no
   bare-number form.
-- `start_machine(machine_id, *, display=False, context=None)` -
+- `start_machine(machine_id, *, display=False)` -
   Start a machine through its assigned backend's adapter and return
   its id; the verified VM identity is recorded in the machine's
   `machine.json` as a `vm` section, written atomically with `phase`.
   CLI twin: `start-machine`.
-- `stop_machine(machine_id, context=None)` - Stop a running machine;
+- `stop_machine(machine_id)` - Stop a running machine;
   identity mismatches fail closed. CLI twin: `stop-machine`.
-- `destroy_machine(machine_id, context=None)` - Delete the machine
+- `destroy_machine(machine_id)` - Delete the machine
   entirely; frees its number for reuse. CLI twin:
   `destroy-machine`.
-- `recreate_machine(*, machine=None, blueprint=None, context=None,
-  properties=None, properties_file=None)` -
+- `recreate_machine(*, machine=None, blueprint=None,
+  properties=None)` -
   Destroy the selected machine and recreate it under the same id,
   re-resolving the current blueprint. Returns the reused id. CLI
   twin: `recreate-machine`.
-- `apply_blueprint(*, machine=None, blueprint=None, context=None,
-  properties=None, properties_file=None)` -
+- `apply_blueprint(*, machine=None, blueprint=None,
+  properties=None)` -
   Adopt the current blueprint into a stopped machine: absorbable
   changes are applied and the baseline digest re-recorded; a changed
   `size` or `materialize` on an already-materialized media image
   fails closed. Returns the id. CLI twin: `apply-blueprint`.
-- `get_machine_dir(*, machine=None, blueprint=None, context=None)` -
+- `get_machine_dir(*, machine=None, blueprint=None)` -
   The selected machine's cache directory as an absolute path (any
   phase). CLI twin: `get-machine-dir`.
-- `mark_stopped(machine_id, context=None)` - Reconcile the phase of
+- `mark_stopped(machine_id)` - Reconcile the phase of
   a machine whose QEMU process has gone.
-- `load_machine_state(machine_id, context=None)` - Read the
+- `load_machine_state(machine_id)` - Read the
   machine's `machine.json`.
-- `machine_dir_path(machine_id, context=None)` - The machine's cache
+- `machine_dir_path(machine_id)` - The machine's cache
   directory.
-- `read_vm_state(machine_dir)` - The machine's recorded live-VM
-  identity (`backend`, `backend-id`, `token`, `endpoint`), or `None`
-  when it is not running.
 
 Persistent machine-state changes — insert/eject are floppy and cdrom
 slots and work running-or-stopped (a running change is applied live
 over QMP); `set_boot_order` is stopped-only; all three persist and
 survive stop/start:
 
-- `insert_media(machine_id, slot, media=None, *, file=None,
-  context=None)` (`insert-media`) - Exactly one of `media` (a
+- `insert_media(machine_id, slot, media=None, *, file=None)`
+  (`insert-media`) - Exactly one of `media` (a
   declared media, fetched and hash-verified) or `file` (your own
   image, mounted in place: anonymous, mutable, unverified, never
   copied — the live-iteration transport).
-- `eject_media(machine_id, slot, *, context=None)` (`eject-media`)
-- `set_boot_order(machine_id, boot_keys, *, context=None)`
-  (`set-boot-order`)
+- `eject_media(machine_id, slot)` (`eject-media`)
+- `set_boot_order(machine_id, boot_keys)` (`set-boot-order`)
 
 ## Driving a machine from a program
 
@@ -154,7 +150,7 @@ result out, iterate. Reliquary supplies the transports and attaches
 no meaning to what travels through them.
 
 - `wait_machine_var(key, value=None, *, machine=None, blueprint=None,
-  timeout=120, interval=1, context=None)` - Read a machine variable
+  timeout=120, interval=1)` - Read a machine variable
   on a loop until it arrives, and return it. For the case a plain
   read cannot serve: **another actor sets it** — a run on another
   thread, or one being followed rather than driven. A blocking
@@ -166,7 +162,7 @@ no meaning to what travels through them.
   Python `TimeoutError` (nothing broke, ask again). CLI twin:
   `wait-machine-var`.
 - `exec(command, *, machine=None, blueprint=None, timeout=120,
-  check=False, context=None)` - Run one command in a running guest
+  check=False)` - Run one command in a running guest
   and return the
   text it produced, as a tuple of screen rows. The run family's
   one-shot member: it drives the machine and returns its output,
@@ -186,13 +182,13 @@ no meaning to what travels through them.
   that *ran* and signalled failure; a mistyped one escapes it. CLI
   twin: `exec --check`.
   Non-DOS platforms raise `NotImplementedError`. CLI twin: `exec`.
-  (The name shadows the Python builtin where it is imported by name,
-  which is the price of the twin-name identity rule; `builtins.exec`
-  remains reachable.)
-- `get_machine_var(key, *, machine=None, blueprint=None,
-  context=None)` - Read one machine variable, or `None` when it is
+  (As a session method the name shadows nothing; the twin-name
+  identity rule settled the spelling, and `builtins.exec` is
+  untouched.)
+- `get_machine_var(key, *, machine=None, blueprint=None)` -
+  Read one machine variable, or `None` when it is
   not set. A query, valid in any phase. CLI twin: `get-machine-var`.
-- `describe_drives(*, machine=None, blueprint=None, context=None)` -
+- `describe_drives(*, machine=None, blueprint=None)` -
   One report of the machine's drives and what they actually hold:
   per drive the declared and chosen facts; per hard disk the at-rest
   read (backing, the partition table as it declares itself, and per
@@ -209,38 +205,38 @@ no meaning to what travels through them.
   Recognized: DOS platforms, FAT12/FAT16/FAT16B, and standard MBR
   primary/extended partitioning — everything else reports as a
   named `unread` refusal. CLI twin: `describe-drives`.
-- `refresh_drives(*, machine=None, blueprint=None, context=None)` -
+- `refresh_drives(*, machine=None, blueprint=None)` -
   Re-read a stopped machine's disks into the record and return the
   same report, fresh. The explicit way to pick up a layout changed
   behind the record — a guest session's repartitioning, an
   out-of-band edit — without waiting for the next start.
   Stopped-only: a running guest owns its disks. CLI twin:
   `refresh-drives`.
-- `set_machine_var(machine_id, key, value, *, context=None)` - Record
+- `set_machine_var(machine_id, key, value)` - Record
   one. Its world-facing spelling is the script `set` verb, so the
   capability reaches the CLI through the scripting language rather
   than a command of its own. Variables are cleared at each `start`,
   so one always reports what the current boot produced; the `rlq` and
   `reliquary` key namespaces are reserved.
-- `put_file(source, destination, *, machine=None, blueprint=None,
-  context=None)` - Copy a host file into the guest, `destination`
+- `put_file(source, destination, *, machine=None, blueprint=None)` -
+  Copy a host file into the guest, `destination`
   addressed **as the guest names it** (`"A:\TEST.EXE"`). Returns
   that address. CLI twin: `put-file`.
-- `get_file(source, destination, *, machine=None, blueprint=None,
-  context=None)` - The reverse: `source` is the guest address,
+- `get_file(source, destination, *, machine=None, blueprint=None)` -
+  The reverse: `source` is the guest address,
   `destination` a host path, and the host path is returned. CLI twin:
   `get-file`.
-- `put_files(source, destination, *, machine=None, blueprint=None,
-  context=None)` - Copy a host directory's **contents** into guest
+- `put_files(source, destination, *, machine=None, blueprint=None)` -
+  Copy a host directory's **contents** into guest
   directory `destination` (`"A:\\"` is the drive root), recursively.
   Returns the guest addresses written, sorted. CLI twin: `put-files`.
-- `get_files(source, destination, *, machine=None, blueprint=None,
-  context=None)` - The reverse: the contents of guest directory
+- `get_files(source, destination, *, machine=None, blueprint=None)` -
+  The reverse: the contents of guest directory
   `source` land in host directory `destination`, which is created if
   absent and is required — Reliquary invents no location to write to.
   Returns the host paths written, sorted. CLI twin: `get-files`.
 - `list_files(address, *, recursive=False, machine=None,
-  blueprint=None, context=None)` - What a guest directory holds: a
+  blueprint=None)` - What a guest directory holds: a
   flat list sorted by address, each entry
   `{"address", "name", "kind", "size"}` — `kind` is `"file"` or
   `"directory"`, `size` is `None` for a directory, and `address` is
@@ -286,20 +282,20 @@ nothing.
   the source line and a caret; `parse_document` is handed a value
   that never had a position, so those are `None` and the diagnostic
   is its field breadcrumb alone.
-- `load_namespace(context=None)` - Build the merged `(name, type)`
+- `load_namespace()` - Build the merged `(name, type)`
   catalog from every `.rlqb` in the active source;
-  `resolve_machine`/`create` and media resolution read it.
+  machine creation and media resolution read it.
   Canonically identical specs of one identity coexist across files;
   differing ones collide. (The catalog-level
   `resolve_media(name, namespace)` lives in `reliquary.resolve`.)
-- `new_blueprint(name, *, platform="dos", context=None)` - Scaffold a
+- `new_blueprint(name, *, platform="dos")` - Scaffold a
   home ``blueprints/<name>.rlqb``. CLI twin: `new-blueprint`.
-- `add_media(name, path, *, context=None)` - Write a home
+- `add_media(name, path)` - Write a home
   ``blueprints\<name>.rlqb`` declaring a media located at `path` and
   pinned to its computed SHA-256. The file stays where it is; nothing
   is cached. Returns the blueprint path, and raises `FileExistsError`
   rather than overwriting one. CLI twin: `add-media`.
-- `delete_blueprint(name, *, context=None)` - Remove the home blueprint
+- `delete_blueprint(name)` - Remove the home blueprint
   file; fails closed while any machine of it exists. Never touches
   package builtins. CLI twin: `delete-blueprint`.
 - Spec types live in `reliquary.document`: `Machine`, `Media`,
@@ -309,7 +305,7 @@ nothing.
 
 ## Media
 
-- `fetch_media(name, context=None, on_mismatch="fail")` - Resolve a
+- `fetch_media(name, on_mismatch="fail")` - Resolve a
   media by name against the catalog and return its verified payload
   path, fetching on demand — a verifying cached payload as-is, a
   verifying cached container re-extracted, then the mirror rungs in
@@ -318,14 +314,14 @@ nothing.
   delete-and-refetch checkpoint), or `"refetch"` (pre-approved
   deletion); a mismatched file whose media names no source is
   always kept. CLI twin: `fetch-media`.
-- `list_media(context=None)` - Sorted media names from the
+- `list_media()` - Sorted media names from the
   namespace — yours alone. CLI twin: `list-media`.
-- `clean_media(name=None, *, context=None)` - Reclaim cached
+- `clean_media(name=None)` - Reclaim cached
   payloads, returning the names reclaimed. Blunt with no name,
   skipping anything a running machine holds; targeted with one. The
   cache holds only what can be fetched or derived again, so nothing
   is spared on provenance. CLI twin: `clean-media`.
-- `prune_media(*, context=None, dry_run=False)` - Drop cached
+- `prune_media(*, dry_run=False)` - Drop cached
   payloads outside the attachment closure, returning the names
   pruned (or, under `dry_run`, the names that would be). CLI twin:
   `prune-media`.
@@ -340,16 +336,17 @@ blank lines, and ordering outside the named key are preserved.
 Malformed files raise `PropertiesError` (a `ValueError`) naming the
 path and line, and are never partly rewritten.
 
-Every function takes `properties_file=` (CLI `--properties`), which
-replaces the home's file rather than layering over it;
-`RELIQUARY_PROPERTIES` selects the same way.
+The selected file rides in the session's record: the `Context`'s
+`properties_file` slot (CLI `--properties`, environment
+`RELIQUARY_PROPERTIES` — both honoured in the CLI's construction of
+its record) replaces the home's file rather than layering over it.
 
-- `get_property(key, context=None, properties_file=None)` - The
+- `get_property(key)` - The
   value, or `None`. A secret returns its marker `{"secret": True}`,
   never its value — exactly what `--json` serializes. CLI twin:
   `get-property`.
-- `set_property(key, value, secret=False, context=None,
-  properties_file=None)` - Create or replace a property, rewriting
+- `set_property(key, value, secret=False)` - Create or
+  replace a property, rewriting
   or appending only that key's line. With `secret=True` the value
   goes to the host credential store and only the marker to the
   file. Changing a property between ordinary and secret raises;
@@ -359,14 +356,14 @@ replaces the home's file rather than layering over it;
   stdin channels exist because argv reaches process listings and
   shell history, which an in-process value never touches — and a
   library function never prompts.
-- `unset_property(key, context=None, properties_file=None)` - Remove
+- `unset_property(key)` - Remove
   a property; for a secret, its credential too. Also clears an
   orphaned credential. CLI twin: `unset-property`.
-- `list_properties(prefix=None, context=None, properties_file=None)` -
+- `list_properties(prefix=None)` -
   The properties projection, key to value-or-marker, sorted.
   `prefix` selects that key and its dotted descendants. CLI twin:
   `list-properties`.
-- `has_credential(key, context=None, properties_file=None)` - Whether
+- `has_credential(key)` - Whether
   a secret's credential is actually present on this host. Kept
   separate from `get_property` so reading a property never depends
   on reaching the store; the CLI renders it as a stderr warning
@@ -387,8 +384,8 @@ an ordinary `set_property` on that key refuses to overwrite.
 - `parse_script(source, path="<script>")` / `load_script(path)` -
   Parse a redesigned-surface `.rlqs` script into an immutable
   `Script`; errors raise `ScriptParseError` with source locations.
-- `run_script(label, *, blueprint=None, machine=None, context=None,
-  display=False, properties=None, properties_file=None,
+- `run_script(label, *, blueprint=None, machine=None,
+  display=False, properties=None,
   progress="auto", expect=None)` - Resolve the
   label through the blueprint's `scripts` map, create a machine when
   the blueprint has none, honor the script's `machine` header,
@@ -396,7 +393,8 @@ an ordinary `set_property` on that key refuses to overwrite.
   declared property before the machine starts, and run it.
   `properties` is the
   explicit `{key: value}` mapping (the CLI's repeated `--property`);
-  `properties_file` selects the binding file; `progress` selects the
+  the record's `properties_file` slot selects the binding file;
+  `progress` selects the
   live rendering (`"auto"` | `"pretty"` | `"plain"` | `"jsonl"`, as
   the CLI's `--progress`), and `"plain"`/`"jsonl"` never prompt.
 
@@ -426,24 +424,19 @@ an ordinary `set_property` on that key refuses to overwrite.
   refused with it — a plan has no window, no stream, and no run whose
   outcome could be contracted. Normative:
   [cli.md](spec/cli.md#the-dry-run).
-- `execute_script(script, *, machine_id, context=None,
-  display=False, script_path=None, bindings=None, events=None)` -
-  Execute an already-parsed script against a specific machine.
-  `bindings` is a `BoundProperties` (from `bind_properties`); without
-  it, a `${key}` reference fails at runtime. `events` is the
-  `EventStream` the run emits into.
 - `bind_properties(script, *, parameters=None, explicit=None,
-  properties_file=None, context=None, asker=None)` - Resolve every
+  asker=None)` - Resolve every
   declared property through the source order, or raise
-  `PropertyBindingError`. `describe_sources(...)` is its dry twin,
-  naming each key's source without binding it (what a dry run
-  reports).
+  `PropertyBindingError`. Returns a `BoundProperties`.
+  `describe_sources(script, *, parameters=None, explicit=None)` is
+  its dry twin, naming each key's source without binding it (what a
+  dry run reports).
 
 `create_machine`, `recreate_machine`, and `apply_blueprint` accept
-`properties=` and `properties_file=`: any `${key}` a media
-`location` (or `sha256`) references binds through the same source
-order before materialization, and the resolved location is recorded
-in the machine state (`start` never re-resolves it). A bound value
+`properties=`, beside the record's selected file: any `${key}` a
+media `location` (or `sha256`) references binds through the same
+source order before materialization, and the resolved location is
+recorded in the machine state (`start` never re-resolves it). A bound value
 that is itself a reference is refused. See the blueprint guide for
 the `location` grammar.
 

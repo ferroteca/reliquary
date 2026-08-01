@@ -3401,7 +3401,9 @@ is waiting on an answer today.
   **at first use, not at `Context` construction**, so a context may
   be built before it is filled and the diagnostic names what was
   asked for rather than the root of a cascade nobody put a question
-  about.
+  about. [P26 supersedes the first-use raising: the session refuses
+  at construction, the id intact — a record may still be built
+  before a session is opened on it.]
 
   **THE RULE IS ONE RULE; ONLY THE DEFAULTING DIFFERS.** The CLI
   assigns the default home whenever neither a flag nor the
@@ -3418,7 +3420,9 @@ is waiting on an answer today.
   **THE NAMING: ONE SPELLING FOR ALL SIX.** `--home-dir`,
   `--blueprints-dir`, `--scripts-dir`, `--cache-dir`,
   `--media-dir`, `--machines-dir`, with API twins `set_*_dir()` and
-  `Context` keywords of the same names; `media_cache_dir` /
+  `Context` keywords of the same names [P26 deletes `set_*_dir()`
+  and the globals behind them; the `Context` keywords at the
+  session's door are the surviving spelling]; `media_cache_dir` /
   `machines_cache_dir` lose the infix, `home()` becomes
   `home_dir()`. **WEIGHED AND DECLINED: keeping `--home` and
   `--cache` bare** beside four suffixed newcomers — two spellings
@@ -3430,7 +3434,10 @@ is waiting on an answer today.
   accretion, not against decision (the 2026-07-27 invocation-knob
   sweep), and this is the decision. They are honoured **at the CLI
   only** — a library must not acquire a directory from the
-  developer's shell — so nothing is read at import.
+  developer's shell — so nothing is read at import. [P26 keeps the
+  rule and moves the mechanism: the CLI honours them in its own
+  construction of the session's record, and `adopt_environment()`
+  is deleted.]
 
   **`--assets` IS RETIRED, AND WITH IT ONE KNOB ANSWERING TWO
   QUESTIONS.** It existed to name a project asset root because
@@ -3472,7 +3479,9 @@ is waiting on an answer today.
   than accidents. `Context` becomes a **plain record** — six
   nullable paths plus `autoseed`, no methods — which answers P7's
   question about six keyword arguments from C or Java, and frees
-  `cache_dir` to be the resolver it reads as. And seeding **on
+  `cache_dir` to be the resolver it reads as. [P26: the record is
+  now the session's initialization value and carries the selected
+  properties file; D88 had already deleted `autoseed`.] And seeding **on
   request** (`seed-blueprint` / `seed-script`) targets the assigned
   directory wherever it is rather than always the home: it is an
   explicit act naming the codex as its source, which is the use the

@@ -11,8 +11,10 @@ SPDX-License-Identifier: GPL-3.0-only
 > four maintenance verbs with their API twins; **secret storage** —
 > the credential-store capability behind a provider seam, the entry
 > channels, the fail-safe update order and orphan handling; **file
-> selection** — `--properties` / `RELIQUARY_PROPERTIES` /
-> `properties_file=`, credentials scoped by the selected file's
+> selection** — `--properties` / `RELIQUARY_PROPERTIES` (the CLI's
+> channels, arriving through the record it builds) / the
+> `Context`'s `properties_file` slot (P26's cargo, the API's one
+> channel), credentials scoped by the selected file's
 > absolute path; **binding into a run** — the layered sources (flag,
 > blueprint parameter with its redirect, environment with collision
 > preflight, file, the **declared derivation** with its `rlq.*` host
@@ -158,7 +160,8 @@ document owns the operator-side mechanics:
   for secrets.
 - **The properties file** — `user.properties` in the Reliquary
   home, or the file named by `--properties <path>` (environment
-  `RELIQUARY_PROPERTIES`; API `properties_file=`), which
+  `RELIQUARY_PROPERTIES`; API: the record's `properties_file`
+  slot), which
   *replaces* the home file for that invocation rather than
   layering over it. Pointing it at a project-controlled file
   makes a run hermetic: nothing from the operator's personal

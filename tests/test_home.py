@@ -1,33 +1,22 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Tests for working-directory resolution: the six placeable dirs."""
+"""Tests for working-directory resolution: the six placeable dirs.
+
+There is no process-global assignment any more (P26): the ``Context``
+record a session is opened on carries everything, so what is asserted
+here is the record's own resolution — slots, derivation, the
+fail-closed refusal — and that nothing ambient stands behind it.
+"""
 
 import os
 import unittest
 
-import importlib
-
+from reliquary import home
 from reliquary.errors import StaticError
 
-home = importlib.import_module("reliquary.home")
 
-
-class _Isolated(unittest.TestCase):
-    """Every test starts with all six directories unassigned."""
-
-    def setUp(self):
-        saved = dict(home._globals)
-        self.addCleanup(home._globals.update, saved)
-        for name in home.DIRECTORIES:
-            home._globals[name] = None
-
-
-class UnassignedTests(_Isolated):
-    """Nothing has a value at startup, and asking is an error."""
-
-    def test_every_directory_starts_unassigned(self):
-        for name in home.DIRECTORIES:
-            self.assertFalse(home.is_assigned(name), name)
+class UnassignedTests(unittest.TestCase):
+    """An empty record holds nothing, and asking is an error."""
 
     def test_each_directory_fails_closed_naming_itself(self):
         resolvers = {
@@ -54,59 +43,23 @@ class UnassignedTests(_Isolated):
         self.assertIn("'cache' or 'home'", message)
 
 
-class DerivationTests(_Isolated):
-    """Assignment cascades, and only into what is still unassigned."""
+class EnvironmentTests(unittest.TestCase):
+    """The variables name themselves; the library reads none of them."""
 
-    def test_home_reaches_all_six(self):
-        home.set_home_dir(os.path.join("some", "home"))
-        root = os.path.abspath(os.path.join("some", "home"))
-        self.assertEqual(home.home_dir(), root)
-        self.assertEqual(home.blueprints_dir(),
-                         os.path.join(root, "blueprints"))
-        self.assertEqual(home.scripts_dir(),
-                         os.path.join(root, "scripts"))
-        self.assertEqual(home.cache_dir(), os.path.join(root, "cache"))
-        self.assertEqual(home.media_dir(),
-                         os.path.join(root, "cache", "media"))
-        self.assertEqual(home.machines_dir(),
-                         os.path.join(root, "cache", "machines"))
+    def test_the_variable_name_follows_the_flag(self):
+        self.assertEqual(home.environment_variable("home"),
+                         "RELIQUARY_HOME_DIR")
+        self.assertEqual(home.environment_variable("blueprints"),
+                         "RELIQUARY_BLUEPRINTS_DIR")
 
-    def test_an_explicit_cache_wins_over_the_derived_one(self):
-        home.set_home_dir(os.path.join("some", "home"))
-        home.set_cache_dir(os.path.join("fast", "disk"))
-        fast = os.path.abspath(os.path.join("fast", "disk"))
-        self.assertEqual(home.cache_dir(), fast)
-        self.assertEqual(home.media_dir(), os.path.join(fast, "media"))
-        self.assertEqual(home.blueprints_dir(),
-                         os.path.join(os.path.abspath(
-                             os.path.join("some", "home")), "blueprints"))
+    def test_the_environment_is_never_read(self):
+        """A library must not acquire a directory from the shell.
 
-    def test_cache_alone_conjures_no_home(self):
-        home.set_cache_dir(os.path.join("only", "cache"))
-        self.assertEqual(home.media_dir(),
-                         os.path.join(os.path.abspath(
-                             os.path.join("only", "cache")), "media"))
-        with self.assertRaises(StaticError):
-            home.home_dir()
-        with self.assertRaises(StaticError):
-            home.blueprints_dir()
-
-    def test_machines_alone_leaves_media_where_the_rest_puts_it(self):
-        home.set_home_dir(os.path.join("some", "home"))
-        home.set_machines_dir(os.path.join("big", "disk"))
-        self.assertEqual(home.machines_dir(),
-                         os.path.abspath(os.path.join("big", "disk")))
-        self.assertEqual(
-            home.media_dir(),
-            os.path.join(os.path.abspath(os.path.join("some", "home")),
-                         "cache", "media"))
-
-
-class EnvironmentTests(_Isolated):
-    """The environment assigns, and only what nothing else has."""
-
-    def _pin(self, name, value):
-        variable = home.environment_variable(name)
+        The environment is honoured by the CLI's own construction
+        step and nowhere else, so an exported variable changes
+        nothing about an engine call's resolution.
+        """
+        variable = home.environment_variable("home")
         saved = os.environ.get(variable)
 
         def restore():
@@ -116,72 +69,59 @@ class EnvironmentTests(_Isolated):
                 os.environ[variable] = saved
 
         self.addCleanup(restore)
-        os.environ[variable] = value
-
-    def test_the_variable_name_follows_the_flag(self):
-        self.assertEqual(home.environment_variable("home"),
-                         "RELIQUARY_HOME_DIR")
-        self.assertEqual(home.environment_variable("blueprints"),
-                         "RELIQUARY_BLUEPRINTS_DIR")
-
-    def test_adopting_assigns_every_named_directory(self):
-        for name in home.DIRECTORIES:
-            self._pin(name, os.path.join("env", name))
-        home.adopt_environment()
-        self.assertEqual(home.machines_dir(),
-                         os.path.abspath(os.path.join("env", "machines")))
-        self.assertEqual(home.blueprints_dir(),
-                         os.path.abspath(os.path.join("env", "blueprints")))
-
-    def test_an_explicit_assignment_wins_over_the_environment(self):
-        self._pin("home", os.path.join("env", "home"))
-        home.set_home_dir(os.path.join("flag", "home"))
-        home.adopt_environment()
-        self.assertEqual(home.home_dir(),
-                         os.path.abspath(os.path.join("flag", "home")))
-
-    def test_nothing_is_read_at_import(self):
-        """A library must not acquire a directory from the shell.
-
-        The environment is honoured by the CLI's own step, so an
-        embedding call is unaffected by whatever the developer has
-        exported. Isolation here has already cleared the globals; what
-        this asserts is that resolution does not consult the
-        environment behind them.
-        """
-        self._pin("home", os.path.join("env", "home"))
+        os.environ[variable] = os.path.join("env", "home")
         with self.assertRaises(StaticError):
             home.home_dir()
 
 
-class ContextTests(_Isolated):
-    """A Context pins slots per call, independent of the globals."""
+class DerivationTests(unittest.TestCase):
+    """A record's slots cascade, and only into what is unassigned."""
 
-    def setUp(self):
-        super().setUp()
-        home.set_home_dir(os.path.join("global", "home"))
-        home.set_cache_dir(os.path.join("global", "cache"))
-
-    def test_explicit_slots_ignore_the_globals(self):
-        context = home.Context(
-            home_dir=os.path.join("scoped", "home"),
-            cache_dir=os.path.join("scoped", "cache"))
-        self.assertEqual(home.home_dir(context),
-                         os.path.abspath(os.path.join("scoped", "home")))
+    def test_a_home_reaches_all_six(self):
+        context = home.Context(home_dir=os.path.join("some", "home"))
+        root = os.path.abspath(os.path.join("some", "home"))
+        self.assertEqual(home.home_dir(context), root)
+        self.assertEqual(home.blueprints_dir(context),
+                         os.path.join(root, "blueprints"))
+        self.assertEqual(home.scripts_dir(context),
+                         os.path.join(root, "scripts"))
         self.assertEqual(home.cache_dir(context),
-                         os.path.abspath(os.path.join("scoped", "cache")))
+                         os.path.join(root, "cache"))
+        self.assertEqual(home.media_dir(context),
+                         os.path.join(root, "cache", "media"))
+        self.assertEqual(home.machines_dir(context),
+                         os.path.join(root, "cache", "machines"))
 
-    def test_an_unfilled_slot_falls_through_to_the_globals(self):
-        context = home.Context(home_dir=os.path.join("scoped", "home"))
-        self.assertEqual(home.cache_dir(context),
-                         os.path.abspath(os.path.join("global", "cache")))
+    def test_an_explicit_cache_wins_over_the_derived_one(self):
+        context = home.Context(home_dir=os.path.join("some", "home"),
+                               cache_dir=os.path.join("fast", "disk"))
+        fast = os.path.abspath(os.path.join("fast", "disk"))
+        self.assertEqual(home.cache_dir(context), fast)
+        self.assertEqual(home.media_dir(context),
+                         os.path.join(fast, "media"))
+        self.assertEqual(home.blueprints_dir(context),
+                         os.path.join(os.path.abspath(
+                             os.path.join("some", "home")), "blueprints"))
 
-    def test_a_scoped_slot_derives_for_its_children(self):
-        context = home.Context(cache_dir=os.path.join("scoped", "cache"))
+    def test_cache_alone_conjures_no_home(self):
+        context = home.Context(cache_dir=os.path.join("only", "cache"))
+        self.assertEqual(home.media_dir(context),
+                         os.path.join(os.path.abspath(
+                             os.path.join("only", "cache")), "media"))
+        with self.assertRaises(StaticError):
+            home.home_dir(context)
+        with self.assertRaises(StaticError):
+            home.blueprints_dir(context)
+
+    def test_machines_alone_leaves_media_where_the_rest_puts_it(self):
+        context = home.Context(home_dir=os.path.join("some", "home"),
+                               machines_dir=os.path.join("big", "disk"))
+        self.assertEqual(home.machines_dir(context),
+                         os.path.abspath(os.path.join("big", "disk")))
         self.assertEqual(
             home.media_dir(context),
-            os.path.join(os.path.abspath(os.path.join("scoped", "cache")),
-                         "media"))
+            os.path.join(os.path.abspath(os.path.join("some", "home")),
+                         "cache", "media"))
 
     def test_bare_string_is_sugar_for_the_home(self):
         self.assertEqual(
@@ -190,16 +130,12 @@ class ContextTests(_Isolated):
                 os.path.abspath(os.path.join("scoped", "home")),
                 "blueprints"))
 
-    def test_none_context_uses_the_globals(self):
-        self.assertEqual(home.cache_dir(None),
-                         os.path.abspath(os.path.join("global", "cache")))
-
     def test_a_context_may_be_built_before_it_is_usable(self):
-        """The error fires at first use, not at construction."""
+        """The refusal fires at use, not at record construction."""
         self.assertIsNone(home.Context().media_dir)
 
 
-class PinnedTests(_Isolated):
+class PinnedTests(unittest.TestCase):
     """The record-only resolution the session pins at its door."""
 
     def test_a_home_alone_fills_all_six(self):
@@ -224,13 +160,6 @@ class PinnedTests(_Isolated):
         self.assertEqual(pinned.cache_dir, fast)
         self.assertEqual(pinned.media_dir, os.path.join(fast, "media"))
 
-    def test_the_globals_are_never_read(self):
-        home.set_home_dir(os.path.join("global", "home"))
-        home.set_cache_dir(os.path.join("global", "cache"))
-        pinned = home._pinned(os.path.join("some", "home"))
-        root = os.path.abspath(os.path.join("some", "home"))
-        self.assertEqual(pinned.cache_dir, os.path.join(root, "cache"))
-
     def test_what_the_record_cannot_derive_stays_none(self):
         pinned = home._pinned(home.Context(
             cache_dir=os.path.join("only", "cache")))
@@ -250,7 +179,7 @@ class PinnedTests(_Isolated):
             os.path.abspath(os.path.join("some", "project.properties")))
 
 
-class NoSeedingAxisTests(_Isolated):
+class NoSeedingAxisTests(unittest.TestCase):
     """There is no seeding axis at all: a miss is a miss (D88).
 
     The knob these tests used to exercise is deleted rather than
@@ -268,6 +197,24 @@ class NoSeedingAxisTests(_Isolated):
 
     def test_no_seeding_switch_survives(self):
         for gone in ("autoseed", "set_autoseed", "_autoseed"):
+            self.assertFalse(hasattr(home, gone), gone)
+
+
+class NoGlobalsTests(unittest.TestCase):
+    """The carrier mechanism P26 retired is gone, not dormant.
+
+    The directory globals, their setters, the environment adoption
+    and the assignment probe were deleted with the surface move; a
+    survivor here would be a second carrier waiting to disagree with
+    the record.
+    """
+
+    def test_the_global_machinery_is_deleted(self):
+        for gone in ("_globals", "_assign", "set_home_dir",
+                     "set_blueprints_dir", "set_scripts_dir",
+                     "set_cache_dir", "set_media_dir",
+                     "set_machines_dir", "is_assigned",
+                     "adopt_environment"):
             self.assertFalse(hasattr(home, gone), gone)
 
 

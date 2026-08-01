@@ -22,7 +22,6 @@ from unittest import mock
 
 import reliquary
 from reliquary import backends, cli
-from reliquary import home as home_module
 from reliquary.backends import Capabilities
 from reliquary.errors import PreflightError, StaticError
 from reliquary.home import Context
@@ -728,8 +727,6 @@ class ScriptDryRunCliTests(unittest.TestCase):
     """The surface collisions the respelling had to settle."""
 
     def setUp(self):
-        saved = dict(home_module._globals)
-        self.addCleanup(home_module._globals.update, saved)
         self.workdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workdir.cleanup)
         self.home = self.workdir.name

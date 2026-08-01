@@ -4,10 +4,11 @@
 
 Reliquary has six working directories and every one of them is
 placeable: ``home``, ``blueprints``, ``scripts``, ``cache``, ``media``
-and ``machines``. Each starts **unassigned**. A value arrives by
-explicit assignment — a ``set_*_dir`` call, the CLI's matching
-``--*-dir`` flag, or the matching ``RELIQUARY_*_DIR`` environment
-variable — and every default is *derived* rather than pre-set:
+and ``machines``. Each starts **unassigned**. A value arrives in the
+``Context`` record a session is opened on — the CLI builds one per
+invocation from its ``--*-dir`` flags, the ``RELIQUARY_*_DIR``
+environment variables, and the default home — and every default is
+*derived* rather than pre-set:
 
 - assigning ``home`` gives default locations under it to
   ``blueprints``, ``scripts`` and ``cache``;
@@ -16,29 +17,28 @@ variable — and every default is *derived* rather than pre-set:
 
 Derivation reaches only what is still unassigned, so assigning
 ``cache`` alone conjures no home, and assigning ``machines`` alone
-leaves ``media`` wherever the rest of the resolution puts it.
+leaves ``media`` wherever the rest of the resolution puts it. There
+is no process-global assignment: the record carries everything, so
+two sessions in one process are unremarkable (P26).
 
-**Unassigned is a fail-closed error**, raised at first use — not at
-``Context`` construction, so a context may be built now and filled
-later, and the diagnostic names the directory actually needed rather
-than the root of a cascade nobody asked about.
+**A record with no home is a fail-closed error at the session's
+door**: construction refuses (``dir.unassigned``), naming the home,
+before any call could find a directory unassigned — an assigned
+home reaching all six by derivation. The same refusal survives at
+first use inside the engine, for a resolution reached with a bare
+record; one rule, one id, wherever it is noticed.
 
 The two surfaces differ only in whether an assignment is made on the
 caller's behalf. The **CLI** gives ``home`` its default whenever
-neither a flag nor the environment named one — since the session's
-first landing (P26), in the per-invocation ``Context`` it opens its
-session on, never in this module's globals — so one assignment
-reaches all six and the error is unreachable at the keyboard: a
+neither a flag nor the environment named one, so one assignment
+reaches all six and the refusal is unreachable at the keyboard: a
 property of that default rather than an exemption from the rule,
 which matters because a property survives the default changing and
 an exemption would have to be re-argued. The **embedding API**
-assigns nothing, so a library call never silently picks up the
-developer's home; there the error is reachable, and it is the whole
-safety of the design.
-
-One further behaviour follows the same CLI-only rule, for the same
-reason: honouring the environment, which the CLI does in that same
-private construction step.
+assigns nothing — a session demands its home at the door — so a
+library call never silently picks up the developer's home. Honouring
+the environment is likewise the CLI's private construction step and
+never the library's: nothing here reads the environment.
 """
 
 import os
@@ -63,84 +63,15 @@ _DERIVED_FROM = {
     "machines": ("cache", "machines"),
 }
 
-# Process-global assignments, all unassigned at import. Nothing is
-# read from the environment here: that is the CLI's step, and doing
-# it at import would make an embedding call's resolution depend on
-# the developer's shell — exactly what the API rule forbids.
-_globals = dict.fromkeys(DIRECTORIES)
-
-
 def environment_variable(name):
     """The environment variable that assigns directory ``name``.
 
     One mechanical rule — ``RELIQUARY_`` plus the flag's own name —
     so ``--blueprints-dir`` is ``RELIQUARY_BLUEPRINTS_DIR`` and there
-    is nothing per-directory to remember.
+    is nothing per-directory to remember. Honoured by the CLI's
+    construction step alone; this module never reads it.
     """
     return "RELIQUARY_%s_DIR" % name.upper()
-
-
-def _assign(name, path):
-    _globals[name] = os.path.abspath(path)
-
-
-def set_home_dir(path):
-    """Assign the home; ``blueprints``/``scripts``/``cache`` derive."""
-    _assign("home", path)
-
-
-def set_blueprints_dir(path):
-    """Assign where machine blueprints resolve from and seed to."""
-    _assign("blueprints", path)
-
-
-def set_scripts_dir(path):
-    """Assign where automation scripts resolve from and seed to."""
-    _assign("scripts", path)
-
-
-def set_cache_dir(path):
-    """Assign the regenerable cache root; ``media``/``machines`` derive."""
-    _assign("cache", path)
-
-
-def set_media_dir(path):
-    """Assign where fetched media payloads are cached."""
-    _assign("media", path)
-
-
-def set_machines_dir(path):
-    """Assign where machines materialize."""
-    _assign("machines", path)
-
-
-def is_assigned(name):
-    """Whether directory ``name`` has a process-global assignment.
-
-    Assignment, not resolvability: a derived directory answers False
-    here while resolving perfectly well. The CLI used to ask so it
-    could default the home only when nothing named one; that check
-    now lives in its private construction step, so nothing in-tree
-    asks any more.
-    """
-    return _globals[name] is not None
-
-
-def adopt_environment():
-    """Assign whatever the environment names, filling unassigned slots.
-
-    A CLI behaviour, never the API's — though since the session's
-    first landing (P26) the CLI honours the environment in its own
-    construction step and no longer calls this. It stays present and
-    public, with the globals it fills, until the surface moves once.
-    Explicit assignment wins: this only fills what is still
-    unassigned.
-    """
-    for name in DIRECTORIES:
-        if _globals[name] is None:
-            value = os.environ.get(environment_variable(name))
-            if value:
-                _assign(name, value)
 
 
 def documents_dir():
@@ -200,15 +131,13 @@ class Context:
     from C or Java where keyword arguments would not (P7) — and it
     leaves ``cache_dir`` free to be the resolver it reads as.
 
-    Every reliquary function that resolves a working directory takes a
-    ``context=``. Omitting it uses the process-global assignments;
-    passing a plain string is sugar for ``Context(home_dir=...)``;
-    passing a ``Context`` pins whatever slots it fills, per call and
-    independent of the globals, with the rest falling through to them
-    and then to derivation. The CLI builds exactly one per
+    Every engine function that resolves a working directory takes a
+    ``context=``: a plain string is sugar for ``Context(home_dir=...)``,
+    and a ``Context`` pins whatever slots it fills, the rest deriving.
+    The session pins the whole record once at construction and hands
+    it to every call (P26); the CLI builds exactly one per
     invocation — from its flags, the environment, and the default
-    home — and opens its session on it (P26); scoped contexts remain
-    an embedding capability.
+    home — and opens its session on it.
 
     ``properties_file`` rides beside the six (P26): the selected
     properties file is ambient state exactly as the directories are,
@@ -277,12 +206,9 @@ def _unassigned(name):
 
 
 def _resolve(name, context):
-    """Resolve one directory: per-call, then global, then derived."""
+    """Resolve one directory: the record's slot, then derivation."""
     context = _ctx(context)
     assigned = getattr(context, "%s_dir" % name)
-    if assigned:
-        return assigned
-    assigned = _globals[name]
     if assigned:
         return assigned
     derivation = _DERIVED_FROM.get(name)
@@ -319,8 +245,8 @@ def _pinned(context=None):
     """Return ``context`` with every derivable slot filled, from it
     alone.
 
-    The resolution a caller would get who pinned every slot: per-call
-    assignment then derivation, with the process globals never read.
+    The resolution a caller would get who pinned every slot:
+    per-call assignment then derivation, from the record alone.
     This is the session's construction step (P26 — the session
     carries the six directories, once). A slot the record cannot
     derive — anything, when it holds no home — stays ``None`` rather

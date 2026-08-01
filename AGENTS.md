@@ -28,15 +28,15 @@ workflow:
   `describe` (the one human line per event both human modes share), and the `pretty` / `plain` / `jsonl` renderers,
   with the output discipline enforced there: human modes render everything to stderr and leave stdout empty, `jsonl`
   owns stdout alone; `home.py` owns the six placeable working
-  directories — assignment, the derivation cascade, the fail-closed unassigned error, and the
-  `Context` record every path-resolving function accepts, which also carries the selected
-  properties file (P26's cargo); `session.py` is the **unexported** `Session` P26 pledges —
-  opened on what `context=` accepts (a bare home string or a `Context`), refusing construction
+  directories — the derivation cascade, the fail-closed unassigned error, and the
+  `Context` record every path-resolving engine function accepts, which also carries the selected
+  properties file (P26's cargo); `session.py` is the exported **`Session`**, P26's one door —
+  opened on a bare home string or a `Context`, refusing construction
   without a home (`dir.unassigned`, the first-use rule moved to the door), pinning the record
-  once at construction from that record alone (no module-global state read or written, so two
+  once at construction from that record alone (no module-global state exists, so two
   sessions in one process are unremarkable), and forwarding one thin veneer method per
   ambient-state verb to the engine modules; the codex verbs (CLI-only, D87) and the pure
-  parsers take no veneer, `Session` stays unexported until the public surface moves once, and
+  parsers take no veneer, and
   the CLI is its first consumer; `assets.py` owns authored-asset residency: one resolution
   source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, and no
   seeding axis behind it), `source_for`, and the
@@ -464,10 +464,10 @@ USE-CASES.md disagree, the principles and use cases govern; the design is realig
 ### CLI–API parity
 
 The CLI and the embedding API are two presentations of one semantic surface, and keeping them in sync is
-extraordinarily important. Every command maps one-to-one onto a public API call with the same semantics;
-nothing is CLI-only, and no public capability may be unreachable from the CLI — it is the fallback binding
-for every language without a native one. A change to this surface lands on both presentations in the same
-change, never deferred to a later pass.
+extraordinarily important. Every command maps one-to-one onto a `Session` method with the same semantics
+(P26); nothing is CLI-only outside the codex family's named exception, and no public capability may be
+unreachable from the CLI — it is the fallback binding for every language without a native one. A change to
+this surface lands on both presentations in the same change, never deferred to a later pass.
 
 ### Platform selection
 
@@ -497,32 +497,31 @@ must remain the default and fallback.
 
 **Six working directories, every one placeable** (`home.py`; normative:
 docs/spec/asset-resolution.md "The working directories"): `home`, `blueprints`, `scripts`, `cache`, `media`,
-`machines`. Each starts **unassigned**; a value arrives by `set_<name>_dir()`, the CLI's `--<name>-dir` flag, or
-`RELIQUARY_<NAME>_DIR`, and the rest **derive** — `home` gives default locations to `blueprints`/`scripts`/`cache`,
+`machines`. Each starts **unassigned**; a value arrives in the `Context` record a session is opened on — the CLI's
+`--<name>-dir` flags and `RELIQUARY_<NAME>_DIR` variables land there through its construction step — and the rest
+**derive** — `home` gives default locations to `blueprints`/`scripts`/`cache`,
 and `cache` (assigned or derived) gives them to `media`/`machines`. Derivation reaches only what is still unassigned,
 so `cache` alone conjures no home and `machines` alone leaves `media` where the rest of the resolution puts it.
-**Unassigned is a fail-closed `StaticError` (`dir.unassigned`) naming the directory**, raised at first use rather than
-at `Context` construction, so the diagnostic names what was actually needed and a context may be built before it is
-filled.
+**A record with no home is a fail-closed `StaticError` (`dir.unassigned`) at the session's door**, naming the home —
+an assigned home reaches all six by derivation, so nothing a session does can find a directory unassigned; a bare
+`Context` may still be built and filled before a session is opened on it.
 
 The surfaces differ only in whether an assignment is made for the caller. **The CLI** gives `home` its default
 (`Documents/reliquary`, falling back to `~/reliquary`) whenever neither a flag nor the environment named one, so one
-assignment reaches all six and the error is unreachable at the keyboard — **a property of that default, not an
+assignment reaches all six and the refusal is unreachable at the keyboard — **a property of that default, not an
 exemption from the rule**, which is what keeps it true if the default ever changes. **The embedding API** assigns
-nothing, and there the error is reachable; that is the whole safety of the design. Honouring the environment is
-likewise the CLI's step and never the library's — since the session's first landing, a private construction step
-inside `cli.py` (`adopt_environment()` remains public, uncalled in-tree, until the surface moves).
+nothing — the session demands its home at the door; that is the whole safety of the design. Honouring the environment
+is likewise the CLI's private construction step and never the library's: the engine reads no environment at all.
 
 `Context` is a **plain record** of the six optional directory paths plus the selected properties file (P26's cargo
 ruling) and nothing else — no methods, all resolution in `home.py`'s module functions — because a handful of nullable
 strings binds cleanly from C or Java where keyword arguments would not
-(P7). Every function resolving a working directory accepts `context=`: omit it for the globals, pass a bare string as
-shorthand for `Context(home_dir=...)`, or pass a `Context` to pin whatever slots it fills per call, unfilled slots
-falling through to the globals and then to derivation. The CLI drives the globals no more: it builds **one `Context`
-per invocation** — flags, then the environment, then the default home — and opens the unexported `Session` on it,
-driving only session methods (the codex family and the locate seam, veneerless by D87, take the same record
-directly); the globals and `set_*_dir()` stay present and public with **no in-tree driver** until the surface moves
-once. `machine.py`'s and the adapters' own `home=` parameters are a different,
+(P7). There is no process-global assignment: the session pins the whole record once at construction, from that record
+alone, so two sessions in one process are unremarkable; the engine functions underneath take the record as their
+`context=` (a bare string is shorthand for `Context(home_dir=...)`), which is the seam the veneer forwards over. The
+CLI builds **one `Context` per invocation** — flags, then the environment, then the default home — and opens one
+`Session` on it, driving only session methods (the codex family and the locate seam, veneerless by D87, take the same
+record directly). `machine.py`'s and the adapters' own `home=` parameters are a different,
 narrower concept — an already-resolved plain directory (sometimes a machine's own materialization directory standing
 in for one), not a `Context`; they were deliberately left alone.
 
@@ -656,18 +655,24 @@ model". Preserve these when touching `script_runner.py`:
 
 ## The embedding surface
 
-The cached-machine model is the sole embedding surface: `machines.py`'s
-flat verb-noun functions (`create_machine` / `start_machine` /
-`stop_machine` / `destroy_machine` / `recreate_machine` /
-`apply_blueprint` / `get_machine_dir` / `resolve_machine` / …) and the
-script runtime (`script_runner.py`'s `run_script`, whose `dry_run=` returns a
-`DryRun` rather than a `ScriptRun`). The
+**The session is the only door** (P26): the exported `Session`,
+opened on a home (a bare path or a `Context`), carries one thin
+veneer method per ambient-state verb — the machines lifecycle with
+its exec, file and variable families, the media family, blueprint
+authoring, asset resolution, properties/credentials/binding, and
+`run_script` (whose `dry_run=` returns a `DryRun` rather than a
+`ScriptRun`) — over the engine modules, which are internal. Beside
+it the root exports the vocabulary: the types, the errors,
+`Context`, `default_home_dir()`, the free parsers, the
+guest-console family at the carrier stratum, and the backend seam's
+read-only vocabulary. The
 milestone-1 root-home runner surface — `workflows.py`'s
 `Runner` / `MachineConfig` / `run_guest_program` / `run_task` / `start`,
 the old root-home state files (a root `machine.json`, `drives/`,
 `vm.json` — distinct from the per-machine cache `machine.json` this
 model writes), and the legacy `drives.py` auto-discovery — was absorbed
-into this model and deleted (no backward compatibility before 1.0). The user-facing reference is
+into this model and deleted, as the module-level verb exports later
+were when the door closed (no backward compatibility before 1.0). The user-facing reference is
 `docs/api-reference.md`; the end-goal API design (settled twin names,
 conventions, handles) is `docs/spec/api.md`.
 
@@ -683,9 +688,11 @@ Doctrine to preserve:
   specific downstream projects; the machine layer stays ignorant of who
   builds on it.
 - The media layer (`media.py`, `library.py`) and the script runtime
-  (`script_runner.py`) are in-repo consumers of this surface and must
-  drive it only through the same public interfaces available to
-  external callers.
+  (`script_runner.py`) are in-repo consumers of this surface and
+  drive the same engine seam the session's veneer drives, nothing
+  deeper — the flat engine functions with their `context=`, exactly
+  what a session method forwards to, never a private helper below
+  them.
 - The project is pre-release; prefer a coherent interface over
   compatibility shims when its architecture changes. The embedding API
   expects native bindings beyond Python (planning/SURFACES.md;

@@ -84,15 +84,14 @@ once answered both questions at once — naming a project root *and*
 declaring hermeticity by the same word — is retired: placement is
 what the directory flags say, and hermeticity is unconditional.
 
-The **embedding API assigns nothing**: a bare call that resolves a
-name with no directory assigned fails closed, naming the directory
-it wanted, so automation never silently picks up user (home) assets
-— or a stray current directory, which is arbitrary for a
-programmatic caller and is not an asset default anywhere. The API
-source is polymorphic: a directory, or a set of JSON-imported
-objects supplied in memory with no files at all (self-identifying by
-`name` — the fileless third source, landing just after the file
-modes).
+The **embedding API assigns nothing**: a session refuses
+construction without a home, naming it, so automation never
+silently picks up user (home) assets — or a stray current
+directory, which is arbitrary for a programmatic caller and is not
+an asset default anywhere. The API source is polymorphic: a
+directory, or a set of JSON-imported objects supplied in memory
+with no files at all (self-identifying by `name` — the fileless
+third source, landing just after the file modes).
 
 **Seeding on request is the only way the codex reaches a tree.**
 `seed-blueprint`
@@ -124,8 +123,9 @@ those directories untouched and a CI tree clean.
 
 Reliquary has **six**, and every one of them is placeable — through
 the CLI and the embedding API alike. Each starts unassigned; values
-arrive by assignment, and the defaults below are *derived* rather
-than pre-set.
+arrive in the `Context` record a session is opened on (P26 — the
+record also carries the selected properties file), and the defaults
+below are *derived* rather than pre-set.
 
 | Directory | Flag | Environment | Derives as |
 |---|---|---|---|
@@ -138,20 +138,26 @@ than pre-set.
 
 Derivation reaches only what is still unassigned, so assigning
 `cache` alone conjures no home and assigning `machines` alone leaves
-`media` where the rest of the resolution puts it. A directory with
-no value when resolution needs it is a **fail-closed error naming
-that directory**, raised at first use rather than at `Context`
-construction.
+`media` where the rest of the resolution puts it. A record with no
+home is a **fail-closed refusal at the session's door**
+(`dir.unassigned`), naming the home — an assigned home reaches all
+six by derivation, so nothing a session does can find a directory
+unassigned. A bare `Context` may still be built and filled before a
+session is opened on it; the refusal is construction's, not the
+record's.
 
 The surfaces differ only in whether an assignment is made for the
-caller. The **CLI** assigns `home` its default —
+caller. The **CLI** gives `home` its default —
 `Documents/reliquary`, falling back to `~/reliquary` — whenever
 neither a flag nor the environment named one, so one assignment
-reaches all six and the error is unreachable at the keyboard. That
-is a property of the default, not an exemption from the rule. The
-**embedding API** assigns nothing, and there the error is reachable;
-that is the safety of the design. Honouring the environment is
-likewise the CLI's behaviour and never the library's.
+reaches all six and the refusal is unreachable at the keyboard.
+That is a property of the default, not an exemption from the rule.
+The **embedding API** assigns nothing — the session demands its
+home at the door; that is the safety of the design. Honouring the
+environment is likewise the CLI's behaviour and never the
+library's: the flags and variables above arrive through the CLI's
+own construction of the record, and the library reads no
+environment.
 
 The home is one of the six, no longer a container for the rest
 ([ARCHITECTURE.md](../../ARCHITECTURE.md) P12). It remains

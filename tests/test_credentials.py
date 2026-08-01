@@ -257,20 +257,19 @@ class PropertiesFileSelectionTests(unittest.TestCase):
         scope = credentials.scope_for("project.properties")
         self.assertIn(os.path.abspath("project.properties"), scope)
 
-    def test_the_environment_selects_the_same_way(self):
-        previous = os.environ.get("RELIQUARY_PROPERTIES")
-        os.environ["RELIQUARY_PROPERTIES"] = self.selected
-        try:
-            properties.set_property("env-key", "value", context=self.home)
-            self.assertTrue(os.path.exists(self.selected))
-            self.assertEqual(
-                properties.list_properties(context=self.home),
-                {"env-key": "value"})
-        finally:
-            if previous is None:
-                del os.environ["RELIQUARY_PROPERTIES"]
-            else:
-                os.environ["RELIQUARY_PROPERTIES"] = previous
+    def test_the_record_slot_selects_the_same_way(self):
+        # The selection rides in the record (P26's cargo). The
+        # environment spelling is the CLI's construction step: the
+        # engine reads no environment, so the slot is the one
+        # programmatic channel.
+        from reliquary.home import Context
+        context = Context(home_dir=self.home,
+                          properties_file=self.selected)
+        properties.set_property("env-key", "value", context=context)
+        self.assertTrue(os.path.exists(self.selected))
+        self.assertEqual(
+            properties.list_properties(context=context),
+            {"env-key": "value"})
 
 
 if __name__ == "__main__":

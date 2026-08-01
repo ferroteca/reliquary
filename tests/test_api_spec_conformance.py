@@ -117,15 +117,18 @@ class TwinNameIdentityTests(unittest.TestCase):
                 for command in sorted(cli._COMMANDS)
                 if command not in exempt}
 
-    def test_every_command_has_an_api_twin(self):
+    def test_every_command_has_a_session_method_twin(self):
+        """The session is the only door (P26): a command's twin is a
+        method of the one exported ``Session``, under the same name
+        with underscores."""
         missing = sorted(
             command for command, twin in self._twins().items()
-            if not hasattr(reliquary, twin))
+            if not hasattr(reliquary.Session, twin))
         self.assertEqual(
             missing, [],
-            f"{missing} are commands with no embedding-API twin. "
+            f"{missing} are commands with no session-method twin. "
             "Nothing is CLI-only outside P6's named exceptions: every "
-            "other command maps one-to-one onto a public API call with "
+            "other command maps one-to-one onto a Session method with "
             "the same semantics (AGENTS.md, CLI-API parity).")
 
     def test_the_codex_exception_is_closed(self):
@@ -133,30 +136,45 @@ class TwinNameIdentityTests(unittest.TestCase):
         allowed to be.
 
         The exemption is a claim in both directions (D87): a codex verb
-        that kept its twin would leave the API able to bind the library
-        while the principle says it cannot, and the exception would be
+        that kept its twin — at the package root or on the session —
+        would leave the API able to bind the library while the
+        principle says it cannot, and the exception would be
         decoration.
         """
         present = sorted(
             verb for verb in _codex_family()
-            if hasattr(reliquary, verb.replace("-", "_")))
+            if hasattr(reliquary, verb.replace("-", "_"))
+            or hasattr(reliquary.Session, verb.replace("-", "_")))
         self.assertEqual(
             present, [],
             f"{present} are exempt from the twin rule as codex verbs "
             "and yet reachable from the embedding API. P6's exception "
             "removes them; it does not merely excuse them.")
 
-    def test_every_twin_is_in_the_declared_surface(self):
-        undeclared = sorted(
+    def test_the_session_is_in_the_declared_surface(self):
+        """The twins' one carrier is itself declared.
+
+        Each twin is a method, so what ``__all__`` owes is the class
+        they hang off; a session absent from the declared surface
+        would make every twin a capability the API does not admit to
+        having.
+        """
+        self.assertIn("Session", reliquary.__all__)
+
+    def test_no_twin_survives_at_the_package_root(self):
+        """The module-verb carrier is gone, not aliased.
+
+        Before the door closed every twin was a root export; a
+        survivor would be a second spelling of a session method, and
+        there are no aliases before 1.0.
+        """
+        survivors = sorted(
             twin for twin in self._twins().values()
-            if hasattr(reliquary, twin)
-            and twin not in reliquary.__all__)
+            if hasattr(reliquary, twin))
         self.assertEqual(
-            undeclared, [],
-            f"{undeclared} are reachable but absent from __all__. The "
-            "package root exposes the intended embedding surface, so "
-            "a twin missing from it is a capability the API does not "
-            "admit to having.")
+            survivors, [],
+            f"{survivors} are session-method twins still reachable at "
+            "the package root. The session is the only door (P26).")
 
     def test_the_exempt_verbs_are_all_commands(self):
         # The exemption is read from the spec, so it can go stale in
