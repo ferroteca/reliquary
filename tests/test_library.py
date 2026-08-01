@@ -38,7 +38,7 @@ OPENBSD_MEDIA = "openbsd-installer"
 OPENBSD_SCRIPT = "openbsd-install"
 EXT = ".rlqb"
 _CODEX_SPEC = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(reliquary.__file__))),
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "docs", "spec", "codex.md")
 
 

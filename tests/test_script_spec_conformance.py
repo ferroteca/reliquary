@@ -33,7 +33,6 @@ from reliquary.script_parser import _DISPLAY, _SIGNATURES
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SPEC = os.path.join(_REPO_ROOT, "docs", "spec", "script-spec.md")
-_PACKAGE = os.path.join(_REPO_ROOT, "reliquary")
 
 _BACKTICKED = re.compile(r"`([^`]+)`")
 _RULE_BULLET = re.compile(r"^- \*\*(V\d+)\*\*", re.M)
