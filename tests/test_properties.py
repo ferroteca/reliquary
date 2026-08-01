@@ -9,7 +9,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from reliquary import credentials, properties
+from reliquary import credentials, home, properties
 from reliquary.properties import PropertiesError
 from tests.test_credentials import FakeStore
 
@@ -311,6 +311,59 @@ class MalformedFileTests(unittest.TestCase):
             [name for name in os.listdir(directory)
              if name.startswith(".user.properties.")],
             [])
+
+
+class SelectedFileTests(unittest.TestCase):
+    """A ``Context`` carries the selected file (P26's cargo)."""
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.home)
+
+    def _pin_env(self, value):
+        saved = os.environ.get("RELIQUARY_PROPERTIES")
+
+        def restore():
+            if saved is None:
+                os.environ.pop("RELIQUARY_PROPERTIES", None)
+            else:
+                os.environ["RELIQUARY_PROPERTIES"] = saved
+
+        self.addCleanup(restore)
+        os.environ["RELIQUARY_PROPERTIES"] = value
+
+    def test_a_context_slot_selects_the_file(self):
+        selected = os.path.join(self.home, "project.properties")
+        context = home.Context(home_dir=self.home,
+                               properties_file=selected)
+        properties.set_property("key", "value", context=context)
+        self.assertTrue(os.path.isfile(selected))
+        self.assertEqual(
+            properties.get_property("key", context=context), "value")
+        # It replaces the home's file rather than layering over it.
+        self.assertIsNone(
+            properties.get_property("key", context=self.home))
+
+    def test_an_explicit_argument_beats_the_context_slot(self):
+        argument = os.path.join(self.home, "argument.properties")
+        context = home.Context(
+            home_dir=self.home,
+            properties_file=os.path.join(self.home, "slot.properties"))
+        properties.set_property("key", "value", context=context,
+                                properties_file=argument)
+        self.assertTrue(os.path.isfile(argument))
+        self.assertFalse(os.path.exists(
+            os.path.join(self.home, "slot.properties")))
+
+    def test_the_context_slot_beats_the_environment(self):
+        self._pin_env(os.path.join(self.home, "env.properties"))
+        selected = os.path.join(self.home, "project.properties")
+        context = home.Context(home_dir=self.home,
+                               properties_file=selected)
+        properties.set_property("key", "value", context=context)
+        self.assertTrue(os.path.isfile(selected))
+        self.assertFalse(os.path.exists(
+            os.path.join(self.home, "env.properties")))
 
 
 if __name__ == "__main__":

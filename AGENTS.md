@@ -29,7 +29,14 @@ workflow:
   with the output discipline enforced there: human modes render everything to stderr and leave stdout empty, `jsonl`
   owns stdout alone; `home.py` owns the six placeable working
   directories — assignment, the derivation cascade, the fail-closed unassigned error, and the
-  `Context` record every path-resolving function accepts; `assets.py` owns authored-asset residency: one resolution
+  `Context` record every path-resolving function accepts, which also carries the selected
+  properties file (P26's cargo); `session.py` is the **unexported** `Session` P26 pledges —
+  opened on what `context=` accepts (a bare home string or a `Context`), refusing construction
+  without a home (`dir.unassigned`, the first-use rule moved to the door), pinning the record
+  once at construction from that record alone (no module-global state read or written, so two
+  sessions in one process are unremarkable), and forwarding one thin veneer method per
+  ambient-state verb to the engine modules; the codex verbs (CLI-only, D87) and the pure
+  parsers take no veneer, and `Session` stays unexported until the public surface moves once; `assets.py` owns authored-asset residency: one resolution
   source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, and no
   seeding axis behind it), `source_for`, and the
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API assigns no
@@ -500,8 +507,9 @@ exemption from the rule**, which is what keeps it true if the default ever chang
 nothing, and there the error is reachable; that is the whole safety of the design. Honouring the environment
 (`adopt_environment()`) is likewise the CLI's step and never the library's.
 
-`Context` is a **plain record** of the six optional paths and nothing else — no methods, all resolution in `home.py`'s
-module functions — because six nullable strings bind cleanly from C or Java where six keyword arguments would not
+`Context` is a **plain record** of the six optional directory paths plus the selected properties file (P26's cargo
+ruling) and nothing else — no methods, all resolution in `home.py`'s module functions — because a handful of nullable
+strings binds cleanly from C or Java where keyword arguments would not
 (P7). Every function resolving a working directory accepts `context=`: omit it for the globals, pass a bare string as
 shorthand for `Context(home_dir=...)`, or pass a `Context` to pin whatever slots it fills per call, unfilled slots
 falling through to the globals and then to derivation. The CLI only ever drives the globals — scoped `Context` objects

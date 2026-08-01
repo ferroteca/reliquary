@@ -54,15 +54,19 @@ def _properties_path(context=None, properties_file=None):
 
     An explicit `properties_file` (CLI `--properties`) *replaces*
     the home's file rather than layering over it, so pointing it at
-    a project-controlled file makes a run hermetic. The
-    `RELIQUARY_PROPERTIES` environment variable selects the same
-    way when no argument does.
+    a project-controlled file makes a run hermetic. A `Context`
+    carrying `properties_file` selects the same way when no argument
+    does — the record is the carrier the session hands around
+    (P26's cargo) — and the `RELIQUARY_PROPERTIES` environment
+    variable when neither names one.
     """
+    from .home import Context, home_dir
+    if properties_file is None and isinstance(context, Context):
+        properties_file = context.properties_file
     if properties_file is None:
         properties_file = os.environ.get("RELIQUARY_PROPERTIES") or None
     if properties_file is not None:
         return os.path.abspath(properties_file)
-    from .home import home_dir
     return os.path.join(home_dir(context), "user.properties")
 
 def _check_key(key):

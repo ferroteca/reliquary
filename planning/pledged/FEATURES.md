@@ -32,53 +32,25 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
-**F32–F34 are one cut** from **P26** — the session layer is the
+**F32–F34 were one cut** from **P26** — the session layer is the
 only door ([pledged/ARCHITECTURE.md](ARCHITECTURE.md)) — whose
 respell is too large for D42's bound, each piece landing
-coherently on its own: the session built (F32), the CLI on it
-(F33), the door closed and the principle armed (F34). The cut is
-staged so the public surface moves **once**: F32 and F33 are
-internal work a consumer never sees, and F34 is the one landing
-that changes the surface, which is where P9's
-coherent-and-complete rule bites — no interval in which two public
-doors stand open.
-
-## F32 — The `Session` object
-
-> Pledged 2026-07-31 (owner), cut from **P26**
-> ([pledged/ARCHITECTURE.md](ARCHITECTURE.md)), which demands it.
-> First of the three: after it the session exists, is complete,
-> and is exercised by the suite — and nothing public has moved.
-> `Session` stays **unexported** until F34 closes the door, so
-> this feature changes no application surface and touches no
-> spec.
-
-1. `session.py`: **`Session`**, opened on what `context=` accepts
-   today — a bare home string or a `Context` — and refusing
-   construction without a home, fail-closed naming what is
-   missing: the construction-time refusal that retires first-use
-   `dir.unassigned` when F34 lands. Two sessions in one process
-   must be unremarkable — construction reads and writes no
-   module-global state.
-2. `Context` grows **`properties_file`** (P26's cargo ruling),
-   and the session hands it to the properties, credentials, and
-   binding veneers the way it hands the directories to
-   everything else.
-3. **The veneer**: one thin session method per ambient-state
-   verb — the machines lifecycle with its exec, file, and
-   variable families, the media family, blueprint authoring,
-   namespace resolution, properties/credentials/binding, and
-   `run_script` — each forwarding to the engine with the stored
-   record and carrying no logic of its own. Pure parse/validate
-   stays free per P26's named boundary; the codex verbs stay
-   CLI-only (P6's named exception, D87) and take no veneer.
-4. Suite coverage driving the session directly, including the
-   two-sessions-two-homes case the globals could never state.
+coherently on its own: the session built (**F32, delivered
+2026-07-31**), the CLI on it (F33), the door closed and the
+principle armed (F34). The cut is staged so the public surface
+moves **once**: F32 was and F33 is internal work a consumer never
+sees, and F34 is the one landing that changes the surface, which
+is where P9's coherent-and-complete rule bites — no interval in
+which two public doors stand open.
 
 ## F33 — The CLI opens a session
 
 > Pledged 2026-07-31 (owner), cut from **P26**; depends on
-> **F32**. The CLI becomes the session layer's first consumer
+> **F32** — delivered 2026-07-31, so that reference now runs
+> *down* the lifecycle: `session.py`'s unexported `Session` is
+> built, pinned on its record, veneered verb for verb, and
+> exercised by the suite.
+> The CLI becomes the session layer's first consumer
 > with **no observable change**: same flags, same environment
 > honoring, same default home, same exit codes — which is what
 > makes it its own sprint, verifiable by the existing CLI suite

@@ -189,9 +189,9 @@ class Context:
 
     A plain record: each slot holds an absolute path or ``None`` for
     unassigned, and all resolution lives in this module's functions.
-    That keeps it six nullable strings, which binds cleanly from C or
-    Java where six keyword arguments would not (P7) — and it leaves
-    ``cache_dir`` free to be the resolver it reads as.
+    That keeps it a handful of nullable strings, which binds cleanly
+    from C or Java where keyword arguments would not (P7) — and it
+    leaves ``cache_dir`` free to be the resolver it reads as.
 
     Every reliquary function that resolves a working directory takes a
     ``context=``. Omitting it uses the process-global assignments;
@@ -201,14 +201,21 @@ class Context:
     and then to derivation. The CLI never builds one — it drives the
     globals from its flags; scoped contexts are an embedding-API
     capability.
+
+    ``properties_file`` rides beside the six (P26): the selected
+    properties file is ambient state exactly as the directories are,
+    so the one record carries it too. ``None`` selects nothing, and
+    the selection in ``properties.py`` then falls through exactly as
+    if no record carried one.
     """
 
     __slots__ = ("home_dir", "blueprints_dir", "scripts_dir",
-                 "cache_dir", "media_dir", "machines_dir")
+                 "cache_dir", "media_dir", "machines_dir",
+                 "properties_file")
 
     def __init__(self, home_dir=None, blueprints_dir=None,
                  scripts_dir=None, cache_dir=None, media_dir=None,
-                 machines_dir=None):
+                 machines_dir=None, properties_file=None):
         self.home_dir = os.path.abspath(home_dir) if home_dir else None
         self.blueprints_dir = (os.path.abspath(blueprints_dir)
                                if blueprints_dir else None)
@@ -218,6 +225,8 @@ class Context:
         self.media_dir = os.path.abspath(media_dir) if media_dir else None
         self.machines_dir = (os.path.abspath(machines_dir)
                              if machines_dir else None)
+        self.properties_file = (os.path.abspath(properties_file)
+                                if properties_file else None)
 
     def __repr__(self):
         filled = ", ".join(
@@ -281,6 +290,39 @@ def _resolve(name, context):
         # would answer a question nobody put. The routes to fix it
         # include that ancestor, so nothing is lost by restating.
         raise _unassigned(name) from None
+
+
+def _derive_from(name, context):
+    """Resolve one directory from ``context`` alone, or ``None``."""
+    assigned = getattr(context, "%s_dir" % name)
+    if assigned:
+        return assigned
+    derivation = _DERIVED_FROM.get(name)
+    if derivation is None:
+        return None
+    parent, leaf = derivation
+    parent_path = _derive_from(parent, context)
+    if parent_path is None:
+        return None
+    return os.path.join(parent_path, leaf)
+
+
+def _pinned(context=None):
+    """Return ``context`` with every derivable slot filled, from it
+    alone.
+
+    The resolution a caller would get who pinned every slot: per-call
+    assignment then derivation, with the process globals never read.
+    This is the session's construction step (P26 — the session
+    carries the six directories, once). A slot the record cannot
+    derive — anything, when it holds no home — stays ``None`` rather
+    than raising, because whether an unfilled slot is an error is the
+    caller's rule, not this record's.
+    """
+    context = _ctx(context)
+    slots = {"%s_dir" % name: _derive_from(name, context)
+             for name in DIRECTORIES}
+    return Context(properties_file=context.properties_file, **slots)
 
 
 def home_dir(context=None):

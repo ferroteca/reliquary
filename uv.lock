@@ -328,7 +328,7 @@ wheels = [
 
 [[package]]
 name = "reliquary"
-version = "0.1.0.dev6"
+version = "0.1.0a2"
 source = { editable = "." }
 dependencies = [
     { name = "keyring" },

@@ -199,19 +199,72 @@ class ContextTests(_Isolated):
         self.assertIsNone(home.Context().media_dir)
 
 
+class PinnedTests(_Isolated):
+    """The record-only resolution the session pins at its door."""
+
+    def test_a_home_alone_fills_all_six(self):
+        pinned = home._pinned(os.path.join("some", "home"))
+        root = os.path.abspath(os.path.join("some", "home"))
+        self.assertEqual(pinned.home_dir, root)
+        self.assertEqual(pinned.blueprints_dir,
+                         os.path.join(root, "blueprints"))
+        self.assertEqual(pinned.scripts_dir,
+                         os.path.join(root, "scripts"))
+        self.assertEqual(pinned.cache_dir, os.path.join(root, "cache"))
+        self.assertEqual(pinned.media_dir,
+                         os.path.join(root, "cache", "media"))
+        self.assertEqual(pinned.machines_dir,
+                         os.path.join(root, "cache", "machines"))
+
+    def test_an_explicit_slot_wins_over_derivation(self):
+        pinned = home._pinned(home.Context(
+            home_dir=os.path.join("some", "home"),
+            cache_dir=os.path.join("fast", "disk")))
+        fast = os.path.abspath(os.path.join("fast", "disk"))
+        self.assertEqual(pinned.cache_dir, fast)
+        self.assertEqual(pinned.media_dir, os.path.join(fast, "media"))
+
+    def test_the_globals_are_never_read(self):
+        home.set_home_dir(os.path.join("global", "home"))
+        home.set_cache_dir(os.path.join("global", "cache"))
+        pinned = home._pinned(os.path.join("some", "home"))
+        root = os.path.abspath(os.path.join("some", "home"))
+        self.assertEqual(pinned.cache_dir, os.path.join(root, "cache"))
+
+    def test_what_the_record_cannot_derive_stays_none(self):
+        pinned = home._pinned(home.Context(
+            cache_dir=os.path.join("only", "cache")))
+        self.assertIsNone(pinned.home_dir)
+        self.assertIsNone(pinned.blueprints_dir)
+        self.assertEqual(
+            pinned.media_dir,
+            os.path.join(os.path.abspath(os.path.join("only", "cache")),
+                         "media"))
+
+    def test_the_properties_file_rides_along(self):
+        pinned = home._pinned(home.Context(
+            home_dir=os.path.join("some", "home"),
+            properties_file=os.path.join("some", "project.properties")))
+        self.assertEqual(
+            pinned.properties_file,
+            os.path.abspath(os.path.join("some", "project.properties")))
+
+
 class NoSeedingAxisTests(_Isolated):
     """There is no seeding axis at all: a miss is a miss (D88).
 
     The knob these tests used to exercise is deleted rather than
     defaulted, so what is left to assert is its absence — a context
-    carries six directories and nothing that decides where a name may
-    come from.
+    carries the working directories and the selected properties file
+    (P26's cargo) and nothing that decides where a name may come
+    from.
     """
 
-    def test_the_record_carries_directories_alone(self):
+    def test_the_record_carries_no_seeding_slot(self):
         self.assertEqual(
             ("home_dir", "blueprints_dir", "scripts_dir", "cache_dir",
-             "media_dir", "machines_dir"), home.Context.__slots__)
+             "media_dir", "machines_dir", "properties_file"),
+            home.Context.__slots__)
 
     def test_no_seeding_switch_survives(self):
         for gone in ("autoseed", "set_autoseed", "_autoseed"):
