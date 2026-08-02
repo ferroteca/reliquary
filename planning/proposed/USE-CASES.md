@@ -661,6 +661,39 @@ spellings shown; every step has its CLI twin (U9).
     `reliquary.destroy_machine("driver-rig-0", ctx)`: nothing
     durable remains but the retrieved results (U14).
 
+**U23 — Test my own Reliquary integration with no hypervisor
+present** — drafted (add, 2026-08-02; the F44 pledge round,
+owner). The gap: a caller building on Reliquary's embedding API
+needs to exercise its *own* integration code — the calls it
+makes, the errors it handles, the branches it takes — without a
+real backend, a real guest, or the wall-clock cost either
+carries. U14 is the nearest case in force ("Drive a machine from
+a program"), but U14 is about driving a *real* machine, and its
+consumers are exactly who a hypervisor-free path would relieve
+of one; nothing names the narrower need of testing the caller's
+own code path against Reliquary's real surface with a stand-in
+guest. Proposed **F12** (the `simulator` backend) and **F44**
+(the `replay` backend) both answer this gap from opposite ends —
+a programmable responder versus a recorded transcript — and both
+were left citing no demand of their own until this entry.
+
+> - **U23 — Test my own Reliquary integration with no hypervisor
+>   present.** A caller has written integration code against
+>   Reliquary's embedding API or CLI — a test suite, a CI job, a
+>   script exercising its own error handling — and wants to run
+>   that code for real, through the real surface, without a
+>   hypervisor installed, a guest booted, or the minutes a real
+>   run costs. What is under test is the caller's own use of
+>   Reliquary, not Reliquary's fidelity to a real machine, so a
+>   stand-in backend that answers truthfully to *that* question —
+>   never fabricating what only a real guest could say — is what
+>   the case asks for. The caller supplies what only it can know
+>   (a programmable responder, or a transcript of a run it once
+>   made for real); Reliquary supplies everything it already owns
+>   — phases, transitions, drive materialization, the control
+>   plane, timing behaviour, failure modes — faithfully and
+>   marked as simulated wherever it is (P11).
+
 ### Pending clarifications
 
 Parked in-place edits — no argument needed, delivered when

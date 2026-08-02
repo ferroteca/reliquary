@@ -38,7 +38,7 @@ nothing is ever reissued.
 
 - **The next D-number to issue is D99** — decisions, recorded in
   [DECISIONS.md](DECISIONS.md).
-- **The next F-number to issue is F47** — features, drafted in
+- **The next F-number to issue is F50** — features, drafted in
   [proposed/FEATURES.md](proposed/FEATURES.md) or cut straight to
   [pledged/FEATURES.md](pledged/FEATURES.md) on pledge.
 - **The next G-number to issue is G8** — the authored language's
@@ -59,7 +59,7 @@ nothing is ever reissued.
   [DECISIONS.md](DECISIONS.md) under the entries that landed them;
   beginning above them is what keeps every T-number in the record
   resolving to exactly one thing.
-- **The next U-number to issue is U23** — use cases, one namespace
+- **The next U-number to issue is U24** — use cases, one namespace
   across proposed, pledged, and the root list.
 - **The next V-number to issue is V17** — the script language's
   static validation rules
