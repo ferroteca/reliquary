@@ -158,4 +158,4 @@ discharge is judgment work, never a script's verdict alone.
   **P21**'s standing question: does each dependency still pull
   its weight better than the stdlib?
 - **Stale after**: one month.
-- **Last performed**: never.
+- **Last performed**: 2026-08-01.
