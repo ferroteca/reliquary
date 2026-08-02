@@ -228,6 +228,20 @@ workflow:
   `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and
   the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
   equality-comparable per-cell attribute tokens) and never per adapter.
+  `screen_stability.py` answers whether the guest has **stopped drawing** — the frame-level question
+  `stable=` cannot ask, a condition being able to hold perfectly on a screen that is still painting. It
+  compares **cells, not rows** (row granularity cannot separate a blinking cursor from an arriving line of
+  text) with the **text+attribute pair as identity** (a cursor menu moves its selection by attribute alone),
+  and measures both halves over **wall-clock windows rather than sample counts** — otherwise a denser poll
+  reaches a different verdict on the same guest, and a recorded run and a production run could take different
+  paths through one script. Stability is the unmasked fraction that held still over the last 200ms, judged
+  against 0.99: 20 cells of 2000, a quarter row, which is the gap between furniture (a cursor 1 cell, a clock
+  8) and content (a row of text, 80). Decoration is **recurrence** — a cell changing 3+ times within 1s —
+  excluded from that fraction, with `_menu_baseline`'s majority-churn bail-out carried over (mask nothing,
+  compare raw). A window never observed answers `stability=None` rather than a verdict the cadence produced
+  (P11). Delivered as F47 and **it has no consumers yet, deliberately**: `exec`'s completion test adopts it
+  under F45, the authored `stability=` surface is F48, and `control_display`'s own `_settled_screen` /
+  `_menu_baseline` retire onto it under F49.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion), `machine.py` is the backend-neutral machine handle:
   a machine is addressed by its materialization directory, the adapter named in the recorded identity supplies
