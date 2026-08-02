@@ -228,6 +228,44 @@ is waiting on an answer today.
 
 ## Decided
 
+- D98 — A CAPTURE IS NOT A RUN RECORD, AND ITS FORMAT IS NOT A
+  SURFACE — DECIDED (owner, 2026-08-01, the F13 pledge round).
+  Supports P22; **bounds D36**.
+
+  **The contested call is whether D36 reaches this.** D36 deleted
+  persisted run output outright — `run-events.jsonl`,
+  `transcript.txt`, the `runs/` archive — and S7 now states the
+  contract as "a run drives the machine and returns its output to
+  whoever started it, storing nothing." F42's `--record <path>`
+  writes screens to disk, which looks like exactly that refusal.
+  It is not: what D36 refused was **persistence as async's
+  substrate**, a record written so another process could follow a
+  run, and it refused it for want of demand. A capture is written
+  only where a maintainer names a path, is read by nothing at
+  runtime, and answers a demand D36 never weighed — P22's gate over
+  a heuristic layer that cannot be tested on fabricated input. D36
+  stands untouched for every run that does not ask.
+
+  **The transcript format is deliberately not an application
+  surface**, and that refusal is recorded because it leaves no other
+  trace: a reader who finds `.rlqt` files and goes looking for the
+  `docs/spec/` entry should learn here that none was ever written.
+  No norm, no stability guarantee, no compatibility obligation — a
+  change to it is housekeeping, not a surface change. What *is*
+  surface is the invocation alone (S1 and S2, landing together under
+  P6). The rejected alternative was a maintainer-only
+  `RELIQUARY_RECORD` environment hatch, which would have left D36
+  and S7 untouched by leaving the capability ungoverned — an
+  undocumented spelling behaving like surface without being weighed
+  as any, in a project whose other `RELIQUARY_*` variables are all
+  specified.
+
+  **What reopens it is F44**: the moment a caller runs flows off a
+  transcript, the format becomes something the world depends on, and
+  it takes the vetting rule and a `docs/spec/` norm with it. That is
+  the whole of what F44 defers, and why the format's standing is
+  stated now rather than discovered then.
+
 - D97 — THE LIST FAMILY SHOWS ITS DESCRIPTIONS; THE DROP EXIT IS
   DECLINED — DECIDED (owner, 2026-08-01). Supports U11; P6, P11.
   Resolves the deferral D88 parked as T8.

@@ -686,69 +686,6 @@ the hook takes a form an unbound language and the CLI can both drive,
 or this backend is knowingly API-only, which is a P6 exception that
 has to be argued and not discovered during implementation.
 
-## F13 — Recorded captures, and the `replay` backend
-
-> **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). **The two tiers below have
-> different demand, and only the first is well-grounded.** Tier 1 is
-> the project's own verification and cites **P22** — the suite is
-> the gate, and this is what would make that gate real for the
-> interpretation layer, which today has no honest way to be tested
-> at all. Tier 2 is public surface and shares F12's uncited demand.
-
-**The primary customer is Reliquary itself**, which is why tier 1 is
-worth building independently of any consumer. The interpretation
-layer is heuristic over real-world text: `_PROMPT_RE` deciding what a
-DOS prompt looks like, `_command_output()` finding the echo by
-scanning back for a row ending with the command and containing `>`,
-`screen_text()`, `wait_text`, `cursor_menu_select`, and everything in
-`script_timing`. **That class of logic cannot be credibly unit tested
-on fabricated input**, because the fabrication encodes the same
-assumptions the heuristic does — you write the screen you believe DOS
-draws, and the parser passes on your own belief. Only captured
-screens carry the weird spacing, the stray CR, the half-drawn menu,
-the prompt that arrived mid-scroll.
-
-**Recording is a debugging tool, not a reward for success.** It is
-worth having *before* the heuristics are reliable, not after: capture
-the boots where prompt detection fails, and each capture becomes a
-regression fixture. The pathological captures are the valuable ones,
-and they are most abundant now. It also makes inspectable what is
-currently only reasoned about — the honest limit that a command
-scrolling more than a screenful leaves only its tail (F14).
-
-TWO TIERS, very different in cost:
-
-1. **Recorded captures as internal test fixtures** — a transcript of
-   screens and timings replayed through the interpretation layer. No
-   public surface, no enum value, no format stability guarantee.
-   Cheap, and justified on its own today.
-2. **A public `--backend replay`** — callers run whole flows off a
-   transcript. Needs a stable format and full lifecycle fidelity;
-   defer, and reuse tier 1's format when it arrives. If it happens,
-   the CLI pairing teaches itself —
-
-       rlq run-script install --record install.rlqt   # once, real QEMU
-       rlq run-script install --backend replay        # thereafter, free
-
-   and the file joins the existing extension family (`.rlqb`,
-   `.rlqs`, `.rlql`) as `.rlqt`.
-
-ONE RULE EITHER TIER NEEDS: **an unmatched request fails loudly.** No
-recorded response for a command is an error — never an improvised
-answer, never empty (P11). Improvising is how a caller ends up
-reporting a pass against a transcript that never covered the case.
-
-TWO DISAMBIGUATIONS, both easy to get wrong. **Against F12**: the
-names are precise *because* both exist — alone, `simulator` would
-overclaim (it models no guest) and `replay` would be too narrow (it
-cannot answer an unrecorded command); side by side each denotes what
-the other does not. **Against F1**, the authoring recorder: that one
-captures a human session to draft a *script*, and its product is
-authored text; this captures screens to test the *parser*, and its
-product is a fixture. Shared machinery is possible and shared purpose
-is not.
-
 ## F14 — Full guest-output capture
 
 > **Entered 2026-07-27** from a consuming project's proposal
@@ -1191,7 +1128,7 @@ ahead:
   exists to prevent.
 - **Properties are bound once, deliberately.** A run today is a
   function of its bound inputs: dry-run's plan, the run record,
-  and the replay ambitions (F13) all lean on that. A mid-run
+  and the replay ambitions (F44) all lean on that. A mid-run
   host input makes outcomes timing-dependent. Screen waits
   already admit timing, but a value channel is a bigger step
   than a signal, and the round prices it or narrows to the
@@ -1355,3 +1292,49 @@ volumes beside the issue-carrying row instead of one unread
 refusal, and the letter map places what is placeable — a surface
 change for the vetting rule, named here so the pledge that cuts
 this feature weighs it rather than discovering it.
+
+## F44 — The `replay` backend
+
+> **Entered 2026-08-01** as the deferred half of F13, that number
+> retiring when the rest of it was pledged as F42 and F43 (D42).
+> **It never shared the pledged half's demand**: F42 and F43 are
+> the project's own verification and cite **P22**, while this is
+> public surface and shares F12's uncited demand — the nearest
+> case, **U14**, is about driving a real machine, so pledging this
+> means drafting the case first (P8).
+
+**Callers run whole flows off a transcript.** The CLI pairing
+teaches itself —
+
+    rlq run-script install --record install.rlqt   # once, real QEMU
+    rlq run-script install --backend replay        # thereafter, free
+
+— and the recording half of that pairing is already F42's, so what
+is left here is the backend value, full lifecycle fidelity, and the
+part that actually costs: **a stable format**.
+
+THAT IS THE WHOLE OF THE DEFERRAL. F42's transcript is deliberately
+not an application surface (D98) — no spec, no stability guarantee,
+a change to it is housekeeping. This feature makes it one, and a
+format promoted to surface takes the vetting rule and a
+`docs/spec/` norm with it. The file keeps the `.rlqt` extension
+F42 claimed, joining the existing family (`.rlqb`, `.rlqs`,
+`.rlql`), so nothing is renamed on the way.
+
+ONE RULE IT INHERITS: **an unmatched request fails loudly.** No
+recorded response for a command is an error — never an improvised
+answer, never empty (P11). Improvising is how a caller ends up
+reporting a pass against a transcript that never covered the case.
+F42 builds this for its own replay session; what this feature adds
+is the obligation to keep it true across a format callers depend
+on.
+
+TWO DISAMBIGUATIONS, both easy to get wrong. **Against F12**: the
+names are precise *because* both exist — alone, `simulator` would
+overclaim (it models no guest) and `replay` would be too narrow (it
+cannot answer an unrecorded command); side by side each denotes what
+the other does not. **Against F1**, the authoring recorder: that one
+captures a human session to draft a *script*, and its product is
+authored text; F42 captures screens to test the *parser*, and its
+product is a fixture. Shared machinery is possible and shared
+purpose is not.
