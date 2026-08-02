@@ -228,6 +228,99 @@ is waiting on an answer today.
 
 ## Decided
 
+- D100 — F12 AND F44 ARE REJECTED OUTRIGHT — DECIDED (owner,
+  2026-08-02, the round directly following D99). Supports P8.
+  Retires both F-numbers for good (D23, no stub).
+
+  D99 withdrew F44's pledge for lack of independent demand and left
+  both proposals sitting in `proposed/FEATURES.md` rather than
+  closing the question. Put to the owner directly, both fail on
+  their own terms rather than merely lacking a citation:
+
+  **F44, the `replay` backend, has no case left once its borrowed
+  demand is gone.** Its only real value — cheap, hypervisor-free
+  reruns of a script — only holds while neither the script nor the
+  guest behaviour behind it changes; the moment either does, the
+  transcript is stale and a fresh recording is needed regardless.
+  What survives that caveat is catching Reliquary's *own*
+  interpretation-layer regressions against a frozen capture, which
+  is **F43's job already** — F44 would only have exposed that
+  internal mechanism publicly for a benefit nobody asked for.
+
+  **F12, the `simulator` backend, has a thread but not one worth the
+  cost.** The one concrete pain it names — consumers monkeypatching
+  `start_machine`/`stop_machine`/`exec` in their own tests — is real
+  but small: a convenience for test authors, not a capability gap
+  blocking anyone. Against that, the entry's own "decide first" left
+  the hard part completely unscoped: what shape a guest-output
+  responder even takes, whether it is expressible in C or Java, and
+  whether it forces a P6 exception — not a detail to settle during
+  implementation, but the whole feature left undesigned. The
+  investment needed to answer those questions honestly is
+  disproportionate to what the thin demand buys back.
+
+  RESOLUTION. Both entries are **struck outright** from
+  `planning/proposed/FEATURES.md` rather than left parked — that
+  shelf holds live arguments waiting on demand, not settled maybes.
+  **F12 and F44 are retired permanently**, no stub left behind
+  (D23): a future proposal wanting either capability starts over on
+  its own argument rather than reopening these. Cross-references
+  updated in the same edit:
+  [design/screen-transcripts.md](design/screen-transcripts.md)'s
+  "What is deliberately not here" section, which named F44 as the
+  format's future public surface, now states plainly that no such
+  surface is coming; F39's citation of "the replay ambitions (F44)"
+  in `proposed/FEATURES.md` is trimmed to what still stands.
+
+- D99 — A DEMAND DRAFTED TO SATISFY THE GATE IS NOT A DEMAND: F44
+  WITHDRAWS, U23 STRIKES — DECIDED (owner, 2026-08-02). Supports
+  P8.
+
+  WHAT STARTED IT. F44 pledged the same round as F45/F47/F48/F49,
+  its own text admitting it cited no demand of its own — the
+  nearest case, U14, being about driving a *real* machine. P8's
+  gate reads "pledging this means drafting the case first," and
+  the round drafted **U23** to satisfy exactly that clause: "test
+  my own Reliquary integration with no hypervisor present." The
+  gate opened. On review the owner named what had actually
+  happened: the case existed to open the gate, not because anyone
+  found an independent use for it.
+
+  THE FAILURE MODE, NAMED FOR REUSE. P8 requires demand *before* a
+  feature precisely so a feature answers a need rather than the
+  need being reverse-engineered from a feature someone already
+  wanted. Drafting a use case *in order to* clear a citation
+  requirement inverts the rule while appearing to satisfy it — the
+  gate reads as passed, and the thing it exists to prevent happens
+  anyway, one level removed. A drafted use case earns its number by
+  describing a need that exists independent of whatever cites it; a
+  use case invented for the citation is not that, whatever its
+  wording.
+
+  THE ONLY GENUINE THREAD, AND IT ISN'T F44'S. Proposed **F12**'s
+  own text names one concrete, present pain: consuming projects
+  monkeypatch `start_machine`/`stop_machine`/`exec` today, asserting
+  against guesses about Reliquary's behaviour rather than its real
+  code path. That is a real, if thin, demand — but it is F12's
+  alone. F44's transcript-driven backend cannot serve it: F12's own
+  text already argues a recording cannot answer a combinatorial or
+  evolving command space, only a live hook can, which is the whole
+  reason F12 exists rather than being folded into a recording-based
+  answer. Taking that argument seriously leaves F44 with no demand
+  of its own — U23's broader "no hypervisor present" framing was
+  carrying weight that belonged, if anywhere, to F12, never to F44.
+
+  RESOLUTION. **F44 withdraws** to
+  [proposed/FEATURES.md](proposed/FEATURES.md) (D44's remedy), the
+  same day it pledged — the promise withdraws, not the design,
+  which stands as written. **U23 strikes outright** rather than
+  narrowing: stripped of F44's borrowed weight it restates a want
+  nobody has separately argued for, and its number is spent and
+  stays spent (no stub, D23). Whether F12's monkeypatch thread
+  deserves its own, narrower use case is left open — that argument
+  was never made here, and should be made on its own footing if
+  anyone wants to make it.
+
 - D98 — A CAPTURE IS NOT A RUN RECORD, AND ITS FORMAT IS NOT A
   SURFACE — DECIDED (owner, 2026-08-01, the F13 pledge round).
   Supports P22; **bounds D36**.

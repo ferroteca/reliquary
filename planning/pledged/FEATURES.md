@@ -112,55 +112,6 @@ Work items:
    they run in the **default** suite, and a failing capture is a
    defect to fix rather than a skip to tolerate.
 
-## F44 — The `replay` backend
-
-> **Pledged 2026-08-02** (owner), the deferred half of F13 as
-> entered 2026-08-01 (that number retired when the rest pledged as
-> **F42** and **F43**, D42). It sat proposed on its own citing no
-> demand — sharing **F12**'s gap, the nearest case being about
-> driving a *real* machine — so this pledge drafts **U23** in
-> [proposed/USE-CASES.md](../proposed/USE-CASES.md), "test my own
-> Reliquary integration with no hypervisor present," which also
-> closes F12's identical gap without pledging F12 itself.
-> Shaped by **P11** and **P6**, and by **D98**, which named this
-> feature outright as the trigger that promotes the `.rlqt`
-> transcript from housekeeping to application surface — the
-> vetting rule and a `docs/spec/` norm arrive with it, never after.
-> Needs **F42** delivered first.
-
-**The pairing is the whole of it**: `--record` teaches the format,
-`--backend replay` spends it —
-
-    rlq run-script install --record install.rlqt   # once, real QEMU
-    rlq run-script install --backend replay         # thereafter, free
-
-— and what this feature adds beyond F42's own replay session is
-full lifecycle fidelity over a format callers can depend on, which
-is exactly the thing D98 refused to call a surface until a caller
-actually did.
-
-Work items:
-
-1. The `replay` backend value in the existing `backend` enum and
-   adapter registry — new values in existing plumbing, per F12's
-   pattern — answering the whole machine lifecycle (create, start,
-   exec, stop, destroy) from a loaded `.rlqt` transcript rather
-   than a real backend session.
-2. The `docs/spec/` norm the format gains on promotion (D98): what
-   `.rlqt` guarantees, what changing it costs, and the vetting rule
-   applied to it from here on — nothing renamed, the extension
-   stays what F42 claimed.
-3. The unmatched-request rule generalized beyond F42's own replay
-   session to every caller of this backend: no recorded response
-   for a command is a loud failure naming the command and the gap,
-   never an improvised or empty answer (P11).
-4. `--backend replay` and its API twin landing together with the
-   command manifest (P6).
-5. Full-lifecycle fidelity tests beyond F43's scripted-corpus
-   scope: a transcript recorded once drives create/start/exec/stop
-   through the replay backend with results indistinguishable from
-   the real run that produced it.
-
 ## F45 — The command wait settles before it reads
 
 > **Pledged 2026-08-02** (owner). Serves **U9**, **U12** and

@@ -167,8 +167,11 @@ deliberately asked to record (D98).
 
 **Not an application surface** (D98): no `docs/spec/` norm, no
 stability guarantee, no compatibility obligation, and a change to it
-is housekeeping. The extension is `.rlqt`, claimed now so that F44
-inherits it rather than renaming.
+is housekeeping. The extension is `.rlqt`, matching the existing
+family (`.rlqb`, `.rlqs`, `.rlql`) — no reservation beyond that. The
+one proposal that would have promoted this format to a surface,
+F44, was rejected outright (D100), so nothing about this format is
+shaped to anticipate a future public one.
 
 What *is* surface is the invocation — `--record <path>` on
 `run-script` and `run_script(record=)` on the session, landing
@@ -176,8 +179,10 @@ together on S1 and S2 (P6).
 
 ## What is deliberately not here
 
-The public `--backend replay` — whole flows run off a transcript —
-is **F44** and stays proposed. It needs a stable format and full
-lifecycle fidelity, and it reuses this format when it arrives.
-Nothing in this design is shaped to anticipate it beyond the
-extension.
+A public backend running whole flows off a transcript was proposed
+as **F44** and rejected (D100): the concrete value it offered —
+cheap reruns of one unchanging script — is F43's job already, and
+the demand it borrowed for anything broader was F12's, which does
+not answer to a recording either. This format stays what it always
+was: a maintainer's own debugging and corpus tool, never something
+a caller drives directly.

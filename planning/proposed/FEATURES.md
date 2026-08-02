@@ -629,63 +629,6 @@ Raised 2026-07-26 in the spec/descriptive round; **the owner agreed
 it needs to win this argument, not that it has** — so unlike F7–F9
 this one was asked for, and still waits on its own case.
 
-## F12 — The `simulator` backend
-
-> **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). **No use case demands it, and
-> saying which one nearly does is the honest way to put it.** The
-> nearest is **U14** — its consumers are exactly who this serves —
-> but U14 is about driving a real machine; a caller testing *its own
-> Reliquary integration* with no hypervisor present is a use nothing
-> in the list names, so pledging this means drafting that case
-> first (P8). What *shapes* it is settled: **P11** (a simulated
-> result reports itself as one) and **P18** (Reliquary attaches no
-> meaning to guest output — so it cannot fabricate it either).
-
-**New values in existing plumbing, not a new seam.** The blueprint
-schema already carries `backend`; `create` writes it into machine
-state, `start` reads it back, and `_backend_dir()` already
-quarantines each backend's artifacts. This is an enum value and the
-adapter behind it.
-
-**Reliquary simulates what it owns**: phases and transitions, boot,
-drive materialization, the control plane, prompt and timing
-behaviour, and the failure modes (`PreflightError` when not running,
-timeouts, cancellation). All of that it knows exactly. It must **not
-simulate guest output** — a component that disclaims understanding
-what a command leaves on the screen cannot coherently fabricate it —
-so the guest half is **programmable**: the caller supplies the
-responder. That constraint is what makes the feature both honest and
-cheap: no transcript format, no recording, no guest modelling. A
-hook.
-
-WHY A HOOK AND NOT A RECORDING. A caller's command space can be
-combinatorial — a per-test invocation of a guest test runner issues a
-distinct command per test, and the set changes whenever a test is
-renamed — so nothing recorded keeps up. But the caller knows exactly
-what its own program prints, which makes answering trivial *for the
-caller* and impossible for Reliquary. What this replaces is real: a
-consumer's unit tests monkeypatch `start_machine` / `stop_machine` /
-`exec` today, which means asserting against guesses about
-Reliquary's behaviour and breaking on a rename. A sanctioned hook
-puts the real code path under those tests.
-
-**Simulated results are marked in the return value**, and the marking
-is not optional: it is P11 at the value level, and it is what lets a
-caller refuse simulated results everywhere outside its own tests —
-the guard against exactly the accident `--dry-run` refuses to
-enable, and it is the reason the two are documented in the same
-breath: the validator shipped 2026-07-29 and deliberately fabricates
-nothing.
-
-DECIDE FIRST, and it is a genuine obstacle rather than a detail:
-**what shape the responder takes under P6 and P7.** A callback is the
-natural Python spelling and one of the harder things to express in C
-or Java, and a callback has no CLI presentation at all — so either
-the hook takes a form an unbound language and the CLI can both drive,
-or this backend is knowingly API-only, which is a P6 exception that
-has to be argued and not discovered during implementation.
-
 ## F14 — Full guest-output capture
 
 > **Entered 2026-07-27** from a consuming project's proposal
@@ -1127,12 +1070,11 @@ ahead:
   already, and the design must not become the flag-channel P19
   exists to prevent.
 - **Properties are bound once, deliberately.** A run today is a
-  function of its bound inputs: dry-run's plan, the run record,
-  and the replay ambitions (F44) all lean on that. A mid-run
-  host input makes outcomes timing-dependent. Screen waits
-  already admit timing, but a value channel is a bigger step
-  than a signal, and the round prices it or narrows to the
-  signal.
+  function of its bound inputs: dry-run's plan and the run
+  record both lean on that. A mid-run host input makes outcomes
+  timing-dependent. Screen waits already admit timing, but a
+  value channel is a bigger step than a signal, and the round
+  prices it or narrows to the signal.
 - **P6 lands every face together**: the CLI command, the
   session twin, and the script-side read or wait arrive in one
   change, and the command manifest gains the capability in the
