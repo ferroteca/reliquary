@@ -1338,3 +1338,459 @@ captures a human session to draft a *script*, and its product is
 authored text; F42 captures screens to test the *parser*, and its
 product is a fixture. Shared machinery is possible and shared
 purpose is not.
+
+## F45 — The command wait settles before it reads
+
+> **Entered 2026-08-02** from the owner's direction. Serves **U9**,
+> **U12** and **U14** — the same three the echo fix served, for the
+> same reason: a caller whose harness is in another language cannot
+> tell a torn read from a real one by inspection, and U14's result
+> *is* the product. Demanded by **P11**: a prompt matched on a
+> half-drawn screen yields confident wrong data, which is the shape
+> P11 forbids. **The record was searched**; two prior rulings bear
+> on it and neither refuses it, but the first constrains its shape —
+> both are engaged below rather than left for the pledge round.
+
+**Reliquary already made this call once, and only applied it where
+it hurt.** `control_display._settled_screen()` waits for the screen
+to change and then requires it to hold steady for two further reads
+before anything acts on it, and its docstring states the reason
+outright: returning at the first difference would hand back a
+half-drawn screen. That is the menu path, which met the failure and
+fixed it.
+
+The command path never got the rule. `interaction_agentless._run()`
+polls, tests `_PROMPT_RE` against the bottom row of whatever frame
+it happened to sample, and on a match returns that frame's rows
+through `_command_output()`. First frame that looks right wins;
+there is no second look.
+
+**THE ASYMMETRY IS THE ARGUMENT.** One project, one guest, one class
+of hazard — a screen read while it is still being painted — handled
+two opposite ways in two files. This proposal does not introduce the
+idea; it observes that the idea is already in force ten feet away
+and asks why the boundary sits where it does.
+
+**WHAT THE FAILURE LOOKS LIKE.** A prompt that arrives mid-scroll,
+or a bottom row transiently resembling one while output is still
+drawing, ends the wait early. `_command_output()` then slices at a
+boundary that never existed and returns a short, plausible, wrong
+tuple. The echo fix closed one route to confident wrong data — rows
+that were somebody else's — by making the wait remember. This closes
+the other, by making the wait *look twice*. Same principle, same
+failure shape, different trigger.
+
+**WHAT IT DOES NOT FIX**, stated so the pledge round does not
+discover it: losses that belong to reading a screen as rows at all.
+A blank line the transport drops, a tab flattened to spaces — those
+happen to a perfectly settled screen, and no amount of waiting
+recovers them. This is strictly the read-too-early class.
+
+**THE FREQUENCY IS UNMEASURED, AND F42 IS THE INSTRUMENT.** Nobody
+can currently say how often a command wait returns on a torn frame,
+because the run keeps nothing to look at. F42's transcripts are
+exactly the measurement, which argues for taking this *after* F42
+rather than beside it — not because the design depends on it, but
+because the priced version of this argument does.
+
+**THE POLL RAMP CONSTRAINS THE SHAPE**, and is not reopened. The
+echo-fix entry rules that **the poll ramps, and that the ramp is
+load-bearing rather than tuning**: the first seconds read at 0.1s
+because the echo must be caught before the command's own output
+scrolls it away, dropping to 2.0s after because "there is nothing to
+catch and only a prompt to wait out."
+
+**The fast half is untouched by this proposal, and its reasoning is
+not reopened.** What this contests is one clause in the
+justification for the slow half — *only a prompt to wait out*. If a
+prompt can appear on a screen that is still painting, then waiting
+one out is also a catching problem, and the interval that made the
+sticky flag safe is the interval that makes the completion test
+unsafe. That is a narrow amendment of a stated reason, not a
+reversal of the ruling, and it is the honest way to raise it.
+
+**`stable=` IS NOT WHAT THIS IS**, and the distinction is easy to
+lose. `stable=2s` is in-force language — parsed, run as episode-age
+tracking, and pinned by the script conformance corpus — and it holds
+a *condition* matched across an episode. This entry guards the
+*screen*, inside `exec`'s completion test, where there is no
+authored condition and no author. A condition can hold perfectly
+while the screen around it is still painting, which is the case that
+separates them.
+
+The pacing round's "weighed and declined: `stable=` as the tool"
+refuses that word as the fix for **input pacing**, not as a feature.
+Nothing here reopens it. Two of its counts are worth carrying anyway
+because they price this work too:
+
+- *"Costs a poll interval plus its duration."* Real, and it lands
+  here. It is the feature's price and the pledge round states it
+  rather than waving it through.
+- *"Must be written on every wait."* **This proposes no author-facing
+  surface at all** — no script vocabulary gains a word and no header
+  changes. It is internal, which is what keeps it separable from
+  F46.
+
+**F46 is the author-facing axis** — `stability=`, the screen's
+quiescence as a fraction, with a default. The two are independent in
+both directions, but if both land they should share one comparison
+primitive rather than growing two.
+
+TWO THINGS IT COMPOSES WITH, both pulling the same way.
+
+**F42 wants the same dense sampling.** The recorder floors the
+interpretation layer's poll clocks so that every poll is also a
+recorded frame; this floors the command path's clock for a
+functional reason. If both land, a recorded run and a production run
+sample alike — which shrinks F42's named observer effect and makes
+F43's fixtures more representative of the runs they stand in for.
+
+**Commands would return sooner.** A finished command can currently
+sit up to two seconds before anything looks at it. At settle pace it
+is noticed almost at once, so the added hold is bought back and then
+some on any run of many commands.
+
+**WHAT THE PLEDGE ROUND OWES** is the surface triage, which is not a
+proposal's to decide. [cli.md](../docs/spec/cli.md)'s "Completion
+means this command finished, not that a prompt is visible" is
+normative, and this
+changes *when* `exec` returns rather than *what* it returns —
+arguably strengthening the sentence rather than amending it. But the
+timing is observable, so **P8** and [SURFACES.md](../SURFACES.md)
+run properly or not at all. The cut, the hold count, the interval,
+and whether the rule reaches `wait_text` as well as the command
+wait all belong to that round.
+
+## F46 — `stability=`, the compare guard
+
+> **Entered 2026-08-02** from the owner's direction, in the same
+> round as **F45** and separable from it. Serves **U9**, **U12** and
+> **U14**; demanded by **P11**, for F45's reason — a condition met
+> on a screen that is still painting is confident wrong data.
+>
+> **A correction is recorded on entry, because the drafting made the
+> mistake this heading now warns against.** The pacing round's
+> "weighed and declined: `stable=` as the tool" is **not** a refusal
+> of `stable=`. That word is in-force language — parsed, run as
+> episode-age tracking, and pinned by the script conformance corpus;
+> what was declined is its use as the *input-pacing* tool, which was
+> correct and is left standing. Nothing below reopens a refusal.
+
+**THE COMPARE CANNOT RUN UNTIL THE SCREEN IS STABLE** (owner, this
+round). That sentence is the whole feature. A wait samples, and a
+sample whose screen has not settled is not a sample the condition is
+evaluated against — it is skipped, and the wait keeps looking.
+
+**TWO AXES, AND THE LANGUAGE CARRIES ONLY ONE.** Today's
+`stable=2s` requires a *condition* to stay matched across an
+episode, measured from the episode's first sample. It says nothing
+about the rest of the screen: `"Formatting"` can sit matched and
+motionless while everything around it repaints.
+
+What no word covers is the other question — **has the guest stopped
+drawing?** A condition can be true on a half-painted screen, and
+that is exactly the screen a wait must not act on. `stable` guards
+the *match* over time; this guards the *frame* over area.
+
+**THE SPELLING IS `stability=`** (owner, this round). `stable` is
+occupied by the temporal sense and cannot take a second unit: a
+duration and a fraction under one word, told apart only by whether
+the author wrote `2s` or `0.99`, is two meanings in one spelling and
+**G6** refuses it. `settle` remains unavailable for the homophone
+reason the pacing round gave, which is stronger now that `stable` is
+adjacent rather than hypothetical.
+
+THE RESIDUAL RISK IS NAMED RATHER THAN WAVED THROUGH: `stability`
+shares a root with `stable` and would sit in the neighbouring slot.
+The round satisfies itself that *"the condition was stable for 2s"*
+and *"the screen had 0.99 stability"* read as siblings on two axes
+rather than as one idea spelled twice — or it picks another word.
+
+**IT GOES ON OBSERVATIONS ONLY, AND THAT COMPLETES A MIRROR THE
+LANGUAGE HAS HALF-BUILT.** `pacing` is already a parse error
+everywhere but the four input verbs, on the stated ground that
+*"pacing paces the actor and a `wait` acts on nothing"*. `stability`
+is its opposite number and takes the opposite home:
+
+| | `pacing` | `stability` |
+|---|---|---|
+| sits on | the four input verbs | observations |
+| container rungs | header, phase — exists | header, phase — new |
+| built-in | 0.1s — exists | 0.99 — new |
+| what it guards | the actor | the compare |
+
+Each guard sits on exactly the statement kind whose hazard it
+addresses, neither overlaps the other, and **no word needs
+position-sensitive semantics** — which is what a wait-and-action
+spelling could not have delivered.
+
+**THE UNGUARDED BARE DELIVERY IS NOT A HOLE THIS MUST PLUG.** An
+input verb with no preceding observation would open its pacing gap
+from an arbitrary frame — but the language already discourages that
+shape on its own ground: *"there is no generic sleep or delay verb,
+on principle (G1, G5)... every pause must be justified by an
+observation."* A script that types twice with nothing observed
+between is already the thing that doctrine refuses. Wait-only
+covers every well-formed script by construction.
+
+**AND THE PACING FLOOR IS STILL WHAT THIS BUYS.** The zero is
+inherited through *sequencing* rather than through the modifier: a
+wait succeeds **on** a stable frame and its delivery follows at the
+same boundary, so pacing's clock starts from a screen that has
+stopped moving whether or not the word appears on the delivery. See
+the D69 seam below, which is unaffected by the placement.
+
+**IT SITS WHERE `stable` CANNOT, AND THE DIVERGENCE IS PRINCIPLED.**
+`stable` is a parse error on a container because *"only a match can
+be required to hold"* — it qualifies a match, so one must exist.
+`stability` qualifies the frame the compare runs on, and a frame
+exists at every sample, so:
+
+- **Container rungs are meaningful** where they are meaningless for
+  `stable` — which is what makes a default possible at all.
+- **A branching `wait` may carry it**, where `stable` is refused
+  with "put it on the `on`". An unstable frame evaluates *none* of
+  the handlers, so the gate belongs to the sample and therefore to
+  the container, exactly as `timeout`'s "bound on reaching the first
+  match" does.
+
+That asymmetry is the reason the two cannot be one word, stated in
+placement terms rather than in taste.
+
+**THE DEFAULT IS THE NOVELTY, NOT THE CONCEPT.** A `stability` only
+ever written per-wait would inherit the pacing decline's heaviest
+count verbatim: *"must be written on every wait, which is the burden
+being objected to."* So the feature is the ladder and the built-in,
+not the knob —
+
+```text
+statement > branching wait > phase > header > built-in 0.99
+```
+
+— matching what `timeout` (60s) and `pacing` (0.1s) already have. A
+default is written nowhere, which is the whole point.
+
+**THE NUMBER FALLS OUT OF THE GEOMETRY, NOT OUT OF TASTE**, and
+this is the entry's one hard recommendation. A text screen is
+80 × 25 = 2000 cells, so a single row of text is 80 of them —
+**4% of the screen**. Any threshold looser than **0.96 therefore
+calls a screen stable while a line is being drawn into it**, which
+is precisely the event the guard exists to refuse.
+
+Screen furniture costs an order of magnitude less: a blinking
+cursor is 1 cell (0.05%), a clock 8 (0.4%), a percentage counter 4
+(0.2%). The default's whole job is to sit in that gap — above
+furniture, below content:
+
+- **0.99** (20 cells, a quarter row) — recommended. Absorbs every
+  furniture case above with room to spare, refuses a line.
+- **0.98** (40 cells, half a row) — defensible, and the looser bound
+  worth keeping if a real capture shows heavier furniture.
+- **0.95** (100 cells) — **refused on the arithmetic**: it admits a
+  full line of text and a quarter besides, which is the hole the
+  feature exists to close.
+
+**CELLS, NOT ROWS, AND THAT IS FORCED.** At row granularity a
+blinking cursor and an arriving line of text are both "one row
+changed", and no fraction can separate them. **This does not reopen
+D98's refusal of cell-granular deltas** — that refusal is about the
+transcript's *storage encoding* and the reconstruction code it would
+oblige; comparing two live frames stores nothing and reconstructs
+nothing.
+
+**IDENTITY IS THE PAIR**, on the transcript design's rule and for
+its reason: a cursor menu moves its selection by attribute alone, so
+a text-only comparison scores exactly those frames as perfectly
+stable.
+
+**MAGNITUDE ALONE IS THE WRONG MEASURE, AND WHERE THE CHANGE SITS
+IS THE RIGHT ONE** (owner, this round). A magnitude threshold cannot
+tell a decoration that repaints forever from a line of content
+arriving once — both are just cells changing, and a progress bar and
+a new line of text are the same size.
+
+THE CASE THAT SHOWS IT: a menu inside a marquee border, with
+"little ants" marching around it continuously. Raw stability never
+approaches 0.99 — the border churns at every sample — yet nothing
+of consequence is happening, and **the region the change occupies
+is itself perfectly steady**. That is a measurable property, and it
+is the one that discriminates.
+
+**THE DURABLE FORM IS RECURRENCE, NOT SET IDENTITY**, and the
+owner's own example is what forces the distinction. Ants drawn as a
+shifting dashed pattern change every border cell every frame, so
+consecutive change-*sets* are identical and set comparison would
+work. A **single** ant advancing one cell per frame changes
+`{k-1, k}` and then `{k, k+1}` — consecutive sets barely overlap,
+and a strict comparison would call that unstable forever. So:
+
+- **A cell is animated** if it changed in at least M of the last N
+  samples. Over a few frames the ant's whole path qualifies and the
+  border is established as decoration.
+- **A cell that changes once is content**, wherever it sits.
+- **Stability is computed over the non-animated cells only**, at
+  which point the geometry argument above applies unchanged — to
+  the screen minus its decoration.
+
+A marching border then reads "100% stable outside a 76-cell animated
+region"; a menu repainting its interior fails on the first sample.
+
+**IT SUBSUMES THE MASK RATHER THAN COMPETING WITH IT.**
+`_menu_baseline` already derives an animation mask, and this is that
+mask made continuous: no learning phase, no quiet moment required
+before it works, and — the gap the learned version cannot close — an
+animation that *begins* mid-wait is absorbed within a few samples
+instead of never entering the mask at all. **Its bail-out carries
+over**: when most of the screen qualifies as animated, mask nothing
+and compare raw, exactly as `_menu_baseline` does when more than half
+the cells churn.
+
+**SO IT RETIRES THE BESPOKE COPIES RATHER THAN JOINING THEM**
+(owner, this round), and that is what makes this a trade rather than
+an addition. The mechanism is universal, so the menu machinery stops
+**owning** one: `_settled_screen`'s hold-for-two-reads and
+`_menu_baseline`'s learned mask are both special cases of the measure
+above, and they become calls into it.
+
+WHAT SURVIVES IS THE MENU'S OWN QUESTIONS, which were never settling:
+whether a keypress changed anything at all — `_settled_screen`
+returns `None` when nothing came, and the caller reads that as a dead
+key — and which row the highlight moved to. Those are
+classification, and they stay where they are.
+
+**THREE CONSUMERS, ONE PRIMITIVE**: the menu machinery, `exec`'s
+completion test (**F45**), and every authored wait. Today the first
+has the only implementation, F45 would add a second, and this makes
+that unnecessary before it happens.
+
+THE RISK IS NAMED: this is behaviour-preserving surgery on the most
+delicate interpretation code in the project, tuned against real
+guests over `wait=2.5` and `hold=2` constants that a threshold does
+not obviously reproduce. **Menu regression is the acceptance
+criterion for the cut**, not a side check after it.
+
+THE REASON IS SHARPEST AT A WAIT, which is the only place this word
+goes: a spinner has no bearing on whether the awaited text is really
+on screen, so excluding it is not a concession but the correct
+reading of the question being asked.
+
+**THE DEFINITION NEEDS A WINDOW, NOT SAMPLE ADJACENCY**, and this is
+the one open defect in the design rather than in its reception.
+Stability measured between *consecutive samples* is a property of
+guest × poll rate, not of the guest: the same screen reads stable at
+a 0.1s cadence, where most adjacent pairs are identical, and
+unstable at 2.0s, where consecutive samples are far enough apart to
+differ almost always. A global default cannot rest on that.
+
+**AND F42 MAKES IT WORSE BEFORE IT MAKES IT BETTER.** The recorder
+floors the interpretation layer's poll clocks, so a recorded run
+samples denser than a production one — which under an adjacency
+definition means **a recorded run and a production run could take
+different paths through the same script**. That is a larger claim
+than the observer effect F42 already names, and it is the reason to
+settle this before the two features meet. Defining stability over a
+*window* — no more than 1% of cells changed in the last 200ms — is
+cadence-independent wherever sampling is dense enough to observe the
+window, and is this entry's recommendation.
+
+**RECURRENCE INHERITS THE SAME OBLIGATION**, which is why this
+paragraph outranks the animation work rather than sitting beside it.
+"Changed in M of the last N *samples*" is cadence-dependent in
+exactly the way adjacency is — a denser run collects more samples
+over the same wall clock and reaches any M sooner. Counted over the
+last *T milliseconds* instead, decoration is decoration at either
+cadence. Both halves of the measure are defined against the clock or
+neither is.
+
+**IT IS WHAT JUSTIFIES PACING'S FLOOR, AND IT CLOSES A SEAM IN THE
+RECORD.** This is the strongest argument for the default and it is
+the owner's.
+
+D69 ruled `pacing`'s 0.1s deliberate rather than provisional, on the
+ground that "the variance is in the readiness mechanism rather than
+the paint speed". But the paragraph it amended had justified the
+swing *by* paint — "a plain text screen renders quickly, an animated
+TUI menu very slowly" — so D69 kept the conclusion while denying its
+stated reason, and **left nothing covering paint**. `stable=2s`
+could, but only if written on every wait, which is the burden the
+same round objected to.
+
+So pacing absorbs paint variance in practice whether or not the
+record says it does, and an author with a slow-painting menu has one
+lever: raise `pacing` for a reason that is not pacing's.
+
+**`stability=` is what makes D69's ruling structurally true.** With
+the screen's quiescence guarded by default, pacing is left with only
+*readiness* — the thing D69 said the variance actually lives in —
+and **0.1s becomes an honest floor rather than an optimistic one**.
+
+**THE TIMEOUT DIAGNOSTIC MUST SAY WHICH CLOCK LOST.** A wait can now
+expire two ways that look identical from outside: the condition
+never matched, or it matched only on frames the guard skipped. The
+second is baffling without help — the text is plainly on screen in
+any screenshot taken at the time — so the failure names which. The
+animated region is what makes that message worth reading: *"stable
+outside a 76-cell animated region; condition never matched there"*
+locates the problem, where a bare `stability 0.62` only restates the
+expiry. The spec's own example, `wait "Formatting" stable=2s`, is
+exactly the case that would otherwise report nothing useful.
+
+**THE PRICE, STATED RATHER THAN ABSORBED.** The pacing round costed
+`stable=` at "a poll interval plus its duration", and wait-only
+placement keeps it to that order: establishing quiescence needs at
+least two agreeing samples, so every guarded observation pays a
+minimum of one sample interval before its condition is first
+evaluated. The common case is cheap — a guest idle at a prompt
+agrees on the second sample — and the charge is bounded by the
+number of observations rather than by every statement, which is
+what the actions-too placement would have cost.
+
+**MIGRATION IS ONE-DIRECTIONAL**, which is what makes a default safe
+to contemplate. A script that raised `pacing` to cover paint keeps
+working — it pays the quiescence gate and then its own over-long
+gap, so it is slower and still correct, carrying slack it can
+reclaim later. Nothing silently breaks. That does not dispose of the
+pacing decline's open count — *"changes what the author is
+asserting"* — which stands: every existing wait would gain a clause
+its author did not write, and whether a silent strengthening is
+acceptable or must be made visible is the round's to settle.
+
+**AGAINST F45**: same insight, opposite standing. F45 is internal to
+`exec`'s completion test and changes no authored word; this is a
+language surface with a default that moves existing scripts. Either
+can land alone — but **order matters if both are taken**. This
+feature supplies the primitive F45 would otherwise write for itself,
+so taking F45 first buys a second implementation that this one then
+retires. Taken in the other order, F45 becomes a caller.
+
+**WHAT THE PLEDGE ROUND OWES**: the **P6** parity landing (script,
+CLI and API together with the command manifest); the **P8** and
+[SURFACES.md](../SURFACES.md) argument for a default that changes
+when existing waits fire; the placement-law row in
+[script-spec.md](../docs/spec/script-spec.md)'s scoping table,
+including the branching-`wait` rung that `stable` is refused; the
+clock table, since a quiescence gate is a sixth clock and the
+existing five are enumerated as complete; the grammar, where
+`stability` fits `watch-mod` in shape but not in unit; the window
+definition above, which is the one thing that cannot be deferred
+past F42; and the menu retirement — `_settled_screen` and
+`_menu_baseline` becoming callers, with menu behaviour as the cut's
+acceptance criterion.
+
+**IT DOES NOT RETIRE `stable=`**, and that was weighed this round
+rather than left open. The two are orthogonal: `stability` asks
+whether a frame is trustworthy to compare against, `stable` whether
+a matched condition is the *durable* state rather than a transient
+one — a screen can be perfectly quiet while showing text that is
+about to be overwritten, and only the second catches it. Neither
+fallback reaches that case: `pacing` delays a delivery the wait has
+already decided on, and an explicit wait-duration is the delay verb
+**G1** and **G5** refuse, `stable` being the language's only
+observation-justified pause. What is true is narrower and belongs in
+the docs rather than the grammar — `stability` absorbs most real
+*uses* of `stable=`, the spec's own `wait "Formatting" stable=2s`
+likely among them, so the word becomes rare rather than unnecessary.
+Retiring it anyway would dissolve the G6 adjacency risk named above
+and could free the shorter word for the fraction; that is a separate
+act on a shipped, conformance-pinned surface, and bundling it here
+would make this entry's approval contingent on a larger claim.
