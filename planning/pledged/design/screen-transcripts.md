@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: GPL-3.0-only
 -->
 
-# Screen transcripts: capture and replay
+# Screen transcripts: capture and reconstruction
 
 > **Status:** design for pledged **F42** and **F43**
 > ([../FEATURES.md](../FEATURES.md)). Demanded by **P22** — the
@@ -44,13 +44,13 @@ every read any layer above makes passes through.
 
 Two consequences, and both are the point:
 
-- **Replay stands a fake session at that same seam**, and the whole
-  interpretation layer — `control_display`, `interaction_agentless`,
-  the runner's dispatch — runs unmodified above it. That is what
-  makes the fixtures worth having.
+- **Reconstruction stands a fake session at that same seam**, and the
+  whole interpretation layer — `control_display`,
+  `interaction_agentless`, the runner's dispatch — runs unmodified
+  above it. That is what makes the fixtures worth having.
 - **The recorder is backend-neutral by construction.** It wraps the
-  seam, not QEMU, so a capture taken against another adapter replays
-  through the same reader.
+  seam, not QEMU, so a capture taken against another adapter
+  reconstructs through the same reader.
 
 ## The pace, and the single QMP client
 
@@ -103,12 +103,13 @@ Consecutive identical frames collapse. What survives each entry:
   full frame. That boundary is semantic rather than an arbitrary
   every-N rule.
 - **A digest of the reconstructed screen**, a few bytes an entry.
-  Playback rebuilds and checks it. A reconstruction bug or a
+  Reconstruction rebuilds and checks it. A reconstruction bug or a
   hand-edited fixture then fails loudly instead of yielding a screen
   that never existed — the fails-loudly rule below, applied to the
   format itself.
 - **Both timestamps** — wall time and elapsed, matching `events.py`'s
-  envelope. Elapsed is what replay uses; wall time is provenance.
+  envelope. Elapsed is what reconstruction uses; wall time is
+  provenance.
 - **The absorbed sample count.** "This screen held two seconds across
   forty samples" and "this screen held two seconds with nobody
   looking" are different facts, and only the first says the guest was
@@ -134,11 +135,11 @@ screenshots taken, media changed — each timestamped on the same
 clock.
 
 That is what makes the file a transcript rather than a screen dump,
-and it is what makes the fails-loudly rule checkable: on
-replay, **a request the transcript does not cover is an error**
-naming what was asked and where. Never an improvised answer, never
-an empty one (P11). Improvising is how a caller ends up reporting a
-pass against a transcript that never covered the case.
+and it is what makes the fails-loudly rule checkable: when
+reconstructing, **a request the transcript does not cover is an
+error** naming what was asked and where. Never an improvised answer,
+never an empty one (P11). Improvising is how a caller ends up
+reporting a pass against a transcript that never covered the case.
 
 ## Secrets stop the recording
 

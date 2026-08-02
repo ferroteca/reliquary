@@ -32,7 +32,7 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
-## F42 — The screen transcript: capture and replay
+## F42 — The screen transcript: capture and reconstruction
 
 > **Pledged 2026-08-01** (owner), cut from F13 with F43 and
 > proposed F44, that number retiring with the split (D42). Demanded
@@ -43,10 +43,10 @@ to this file on pledge.
 > [design/screen-transcripts.md](design/screen-transcripts.md);
 > the D36 squaring and the format's standing are **D98**.
 
-**Capture and replay land together**, because a transcript format
-with no reader is an unverified format: nothing would prove a
-capture is replayable, and the format would be wrong in ways only
-F43's fixtures would eventually discover.
+**Capture and reconstruction land together**, because a transcript
+format with no reader is an unverified format: nothing would prove a
+capture is reconstructible, and the format would be wrong in ways
+only F43's fixtures would eventually discover.
 
 **Recording is a debugging tool, not a reward for success.** It is
 worth having *before* the heuristics are reliable, not after —
@@ -75,9 +75,9 @@ Work items:
 5. `--record <path>` and `run_script(record=)`, landing on S1 and S2
    in the same change with `docs/spec/cli.md`, `docs/spec/api.md`
    and the command manifest.
-6. The replay session at the same seam: reconstruct, verify every
-   digest, and fail loudly naming what was asked where the
-   transcript does not cover a request.
+6. The reconstruction session at the same seam: rebuild frames from
+   the transcript, verify every digest, and fail loudly naming what
+   was asked where the transcript does not cover a request.
 7. The round-trip test, against `tests/fake_backend.py` — no unit
    test launches a real backend, so capturing real guests is F43's
    under the opt-in integration run.
@@ -108,8 +108,8 @@ Work items:
    fixture.
 4. The corpus README, as the blueprint and script corpora each
    carry: where its findings live.
-5. The suite discipline: fixtures replay with no QEMU present, so
-   they run in the **default** suite, and a failing capture is a
+5. The suite discipline: fixtures reconstruct with no QEMU present,
+   so they run in the **default** suite, and a failing capture is a
    defect to fix rather than a skip to tolerate.
 
 ## F45 — The command wait settles before it reads
