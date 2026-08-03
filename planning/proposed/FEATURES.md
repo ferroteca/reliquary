@@ -84,49 +84,6 @@ Deliverables:
 7. CLI `record` command family and API twins, landing together
    under parity.
 
-## F3 — Second backend: VirtualBox
-
-> **Dropped from the numbered arc to the backlog** (owner,
-> 2026-07-23): the former Milestone 11, not yet scheduled. It left
-> on the same ground as the seam extraction — no use case demanded
-> the pillar — and **that ground is gone**: U7 is its demand too,
-> and U7 was pledged on 2026-07-28 along with the extraction
-> itself (**F2**, delivered the same day; its number is retired).
-> The seam F3 was waiting behind is built, and its stub adapter is
-> already in the tree claiming nothing. What holds F3 here is no
-> longer a missing argument or a missing seam but an unmade
-> decision: a pledged demand is necessary for a feature and
-> sufficient for none, and this one is pledged by its own move.
-
-The first non-QEMU adapter end to end, proving the adapter API
-against a genuinely different hypervisor. VirtualBox is the
-candidate: `VBoxManage` covers lifecycle, keyboard scancodes,
-screenshots, and serial redirection — the closest match to the
-control plane set scripts already rely on.
-
-Deliverables:
-
-1. Lifecycle through `VBoxManage`, with machine files kept inside
-   `cache/machines/<id>/` and VDI/differencing materialization
-   of the drive triad. **VDI is the committed format for this
-   backend** — the field reference's backend/format table said so
-   before any of it existed, and until 2026-07-27 the code
-   contradicted it by materializing qcow2 for a blueprint that
-   declared `virtualbox`. `create-machine` now refuses an unwired
-   backend outright (P11), so the table is intent recorded here
-   rather than a promise the shipped code breaks.
-2. The agentless display control plane: `controlvm
-   keyboardputscancode` input and `screenshotpng` capture, with
-   pixel-level text recognition for fixed-font text modes behind
-   the same control plane interface.
-3. VirtualBox in autodiscovery and the priority list;
-   `recreate-machine`
-   as the sanctioned backend move, drives regenerating in native
-   formats.
-
-Done when: the FreeDOS install script runs unmodified on both
-backends from the same blueprint (minus a pinned backend field).
-
 ## F4 — Guest agent communication
 
 > **Dropped from the numbered arc to the backlog** (owner,
@@ -209,7 +166,8 @@ passes byte-for-byte.
 > entry is two features wearing one number, and U7's pledge reaches
 > only one of them: U7 names Hyper-V outright — "a Windows laptop
 > with Hyper-V already enabled" — so the *last two adapters* below
-> now stand on pledged demand like F2 and F3 do. **GUI automation
+> now stand on pledged demand like F2 did and like F50–F52 (cut
+> from F3) do. **GUI automation
 > itself still cites nothing.** The VNC plane, the landmark asset
 > spec, and pointer input answer to no use case in force or
 > pledged, and U7 does not reach them: materializing on the host's
@@ -326,7 +284,7 @@ Deliverables:
    framebuffer capture, key events, pointer events — behind the
    same input and screen capabilities as agentless display,
    reusing the pixel-level text recognition built for the
-   VirtualBox display plane (F3 above).
+   VirtualBox display plane (F51 / F52).
    `control-planes: ["vnc"]` honored end to end, with a
    capability error naming Hyper-V where it cannot exist.
 2. The three portable input primitives exposed at the

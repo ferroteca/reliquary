@@ -4,13 +4,13 @@
 
 The seam's own arithmetic, judged without any hypervisor: what a
 requirement means against a capability report, what the priority walk
-picks, and what the three unbuilt adapters claim (nothing).
+picks, and what the unbuilt adapters claim (nothing).
 """
 
 import unittest
 from unittest import mock
 
-from reliquary import backend_stubs, backends
+from reliquary import backend_stubs, backend_virtualbox, backends
 from reliquary.backends import Capabilities, Requirements
 from reliquary.errors import PreflightError, StaticError
 from tests import fake_backend
@@ -61,10 +61,10 @@ class SettingsVocabularyTests(unittest.TestCase):
     """
 
     def test_an_adapter_reading_no_settings_refuses_every_key(self):
-        # The honest default, and the reason a stub needs no code: a
-        # section it cannot honor is refused rather than preserved as
-        # configuration nothing will apply (P11).
-        adapter = backend_stubs.VirtualBoxAdapter()
+        # The honest default (P11): a section it cannot honor is
+        # refused rather than preserved as configuration nothing will
+        # apply. VirtualBox still reads none (F50); so do the stubs.
+        adapter = backend_virtualbox.VirtualBoxAdapter()
         self.assertEqual(adapter.settings_keys, ())
         with self.assertRaises(StaticError) as caught:
             adapter.validate_settings({"machine": "pc"})
@@ -206,20 +206,24 @@ class AssignmentTests(unittest.TestCase):
 class DiscoveryTests(unittest.TestCase):
     def test_discovery_reports_every_backend_in_priority_order(self):
         # QEMU's probe runs a binary, which unit tests never do; the
-        # three stubs probe the filesystem alone, so they answer for
-        # real here.
+        # remaining stubs probe the filesystem alone, so they answer
+        # for real here. VirtualBox is faked so discovery stays
+        # hypervisor-free.
         with fake_backend.installed():
-            probes = backends.discover()
+            with fake_backend.installed(
+                    fake_backend.FakeAdapter("virtualbox"),
+                    name="virtualbox"):
+                probes = backends.discover()
         self.assertEqual([probe.backend for probe in probes],
                          list(backends.PRIORITY))
 
     def test_a_stub_claims_no_capability_even_where_it_is_installed(self):
         # P11 at this seam: an untested capability is an unclaimed
-        # one, so an installed VirtualBox is still passed over by the
+        # one, so an installed VMware is still passed over by the
         # walk until its adapter is built.
-        adapter = backend_stubs.VirtualBoxAdapter()
+        adapter = backend_stubs.VMwareAdapter()
         with mock.patch.object(backend_stubs, "_which",
-                               return_value="C:/VBoxManage.exe"):
+                               return_value="C:/vmrun.exe"):
             probe = adapter.discover()
         self.assertTrue(probe.available)
         self.assertIn("unbuilt", probe.detail)
@@ -227,6 +231,18 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(
             adapter.unmet(_requirements(
                 control_planes=("agentless-display",))),
+            ("control plane 'agentless-display'",))
+
+    def test_virtualbox_claims_no_agentless_display_yet(self):
+        # F50: lifecycle is real; the display plane is F52. A DOS
+        # machine's default control plane is therefore still unmet.
+        adapter = backend_virtualbox.VirtualBoxAdapter()
+        self.assertEqual(adapter.capabilities().control_planes, ())
+        self.assertEqual(
+            adapter.unmet(_requirements(
+                control_planes=("agentless-display",),
+                media=("hdd",), controllers=("ide",),
+                materialize=("new",))),
             ("control plane 'agentless-display'",))
 
     def test_an_absent_stub_backend_says_what_it_looked_for(self):

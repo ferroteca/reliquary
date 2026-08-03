@@ -61,3 +61,54 @@ Work items:
 5. The suite discipline: fixtures reconstruct with no QEMU present,
    so they run in the **default** suite, and a failing capture is a
    defect to fix rather than a skip to tolerate.
+
+## F51 — Shared fixed-font text recognizer
+
+> **Pledged 2026-08-03** (owner), cut from **F3** with F50 and
+> F52 (D42). Demanded by **U7** via the agentless-display plane
+> VirtualBox cannot scrape. Doctrine already settled:
+> [design/backend-adapter.md](../design/backend-adapter.md)
+> "The text-screen contract" and
+> [design/guest-communication.md](../design/guest-communication.md).
+> **F50 is delivered** (lifecycle / VDI).
+
+One shared recognizer over a captured framebuffer — written once
+for every backend without native text memory, living with the
+control plane (`control_display`), never per adapter. Returns the
+same `(rows, attribute tokens)` contract VGA scraping already
+satisfies, so `DisplayConsole` and the script language need no
+VirtualBox branch.
+
+Work items:
+
+1. The recognizer module: PNG → character rows plus opaque
+   per-cell attribute tokens (foreground/background hash).
+2. The FreeDOS / VGA text-mode glyph set it matches against.
+3. Fixture-based unit tests (golden PNGs); no hypervisor.
+
+Done when: known FreeDOS text screens reconstruct from fixture
+PNGs under the default suite.
+
+## F52 — VirtualBox agentless display and FreeDOS parity
+
+> **Pledged 2026-08-03** (owner), cut from **F3** with F50 and
+> F51 (D42). Demanded by **U7**. Needs **F50** (delivered) and
+> **F51** delivered first.
+
+The agentless-display carriers on VirtualBox, then the Done-when
+that was F3's: the FreeDOS install script runs unmodified on both
+backends from the same blueprint (minus a pinned `backend` field).
+
+Work items:
+
+1. `keyboardputscancode` input mapped from the portable key-name
+   set; `screenshotpng` capture; live `change_medium` via storage
+   attach/detach.
+2. `text_screen` = screenshot + F51's recognizer.
+3. Claim `agentless-display` in the capability report — only once
+   the carriers above are real (P11).
+4. Opt-in FreeDOS integration on VirtualBox; field-reference and
+   CHANGELOG; retire this entry.
+
+Done when: FreeDOS install + verify pass on VirtualBox under the
+opt-in integration run, unmodified script, same blueprint.

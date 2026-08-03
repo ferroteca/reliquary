@@ -222,9 +222,13 @@ workflow:
   drive seam maps onto the standing rule ids. `geometry()` reports the drive's shape (partitions with their
   declared types, volume count, and the BPB's own CHS where it states one) as P10's *read on the host*
   source, blank-as-an-answer included.
-  `backend_stubs.py` holds the three unbuilt adapters (VirtualBox, VMware
-  Workstation, Hyper-V): their host probe is real, they claim **no capability**, so assignment passes over
-  them even where the backend is installed, and a pinned one fails preflight naming the gap.
+  `backend_virtualbox.py` is the VirtualBox adapter (F50: lifecycle
+  and VDI; agentless-display carriers still unclaimed, F52).
+  `backend_stubs.py` holds the two unbuilt adapters (VMware
+  Workstation, Hyper-V): their host probe is real, they claim **no
+  capability**, so assignment passes over them even where the
+  backend is installed, and a pinned one fails preflight naming the
+  gap.
   `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and
   the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
   equality-comparable per-cell attribute tokens) and never per adapter. **Whether a screen has stopped changing

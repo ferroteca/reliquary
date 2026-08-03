@@ -11,6 +11,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+- **VirtualBox lifecycle and VDI materialization** (F50, cut from
+  F3 with F51/F52). The first non-QEMU adapter body:
+  `backend_virtualbox.py` discovers `VBoxManage`, materializes
+  VDI images (`new` / `difference` / `copy`), registers the VM
+  under `cache/machines/<id>/virtualbox/` at first start, and
+  start/stop with UUID identity verification. It claims no
+  `agentless-display` yet (P11) — that plane is F52 — so a DOS
+  machine pinned to VirtualBox still fails capability preflight
+  naming the gap. The VMware and Hyper-V stubs remain.
+
 ### Added
 
 - **The command manifest.** The package ships

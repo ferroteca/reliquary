@@ -226,15 +226,13 @@ class MaterializationTests(_HomeCase):
         self.assertIn("controller 'scsi'", str(caught.exception))
         self.assertEqual(self.backend.images, [])
 
-    def test_a_pinned_stub_backend_fails_closed(self):
-        """A pinned backend whose adapter is a stub is refused by name.
+    def test_a_pinned_incapable_backend_fails_closed(self):
+        """A pinned backend that cannot honor the blueprint is refused.
 
-        It used to be recorded and ignored: `backend: virtualbox`
-        materialized a qcow2 image and would have launched QEMU, so
-        the machine's recorded backend and its real one disagreed with
-        nobody told. Now the pin skips the priority walk, that adapter
-        alone is asked, and it claims no capability — so the refusal
-        names the backend and what it cannot provide.
+        Stubs (vmware, hyperv) claim nothing. VirtualBox (F50) claims
+        lifecycle but not agentless-display, so a DOS machine — whose
+        default plane is agentless-display — is still refused by name
+        before any image work.
         """
         for backend in ("virtualbox", "vmware", "hyperv"):
             with self.subTest(backend=backend):

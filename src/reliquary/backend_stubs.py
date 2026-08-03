@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The three unbuilt adapters: VirtualBox, VMware Workstation, Hyper-V.
+"""The two unbuilt adapters: VMware Workstation and Hyper-V.
 
 Each is a real entry in the backend priority order (D66) and a real
-host probe — discovery works, because knowing whether VirtualBox is
-installed costs nothing and is honest either way. Everything past
+host probe — discovery works, because knowing whether the backend
+is installed costs nothing and is honest either way. Everything past
 discovery is unbuilt, and says so.
 
 **They report no capabilities**, which is the whole of P11 at this
@@ -21,6 +21,8 @@ satisfy it, which is a PREFLIGHT ERROR under the error taxonomy
 (D58). The bare ``NotImplementedError`` inherited from
 :class:`~reliquary.backends.BackendAdapter` guards the operations
 assignment can never reach.
+
+VirtualBox left this module with F50 (``backend_virtualbox``).
 """
 
 import os
@@ -69,26 +71,6 @@ class _StubAdapter(BackendAdapter):
         return Availability(
             self.name, False,
             detail=f"{self.looks_for} not found on this host")
-
-
-class VirtualBoxAdapter(_StubAdapter):
-    """Oracle VirtualBox, driven through ``VBoxManage``."""
-
-    name = "virtualbox"
-    looks_for = "VBoxManage"
-
-    def discover(self):
-        binary = "VBoxManage.exe" if os.name == "nt" else "VBoxManage"
-        directories = []
-        if os.name == "nt":
-            home = os.environ.get("VBOX_MSI_INSTALL_PATH") or ""
-            directories = [path for path in [home] if path]
-            directories += [os.path.join(root, "Oracle", "VirtualBox")
-                            for root in _program_files()]
-        else:
-            directories = ["/usr/bin", "/usr/local/bin"]
-        found = _which(binary, directories)
-        return self._found(found) if found else self._absent()
 
 
 class VMwareAdapter(_StubAdapter):

@@ -44,7 +44,8 @@ none of the things the primary surfaces are:
   fails capability preflight by name; nothing is silently
   approximated.
 - **In-repo consumers only, for now.** All four adapters ship with
-  Reliquary — one built and three stubs. If a third-party adapter
+  Reliquary — two built (QEMU, VirtualBox lifecycle) and two stubs.
+  If a third-party adapter
   story ever becomes real, the
   seam is elevated into the SURFACES inventory through the
   surface-change rule — that elevation is the recorded watch,
@@ -246,12 +247,14 @@ Hyper-V has no VNC at all, leaving it with no agentless display
 plane. Order breaks ties among candidates already available and
 capable, so it never substitutes for a capability check.
 
-**What the three stubs claim is nothing.** Their host probe is
-real — knowing whether VirtualBox is installed costs nothing and is
-honest either way — and their capability report is empty, so the
-walk passes over them even where the backend is installed (P11: an
-untested capability is an unclaimed one). A pinned `backend` naming
-one fails preflight by name; the abstract-method
+**What the remaining stubs claim is nothing.** Their host probe is
+real — knowing whether VMware or Hyper-V is installed costs nothing
+and is honest either way — and their capability report is empty, so
+the walk passes over them even where the backend is installed (P11:
+an untested capability is an unclaimed one). VirtualBox (F50)
+claims lifecycle capabilities but not `agentless-display` until
+F52. A pinned `backend` naming an incapable adapter fails
+preflight by name; the abstract-method
 `NotImplementedError` guards only what assignment can never reach,
 because a reachable gap with a message is a PREFLIGHT ERROR under
 the error taxonomy (D58).
@@ -284,8 +287,11 @@ settled in this extraction and are recorded below.
 
 Recorded here on delivery (2026-07-28), from the working code
 rather than ahead of it. `src/reliquary/backends.py` holds the
-contract; `src/reliquary/backend_qemu.py` implements it;
-`src/reliquary/backend_stubs.py` holds the three that do not.
+contract; `src/reliquary/backend_qemu.py` and
+`src/reliquary/backend_virtualbox.py` implement it (VirtualBox
+lifecycle as of F50, 2026-08-03; its agentless-display carriers
+are F52); `src/reliquary/backend_stubs.py` holds the two that do
+not.
 
 **The vocabulary.** Three frozen records, all plain data:
 

@@ -41,7 +41,7 @@ PRIORITY = ("qemu", "virtualbox", "vmware", "hyperv")
 #: backend costs nothing until one is actually asked for.
 _ADAPTERS = {
     "qemu": (".backend_qemu", "QemuAdapter"),
-    "virtualbox": (".backend_stubs", "VirtualBoxAdapter"),
+    "virtualbox": (".backend_virtualbox", "VirtualBoxAdapter"),
     "vmware": (".backend_stubs", "VMwareAdapter"),
     "hyperv": (".backend_stubs", "HyperVAdapter"),
 }
