@@ -91,7 +91,7 @@ the complete inventory this feature would retire:
 2. **The whole-disk-or-none rule.** A partition row Remanence
    reports with an issue refuses the entire disk, on the ordering
    argument in-force P27 records — an argument Remanence's
-   proposed F20 dissolves outright ("an unreadable region retains
+   pledged **F38** dissolves outright ("an unreadable region retains
    its identity and position, so a failure cannot renumber objects
    which follow it").
 3. **Sector-0 classification.** The `partitioned` flag is derived
@@ -117,13 +117,14 @@ the complete inventory this feature would retire:
 
 **The missing upstream contract.** None of the capabilities below
 is available to Reliquary from the pinned Remanence `0.0.1a2`.
-Five are named by Remanence's pledged F19 or proposed F20, but a
-planning entry is not a consumable capability; the remaining three
-have not been proposed upstream at all. **All eight are blocking.**
+Five are named by Remanence's pledged **F38** / **F39** (cut from
+proposed F20 on pledge), but a planning entry is not a consumable
+capability; the remaining three are still only proposed upstream
+(**F24**, **F25**, **F26**). **All eight are blocking.**
 P27's no-hybrid rule permits no local fallback for a capability a
 partial upstream delivery omits.
 
-Already planned upstream, but not delivered:
+Named by Remanence's pledged F38 / F39, but not delivered:
 
 1. **Stable region and volume identities, end to end.** Every
    discovered region and readable volume carries an identity which
@@ -132,31 +133,34 @@ Already planned upstream, but not delivered:
    anything after it. A later access names the volume by that
    identity; disappearance is an identity miss, not a changed-count
    inference. This retires positional volume identity and supplies
-   the premise on which partial reads are safe.
+   the premise on which partial reads are safe. (F38 issues the
+   identities; F39 makes the file verbs select by them and retires
+   `DiskGeometry` / `geometry()`.)
 2. **Sector 0 classified by the disk seam.** The report distinguishes
    four outcomes directly: blank; a partition schema containing no
    volumes; a direct, unpartitioned volume; and unknown nonblank
    content. Reliquary must not reconstruct those states from
-   `partitions`, `blank`, and `volumes` combinations.
+   `partitions`, `blank`, and `volumes` combinations. (F38.)
 3. **Filesystem-declared geometry kept at the filesystem seam.** A
    volume reports the geometry its filesystem declares, unanswered
    where it declares none. The disk report must leave Reliquary no
    reason to select the first volume's BPB answer as a synthesized
-   disk-level `cylinders` value.
+   disk-level `cylinders` value. (F38.)
 4. **A partial-read report.** Failure to interpret one region is an
    issue on that region, not failure of the disk report. Regions and
    volumes which can be read remain present with their stable
    identities, including those after the issue, so the consumer can
    place and use everything whose identity and position are known.
+   (F38.)
 5. **Declared-type readings fit for a user-facing refusal.** Every
    partition or region reports both its raw declaration and a
    description Reliquary can quote without maintaining its own type
    table. A kind tag alone is insufficient: type byte `0x07` must
    yield "NTFS or exFAT", and `0xEE` must yield "a GPT protective
-   partition — this disk is GPT, not MBR". F20 proposes declared-type
-   readings but does not yet commit to this quality bar.
+   partition — this disk is GPT, not MBR". (F38 commits to readings
+   fit to quote in a user-facing refusal.)
 
-Not yet proposed upstream:
+Still proposed upstream (F24 / F25 / F26):
 
 6. **FAT label semantics owned at the filesystem seam.** The FAT
    answer treats `NO NAME` as the format's spelling of unlabeled and
@@ -182,7 +186,7 @@ Not yet proposed upstream:
    positional indexes. This goes beyond Remanence P19's current
    wording, which consumes an explicit drive mapping rather than
    producing one; which image occupies each slot remains the
-   machine model's fact.
+   machine model's fact. (Needs Remanence F38 delivered.)
 
 The upstream API's spelling is Remanence's design choice. The gate
 is observable: a released API must make each answer above available
