@@ -429,6 +429,8 @@ class _ScriptEngine:
         self._secret_recorded = False
         self._record_pace = record_pace
         self._recording_writer = recording_writer
+        self._pace_settle = max(_SETTLE_POLL, record_pace or 0)
+        self._pace_idle = max(_POLL_INTERVAL, record_pace or 0)
         self._phase = None
         self._run_started = None
         self._phase_started = None
@@ -480,6 +482,16 @@ class _ScriptEngine:
         failure.scope = bound.source
         return failure
 
+    def _poll_interval(self, settled):
+        """Return the sleep interval between samples.
+
+        When recording, both intervals are floored against the record
+        pace so a captured run polls at least as hard as the recording
+        cadence — a steady interval is simpler to replay and an
+        undersampled transcript misses frames.
+        """
+        return self._pace_idle if settled else self._pace_settle
+
     def _redact(self, message):
         """Blank any bound secret value out of a rendered line.
 
@@ -489,7 +501,7 @@ class _ScriptEngine:
         """
         for value in self._secret_values:
             if value and value in message:
-                message = message.replace(value, "«secret»")
+                message = message.replace(value, "\u00absecret\u00bb")
         return message
 
     def _emit(self, kind, **fields):
@@ -860,7 +872,7 @@ class _ScriptEngine:
             if not (settled or (expired and not self._measured)):
                 if expired:
                     self._expire_interval(description, bound, phase)
-                self._sleep(_SETTLE_POLL)
+                self._sleep(self._poll_interval(False))
                 continue
             fired = None
             for index, observation in enumerate(observations):
@@ -873,7 +885,7 @@ class _ScriptEngine:
                 if expired:
                     self._expire_interval(description, bound, phase)
                 self._progress(expiry, bound.seconds, "dispatch", now)
-                self._sleep(_POLL_INTERVAL if settled else _SETTLE_POLL)
+                self._sleep(self._poll_interval(settled))
                 continue
             observations[fired].consumed = True
             handler = phase.handlers[fired]
@@ -918,7 +930,7 @@ class _ScriptEngine:
             if not (settled or (expired and not self._measured)):
                 if expired:
                     self._expire_observation(description, bound, statement)
-                self._sleep(_SETTLE_POLL)
+                self._sleep(self._poll_interval(False))
                 continue
             for index, observation in enumerate(observations):
                 if observation.update(sample, now):
@@ -935,7 +947,7 @@ class _ScriptEngine:
             if expired:
                 self._expire_observation(description, bound, statement)
             self._progress(expiry, bound.seconds, description, now)
-            self._sleep(_POLL_INTERVAL if settled else _SETTLE_POLL)
+            self._sleep(self._poll_interval(settled))
 
     def _expire_interval(self, description, bound, phase):
         """Declare a reactive interval expiry, naming which clock lost."""
@@ -1820,7 +1832,7 @@ def _redactor(bindings):
     def redact(text):
         for value in values:
             if value in text:
-                text = text.replace(value, "«secret»")
+                text = text.replace(value, "\u00absecret\u00bb")
         return text
 
     return redact
