@@ -662,30 +662,130 @@ class InteractionAdapterTests(unittest.TestCase):
         self.assertIsInstance(adapter, interaction_module.GuestExec)
 
 
+class _GuestClock:
+    """A deterministic clock advanced only by sleeping."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+class _PaintingGuest:
+    """A guest that hands back one frame per read, then holds.
+
+    Frames are given as row lists; the console contract's attribute
+    half is supplied uniformly, so a test says what the guest drew
+    without spelling out a second grid.
+    """
+
+    def __init__(self, frames):
+        self._frames = [list(rows) + [""] * (25 - len(rows))
+                        for rows in frames]
+        self._index = 0
+
+    def screen(self):
+        rows = self._frames[min(self._index, len(self._frames) - 1)]
+        self._index += 1
+        return list(rows), [[0x07] * 80 for _ in range(25)]
+
+    def screen_text(self):
+        return self.screen()[0]
+
+
+def _run_against(frames, command="dir", timeout=120):
+    guest = _PaintingGuest(frames)
+    console = mock.Mock()
+    console.screen.side_effect = guest.screen
+    console.screen_text.side_effect = guest.screen_text
+    clock = _GuestClock()
+    with _over(console), \
+            mock.patch.object(agentless_module.time, "sleep",
+                              clock.sleep), \
+            mock.patch.object(agentless_module.time, "monotonic",
+                              clock.monotonic):
+        rows = agentless_module.AgentlessGuestExec(
+            machine_module.Machine()).execute(command, timeout)
+    return rows, console
+
+
 class RunCommandTests(unittest.TestCase):
     def test_agentless_adapter_executes_through_display_console(self):
         # The screen has to *move*: a command completes when there is
         # evidence it ran, not when a prompt is visible, so a console
         # frozen at the prompt wait_ready left would wait out the whole
         # timeout — which is the behaviour, not a fixture quirk.
-        frames = iter([["C:\\>"] + [""] * 24,
-                       ["C:\\>dir", "2 FILE(S)", "C:\\>"] + [""] * 22])
-        showing = []
-
-        def screen_text():
-            nonlocal showing
-            showing = next(frames, showing)
-            return list(showing)
-
-        console = mock.Mock()
-        console.screen_text.side_effect = screen_text
-        with _over(console), \
-                mock.patch.object(agentless_module.time, "sleep"):
-            rows = agentless_module.AgentlessGuestExec(
-                machine_module.Machine()).execute("dir")
+        rows, console = _run_against([
+            ["C:\\>"],
+            ["C:\\>dir", "2 FILE(S)", "C:\\>"],
+        ])
 
         console.send_text.assert_called_once_with("dir")
         self.assertEqual(rows, ("2 FILE(S)",))
+
+    def test_a_prompt_that_never_settles_says_so_when_it_expires(self):
+        # a wait now expires two ways that look identical from
+        # outside, and the second is baffling without help: a
+        # screenshot taken at the time shows the prompt plainly
+        frames = []
+        for step in range(120):
+            rows = ["C:\\>dir"] + [""] * 20 + ["C:\\>"]
+            rows[1 + step % 18] = "x" * 40 + str(step)
+            frames.append(rows)
+
+        with self.assertRaises(RunFailure) as expired:
+            _run_against(frames, timeout=5)
+
+        message = str(expired.exception)
+        self.assertIn("never settled", message)
+        self.assertIn("stability", message)
+
+    def test_waiting_out_a_long_command_keeps_the_slow_ramp(self):
+        # dense reads are spent confirming a prompt, never waiting for
+        # one: a long command must not be polled at settle pace for
+        # its whole runtime just because the confirmation needs it
+        guest = _PaintingGuest([["C:\\>fmt", "working..."]])
+        console = mock.Mock()
+        console.screen.side_effect = guest.screen
+        console.screen_text.side_effect = guest.screen_text
+        clock = _GuestClock()
+        with _over(console), \
+                mock.patch.object(agentless_module.time, "sleep",
+                                  clock.sleep), \
+                mock.patch.object(agentless_module.time, "monotonic",
+                                  clock.monotonic):
+            with self.assertRaises(RunFailure):
+                agentless_module.AgentlessGuestExec(
+                    machine_module.Machine()).execute("fmt", 13)
+
+        # 3s of echo-catching at 0.1s, then 10s of waiting at 2.0s
+        self.assertLess(console.screen.call_count, 60)
+        self.assertGreater(console.screen.call_count, 25)
+
+    def test_a_wait_that_never_saw_a_prompt_says_only_that(self):
+        # the other expiry, and it must not borrow the first's
+        # explanation: nothing was seen, so there is nothing to
+        # explain about what was under it
+        with self.assertRaises(RunFailure) as expired:
+            _run_against([["C:\\>dir", "working..."]] * 120, timeout=5)
+
+        self.assertNotIn("never settled", str(expired.exception))
+
+    def test_a_prompt_on_a_still_painting_screen_is_not_completion(self):
+        # the listing is still arriving when the prompt is already at
+        # the bottom row; returning there slices at a boundary that
+        # never existed and hands back a short, plausible, wrong tuple
+        rows, _ = _run_against([
+            ["C:\\>"],
+            ["C:\\>dir", "FILE1", "C:\\>"],
+            ["C:\\>dir", "FILE1", "FILE2", "FILE3", "C:\\>"],
+        ])
+
+        self.assertEqual(rows, ("FILE1", "FILE2", "FILE3"))
 
 if __name__ == "__main__":
     unittest.main()

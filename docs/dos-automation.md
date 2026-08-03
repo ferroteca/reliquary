@@ -16,7 +16,10 @@ Reliquary provides agentless automation for DOS guests through QEMU. No guest ag
   the guest names them — one file (`put-file` / `get-file`), a
   whole tree (`put-files` / `get-files`), or a listing of what is
   there (`list-files`)
-- **Command completion** is detected by watching for the DOS prompt
+- **Command completion** is detected by watching for the DOS prompt,
+  and confirmed only once the screen under it has stopped changing —
+  a prompt can arrive mid-scroll, and reading one that is still being
+  drawn returns output cut at a boundary that never existed
 - **Screenshots** are captured through QEMU
 
 ## Declaring the machine

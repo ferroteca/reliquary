@@ -25,6 +25,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`exec` waits for the screen to settle before reading it**
+  (F45, over F47's new stability measure). A DOS prompt can
+  arrive mid-scroll, or the bottom row can transiently resemble
+  one while output is still drawing; the completion test used to
+  accept the first frame that looked right and return output
+  sliced at a boundary that never existed — short, plausible and
+  wrong. A prompt is now a candidate until the screen under it
+  has stopped changing. **What `exec` returns is unchanged where
+  it was already right**, and this is a timing change only: the
+  spec's "completion means this command finished, not that a
+  prompt is visible" is strengthened rather than amended. A
+  command costs roughly an extra 200ms of confirmation, and the
+  waiting ramp is untouched — dense reads are spent confirming a
+  prompt, never waiting for one. A wait that expires having seen
+  a prompt now says so, naming the stability it never reached.
+
 - **Listings show their descriptions** (D97, resolving the
   deferral D88 parked as T8). Wherever a listing's noun carries a
   `description` — `list-codex`, both `list-scripts` forms,

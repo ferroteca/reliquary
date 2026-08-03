@@ -6,6 +6,7 @@ import re
 import sys
 import time
 
+from . import screen_stability
 from .errors import RunFailure
 from .machine import Machine
 
@@ -20,6 +21,16 @@ _PROMPT_RE = re.compile(r"^[A-Z]:(\\[^>]*)?>$")
 _ECHO_POLL = 0.1
 _ECHO_WINDOW = 3.0
 _PROMPT_POLL = 2.0
+
+#: And how often once a prompt *has* been seen, until the screen under
+#: it settles. The slow interval waits a prompt out cheaply, but it
+#: cannot confirm one: a quiescence window is only observable by
+#: sampling inside it, and two reads two seconds apart say nothing
+#: about the last 200ms. So the ramp gains a third rung rather than
+#: losing its second — dense reads are spent only where the question
+#: has become "is this screen finished?", and never for the whole of a
+#: long command.
+_SETTLE_POLL = 0.1
 
 #: The outcome probe, and the word it looks for. `IF ERRORLEVEL n` is
 #: true for *n or greater* and is portable across DOS shells in a way
@@ -118,27 +129,82 @@ class AgentlessGuestExec:
                 rule_id="command.signalled-failure")
 
     def _run(self, command, timeout):
-        """Type one command, wait for the prompt, return its rows."""
+        """Type one command, wait for the prompt, return its rows.
+
+        **A prompt is not read the moment it appears.** It can arrive
+        mid-scroll, or the bottom row can transiently resemble one
+        while output is still drawing, and acting on either slices the
+        output at a boundary that never existed — a short, plausible,
+        wrong answer, which is the shape P11 forbids. So a completion
+        is a candidate until the screen under it has settled
+        (:mod:`screen_stability`), and the menu machinery's rule —
+        look twice before believing a screen — finally reaches the
+        command path, ten feet from where it was already in force.
+        """
         with self._machine.console() as console:
             before = [row for row in console.screen_text() if row]
             console.send_text(command)
             sent = time.monotonic()
             deadline = sent + timeout
             echoed = False
+            settling = screen_stability.ScreenStability()
+            unsettled = None
             while time.monotonic() < deadline:
-                rows = [row for row in console.screen_text() if row]
+                now = time.monotonic()
+                frame = console.screen()
+                reading = settling.observe(frame, now=now)
+                rows = [row for row in frame[0] if row]
                 # Sticky: once the echo has been seen, a later screen
                 # without it is a scrolled one, not a command that
                 # never ran. Nothing else can tell those apart.
                 echoed = echoed or _echo_at(rows, command) is not None
                 landed = echoed or rows != before
-                if landed and rows and _PROMPT_RE.match(rows[-1]):
+                complete = bool(landed and rows
+                                and _PROMPT_RE.match(rows[-1]))
+                if complete and reading.stable:
                     return _command_output(rows, command, echoed=echoed)
-                time.sleep(_ECHO_POLL if time.monotonic() - sent < _ECHO_WINDOW
-                           else _PROMPT_POLL)
+                if complete:
+                    unsettled = reading
+                time.sleep(_poll_interval(complete, now - sent))
         raise RunFailure(
             f"timed out after {timeout}s waiting for command to finish: "
-            f"{command}", rule_id="screen.no-match")
+            f"{command}{_settling_note(unsettled)}",
+            rule_id="screen.no-match")
+
+
+def _poll_interval(confirming, elapsed):
+    """How long to wait before the next read.
+
+    Confirming outranks the ramp: once a prompt is on screen the
+    question has changed from "has it finished?" to "is this screen
+    finished?", and only the second needs dense reads.
+    """
+    if confirming:
+        return _SETTLE_POLL
+    return _ECHO_POLL if elapsed < _ECHO_WINDOW else _PROMPT_POLL
+
+
+def _settling_note(reading):
+    """Why a completion that *was* seen never ended the wait.
+
+    A wait now expires two ways that look identical from outside: the
+    prompt never came, or it came only on screens still being drawn.
+    The second is baffling without help — a screenshot taken at the
+    time shows the prompt plainly — so the failure says which, and
+    names the region it set aside as decoration, that being what makes
+    the message locate the problem rather than restate the expiry.
+    """
+    if reading is None:
+        return ""
+    note = ("; a prompt was on screen but what sits under it never "
+            "settled")
+    if reading.stability is None:
+        return f"{note} (never read often enough to tell)"
+    note += f" (stability {reading.stability:.3f}"
+    if reading.animated:
+        note += (f", outside a {len(reading.animated)}-cell animated "
+                 "region")
+    return f"{note})"
 
 
 def _echo_at(rows, command):

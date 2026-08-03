@@ -239,11 +239,16 @@ workflow:
   8) and content (a row of text, 80). Decoration is **recurrence** — a cell changing 3+ times within 1s —
   excluded from that fraction, with `_menu_baseline`'s majority-churn bail-out carried over (mask nothing,
   compare raw). A window never observed answers `stability=None` rather than a verdict the cadence produced
-  (P11). Delivered as F47 and **it has no consumers yet, deliberately**: `exec`'s completion test adopts it
-  under F45, the authored `stability=` surface is F48, and `control_display`'s own `_settled_screen` /
-  `_menu_baseline` retire onto it under F49.
+  (P11). Delivered as F47; `exec`'s completion test is its first consumer (F45, below). Still to adopt it: the
+  authored `stability=` surface (F48), and `control_display`'s own `_settled_screen` / `_menu_baseline`, which
+  retire onto it under F49 — until then the menu machinery keeps its own hold-for-two-reads and learned mask.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
-  adapter (prompt-based readiness and command completion), `machine.py` is the backend-neutral machine handle:
+  adapter (prompt-based readiness and command completion — **a prompt is a candidate, not an answer**, held
+  until `screen_stability` says the screen under it settled, because one arriving mid-scroll would otherwise
+  slice the output at a boundary that never existed, F45; the poll ramp gains a third rung for that rather
+  than losing its second — `_ECHO_POLL` catches the echo, `_PROMPT_POLL` waits a prompt out cheaply, and
+  `_SETTLE_POLL` confirms one, dense reads being spent only where the question has become "is this screen
+  finished?"), `machine.py` is the backend-neutral machine handle:
   a machine is addressed by its materialization directory, the adapter named in the recorded identity supplies
   the session (`Machine.session()` / `console()`), and `Machine.qmp()` is the QEMU-scoped escape hatch that
   refuses any other backend,

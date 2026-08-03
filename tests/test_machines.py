@@ -1302,28 +1302,93 @@ class CommandOutputTests(unittest.TestCase):
 
 
 class _ScriptedConsole:
-    """A console playing a fixed sequence of screens."""
+    """A console playing fixed screens, one segment per console opened.
 
-    def __init__(self, frames):
-        self.frames = list(frames)
+    `execute` opens a console, and `--check`'s probe opens another, so
+    a script is grouped the same way rather than as one flat run of
+    reads. Within a segment the **last frame repeats**: a screen that
+    has settled stays settled however often a wait looks at it, which
+    is what a real guest does and what keeps these scripts independent
+    of how many reads any one wait happens to take.
+    """
+
+    def __init__(self, segments):
+        self.segments = [list(frames) for frames in segments]
+        self.opened = -1
         self.sent = []
+
+    def open(self):
+        self.opened += 1
+
+    @property
+    def _frames(self):
+        return self.segments[min(self.opened,
+                                 len(self.segments) - 1)]
 
     def send_text(self, text, enter=True):
         del enter
         self.sent.append(text)
 
     def screen_text(self):
-        return list(self.frames[0] if len(self.frames) == 1
-                    else self.frames.pop(0))
+        frames = self._frames
+        return list(frames[0] if len(frames) == 1 else frames.pop(0))
+
+    def screen(self):
+        """The same sequence, as the seam's (rows, attributes) pair.
+
+        These scripts say what the guest displayed, so the attribute
+        half is supplied uniformly: nothing here turns on a highlight.
+        """
+        rows = self.screen_text()
+        return rows, [[0x07] * 80 for _ in range(len(rows))]
 
 
 class _ScriptedMachine:
-    def __init__(self, frames):
-        self.console_double = _ScriptedConsole(frames)
+    """A machine whose console replays a script.
+
+    A flat list of frames is the single-segment case, which is every
+    script but the checked command's.
+    """
+
+    def __init__(self, frames, segments=None):
+        self.console_double = _ScriptedConsole(
+            segments if segments is not None else [frames])
 
     @contextlib.contextmanager
     def console(self):
+        self.console_double.open()
         yield self.console_double
+
+
+class _ScriptedClock:
+    """A deterministic clock advanced only by sleeping.
+
+    The command wait now holds a candidate prompt until the screen
+    under it settles, so these scripts would otherwise sleep for real
+    while the settle window passes — slow, and margin against a
+    one-second timeout that a loaded machine could eat.
+    """
+
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+def _install_scripted_clock(test):
+    """Drive the agentless module's clock for one test."""
+    clock = _ScriptedClock()
+    for name in ("sleep", "monotonic"):
+        patcher = mock.patch(
+            f"reliquary.interaction_agentless.time.{name}",
+            getattr(clock, name))
+        patcher.start()
+        test.addCleanup(patcher.stop)
+    return clock
 
 
 class CommandCompletionTests(unittest.TestCase):
@@ -1338,6 +1403,9 @@ class CommandCompletionTests(unittest.TestCase):
     PROMPT = "C:\\>"
     BOOT = ["UDVD2 CD driver, success",
             "Modules using memory below 1 MB:", PROMPT]
+
+    def setUp(self):
+        _install_scripted_clock(self)
 
     def _run(self, frames, command="VER", timeout=1):
         guest = AgentlessGuestExec(_ScriptedMachine(frames))
@@ -1397,21 +1465,27 @@ class CheckedCommandTests(unittest.TestCase):
     PROMPT = "C:\\>"
     PROBE = "IF ERRORLEVEL 1 ECHO RLQ-EXEC-FAILED"
 
-    def _guest(self, frames):
-        return AgentlessGuestExec(_ScriptedMachine(frames))
+    def setUp(self):
+        _install_scripted_clock(self)
+
+    def _guest(self, segments):
+        return AgentlessGuestExec(
+            _ScriptedMachine(None, segments=segments))
 
     def _frames(self, *, failed):
-        """The screens for one command plus its probe.
+        """The screens for one command plus its probe, one segment each.
 
-        Each `execute` opens its own console and the double replays one
-        sequence, so the probe's frames simply follow the command's.
+        Each `execute` opens its own console, so the probe's screens
+        are their own segment rather than following the command's in
+        one run — the command's wait settles against its own last
+        frame instead of consuming the probe's first.
         """
         probe_output = (["RLQ-EXEC-FAILED"] if failed else [])
         return [
-            [self.PROMPT],
-            ["C:\\>DRIVER.EXE", "loading", self.PROMPT],
-            [self.PROMPT],
-            [f"C:\\>{self.PROBE}"] + probe_output + [self.PROMPT],
+            [[self.PROMPT],
+             ["C:\\>DRIVER.EXE", "loading", self.PROMPT]],
+            [[self.PROMPT],
+             [f"C:\\>{self.PROBE}"] + probe_output + [self.PROMPT]],
         ]
 
     def test_a_failing_command_raises_naming_it(self):
@@ -1450,14 +1524,14 @@ class CheckedCommandTests(unittest.TestCase):
     def test_an_unreadable_probe_refuses_rather_than_passing(self):
         # The probe never echoed, so its verdict cannot be read. An
         # unknown outcome is not a success (P11).
-        frames = [
-            [self.PROMPT],
-            ["C:\\>DRIVER.EXE", "loading", self.PROMPT],
-            [self.PROMPT],
-            ["SOMETHING ELSE ENTIRELY", self.PROMPT],
+        segments = [
+            [[self.PROMPT],
+             ["C:\\>DRIVER.EXE", "loading", self.PROMPT]],
+            [[self.PROMPT],
+             ["SOMETHING ELSE ENTIRELY", self.PROMPT]],
         ]
         with self.assertRaises(RunFailure) as caught:
-            self._guest(frames).execute("DRIVER.EXE", 1, check=True)
+            self._guest(segments).execute("DRIVER.EXE", 1, check=True)
         self.assertEqual(caught.exception.rule_id,
                          "command.outcome-unreadable")
         self.assertIn("DRIVER.EXE", str(caught.exception))
