@@ -154,6 +154,10 @@ class ReturnedOutputTests(unittest.TestCase):
             def screen_text(self):
                 return ["Hello"]
 
+            def screen(self):
+                rows = self.screen_text()
+                return rows, [[0x07] * 80 for _ in range(len(rows))]
+
         @contextlib.contextmanager
         def console():
             yield _Console()

@@ -50,6 +50,15 @@ DEFAULT_WINDOW = 0.2
 DEFAULT_ANIMATION_WINDOW = 1.0
 DEFAULT_ANIMATION_REPEATS = 3
 
+#: Slack on the window edge, so a change exactly one window old falls
+#: *outside* it deterministically. Without this the boundary is
+#: decided by float noise, and it is not a rare case: polling at 0.1s
+#: against a 0.2s window puts a change exactly two samples back on the
+#: edge every time, so the same settled screen would read stable or
+#: unstable depending on accumulated rounding. Far below any real
+#: sampling interval, so it can never absorb a change that mattered.
+_EDGE = 1e-9
+
 
 def _grid(frame):
     """Flatten a frame into rows of (character, attribute) pairs."""
@@ -148,7 +157,7 @@ class ScreenStability:
         so the mask is dropped and the comparison runs raw, the same
         bail-out the menu machinery's learned mask already makes.
         """
-        horizon = now - self._animation_window
+        horizon = now - self._animation_window + _EDGE
         counts = {}
         for when, cells in self._changes:
             if when <= horizon:
@@ -165,7 +174,7 @@ class ScreenStability:
         animated = self._animated(now)
         if now - self._first < self._window:
             return Reading(False, None, animated)
-        horizon = now - self._window
+        horizon = now - self._window + _EDGE
         changed = set()
         for when, cells in self._changes:
             if when > horizon:

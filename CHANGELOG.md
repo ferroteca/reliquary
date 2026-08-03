@@ -23,6 +23,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   prose specs defer to it for what exists — cli.md and api.md
   stay normative for behavior and design.
 
+### Added
+
+- **`stability=`, the quiescence gate on observations** (F48, over
+  F47's measure). A condition can hold perfectly on a screen that
+  is still painting, and that is exactly the screen a wait must not
+  act on — `stable=` guards how long a *match* holds, and nothing
+  guarded the *frame* the compare ran on. A sample below the gate
+  is now not one any condition is judged on; in a branching `wait`
+  an unsettled frame evaluates none of the handlers. It is a
+  proportion rather than a duration, and it scopes like `timeout`
+  — `statement > branching wait > phase > header > built-in 0.99`
+  — so it is **written nowhere in an ordinary script**. The
+  default follows the geometry: one row of an 80×25 screen is 4%
+  of it, so anything looser than 0.96 calls a screen settled while
+  a line is being drawn, while furniture (a cursor 1 cell, a clock
+  8) costs an order of magnitude less. `stability=0` turns the
+  guard off for one observation and costs nothing.
+
+  **This changes when existing waits fire, deliberately** (P8):
+  every wait gains a clause its author did not write. Two rules
+  bound that. The gate **never causes a failure on its own** —
+  where it could not measure at all, the condition is judged on
+  what is there, so a short bound still works and "a timeout means
+  samples were taken, never that nobody looked" still holds. And
+  where it measured a moving screen, the expiry **says so**,
+  naming the proportion reached rather than leaving the two ways a
+  wait can now expire indistinguishable. It does not retire
+  `stable=`: the two answer different questions, and only `stable`
+  catches a quiet screen showing text about to be overwritten.
+
 ### Changed
 
 - **`exec` waits for the screen to settle before reading it**

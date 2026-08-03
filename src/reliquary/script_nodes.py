@@ -26,6 +26,12 @@ from typing import Mapping, Optional, Tuple
 from .errors import InternalError, StaticError
 
 _DURATION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:ms|s|m|h)$")
+# A bare number carrying no unit, which is what a proportion is.
+# Admitted only after a name that takes one, so "durations carry a
+# unit" stays the answer everywhere a duration was meant.
+_FRACTION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$")
+#: The names whose value is a proportion rather than a duration.
+FRACTION_VALUED = frozenset({"stability"})
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
 # A media name may lead with a digit where a property key may not:
 # the `@` sigil already classifies the token, while a property key
@@ -51,7 +57,7 @@ _DELIMITERS = " \t{}#"
 # there would surface as "unexpected token" instead of a named rule.
 KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
-    "pacing",
+    "pacing", "stability",
     "property", "http", "content", "phase", "wait", "on", "always",
     "goto", "finish", "enter", "type", "press", "select", "screenshot",
     "insert", "eject", "set-boot", "set", "start", "stop",
@@ -144,6 +150,7 @@ RULE_OF.update({
     "syn.unexpected-end": "V1",
     "syn.duplicate-header": "V3",
     "node.modifier-not-a-duration": "V2",
+    "node.modifier-not-a-fraction": "V2",
     "node.modifier-not-a-string": "V2",
     "prop.unknown-kind": "V5",
 })
@@ -434,7 +441,8 @@ def _scan_word(text, start, stop_at_equals):
     return text[start:index], index
 
 
-def _scan_value(text, start, number, bare_number=False):
+def _scan_value(text, start, number, bare_number=False,
+                bare_fraction=False):
     """Scan one non-modifier token beginning at ``start``."""
     char = text[start]
     if text[start:start + 3] == '"""':
@@ -460,6 +468,8 @@ def _scan_value(text, start, number, bare_number=False):
     if char.isdigit() or char == ".":
         if not _DURATION.fullmatch(word):
             if bare_number and word.isdigit():
+                return Token("word", word, word, number, start + 1), end
+            if bare_fraction and _FRACTION.fullmatch(word):
                 return Token("word", word, word, number, start + 1), end
             raise ScriptParseError(
                 number,
@@ -505,13 +515,20 @@ def tokenize(text, number):
                         rule_id="lex.modifier-missing-value")
                 value, end = _scan_value(
                     text, end + 1, number,
-                    bare_number=name in ("port-min", "port-max"))
+                    bare_number=name in ("port-min", "port-max"),
+                    bare_fraction=name in FRACTION_VALUED)
                 tokens.append(Token("modifier", text[index:end],
                                     Modifier(name, value, number, index + 1),
                                     number, index + 1))
                 index = end
                 continue
-        token, index = _scan_value(text, index, number)
+        # A header's value follows its keyword rather than an `=`, so
+        # the leading word is what says whether a bare number belongs
+        # here — the same contextual admission the modifier path makes.
+        token, index = _scan_value(
+            text, index, number,
+            bare_fraction=bool(tokens)
+            and tokens[0].value in FRACTION_VALUED)
         tokens.append(token)
     return tuple(tokens)
 

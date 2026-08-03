@@ -29,6 +29,9 @@ header: KW_DESCRIPTION STRING _NL       -> h_description
       | KW_TIMEOUT DURATION _NL         -> h_timeout
       | KW_DEADLINE DURATION _NL        -> h_deadline
       | KW_PACING DURATION _NL          -> h_pacing
+      // A proportion, not a duration: it lexes as a bare number,
+      // which reaches the grammar as NAME.
+      | KW_STABILITY NAME _NL           -> h_stability
 
 property_def: KW_PROPERTY NAME NAME? modifier* _NL
 http_def: KW_HTTP modifier* _open content_def+ _close
@@ -89,6 +92,7 @@ _open: _BLOCK_OPEN _NL
 _close: _BLOCK_CLOSE _NL
 
 %declare KW_DESCRIPTION KW_PLATFORM KW_MACHINE KW_ENTRY KW_TIMEOUT KW_PACING
+%declare KW_STABILITY
 %declare KW_DEADLINE KW_PROPERTY KW_HTTP KW_CONTENT KW_PHASE KW_WAIT KW_ON KW_ALWAYS
 %declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT
 %declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_SET KW_START KW_STOP

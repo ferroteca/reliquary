@@ -49,6 +49,18 @@ DEFAULT_TIMEOUT = "60s"
 # weight. Nonzero because that readiness is unobservable (G1).
 DEFAULT_PACING = "0.1s"
 
+# The built-in quiescence gate: the proportion of the screen that must
+# hold still before a sample is one a condition is evaluated against.
+# The number falls out of the geometry rather than out of taste. A
+# text screen is 80 x 25 = 2000 cells, so one row of text is 80 of
+# them — 4% — and any threshold looser than 0.96 calls a screen
+# stable while a line is being drawn into it. Furniture costs an order
+# of magnitude less (a cursor 1 cell, a clock 8), so 0.99 sits in the
+# gap: above furniture, below content. Written nowhere by default,
+# which is the whole point — a guard every author had to spell would
+# be the burden the pacing round objected to.
+DEFAULT_STABILITY = "0.99"
+
 _UNITS = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0}
 
 #: The verbs that deliver keystrokes, and so pay the pacing gap.
@@ -72,15 +84,13 @@ def parse_duration(spelling):
                           rule_id="time.not-a-duration") from None
 
 
-@dataclass(frozen=True)
-class Bound:
-    """One resolved clock: its duration and where it came from."""
+class _Sourced:
+    """The scope-naming half a resolved setting shares.
 
-    spelling: str
-    seconds: float
-    scope: str                    # "statement", "phase", "header", ...
-    scope_name: Optional[str] = None
-    line: int = 0
+    A failure and a plan report both say *where* a setting came from,
+    and that sentence is the same whether the setting is a duration or
+    a proportion.
+    """
 
     @property
     def source(self):
@@ -97,6 +107,34 @@ class Bound:
 
 
 @dataclass(frozen=True)
+class Bound(_Sourced):
+    """One resolved clock: its duration and where it came from."""
+
+    spelling: str
+    seconds: float
+    scope: str                    # "statement", "phase", "header", ...
+    scope_name: Optional[str] = None
+    line: int = 0
+
+
+@dataclass(frozen=True)
+class Level(_Sourced):
+    """One resolved proportion: its value and where it came from.
+
+    Bound's sibling for a setting that is not a clock. Stability is a
+    fraction of the screen rather than a span of time, so it takes its
+    own record instead of borrowing a field named ``seconds`` — the
+    same reason the language spells it `stability` and not `stable`.
+    """
+
+    spelling: str
+    value: float
+    scope: str
+    scope_name: Optional[str] = None
+    line: int = 0
+
+
+@dataclass(frozen=True)
 class Observation:
     """One observation in the plan, with the clocks that bound it."""
 
@@ -106,6 +144,7 @@ class Observation:
     phase: Optional[str]
     timeout: Bound
     stable: Optional[Bound] = None
+    stability: Optional[Level] = None
 
 
 @dataclass(frozen=True)
@@ -129,6 +168,7 @@ class TimingPlan:
     observations: Tuple[Observation, ...] = ()
     default_pacing: Optional[Bound] = None
     inputs: Tuple[Input, ...] = ()
+    default_stability: Optional[Level] = None
 
     def at(self, node):
         """The plan entry for a parsed node, by its source position."""
@@ -155,6 +195,7 @@ def resolve(script):
     """Resolve a parsed script's whole timing plan."""
     default = _header_default(script)
     pacing = _header_pacing(script)
+    stability = _header_stability(script)
     run = _bound(script.deadline, "header", None,
                  script.headers.get("deadline", 0))
     deadlines = {}
@@ -169,23 +210,26 @@ def resolve(script):
                            phase.line) or default
             inner_pacing = _bound(phase.pacing, "phase", phase.name,
                                   phase.line) or pacing
+            inner_stability = _level(phase.stability, "phase", phase.name,
+                                     phase.line) or stability
             if phase.handlers:
                 # A reactive phase's timeout is itself a clock: the
                 # interval it allows with no handler firing.
                 observations.append(Observation(
                     "reactive interval", phase.line, phase.column,
-                    phase.name, inner))
+                    phase.name, inner, None, inner_stability))
                 for handler in phase.handlers:
-                    _handler(handler, inner, inner_pacing, phase.name,
-                             observations, inputs)
+                    _handler(handler, inner, inner_pacing, inner_stability,
+                             phase.name, observations, inputs)
             else:
                 _statements(phase.statements, inner, inner_pacing,
-                            phase.name, observations, inputs)
+                            inner_stability, phase.name, observations,
+                            inputs)
     else:
-        _statements(script.statements, default, pacing, None,
+        _statements(script.statements, default, pacing, stability, None,
                     observations, inputs)
     return TimingPlan(default, run, dict(deadlines), tuple(observations),
-                      pacing, tuple(inputs))
+                      pacing, tuple(inputs), stability)
 
 
 def format_plan(plan, name=None):
@@ -197,6 +241,8 @@ def format_plan(plan, name=None):
     lines.append(f"default timeout: {plan.default}")
     if plan.default_pacing is not None:
         lines.append(f"default pacing: {plan.default_pacing}")
+    if plan.default_stability is not None:
+        lines.append(f"default stability: {plan.default_stability}")
     if plan.run_deadline is not None:
         lines.append(f"run deadline: {plan.run_deadline}")
     if plan.phase_deadlines:
@@ -213,6 +259,13 @@ def format_plan(plan, name=None):
                      f"{observation.timeout}")
             if observation.stable is not None:
                 entry += f"; stable {observation.stable}"
+            # Reported only where it was overridden: the default is
+            # stated once above, and repeating it on every line would
+            # bury the observations that actually differ.
+            if (observation.stability is not None
+                    and observation.stability is not
+                    plan.default_stability):
+                entry += f"; stability {observation.stability}"
             lines.append(entry)
     if plan.inputs:
         lines.append("guest input:")
@@ -239,6 +292,20 @@ def _header_pacing(script):
         DEFAULT_PACING, parse_duration(DEFAULT_PACING), "built-in")
 
 
+def _header_stability(script):
+    """The script-wide quiescence gate, or the built-in one."""
+    return _level(script.stability, "header", None,
+                  script.headers.get("stability", 0)) or Level(
+        DEFAULT_STABILITY, float(DEFAULT_STABILITY), "built-in")
+
+
+def _level(spelling, scope, scope_name, line):
+    """A level for a written proportion, or ``None`` if none was."""
+    if spelling is None:
+        return None
+    return Level(spelling, float(spelling), scope, scope_name, line)
+
+
 def _bound(spelling, scope, scope_name, line):
     """A bound for a written duration, or ``None`` if none was."""
     if spelling is None:
@@ -246,7 +313,8 @@ def _bound(spelling, scope, scope_name, line):
     return Bound(spelling, parse_duration(spelling), scope, scope_name, line)
 
 
-def _statements(statements, default, pacing, phase, observations, inputs):
+def _statements(statements, default, pacing, stability, phase,
+                observations, inputs):
     """Resolve a statement list under its innermost defaults."""
     for statement in statements:
         if statement.verb in INPUT_VERBS:
@@ -259,38 +327,53 @@ def _statements(statements, default, pacing, phase, observations, inputs):
             # lists: its feedback watches run within the statement's
             # effective timeout, and it still delivers keys.
             observations.append(Observation(
-                "select", statement.line, statement.column, phase, default))
+                "select", statement.line, statement.column, phase, default,
+                None, stability))
             continue
         if statement.verb != "wait":
             continue
+        own = _level(statement.stability, "statement", None,
+                     statement.line) or stability
         if not statement.handlers:
             inner = _bound(statement.timeout, "statement", None,
                            statement.line) or default
             observations.append(Observation(
                 "wait", statement.line, statement.column, phase, inner,
-                _bound(statement.stable, "statement", None, statement.line)))
+                _bound(statement.stable, "statement", None, statement.line),
+                own))
             continue
         # A branching wait bounds reaching the first match, and is
         # the innermost scope for the observations its handlers
-        # lexically contain.
+        # lexically contain. Unlike `stable`, `stability` may be
+        # written here: an unstable frame evaluates none of the
+        # handlers, so the gate belongs to the sample and therefore to
+        # the container.
         branching = _bound(statement.timeout, "branching wait", None,
                            statement.line) or default
+        inherited = _level(statement.stability, "branching wait", None,
+                           statement.line) or stability
         observations.append(Observation(
             "branching wait", statement.line, statement.column, phase,
-            branching))
+            branching, None, inherited))
         for handler in statement.handlers:
-            _handler(handler, branching, pacing, phase, observations, inputs)
+            _handler(handler, branching, pacing, inherited, phase,
+                     observations, inputs)
 
 
-def _handler(handler, default, pacing, phase, observations, inputs):
+def _handler(handler, default, pacing, stability, phase, observations,
+             inputs):
     """Resolve one handler: its own hold, then its body.
 
     The branching ``wait`` above is the innermost *timeout* scope for
     this body and no scope at all for pacing — it cannot carry one —
-    so the pacing default passes straight through from the phase.
+    so the pacing default passes straight through from the phase. It
+    *is* a stability scope, which is where the two observation
+    families diverge.
     """
+    own = _level(handler.stability, "statement", None,
+                 handler.line) or stability
     observations.append(Observation(
         handler.keyword, handler.line, handler.column, phase, default,
-        _bound(handler.stable, "statement", None, handler.line)))
-    _statements(handler.statements, default, pacing, phase, observations,
-                inputs)
+        _bound(handler.stable, "statement", None, handler.line), own))
+    _statements(handler.statements, default, pacing, own, phase,
+                observations, inputs)

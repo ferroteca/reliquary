@@ -450,6 +450,7 @@ Header nodes:
 | `timeout` | duration | script-wide observation default |
 | `deadline` | duration | wall-clock budget for the whole run |
 | `pacing` | duration | script-wide gap before guest input |
+| `stability` | proportion | script-wide quiescence gate on observations |
 
 Declarations:
 
@@ -463,10 +464,10 @@ Statements:
 
 | node | arguments | modifiers | block |
 |---|---|---|---|
-| `wait` | one condition (string/regex, or `machine=` state) | `timeout`, `stable` | — |
-| `wait` | — (no condition; its handlers carry them) | `timeout` | `on` handlers |
-| `on` | one condition | `stable` | statements |
-| `always` | one condition | `stable` | statements |
+| `wait` | one condition (string/regex, or `machine=` state) | `timeout`, `stable`, `stability` | — |
+| `wait` | — (no condition; its handlers carry them) | `timeout`, `stability` | `on` handlers |
+| `on` | one condition | `stable`, `stability` | statements |
+| `always` | one condition | `stable`, `stability` | statements |
 | `goto` | phase name | — | — |
 | `finish` | — | — | — |
 | `http` | `start` plus optional content names, or `stop` | — | optional `content` entries for `start` |
@@ -486,7 +487,7 @@ And the phase declaration:
 
 | node | arguments | modifiers | block |
 |---|---|---|---|
-| `phase` | name | `timeout`, `deadline`, `pacing` | statements, or `always` handlers |
+| `phase` | name | `timeout`, `deadline`, `pacing`, `stability` | statements, or `always` handlers |
 
 ### Grammar (normative)
 
@@ -505,7 +506,8 @@ header          = "description" , string , eol
                 | "entry" , name , eol
                 | "timeout" , duration , eol
                 | "deadline" , duration , eol
-                | "pacing" , duration , eol ;
+                | "pacing" , duration , eol
+                | "stability" , proportion , eol ;
 
 property-def    = "property" , [ "text" | "media" | "secret" ] ,
                   property-key , [ prompt-mod ] , eol ;
@@ -529,12 +531,14 @@ phase           = "phase" , name , { timing-mod } , block-open ,
                   ( sequential-body | reactive-body ) ,
                   block-close ;
 timing-mod      = ( "timeout" | "deadline" | "pacing" ) , "=" ,
-                  duration ;
+                  duration
+                | stability-mod ;
 
 sequential-body = statement-list ;
 reactive-body   = always-handler , { always-handler } ;
 always-handler  = "always" , condition ,
-                  [ "stable" , "=" , duration ] , block-open ,
+                  [ "stable" , "=" , duration ] ,
+                  [ stability-mod ] , block-open ,
                   statement-list , block-close ;
 statement-list  = { statement } ;
 
@@ -542,13 +546,22 @@ statement       = observation | action | transfer ;
 transfer        = "goto" , name , eol | "finish" , eol ;
 observation     = "wait" , condition , { watch-mod } , eol
                 | "wait" , [ "timeout" , "=" , duration ] ,
+                  [ stability-mod ] ,
                   block-open , handler , handler , { handler } ,
                   block-close ;
 handler         = "on" , condition ,
-                  [ "stable" , "=" , duration ] , block-open ,
+                  [ "stable" , "=" , duration ] ,
+                  [ stability-mod ] , block-open ,
                   statement-list , block-close ;
-watch-mod       = ( "timeout" | "stable" ) , "=" , duration ;
+watch-mod       = ( "timeout" | "stable" ) , "=" , duration
+                | stability-mod ;
 pacing-mod      = "pacing" , "=" , duration ;
+(* A proportion, not a duration: it carries no unit, which is what
+   keeps `stable=2s` and `stability=0.99` two words for two axes
+   rather than one word for two meanings (G6). *)
+stability-mod   = "stability" , "=" , proportion ;
+proportion      = digit , { digit } , [ "." , digit , { digit } ]
+                | "." , digit , { digit } ;
 
 condition       = string | regex
                 | "machine" , "=" , machine-state ;
@@ -831,6 +844,11 @@ deadline    45m
   it.
 - `pacing` optionally sets the script-wide gap before guest
   input, which phases and input verbs may narrow. See
+  [timing](#timing).
+- `stability` optionally changes the script-wide quiescence gate
+  from `0.99` — the proportion of the screen that must be holding
+  still before a sample is one a condition is judged on. It is a
+  **proportion, not a duration**, and carries no unit. See
   [timing](#timing).
 
 Each header may appear at most once. The file name supplies the
@@ -1192,8 +1210,9 @@ statement's effective timeout.
 
 ### Clocks
 
-Five clocks exist. Each is checked at **boundaries** — dispatch
-samples and statement starts — never mid-delivery:
+Five clocks exist, and one gate that is not a clock. Each is
+checked at **boundaries** — dispatch samples and statement starts —
+never mid-delivery:
 
 | clock | starts | satisfied / expires |
 |---|---|---|
@@ -1202,6 +1221,29 @@ samples and statement starts — never mid-delivery:
 | reactive interval (`timeout` on a reactive phase) | at phase entry, and again each time dispatch resumes after a handler action | expires when the duration passes with no handler firing |
 | phase `deadline` | at each activation (each entry to the phase) | expires when the activation's wall clock exceeds the budget |
 | run `deadline` | at run start | expires when the run's wall clock exceeds the budget |
+
+**`stability` is the sixth entry and deliberately not a clock**: it
+is a proportion of the screen rather than a span of time, and it
+gates *which samples count* rather than bounding how long something
+may take. A sample whose screen has not settled to the effective
+proportion is **not a sample any condition is evaluated against** —
+it is skipped and the wait keeps looking. In a branching `wait` an
+unsettled frame evaluates *none* of the handlers, which is why the
+gate belongs to the sample and therefore to the container.
+
+Two consequences follow, and both are normative:
+
+- **The gate never causes a failure on its own.** Where the gate
+  has had no chance to measure at all — a bound so short that no
+  window could be observed — the condition is evaluated on what is
+  there, so the invariant above holds: a timeout still means
+  samples were taken and none satisfied the condition, never that
+  nobody looked.
+- **Where it has measured and the screen is moving, expiry is
+  declared and says so.** The diagnostic names the gate and the
+  proportion reached, because otherwise the two ways a wait can
+  expire — the condition never matched, or it matched only on
+  frames the gate skipped — are indistinguishable from outside.
 
 Expiry produces the failure the [timing section](#timing)
 promises: the diagnostic names the expired clock and the scope
@@ -1500,12 +1542,13 @@ always "Installation complete" stable=1s {
 The timing model in one sentence: **`timeout` bounds the time to
 the next observed event, `deadline` bounds the total wall clock of
 the construct it annotates, `stable` strengthens one observation,
+`stability` decides which samples an observation may be judged on,
 `pacing` sets the gap before guest input, and there is no
 `delay`.** When each clock starts, where it is
 checked, and how expiry is declared are defined by the
 [execution model's clock table](#clocks).
 
-The three families scope differently, and placement is the law:
+The four families scope differently, and placement is the law:
 
 - **Per-observation settings (`timeout`, `stable`) are lexically
   scoped.** An observation bound is a parameter of an observation,
@@ -1537,19 +1580,51 @@ The three families scope differently, and placement is the law:
   `wait` acts on nothing. A guest-input verb inside a handler
   therefore inherits from its phase or the header, skipping the
   `wait` that contains it.
+- **The quiescence gate (`stability`) is lexically scoped** like
+  the first family, and applies to observations:
+
+  ```text
+  statement > branching wait > phase > header > built-in 0.99
+  ```
+
+  It **does** have a branching-`wait` rung, and that is where it
+  diverges from `stable` rather than from `pacing`: `stable`
+  qualifies a *match*, so a container carrying it is meaningless —
+  there is no condition to hold — while `stability` qualifies the
+  *frame a compare runs on*, and a frame exists at every sample.
+  That is also what makes a built-in default possible at all, so
+  the gate is written nowhere in an ordinary script.
+
+  **The number falls out of the geometry.** A text screen is
+  80 × 25 = 2000 cells, so one row of text is 80 of them — 4% —
+  and any threshold looser than `0.96` would call a screen settled
+  while a line is still being drawn into it. Screen furniture costs
+  an order of magnitude less: a cursor 1 cell, a clock 8, a
+  percentage counter 4. `0.99` sits in that gap, above furniture
+  and below content. **`stability=0` turns the gate off** for the
+  observation that carries it, which is the escape for a screen the
+  default refuses; it is legal precisely because it costs nothing,
+  not even the window establishing quiescence would take.
 
 Where each word may appear, and what it means there — any other
 placement is a parse error:
 
-| written on | `timeout` | `deadline` | `stable` | `pacing` |
-|---|---|---|---|---|
-| header | default for all observations | budget for the run | error | default for all guest input |
-| `phase` | default within the phase | budget per phase entry | error | default within the phase |
-| single-condition `wait` | bound on this observation | error | hold requirement on this match | error — it delivers no input |
-| branching `wait` | bound on reaching the first match | error | error — put it on the `on` | error — it delivers no input |
-| `on` / `always` | error — the container owns the waiting | error | hold requirement on this condition | error — put it on the input verb |
-| `enter` / `type` / `press` / `select` | error | error | error | gap before this delivery |
-| every other statement | error | error | error | error — it delivers no input |
+| written on | `timeout` | `deadline` | `stable` | `stability` | `pacing` |
+|---|---|---|---|---|---|
+| header | default for all observations | budget for the run | error | default for all observations | default for all guest input |
+| `phase` | default within the phase | budget per phase entry | error | default within the phase | default within the phase |
+| single-condition `wait` | bound on this observation | error | hold requirement on this match | gate on this observation's samples | error — it delivers no input |
+| branching `wait` | bound on reaching the first match | error | error — put it on the `on` | gate on this wait's samples | error — it delivers no input |
+| `on` / `always` | error — the container owns the waiting | error | hold requirement on this condition | gate on this handler's samples | error — put it on the input verb |
+| `enter` / `type` / `press` / `select` | error | error | error | error — it compares nothing | gap before this delivery |
+| every other statement | error | error | error | error — it compares nothing | error — it delivers no input |
+
+**`stability` and `pacing` are opposite numbers**, and the table is
+the clearest place to see it: each sits on exactly the statement
+kind whose hazard it addresses — pacing guards the actor and lives
+on the four verbs that deliver input, stability guards the compare
+and lives on the observations — so neither overlaps the other and
+no word needs position-sensitive semantics.
 
 Three placements are rejected deliberately rather than tolerated:
 `deadline` on a single observation would be an exact synonym for
@@ -1565,6 +1640,9 @@ duration — a bound of zero asks for what can never happen.
 ready, do not wait". It is an interval rather than a bound, and an
 author who knows a screen is entitled to say so; refusing it would
 only yield `pacing=1ms`, which says the same thing less honestly.
+`stability` is not a duration at all: it is a proportion between
+`0` and `1` inclusive, and both ends are meaningful — `1` demands a
+frame with no change whatever, `0` turns the gate off.
 
 Because per-observation and pacing resolution are fully lexical,
 the effective timeout of every observation and the effective gap
@@ -1582,6 +1660,26 @@ stated duration before succeeding:
 ```rlqs
 wait "Formatting" stable=2s
 ```
+
+**`stable` and `stability` are two axes, not two spellings**, and
+the difference decides which one an author wants. `stable` asks
+whether a *matched condition* is the durable state rather than a
+transient one; `stability` asks whether the *frame* the compare ran
+on is trustworthy at all. A condition can hold perfectly on a
+half-painted screen — that is the case only `stability` catches —
+and a screen can be perfectly quiet while showing text about to be
+overwritten, which is the case only `stable` catches. Neither
+subsumes the other, which is why **`stability` does not retire
+`stable`**, and why one word could not carry both: a duration and a
+proportion told apart only by whether the author wrote `2s` or
+`0.99` is two meanings in one spelling, which **G6** refuses.
+
+In practice the gate absorbs most *uses* of `stable=`, this
+example among them: what an author usually means by
+`wait "Formatting" stable=2s` is "do not act on this until the
+screen has stopped moving", which the default now does without
+being written. `stable` becomes the rarer tool for the case it
+alone answers, rather than an unnecessary one.
 
 There is no generic sleep or delay verb, on principle (G1, G5): a
 blind

@@ -33,11 +33,16 @@ from .script_validation import validate
 # observation names a channel (script-spec.md, "Channels"), which
 # V7 checks in the validation layer.
 _SIGNATURES = {
-    "wait_one": ("timeout", "stable"),
-    "wait_branching": ("timeout",),
-    "on_handler": ("stable",),
-    "always_handler": ("stable",),
-    "phase": ("timeout", "deadline", "pacing"),
+    # `stability` sits where `stable` cannot, and the divergence is
+    # principled: `stable` qualifies a match, so one must exist, while
+    # `stability` qualifies the frame a compare runs on and a frame
+    # exists at every sample. That is what makes the container rungs
+    # meaningful — and a default possible at all.
+    "wait_one": ("timeout", "stable", "stability"),
+    "wait_branching": ("timeout", "stability"),
+    "on_handler": ("stable", "stability"),
+    "always_handler": ("stable", "stability"),
+    "phase": ("timeout", "deadline", "pacing", "stability"),
     "property_def": ("prompt",),
     "http_def": ("port-min", "port-max"),
     "content_def": ("indent", "from"),
@@ -68,6 +73,13 @@ _DISPLAY = {
 # from the channels it observes.
 _DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable",
                                  "pacing"})
+
+# And the one whose value is a proportion. It joins the set above in
+# separating an observation's own modifiers from its channels, but
+# not in taking a unit: `stable=2s` is how long a *match* must hold,
+# `stability=0.99` how still the *screen* must be. Two axes, and G6
+# refuses one word for both.
+_FRACTION_MODIFIERS = frozenset({"stability"})
 
 # The placement matrix (script-spec.md, "Timing"): every timing
 # word the signatures above reject is rejected for a reason, and
@@ -133,6 +145,22 @@ _PLACEMENT = {
         "pacing is the gap before delivering guest input, and this "
         "verb delivers none",
 }
+
+# `stability` is `pacing`'s opposite number and takes the opposite
+# home: pacing sits on the four verbs that deliver input, stability on
+# the observations that compare. Every verb that compares nothing
+# refuses it for the one reason, so these are generated rather than
+# written out — a screenshot and a set-boot are refused identically
+# and for identically little interest.
+_PLACEMENT.update({
+    (node, "stability"):
+        "stability guards the frame a compare runs on, and this verb "
+        "compares nothing: write it on the observation whose result "
+        "you are waiting for, or on the phase"
+    for node in ("enter", "type_text", "press", "select", "screenshot",
+                 "insert", "eject", "set_boot", "set_var", "start",
+                 "stop", "http_control")
+})
 # A modifier value's terminal, as the condition kind it spells.
 _CONDITION_KINDS = {
     "STRING": "text", "REGEX": "regex", "NAME": "state",
@@ -180,6 +208,7 @@ class Handler(_Observed):
     conditions: Tuple[Condition, ...]
     statements: Tuple["Statement", ...]
     stable: Optional[str] = None
+    stability: Optional[str] = None
     line: int = 0
     column: int = 1
 
@@ -194,6 +223,7 @@ class Statement(_Observed):
     handlers: Tuple[Handler, ...] = ()
     timeout: Optional[str] = None
     stable: Optional[str] = None
+    stability: Optional[str] = None
     pacing: Optional[str] = None
     exclude: Optional[StringLiteral] = None
     contents: Tuple["HttpContent", ...] = ()
@@ -223,6 +253,7 @@ class Phase:
     timeout: Optional[str] = None
     deadline: Optional[str] = None
     pacing: Optional[str] = None
+    stability: Optional[str] = None
     line: int = 0
     column: int = 1
 
@@ -262,6 +293,7 @@ class Script:
     timeout: Optional[str] = None
     deadline: Optional[str] = None
     pacing: Optional[str] = None
+    stability: Optional[str] = None
     properties: Tuple[Property, ...] = ()
     http: Optional[Http] = None
     statements: Tuple[Statement, ...] = ()
@@ -370,8 +402,30 @@ def _modifiers(node, items):
             raise ScriptParseError(
                 line, f"{name} must be a duration", column,
                 rule_id="node.modifier-not-a-duration")
+        if name in _FRACTION_MODIFIERS:
+            _fraction(name, value, line, column)
         found[name] = value
     return found
+
+
+def _fraction(name, value, line, column):
+    """Check a proportion modifier's value, and return it.
+
+    The range is closed at both ends and each end means something a
+    script may legitimately say: ``1`` demands a frame with no change
+    at all, and ``0`` turns the guard off for one observation, which
+    is the escape hatch for a screen the default would refuse.
+    """
+    try:
+        number = float(str(value))
+    except ValueError:
+        number = None
+    if number is None or not 0.0 <= number <= 1.0:
+        raise ScriptParseError(
+            line, f"{name} must be a proportion of the screen between "
+            f"0 and 1, such as 0.99 (got {str(value)!r})", column,
+            rule_id="node.modifier-not-a-fraction")
+    return number
 
 
 def _observation(node, items):
@@ -382,9 +436,10 @@ def _observation(node, items):
     carries a value of the right kind is V7's, in the validation
     layer, where the diagnostic can say so.
     """
-    timing = [item for item in items if item[0] in _DURATION_MODIFIERS]
+    own = _DURATION_MODIFIERS | _FRACTION_MODIFIERS
+    timing = [item for item in items if item[0] in own]
     channels = tuple(_channel(item) for item in items
-                     if item[0] not in _DURATION_MODIFIERS)
+                     if item[0] not in own)
     return _modifiers(node, timing), channels
 
 
@@ -496,6 +551,11 @@ class _Builder(Transformer):
 
     def h_pacing(self, children):
         return ("pacing", str(children[1]), _line(children[0]))
+
+    def h_stability(self, children):
+        _fraction("stability", children[1], _line(children[0]),
+                  _column(children[1]))
+        return ("stability", str(children[1]), _line(children[0]))
 
     # -- declarations --------------------------------------------
     def property_def(self, children):
@@ -669,6 +729,7 @@ class _Builder(Transformer):
             "wait", conditions=tuple(conditions) + channels,
             timeout=_duration(modifiers.get("timeout")),
             stable=_duration(modifiers.get("stable")),
+            stability=_spelling(modifiers.get("stability")),
             line=_line(children[0]), column=_column(children[0]))
 
     def wait_branching(self, children):
@@ -677,6 +738,8 @@ class _Builder(Transformer):
             "wait_branching", [c for c in children if isinstance(c, tuple)])
         return Statement("wait", conditions=channels, handlers=handlers,
                          timeout=_duration(modifiers.get("timeout")),
+                         stability=_spelling(
+                             modifiers.get("stability")),
                          line=_line(children[0]),
                          column=_column(children[0]))
 
@@ -693,7 +756,8 @@ class _Builder(Transformer):
         return Handler(
             keyword, conditions + channels,
             tuple(c for c in children if isinstance(c, Statement)),
-            _duration(modifiers.get("stable")), _line(children[0]),
+            _duration(modifiers.get("stable")),
+            _spelling(modifiers.get("stability")), _line(children[0]),
             _column(children[0]))
 
     # -- transfers and actions -----------------------------------
@@ -804,7 +868,8 @@ class _Builder(Transformer):
             tuple(c for c in children if isinstance(c, Handler)),
             _duration(modifiers.get("timeout")),
             _duration(modifiers.get("deadline")),
-            _duration(modifiers.get("pacing")), _line(children[0]),
+            _duration(modifiers.get("pacing")),
+            _spelling(modifiers.get("stability")), _line(children[0]),
             _column(children[0]))
 
     def phased_body(self, children):
@@ -843,11 +908,16 @@ class _Builder(Transformer):
             headers.get("platform"), headers.get("description"),
             headers.get("machine"), headers.get("entry"),
             headers.get("timeout"), headers.get("deadline"),
-            headers.get("pacing"),
+            headers.get("pacing"), headers.get("stability"),
             tuple(properties), http, tuple(statements), tuple(phases), lines)
 
 
 def _duration(token):
+    return str(token) if token is not None else None
+
+
+def _spelling(token):
+    """A modifier's value as written, for a non-duration setting."""
     return str(token) if token is not None else None
 
 

@@ -1,0 +1,8 @@
+# invalid: the placement matrix: stability guards the frame a
+# compare runs on, and an input verb compares nothing
+# rule: V2
+# id: node.timing-placement
+# spec: Timing
+
+platform dos
+enter "DIR" stability=0.99

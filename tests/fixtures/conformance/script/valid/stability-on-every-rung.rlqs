@@ -1,0 +1,26 @@
+# valid: the quiescence gate on each rung of its ladder, including
+# the branching wait that `stable` is refused on — a frame exists at
+# every sample, where a match need not
+# spec: Timing
+
+platform dos
+entry install
+stability 0.98
+
+phase install stability=0.97 {
+    wait "Welcome" stability=0.99
+    wait stability=0.96 {
+        on "Format?" stability=1 {
+            press enter
+        }
+        on "Ready" {
+            goto done
+        }
+    }
+    goto done
+}
+
+phase done {
+    wait "C:\>" stability=0
+    finish
+}

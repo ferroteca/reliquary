@@ -1,0 +1,8 @@
+# invalid: stability is a proportion of the screen, not a count and
+# not a duration, so it is closed at both ends
+# rule: V2
+# id: node.modifier-not-a-fraction
+# spec: Timing
+
+platform dos
+wait "x" stability=1.5

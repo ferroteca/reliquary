@@ -222,6 +222,22 @@ class ScreenStabilityTests(unittest.TestCase):
         self.assertTrue(verdicts[8].stable)
         self.assertEqual(len(verdicts[8].animated), 76)
 
+    def test_a_change_exactly_one_window_old_is_outside_it(self):
+        # polling at 0.1s against a 0.2s window puts a change exactly
+        # two samples back on the edge every time, so a boundary
+        # decided by float noise is not a rare case but the common
+        # one: the same settled screen would read either way
+        screen = _Screen().write(0, 0, "C:\\>")
+        monitor = screen_stability.ScreenStability()
+        monitor.observe(screen.frame(), now=0.0)
+        screen.write(5, 0, "Loading FreeDOS" + "." * 60)
+        reading = None
+        for step in range(1, 4):
+            reading = monitor.observe(screen.frame(),
+                                      now=0.1 * step)
+
+        self.assertTrue(reading.stable)
+
     def test_a_window_never_observed_cannot_be_judged(self):
         # quiescence over a span nobody watched is not an answer the
         # measure has: every guarded observation pays one window

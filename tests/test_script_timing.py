@@ -308,3 +308,47 @@ class CycleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StabilityTests(unittest.TestCase):
+    """`stability` guards the frame a compare runs on (F48)."""
+
+    def test_a_wait_carries_the_stability_written_on_it(self):
+        plan = resolve(parse_script(_HEAD + 'wait "x" stability=0.98\n'))
+
+        self.assertEqual(plan.observations[0].stability.spelling, "0.98")
+        self.assertEqual(plan.observations[0].stability.scope, "statement")
+
+    def test_stability_is_refused_where_nothing_is_compared(self):
+        # pacing's opposite number: each guard sits on exactly the
+        # statement kind whose hazard it addresses, so neither needs
+        # position-sensitive semantics
+        for source in (_HEAD + 'enter "DIR" stability=0.99\n',
+                       _HEAD + "press enter stability=0.99\n",
+                       _HEAD + 'select "Install" stability=0.99\n',
+                       _HEAD + "screenshot stability=0.99\n"):
+            with self.assertRaises(ScriptParseError, msg=source) as caught:
+                parse_script(source)
+            self.assertIn("compares nothing", caught.exception.message)
+            self.assertEqual(RULE_OF[caught.exception.rule_id], "V2")
+
+    def test_every_observation_rung_may_carry_it(self):
+        # the divergence from `stable` is principled: a frame exists
+        # at every sample, so the container rungs are meaningful
+        for source in (_HEAD + "stability 0.98\nstart\n",
+                       _HEAD + "entry p\nphase p stability=0.98 {\n"
+                               '  wait "x"\n  finish\n}\n',
+                       _HEAD + 'wait "x" stability=0.98\n',
+                       _HEAD + 'wait stability=0.98 {\n'
+                               '  on "a" {\n    press enter\n  }\n'
+                               '  on "b" {\n    press enter\n  }\n}\n',
+                       _HEAD + 'wait {\n  on "a" stability=0.98 {\n'
+                               '    press enter\n  }\n'
+                               '  on "b" {\n    press enter\n  }\n}\n'):
+            parse_script(source)
+
+    def test_a_proportion_outside_zero_to_one_is_refused(self):
+        for spelling in ("1.5", "2"):
+            with self.assertRaises(ScriptParseError) as caught:
+                parse_script(_HEAD + f'wait "x" stability={spelling}\n')
+            self.assertIn("between 0 and 1", caught.exception.message)

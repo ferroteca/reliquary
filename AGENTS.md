@@ -239,9 +239,10 @@ workflow:
   8) and content (a row of text, 80). Decoration is **recurrence** — a cell changing 3+ times within 1s —
   excluded from that fraction, with `_menu_baseline`'s majority-churn bail-out carried over (mask nothing,
   compare raw). A window never observed answers `stability=None` rather than a verdict the cadence produced
-  (P11). Delivered as F47; `exec`'s completion test is its first consumer (F45, below). Still to adopt it: the
-  authored `stability=` surface (F48), and `control_display`'s own `_settled_screen` / `_menu_baseline`, which
-  retire onto it under F49 — until then the menu machinery keeps its own hold-for-two-reads and learned mask.
+  (P11). Delivered as F47, with two consumers: `exec`'s completion test (F45, below) and the script language's
+  `stability=` (F48, below). Still to adopt it: `control_display`'s own `_settled_screen` / `_menu_baseline`,
+  which retire onto it under F49 — until then the menu machinery keeps its own hold-for-two-reads and learned
+  mask.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion — **a prompt is a candidate, not an answer**, held
   until `screen_stability` says the screen under it settled, because one arriving mid-scroll would otherwise
@@ -259,8 +260,20 @@ workflow:
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
   `load_script`), `script_validation.py` (the V-numbered static rules, each diagnostic citing its id),
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
-  effective timeout and every guest-input verb's effective `pacing` — the settling gap before its first
-  key event, D60 — each with the scope that supplied it; `format_plan` and
+  effective timeout and quiescence gate, and every guest-input verb's effective `pacing` — the settling gap
+  before its first
+  key event, D60 — each with the scope that supplied it. **`stability=` is `pacing`'s opposite number** (F48):
+  a proportion rather than a duration, resolved over the ladder statement > branching wait > phase > header >
+  built-in 0.99, sitting on observations where pacing sits on the four input verbs — each guard on exactly the
+  statement kind whose hazard it addresses, so neither needs position-sensitive semantics. It sits where
+  `stable` cannot, and the divergence is principled: `stable` qualifies a match, so one must exist, while
+  `stability` qualifies the frame a compare runs on, and a frame exists at every sample — which is also what
+  makes a default possible at all. A sample below the gate is not one any condition is judged on, and in a
+  branching `wait` an unsettled frame evaluates **none** of the handlers. **The gate never causes a failure on
+  its own**: where it never got to measure the condition is judged on what is there, so the "a timeout means
+  samples were taken, never that nobody looked" invariant survives; where it measured and the screen was
+  moving, the expiry names it. `stability=0` turns it off and costs nothing — the escape for a screen the
+  default refuses; `format_plan` and
   `run_script(dry_run=True)` / `rlq run-script --dry-run` report it without running,
   with `script_validation.reach` counting the statements no static pass can promise
   will run — a handler body is the guest's decision, not the plan's).

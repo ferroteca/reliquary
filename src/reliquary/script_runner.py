@@ -41,6 +41,7 @@ from .script_timing import (format_plan, parse_duration,
                             resolve as resolve_timing)
 from .script_validation import PORTABLE_KEY_NAMES, reach
 from . import events as _events
+from . import screen_stability as _stability
 from . import machines as _machines
 from .machines import DryRun
 
@@ -53,6 +54,13 @@ _FINISH = object()
 # Seconds between dispatch samples. Cadence is the control plane's
 # business, never the script's (G5).
 _POLL_INTERVAL = 2.0
+
+#: And how often while a screen is still moving. The poll above waits
+#: a screen out cheaply, but it cannot confirm one has settled: a
+#: quiescence window is only observable by sampling inside it, and two
+#: reads two seconds apart say nothing about the last 200ms. Dense
+#: reads are spent only there, never for the whole of a long wait.
+_SETTLE_POLL = 0.1
 
 # QEMU translations for every portable language key. Membership in
 # the closed vocabulary is owned by static validation; keeping the
@@ -323,10 +331,17 @@ class ScriptRun:
 
 @dataclasses.dataclass(frozen=True)
 class _Sample:
-    """One reading of every channel, taken at one instant."""
+    """One reading of every channel, taken at one instant.
+
+    ``rows`` are normalized for matching; ``frame`` is the screen as
+    the seam handed it over — character rows and their attribute
+    tokens — which is what the quiescence gate compares, identity
+    being the whole pair.
+    """
 
     rows: tuple = ()
     stopped: bool = False
+    frame: tuple = ()
 
 
 class _Observation:
@@ -821,10 +836,25 @@ class _ScriptEngine:
         self._require_screen(observations, phase)
         started = self._now()
         expiry = started + bound.seconds
+        gate = self._gate(phase)
+        monitor = _stability.ScreenStability() if gate is None else (
+            _stability.ScreenStability(threshold=gate.value))
+        self._gated = None
+        self._measured = False
         while True:
             self._check_clocks()
             sample = self._read()
             now = self._now()
+            # An unstable frame evaluates *none* of the handlers,
+            # which is why the gate belongs to the container rather
+            # than to any one of them.
+            settled = self._settled(gate, monitor, sample, now)
+            expired = now >= expiry
+            if not (settled or (expired and not self._measured)):
+                if expired:
+                    self._expire_interval(description, bound, phase)
+                self._sleep(_SETTLE_POLL)
+                continue
             fired = None
             for index, observation in enumerate(observations):
                 # Every armed observation sees every sample, so the
@@ -833,18 +863,10 @@ class _ScriptEngine:
                 if observation.update(sample, now) and fired is None:
                     fired = index
             if fired is None:
-                if now >= expiry:
-                    self.events.clear()
-                    self._emit(_events.OBSERVATION_TIMEOUT,
-                               description=description,
-                               timeout=bound.seconds, line=phase.line,
-                               **{"timeout-source": bound.source})
-                    raise self._expired(
-                        "the reactive interval", bound,
-                        detail=" with no handler firing",
-                        rule_id="time.reactive-interval-expired")
+                if expired:
+                    self._expire_interval(description, bound, phase)
                 self._progress(expiry, bound.seconds, "dispatch", now)
-                self._sleep(_POLL_INTERVAL)
+                self._sleep(_POLL_INTERVAL if settled else _SETTLE_POLL)
                 continue
             observations[fired].consumed = True
             handler = phase.handlers[fired]
@@ -868,10 +890,29 @@ class _ScriptEngine:
         self._require_screen(observations, statement)
         started = self._now()
         expiry = started + bound.seconds
+        gate = self._gate(statement)
+        monitor = _stability.ScreenStability() if gate is None else (
+            _stability.ScreenStability(threshold=gate.value))
+        self._gated = None
+        self._measured = False
         while True:
             self._check_clocks(statement)
             sample = self._read()
             now = self._now()
+            # An unsettled sample is not one the condition is judged
+            # on, and sampling tightens while the screen moves: a
+            # quiescence window is only observable from inside it.
+            # **The gate delays acceptance and never causes failure by
+            # itself** — at expiry the condition is evaluated on
+            # whatever is there, so a timeout still means samples were
+            # taken and none satisfied it, never that nobody looked.
+            settled = self._settled(gate, monitor, sample, now)
+            expired = now >= expiry
+            if not (settled or (expired and not self._measured)):
+                if expired:
+                    self._expire_observation(description, bound, statement)
+                self._sleep(_SETTLE_POLL)
+                continue
             for index, observation in enumerate(observations):
                 if observation.update(sample, now):
                     self.events.clear()
@@ -884,18 +925,34 @@ class _ScriptEngine:
                     return index
             # Checked after a sample: a timeout always means samples
             # were taken and none satisfied the condition.
-            if now >= expiry:
-                self.events.clear()
-                self._emit(_events.OBSERVATION_TIMEOUT,
-                           description=description, timeout=bound.seconds,
-                           line=getattr(statement, "line", 0),
-                           **{"timeout-source": bound.source})
-                raise self._expired(
-                    "the observation timeout", bound, statement,
-                    f" waiting for {description}",
-                    rule_id="time.observation-expired")
+            if expired:
+                self._expire_observation(description, bound, statement)
             self._progress(expiry, bound.seconds, description, now)
-            self._sleep(_POLL_INTERVAL)
+            self._sleep(_POLL_INTERVAL if settled else _SETTLE_POLL)
+
+    def _expire_interval(self, description, bound, phase):
+        """Declare a reactive interval expiry, naming which clock lost."""
+        self.events.clear()
+        self._emit(_events.OBSERVATION_TIMEOUT,
+                   description=description, timeout=bound.seconds,
+                   line=phase.line,
+                   **{"timeout-source": bound.source})
+        raise self._expired(
+            "the reactive interval", bound,
+            detail=f" with no handler firing{self._gate_note()}",
+            rule_id="time.reactive-interval-expired")
+
+    def _expire_observation(self, description, bound, statement):
+        """Declare an observation timeout, naming which clock lost."""
+        self.events.clear()
+        self._emit(_events.OBSERVATION_TIMEOUT,
+                   description=description, timeout=bound.seconds,
+                   line=getattr(statement, "line", 0),
+                   **{"timeout-source": bound.source})
+        raise self._expired(
+            "the observation timeout", bound, statement,
+            f" waiting for {description}{self._gate_note()}",
+            rule_id="time.observation-expired")
 
     def _matched(self, description, sample, observation, elapsed, line):
         """Report a match, naming the row that satisfied it."""
@@ -911,6 +968,65 @@ class _ScriptEngine:
         """The effective timeout the timing plan resolved for a node."""
         entry = self._plan.at(node)
         return entry.timeout if entry is not None else self._plan.default
+
+    def _gate(self, node):
+        """The quiescence gate the plan resolved for this observation.
+
+        ``None`` where the guard is off — ``stability=0`` is the
+        author's escape for a screen the default would refuse, and it
+        must cost nothing at all, not even the window that
+        establishing quiescence would otherwise take.
+        """
+        entry = self._plan.at(node)
+        level = (entry.stability if entry is not None
+                 else self._plan.default_stability)
+        if level is None or level.value <= 0:
+            return None
+        return level
+
+    def _settled(self, gate, monitor, sample, now):
+        """Whether this sample is one a condition may be judged on.
+
+        A condition can hold perfectly on a screen that is still
+        painting, and that is the screen a wait must not act on — so
+        an unsettled sample is skipped rather than evaluated, and the
+        wait keeps looking. A stopped machine has no screen to judge,
+        and the machine channel still has to be answerable there.
+        """
+        if gate is None or sample.stopped or not sample.frame:
+            return True
+        reading = monitor.observe(sample.frame, now=now)
+        if reading.stability is not None:
+            # The window was observed, so there is a verdict here
+            # rather than merely an absence of evidence. Which of
+            # those two it is decides what an expiry may do.
+            self._measured = True
+        if reading.stable:
+            return True
+        self._gated = reading
+        return False
+
+    def _gate_note(self):
+        """What to add to an expiry that skipped unsettled samples.
+
+        A wait now expires two ways that look identical from outside:
+        the condition never matched, or it matched only on frames the
+        guard skipped. The second is baffling without help — the text
+        is plainly there in any screenshot taken at the time — so the
+        failure says which, and the animated region is what makes the
+        message locate the problem rather than restate the expiry.
+        """
+        reading = self._gated
+        if reading is None:
+            return ""
+        note = "; the screen never settled enough to compare against"
+        if reading.stability is None:
+            return f"{note} (never sampled densely enough to tell)"
+        note += f" (stability {reading.stability:.3f}"
+        if reading.animated:
+            note += (f", outside a {len(reading.animated)}-cell "
+                     "animated region")
+        return f"{note})"
 
     def _pace(self, statement):
         """Let the guest settle before the first key event.
@@ -969,7 +1085,8 @@ class _ScriptEngine:
             return self._sampled(_Sample((), True))
         try:
             with self._console() as console:
-                rows = console.screen_text()
+                frame = console.screen()
+            rows = frame[0]
         except (OSError, ConnectionError):
             # The QEMU process is gone: the guest powered itself off,
             # so the machine's phase must return to `ready` for any
@@ -985,7 +1102,8 @@ class _ScriptEngine:
             self._mark_stopped()
             return self._sampled(_Sample((), True))
         return self._sampled(
-            _Sample(tuple(_normalize_row(row) for row in rows), False))
+            _Sample(tuple(_normalize_row(row) for row in rows), False,
+                    frame))
 
     def _sampled(self, sample):
         """Keep the latest reading, which the failure report needs."""

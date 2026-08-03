@@ -53,12 +53,22 @@ class _Clock:
 class _FakeConsole:
     """A console over scripted screens, recording what it is sent."""
 
-    def __init__(self, screens=(), fail=False):
+    #: How many reads each scripted screen is held for. A screen is a
+    #: *state the guest displays*, not a single read: a guest waiting
+    #: at a prompt holds it, and the quiescence gate (F48) will only
+    #: judge a condition on a screen that has stopped changing. One
+    #: read per entry would mean every sample caught the guest
+    #: mid-redraw, which is the one thing a wait must not act on.
+    HOLD = 3
+
+    def __init__(self, screens=(), fail=False, hold=HOLD):
         self.screens = list(screens)
         self.fail = fail
+        self.hold = hold
         self.commands = []
         self.keys = []
         self.reads = 0
+        self._held = 0
 
     def screen_text(self):
         self.reads += 1
@@ -70,9 +80,23 @@ class _FakeConsole:
             raise ConnectionError("machine is gone")
         if not self.screens:
             return []
+        current = self.screens[0]
         if len(self.screens) > 1:
-            return self.screens.pop(0)
-        return self.screens[0]
+            self._held += 1
+            if self._held >= self.hold:
+                self._held = 0
+                self.screens.pop(0)
+        return current
+
+    def screen(self):
+        """The same screens, as the seam's (rows, attributes) pair.
+
+        These scripts say what the guest displayed; the attribute half
+        is uniform because nothing here turns on a highlight, and a
+        screen that stops changing therefore reads as settled.
+        """
+        rows = self.screen_text()
+        return rows, [[0x07] * 80 for _ in range(len(rows))]
 
     def send_text(self, text, enter=True):
         self.commands.append(("send_text", text, enter))
@@ -118,7 +142,7 @@ class _RuntimeCase(unittest.TestCase):
     """Builds engines over a fake console and a controlled clock."""
 
     def engine(self, source, screens=(), running=True, fail=False,
-               bindings=None, events=None):
+               bindings=None, events=None, hold=_FakeConsole.HOLD):
         _FakeHttpService.instances = []
         script = parse_script(_HEAD + source)
         clock = _Clock()
@@ -128,7 +152,7 @@ class _RuntimeCase(unittest.TestCase):
             script_path="demo.rlqs", clock=clock, sleep=clock.sleep,
             http_service_factory=_FakeHttpService, bindings=bindings)
         engine._running = running
-        self.console = _FakeConsole(screens, fail)
+        self.console = _FakeConsole(screens, fail, hold=hold)
         self.clock = clock
 
         @contextlib.contextmanager
@@ -192,7 +216,10 @@ class ObservationTests(_RuntimeCase):
         engine = self.engine('wait "Hello World"\n',
                              screens=[["", "  Hello   World  "]])
         self.run_linear(engine)
-        self.assertEqual(self.console.reads, 1)
+        # Matched on the first *settled* sample. Establishing
+        # quiescence costs the window before any condition is judged
+        # (F48), which is the guard's stated price.
+        self.assertEqual(self.console.reads, 3)
 
     def test_a_regex_condition_matches_a_row(self):
         engine = self.engine('wait /installed [0-9]+ packages/\n',
@@ -203,7 +230,9 @@ class ObservationTests(_RuntimeCase):
         engine = self.engine('wait "second"\n',
                              screens=[["first"], ["second"]])
         self.run_linear(engine)
-        self.assertEqual(self.console.reads, 2)
+        # Each screen is a state the guest holds, and each is judged
+        # only once it has settled.
+        self.assertEqual(self.console.reads, 6)
 
     def test_a_timeout_names_the_clock_and_its_source_scope(self):
         engine = self.engine('timeout 10s\nwait "never"\n',
@@ -224,7 +253,11 @@ class ObservationTests(_RuntimeCase):
                              screens=[["ready"]])
         self.clock.now = 60.0
         self.run_linear(engine)
-        self.assertEqual(self.console.reads, 1)
+        # And the quiescence gate cannot break that rule: it delays
+        # acceptance but never causes a failure by itself, so an
+        # already-elapsed bound still evaluates what is on screen
+        # rather than expiring on a sample nobody was allowed to read.
+        self.assertEqual(self.console.reads, 2)
 
     def test_the_innermost_bound_is_the_one_enforced(self):
         engine = self.engine(
@@ -238,16 +271,19 @@ class ObservationTests(_RuntimeCase):
         engine = self.engine('wait "ready" stable=4s\n',
                              screens=[["ready"]])
         self.run_linear(engine)
-        # One sample arms the episode; the hold is satisfied only
-        # once its age reaches the duration.
-        self.assertEqual(self.console.reads, 3)
+        # One *settled* sample arms the episode; the hold is satisfied
+        # only once its age reaches the duration. The extra reads are
+        # the quiescence window, paid before the episode starts.
+        self.assertEqual(self.console.reads, 5)
 
     def test_an_interrupted_episode_restarts_the_hold(self):
         engine = self.engine(
             'wait "ready" stable=2s\n',
             screens=[["ready"], ["busy"], ["ready"], ["ready"]])
         self.run_linear(engine)
-        self.assertEqual(self.console.reads, 4)
+        # "busy" ends the episode and the hold starts over, each state
+        # judged once it has settled.
+        self.assertEqual(self.console.reads, 10)
 
     def test_a_machine_condition_observes_the_backend(self):
         engine = self.engine("wait machine=stopped\n", fail=True)
@@ -383,6 +419,73 @@ class BranchingWaitTests(_RuntimeCase):
             machines.eject_media.assert_called_once_with(
                 "plain-0", "cdrom0", context="/tmp/home")
         self.assertEqual(self.console.keys, [])
+
+
+class StabilityGateTests(_RuntimeCase):
+    """A condition is judged only on a settled screen (F48)."""
+
+    def painting(self, count=80):
+        """Screens where the awaited text sits on a moving screen.
+
+        Output arrives into a *different* row each frame, which is
+        what makes this content rather than decoration: cells that
+        churn in place recur, and recurrence is precisely what the
+        animation mask exists to set aside (a spinner has no bearing
+        on whether the awaited text is really on screen). A row here
+        is rewritten only every twenty frames — outside the animation
+        window — so nothing is ever masked and the screen is honestly
+        still being drawn.
+        """
+        frames = []
+        for step in range(count):
+            rows = ["ready"] + [""] * 20
+            rows[1 + step % 20] = "X" * 60
+            frames.append(rows)
+        return frames
+
+    def test_a_condition_on_a_painting_screen_is_not_matched(self):
+        # the text is plainly there — a screenshot taken at the time
+        # would show it — but the screen around it is still being
+        # drawn, so it is not a sample the condition is judged on
+        engine = self.engine("timeout 3s\nwait \"ready\"\n",
+                             screens=self.painting(), hold=1)
+
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            self.run_linear(engine)
+
+        self.assertIn("never settled", str(caught.exception))
+
+    def test_the_gate_names_itself_when_the_wait_expires(self):
+        # a wait now expires two ways that look identical from
+        # outside, and the failure has to say which
+        engine = self.engine("timeout 3s\nwait \"ready\"\n",
+                             screens=self.painting(), hold=1)
+
+        with self.assertRaises(ScriptRuntimeError) as caught:
+            self.run_linear(engine)
+
+        self.assertIn("stability", str(caught.exception))
+
+    def test_stability_zero_turns_the_guard_off(self):
+        # the escape for a screen the default would refuse, and it
+        # must cost nothing at all — not even the window that
+        # establishing quiescence would otherwise take
+        engine = self.engine(
+            "timeout 3s\nwait \"ready\" stability=0\n",
+            screens=self.painting(), hold=1)
+
+        self.run_linear(engine)
+
+        self.assertEqual(self.console.reads, 1)
+
+    def test_a_settled_screen_is_matched_normally(self):
+        # the same script against a guest that has stopped drawing
+        engine = self.engine("timeout 3s\nwait \"ready\"\n",
+                             screens=[["ready", "copying done"]])
+
+        self.run_linear(engine)
+
+        self.assertEqual(self.console.reads, 3)
 
 
 class ReactivePhaseTests(_RuntimeCase):
