@@ -47,6 +47,7 @@ reliquary = [
     "*.lark",
     "schemas/*.json",
     "schemas/*.toml",
+    "fonts/*.bin",
     "codex/codex.json",
     "codex/blueprints/*.rlqb",
     "codex/scripts/*.rlqs",

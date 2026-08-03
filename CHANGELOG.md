@@ -11,6 +11,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+- **Fixed-font text-screen recognition** (F51, cut from F3 with
+  F50/F52). `text_recognize` turns a PNG framebuffer into the
+  seam's `(rows, attribute tokens)` contract using Reliquary's
+  own CP437-layout 8×16 glyph bank — original work, not a
+  third-party ROM dump. Fixtures under
+  `tests/fixtures/text_recognize/` round-trip with no hypervisor.
+  VirtualBox's agentless-display carriers (F52) compose this next.
+
+### Added
+
 - **VirtualBox lifecycle and VDI materialization** (F50, cut from
   F3 with F51/F52). The first non-QEMU adapter body:
   `backend_virtualbox.py` discovers `VBoxManage`, materializes

@@ -231,7 +231,10 @@ workflow:
   gap.
   `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and
   the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
-  equality-comparable per-cell attribute tokens) and never per adapter. **Whether a screen has stopped changing
+  equality-comparable per-cell attribute tokens) and never per adapter.
+  `text_recognize.py` is the **shared fixed-font recognizer** (F51) backends without VGA text memory
+  use over a screenshot — same contract, one glyph bank (`fonts/cp437_8x16.bin`).
+  **Whether a screen has stopped changing
   is not decided here** (F49): `_settled_screen` and `_menu_baseline` are callers of `screen_stability` rather
   than owners of a copy. What stays is what was never about settling — whether a keypress changed anything at
   all (`None` reads as a dead key) and which row the highlight moved to, both classification.

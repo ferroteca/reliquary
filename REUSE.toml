@@ -16,6 +16,7 @@ path = [
     "tests/fixtures/**",
     "reliquary/codex/**/*.json",
     "reliquary/codex/**/*.rlqb",
+    "reliquary/fonts/*.bin",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Paul Galbraith"

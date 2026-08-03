@@ -16,8 +16,9 @@ find and follow the selection highlight. VGA attribute bytes satisfy
 that contract today; a fixed-font recognizer hashing each cell's
 foreground/background pair into a token satisfies it identically, and
 this algorithm carries over unchanged. Where a backend has no native
-text carrier, that one shared recognizer lives here too, with the
-control plane — never once per adapter.
+text carrier, that one shared recognizer lives in
+:mod:`reliquary.text_recognize` — composed here, never once per
+adapter.
 
 **Whether a screen has stopped changing is not decided here.** That
 measure is :mod:`screen_stability`'s, and this module is one of its

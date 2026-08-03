@@ -1,0 +1,4 @@
+Welcome to FreeDOS 1.4 (LiveCD)
+
+Install to harddisk
+Return to DOS
