@@ -520,6 +520,11 @@ def main(argv=None):
              "presence chooses which tier is checked -- and the only "
              "one that answers to --json, a plan being a document "
              "rather than a stream")
+    command.add_argument(
+        "--record", default=None, metavar="PATH",
+        help="record a screen transcript at PATH (.rlqt): every frame "
+             "and carrier call, for debugging and corpus capture. "
+             "Stops once a bound secret reaches the guest")
 
     # fetch-media
     command = subcommands.add_parser(
@@ -907,6 +912,7 @@ def _script(arguments, session):
         progress=arguments.progress,
         dry_run=dry_run,
         expect=_expectations(arguments),
+        record=getattr(arguments, "record", None),
     )
     if dry_run:
         # Under --dry-run the twin returns a document, so --json is

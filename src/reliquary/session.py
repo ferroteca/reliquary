@@ -330,11 +330,11 @@ class Session:
 
     def run_script(self, label, *, blueprint=None, machine=None,
                    display=False, properties=None, progress="auto",
-                   dry_run=False, expect=None):
+                   dry_run=False, expect=None, record=None):
         """Resolve ``label``, ensure a machine, run it, and return
         its output."""
         return script_runner.run_script(
             label, blueprint=blueprint, machine=machine,
             context=self._context, display=display,
             properties=properties, progress=progress, dry_run=dry_run,
-            expect=expect)
+            expect=expect, record=record)

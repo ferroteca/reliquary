@@ -442,6 +442,7 @@ class RunScriptWiringTests(unittest.TestCase):
             # which would make "expected nothing" and "expected
             # nothing in particular" the same value.
             expect=None,
+            record=None,
         )
         # A stream-bearing command's human modes leave stdout empty:
         # the outcome travels by exit code.

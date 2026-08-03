@@ -43,6 +43,7 @@ from .script_validation import PORTABLE_KEY_NAMES, reach
 from . import events as _events
 from . import screen_stability as _stability
 from . import machines as _machines
+from . import transcript as _transcript
 from .machines import DryRun
 
 
@@ -53,6 +54,8 @@ _FINISH = object()
 
 # Seconds between dispatch samples. Cadence is the control plane's
 # business, never the script's (G5).
+_RECORD_PACE = 0.1
+
 _POLL_INTERVAL = 2.0
 
 #: And how often while a screen is still moving. The poll above waits
@@ -402,7 +405,8 @@ class _ScriptEngine:
     def __init__(self, script, machine_id, context, machine_home,
                  events=None, script_path=None, plan=None,
                  clock=time.monotonic, sleep=time.sleep,
-                 http_service_factory=_HttpService, bindings=None):
+                 http_service_factory=_HttpService, bindings=None,
+                 record_pace=None, recording_writer=None):
         self._script = script
         self._plan = plan if plan is not None else resolve_timing(script)
         self._phases = {phase.name: phase for phase in script.phases}
@@ -422,6 +426,9 @@ class _ScriptEngine:
         self._secret_values = (
             set(bindings.secret_values()) if bindings else set())
         self._secret_entered = False
+        self._secret_recorded = False
+        self._record_pace = record_pace
+        self._recording_writer = recording_writer
         self._phase = None
         self._run_started = None
         self._phase_started = None
@@ -1118,7 +1125,12 @@ class _ScriptEngine:
         none is ever held while a statement list runs — QEMU's QMP
         server admits one client at a time.
         """
-        with Machine(self._machine_home).console() as console:
+        machine = Machine(self._machine_home)
+        if self._recording_writer is not None:
+            machine._session_wrapper = (
+                lambda session: _transcript.RecordingSession(
+                    session, self._recording_writer))
+        with machine.console() as console:
             yield console
 
     def _mark_stopped(self):
@@ -1175,7 +1187,9 @@ class _ScriptEngine:
         Once a secret reaches the guest, automatic failure screenshots
         are suppressed for the rest of the run; an explicitly
         requested screenshot is the author's own call and is never
-        suppressed.
+        suppressed. Recording stops too: a raw screen carries a typed
+        password in plain text, and a frame is a grid so event-stream
+        redaction cannot reach it.
         """
         if self._secret_entered or not self._secret_values:
             return
@@ -1186,6 +1200,11 @@ class _ScriptEngine:
             if key and self._property_bindings and \
                     key in self._property_bindings.secret_keys:
                 self._secret_entered = True
+                writer = self._recording_writer
+                if writer is not None:
+                    writer.stop(
+                        "a bound secret reached the guest; recording "
+                        "stopped for the rest of the run")
                 return
 
     def _press(self, statement):
@@ -1455,7 +1474,8 @@ def _preflight_machine_rules(script, machine_state, script_path,
 
 
 def execute_script(script, *, machine_id, context=None, display=False,
-                   script_path=None, bindings=None, events=None):
+                   script_path=None, bindings=None, events=None,
+                   record=None):
     """Execute a parsed Script against a cached machine.
 
     The machine state the script's ``machine`` header expects is
@@ -1481,13 +1501,25 @@ def execute_script(script, *, machine_id, context=None, display=False,
     _preflight_machine_rules(
         script, _machines.load_machine_state(machine_id, context),
         script_path, context)
+    record_pace = None
+    recording_writer = None
+    if record is not None:
+        record_pace = _RECORD_PACE
+        recording_writer = _transcript._TranscriptWriter(
+            record, pace=record_pace)
+        recording_writer.open()
     engine = _ScriptEngine(
         script, machine_id, context,
         _machines.machine_dir_path(machine_id, context),
-        events=events, script_path=script_path, bindings=bindings)
-    with _cancel_on_interrupt(engine):
-        engine.run(display=display)
-    return engine.final_phase, engine.machine_phase
+        events=events, script_path=script_path, bindings=bindings,
+        record_pace=record_pace, recording_writer=recording_writer)
+    try:
+        with _cancel_on_interrupt(engine):
+            engine.run(display=display)
+        return engine.final_phase, engine.machine_phase
+    finally:
+        if recording_writer is not None:
+            recording_writer.close()
 
 
 @contextlib.contextmanager
@@ -1638,7 +1670,8 @@ def _blueprint_invocation(state, context):
 
 def run_script(label, *, blueprint=None, machine=None, context=None,
                display=False, properties=None, properties_file=None,
-               progress="auto", dry_run=False, expect=None):
+               progress="auto", dry_run=False, expect=None,
+               record=None):
     """Resolve ``label``, ensure a machine, run it, and return its output.
 
     Looks up ``label`` in the machine's blueprint ``scripts`` map
@@ -1737,7 +1770,8 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
                 properties_file=properties_file, events=events)
         final_phase, machine_phase = execute_script(
             script, machine_id=machine_id, context=context, display=display,
-            script_path=script_path, bindings=bindings, events=events)
+            script_path=script_path, bindings=bindings, events=events,
+            record=record)
         _check_expectations(expect, machine_id, context)
         return ScriptRun(
             machine_id=machine_id,

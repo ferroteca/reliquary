@@ -57,6 +57,7 @@ class Machine:
 
     home: "str | None" = None
     deadline: "float | None" = None
+    _session_wrapper: "object" = None
 
     def _identity(self):
         """The recorded VM identity and the adapter that owns it."""
@@ -94,7 +95,10 @@ class Machine:
     def console(self):
         """Yield the agentless display console over a fresh session."""
         with self.session() as open_session:
-            yield DisplayConsole(open_session)
+            session = open_session
+            if self._session_wrapper is not None:
+                session = self._session_wrapper(session)
+            yield DisplayConsole(session)
 
     def screenshot(self, name="screen", directory=None):
         """Capture the guest framebuffer as a PNG, and return its path."""
@@ -104,7 +108,10 @@ class Machine:
         os.makedirs(screenshots, exist_ok=True)
         png = os.path.join(screenshots, f"{name}.png")
         with self.session() as open_session:
-            written = open_session.screenshot(png)
+            session = open_session
+            if self._session_wrapper is not None:
+                session = self._session_wrapper(session)
+            written = session.screenshot(png)
         print(f"rlq: saved {written}", file=sys.stderr)
         return written
 
