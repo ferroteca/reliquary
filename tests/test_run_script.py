@@ -46,6 +46,80 @@ class ResolveScriptStemTests(unittest.TestCase):
         self.assertIn(".rlqs", str(caught.exception))
 
 
+class ScriptsMapIsReadLiveTests(unittest.TestCase):
+    """The label map is the blueprint's, read at invocation.
+
+    A script label names *which instructions to run*, not what the
+    machine is, so it belongs with `parameters` on the live-read side
+    of the instance model rather than in the machine's shape baseline
+    — cli.md resolves a label against "the blueprint's `scripts` map",
+    and the U5 record has parameters read at invocation "like the
+    scripts map".
+    """
+
+    def setUp(self):
+        self.workdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workdir.cleanup)
+        self.home = self.workdir.name
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        self.backend = stack.enter_context(fake_backend.installed())
+        self.blueprints = os.path.join(self.home, "blueprints")
+        scripts = os.path.join(self.home, "scripts")
+        os.makedirs(self.blueprints)
+        os.makedirs(scripts)
+        self._write_blueprint({"install": "install-script"})
+        for stem in ("install-script", "ready-script"):
+            with open(os.path.join(scripts, f"{stem}.rlqs"), "w",
+                      encoding="utf-8", newline="\n") as handle:
+                handle.write("platform dos\n")
+                handle.write('wait "ready" timeout=1s\n')
+
+    def _write_blueprint(self, scripts_map):
+        with open(os.path.join(self.blueprints, "plain.rlqb"), "w",
+                  encoding="utf-8") as handle:
+            json.dump([
+                {"type": "machine", "name": "plain", "platform": "dos",
+                 "drives": {"hdd0": "blank-20m"},
+                 "scripts": scripts_map},
+                {"type": "media", "name": "blank-20m",
+                 "materialize": "new", "size": "20M"},
+            ], handle)
+
+    def _run(self, label):
+        def execute(script, *, machine_id, **rest):
+            del script, machine_id, rest
+            return ("-", "ready")
+
+        with mock.patch("reliquary.script_runner.execute_script",
+                        side_effect=execute):
+            return run_script(label, blueprint="plain",
+                              context=self.home, progress="plain")
+
+    def test_a_label_added_after_the_machine_exists_resolves(self):
+        # the machine was created when the blueprint named one label;
+        # adding a second must not require `apply` to become
+        # runnable, because a label map is not machine shape
+        self._run("install")
+
+        self._write_blueprint({"install": "install-script",
+                               "ready": "ready-script"})
+
+        self.assertEqual(self._run("ready").machine_phase, "ready")
+
+    def test_a_relabelled_script_takes_effect_without_apply(self):
+        self._run("install")
+
+        self._write_blueprint({"install": "ready-script"})
+
+        with mock.patch("reliquary.script_runner.load_script") as loaded:
+            loaded.side_effect = AssertionError("stop here")
+            with self.assertRaises(AssertionError):
+                self._run("install")
+        self.assertIn("ready-script",
+                      str(loaded.call_args[0][0]))
+
+
 class ResolveOrCreateMachineTests(unittest.TestCase):
     def setUp(self):
         self.workdir = tempfile.TemporaryDirectory()

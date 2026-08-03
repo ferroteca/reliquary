@@ -1604,28 +1604,36 @@ def _ensure_script_path(stem, context=None):
     return locate_script(stem, context=context)
 
 
-def _blueprint_parameters(state, context):
-    """The blueprint's `parameters` map, read live at invocation.
+def _blueprint_invocation(state, context):
+    """The blueprint's `scripts` and `parameters`, read live.
 
-    Parameters configure script binding, not machine shape: they carry
-    no state, `apply`, or baseline-digest involvement (docs/spec/instance-model.md), so they are read from the blueprint file each run
-    rather than from the machine snapshot. A machine whose blueprint
-    file has since moved simply contributes no parameters — its own
-    state remains authoritative for shape.
+    Neither configures what a machine *is*: `parameters` feed script
+    binding and `scripts` name which instructions to run, so both sit
+    outside the shape baseline — no state, no `apply`, no digest
+    involvement (docs/spec/instance-model.md) — and are read from the
+    blueprint file each run rather than from the machine snapshot.
+    Recording the label map made a machine unable to run a label its
+    blueprint gained after creation until an `apply` it had no shape
+    reason to need, which is the asymmetry this resolves (D101).
+
+    A machine whose blueprint file has since moved contributes
+    neither — its own state remains authoritative for shape.
     """
     source = state.get("blueprint-source")
     if not source or not os.path.exists(source):
-        return {}
+        return {}, {}
     from .document import load_document
     try:
         document = load_document(source)
     except (OSError, StaticError, PreflightError):
-        return {}
+        return {}, {}
     name = state.get("blueprint")
     component = document.machines.get(name)
     if component is None and len(document.machines) == 1:
         component = next(iter(document.machines.values()))
-    return dict(component.parameters) if component is not None else {}
+    if component is None:
+        return {}, {}
+    return dict(component.scripts), dict(component.parameters)
 
 
 def run_script(label, *, blueprint=None, machine=None, context=None,
@@ -1701,8 +1709,7 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
         machine=machine, blueprint=blueprint, context=context)
     if machine_id is not None:
         state = _machines.load_machine_state(machine_id, context)
-        scripts_map = state.get("scripts") or {}
-        parameters = _blueprint_parameters(state, context)
+        scripts_map, parameters = _blueprint_invocation(state, context)
     else:
         component = _blueprint_component(blueprint, context)
         scripts_map = dict(component.scripts) if component is not None else {}
@@ -1816,8 +1823,7 @@ def _dry_run_script(label, *, blueprint=None, machine=None, context=None,
             machine=machine, blueprint=blueprint, context=context)
     if machine_id is not None:
         state = _machines.load_machine_state(machine_id, context)
-        scripts_map = state.get("scripts") or {}
-        parameters = _blueprint_parameters(state, context)
+        scripts_map, parameters = _blueprint_invocation(state, context)
     elif blueprint is not None:
         from .library import locate_blueprint
         from .document import load_document

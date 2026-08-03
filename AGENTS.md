@@ -593,7 +593,12 @@ unrelated cache state file):
   parent via `cache_dir`), under the cache root, each with `machine.json` (the
   resolved state; while running its `vm` section carries the live VM identity,
   port, PID; and a `variables` map holding the machine variables a
-  script `set`s, cleared on start — D36),
+  script `set`s, cleared on start — D36. **The recorded snapshot is the
+  machine's *shape* and only that**: `parameters` and `scripts` are blueprint
+  fields deliberately outside it, read from the blueprint file at each
+  invocation, absent from the digest, and needing no `apply` to take effect —
+  they name what to run against a machine and what to bind into it, never what
+  it is, D101),
   `media/` (the machine's per-machine images and vvfat directories,
   named by media), `screenshots/` (where a script's `screenshot` verb
   and an automatic failure capture land, now that there is no run

@@ -451,7 +451,6 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "boot": list(machine.boot),
         "name": machine.name,
         "description": machine.description,
-        "scripts": dict(machine.scripts),
         "control-planes": control_planes,
         "backend-settings": {
             name: dict(section)
@@ -1064,7 +1063,6 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "boot": list(parsed.boot),
             "name": parsed.name,
             "description": parsed.description,
-            "scripts": dict(parsed.scripts),
             "control-planes": control_planes,
             "backend-settings": {
                 name: dict(section)

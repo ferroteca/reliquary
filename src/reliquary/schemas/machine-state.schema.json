@@ -75,11 +75,6 @@
       "description": "The blueprint's human description, or null.",
       "type": ["string", "null"]
     },
-    "scripts": {
-      "description": "The blueprint's script label -> stem map.",
-      "type": "object",
-      "additionalProperties": {"type": "string"}
-    },
     "control-planes": {
       "description": "The resolved ordered control-plane policy.",
       "type": "array",

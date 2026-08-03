@@ -55,6 +55,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **A blueprint's `scripts` map is read at invocation, not recorded
+  in machine state** (D101), which is what `docs/spec/cli.md` always
+  said — a label resolves against *the blueprint's* map — and the
+  premise the blueprint-`parameters` design was written on.
+  Previously the map was snapshotted into `machine.json` at create,
+  so a machine could not run a label its blueprint gained afterwards
+  until an `apply` it had no shape reason to need. A label names
+  which instructions to run, not what the machine is, so it now sits
+  outside the shape baseline exactly as `parameters` already did.
+
+  **Two observable consequences.** `scripts` is gone from the
+  published machine-state schema, and a script-map edit no longer
+  marks a machine diverged. Machines created before this change
+  carry a digest computed over the removed field, so the first
+  `apply` after upgrading reconciles a difference that is not
+  really there and re-records the digest — a stale artifact of the
+  kind the pre-1.0 compatibility rule covers, not a migration.
+
 - **The menu machinery stops owning a settling measure of its own**
   (F49). `_settled_screen`'s hold-for-two-reads and
   `_menu_baseline`'s learned animation mask were both special cases

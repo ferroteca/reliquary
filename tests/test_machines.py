@@ -124,7 +124,11 @@ class MaterializationTests(_HomeCase):
         self.assertEqual(state["memory"], 16)
         self.assertEqual(state["cpus"], 1)
         self.assertEqual(state["control-planes"], ["agentless-display"])
-        self.assertEqual(state["scripts"], {"install": "install-script"})
+        # The blueprint declares a scripts map and the state does not
+        # record it (D101): a label names which instructions to run,
+        # not what the machine is, so it stays outside the shape
+        # baseline and is read live at each invocation.
+        self.assertNotIn("scripts", state)
         self.assertEqual(state["boot"], ["hdd0"])
         self.assertEqual(state["backend-id"], f"reliquary-{machine_id}")
         self.assertTrue(state["blueprint-digest"].startswith("sha256:"))
@@ -134,7 +138,7 @@ class MaterializationTests(_HomeCase):
         state = self._state(machine_id)
         self.assertEqual(state["memory"], 16)
         self.assertIsNone(state["description"])
-        self.assertEqual(state["scripts"], {})
+        self.assertNotIn("scripts", state)
         self.assertEqual(state["drives"], {})
         self.assertEqual(state["boot"], [])
 

@@ -228,6 +228,65 @@ is waiting on an answer today.
 
 ## Decided
 
+- D101 — THE SCRIPTS MAP IS THE BLUEPRINT'S, READ AT INVOCATION —
+  DECIDED (owner, 2026-08-02). Supports U1, U14; P6, P11. Resolves a
+  defect against **docs/spec/cli.md** and restores the premise the
+  U5 parameters design was written on.
+
+  HOW IT SURFACED. The F49 integration run failed its third step with
+  `script not found: ready.rlqs` against a reused scratch home. Two
+  layers of staleness, and the second is the defect: refreshing the
+  home's seeded blueprint was not enough, because `run_script` read
+  the label map from `machine.json` as recorded at **create** time.
+  A machine created before its blueprint gained a label could not run
+  that label at all until an `apply` it had no shape reason to need.
+
+  THE RECORD ALREADY SAID SO, TWICE. cli.md resolves a label against
+  "the blueprint's `scripts` map" — the blueprint, not a machine's
+  snapshot of one. And the U5 gap-closure entry describes blueprint
+  `parameters` as "read at invocation **like the scripts map**, no
+  state/apply/digest involvement": the scripts map being read live
+  was the *premise* that design was built on, and the code had drifted
+  from it while `parameters` was implemented exactly as written. The
+  asymmetry was visible in one function — parameters read live from
+  the blueprint file, `scripts` read from state, three lines apart.
+
+  WHY THE BLUEPRINT AND NOT THE MACHINE, on the merits rather than on
+  the citations. The instance model's "state is authoritative,
+  `start` never re-reads the blueprint" governs a machine's **shape**
+  — memory, drives, boot order, backend settings — because those
+  decide what the machine *is*, and a running machine must not change
+  under an editor's hands. A label map decides which instructions to
+  run against it, which is the same kind of thing `parameters` is and
+  the same kind of thing a script *path* is: neither is shape, and
+  neither was ever protected by that rule. Recording it bought
+  nothing a blueprint read does not, and cost the case above.
+
+  SCOPE, AND IT IS THE WHOLE OF IT (P9). `scripts` leaves the machine
+  state entirely rather than being read live while still recorded:
+  `create` and `apply_blueprint` stop writing it, it leaves
+  `_blueprint_digest` with them, and it leaves the **published
+  machine-state schema**. A field retained in a public contract that
+  nothing reads is the residue this project deletes, and leaving it
+  in the digest would have been worse than either end — a blueprint's
+  relabelling would mark a machine diverged while no longer changing
+  anything about the run.
+
+  WHAT THAT COSTS, stated rather than discovered. Two observable
+  changes, both accepted: a script-map edit no longer marks a machine
+  diverged, and **every machine created before this change has a
+  digest computed over a field the new code omits**, so the first
+  `apply` after upgrading reconciles a difference that is not really
+  there. Pre-1.0 that is a stale artifact of the kind the
+  compatibility rule already covers, and `apply` re-records the
+  digest; it is named in the CHANGELOG rather than migrated.
+
+  WEIGHED AND NOT TAKEN: making `parameters` read from state instead,
+  which would have produced symmetry by breaking the half that was
+  right. It contradicts U5's recorded design, and it would mean a
+  blueprint's parameter edit needed an `apply` to reach a run that
+  binds it — the same defect, moved.
+
 - D100 — F12 AND F44 ARE REJECTED OUTRIGHT — DECIDED (owner,
   2026-08-02, the round directly following D99). Supports P8.
   Retires both F-numbers for good (D23, no stub).

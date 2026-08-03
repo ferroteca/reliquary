@@ -169,7 +169,19 @@ first.
 
 Editing a blueprint affects future `create` operations, not existing
 machines. Each machine records the source blueprint and resolved digest at
-creation; that resolved snapshot is the machine's baseline. Between
+creation; that resolved snapshot is the machine's baseline.
+
+**The baseline is the machine's shape, and only that.** Two blueprint
+fields are deliberately outside it and are read from the blueprint
+file at each invocation instead: `parameters`, which feeds script
+property binding, and `scripts`, the label → stem map a
+`run-script <label>` resolves against. Neither decides what the
+machine *is* — they name what to run against it and what to bind
+into it — so neither is recorded, neither enters the digest, and
+neither needs an `apply` to take effect. A label added to a
+blueprint after its machine exists is runnable immediately; a
+machine whose blueprint file has since moved simply contributes
+neither, its own state remaining authoritative for shape (D101). Between
 `apply`s the machine's own state is authoritative — script
 `insert`/`eject` persists there, so a machine may legitimately
 diverge from its baseline — and `start` runs the machine as its
