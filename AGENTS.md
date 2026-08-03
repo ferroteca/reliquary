@@ -227,7 +227,10 @@ workflow:
   them even where the backend is installed, and a pinned one fails preflight naming the gap.
   `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and
   the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
-  equality-comparable per-cell attribute tokens) and never per adapter.
+  equality-comparable per-cell attribute tokens) and never per adapter. **Whether a screen has stopped changing
+  is not decided here** (F49): `_settled_screen` and `_menu_baseline` are callers of `screen_stability` rather
+  than owners of a copy. What stays is what was never about settling — whether a keypress changed anything at
+  all (`None` reads as a dead key) and which row the highlight moved to, both classification.
   `screen_stability.py` answers whether the guest has **stopped drawing** — the frame-level question
   `stable=` cannot ask, a condition being able to hold perfectly on a screen that is still painting. It
   compares **cells, not rows** (row granularity cannot separate a blinking cursor from an arriving line of
@@ -239,10 +242,13 @@ workflow:
   8) and content (a row of text, 80). Decoration is **recurrence** — a cell changing 3+ times within 1s —
   excluded from that fraction, with `_menu_baseline`'s majority-churn bail-out carried over (mask nothing,
   compare raw). A window never observed answers `stability=None` rather than a verdict the cadence produced
-  (P11). Delivered as F47, with two consumers: `exec`'s completion test (F45, below) and the script language's
-  `stability=` (F48, below). Still to adopt it: `control_display`'s own `_settled_screen` / `_menu_baseline`,
-  which retire onto it under F49 — until then the menu machinery keeps its own hold-for-two-reads and learned
-  mask.
+  (P11). Delivered as F47, and **the only implementation of the measure in the tree** (F49): its three consumers
+  are `exec`'s completion test (F45, below), the script language's `stability=` (F48, below), and the menu
+  machinery, whose own hold-for-two-reads and learned animation mask were special cases of it and were deleted
+  rather than kept beside it. One interaction the cut exposed and `control_display._BASELINE_READS` now records:
+  **settling and recognizing decoration want different amounts of looking** — a clock moves two cells and is
+  settled on sight, but nothing can know it is a clock until it has ticked repeatedly, so a baseline that stops
+  at the first settled frame hands back an empty mask.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion — **a prompt is a candidate, not an answer**, held
   until `screen_stability` says the screen under it settled, because one arriving mid-scroll would otherwise

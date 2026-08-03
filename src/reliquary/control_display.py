@@ -18,12 +18,40 @@ foreground/background pair into a token satisfies it identically, and
 this algorithm carries over unchanged. Where a backend has no native
 text carrier, that one shared recognizer lives here too, with the
 control plane — never once per adapter.
+
+**Whether a screen has stopped changing is not decided here.** That
+measure is :mod:`screen_stability`'s, and this module is one of its
+callers rather than the owner of a copy: the menu machinery met the
+half-drawn-screen hazard first and grew its own hold-for-two-reads
+and its own learned animation mask, both of which turned out to be
+special cases of the general measure. What stays here is what was
+never about settling — whether a keypress changed anything at all,
+and which row the highlight moved to. Those are classification.
 """
 
 import difflib
 import time
 
+from . import screen_stability
 from .errors import RunFailure, StaticError
+
+#: How often the screen is read while waiting for it to settle.
+#: A quiescence window is only observable by sampling inside it, so
+#: this is the menu machinery's own poll rather than a tuned constant:
+#: what counts as settled is :mod:`screen_stability`'s to say.
+_SETTLE_POLL = 0.1
+
+#: How many reads a baseline takes before trusting its mask, and the
+#: number is forced rather than chosen. **Settling and recognizing
+#: decoration want different amounts of looking**: a clock ticking in
+#: a corner moves two cells, which is settled on sight, yet nothing
+#: can know it is a clock until it has ticked repeatedly. Stopping at
+#: the first settled frame would hand back an empty mask and leave the
+#: menu treating its own furniture as the effect of a keypress. A cell
+#: must change `repeats` times to qualify as decoration, which cannot
+#: be observed in fewer than that many reads plus the one they are
+#: measured against.
+_BASELINE_READS = screen_stability.DEFAULT_ANIMATION_REPEATS + 1
 
 
 _SHIFTED = {
@@ -114,49 +142,12 @@ def _match_menu_row(rows, item, exclude=()):
         rule_id="screen.menu-absent")
 
 
-def _animation_cells(samples):
-    """Return the (row, column) cells that changed with no keypress.
-
-    Samples are (text rows, attribute rows) screens read back to
-    back. Any cell whose character or attribute token differs between
-    reads is repainting on its own — a clock, a countdown, a
-    blinking indicator — and must be ignored when watching for the
-    effect of a keypress, or the screen would never settle.
-    """
-    mask = set()
-    base_rows, base_attributes = samples[0]
-    base_text = [row.ljust(80) for row in base_rows]
-    for rows, attributes in samples[1:]:
-        text = [row.ljust(80) for row in rows]
-        for row in range(len(attributes)):
-            if (text[row] == base_text[row]
-                    and attributes[row] == base_attributes[row]):
-                continue
-            for column in range(80):
-                if (text[row][column] != base_text[row][column]
-                        or attributes[row][column]
-                        != base_attributes[row][column]):
-                    mask.add((row, column))
-    return mask
-
-
 def _masked_attributes(attributes, mask):
     """Attribute rows with self-animating cells nulled for comparison."""
     view = [list(row) for row in attributes]
     for row, column in mask:
         view[row][column] = None
     return view
-
-
-def _masked_text(rows, mask):
-    """Text rows with self-animating cells blanked for comparison."""
-    padded = [row.ljust(80) for row in rows]
-    if not mask:
-        return padded
-    view = [list(row) for row in padded]
-    for row, column in mask:
-        view[row][column] = " "
-    return ["".join(characters) for characters in view]
 
 
 def _changed_attribute(before, attributes, row):
@@ -347,31 +338,37 @@ class DisplayConsole:
         """Wait for the menu to finish painting, then learn its noise.
 
         Returns (animation mask, text rows, masked attribute rows).
-        The screen must hold still for two consecutive reads before
-        the animation cells are sampled: sampling straight away would
-        mistake a menu's own initial paint for animation and blind
-        the highlight tracking to the very cells it must watch. A
-        screen that never holds still (real animation) is sampled
-        after the cap regardless — the mask absorbs those cells.
+        Both halves are :mod:`screen_stability`'s: it says when the
+        paint has finished, and the region it set aside as decoration
+        *is* the mask — a clock, a countdown, a blinking indicator,
+        which must be ignored when watching for the effect of a
+        keypress or the screen would never settle.
+
+        **The measure is continuous where the learned mask was a
+        snapshot**, and that closes a gap rather than reproducing
+        one: there is no learning phase to get wrong, decoration that
+        begins mid-menu is absorbed within a few samples instead of
+        never entering the mask at all, and a cell that changes *once*
+        stays content — so a menu's own initial paint can no longer be
+        mistaken for animation and blind the tracking to the very
+        cells it must watch. A screen that never holds still is
+        answered after the cap regardless, the mask having absorbed
+        the churn; where nearly everything repaints the mask empties
+        itself, which is the same bail-out this code made by hand.
         """
         end = min(deadline, time.monotonic() + quiet)
-        previous = None
-        while time.monotonic() < end:
+        monitor = screen_stability.ScreenStability()
+        screen = self.screen()
+        reading = monitor.observe(screen, now=time.monotonic())
+        reads = 1
+        while ((not reading.stable or reads < _BASELINE_READS)
+               and time.monotonic() < end):
+            time.sleep(_SETTLE_POLL)
             screen = self.screen()
-            if previous is not None and screen == previous:
-                break
-            previous = screen
-            time.sleep(0.1)
-        samples = [self.screen() if previous is None else previous]
-        for _ in range(2):
-            time.sleep(0.15)
-            samples.append(self.screen())
-        mask = _animation_cells(samples)
-        if len(mask) * 2 > 25 * 80:
-            # Nearly everything repaints; masking it all would blind
-            # highlight tracking entirely, so track unmasked instead.
-            mask = set()
-        rows, raw = samples[-1]
+            reading = monitor.observe(screen, now=time.monotonic())
+            reads += 1
+        mask = set(reading.animated)
+        rows, raw = screen
         return mask, rows, _masked_attributes(raw, mask)
 
     def _follow_keypress(self, attributes, deadline, mask):
@@ -401,37 +398,35 @@ class DisplayConsole:
             if observed is None:
                 return True, rows, attributes, None, None
 
-    def _settled_screen(self, before, deadline, mask,
-                        wait=2.5, hold=2):
+    def _settled_screen(self, before, deadline, mask, wait=2.5):
         """Wait out the repaint following a keypress; None if none came.
 
-        Polls until the non-masked attributes change from `before`
-        and the screen then holds steady for `hold` further reads.
-        Slow menus repaint over many reads; returning at the first
-        difference would hand back a half-drawn screen. The cap only
-        bounds the wait for the first change; a screen that has
-        started changing is followed until it settles or the deadline
-        expires (when the last read wins). With no change at all,
-        returns None.
+        Two questions, and only the second is this module's. **Did
+        anything change at all** is the menu's own — a keypress at the
+        edge of a menu legitimately changes nothing, and the caller
+        reads ``None`` as a dead key — so it stays here, asked against
+        the mask. **Has the screen finished changing** is
+        :mod:`screen_stability`'s, because returning at the first
+        difference would hand back a half-drawn screen and slow menus
+        repaint over many reads.
+
+        The cap bounds only the wait for the first change; a screen
+        that has started changing is followed until it settles or the
+        deadline expires, when the last read wins.
         """
         first = min(deadline, time.monotonic() + wait)
-        previous = None
-        steady = 0
+        monitor = screen_stability.ScreenStability()
+        seen = None
         while True:
-            rows, raw = self.screen()
+            screen = self.screen()
+            now = time.monotonic()
+            reading = monitor.observe(screen, now=now)
+            rows, raw = screen
             attributes = _masked_attributes(raw, mask)
-            view = (_masked_text(rows, mask), attributes)
             if attributes != before:
-                if previous is not None and view == previous[0]:
-                    steady += 1
-                    if steady >= hold:
-                        return previous[1], previous[2]
-                else:
-                    previous = (view, rows, attributes)
-                    steady = 0
-            if time.monotonic() >= (deadline if previous is not None
-                                    else first):
-                if previous is not None:
-                    return previous[1], previous[2]
-                return None
-            time.sleep(0.1)
+                seen = (rows, attributes)
+                if reading.stable:
+                    return seen
+            if now >= (deadline if seen is not None else first):
+                return seen
+            time.sleep(_SETTLE_POLL)

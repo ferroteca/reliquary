@@ -55,6 +55,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The menu machinery stops owning a settling measure of its own**
+  (F49). `_settled_screen`'s hold-for-two-reads and
+  `_menu_baseline`'s learned animation mask were both special cases
+  of F47's measure, tuned by hand rather than derived; they are now
+  callers of it and the bespoke copies are deleted, leaving one
+  implementation in the tree with three consumers. Menu behaviour is
+  unchanged — the cursor-menu suite is the acceptance criterion for
+  the cut and passes intact — and two things improve by
+  construction: a mask needs no quiet moment to be learned in, and
+  decoration that *begins* mid-menu is absorbed within a few samples
+  where a once-learned mask would never take it. What stays in the
+  menu machinery is what was never about settling: whether a
+  keypress changed anything at all, and which row the highlight
+  moved to.
+
 - **`exec` waits for the screen to settle before reading it**
   (F45, over F47's new stability measure). A DOS prompt can
   arrive mid-scroll, or the bottom row can transiently resemble
