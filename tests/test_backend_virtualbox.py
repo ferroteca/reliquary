@@ -104,9 +104,9 @@ class AdapterSurfaceTests(unittest.TestCase):
         path = self.adapter.image_path(self.tempdir.name, "hdd0")
         self.assertTrue(path.endswith("hdd0.vdi"))
 
-    def test_capabilities_omit_agentless_display(self):
+    def test_capabilities_include_agentless_display(self):
         report = self.adapter.capabilities()
-        self.assertEqual(report.control_planes, ())
+        self.assertEqual(report.control_planes, ("agentless-display",))
         self.assertEqual(report.media, ("floppy", "hdd", "cdrom"))
         self.assertEqual(report.controllers, ("ide",))
         self.assertFalse(report.vvfat)
@@ -182,6 +182,9 @@ class OwnershipTests(unittest.TestCase):
         self.assertEqual(identity["backend-id"], self.vm_uuid)
         self.assertEqual(identity["token"], self.vm_uuid)
         self.assertEqual(identity["endpoint"]["name"], "reliquary-demo-0")
+        self.assertIn("hdd0", identity["endpoint"]["drives"])
+        self.assertEqual(
+            identity["endpoint"]["drives"]["hdd0"]["type"], "hdd")
         verbs = [c[1] for c in calls]
         self.assertIn("createvm", verbs)
         self.assertIn("modifyvm", verbs)
@@ -229,21 +232,68 @@ class OwnershipTests(unittest.TestCase):
         self.assertEqual(caught.exception.rule_id,
                          "machine.vm-identity-mismatch")
 
-    def test_session_carriers_name_the_unbuilt_plane(self):
+    def test_send_keys_emits_make_then_break_scancodes(self):
+        calls = []
+
         def run(args, **kwargs):
+            calls.append(list(args))
             return _completed(stdout=self._info(state="running"))
 
-        vm = {"backend": "virtualbox", "backend-id": self.vm_uuid,
-              "token": self.vm_uuid, "endpoint": {}}
+        vm = {
+            "backend": "virtualbox", "backend-id": self.vm_uuid,
+            "token": self.vm_uuid,
+            "endpoint": {"name": "reliquary-demo-0", "drives": {}},
+        }
+        adapter = vbox.VirtualBoxAdapter()
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+             mock.patch("subprocess.run", side_effect=run), \
+             mock.patch.object(vbox.time, "sleep"):
+            with adapter.session(vm) as session:
+                session.send_keys([["ret"]], delay=0)
+        key_call = next(c for c in calls
+                        if c[1:][:2] == ["controlvm", self.vm_uuid]
+                        and "keyboardputscancode" in c)
+        # enter make 1c, break 9c
+        self.assertEqual(key_call[-2:], ["1c", "9c"])
+
+    def test_change_medium_retargets_the_recorded_attachment(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(list(args))
+            return _completed(stdout=self._info(state="running"))
+
+        drives = {
+            "cdrom0": {
+                "storagectl": "reliquary-ide", "port": 1, "device": 0,
+                "type": "dvddrive",
+            },
+        }
+        vm = {
+            "backend": "virtualbox", "backend-id": self.vm_uuid,
+            "token": self.vm_uuid,
+            "endpoint": {"name": "reliquary-demo-0", "drives": drives},
+        }
+        iso = os.path.join(self.tempdir.name, "live.iso")
+        with open(iso, "wb") as handle:
+            handle.write(b"ISO")
         adapter = vbox.VirtualBoxAdapter()
         with mock.patch.object(vbox, "find_vboxmanage",
                                return_value="VBoxManage"), \
              mock.patch("subprocess.run", side_effect=run):
             with adapter.session(vm) as session:
-                with self.assertRaises(PreflightError) as caught:
-                    session.send_keys([["ret"]])
-        self.assertEqual(caught.exception.rule_id,
-                         "machine.control-plane-unbuilt")
+                session.change_medium("cdrom0", iso)
+                session.change_medium("cdrom0", None)
+        attaches = [c for c in calls if c[1] == "storageattach"]
+        self.assertEqual(len(attaches), 2)
+        self.assertTrue(any(iso in a for a in attaches[0]))
+        self.assertTrue(any("emptydrive" in a for a in attaches[1]))
+
+    def test_scancodes_for_shift_chord(self):
+        codes = vbox.scancodes_for(["shift", "a"])
+        # shift make, a make, a break, shift break
+        self.assertEqual(codes, [0x2a, 0x1e, 0x9e, 0xaa])
 
 
 class BootOrderTests(unittest.TestCase):

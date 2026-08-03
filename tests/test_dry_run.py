@@ -419,6 +419,9 @@ class BackendQuestionTests(_DryCase):
         self._write("demo", self._mixed(), [self._livecd(),
                                             self._remote()])
         self.backend.available = False
+        # VirtualBox is a real capable candidate on hosts that have
+        # it (F52); pin it absent so the walk has nothing left.
+        self._install("virtualbox", available=False)
         with self.assertRaises(PreflightError) as caught:
             self._dry()
         self.assertEqual("machine.no-capable-backend",

@@ -233,17 +233,17 @@ class DiscoveryTests(unittest.TestCase):
                 control_planes=("agentless-display",))),
             ("control plane 'agentless-display'",))
 
-    def test_virtualbox_claims_no_agentless_display_yet(self):
-        # F50: lifecycle is real; the display plane is F52. A DOS
-        # machine's default control plane is therefore still unmet.
+    def test_virtualbox_claims_agentless_display(self):
+        # F52: the carriers are real, so the capability is claimed.
         adapter = backend_virtualbox.VirtualBoxAdapter()
-        self.assertEqual(adapter.capabilities().control_planes, ())
+        self.assertEqual(
+            adapter.capabilities().control_planes, ("agentless-display",))
         self.assertEqual(
             adapter.unmet(_requirements(
                 control_planes=("agentless-display",),
                 media=("hdd",), controllers=("ide",),
                 materialize=("new",))),
-            ("control plane 'agentless-display'",))
+            ())
 
     def test_an_absent_stub_backend_says_what_it_looked_for(self):
         adapter = backend_stubs.VMwareAdapter()

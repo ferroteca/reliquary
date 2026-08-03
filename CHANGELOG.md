@@ -11,25 +11,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **VirtualBox agentless display and FreeDOS parity** (F52, cut from
+  F3 with F50/F51). `keyboardputscancode` input, `screenshotpng`
+  capture, live medium change, and `text_screen` via F51's
+  recognizer — then `agentless-display` claimed. Opt-in FreeDOS
+  integration: `RELIQUARY_INTEGRATION=1` with
+  `tests.test_freedos_virtualbox_integration` (pins
+  `backend: virtualbox` on the seeded blueprint). The VGA 8×16
+  glyph bank is curated from the host QEMU vgabios by
+  `tools/extract_vga_font.py`.
+
 - **Fixed-font text-screen recognition** (F51, cut from F3 with
   F50/F52). `text_recognize` turns a PNG framebuffer into the
   seam's `(rows, attribute tokens)` contract using Reliquary's
-  own CP437-layout 8×16 glyph bank — original work, not a
-  third-party ROM dump. Fixtures under
+  CP437-layout 8×16 glyph bank. Fixtures under
   `tests/fixtures/text_recognize/` round-trip with no hypervisor.
-  VirtualBox's agentless-display carriers (F52) compose this next.
-
-### Added
 
 - **VirtualBox lifecycle and VDI materialization** (F50, cut from
   F3 with F51/F52). The first non-QEMU adapter body:
   `backend_virtualbox.py` discovers `VBoxManage`, materializes
   VDI images (`new` / `difference` / `copy`), registers the VM
   under `cache/machines/<id>/virtualbox/` at first start, and
-  start/stop with UUID identity verification. It claims no
-  `agentless-display` yet (P11) — that plane is F52 — so a DOS
-  machine pinned to VirtualBox still fails capability preflight
-  naming the gap. The VMware and Hyper-V stubs remain.
+  start/stop with UUID identity verification. The VMware and
+  Hyper-V stubs remain.
 
 ### Added
 

@@ -4,9 +4,9 @@
 
 F50: lifecycle and VDI materialization. Discovery, image creation,
 ``createvm`` under the machine's ``virtualbox/`` directory, start /
-stop with identity verification, and dispose. Agentless-display
-carriers land with F52 — this adapter claims none of that plane
-(P11), and a session refuses them by name until then.
+stop with identity verification, and dispose. F52: agentless-display
+carriers — ``keyboardputscancode``, ``screenshotpng``, live medium
+change, and ``text_screen`` via ``text_recognize``.
 """
 
 import contextlib
@@ -15,9 +15,12 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 import uuid
 
 from . import backends
+from . import text_recognize
 from .backends import Availability, BackendAdapter, Capabilities
 from .errors import PreflightError, RunFailure, StaticError
 
@@ -260,8 +263,44 @@ def _attach_args(vm_name, storagectl, port, device, medium_type, path):
     ]
 
 
+def drive_attachments(state):
+    """Map each drive key to its VirtualBox storage attachment.
+
+    Mirrors :func:`configure_vm`'s placement so a live
+    ``change_medium`` can retarget the same port the guest sees.
+    """
+    drives = state.get("drives") or {}
+    attachments = {}
+    floppies = []
+    disks = []
+    for key, drive in sorted(drives.items()):
+        medium = drive.get("medium")
+        if medium == "floppy":
+            floppies.append(key)
+        elif medium in ("hdd", "cdrom"):
+            disks.append((key, drive))
+    for index, key in enumerate(floppies[:2]):
+        attachments[key] = {
+            "storagectl": _FLOPPY, "port": index, "device": 0,
+            "type": "fdd",
+        }
+    for index, (key, drive) in enumerate(disks[:4]):
+        port, device = _ide_slot(index)
+        attachments[key] = {
+            "storagectl": _IDE, "port": port, "device": device,
+            "type": ("dvddrive" if drive.get("medium") == "cdrom"
+                     else "hdd"),
+        }
+    return attachments
+
+
 def configure_vm(state, vm_name):
-    """Apply Reliquary drive vocabulary to a registered VirtualBox VM."""
+    """Apply Reliquary drive vocabulary to a registered VirtualBox VM.
+
+    Returns the attachment map :func:`drive_attachments` builds — the
+    same placement written into the identity endpoint so a later
+    session can change media without re-deriving the layout.
+    """
     memory = state.get("memory") or 16
     cpus = state.get("cpus") if state.get("cpus") is not None else 1
     drives = state.get("drives") or {}
@@ -284,46 +323,29 @@ def configure_vm(state, vm_name):
                 ["storagectl", vm_name, f"--name={value}", "--remove"],
                 action="removing controller", target=value)
 
-    floppies = []
-    disks = []
-    for key, drive in sorted(drives.items()):
-        medium = drive.get("medium")
-        if medium == "floppy":
-            floppies.append((key, drive))
-        elif medium in ("hdd", "cdrom"):
-            disks.append((key, drive))
-
-    if floppies:
+    attachments = drive_attachments(state)
+    if any(a["storagectl"] == _FLOPPY for a in attachments.values()):
         run_vbox(
             ["storagectl", vm_name, f"--name={_FLOPPY}",
              "--add=floppy", "--controller=I82078"],
             action="adding floppy controller", target=vm_name)
-        for index, (_key, drive) in enumerate(floppies[:2]):
-            run_vbox(
-                _attach_args(vm_name, _FLOPPY, index, 0, "fdd",
-                             drive.get("path")),
-                action="attaching floppy", target=_key)
 
     run_vbox(
         ["storagectl", vm_name, f"--name={_IDE}",
          "--add=ide", "--controller=PIIX4"],
         action="adding IDE controller", target=vm_name)
-    for index, (_key, drive) in enumerate(disks[:4]):
-        port, device = _ide_slot(index)
-        medium_type = "dvddrive" if drive.get("medium") == "cdrom" else "hdd"
+
+    for key, attach in attachments.items():
+        path = (drives.get(key) or {}).get("path")
         run_vbox(
-            _attach_args(vm_name, _IDE, port, device, medium_type,
-                         drive.get("path")),
-            action="attaching drive", target=_key)
+            _attach_args(vm_name, attach["storagectl"], attach["port"],
+                         attach["device"], attach["type"], path),
+            action="attaching drive", target=key)
+    return attachments
 
 
 def ensure_vm(state, *, backend_dir):
-    """Register the VirtualBox machine if absent; return its UUID.
-
-    Images already live under ``media/`` from create. This creates
-    the ``.vbox`` under ``backend_dir`` on first start and reuses it
-    afterwards.
-    """
+    """Register the VirtualBox machine if absent; return UUID + attachments."""
     name = _vm_name(state)
     os.makedirs(backend_dir, exist_ok=True)
     try:
@@ -343,8 +365,8 @@ def ensure_vm(state, *, backend_dir):
              "--platform-architecture=x86", "--ostype=DOS",
              "--register"],
             action="creating VM", target=name)
-    configure_vm(state, name)
-    return vm_uuid
+    attachments = configure_vm(state, name)
+    return vm_uuid, attachments
 
 
 def launch_owned_vm(state, *, backend_dir, display=False, current=None):
@@ -365,7 +387,7 @@ def launch_owned_vm(state, *, backend_dir, display=False, current=None):
                     "stop it before starting another VM for this machine",
                     rule_id="machine.vm-already-active")
 
-    vm_uuid = ensure_vm(state, backend_dir=backend_dir)
+    vm_uuid, attachments = ensure_vm(state, backend_dir=backend_dir)
     name = _vm_name(state)
     start_type = "gui" if display else "headless"
     print(f"rlq: VirtualBox starting: {name} ({vm_uuid})", file=sys.stderr)
@@ -374,7 +396,8 @@ def launch_owned_vm(state, *, backend_dir, display=False, current=None):
         action="starting", target=name)
     verify_vm(vm_uuid, vm_uuid)
     return backends.identity(
-        "virtualbox", vm_uuid, vm_uuid, {"name": name})
+        "virtualbox", vm_uuid, vm_uuid,
+        {"name": name, "drives": attachments})
 
 
 def stop(vm):
@@ -390,13 +413,77 @@ def stop(vm):
         action="stopping", target=expected)
 
 
-class VirtualBoxSession:
-    """Identity-verified session; carriers land with F52."""
+# -- F52 agentless-display carriers --------------------------------
 
-    def __init__(self, vm_uuid, name):
+#: Seam key names (QEMU qcodes today — see ``control_display`` /
+#: ``script_runner``) → PS/2 set-1 make scancodes. Extended keys are
+#: a tuple whose first byte is ``0xe0``.
+_SCANCODES = {
+    "esc": (0x01,),
+    "1": (0x02,), "2": (0x03,), "3": (0x04,), "4": (0x05,),
+    "5": (0x06,), "6": (0x07,), "7": (0x08,), "8": (0x09,),
+    "9": (0x0a,), "0": (0x0b,),
+    "minus": (0x0c,), "equal": (0x0d,),
+    "backspace": (0x0e,), "tab": (0x0f,),
+    "q": (0x10,), "w": (0x11,), "e": (0x12,), "r": (0x13,),
+    "t": (0x14,), "y": (0x15,), "u": (0x16,), "i": (0x17,),
+    "o": (0x18,), "p": (0x19,),
+    "bracket_left": (0x1a,), "bracket_right": (0x1b,),
+    "ret": (0x1c,), "ctrl": (0x1d,),
+    "a": (0x1e,), "s": (0x1f,), "d": (0x20,), "f": (0x21,),
+    "g": (0x22,), "h": (0x23,), "j": (0x24,), "k": (0x25,),
+    "l": (0x26,),
+    "semicolon": (0x27,), "apostrophe": (0x28,),
+    "grave_accent": (0x29,), "shift": (0x2a,),
+    "backslash": (0x2b,),
+    "z": (0x2c,), "x": (0x2d,), "c": (0x2e,), "v": (0x2f,),
+    "b": (0x30,), "n": (0x31,), "m": (0x32,),
+    "comma": (0x33,), "dot": (0x34,), "slash": (0x35,),
+    "alt": (0x38,), "spc": (0x39,),
+    "f1": (0x3b,), "f2": (0x3c,), "f3": (0x3d,), "f4": (0x3e,),
+    "f5": (0x3f,), "f6": (0x40,), "f7": (0x41,), "f8": (0x42,),
+    "f9": (0x43,), "f10": (0x44,), "f11": (0x57,), "f12": (0x58,),
+    "home": (0xe0, 0x47), "up": (0xe0, 0x48), "pgup": (0xe0, 0x49),
+    "left": (0xe0, 0x4b), "right": (0xe0, 0x4d),
+    "end": (0xe0, 0x4f), "down": (0xe0, 0x50), "pgdn": (0xe0, 0x51),
+    "insert": (0xe0, 0x52), "delete": (0xe0, 0x53),
+}
+
+
+def _make_break(make_bytes):
+    """PS/2 set-1 break sequence for a make sequence."""
+    if make_bytes[0] == 0xe0:
+        return (0xe0, make_bytes[1] | 0x80)
+    return (make_bytes[0] | 0x80,)
+
+
+def scancodes_for(combo):
+    """Expand one simultaneous key combo into make then break bytes."""
+    makes = []
+    for name in combo:
+        codes = _SCANCODES.get(name)
+        if codes is None:
+            # Single-character letters/digits already use their name.
+            raise StaticError(
+                f"no VirtualBox scancode for key {name!r}",
+                rule_id="key.no-mapping")
+        makes.append(codes)
+    sequence = []
+    for codes in makes:
+        sequence.extend(codes)
+    for codes in reversed(makes):
+        sequence.extend(_make_break(codes))
+    return sequence
+
+
+class VirtualBoxSession:
+    """Identity-verified session with agentless-display carriers (F52)."""
+
+    def __init__(self, vm_uuid, name, drives=None):
         self.backend = "virtualbox"
         self._uuid = vm_uuid
         self._name = name
+        self._drives = dict(drives or {})
 
     def native(self):
         """No portable native hatch: VBoxManage is the whole surface."""
@@ -406,32 +493,58 @@ class VirtualBoxSession:
             rule_id="machine.backend-no-native")
 
     def send_keys(self, combos, delay=0.06):
-        raise PreflightError(
-            "the virtualbox agentless-display carriers are unbuilt "
-            "(F52); keyboard input is not available yet",
-            rule_id="machine.control-plane-unbuilt")
-
-    def text_screen(self):
-        raise PreflightError(
-            "the virtualbox agentless-display carriers are unbuilt "
-            "(F52); text-screen readback is not available yet",
-            rule_id="machine.control-plane-unbuilt")
+        """Inject key combinations via ``keyboardputscancode``."""
+        for combo in combos:
+            codes = scancodes_for(combo)
+            hex_args = [f"{byte:02x}" for byte in codes]
+            run_vbox(
+                ["controlvm", self._uuid, "keyboardputscancode",
+                 *hex_args],
+                action="sending keys", target=self._uuid)
+            time.sleep(delay)
 
     def screenshot(self, path):
-        raise PreflightError(
-            "the virtualbox agentless-display carriers are unbuilt "
-            "(F52); screenshots are not available yet",
-            rule_id="machine.control-plane-unbuilt")
+        """Capture the guest display to ``path`` as a PNG."""
+        png = os.path.abspath(os.fspath(path))
+        parent = os.path.dirname(png)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        run_vbox(
+            ["controlvm", self._uuid, "screenshotpng", png],
+            action="screenshot", target=self._uuid)
+        return png
+
+    def text_screen(self):
+        """Screenshot + shared fixed-font recognizer (F51)."""
+        with tempfile.NamedTemporaryFile(
+                suffix=".png", delete=False) as handle:
+            path = handle.name
+        try:
+            self.screenshot(path)
+            return text_recognize.recognize(path)
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
 
     def change_medium(self, drive_key, path=None):
-        raise PreflightError(
-            "the virtualbox agentless-display carriers are unbuilt "
-            "(F52); live medium change is not available yet",
-            rule_id="machine.control-plane-unbuilt")
+        """Swap or eject a removable medium on the running machine."""
+        attach = self._drives.get(drive_key)
+        if attach is None:
+            raise PreflightError(
+                f"drive {drive_key!r} has no recorded VirtualBox "
+                "attachment on this VM",
+                rule_id="machine.slot-not-declared")
+        run_vbox(
+            _attach_args(self._name, attach["storagectl"],
+                         attach["port"], attach["device"],
+                         attach["type"], path),
+            action="changing medium", target=drive_key)
 
 
 class VirtualBoxAdapter(BackendAdapter):
-    """VirtualBox: lifecycle and VDI; display plane still claimed empty."""
+    """VirtualBox: lifecycle, VDI, and agentless-display (F50+F52)."""
 
     name = "virtualbox"
     settings_keys = ()
@@ -450,17 +563,14 @@ class VirtualBoxAdapter(BackendAdapter):
             detail=f"found at {executable}")
 
     def capabilities(self):
-        """What this adapter honors today — no agentless-display yet.
+        """What this adapter honors today — including agentless-display.
 
-        Media, controllers and materialization modes are real under
-        F50. Claiming ``agentless-display`` before the carriers exist
-        would promise what nothing can honor (P11); that claim is
-        F52's. ``vvfat`` and at-rest stay false: VDI is outside
-        Remanence's claim, and directory-source drives are QEMU-only.
+        ``vvfat`` and at-rest stay false: VDI is outside Remanence's
+        claim, and directory-source drives are QEMU-only.
         """
         return Capabilities(
             backend="virtualbox",
-            control_planes=(),
+            control_planes=("agentless-display",),
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
@@ -532,4 +642,7 @@ class VirtualBoxAdapter(BackendAdapter):
                 "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {expected}",
                 rule_id="machine.vm-unreachable") from error
-        yield VirtualBoxSession(expected, info.get("name", expected))
+        endpoint = vm.get("endpoint") or {}
+        yield VirtualBoxSession(
+            expected, endpoint.get("name") or info.get("name", expected),
+            drives=endpoint.get("drives"))

@@ -61,28 +61,3 @@ Work items:
 5. The suite discipline: fixtures reconstruct with no QEMU present,
    so they run in the **default** suite, and a failing capture is a
    defect to fix rather than a skip to tolerate.
-
-## F52 — VirtualBox agentless display and FreeDOS parity
-
-> **Pledged 2026-08-03** (owner), cut from **F3** with F50 and
-> F51 (D42). Demanded by **U7**. **F50** and **F51** are
-> delivered.
-
-The agentless-display carriers on VirtualBox, then the Done-when
-that was F3's: the FreeDOS install script runs unmodified on both
-backends from the same blueprint (minus a pinned `backend` field).
-
-Work items:
-
-1. `keyboardputscancode` input mapped from the portable key-name
-   set; `screenshotpng` capture; live `change_medium` via storage
-   attach/detach.
-2. `text_screen` = screenshot + F51's recognizer
-   (`text_recognize`).
-3. Claim `agentless-display` in the capability report — only once
-   the carriers above are real (P11).
-4. Opt-in FreeDOS integration on VirtualBox; field-reference and
-   CHANGELOG; retire this entry.
-
-Done when: FreeDOS install + verify pass on VirtualBox under the
-opt-in integration run, unmodified script, same blueprint.

@@ -598,7 +598,7 @@ media uses the backend-native differencing format:
 | backend | image format | |
 |--------------|--------------|---|
 | `qemu`       | qcow2 (v3)   | built |
-| `virtualbox` | VDI          | lifecycle (F50); agentless display unbuilt (F52) |
+| `virtualbox` | VDI          | lifecycle + agentless display (F50/F52) |
 | `vmware`     | VMDK         | adapter unbuilt |
 | `hyperv`     | VHDX         | adapter unbuilt |
 

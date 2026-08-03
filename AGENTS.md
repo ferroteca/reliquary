@@ -222,8 +222,8 @@ workflow:
   drive seam maps onto the standing rule ids. `geometry()` reports the drive's shape (partitions with their
   declared types, volume count, and the BPB's own CHS where it states one) as P10's *read on the host*
   source, blank-as-an-answer included.
-  `backend_virtualbox.py` is the VirtualBox adapter (F50: lifecycle
-  and VDI; agentless-display carriers still unclaimed, F52).
+  `backend_virtualbox.py` is the VirtualBox adapter (F50 lifecycle
+  and VDI; F52 agentless-display carriers and FreeDOS parity).
   `backend_stubs.py` holds the two unbuilt adapters (VMware
   Workstation, Hyper-V): their host probe is real, they claim **no
   capability**, so assignment passes over them even where the
@@ -949,14 +949,17 @@ Run `git diff --check` before handing work back.
 Hands-on tests require QEMU. Use `--home-dir` with a scratch or deliberately reused test home rather than polluting the
 default per-user home.
 
-The FreeDOS install+verify QEMU integration test is opt-in (skipped in the
-default suite; needs network for the LiveCD on a cold home):
+The FreeDOS install+verify integration tests are opt-in (skipped in the
+default suite; need network for the LiveCD on a cold home). QEMU is the
+default backend; VirtualBox (F52) pins ``backend: virtualbox`` on the
+seeded blueprint and needs ``VBoxManage`` on ``PATH``:
 
 ```powershell
 $env:RELIQUARY_INTEGRATION = "1"
 # optional: reuse a home so cache/media survives reruns
 # $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
 .venv\Scripts\python.exe -m unittest -v tests.test_freedos_install_integration
+.venv\Scripts\python.exe -m unittest -v tests.test_freedos_virtualbox_integration
 ```
 
 ## Test expectations

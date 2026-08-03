@@ -227,14 +227,12 @@ class MaterializationTests(_HomeCase):
         self.assertEqual(self.backend.images, [])
 
     def test_a_pinned_incapable_backend_fails_closed(self):
-        """A pinned backend that cannot honor the blueprint is refused.
+        """A pinned stub backend that cannot honor the blueprint is refused.
 
-        Stubs (vmware, hyperv) claim nothing. VirtualBox (F50) claims
-        lifecycle but not agentless-display, so a DOS machine — whose
-        default plane is agentless-display — is still refused by name
-        before any image work.
+        VMware and Hyper-V still claim nothing. VirtualBox (F52) now
+        claims agentless-display, so it is no longer in this loop.
         """
-        for backend in ("virtualbox", "vmware", "hyperv"):
+        for backend in ("vmware", "hyperv"):
             with self.subTest(backend=backend):
                 self._write(backend, {"platform": "dos",
                                       "backend": backend,
@@ -243,7 +241,6 @@ class MaterializationTests(_HomeCase):
                 with self.assertRaises(PreflightError) as caught:
                     create_machine(backend, context=self.home)
                 self.assertIn(repr(backend), str(caught.exception))
-                # Refused before any image work, like the other gates.
                 self.assertEqual(self.backend.images, [])
                 self.assertFalse(os.path.exists(
                     machine_dir_path(f"{backend}-0", self.home)))

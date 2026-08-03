@@ -56,17 +56,19 @@ arc on that lack: **F2**, the adapter seam, pledged in the same
 act — and **delivered the same day**, so its number is retired and
 the seam is built — and **F3**, the second backend, which followed
 on its own move (2026-08-03) and was cut at pledge into **F50** /
-**F51** / **F52** (D42), F3 retiring with the split; **F50** and
-**F51** are delivered (VirtualBox lifecycle/VDI, and the shared
-fixed-font recognizer). U7's pledge was
+**F51** / **F52** (D42), F3 retiring with the split; **F50**,
+**F51**, and **F52** are delivered (VirtualBox lifecycle/VDI, the
+shared fixed-font recognizer, and VirtualBox agentless display with
+FreeDOS parity). U7's pledge was
 necessary for both and sufficient for neither. **U7 stays here**:
 the seam it demanded exists, but the case is met when a machine
 materializes on the hypervisor a host actually provides, and two
 of the four adapters are still stubs that claim no capability
-(VirtualBox's display plane is F52). What F2 delivered is what
+(VMware and Hyper-V). What F2 delivered is what
 U7 required, not what U7 asks for. The backend-adapter design (now
-`design/backend-adapter.md`, its feature delivered) and F52
-cite U7 from here. **A second delivery answered part of it and moved it
+`design/backend-adapter.md`, its feature delivered) cites U7 from
+here; F52 closed the VirtualBox half of the demand. **A second
+delivery answered part of it and moved it
 no closer** (2026-07-29; D80): `create-machine --dry-run --backend`
 asks whether a blueprint would work on a named backend, capability
 alone deciding, with nothing installed and nothing booted — U7's own
