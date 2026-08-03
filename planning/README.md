@@ -98,9 +98,14 @@ records when; no death records behind retired numbers (no stub,
 D23 — the gap in a sequence is the history); and no entry kept
 after being applied or struck — done work leaves by deletion. A
 live entry's own provenance and argument are not diary; they are
-the argument. [DECISIONS.md](DECISIONS.md) is the one exception,
-being the record itself: its entries keep the spellings of their
-time, annotated and never rewritten.
+the argument. **[DECISIONS.md](DECISIONS.md) is no exception**: it
+is a working file rather than an archive, so an entry is rewritten
+in current spellings against the current surface as readily as it
+is added, and one that no longer carries value today is struck. Git
+history holds what each said when it was written — a record too
+large to search stops being a guard against anything. What an entry
+keeps is the part with no normative home: a contested call, its
+rejected alternative, and the condition that would reopen it.
 
 **Features carry F-numbers and a size bound** (D42). The number is a
 handle for what depends on a feature, running in one sequence across
