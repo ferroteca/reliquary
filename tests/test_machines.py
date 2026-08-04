@@ -409,21 +409,19 @@ class MaterializationTests(_HomeCase):
         entry = self._state(machine_id)["drives"]["cdrom0"]
         self.assertEqual(entry["path"], self.iso_path)
 
-    def test_an_unbound_location_property_fails_the_create(self):
-        from reliquary.binding import PropertyBindingError
+    def test_an_unbound_location_property_is_asked(self):
         self._write(
             "needy", {"platform": "dos", "drives": {"cdrom0": "livecd"}},
             media=[{"name": "livecd", "materialize": "use",
                     "read-only": True, "location": "${live.iso}"}])
-        with self.assertRaises(PropertyBindingError):
+        asker = mock.Mock(return_value=self.iso_path)
+        with mock.patch(
+                "reliquary.binding.console_asker",
+                return_value=asker):
             create_machine("needy", context=self.home)
-        # The failed create left no machine behind.
-        machines_root = os.path.join(
-            self.home, "cache", "machines")
-        leftover = (os.path.isdir(machines_root)
-                    and [n for n in os.listdir(machines_root)
-                         if not n.startswith(".")])
-        self.assertFalse(leftover)
+        asker.assert_called_once_with("live.iso", "live.iso", False)
+        entry = self._state("needy-0")["drives"]["cdrom0"]
+        self.assertEqual(entry["path"], self.iso_path)
 
     def test_missing_state_raises_filenotfound(self):
         with self.assertRaises(PreflightError):
