@@ -3,7 +3,12 @@
 
 root = true
 
-[*.md]
+[*]
+tab_width = 8
+indent_size = 4
+indent_style = space
 max_line_length = 72
+
+[*.md]
 ij_markdown_wrap_text_if_long = true
 ij_markdown_keep_line_breaks_inside_text_blocks = false
