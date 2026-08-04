@@ -55,7 +55,7 @@ machine_id = session.create_machine("freedos")
 refuses at the door rather than reading the developer's home or a
 stray current directory, and nothing resolves out of the built-in
 codex on any surface, so it never feeds an automated run at all.
-The environment (`RELIQUARY_HOME_DIR` and its siblings,
+The environment (`RELIQUARY_HOME` and its siblings,
 `RELIQUARY_PROPERTIES`) is honoured by the CLI's own construction
 of its record and never by the library, for the same reason.
 

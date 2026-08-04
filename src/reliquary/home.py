@@ -7,7 +7,8 @@ placeable: ``home``, ``blueprints``, ``scripts``, ``cache``, ``media``
 and ``machines``. Each starts **unassigned**. A value arrives in the
 ``Context`` record a session is opened on — the CLI builds one per
 invocation from its ``--*-dir`` flags, the ``RELIQUARY_*_DIR``
-environment variables, and the default home — and every default is
+environment variables (except ``RELIQUARY_HOME`` for the home), and
+the default home — and every default is
 *derived* rather than pre-set:
 
 - assigning ``home`` gives default locations under it to
@@ -68,9 +69,13 @@ def environment_variable(name):
 
     One mechanical rule — ``RELIQUARY_`` plus the flag's own name —
     so ``--blueprints-dir`` is ``RELIQUARY_BLUEPRINTS_DIR`` and there
-    is nothing per-directory to remember. Honoured by the CLI's
-    construction step alone; this module never reads it.
+    is nothing per-directory to remember. ``home`` is the one
+    user-facing exception: its established spelling is
+    ``RELIQUARY_HOME``. Honoured by the CLI's construction step alone;
+    this module never reads it.
     """
+    if name == "home":
+        return "RELIQUARY_HOME"
     return "RELIQUARY_%s_DIR" % name.upper()
 
 

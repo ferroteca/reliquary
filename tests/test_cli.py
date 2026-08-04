@@ -1070,6 +1070,14 @@ class CliContextConstructionTests(unittest.TestCase):
         os.environ[variable] = value
 
     def test_the_environment_names_the_home(self):
+        self._pin_env("RELIQUARY_HOME", self.home)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = cli.main(["list-blueprints"])
+        self.assertEqual(result, 0)
+        self.assertIn("(no blueprints)", stdout.getvalue())
+
+    def test_the_former_home_variable_is_accepted_as_a_fallback(self):
         self._pin_env("RELIQUARY_HOME_DIR", self.home)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -1077,9 +1085,20 @@ class CliContextConstructionTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("(no blueprints)", stdout.getvalue())
 
+    def test_the_documented_home_variable_beats_the_former_spelling(self):
+        former = os.path.join(self.home, "former-home")
+        self._pin_env("RELIQUARY_HOME", self.home)
+        self._pin_env("RELIQUARY_HOME_DIR", former)
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = cli.main(["new-blueprint", "documented"])
+        self.assertEqual(result, 0)
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.home, "blueprints", "documented.rlqb")))
+        self.assertFalse(os.path.exists(former))
+
     def test_a_flag_beats_the_environment(self):
         decoy = os.path.join(self.home, "env-home")
-        self._pin_env("RELIQUARY_HOME_DIR", decoy)
+        self._pin_env("RELIQUARY_HOME", decoy)
         with contextlib.redirect_stdout(io.StringIO()):
             result = cli.main(["--home-dir", self.home,
                                "new-blueprint", "flagged"])

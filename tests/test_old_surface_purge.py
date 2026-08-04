@@ -229,7 +229,6 @@ _FORBIDDEN = (
     ("retired HOME_ASSETS", re.compile(r"\bHOME_ASSETS\b")),
     ("old media_cache_dir", re.compile(r"\bmedia_cache_dir\b")),
     ("old machines_cache_dir", re.compile(r"\bmachines_cache_dir\b")),
-    ("old RELIQUARY_HOME", re.compile(r"\bRELIQUARY_HOME(?!_DIR)\b")),
 )
 
 

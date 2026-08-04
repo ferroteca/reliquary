@@ -129,7 +129,7 @@ below are *derived* rather than pre-set.
 
 | Directory | Flag | Environment | Derives as |
 |---|---|---|---|
-| home | `--home-dir` | `RELIQUARY_HOME_DIR` | — |
+| home | `--home-dir` | `RELIQUARY_HOME` | — |
 | blueprints | `--blueprints-dir` | `RELIQUARY_BLUEPRINTS_DIR` | `<home>/blueprints` |
 | scripts | `--scripts-dir` | `RELIQUARY_SCRIPTS_DIR` | `<home>/scripts` |
 | cache | `--cache-dir` | `RELIQUARY_CACHE_DIR` | `<home>/cache` |

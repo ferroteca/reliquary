@@ -17,8 +17,10 @@ appear before or after the command word.
 ## Global options
 
 Six flags place Reliquary's working directories. Each is also
-settable as `RELIQUARY_<NAME>_DIR` in the environment, an explicit
-flag winning; what none of them names derives from what does.
+settable in the environment, an explicit flag winning; what none of
+them names derives from what does. The home variable is
+`RELIQUARY_HOME`; the other five follow the
+`RELIQUARY_<NAME>_DIR` pattern.
 
 - `--home-dir <path>` - The Reliquary home (default:
   `Documents/reliquary`, falling back to `~/reliquary`)

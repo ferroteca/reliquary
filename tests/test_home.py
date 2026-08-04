@@ -48,7 +48,7 @@ class EnvironmentTests(unittest.TestCase):
 
     def test_the_variable_name_follows_the_flag(self):
         self.assertEqual(home.environment_variable("home"),
-                         "RELIQUARY_HOME_DIR")
+                         "RELIQUARY_HOME")
         self.assertEqual(home.environment_variable("blueprints"),
                          "RELIQUARY_BLUEPRINTS_DIR")
 

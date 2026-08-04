@@ -244,7 +244,7 @@ rlq create-machine --blueprint freedos --dry-run --backend hyperv
 
 Vendor media is cached and verified against pinned SHA-256 hashes on every use, under `cache/media/`
 (`Documents\reliquary` by default; override the payload cache with `--media-dir`, or move everything
-at once with `--home-dir` or the `RELIQUARY_HOME_DIR` environment variable).
+at once with `--home-dir` or the `RELIQUARY_HOME` environment variable).
 
 A run **returns its output** and stores nothing: it streams its progress live — `--progress pretty` for a person,
 `--progress jsonl` for a program — and the stream is gone when the run ends. Redirect it if you want to keep it. When a
@@ -358,7 +358,7 @@ a big one, blueprints in your project's repository. Name any of them and the res
 
 | Directory | Flag | Environment | Where it lands if you say nothing |
 |---|---|---|---|
-| home | `--home-dir` | `RELIQUARY_HOME_DIR` | `Documents/reliquary` |
+| home | `--home-dir` | `RELIQUARY_HOME` | `Documents/reliquary` |
 | blueprints | `--blueprints-dir` | `RELIQUARY_BLUEPRINTS_DIR` | `<home>/blueprints` |
 | scripts | `--scripts-dir` | `RELIQUARY_SCRIPTS_DIR` | `<home>/scripts` |
 | cache | `--cache-dir` | `RELIQUARY_CACHE_DIR` | `<home>/cache` |
@@ -795,7 +795,7 @@ why each was passed over.
 
 Guest-console commands find the running VM through the `vm` section of
 the machine's `cache/machines/<id>/machine.json`. Ensure every command
-uses the same `--home-dir` / `RELIQUARY_HOME_DIR` and the same machine
+uses the same `--home-dir` / `RELIQUARY_HOME` and the same machine
 selector, and that `rlq start-machine` completed successfully.
 
 ### The VM identity does not match

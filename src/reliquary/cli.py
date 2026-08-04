@@ -234,8 +234,14 @@ def _invocation_context(arguments):
     """
     slots = {}
     for name in DIRECTORIES:
-        value = (getattr(arguments, "%s_dir" % name, None)
-                 or os.environ.get(environment_variable(name)) or None)
+        value = getattr(arguments, "%s_dir" % name, None)
+        if not value:
+            value = os.environ.get(environment_variable(name))
+        # ``RELIQUARY_HOME`` is the documented spelling. Accept the
+        # former mechanical spelling for existing CLI users only when
+        # the primary spelling is absent.
+        if not value and name == "home":
+            value = os.environ.get("RELIQUARY_HOME_DIR")
         if value:
             slots["%s_dir" % name] = value
     defaulted = "home_dir" not in slots

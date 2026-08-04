@@ -1516,8 +1516,9 @@ Seven flags are accepted by every command, mirroring the API's
 shared keywords. Six place Reliquary's working directories —
 `--home-dir`, `--blueprints-dir`, `--scripts-dir`, `--cache-dir`,
 `--media-dir`, `--machines-dir` — each also settable by
-`RELIQUARY_<NAME>_DIR` in the environment; what none of them names
-derives, and a bare invocation places all six under the default home
+an environment variable: `RELIQUARY_HOME` for the home, and
+`RELIQUARY_<NAME>_DIR` for every other directory; what none of them
+names derives, and a bare invocation places all six under the default home
 (`Documents/reliquary`). There is no flag deciding whether a name may
 come from the built-in library, because none may: the directories are
 the sole source, and the library reaches a tree only through
