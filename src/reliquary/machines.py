@@ -169,14 +169,14 @@ def machine_dir_path(machine_id, context=None):
     return os.path.join(machines_dir(context), machine_id)
 
 
-def _machine_media_dir(machine_id, context=None):
+def _machine_disks_dir(machine_id, context=None):
     """Per-machine materialized-image directory, keyed by media item.
 
     Images are named for the media (``<media-name>.<ext>``), not the
     slot, so media swapping through one removable slot each keep their
     own materialization and a re-insert reuses the existing image.
     """
-    return os.path.join(machine_dir_path(machine_id, context), "media")
+    return os.path.join(machine_dir_path(machine_id, context), "disks")
 
 
 def _backend_dir(machine_id, backend, context=None):
@@ -184,7 +184,7 @@ def _backend_dir(machine_id, backend, context=None):
 
     reliquary quarantines each backend's files in a backend-named
     subdir so the machine root holds only ``machine.json`` and the
-    ``media/`` and ``screenshots/`` directories. For QEMU it holds
+    ``disks/`` and ``screenshots/`` directories. For QEMU it holds
     just the captured ``qemu-stderr.log``.
     """
     return os.path.join(machine_dir_path(machine_id, context),
@@ -308,7 +308,7 @@ def _drive_common(key, drive):
     return entry
 
 
-def _materialize_drive(key, drive, adapter, media_root, namespace, context,
+def _materialize_drive(key, drive, adapter, disks_root, namespace, context,
                        properties=None, events=None, cancelled=None):
     """Materialize one enabled drive, returning its resolved state entry.
 
@@ -317,7 +317,7 @@ def _materialize_drive(key, drive, adapter, media_root, namespace, context,
     ``use`` attaches the fetched payload directly (a directory payload
     renders as vvfat); ``difference``/``copy`` build a per-machine image
     over/of the fetched payload. Per-machine images live under
-    ``media/`` keyed by the media name, not the slot, so a media moving
+    ``disks/`` keyed by the media name, not the slot, so a media moving
     through a removable slot keeps its own image; the adapter names the
     file, since the native image format is its choice. The entry
     records the realized ``path`` plus the media name and mode.
@@ -337,7 +337,7 @@ def _materialize_drive(key, drive, adapter, media_root, namespace, context,
     entry["media"] = media.name
     entry["materialize"] = mode
     if mode == "new":
-        path = adapter.image_path(media_root, _image_stem(media, key))
+        path = adapter.image_path(disks_root, _image_stem(media, key))
         adapter.create_image(path, mode="new", size=media.size)
         entry.update(size=media.size, path=path)
     elif mode == "use":
@@ -348,7 +348,7 @@ def _materialize_drive(key, drive, adapter, media_root, namespace, context,
         base_payload = _acquire_fetch(
             media, namespace, context, properties=properties, events=events,
             cancelled=cancelled)
-        dest = adapter.image_path(media_root, _image_stem(media, key))
+        dest = adapter.image_path(disks_root, _image_stem(media, key))
         adapter.create_image(dest, mode=mode, base=base_payload)
         entry["path"] = dest
     else:
@@ -368,7 +368,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
     the fully resolved configuration and its provenance
     (``blueprint-source``, ``blueprint-digest``, ``backend-id``), and
     materializes every enabled drive: a per-machine image under
-    ``media/`` for ``new``/``difference``/``copy`` media, the fetched
+    ``disks/`` for ``new``/``difference``/``copy`` media, the fetched
     payload attached in place for ``use``. ``source`` is the absolute
     path of the blueprint file this machine resolved from, recorded for
     selection scoping. The machine number is the lowest free
@@ -391,8 +391,8 @@ def create(machine, namespace, *, context=None, blueprint_name="",
                 raise PreflightError(
                     f"machine {machine_id} already exists",
                     rule_id="machine.already-exists")
-        media_root = _machine_media_dir(machine_id, context)
-        os.makedirs(media_root)
+        disks_root = _machine_disks_dir(machine_id, context)
+        os.makedirs(disks_root)
         # Mark the machine `creating` before materialization begins, so
         # an interrupted create is detectable and recoverable.
         _write_state(machine_id, {
@@ -407,7 +407,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
         try:
             return _materialize_machine(
                 machine, namespace, machine_id, blueprint_name, created,
-                media_root, source, context, properties, events, backend)
+                disks_root, source, context, properties, events, backend)
         except BaseException:
             # Roll back a failed create: the machine never reached a
             # usable phase, so its partial materialization is discarded.
@@ -417,7 +417,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 
 
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
-                         created, media_root, source, context,
+                         created, disks_root, source, context,
                          properties=None, events=None, backend=None):
     # Assignment happens before anything is materialized, so a machine
     # nothing on this host can build costs no image work — and the
@@ -442,7 +442,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             # entirely (blueprint-reference.md).
             continue
         resolved_drives[key] = _materialize_drive(
-            key, drive, adapter, media_root, namespace, context,
+            key, drive, adapter, disks_root, namespace, context,
             properties, events)
 
     memory = machine.memory
@@ -651,7 +651,7 @@ def _refuse_missing(entries):
         rule_id="media.file-missing")
 
 
-def _dry_drive(key, drive, adapter, media_root, namespace, context,
+def _dry_drive(key, drive, adapter, disks_root, namespace, context,
                properties, entries):
     """One drive's resolved plan, materializing nothing.
 
@@ -675,7 +675,7 @@ def _dry_drive(key, drive, adapter, media_root, namespace, context,
     entry["materialize"] = mode
     if mode == "new":
         entry.update(size=media.size,
-                     path=adapter.image_path(media_root,
+                     path=adapter.image_path(disks_root,
                                              _image_stem(media, key)))
         return entry
     payload = _dry_payload(media, namespace, context, properties, entries)
@@ -683,7 +683,7 @@ def _dry_drive(key, drive, adapter, media_root, namespace, context,
         entry["path"] = payload
     elif mode in ("difference", "copy"):
         entry["base"] = payload
-        entry["path"] = adapter.image_path(media_root,
+        entry["path"] = adapter.image_path(disks_root,
                                            _image_stem(media, key))
     else:
         raise InternalError(f"unknown materialize mode {mode!r} for {key}")
@@ -736,10 +736,10 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
     # too, and in the same place — the settings are authored input,
     # judged identically whether or not the backend is on this host.
     adapter.validate_settings(machine.backend_settings.get(assigned))
-    media_root = _machine_media_dir(machine_id, context)
+    disks_root = _machine_disks_dir(machine_id, context)
     entries = []
     drives = [
-        _dry_drive(key, drive, adapter, media_root, namespace, context,
+        _dry_drive(key, drive, adapter, disks_root, namespace, context,
                    bound.values, entries)
         for key, drive in sorted(machine.drives.items()) if drive.enabled]
     _refuse_missing(entries)
@@ -929,7 +929,7 @@ def get_machine_dir(*, machine=None, blueprint=None, context=None):
 _OWNED_MODES = ("new", "difference", "copy")
 
 
-def _reconcile_drives(machine, namespace, old_drives, adapter, media_root,
+def _reconcile_drives(machine, namespace, old_drives, adapter, disks_root,
                       context, properties=None, events=None):
     """Reconcile a machine's drives to a re-resolved machine component.
 
@@ -952,7 +952,7 @@ def _reconcile_drives(machine, namespace, old_drives, adapter, media_root,
             # No reliquary-owned image here: (re)materialize/re-point
             # freely (media re-fetch, empty slot, or a new image).
             new_drives[key] = _materialize_drive(
-                key, drive, adapter, media_root, namespace, context,
+                key, drive, adapter, disks_root, namespace, context,
                 properties, events)
             continue
         # An existing materialized image may only be kept unchanged.
@@ -1047,9 +1047,9 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         bound = _bind_location_properties(
             parsed, namespace, explicit=properties,
             properties_file=properties_file, context=context)
-        media_root = _machine_media_dir(machine_id, context)
+        disks_root = _machine_disks_dir(machine_id, context)
         new_drives = _reconcile_drives(
-            parsed, namespace, state.get("drives", {}), adapter, media_root,
+            parsed, namespace, state.get("drives", {}), adapter, disks_root,
             context, bound, events)
 
         memory = parsed.memory

@@ -85,7 +85,7 @@ How the drive is realized from the payload; default `use`:
 validation error. `new` takes `size` and forbids `location` — and a
 spec carrying `size` and no `location` *is* `new`, which is what
 lets the drive-inline blank be written `{"size": "20M"}`. `new` / `difference` / `copy` materialize a per-machine
-image under `cache/machines/<id>/media/<name>.<ext>` (named for the
+image under `cache/machines/<id>/disks/<name>.<ext>` (named for the
 media, not the slot); `use` attaches the shared payload — the
 `cache/media/` file, the `local` file, or the directory a
 location names — **directly**, with no per-machine copy. This is what a machine

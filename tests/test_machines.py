@@ -108,7 +108,8 @@ class MaterializationTests(_HomeCase):
         root = machine_dir_path(machine_id, self.home)
         self.assertTrue(os.path.isfile(
             os.path.join(root, "machine.json")))
-        self.assertTrue(os.path.isdir(os.path.join(root, "media")))
+        self.assertTrue(os.path.isdir(os.path.join(root, "disks")))
+        self.assertFalse(os.path.exists(os.path.join(root, "media")))
 
     def test_state_records_bookkeeping_and_defaults(self):
         machine_id = self._create(
@@ -734,10 +735,10 @@ class LifecycleTests(_HomeCase):
                    "drives": {"hdd0": "blank", "hdd1": "big"}},
             media=[_BLANK, {"name": "big", "materialize": "new",
                             "size": "30M"}])
-        media_root = os.path.join(
-            machine_dir_path(machine_id, self.home), "media")
+        disks_root = os.path.join(
+            machine_dir_path(machine_id, self.home), "disks")
         # The dropped drive's per-machine image is named for its media.
-        open(os.path.join(media_root, "big.qcow2"), "w").close()
+        open(os.path.join(disks_root, "big.qcow2"), "w").close()
         self._write("ar", {"platform": "dos",
                           "drives": {"hdd0": "blank", "cdrom0": None}},
                    media=[_BLANK])
@@ -746,7 +747,7 @@ class LifecycleTests(_HomeCase):
         self.assertNotIn("hdd1", state["drives"])
         self.assertIn("cdrom0", state["drives"])
         self.assertFalse(os.path.exists(
-            os.path.join(media_root, "big.qcow2")))
+            os.path.join(disks_root, "big.qcow2")))
 
     def test_apply_refuses_an_unimplemented_control_plane(self):
         machine_id = self._create(

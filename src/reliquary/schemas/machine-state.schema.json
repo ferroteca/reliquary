@@ -85,7 +85,7 @@
       "type": "object"
     },
     "drives": {
-      "description": "The resolved, enabled drives keyed by drive key. Each entry carries the drive's medium and slot plus the realized cache path (a per-machine image under media/, an attached payload, a host directory, or null for an empty removable slot).",
+      "description": "The resolved, enabled drives keyed by drive key. Each entry carries the drive's medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, a host directory, or null for an empty removable slot).",
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/driveState"}
     },

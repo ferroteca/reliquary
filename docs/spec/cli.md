@@ -488,7 +488,7 @@ boot: hdd0, cdrom0
 control planes: agentless-display
 drives:
   cdrom0 (cdrom slot 0 ide): empty
-  hdd0 (hdd slot 0 ide): (inline) new 20M -> ...\media\hdd0.qcow2
+  hdd0 (hdd slot 0 ide): (inline) new 20M -> ...\disks\hdd0.qcow2
 
 nothing was created.
 ```

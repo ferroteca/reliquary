@@ -125,7 +125,7 @@ warning:
 
 The `hdd` drive names the `blank-20m` media — `materialize: new`,
 so rlq creates a 20 MiB dynamically-allocated image at the
-media-keyed path (`media/blank-20m.qcow2` on QEMU — the
+media-keyed path (`disks/blank-20m.qcow2` on QEMU — the
 [naming and format](blueprint-reference.md#image-naming-and-formats)
 are Reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,

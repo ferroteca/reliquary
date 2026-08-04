@@ -699,7 +699,7 @@ cache/machines/<id>/
 │                   VM identity (backend, backend-id, token,
 │                   endpoint, pid), written atomically with phase
 │                   so the two cannot disagree
-├── media/          per-machine materialized images, <media-name>.<ext>
+├── disks/          per-machine materialized images, <media-name>.<ext>
 ├── screenshots/    the `screenshot` verb's captures, and a
 │                   failure's automatic one
 └── <backend>/      the backend's own artifacts (qemu/ virtualbox/ …)
@@ -715,7 +715,7 @@ here because the model depends on it.
 ## Materialization
 
 - **Materialized images are named for the media, not the slot**,
-  under `cache/machines/<id>/media/<media-name>.<ext>`. Media
+  under `cache/machines/<id>/disks/<media-name>.<ext>`. Media
   moving through a shared removable slot each keep their own
   materialization and never clobber one another, and a re-insert
   reuses the existing image. The **anonymous blank**, having no

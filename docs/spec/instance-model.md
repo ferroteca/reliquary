@@ -32,7 +32,7 @@ have ids.
     └── freedos-0/            the machine — disposable
         ├── machine.json      state; while running, the live VM
         │                     identity folds in as a `vm` section
-        ├── media/            per-machine images, by media name
+        ├── disks/            per-machine images, by media name
         ├── screenshots/      the `screenshot` verb's captures, and
         │                     a failure's automatic one
         └── <backend>/        the backend's own files (e.g. qemu/)
@@ -88,7 +88,7 @@ listings with D62 as `put-files` / `get-files` / `list-files`).
 Reaching in stays possible and always will — a stopped machine's
 drives are plain host state — but no supported use case requires
 it (**P16**). While the machine is stopped on every control
-plane, the content under `media/` is plain host state: a drive
+plane, the content under `disks/` is plain host state: a drive
 whose media is a directory *is* that directory, and image drives
 are readable and writable with the user's own tools. Reliquary
 neither mediates nor records out-of-band access — what the

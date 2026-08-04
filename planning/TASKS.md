@@ -129,8 +129,3 @@ not keep.
 
 Use one of `rich`, `tabulate`, or `PrettyTable` to render the CLI's list
 tables consistently.
-
-### T13 — Rename machine media directories to `disks`
-
-Rename each machine materialization's `media` subdirectory to `disks`, and
-update every reader, writer, and documented path accordingly.

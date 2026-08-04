@@ -473,7 +473,7 @@ There are no paths to Reliquary-managed images anywhere in the
 blueprint. A drive whose media materializes a per-machine image
 (`new` / `difference` / `copy`) gets it created by Reliquary inside
 the cached materialization, named for the **media** —
-`cache/machines/<id>/media/blank-20m.qcow2` for a media `blank-20m`
+`cache/machines/<id>/disks/blank-20m.qcow2` for a media `blank-20m`
 on QEMU — with the extension of the format Reliquary chose (see
 [image naming](#image-naming-and-formats)). You never name, place,
 or reference these files; the media name is the handle.
@@ -584,7 +584,7 @@ convention above.)
 
 A drive's per-machine image (a media that `materialize`s
 `new` / `difference` / `copy`) lives at the canonical path
-`cache/machines/<id>/media/<media-name>.<ext>` — named for the
+`cache/machines/<id>/disks/<media-name>.<ext>` — named for the
 media, not the slot, so a media moving through one removable slot
 keeps its own image and a re-insert reuses it. There are no other
 image names, ever: the blueprint has no image-path field, and

@@ -43,6 +43,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Machine-local images now live in `disks/`** rather than `media/`
+  below each `cache/machines/<id>/` materialization. The separate
+  shared payload cache remains `cache/media/`.
+
 - **`stop-machine` and `destroy-machine` now accept an optional
   positional machine id** (`rlq stop-machine <id>` is a short alias
   for `rlq stop-machine --machine <id>`, and likewise `destroy-machine`

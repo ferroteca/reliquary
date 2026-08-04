@@ -120,7 +120,7 @@ Two rules carry the whole model:
 ├── machine.json             the machine's state — reliquary's; while
 │                            running, the live VM identity folds in
 │                            as a `vm` section
-├── media/                   per-machine materialized images, by
+├── disks/                   per-machine materialized images, by
 │                            media name
 ├── screenshots/             where the `screenshot` verb and an
 │                            automatic failure capture land

@@ -296,7 +296,7 @@ Any DOS with a bootable image works. A machine's drives each name a
 `materialize: new` disk of `size`, a `difference`/`copy` over a
 payload, or a `use` attach (an ISO, or a host directory served as a
 virtual FAT drive) — and Reliquary materializes any per-machine image
-under `cache/machines/<id>/media/`. Any QEMU-supported image format
+under `cache/machines/<id>/disks/`. Any QEMU-supported image format
 works; `*.img` and `*.iso` are taken as raw. Reliquary hands back a
 guest program's raw output, and interpreting it is left to the caller.
 
@@ -388,7 +388,7 @@ Documents/reliquary/
     └── machines/<id>/    each materialized machine — its own directory
                           with machine.json (the state; while running its
                           `vm` section holds the live VM identity, and
-                          any machine variables a script set), media/
+                          any machine variables a script set), disks/
                           (per-machine images), screenshots/, and a
                           <backend>/ subdir (e.g. qemu/qemu-stderr.log).
                           A run stores nothing here — it returns its
@@ -444,7 +444,7 @@ rlq create-machine --blueprint freedos
 ```
 
 `create-machine` materializes the machine's per-machine images under
-`cache/machines/<id>/media/` and prints the generated id. (If a
+`cache/machines/<id>/disks/` and prints the generated id. (If a
 machine of this blueprint already exists — e.g. one installed by
 `run-script install` — you can start it directly.)
 
