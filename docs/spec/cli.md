@@ -501,7 +501,7 @@ is exactly what its twin returns.
 
 ```
 rlq start-machine (--blueprint <name> | --machine <id>) [--display]
-rlq stop-machine (--blueprint <name> | --machine <id>)
+rlq stop-machine [<id>] (--blueprint <name> | --machine <id>)
 ```
 
 ```powershell

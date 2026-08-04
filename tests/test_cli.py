@@ -681,6 +681,19 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         stop.assert_called_once_with("plain-0")
 
+    def test_stop_via_positional_machine_id(self):
+        """stop-machine <id> is a short alias for --machine <id>."""
+        machine_home = self._running_machine()
+        with mock.patch(
+                "reliquary.session.Session.stop_machine") as stop, \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = cli.main([
+                "--home-dir", self.home,
+                "stop-machine", "plain-0",
+            ])
+        self.assertEqual(result, 0)
+        stop.assert_called_once_with("plain-0")
+
     def test_destroy_via_machine_id(self):
         """--machine <blueprint>-<n> destroy deletes the machine."""
         stdout = io.StringIO()

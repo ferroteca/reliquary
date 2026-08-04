@@ -159,9 +159,11 @@ is reported rather than raised.
 Start a machine (a selector is required). Returns when QEMU is
 ready.
 
-### `rlq stop-machine (--blueprint NAME | --machine ID)`
+### `rlq stop-machine [ID] (--blueprint NAME | --machine ID)`
 
-Stop a running machine (a selector is required).
+Stop a running machine. The machine id may be given as a positional
+argument (`rlq stop-machine freedos-0` is a short alias for
+`rlq stop-machine --machine freedos-0`).
 
 ### `rlq destroy-machine [ID] (--blueprint NAME | --machine ID)`
 
