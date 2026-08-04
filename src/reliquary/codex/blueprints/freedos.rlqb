@@ -32,7 +32,6 @@
     // The download, and the ISO read out of it. One remote rung, one
     // hash; the child names its path inside the container.
     "type": "media",
-    "name": "freedos-livecd-zip",
     "location": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
     "sha256": "2020ff6bb681967fd6eff8f51ad2e5cd5ab4421165948cef4246e4f7fcaf6339",
     "children": [
