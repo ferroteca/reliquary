@@ -147,12 +147,12 @@ it would land on, each drive's resolved plan, and each media as
 `unbound` — resolved, never fetched, and never hashed. It fails
 where a create would fail, so a nonzero exit is the verdict.
 
-`--backend NAME`, legal only with `--dry-run`, asks whether the
-blueprint would work on that backend rather than on this host: its
-capability decides and it need not be installed here. It is not
-simulation — `--dry-run --backend simulator` validates and stops,
-while running simulated means dropping `--dry-run` and keeping the
-backend.
+`--backend NAME` overrides the blueprint's `backend` field, pinning
+assignment at materialization — the named backend must be available
+and capable on this host, failing closed on either count. With
+`--dry-run` the question is whether the blueprint would work *there*,
+so its capability decides and it need not be installed here: absence
+is reported rather than raised.
 
 ### `rlq start-machine (--blueprint NAME | --machine ID) [--display]`
 

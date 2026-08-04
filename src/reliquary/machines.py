@@ -357,7 +357,8 @@ def _materialize_drive(key, drive, adapter, media_root, namespace, context,
 
 
 def create(machine, namespace, *, context=None, blueprint_name="",
-           source=None, number=None, properties=None, events=None):
+           source=None, number=None, properties=None, events=None,
+           backend=None):
     """Materialize one machine from a parsed composed machine component.
 
     Assigns the backend (a declared one pins the choice; otherwise the
@@ -372,8 +373,9 @@ def create(machine, namespace, *, context=None, blueprint_name="",
     path of the blueprint file this machine resolved from, recorded for
     selection scoping. The machine number is the lowest free
     non-negative integer for that blueprint, unless ``number`` pins a
-    specific one (``recreate`` reuses the old id). Returns the
-    generated machine id.
+    specific one (``recreate`` reuses the old id). ``backend``
+    overrides the blueprint's backend field, pinning assignment the same
+    way a declared ``backend`` does. Returns the generated machine id.
     """
     if not isinstance(blueprint_name, str) or not blueprint_name:
         raise StaticError("create requires a non-empty blueprint_name",
@@ -405,7 +407,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
         try:
             return _materialize_machine(
                 machine, namespace, machine_id, blueprint_name, created,
-                media_root, source, context, properties, events)
+                media_root, source, context, properties, events, backend)
         except BaseException:
             # Roll back a failed create: the machine never reached a
             # usable phase, so its partial materialization is discarded.
@@ -416,13 +418,16 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
                          created, media_root, source, context,
-                         properties=None, events=None):
+                         properties=None, events=None, backend=None):
     # Assignment happens before anything is materialized, so a machine
     # nothing on this host can build costs no image work — and the
     # backend is fixed before the first image is written in its own
     # native format.
     control_planes = _resolve_control_planes(machine)
-    declared, narrowed, _source = _backend_choice(machine)
+    if backend is not None:
+        declared, narrowed = backend, None
+    else:
+        declared, narrowed, _source = _backend_choice(machine)
     backend = backends.assign(_requirements(machine, namespace),
                               declared=declared, narrowed=narrowed)
     adapter = backends.adapter(backend)
@@ -844,18 +849,13 @@ def create_machine(name, *, context=None, number=None, properties=None,
     id it would allocate, the backend it would land on, each drive's
     resolved plan, and where every media would come from. It leaves
     no state behind (nothing is seeded, fetched, locked or written)
-    and never prompts. ``backend`` asks what a *named* backend would
-    do rather than what this host would: its capability decides and
-    its absence here is only reported. Being a question rather than a
-    configuration, it is legal with ``dry_run`` alone — the machine's
-    backend comes from its blueprint (P10).
+    and never prompts. ``backend`` overrides the blueprint's
+    ``backend`` field, pinning assignment the same way a declared
+    one does: it must be available and capable, and it fails closed
+    on either count. With ``dry_run`` it asks the other question —
+    whether the blueprint would work *there* — so absence is
+    reported rather than raised (P11).
     """
-    if backend is not None and not dry_run:
-        raise StaticError(
-            "--backend asks what another backend would do and means "
-            "something only with --dry-run; a machine's backend comes "
-            "from its blueprint",
-            rule_id="machine.backend-outside-dry-run")
     if dry_run:
         namespace = load_namespace(context)
         if name not in namespace.machines:
@@ -887,7 +887,7 @@ def create_machine(name, *, context=None, number=None, properties=None,
         properties_file=properties_file, context=context)
     return create(machine, namespace, context=context, blueprint_name=name,
                   source=source, number=number, properties=bound,
-                  events=events)
+                  events=events, backend=backend)
 
 
 def recreate_machine(*, machine=None, blueprint=None, context=None,

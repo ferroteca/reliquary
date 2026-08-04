@@ -37,6 +37,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   start/stop with UUID identity verification. The VMware and
   Hyper-V stubs remain.
 
+### Changed
+
+- **`--backend` on `create-machine` now overrides the blueprint's
+  `backend` field at materialization**, pinning assignment the same
+  way a declared backend does — the named backend must be available
+  and capable, failing closed on either count. It is no longer
+  restricted to `--dry-run`: with `--dry-run` the question is still
+  whether the blueprint would work *there*, so absence is reported
+  rather than raised. The old `machine.backend-outside-dry-run`
+  guard is deleted.
+
 ### Added
 
 - **`delete-script`, the script removal command.**

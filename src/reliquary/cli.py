@@ -419,12 +419,12 @@ def main(argv=None):
              "nothing is seeded, fetched, locked or written")
     command.add_argument(
         "--backend", default=None,
-        help="with --dry-run, ask whether this blueprint would work "
-             "on the named backend -- its capability decides and it "
-             "need not be installed here. Not simulation: "
-             "--dry-run --backend simulator validates and stops, "
-             "while running simulated means dropping --dry-run and "
-             "keeping the backend")
+        help="override the blueprint's backend: the named backend is "
+             "pinned at assignment and must be available and capable. "
+             "With --dry-run the question is whether the blueprint "
+             "would work *there* — its capability decides and it "
+             "need not be installed here, so absence is reported "
+             "rather than raised")
 
     # start-machine
     command = subcommands.add_parser(

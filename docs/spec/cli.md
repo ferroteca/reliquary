@@ -464,18 +464,15 @@ rather than a judgement about severity:
   section says a real create would ask.
 - **Under `--backend`, absence is reported and not raised** (below).
 
-`--backend <name>` asks whether the blueprint would work on the
-named backend rather than what this host would do — so **its
-capability decides and it need not be installed here**, and its
-absence is reported as a line in the plan. That is the U7 contract
+`--backend <name>` overrides the blueprint's `backend` field,
+pinning assignment at materialization: the named backend must be
+available and capable on this host, failing closed on either count
+the same way a declared `backend` does. With `--dry-run` the
+question is different — whether the blueprint would work *there* —
+so **its capability decides and it need not be installed here**,
+absence being reported rather than raised. That is the U7 contract
 checked statically: capability, not identity, failing closed by
-name. It is legal **only** with `--dry-run`: a machine's backend
-comes from its blueprint, and a flag that changed the assigned
-backend at materialization would put that configuration outside the
-blueprint. Note the combination that is *not* simulation —
-`--dry-run --backend simulator` validates against the simulator's
-capabilities and stops; running simulated means dropping
-`--dry-run` and keeping the backend.
+name.
 
 ```powershell
 $ rlq create-machine --blueprint freedos --dry-run

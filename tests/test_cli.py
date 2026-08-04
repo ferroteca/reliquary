@@ -268,7 +268,11 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual("plain-0", document["plan"]["machine"])
         self.assertIn("report", document)
 
-    def test_backend_needs_dry_run(self):
+    def test_backend_overrides_the_blueprint_field(self):
+        # --backend without --dry-run pins assignment, exactly as a
+        # declared backend does: it must be available and capable.
+        # The stub vmware claims no capability, so it fails
+        # preflight (exit 3) rather than at the static gate (exit 2).
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             result = cli.main([
@@ -276,8 +280,8 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "create-machine", "--blueprint", "plain",
                 "--backend", "vmware",
             ])
-        self.assertEqual(result, 2)
-        self.assertIn("--dry-run", stderr.getvalue())
+        self.assertEqual(result, 3)
+        self.assertIn("vmware", stderr.getvalue())
 
     def test_dry_run_flags_before_command(self):
         stdout = io.StringIO()

@@ -405,13 +405,23 @@ class BackendQuestionTests(_DryCase):
             self._dry(backend="parallels")
         self.assertEqual("machine.backend-unknown", caught.exception.rule_id)
 
-    def test_backend_without_dry_run_is_refused(self):
-        self._write("demo", self._mixed(), [self._livecd(),
-                                            self._remote()])
-        with self.assertRaises(StaticError) as caught:
-            create_machine("demo", context=self.home, backend="vmware")
-        self.assertEqual("machine.backend-outside-dry-run",
-                         caught.exception.rule_id)
+    def test_backend_overrides_the_blueprint_field(self):
+        machine = dict(self._mixed(), backend="qemu")
+        self._write("demo", machine, [self._livecd(), self._remote()])
+        # Without --backend, the blueprint's declared backend wins.
+        self.assertEqual("declared", self._dry().plan["backend-source"])
+        self.assertEqual("qemu", self._dry().plan["backend"])
+        # --backend overrides it, pinning assignment itself.
+        self._install("vmware", available=True,
+                      capabilities=Capabilities(
+                          backend="vmware",
+                          control_planes=("agentless-display",),
+                          media=("floppy", "hdd", "cdrom"),
+                          controllers=("ide",),
+                          materialize=("new", "use")))
+        plan = self._dry(backend="vmware").plan
+        self.assertEqual("vmware", plan["backend"])
+        self.assertEqual("--backend", plan["backend-source"])
 
     def test_without_the_flag_assignment_still_needs_availability(self):
         # The question changes with the flag and not without it: an
