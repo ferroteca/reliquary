@@ -161,8 +161,8 @@ standing:
 They are deliberately not independent designs. The CLI and
 the API are two presentations of one semantic surface: every
 command maps one-to-one onto a public API call with the same
-semantics, and nothing is CLI-only
-([docs/spec/cli.md](docs/spec/cli.md)).
+semantics unless the command manifest names a reasoned CLI-only
+exception ([docs/spec/cli.md](docs/spec/cli.md)).
 Keeping the two in sync is extraordinarily important — a change
 to the surface lands on both in the same change, never deferred —
 and this parity is a required invariant (AGENTS.md; P6). The

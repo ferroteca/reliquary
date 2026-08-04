@@ -662,6 +662,7 @@ class QemuAdapter(BackendAdapter):
             return Availability("qemu", False, detail=str(missing))
         return Availability("qemu", True, version=_qemu_version(executable),
                             executable=executable,
+                            home=os.path.dirname(executable),
                             detail=f"found at {executable}")
 
     def capabilities(self):

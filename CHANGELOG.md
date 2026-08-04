@@ -13,6 +13,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`list-backends`** reports the backends discovered on the host and
+  their installation home directories. It is CLI-only; `--json`
+  returns the same `{backend, home}` records for automation.
+
 - **VirtualBox agentless display and FreeDOS parity** (F52, cut from
   F3 with F50/F51). `keyboardputscancode` input, `screenshotpng`
   capture, live medium change, and `text_screen` via F51's

@@ -509,6 +509,16 @@ in the guest.
 
 ## Command guide
 
+### Installed backends
+
+```text
+rlq list-backends
+```
+
+`list-backends` shows the backends Reliquary discovers on this host and each
+installation's home directory. Add `--json` for an array of `{backend, home}`
+records.
+
 ### Managing machines (blueprint lifecycle)
 
 ```text

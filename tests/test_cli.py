@@ -14,6 +14,7 @@ from unittest import mock
 
 from reliquary import cli
 from reliquary import backends
+from reliquary.backends import Availability
 from tests import fake_backend
 
 class CliEmptyListingTests(unittest.TestCase):
@@ -81,6 +82,30 @@ class CliEmptyListingTests(unittest.TestCase):
             result = cli.main(["--home-dir", self.home, "list-blueprints"])
         self.assertEqual(result, 0)
         self.assertIn("no blueprints", stdout.getvalue())
+
+    def test_list_backends_reports_only_discovered_backends(self):
+        probes = (
+            Availability("qemu", True, executable="/opt/qemu/bin/qemu",
+                         home="/opt/qemu"),
+            Availability("virtualbox", False, detail="not installed"),
+        )
+        with mock.patch.object(backends, "discover", return_value=probes), \
+                contextlib.redirect_stdout(io.StringIO()) as stdout:
+            result = cli.main(["list-backends"])
+        self.assertEqual(result, 0)
+        self.assertIn("qemu", stdout.getvalue())
+        self.assertIn("/opt/qemu", stdout.getvalue())
+        self.assertNotIn("virtualbox", stdout.getvalue())
+
+    def test_list_backends_json_is_the_discovered_records(self):
+        probes = (Availability("qemu", True, home="/opt/qemu"),)
+        with mock.patch.object(backends, "discover", return_value=probes), \
+                contextlib.redirect_stdout(io.StringIO()) as stdout:
+            result = cli.main(["list-backends", "--json"])
+        self.assertEqual(result, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), [
+            {"backend": "qemu", "home": "/opt/qemu"},
+        ])
 
     def test_list_scripts_reports_none_found(self):
         """An empty scripts directory says so, not a bare header."""

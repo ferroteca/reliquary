@@ -560,6 +560,7 @@ class VirtualBoxAdapter(BackendAdapter):
         # closed at create/start with VBoxManage's own message.
         return Availability(
             "virtualbox", True, executable=executable,
+            home=os.path.dirname(executable),
             detail=f"found at {executable}")
 
     def capabilities(self):

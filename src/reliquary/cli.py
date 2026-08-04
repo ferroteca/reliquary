@@ -26,6 +26,7 @@ from .home import (Context, DIRECTORIES, default_home_dir,
 # Context directly.
 from .library import (list_codex, locate_script, seed_blueprint,
                       seed_script)
+from . import backends
 from .errors import (PreflightError, ReliquaryError, StaticError,
                      UNEXPECTED, exit_code)
 from .machines import read_vm_state, split_machine_id
@@ -50,7 +51,7 @@ _COMMANDS = frozenset({
     "delete-blueprint", "delete-script",
     "get-property", "set-property", "unset-property",
     "list-properties", "list-blueprints", "list-codex",
-    "list-machines", "list-scripts", "list-media",
+    "list-backends", "list-machines", "list-scripts", "list-media",
     "clean-media", "prune-media", "add-media",
     "insert-media", "eject-media", "set-boot-order",
     "get-machine-var", "wait-machine-var",
@@ -207,6 +208,12 @@ def _add_home(parser):
         parser.add_argument(
             "--%s-dir" % name, default=None, metavar="PATH",
             dest="%s_dir" % name, help=_DIRECTORY_HELP[name])
+    _add_json(parser)
+    return parser
+
+
+def _add_json(parser):
+    """Add the result-document switch to a command parser."""
     parser.add_argument(
         "--json", action="store_true",
         help="print the command's result as one JSON document")
@@ -613,6 +620,10 @@ def main(argv=None):
 
     # list-*
     command = subcommands.add_parser(
+        "list-backends", help="list discovered backend installations")
+    _add_json(command)
+
+    command = subcommands.add_parser(
         "list-blueprints", help="list your blueprint names")
     _add_home(command)
 
@@ -1000,6 +1011,26 @@ def _print_names(names, empty):
         return
     for name in names:
         print(name)
+
+
+def _list_backends(arguments):
+    """The host's discovered backend installations, and no candidates."""
+    rows = [
+        {"backend": probe.backend, "home": probe.home}
+        for probe in backends.discover()
+        if probe.available
+    ]
+
+    def render():
+        if not rows:
+            print("(no backends discovered)")
+            return
+        width = max([7] + [len(row["backend"]) for row in rows])
+        print(f"{'BACKEND':<{width}}  HOME")
+        for row in rows:
+            print(f"{row['backend']:<{width}}  {row['home']}")
+
+    return _emit(arguments, rows, render)
 
 
 def _list_media(arguments, session):
@@ -1487,6 +1518,8 @@ def _dispatch(arguments, session, context):
         return _unset_property(arguments, session)
     if arguments.command == "list-properties":
         return _list_properties(arguments, session)
+    if arguments.command == "list-backends":
+        return _list_backends(arguments)
     if arguments.command == "list-blueprints":
         return _list_blueprints(arguments, session)
     if arguments.command == "list-codex":

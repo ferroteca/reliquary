@@ -1589,13 +1589,12 @@ non-tty.
 
 `--json` is the global machine-readable switch for result-bearing
 commands — the query half of the feedback split, and the parity
-rule made visible: under `--json` a command prints **exactly what
-its API twin returns**, serialized as one JSON document (object,
-array, or scalar) on stdout — nothing else on stdout, diagnostics
-on stderr, the exit code unchanged. The two presentations cannot
-drift: a twin's return contract *is* the command's `--json`
-contract, defined once where the twin is specified
-([api.md](api.md)).
+rule made visible: under `--json` a command prints **exactly its
+result**, serialized as one JSON document (object, array, or scalar)
+on stdout — nothing else on stdout, diagnostics on stderr, the exit
+code unchanged. For a command with an API twin, the twin's return
+contract is the command's `--json` contract, defined once where the
+twin is specified ([api.md](api.md)).
 
 ```powershell
 $ rlq list-machines --json
@@ -1604,6 +1603,18 @@ $ rlq list-machines --json
 $ rlq create-machine --blueprint freedos --json
 "freedos-1"
 ```
+
+### Discovering backends
+
+```
+rlq list-backends
+```
+
+`list-backends` reports only the backends discovered on this host. Each row
+names the backend and its installation home directory. It is a host-inspection
+command rather than an embedding-API twin: adapter discovery remains an
+internal provider seam, while `--json` returns the same array of `{backend,
+home}` records for programs that need the report.
 
 Rules:
 

@@ -125,11 +125,6 @@ violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
 
-### T11 — Add a `list-backends` command
-
-Expose the discovered backend adapters, including their availability and
-capabilities, through a CLI command.
-
 ### T12 — Clean up list tables
 
 Use one of `rich`, `tabulate`, or `PrettyTable` to render the CLI's list

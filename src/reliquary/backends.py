@@ -56,13 +56,15 @@ class Availability:
     Discovery establishes that a backend *could* be used; it never
     selects one and never changes a machine's recorded backend.
     ``executable`` is what the probe found (a binary path, a service
-    name); ``detail`` says where it was found, or why it was not.
+    name); ``home`` is its installation directory when one is known;
+    ``detail`` says where it was found, or why it was not.
     """
 
     backend: str
     available: bool
     version: Optional[str] = None
     executable: Optional[str] = None
+    home: Optional[str] = None
     detail: str = ""
 
 

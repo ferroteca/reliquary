@@ -127,6 +127,13 @@ reason = """CLI-only by decision (D87): reaching the shipped \
 library is a human act, and nothing programmatic may bind a \
 name the next point release may move (P18)"""
 
+[[exceptions]]
+name = "list-backends"
+missing = "api"
+reason = """CLI-only: backend discovery reports this host's installed \
+tools, while adapters remain an internal provider seam; --json is the \
+programmatic presentation of the host report"""
+
 # The embedding surface that is legitimately not a command:
 # every public name appears in exactly one class, so a new
 # export is classified here or the suite fails.

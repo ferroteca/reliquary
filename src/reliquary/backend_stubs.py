@@ -61,8 +61,10 @@ class _StubAdapter(BackendAdapter):
         return Capabilities(backend=self.name)
 
     def _found(self, executable):
+        home = (executable if os.path.isdir(executable)
+                else os.path.dirname(executable))
         return Availability(
-            self.name, True, executable=executable,
+            self.name, True, executable=executable, home=home,
             detail=f"found at {executable}, but the {self.name} adapter "
                    "is unbuilt (it reports no capabilities, so "
                    "assignment passes over it)")

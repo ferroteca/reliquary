@@ -101,7 +101,8 @@ class FakeAdapter(BackendAdapter):
             return Availability(self.name, False,
                                 detail=f"no {self.name} on this host")
         return Availability(self.name, True, version="fake 1.0",
-                            executable=f"fake-{self.name}",
+                            executable=f"/fake/{self.name}/bin",
+                            home=f"/fake/{self.name}",
                             detail=f"found at fake-{self.name}")
 
     def capabilities(self):
