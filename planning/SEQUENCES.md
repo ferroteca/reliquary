@@ -52,7 +52,7 @@ nothing is ever reissued.
 - **The next S-number to issue is S9** — application surfaces
   (root [ARCHITECTURE.md](../ARCHITECTURE.md), "The application
   surfaces").
-- **The next T-number to issue is T11** — tasks, entering
+- **The next T-number to issue is T13** — tasks, entering
   [TASKS.md](TASKS.md), entry being the pledge (D43). The sequence
   started at **T8** because T0–T7 were spent by an earlier
   per-list numbering that ran three separate times, surviving in
