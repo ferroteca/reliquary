@@ -702,6 +702,26 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         destroy.assert_called_once_with(machine_id)
 
+    def test_destroy_via_positional_machine_id(self):
+        """destroy-machine <id> is a short alias for --machine <id>."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            cli.main([
+                "--home-dir", self.home,
+                "create-machine",
+                "--blueprint", "plain",
+            ])
+        machine_id = stdout.getvalue().split()[-1].strip()
+        with mock.patch(
+                "reliquary.session.Session.destroy_machine") as destroy, \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = cli.main([
+                "--home-dir", self.home,
+                "destroy-machine", machine_id,
+            ])
+        self.assertEqual(result, 0)
+        destroy.assert_called_once_with(machine_id)
+
     def test_destroy_rejects_blueprint_and_machine_together(self):
         """--blueprint and --machine are mutually exclusive."""
         with contextlib.redirect_stdout(io.StringIO()):

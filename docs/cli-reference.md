@@ -163,9 +163,11 @@ ready.
 
 Stop a running machine (a selector is required).
 
-### `rlq destroy-machine (--blueprint NAME | --machine ID)`
+### `rlq destroy-machine [ID] (--blueprint NAME | --machine ID)`
 
-Destroy a machine. Frees the machine number for reuse.
+Destroy a machine. The machine id may be given as a positional argument
+(`rlq destroy-machine freedos-0` is a short alias for
+`rlq destroy-machine --machine freedos-0`). Frees the machine number for reuse.
 
 ### `rlq recreate-machine (--blueprint NAME | --machine ID)`
 

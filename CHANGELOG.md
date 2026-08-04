@@ -39,6 +39,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`destroy-machine` now accepts an optional positional machine id**
+  (`rlq destroy-machine <id>` is a short alias for
+  `rlq destroy-machine --machine <id>`). `--blueprint` and
+  `--machine` still work as before.
+
 - **`--backend` on `create-machine` now overrides the blueprint's
   `backend` field at materialization**, pinning assignment the same
   way a declared backend does — the named backend must be available

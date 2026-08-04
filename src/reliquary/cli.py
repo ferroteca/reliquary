@@ -441,6 +441,9 @@ def main(argv=None):
     command = subcommands.add_parser(
         "destroy-machine", help="delete a stopped machine")
     _add_selectors(command)
+    command.add_argument(
+        "machine_id", nargs="?", default=None,
+        help="machine id for 'destroy-machine <id>' (short for --machine)")
 
     # recreate-machine
     command = subcommands.add_parser(
@@ -1531,7 +1534,11 @@ def _dispatch(arguments, session, context):
         session.stop_machine(machine_id)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "destroy-machine":
-        machine_id = _require_machine_selector(arguments, session)
+        pos_id = getattr(arguments, "machine_id", None)
+        if pos_id:
+            machine_id = session.resolve_machine(machine=pos_id)
+        else:
+            machine_id = _require_machine_selector(arguments, session)
         session.destroy_machine(machine_id)
         return _emit(arguments, {},
                      lambda: _narrate(f"destroyed machine {machine_id}"))
