@@ -32,7 +32,7 @@ pinned record means no later call reads any either.
 """
 
 from . import (binding, blueprint, library, machines, media, properties,
-               resolve, script_runner)
+               resolve, script, script_runner)
 from .errors import StaticError
 from .home import _ctx, _pinned
 
@@ -265,6 +265,17 @@ class Session:
         machines exist."""
         return blueprint.delete_blueprint(name, context=self._context)
 
+    # Script management
+
+    def delete_script(self, name):
+        """Remove the home script file for ``name``. Returns the removed path.
+
+        Fails closed while any blueprint refers to the script.
+        Never deletes package codex files — only a file under
+        ``scripts/``.
+        """
+        return script.delete_script(name, context=self._context)
+
     # Asset resolution.
 
     def load_namespace(self):
@@ -326,7 +337,7 @@ class Session:
             script, parameters=parameters, explicit=explicit,
             context=self._context)
 
-    # The run family.
+    # The script family.
 
     def run_script(self, label, *, blueprint=None, machine=None,
                    display=False, properties=None, progress="auto",

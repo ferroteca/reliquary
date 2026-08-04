@@ -47,7 +47,7 @@ _COMMANDS = frozenset({
     "get-machine-dir",
     "run-script", "fetch-media",
     "seed-blueprint", "seed-script", "new-blueprint",
-    "delete-blueprint",
+    "delete-blueprint", "delete-script",
     "get-property", "set-property", "unset-property",
     "list-properties", "list-blueprints", "list-codex",
     "list-machines", "list-scripts", "list-media",
@@ -563,6 +563,12 @@ def main(argv=None):
         "delete-blueprint", help="delete a home blueprint file")
     _add_home(command)
     command.add_argument("name", help="blueprint name")
+
+    # delete-script
+    command = subcommands.add_parser(
+        "delete-script", help="delete a home script file")
+    _add_home(command)
+    command.add_argument("name", help="script name")
 
     # property family
     command = subcommands.add_parser(
@@ -1129,6 +1135,11 @@ def _delete_blueprint(arguments, session):
     return _emit(arguments, path, lambda: print(path))
 
 
+def _delete_script(arguments, session):
+    path = session.delete_script(arguments.name)
+    return _emit(arguments, path, lambda: print(path))
+
+
 def _property_text(value):
     """Render one property value for a human. Secrets show their kind."""
     return "@secret" if is_secret(value) else value
@@ -1460,6 +1471,8 @@ def _dispatch(arguments, session, context):
         return _new_blueprint(arguments, session)
     if arguments.command == "delete-blueprint":
         return _delete_blueprint(arguments, session)
+    if arguments.command == "delete-script":
+        return _delete_script(arguments, session)
     if arguments.command == "get-property":
         return _get_property(arguments, session)
     if arguments.command == "set-property":

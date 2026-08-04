@@ -220,9 +220,15 @@ are seeded with the blueprint that declares them.
 
 ### `rlq delete-blueprint <name>`
 
-Remove the home blueprint file (``.rlqb`` or legacy ``.json``).
+Remove the home blueprint file (``.rlqb``).
 Refuses while any machine of that blueprint exists, naming their
-ids — destroy them first. Never deletes package builtins.
+ids — destroy them first. Never deletes codex blueprints.
+
+### `rlq delete-script <name>`
+
+Remove the home script file (``.rlqs``).
+Refuses while any blueprint still refers to the script. Never
+deletes codex scripts.
 
 ### `rlq list-scripts [--blueprint NAME]`
 

@@ -39,6 +39,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`delete-script`, the script removal command.**
+  Removes a home script file under ``scripts/`` and
+  fails closed while any blueprint refers to the script,
+  naming each referencing blueprint. Error ids
+  ``script.unknown`` / ``script.has-blueprints`` mirror
+  ``blueprint.unknown`` / ``blueprint.has-machines``.
+
 - **The command manifest.** The package ships
   `schemas/command-manifest.toml`, the normative inventory of the
   command surfaces (P6): every capability declared once, the CLI

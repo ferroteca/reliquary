@@ -1205,6 +1205,22 @@ the one display every listing uses (D97). Searching scripts
 is unbuilt — the codex index it would query is itself planned
 ([codex.md](codex.md)).
 
+### Deleting a script
+
+```
+rlq delete-script <name>
+```
+
+Removes the script's `.rlqs` file. Refuses while any blueprint
+refers to it, listing their names:
+
+```
+$ rlq delete-script freedos-install
+rlq: script 'freedos-install' still has 1 blueprint(s):
+  freedos
+edit them to remove the reference first, then delete the script
+```
+
 ### Running scripts
 
 ```

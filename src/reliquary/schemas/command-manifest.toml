@@ -26,6 +26,7 @@ twins = [
     "clean-media",
     "create-machine",
     "delete-blueprint",
+    "delete-script",
     "describe-drives",
     "destroy-machine",
     "eject-media",
