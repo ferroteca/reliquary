@@ -967,8 +967,14 @@ def _print_table(columns, rows):
 
     Rich measures terminal cells rather than Python characters, and folds
     values that do not fit — including a long description in its own cell.
+    When stdout is not a tty (piped, captured, or under the suite), pin
+    the width at 80 rather than reading the controlling terminal — that
+    size is not the stream we are writing to, and letting it leak made
+    pipe output and unit assertions depend on whoever's window ran them.
     """
-    console = Console(file=sys.stdout, highlight=False)
+    force_width = None if sys.stdout.isatty() else 80
+    console = Console(file=sys.stdout, highlight=False,
+                      width=force_width)
     headings = tuple(columns)
     gutter = 2 * (len(headings) - 1)
     available = max(sum(cell_len(heading) for heading in headings),

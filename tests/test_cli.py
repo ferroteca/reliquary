@@ -568,16 +568,15 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "platform": "dos",
                 "drives": {"hdd": {"size": "20M"}},
             }, handle)
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            result = cli.main([
-                "--home-dir", self.home, "list-blueprints",
-            ])
+        # Assert via --json: the human table may fold a long path across
+        # lines, so a contiguous "nested.rlqb" substring is not promised.
+        result, out = self._json_out(["list-blueprints"])
         self.assertEqual(result, 0)
-        output = stdout.getvalue()
-        self.assertIn("nested", output)
-        self.assertIn("d.rlqb", output)
-        self.assertNotIn("…", output)
+        rows = json.loads(out)
+        paths = {row["path"] for row in rows}
+        self.assertIn(os.path.abspath(nested_path), paths)
+        names = {row["name"] for row in rows}
+        self.assertIn("nested", names)
 
     def test_list_blueprints_ignores_cache_dir(self):
         """A JSON file under cache/ is never reported as a blueprint."""
@@ -1142,7 +1141,10 @@ class CliContextConstructionTests(unittest.TestCase):
                 os.environ[variable] = saved
 
         self.addCleanup(restore)
-        os.environ[variable] = value
+        if value is None:
+            os.environ.pop(variable, None)
+        else:
+            os.environ[variable] = value
 
     def test_the_environment_names_the_home(self):
         self._pin_env("RELIQUARY_HOME", self.home)
@@ -1153,6 +1155,10 @@ class CliContextConstructionTests(unittest.TestCase):
         self.assertIn("(no blueprints)", stdout.getvalue())
 
     def test_the_former_home_variable_is_accepted_as_a_fallback(self):
+        # Clear the documented spelling so this actually exercises the
+        # former name — otherwise a process-level RELIQUARY_HOME would
+        # beat it and the assertion would be about the wrong home.
+        self._pin_env("RELIQUARY_HOME", None)
         self._pin_env("RELIQUARY_HOME_DIR", self.home)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
