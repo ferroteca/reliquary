@@ -13,6 +13,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **JSON5 blueprints** (F53; D102). `.rlqb` documents accept the
+  published JSON5 grammar — comments, trailing commas, unquoted
+  keys, single-quoted strings, hexadecimal and signed numbers, and
+  the rest — instead of the former project-defined JSONC dialect.
+  `NaN`, `Infinity`, and `-Infinity` are refused so parsed values
+  remain ordinary JSON data. Source-positioned diagnostics are
+  retained. Machine-written files stay strict JSON. The reader lives
+  in `json5reader` (Apache-2.0 `json5` package underneath).
+
 - **`list-backends`** reports the backends discovered on the host and
   their installation home directories. It is CLI-only; `--json`
   returns the same `{backend, home}` records for automation.

@@ -144,7 +144,7 @@ automation from depending on content that moves in a point release
 
 Seeding obeys the never-overwrite rule.
 
-Codex blueprints are JSONC
+Codex blueprints are JSON5
 documents (see
 [format stability](../blueprint-guide.md#format-stability-none-yet))
 and use comments deliberately: a codex blueprint annotates its

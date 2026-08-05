@@ -43,7 +43,7 @@ matching to declared rectangles are deferred as additive growth
 (G7). Failure reporting stays per-variant: the nearest miss names
 the closest variant.
 
-**Catalog form.** The declaration is `<name>.rlql`, a JSONC
+**Catalog form.** The declaration is `<name>.rlql`, a JSON5
 authored document — the third authored extension beside
 `.rlqb` / `.rlqs`, resolved under exactly the same
 rules (docs/spec/asset-resolution.md: home mode

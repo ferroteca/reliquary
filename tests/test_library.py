@@ -18,7 +18,7 @@ import unittest
 from unittest import mock
 
 import reliquary
-from reliquary import document, jsonc
+from reliquary import document, json5reader
 from reliquary.errors import PreflightError, StaticError
 from reliquary.library import (codex_blueprint_available, list_codex,
                                list_builtin_blueprints, seed_blueprint,
@@ -173,7 +173,7 @@ class FirstReferenceTest(_HomeTest):
             self.home, "blueprints", f"{BLUEPRINT}{EXT}")
         self.assertTrue(os.path.isfile(blueprint_path))
         with open(blueprint_path, encoding="utf-8") as handle:
-            data = jsonc.load(handle)
+            data = json5reader.load(handle)
         machine = next(spec for spec in data
                        if spec.get("type") == "machine")
         machine["memory"] = 64
@@ -291,6 +291,41 @@ class CodexMediaTests(unittest.TestCase):
             "cf8a5130449f")
 
 
+class CodexParsesTests(unittest.TestCase):
+    """Every shipped codex artifact parses, or the suite fails.
+
+    The codex is the worked example users seed and copy from. A
+    blueprint or script that does not parse is a defect the default
+    suite must catch — not something left to an opt-in integration
+    run or a single named reference script.
+    """
+
+    @staticmethod
+    def _codex_root():
+        return os.path.join(os.path.dirname(reliquary.__file__), "codex")
+
+    @classmethod
+    def _files(cls, kind, extension):
+        root = os.path.join(cls._codex_root(), kind)
+        return sorted(
+            os.path.join(root, name) for name in os.listdir(root)
+            if name.endswith(extension))
+
+    def test_every_codex_blueprint_parses(self):
+        paths = self._files("blueprints", EXT)
+        self.assertTrue(paths, "no codex blueprints shipped")
+        for path in paths:
+            with self.subTest(blueprint=os.path.basename(path)):
+                document.load_document(path)
+
+    def test_every_codex_script_parses(self):
+        paths = self._files("scripts", ".rlqs")
+        self.assertTrue(paths, "no codex scripts shipped")
+        for path in paths:
+            with self.subTest(script=os.path.basename(path)):
+                load_script(path)
+
+
 class CodexIndexTests(_HomeTest):
     """The shipped codex against its own index.
 
@@ -308,7 +343,7 @@ class CodexIndexTests(_HomeTest):
     def _index(cls):
         with open(os.path.join(cls._codex_root(), "codex.json"),
                   encoding="utf-8") as handle:
-            return jsonc.loads(handle.read())
+            return json5reader.loads(handle.read())
 
     def test_every_codex_blueprint_is_indexed(self):
         # The reverse of test_builtin_blueprint_index_names_existing_files:

@@ -43,7 +43,9 @@ workflow:
   name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API assigns no
   directory, so it fails closed rather than reading a home or CWD, and an `ObjectSource` of
   JSON-imported objects is the planned third
-  source, `document.py` is the `.rlqb` parser (normative spec: `docs/spec/blueprint-model.md`) —
+  source, `json5reader.py` is the JSON5 document reader (D102 — the published
+  grammar, `NaN`/infinities refused so values stay ordinary JSON, source
+  positions on request), `document.py` is the `.rlqb` parser (normative spec: `docs/spec/blueprint-model.md`) —
   `parse_document` / `load_document` build a `Document` of `machines` / `media` from a root array of specs (a lone
   spec object is sugar for the array of one; `type` defaults to `media`, so an untyped object is a media and the
   media branch's unknown-field error carries a did-you-mean when machine vocabulary appears), dataclasses `Machine`,

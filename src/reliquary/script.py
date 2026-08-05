@@ -15,7 +15,7 @@ def delete_script(name, *, context=None):
     Never deletes package codex files — only a file under
     ``scripts/``. Returns the removed path.
     """
-    from . import assets, jsonc, library
+    from . import assets, json5reader, library
     from .errors import ReliquaryError
     from .home import scripts_dir
 
@@ -25,7 +25,7 @@ def delete_script(name, *, context=None):
     for path in source.candidate_files("blueprint"):
         try:
             with open(path, encoding="utf-8") as handle:
-                data = jsonc.loads(handle.read())
+                data = json5reader.loads(handle.read())
         except (OSError, ReliquaryError):
             continue
 

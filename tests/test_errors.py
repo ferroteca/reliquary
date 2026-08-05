@@ -296,10 +296,10 @@ class EveryDiagnosticNamesItsRuleTests(unittest.TestCase):
     #: capability refusal the user sees — `ImageLocked` is its
     #: contention subclass, restated there as ``image.locked``.
     #: `_Unreadable` is the same
-    #: idiom in the JSONC position scanner:
+    #: idiom in the JSON5 position scanner:
     #: it means "stop recording positions here", is caught by the scan
     #: that started it, and reports to nobody — the document itself has
-    #: already been judged by `json.loads`. A bare `NotImplementedError`
+    #: already been judged by `json5.loads`. A bare `NotImplementedError`
     #: is the abstract-method idiom, an invariant the language enforces
     #: rather than a report to anyone.
     EXEMPT = {"InternalError", "RunCancelled", "_PropertyUnbound",

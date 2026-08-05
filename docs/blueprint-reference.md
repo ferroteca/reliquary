@@ -22,7 +22,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > `platform`, `backend`, `memory`, `cpus`, `drives` (a media name,
 > `null`, or an object with `controller`/`enabled`/`media`), `boot`,
 > `name`, `description`, `scripts`, `control-planes`,
-> `backend-settings`, and `parameters` — with JSONC acceptance and
+> `backend-settings`, and `parameters` — with JSON5 acceptance and
 > media-name resolution. Machine materialization realizes each drive's
 > media per its `materialize` mode (`new`/`difference`/`copy`/`use`),
 > resolves defaults into the state, and records the provenance fields
@@ -54,9 +54,9 @@ All fields are present in the state unless noted otherwise.
 
 There is no version field — see
 [Format stability](blueprint-guide.md#format-stability-none-yet).
-Blueprints accept comments and trailing commas — the JSONC
-dialect — per the same section; the state is strict canonical
-JSON, always.
+Blueprints accept the published JSON5 grammar — comments, trailing
+commas, unquoted keys, and the rest — per the same section; the
+state is strict canonical JSON, always.
 
 The machine-checkable companion is the one published
 [blueprint-schema-v1.json](../src/reliquary/schemas/blueprint-schema-v1.json)

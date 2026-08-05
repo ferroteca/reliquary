@@ -328,7 +328,7 @@ class RetiredMediaDefinitionTests(unittest.TestCase):
         """
         import warnings
 
-        from reliquary import document, jsonc
+        from reliquary import document, json5reader
 
         skip_dirs = {".venv", ".git", "__pycache__", "build", "dist"}
         stale = []
@@ -341,7 +341,7 @@ class RetiredMediaDefinitionTests(unittest.TestCase):
                     continue
                 path = os.path.join(dirpath, name)
                 with open(path, encoding="utf-8") as handle:
-                    raw = jsonc.load(handle)
+                    raw = json5reader.load(handle)
                 if isinstance(raw, dict) and (
                         {"machines", "sources", "archives"} & set(raw)):
                     stale.append(os.path.relpath(path, _REPO_ROOT))

@@ -25,8 +25,15 @@ classifiers = [
     "Topic :: System :: Emulators",
     "Topic :: System :: Installation/Setup",
 ]
-dependencies = ["keyring", "lark", "pillow", "qemu.qmp", "rich",
-                "remanence==0.0.1a2"]
+dependencies = [
+    "json5>=0.15.0",
+    "keyring",
+    "lark",
+    "pillow",
+    "qemu.qmp",
+    "remanence==0.0.1a2",
+    "rich",
+]
 
 [project.urls]
 Homepage = "https://github.com/ferroteca/reliquary"

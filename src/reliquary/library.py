@@ -22,7 +22,7 @@ import os
 import re
 from importlib import resources
 
-from . import assets, document, jsonc
+from . import assets, document, json5reader
 from .errors import PreflightError, StaticError
 from .home import blueprints_dir, scripts_dir
 
@@ -81,7 +81,7 @@ def _referenced_scripts(blueprint_data):
 def list_builtin_blueprints():
     """Yield the stem names of blueprints shipped in the built-in library."""
     try:
-        data = jsonc.loads((_builtins_root() / "codex.json").read_text(encoding="utf-8"))
+        data = json5reader.loads((_builtins_root() / "codex.json").read_text(encoding="utf-8"))
         blueprints = data.get("blueprints", {})
         for name in sorted(blueprints.keys()):
             yield name
@@ -111,7 +111,7 @@ def _blueprint_meta(path):
     """
     try:
         with open(path, encoding="utf-8") as handle:
-            raw = jsonc.loads(handle.read())
+            raw = json5reader.loads(handle.read())
     except (OSError, StaticError, UnicodeDecodeError):
         raw = None
     machine = next(_machine_objects(raw), None)
@@ -281,7 +281,7 @@ def seed_blueprint(name, context=None, *, only=False):
     # Pre-read to catch referenced media/scripts
     try:
         text = source.read_text(encoding="utf-8")
-        data = jsonc.loads(text)
+        data = json5reader.loads(text)
     except (StaticError, UnicodeDecodeError):
         # A malformed builtin still copies out; loading it reports
         # the real parse error against the user's file.

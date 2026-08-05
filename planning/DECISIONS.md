@@ -107,11 +107,10 @@ what gates nothing in particular.
   and a variant/matrix expansion are the candidates on record —
   while general computation never enters the JSON tree. It would
   arrive only as a layer producing plain blueprints: generation
-  above via the embedding API, or a JSON-superset evaluation
-  layer (Jsonnet the leading candidate — JSONC is already valid
-  Jsonnet). In-tree function objects and string templating are
-  permanently rejected. What stays open is only which constructs,
-  and when one earns its keep.
+  above via the embedding API, or a separately specified evaluation
+  layer (Jsonnet the leading candidate). In-tree function objects
+  and string templating are permanently rejected. What stays open
+  is only which constructs, and when one earns its keep.
 - **Per-drive backend settings**: whether they are ever needed
   beyond the top-level `backend-settings` scope. Sharpened by D92,
   which made that top-level scope real: adapters honor it now, so

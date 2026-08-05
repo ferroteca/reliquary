@@ -73,7 +73,7 @@ keeps the snapshot it was created from. To adopt blueprint edits, destroy the ma
 Here is a whole blueprint — an MS-DOS-era box with 1 MB of memory
 and one floppy drive, saved as `blueprints/msdos.rlqb`:
 
-```jsonc
+```json5
 [
   {
     "type": "machine",
@@ -115,7 +115,7 @@ A different design is a different blueprint. This one has sixteen
 times the memory and a CD-ROM, so it is `blueprints/dos-cd.rlqb`
 rather than a variant of the first:
 
-```jsonc
+```json5
 [
   {
     "type": "machine",

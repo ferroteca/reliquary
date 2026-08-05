@@ -674,7 +674,7 @@ as v1, additively where it can. The prose reference remains
 normative, and schema validity never implies blueprint validity:
 media-name resolution, cross-document rules, and every capability
 check live beyond the schema. The schema validates the parsed
-document, so JSONC comments and trailing commas are invisible to
+document, so JSON5 comments and other syntax extensions are invisible to
 it; editors bind it to `.rlqb` by file association.
 
 ## Platform defaults
@@ -691,12 +691,12 @@ the resolved values appear in the state:
 
 ## Format stability
 
-The format's stability posture, its JSONC dialect, the closed
+The format's stability posture, its JSON5 grammar, the closed
 `${…}` reference grammar, and the growth rule are **norm
 material** and live with the norm:
 [blueprint-model.md](spec/blueprint-model.md) "Format
 stability". The short version: no backward compatibility before
-1.0 (P9), no version or `$schema` field, JSONC comments for
+1.0 (P9), no version or `$schema` field, JSON5 for
 authors and strict JSON from Reliquary, values may be enriched
 but computation never enters the tree, and the reference body is
 closed against operators.

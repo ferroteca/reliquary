@@ -24,7 +24,7 @@ import warnings
 from dataclasses import dataclass, field, replace
 from typing import Mapping, Optional, Tuple, Union
 
-from . import jsonc
+from . import json5reader
 from .errors import PreflightError, StaticError
 
 _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
@@ -162,7 +162,7 @@ class Where:
         if text is None:
             text = f"{self.text}[{key}]" if isinstance(key, int) \
                 else f"{self.text}.{key}"
-        return Where(text, jsonc.position_of(container, key) or self.position)
+        return Where(text, json5reader.position_of(container, key) or self.position)
 
     def error(self, message, *, rule_id=None):
         """The located diagnostic for this field."""
@@ -172,7 +172,7 @@ class Where:
 
 def _rooted(value, text):
     """The root breadcrumb for a document or spec, positioned at it."""
-    return Where(text, jsonc.position(value))
+    return Where(text, json5reader.position(value))
 
 
 # The unlocated defaults, for a caller that names no field: reaching one
@@ -1339,7 +1339,7 @@ def load_document(path):
             rule_id="blueprint.unknown")
     with open(path, "r", encoding="utf-8") as handle:
         text = handle.read()
-    value = jsonc.loads(text, positions=True)
+    value = json5reader.loads(text, positions=True)
     try:
         parsed = parse_document(value)
     except BlueprintError as error:

@@ -1,9 +1,16 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""JSON with Comments (JSONC) reader.
+"""JSON5 document reader.
 
-Implements RFC 8259 + // and /* */ comments + trailing commas.
-Comments are replaced by spaces to preserve line and column numbers.
+Parses the published JSON5 grammar (https://spec.json5.org) so an
+authored blueprint has one external contract rather than a
+project-defined dialect (D102). Comments are blanked to spaces of
+the same length before the parse and the position scan, which keeps
+line and column numbers exact.
+
+**Non-finite numbers are refused.** JSON5 admits ``NaN``,
+``Infinity`` and ``-Infinity``; Reliquary does not — blueprint
+values remain ordinary JSON data after parsing.
 
 **Positions are recorded on request** (``positions=True``), which is
 what lets a blueprint diagnostic cite a line and column rather than a
@@ -11,18 +18,19 @@ field breadcrumb alone. They are off by default: a caller that only
 wants values pays nothing, and the containers it gets back are the
 plain ones.
 
-The recording is a *second pass* over the same text rather than a
-replacement parser. ``json.loads`` stays the one authority on what a
-document means -- numbers, escapes, duplicate keys and the decode
-failure's own message and position -- and the scan below reads only
-the structure, which is all a position needs. Where the two disagree
+The recording is a *second pass* over the same blanked text rather
+than a replacement parser. ``json5.loads`` stays the one authority
+on what a document means, and the scan below reads only the
+structure, which is all a position needs. Where the two disagree
 about shape the positions are dropped for that subtree rather than
 guessed at: an unlocated diagnostic is what this module produced
 before, and a *misplaced* caret is worse than none.
 """
 
-import json
+import math
 import re
+
+import json5
 
 from .errors import StaticError
 
@@ -31,6 +39,22 @@ from .errors import StaticError
 # scan never interprets a scalar, so anything that is not a container,
 # a string or a delimiter is one token to step over.
 _SCALAR_END = set(",]} \t\r\n")
+
+# json5's ValueError message carries line and column in prose rather
+# than as attributes: "<string>:12 Unexpected ... at column 34".
+_ERROR_AT = re.compile(
+    r":(\d+)\s+(.*?)\s+at column\s+(\d+)\s*$")
+
+# ECMAScript IdentifierName, approximated for the position scan: a
+# start character, then continue characters. The scan never decides
+# meaning — json5.loads already did — so an exotic Unicode key that
+# this misses costs positions on that subtree, never a wrong value.
+_IDENT_START = re.compile(r"[$_A-Za-z]")
+_IDENT_CONTINUE = re.compile(r"[$_A-Za-z0-9]")
+
+# One rule id for every refusal this module raises: the document is
+# not legal JSON5 under Reliquary's value-model constraint (D102).
+_RULE = "blueprint.json5"
 
 
 class PositionedDict(dict):
@@ -89,79 +113,44 @@ def position(node):
 
 
 def loads(s, *, positions=False):
-    """Load JSONC string.
+    """Load a JSON5 string.
 
     A document that does not parse is a STATIC ERROR: the text alone
-    settles it, and the caller wrote the text. ``JSONDecodeError``
-    would otherwise escape as a bare ``ValueError`` and report as
-    reliquary's own fault (exit 1) rather than the author's mistake.
-    Its message carries the line and column, so it is kept verbatim.
+    settles it, and the caller wrote the text. ``ValueError`` from
+    the JSON5 reader would otherwise escape as a bare exception and
+    report as reliquary's own fault (exit 1) rather than the author's
+    mistake. Its message carries the line and column, so it is kept
+    verbatim when present.
 
     With ``positions``, objects and arrays come back as
     :class:`PositionedDict` and :class:`PositionedList`, each carrying
     the source position of its members.
     """
-    # 1. Replace comments with spaces of the same length
-    # This keeps line/column numbers exact for the JSON parser if it reports them.
-    # Note: we must be careful not to replace comments inside strings.
-
-    # Regex for JSON strings, // comments, and /* */ comments
-    # Strings: " ( [^"\\] | \\. )* "
-    # // comments: // [^\n]*
-    # /* */ comments: /\* .*? \*/
-    pattern = re.compile(
-        r'("(?:[^"\\]|\\.)*")|'      # Group 1: Strings
-        r'(//[^\n]*)|'               # Group 2: // comments
-        r'(/\*.*?\*/)',              # Group 3: /* */ comments
-        re.DOTALL
-    )
-
-    def replace(match):
-        if match.group(1):
-            return match.group(1) # Keep strings as is
-        return ''.join(
-            '\n' if char == '\n' else ' '
-            for char in match.group(0))
-
-    s = pattern.sub(replace, s)
-
-    # 2. Remove trailing commas
-    # [1, 2,] -> [1, 2]
-    # {"a": 1,} -> {"a": 1}
-    # We look for a comma followed by whitespace and then ] or }
-    # Again, avoiding commas inside strings.
-
-    # This is a bit trickier with regex alone to be 100% correct regarding strings,
-    # but since we already know where the strings are from the previous pass,
-    # we can do it safely.
-
-    # Re-using the pattern to find strings and trailing commas
-    trailing_comma_pattern = re.compile(
-        r'("(?:[^"\\]|\\.)*")|'      # Group 1: Strings
-        r'(,\s*([\]\}]))'            # Group 2: Trailing comma, Group 3: closing char
-    )
-
-    def replace_comma(match):
-        if match.group(1):
-            return match.group(1)
-        else:
-            return ' ' + match.group(3) # Replace comma with space, keep closing char
-
-    s = trailing_comma_pattern.sub(replace_comma, s)
+    # Replace comments with spaces of the same length so line/column
+    # numbers stay exact for both the JSON5 parse and the position
+    # scan. Strings — double- and single-quoted — are left alone so a
+    # "//" inside one is not mistaken for a comment.
+    s = _blank_comments(s)
 
     try:
-        value = json.loads(s)
-    except json.JSONDecodeError as error:
-        failure = StaticError(str(error))
-        # Comment stripping preserves line and column on purpose, so
-        # the position survives the class change rather than being
-        # readable only out of the message. A properly located
-        # blueprint diagnostic -- line, column and a rule id, as
-        # ScriptParseError already carries -- is document.py's, built
-        # on the positions this module records below (D70).
-        failure.lineno = error.lineno
-        failure.colno = error.colno
+        value = json5.loads(s, parse_constant=_refuse_nonfinite)
+    except StaticError:
+        raise
+    except ValueError as error:
+        match = _ERROR_AT.search(str(error))
+        if match:
+            lineno = int(match.group(1))
+            colno = int(match.group(3))
+            detail = match.group(2)
+            failure = StaticError(
+                f"line {lineno} column {colno}: {detail}",
+                rule_id=_RULE)
+            failure.lineno = lineno
+            failure.colno = colno
+        else:
+            failure = StaticError(str(error), rule_id=_RULE)
         raise failure from error
+    _reject_nonfinite(value)
     if not positions:
         return value
     # Both passes ran over the same blanked text, so the scan's offsets
@@ -170,8 +159,56 @@ def loads(s, *, positions=False):
 
 
 def load(fp, *, positions=False):
-    """Load JSONC from a file-like object."""
+    """Load JSON5 from a file-like object."""
     return loads(fp.read(), positions=positions)
+
+
+def _refuse_nonfinite(token):
+    """``parse_constant`` hook: JSON5's non-finite tokens are refused."""
+    raise StaticError(
+        f"non-finite number {token} is not allowed "
+        f"(blueprint values must be ordinary JSON data)",
+        rule_id=_RULE)
+
+
+def _reject_nonfinite(value):
+    """Refuse any non-finite float that reached the value tree.
+
+    ``parse_constant`` catches the JSON5 spellings; this walk is the
+    belt for anything that arrived some other way (a custom hook, a
+    future library change) so the invariant stays fail-closed.
+    """
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        raise StaticError(
+            "non-finite number is not allowed "
+            "(blueprint values must be ordinary JSON data)",
+            rule_id=_RULE)
+    if isinstance(value, dict):
+        for member in value.values():
+            _reject_nonfinite(member)
+    elif isinstance(value, list):
+        for member in value:
+            _reject_nonfinite(member)
+
+
+def _blank_comments(text):
+    """Replace ``//`` and ``/* */`` comments with same-length spaces."""
+    pattern = re.compile(
+        r'("(?:[^"\\]|\\.)*")|'      # Group 1: double-quoted strings
+        r"('(?:[^'\\]|\\.)*')|"      # Group 2: single-quoted strings
+        r'(//[^\n]*)|'               # Group 3: // comments
+        r'(/\*.*?\*/)',              # Group 4: /* */ comments
+        re.DOTALL
+    )
+
+    def replace(match):
+        if match.group(1) is not None or match.group(2) is not None:
+            return match.group(0)
+        return ''.join(
+            '\n' if char == '\n' else ' '
+            for char in match.group(0))
+
+    return pattern.sub(replace, text)
 
 
 class _Node:
@@ -196,11 +233,12 @@ class _Scanner:
 
     It reads the shape and nothing else: strings are skipped
     escape-aware so a brace inside one cannot be mistaken for
-    structure, and every other scalar is skipped as an opaque run up to
-    the next delimiter. Malformed text is not this pass's business --
-    ``json.loads`` has already accepted the document by the time it
-    runs -- so it stops at the first thing it cannot read and reports
-    the positions it did find.
+    structure, unquoted keys are read as identifier runs, and every
+    other scalar is skipped as an opaque run up to the next delimiter.
+    Malformed text is not this pass's business -- ``json5.loads`` has
+    already accepted the document by the time it runs -- so it stops
+    at the first thing it cannot read and reports the positions it did
+    find.
     """
 
     def __init__(self, text):
@@ -251,7 +289,7 @@ class _Scanner:
         if char == "[":
             return self._array()
         node = _Node(self._here())
-        if char == '"':
+        if char in "\"'":
             self._string()
         else:
             self._scalar()
@@ -268,16 +306,16 @@ class _Scanner:
             return node
         while True:
             self._space()
-            if self._peek() != '"':    # a trailing comma, blanked to space
+            if self._peek() == "}":        # a trailing comma, blanked
                 break
             key_at = self._here()
-            key = self._string()
+            key = self._key()
             self._space()
             if self._peek() != ":":
                 raise _Unreadable()
             self._step()
             self._space()
-            # Last wins, as json.loads does with a repeated key.
+            # Last wins, as json5.loads does with a repeated key.
             node.members[key] = self._value()
             node.keys[key] = key_at
             self._space()
@@ -301,7 +339,7 @@ class _Scanner:
         index = 0
         while True:
             self._space()
-            if self._peek() == "]":    # a trailing comma, blanked to space
+            if self._peek() == "]":        # a trailing comma, blanked
                 break
             node.members[index] = self._value()
             index += 1
@@ -315,21 +353,43 @@ class _Scanner:
         self._step()
         return node
 
+    def _key(self):
+        """Step over a member key, returning its decoded name."""
+        char = self._peek()
+        if char in "\"'":
+            return self._string()
+        return self._identifier()
+
+    def _identifier(self):
+        """Step over an unquoted IdentifierName key."""
+        start = self.index
+        if not _IDENT_START.match(self._peek()):
+            raise _Unreadable()
+        self._step()
+        while (self.index < len(self.text)
+               and _IDENT_CONTINUE.match(self.text[self.index])):
+            self._step()
+        return self.text[start:self.index]
+
     def _string(self):
         """Step over a string literal, returning its decoded text."""
+        quote = self._peek()
         start = self.index
         self._step()                       # past the opening quote
         while True:
             char = self._peek()
             if char == "\\":
+                # JSON5 allows a line continuation: backslash + newline
+                # is one escape, so step both. Any other escape is two
+                # characters the same way.
                 self._step(2)
                 continue
             self._step()
-            if char == '"':
+            if char == quote:
                 break
-        # json decodes the escapes, so a key with one still matches the
-        # key json.loads produced.
-        return json.loads(self.text[start:self.index])
+        # json5 decodes the escapes, so a key with one still matches
+        # the key json5.loads produced. Use it on the slice alone.
+        return json5.loads(self.text[start:self.index])
 
     def _scalar(self):
         """Step over a number or one of the three literals."""

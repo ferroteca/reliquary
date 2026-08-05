@@ -23,7 +23,7 @@ from importlib import resources
 
 import jsonschema
 
-from reliquary import document, jsonc, script_parser
+from reliquary import document, json5reader, script_parser
 from reliquary.errors import StaticError
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,7 +53,9 @@ _ELISION = ("…", "...")
 _STATE_FIELDS = {"id", "phase", "blueprint-digest", "blueprint-source",
                  "backend-id", "created"}
 
-_FENCE = re.compile(r"```jsonc?\n(.*?)```", re.S)
+# Blueprint fences are JSON5; ``json`` / legacy ``jsonc`` tags remain
+# accepted so older prose still runs through the same gate.
+_FENCE = re.compile(r"```(?:json5|jsonc?)\n(.*?)```", re.S)
 
 
 def _blocks(path):
@@ -64,7 +66,7 @@ def _blocks(path):
         text = handle.read()
     for index, block in enumerate(_FENCE.findall(text)):
         try:
-            value = jsonc.loads(block)
+            value = json5reader.loads(block)
         except StaticError:
             # Prose fences carrying an elided fragment (…) are
             # illustrations, not documents.

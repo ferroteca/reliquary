@@ -40,7 +40,7 @@ parse harness, and the published schema cannot judge it at all.
 Every fixture opens with comment lines naming what it exercises and
 where the rule lives:
 
-```jsonc
+```json5
 // invalid: P14's acceptance test: this passes the character class and
 //          is refused by the production - mem is not a qualifier
 // spec: The closure

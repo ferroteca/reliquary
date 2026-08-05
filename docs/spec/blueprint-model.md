@@ -40,7 +40,7 @@ for the growth rule; this document states the grammar it closes.
 
 A `.rlqb` root is an **array of specs**:
 
-```jsonc
+```json5
 [
   { "type": "machine", "name": "freedos", "platform": "dos", … },
   { "type": "media", "name": "freedos-livecd", … }
@@ -50,7 +50,7 @@ A `.rlqb` root is an **array of specs**:
 A **lone spec object** is accepted as pure sugar for the array
 of one, under exactly the same rules:
 
-```jsonc
+```json5
 { "type": "machine", "name": "freedos", "platform": "dos", … }
 ```
 
@@ -72,9 +72,12 @@ It is invalid where the location kind demands a pin: a bare URL
 string fails closed naming the object form, since a remote
 payload needs a `sha256` it has nowhere to put.
 
-JSONC is accepted: RFC 8259 plus `//`, `/* */`, and trailing
-commas — nothing more. Every machine-written file stays strict
-JSON. There is no `$schema` or version field pre-1.0.
+JSON5 is accepted ([spec.json5.org](https://spec.json5.org)):
+comments, trailing commas, unquoted keys, single-quoted strings,
+hexadecimal and signed numbers, and the rest of that grammar.
+`NaN`, `Infinity`, and `-Infinity` are refused — parsed blueprint
+values remain ordinary JSON data. Every machine-written file stays
+strict JSON. There is no `$schema` or version field pre-1.0.
 
 ## Spec types
 
@@ -377,7 +380,7 @@ location. Because the identity rules are position-independent,
 a spec written as a child and the same spec written standalone
 are the same spec.
 
-```jsonc
+```json5
 [
   { "type": "media", "name": "freedos-livecd-zip",
     "location": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
@@ -391,7 +394,7 @@ are the same spec.
 
 The same graph, written from the child side:
 
-```jsonc
+```json5
 [
   { "type": "media", "name": "freedos-livecd-zip",
     "location": "https://download.freedos.org/1.4/FD14-LiveCD.zip",
@@ -746,7 +749,7 @@ here because the model depends on it.
 
 ### 1 — a nested container, children itemized
 
-```jsonc
+```json5
 [
   { "type": "media", "name": "PaulsFreedos",
     "location": ["https://paul.com/PaulsFreedos.zip",
@@ -783,7 +786,7 @@ codex's own entries are generic (D21).
 
 ### 2 — an overlay over another media
 
-```jsonc
+```json5
 [
   { "type": "media", "name": "golden", "location": "C:/images/golden.qcow2" },
   { "type": "media", "name": "scratch", "materialize": "difference",
@@ -805,7 +808,7 @@ the licensed, non-redistributable case (U4). Resolution fails
 closed naming the media, and there are two ways to supply it —
 neither of which edits the shipped spec's identity.
 
-```jsonc
+```json5
 // shipped: pinned, located by property
 [
   { "type": "media", "name": "windows-install-cd", "read-only": true,
@@ -853,23 +856,23 @@ Reliquary rejects). When versioning arrives, no earlier than 1.0,
 the version field (planning/DECISIONS.md "Open questions" (was "Decisions still
 needed").
 
-The blueprint's value grammar is JSON, and JSON only — there is
-no YAML form, and none is planned. Because a blueprint is a
-document you author and Reliquary only ever reads (`import` and
-`init` write one once, then never again), the file accepts the
-JSONC dialect: JSON (RFC 8259) plus `//` and `/* */` comments
-and trailing commas in arrays and objects — the dialect editors
-already apply to files like `tsconfig.json`, and nothing more
-(no unquoted keys, no single-quoted strings, no other JSON5
-extensions). Comments are the author's margin notes — a seeded
-built-in blueprint uses them to point out its customization
-seams (U5) — and carry no meaning: Reliquary never reads them,
-and nothing normative may live in one; anything the contract
-needs is a field. A blueprint without comments remains valid
-strict JSON; one with them is not parseable by strict JSON
-tooling — a deliberate trade. Machine-written documents are
-different: the state — and every other file Reliquary writes —
-is strict canonical JSON, always.
+The blueprint's value model is ordinary JSON data — there is no
+YAML form, and none is planned. Because a blueprint is a document
+you author and Reliquary only ever reads (`import` and `init`
+write one once, then never again), the file accepts the published
+**JSON5** grammar ([spec.json5.org](https://spec.json5.org); D102):
+comments, trailing commas, unquoted keys, single-quoted strings,
+hexadecimal and signed numbers, and the other JSON5 productions.
+`NaN`, `Infinity`, and `-Infinity` are refused so the parsed
+value tree stays ordinary JSON. Comments are the author's margin
+notes — a seeded built-in blueprint uses them to point out its
+customization seams (U5) — and carry no meaning: Reliquary never
+reads them, and nothing normative may live in one; anything the
+contract needs is a field. A blueprint written as strict JSON
+remains valid JSON5; one that uses JSON5 syntax is not parseable
+by strict JSON tooling — a deliberate trade. Machine-written
+documents are different: the state — and every other file
+Reliquary writes — is strict canonical JSON, always.
 
 The format's growth rule is likewise decided ahead of the
 growth (planning/DECISIONS.md, 2026-07-23). Computational

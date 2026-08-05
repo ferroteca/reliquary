@@ -1,0 +1,15 @@
+// valid: JSON5 is accepted: comments, trailing commas, unquoted keys,
+//          single-quoted strings, hexadecimal and signed numbers
+// spec: The file
+[
+  // a machine, with JSON5 syntax throughout
+  {
+    type: 'machine',
+    name: 'rig',
+    platform: 'dos',
+    cpus: +1,
+    memory: 0x10,
+    /* the empty removable slot a script fills */
+    drives: { cdrom0: null, },
+  },
+]

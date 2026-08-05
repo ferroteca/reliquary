@@ -11,7 +11,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > parent/children containment, unknown-key rejection, catalog
 > resolution with identity dedup and collision detection,
 > hash-verified fetch and extraction with the mismatched-file
-> contract, JSONC acceptance, and the media command family.
+> contract, JSON5 acceptance, and the media command family.
 >
 > **This document covers acquisition** — where a payload comes from
 > in practice, how it is verified, and how the cache behaves. The

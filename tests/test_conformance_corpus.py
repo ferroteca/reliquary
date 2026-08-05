@@ -32,7 +32,7 @@ from importlib import resources
 
 import jsonschema
 
-from reliquary import document, jsonc
+from reliquary import document, json5reader
 from reliquary.errors import StaticError
 
 _HERE = os.path.dirname(__file__)
@@ -47,7 +47,7 @@ def _fixtures(bucket):
 
 def _load(path):
     with open(path, encoding="utf-8") as handle:
-        return jsonc.load(handle)
+        return json5reader.load(handle)
 
 
 def _header(path):
@@ -245,7 +245,7 @@ class SpecifiedPhaseTests(unittest.TestCase):
 
     @staticmethod
     def _schema_enum():
-        schema = jsonc.loads(
+        schema = json5reader.loads(
             (resources.files("reliquary") / "schemas"
              / "machine-state.schema.json").read_text(encoding="utf-8"))
         return set(schema["properties"]["phase"]["enum"])
@@ -270,7 +270,7 @@ class MachineStateSchemaTests(unittest.TestCase):
         from reliquary import Context
         from reliquary.machines import create_machine, load_machine_state
         from tests import fake_backend
-        schema = jsonc.loads(
+        schema = json5reader.loads(
             (resources.files("reliquary") / "schemas"
              / "machine-state.schema.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as tmp:

@@ -46,7 +46,7 @@ def _pin_virtualbox(home):
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
     # Strip // comments the JSON parser will not accept after we
-    # round-trip; the seeded file is JSONC. Parse via a light pass:
+    # round-trip; the seeded file is JSON5. Parse via a light pass:
     # the document is a JSON array with // line comments.
     lines = []
     for line in text.splitlines():
