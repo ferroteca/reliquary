@@ -124,8 +124,3 @@ is mechanical, a defect needs no pledge because the norm it
 violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
-
-### T12 — Clean up list tables
-
-Use one of `rich`, `tabulate`, or `PrettyTable` to render the CLI's list
-tables consistently.

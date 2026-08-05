@@ -9,8 +9,12 @@ import importlib.metadata
 import json
 import os
 import sys
-import textwrap
 import traceback
+
+from rich import box
+from rich.cells import cell_len
+from rich.console import Console
+from rich.table import Table
 
 try:
     _version = importlib.metadata.version("reliquary")
@@ -29,7 +33,7 @@ from .library import (list_codex, locate_script, seed_blueprint,
 from . import backends
 from .errors import (PreflightError, ReliquaryError, StaticError,
                      UNEXPECTED, exit_code)
-from .machines import read_vm_state, split_machine_id
+from .machines import read_vm_state
 from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
 from .properties import is_secret
@@ -952,21 +956,52 @@ def _script(arguments, session):
     return 0
 
 
-#: The display D97 settled: a description is **never a column**. It
-#: prints beneath its entry, indented clear of the names and wrapped
-#: to a fixed width, and an entry without one contributes no line.
-_DESCRIPTION_INDENT = "  "
-_DESCRIPTION_WIDTH = 72
+def _table_box(encoding):
+    """Choose borders the console's declared encoding can represent."""
+    normalized = (encoding or "").lower().replace("_", "").replace("-", "")
+    return box.ROUNDED if normalized.startswith("utf") else box.ASCII
 
 
-def _description_lines(text):
-    """A description as its indented, wrapped display lines (D97)."""
-    if not text or text == "-":
-        return []
-    return textwrap.wrap(
-        text, width=_DESCRIPTION_WIDTH,
-        initial_indent=_DESCRIPTION_INDENT,
-        subsequent_indent=_DESCRIPTION_INDENT)
+def _print_table(columns, rows):
+    """Render a compact, colorful, wrapping table.
+
+    Rich measures terminal cells rather than Python characters, and folds
+    values that do not fit — including a long description in its own cell.
+    """
+    console = Console(file=sys.stdout, highlight=False)
+    headings = tuple(columns)
+    gutter = 2 * (len(headings) - 1)
+    available = max(sum(cell_len(heading) for heading in headings),
+                    console.width - gutter - 2)
+    desired = [max(cell_len(heading),
+                   *(cell_len(str(row[index])) for row in rows))
+               for index, heading in enumerate(headings)]
+    widths = [cell_len(heading) for heading in headings]
+    remaining = available - sum(widths)
+    while remaining and any(width < wanted
+                            for width, wanted in zip(widths, desired)):
+        for index, wanted in enumerate(desired):
+            if remaining == 0:
+                break
+            if widths[index] < wanted:
+                widths[index] += 1
+                remaining -= 1
+
+    def table(*, header):
+        result = Table(box=_table_box(console.encoding),
+                       border_style="bright_blue",
+                       header_style="bold bright_cyan", pad_edge=False,
+                       padding=(0, 1), collapse_padding=True,
+                       show_header=header, show_lines=True)
+        for heading, width in zip(headings, widths):
+            result.add_column(heading, width=width, overflow="fold")
+        return result
+
+    result = table(header=True)
+    for index, row in enumerate(rows):
+        result.add_row(*(str(value) for value in row),
+                       style="bright_white" if index % 2 else "white")
+    console.print(result)
 
 
 def _list_blueprints(arguments, session):
@@ -976,21 +1011,21 @@ def _list_blueprints(arguments, session):
         if not rows:
             print("(no blueprints)")
             return
-        name_width = max([4] + [len(row["name"]) for row in rows])
-        print(f"{'NAME':<{name_width}}  PATH")
-        for row in rows:
-            print(f"{row['name']:<{name_width}}  {row['path']}")
-            for line in _description_lines(row["description"]):
-                print(line)
+        if any(row["description"] for row in rows):
+            _print_table(("NAME", "PATH", "DESCRIPTION"),
+                         [(row["name"], row["path"],
+                           row["description"] or "") for row in rows])
+        else:
+            _print_table(("NAME", "PATH"),
+                         [(row["name"], row["path"]) for row in rows])
     return _emit(arguments, rows, render)
 
 
 def _list_codex(arguments):
     """The library's own listing — names to a person, records to --json.
 
-    The description prints beneath its name, indented and wrapped
-    (D97): the column D88 refused stays refused, and the field a
-    person scans the library for is on the screen (U11).
+    A description shares the row with its blueprint, wrapping as the
+    terminal needs.
     """
     rows = list_codex()
 
@@ -998,10 +1033,9 @@ def _list_codex(arguments):
         if not rows:
             print("(no built-in blueprints)")
             return
-        for row in rows:
-            print(row["name"])
-            for line in _description_lines(row["description"]):
-                print(line)
+        _print_table(("NAME", "DESCRIPTION"),
+                     [(row["name"], row["description"] or "")
+                      for row in rows])
     return _emit(arguments, rows, render)
 
 
@@ -1025,10 +1059,8 @@ def _list_backends(arguments):
         if not rows:
             print("(no backends discovered)")
             return
-        width = max([7] + [len(row["backend"]) for row in rows])
-        print(f"{'BACKEND':<{width}}  HOME")
-        for row in rows:
-            print(f"{row['backend']:<{width}}  {row['home']}")
+        _print_table(("BACKEND", "HOME"),
+                     [(row["backend"], row["home"]) for row in rows])
 
     return _emit(arguments, rows, render)
 
@@ -1053,31 +1085,18 @@ def _render_machines(machines, filter_blueprint):
         else:
             print("(no machines)")
         return
-    bp_width = max(
-        [9] + [len(state.get("blueprint") or "-")
-                for state in machines],
-        default=9)
-    num_width = max(
-        [6] + [len(str(split_machine_id(state["id"])[1]))
-                for state in machines
-                if split_machine_id(state["id"]) is not None],
-        default=6)
-    print(f"{'BLUEPRINT':<{bp_width}}  {'NUMBER':>{num_width}}  "
-          f"{'PHASE':<8}  BACKEND")
+    rows = []
     for state in machines:
-        blueprint = state.get("blueprint") or "-"
-        parsed = split_machine_id(state["id"])
-        number = str(parsed[1]) if parsed else "-"
         phase = state.get("phase") or "?"
         backend = state.get("backend") or "qemu"
-        print(f"{blueprint:<{bp_width}}  {number:>{num_width}}  "
-              f"{phase:<8}  {backend}")
+        rows.append((state["id"], phase, backend))
+    _print_table(("ID", "PHASE", "BACKEND"), rows)
 
 
 def _description(script):
     """A script's description as one line of listing text."""
     if script.description is None:
-        return "-"
+        return ""
     # A listing binds no properties, so any reference is shown as
     # the author wrote it.
     return script.description.spelling
@@ -1113,12 +1132,13 @@ def _list_scripts(arguments, session, context):
             if not rows:
                 print(f"(blueprint {blueprint_name} declares no scripts)")
                 return
-            width = max([5] + [len(row["label"]) for row in rows])
-            print(f"{'LABEL':<{width}}  STEM")
-            for row in rows:
-                print(f"{row['label']:<{width}}  {row['stem']}")
-                for line in _description_lines(row["description"]):
-                    print(line)
+            if any(row["description"] for row in rows):
+                _print_table(("LABEL", "STEM", "DESCRIPTION"),
+                             [(row["label"], row["stem"],
+                               row["description"]) for row in rows])
+            else:
+                _print_table(("LABEL", "STEM"),
+                             [(row["label"], row["stem"]) for row in rows])
         return _emit(arguments, rows, render_labels)
 
     rows = [{"name": row["name"], "path": row["path"],
@@ -1129,12 +1149,13 @@ def _list_scripts(arguments, session, context):
         if not rows:
             print("(no scripts)")
             return
-        width = max([4] + [len(row["name"]) for row in rows])
-        print(f"{'NAME':<{width}}  PATH")
-        for row in rows:
-            print(f"{row['name']:<{width}}  {row['path']}")
-            for line in _description_lines(row["description"]):
-                print(line)
+        if any(row["description"] for row in rows):
+            _print_table(("NAME", "PATH", "DESCRIPTION"),
+                         [(row["name"], row["path"], row["description"])
+                          for row in rows])
+        else:
+            _print_table(("NAME", "PATH"),
+                         [(row["name"], row["path"]) for row in rows])
     return _emit(arguments, rows, render_dir)
 
 
@@ -1272,9 +1293,9 @@ def _list_properties(arguments, session):
     def render():
         if not properties:
             return
-        key_width = max(len(key) for key in properties)
-        for key, value in properties.items():
-            print(f"{key:<{key_width}}  {_property_text(value)}")
+        _print_table(("KEY", "VALUE"),
+                     [(key, _property_text(value))
+                      for key, value in properties.items()])
     return _emit(arguments, properties, render)
 
 
@@ -1441,12 +1462,10 @@ def _list_files(arguments, session):
         if not entries:
             print("(no files)")
             return
-        width = max(len(str(entry["size"] if entry["size"] is not None
-                            else "<DIR>")) for entry in entries)
-        for entry in entries:
-            size = entry["size"]
-            size = "<DIR>" if size is None else str(size)
-            print(f"{size:>{width}}  {entry['address']}")
+        _print_table(("SIZE", "ADDRESS"),
+                     [("<DIR>" if entry["size"] is None
+                       else entry["size"], entry["address"])
+                      for entry in entries])
     return _emit(arguments, entries, render)
 
 

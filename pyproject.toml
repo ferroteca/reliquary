@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: System :: Emulators",
     "Topic :: System :: Installation/Setup",
 ]
-dependencies = ["keyring", "lark", "pillow", "qemu.qmp",
+dependencies = ["keyring", "lark", "pillow", "qemu.qmp", "rich",
                 "remanence==0.0.1a2"]
 
 [project.urls]

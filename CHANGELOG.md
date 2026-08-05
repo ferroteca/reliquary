@@ -43,6 +43,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **CLI list tables use Rich** for consistent terminal-cell alignment and
+  wrapping. Long paths, addresses, property values, and other wide data fold
+  across lines instead of being truncated. Machine listings lead with machine
+  IDs; listings with descriptions place them in a wrapping column on the same
+  row. UTF consoles render rounded borders; other encodings fall back to ASCII.
+
 - **Machine-local images now live in `disks/`** rather than `media/`
   below each `cache/machines/<id>/` materialization. The separate
   shared payload cache remains `cache/media/`.

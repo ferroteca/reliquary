@@ -12,6 +12,9 @@ import tempfile
 import unittest
 from unittest import mock
 
+from rich import box
+from rich.cells import cell_len
+
 from reliquary import cli
 from reliquary import backends
 from reliquary.backends import Availability
@@ -106,6 +109,21 @@ class CliEmptyListingTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), [
             {"backend": "qemu", "home": "/opt/qemu"},
         ])
+
+    def test_list_tables_fold_wide_values_on_terminal_cell_boundaries(self):
+        """Rich keeps wide Unicode data readable instead of truncating it."""
+        value = "C:\\資料\\" + "ファイル" * 24
+        with contextlib.redirect_stdout(io.StringIO()) as stdout:
+            cli._print_table(("NAME", "PATH"), [("wide", value)])
+        lines = stdout.getvalue().splitlines()
+        self.assertGreater(len(lines), 2)
+        self.assertNotIn("…", stdout.getvalue())
+        self.assertTrue(all(cell_len(line) <= 80 for line in lines))
+
+    def test_list_tables_use_ascii_borders_without_a_unicode_encoding(self):
+        self.assertEqual(cli._table_box("utf-8"), box.ROUNDED)
+        self.assertEqual(cli._table_box("cp437"), box.ASCII)
+        self.assertEqual(cli._table_box(None), box.ASCII)
 
     def test_list_scripts_reports_none_found(self):
         """An empty scripts directory says so, not a bare header."""
@@ -404,7 +422,7 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue().strip(), "plain-0")
 
     def test_list_machines_table(self):
-        """list-machines prints blueprint, number, phase, and backend."""
+        """list-machines leads with each machine's durable id."""
         with contextlib.redirect_stdout(io.StringIO()):
             cli.main([
                 "--home-dir", self.home,
@@ -418,8 +436,10 @@ class CliMachineLifecycleTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         output = stdout.getvalue()
-        self.assertIn("BLUEPRINT", output)
-        self.assertIn("plain", output)
+        self.assertIn("ID", output)
+        self.assertNotIn("BLUEPRINT", output)
+        self.assertNotIn("NUMBER", output)
+        self.assertIn("plain-0", output)
         self.assertIn("ready", output)
 
     def test_list_codex_names_the_library_and_nothing_of_yours(self):
@@ -477,14 +497,11 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("plain", output)
         self.assertIn(
             os.path.join(self.home, "blueprints", "plain.rlqb"), output)
-        header = output.splitlines()[0]
-        self.assertTrue(header.startswith("NAME"))
-        self.assertTrue(header.endswith("PATH"))
+        self.assertIn("NAME", output)
+        self.assertIn("PATH", output)
 
-    def test_list_blueprints_shows_a_description_beneath_its_row(self):
-        """The display D97 settled: never a column — an indented,
-        wrapped line beneath the entry, and a row without one
-        contributes no line."""
+    def test_list_blueprints_shows_a_description_in_its_row(self):
+        """Descriptions occupy a wrapping cell beside their blueprint."""
         with open(os.path.join(self.home, "blueprints", "told.rlqb"),
                   "w", encoding="utf-8") as handle:
             json.dump([
@@ -503,15 +520,9 @@ class CliMachineLifecycleTests(unittest.TestCase):
                                "list-blueprints"])
         self.assertEqual(result, 0)
         lines = stdout.getvalue().splitlines()
-        wrapped = [line for line in lines if line.startswith("  ")]
-        self.assertGreater(len(wrapped), 1)     # it wrapped
-        self.assertIn("A described machine", wrapped[0])
-        self.assertTrue(all(len(line) <= 72 for line in wrapped))
-        # The undescribed row contributes no line: `plain` sorts
-        # first, and the line after its row is `told`'s row.
-        plain_at = next(index for index, line in enumerate(lines)
-                        if line.startswith("plain"))
-        self.assertFalse(lines[plain_at + 1].startswith("  "))
+        self.assertIn("DESCRIPTION", stdout.getvalue())
+        told = next(line for line in lines if "told" in line)
+        self.assertIn("A described machine", told)
 
     def test_json_list_blueprints_carries_description_and_platform(self):
         """The record holds what the human view shows (D97; P6)."""
@@ -522,16 +533,16 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIsNone(row["description"])
         self.assertEqual(row["platform"], "dos")
 
-    def test_list_codex_prints_the_description_beneath_the_name(self):
-        """U11's "read a description", at the keyboard (D97)."""
+    def test_list_codex_prints_the_description_in_the_name_row(self):
+        """The library table pairs each name with its description."""
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             result = cli.main(["--home-dir", self.home, "list-codex"])
         self.assertEqual(result, 0)
         lines = stdout.getvalue().splitlines()
-        at = lines.index("freedos")
-        self.assertTrue(lines[at + 1].startswith("  "))
-        self.assertIn("FreeDOS", lines[at + 1])
+        self.assertIn("DESCRIPTION", stdout.getvalue())
+        freedos = next(line for line in lines if "freedos" in line)
+        self.assertIn("FreeDOS", freedos)
 
     def test_list_blueprints_empty_has_no_column_headers(self):
         """An empty home reports absence, not a headerless table."""
@@ -563,7 +574,10 @@ class CliMachineLifecycleTests(unittest.TestCase):
                 "--home-dir", self.home, "list-blueprints",
             ])
         self.assertEqual(result, 0)
-        self.assertIn(nested_path, stdout.getvalue())
+        output = stdout.getvalue()
+        self.assertIn("nested", output)
+        self.assertIn("d.rlqb", output)
+        self.assertNotIn("…", output)
 
     def test_list_blueprints_ignores_cache_dir(self):
         """A JSON file under cache/ is never reported as a blueprint."""
@@ -806,10 +820,10 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("NAME", output)
         self.assertIn("PATH", output)
         self.assertIn("alpha", output)
-        # Never a column (D97): the description prints beneath its
-        # row, indented and wrapped.
-        self.assertNotIn("DESCRIPTION", output)
-        self.assertIn("\n  Alpha script", output)
+        self.assertIn("DESCRIPTION", output)
+        alpha = next(line for line in output.splitlines()
+                     if "alpha" in line)
+        self.assertIn("Alpha script", alpha)
         result, out = self._json_out(["list-scripts"])
         self.assertEqual(result, 0)
         self.assertEqual("Alpha script",
@@ -857,15 +871,14 @@ class CliMachineLifecycleTests(unittest.TestCase):
         self.assertIn("setup", output)
         self.assertIn("cust-setup", output)
         self.assertIn("teardown", output)
-        # Never a column (D97): the described label carries its
-        # indented line, and the undescribed one contributes none.
-        self.assertNotIn("DESCRIPTION", output)
-        self.assertIn("\n  Custom setup", output)
+        self.assertIn("DESCRIPTION", output)
+        setup = next(line for line in output.splitlines()
+                     if "setup" in line)
+        self.assertIn("Custom setup", setup)
         lines = output.splitlines()
         teardown_at = next(index for index, line in enumerate(lines)
-                           if line.startswith("teardown"))
-        self.assertTrue(teardown_at == len(lines) - 1
-                        or not lines[teardown_at + 1].startswith("  "))
+                           if "teardown" in line)
+        self.assertNotIn("Custom setup", lines[teardown_at])
 
     def test_start_without_selector_errors(self):
         """The legacy root-home start path is gone: a selector is required."""

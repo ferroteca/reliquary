@@ -297,28 +297,26 @@ two sets.
 
 ```powershell
 $ rlq list-blueprints
-NAME     PATH
-freedos  C:\Users\you\Documents\reliquary\blueprints\freedos.rlqb
-  Plain FreeDOS 1.4 system installed from the LiveCD
+NAME     PATH                                             DESCRIPTION
+freedos  C:\Users\you\Documents\reliquary\blueprints\freedos.rlqb  Plain FreeDOS 1.4 system installed from the LiveCD
 test-rig C:\Users\you\Documents\reliquary\blueprints\test-rig.rlqb
 
 $ rlq list-codex
-freedos
-  Plain FreeDOS 1.4 system installed from the LiveCD
-openbsd
-  OpenBSD 7.9 amd64 installed from install79.iso using autoinstall over
-  reliquary's run-scoped HTTP server
+NAME     DESCRIPTION
+freedos  Plain FreeDOS 1.4 system installed from the LiveCD
+openbsd  OpenBSD 7.9 amd64 installed from install79.iso using autoinstall over
+         reliquary's run-scoped HTTP server
 ```
 
-**A description is never a column** (D97). Wherever a listing's noun
-carries one — `list-codex`, `list-scripts`, `list-blueprints` — the
-human listing prints it beneath its entry, indented and wrapped to a
-fixed width, and an entry without one contributes no line: free text
-of unbounded length is shown whole rather than truncated to fit a
-table it would otherwise dominate. The `--json` record carries the
+When a listing contains descriptions — `list-codex`, `list-scripts`,
+`list-blueprints` — the human table adds a `DESCRIPTION` column in the
+same row as its item. Rich wraps the cell to the terminal width rather
+than truncating free text; entries without descriptions leave the
+column out altogether. The `--json` record carries the
 same field — `list-blueprints` rows carry `description` and
 `platform` beside `name` and `path` — so the two presentations show
-one surface.
+one surface. A UTF console renders rounded table borders; any other
+console encoding receives an ASCII border grid.
 
 Neither command filters, and **no noun has a search verb** — nor a
 term parameter: matching a term is filtering, which a shell does and
@@ -1196,10 +1194,9 @@ bracket returns if the async work schedules.
 rlq list-scripts
 ```
 
-`list-scripts` shows everything in `scripts/`. A script's
-`description` header prints beneath its row, indented and wrapped —
-the one display every listing uses (D97). Searching scripts
-is unbuilt — the codex index it would query is itself planned
+`list-scripts` shows everything in `scripts/`. Its `DESCRIPTION`
+column shares the script's row and wraps wide text to the terminal.
+Searching scripts is unbuilt — the codex index it would query is itself planned
 ([codex.md](codex.md)).
 
 ### Deleting a script

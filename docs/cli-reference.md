@@ -207,8 +207,8 @@ separate set with its own verb below, and no listing spans the two.
 
 List the built-in library's blueprints by name. Nothing of yours
 appears, so which command you ran is the provenance — there is no
-column saying where a row came from. Each entry's description rides
-the `--json` record rather than the printed table.
+column saying where a row came from. Each entry's description shares
+its printed table row and is also present in the `--json` record.
 
 Nothing resolves out of the library: a name your directories do not
 hold is refused, and the refusal names `rlq seed-blueprint <name>`
