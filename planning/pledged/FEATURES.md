@@ -32,6 +32,28 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
+## F53 — JSON5 blueprints
+
+> Pledged 2026-08-05 (owner). Serves **U4** and **U5** through
+> **G2**; touches **S4**. Design settled by **D102**.
+
+Replace the project-defined JSONC input dialect with JSON5, retaining
+ordinary JSON data as the blueprint value model. This is one coherent
+surface change: a blueprint author can use JSON5 syntax everywhere
+`.rlqb` is read, while non-finite JSON5 numeric values are refused.
+
+Work items:
+
+1. Parse `.rlqb` documents with JSON5 syntax and retain Reliquary's
+   source-positioned diagnostics.
+2. Reject `NaN`, `Infinity`, and `-Infinity`, so the parsed blueprint
+   model contains only ordinary JSON values.
+3. Update the normative blueprint specification, schema/editor
+   guidance, authored examples, and user-facing format references
+   together; machine-written files remain strict JSON.
+4. Cover JSON5-specific accepted syntax and non-finite-value refusal,
+   alongside the existing blueprint validation corpus.
+
 ## F43 — The interpretation-layer corpus
 
 > **Pledged 2026-08-01** (owner), cut from F13 with F42, that

@@ -179,6 +179,25 @@ is waiting on an answer today.
 
 ## Decided
 
+- D102 — BLUEPRINTS USE JSON5, NOT JSONC — DECIDED (owner,
+  2026-08-05). Supports U4, U5; G2. Amends D18's input-format
+  choice; its computational-growth rule remains in force.
+
+  **JSON5 is the authored blueprint grammar.** JSONC is an ecosystem
+  label rather than one settled grammar: even its draft specification
+  makes trailing-comma support optional, while Reliquary's former
+  wording had to define a project-specific dialect. A published JSON5
+  grammar gives authors and independent tooling one external contract
+  to implement. The parser still rejects `NaN` and both infinities:
+  blueprint values remain ordinary JSON data after parsing.
+
+  WEIGHED AND DECLINED: retaining the narrow JSONC dialect for editor
+  familiarity. That remains a useful configuration-file convention,
+  but it does not outweigh a specified grammar for Reliquary's own
+  authored format. Reopens only on evidence that the required editor
+  and schema workflow cannot support JSON5 without a material loss of
+  the authoring experience.
+
 - D101 — THE SCRIPTS MAP IS THE BLUEPRINT'S, READ AT INVOCATION —
   DECIDED (owner, 2026-08-02). Supports U1, U14; P6, P11.
 
@@ -2095,16 +2114,17 @@ is waiting on an answer today.
   library: the layering is small, the semantics are the project's
   own, and a dependency would have to be bent to match them (P21).
 
-- D18 — BLUEPRINT FORMAT: JSONC AFFIRMED + THE COMPUTATIONAL-GROWTH
-  RULE — DECIDED (owner, 2026-07-23). Supports U4, U5; G2.
-  **Amended by D26**, which moved HCL2 from deferred to closed.
+- D18 — BLUEPRINT FORMAT: THE COMPUTATIONAL-GROWTH RULE — DECIDED
+  (owner, 2026-07-23). Supports U4, U5; G2. **Its prior JSONC
+  choice is superseded by D102; amended by D26**, which moved HCL2
+  from deferred to closed.
 
   THE GROWTH RULE, which is the durable half: a construct that
   *enriches values* may land as plain data expanded by reliquary;
   **general computation never enters the JSON tree**. It would
   arrive only as a layer producing plain blueprints — generation
-  above via the embedding API, or a JSON-superset evaluation layer
-  (Jsonnet the candidate, since JSONC is already valid Jsonnet).
+  above via the embedding API, or a separately specified evaluation
+  layer (Jsonnet the candidate).
   In-tree function objects and string templating are permanently
   rejected: a blueprint that computes is a blueprint no tool can
   read without running it.
