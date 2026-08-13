@@ -276,12 +276,20 @@ class BackendAdapter:
         """Power off the identified VM, fail-closed on identity."""
         raise NotImplementedError
 
-    def session(self, vm):
+    def session(self, vm, cache=None):
         """Yield an identity-verified session over the running VM.
 
         A context manager. Every carrier hangs off the session, and
         every session verifies the recorded identity before it
         commands anything.
+
+        ``cache`` is the resolved cache root — a plain directory, not
+        a :class:`~home.Context` — under which an adapter may keep
+        what it extracts from its own installation on this host
+        (``cache/support/<backend>/``, `text_recognize.cached_bank`).
+        Optional because it is a *speed* concern and never a
+        correctness one: an adapter given ``None`` does the same work
+        without keeping the result.
         """
         raise NotImplementedError
 

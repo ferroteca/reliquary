@@ -8,6 +8,7 @@ drive and boot rendering a machine's state lowers into, and the
 carriers a session exposes.
 """
 
+import inspect
 import io
 import os
 import sys
@@ -31,6 +32,7 @@ except ModuleNotFoundError:
 
 import reliquary
 from reliquary import backend_qemu as qemu_module
+from reliquary import text_recognize
 from reliquary.errors import PreflightError, RunFailure, StaticError
 
 
@@ -583,6 +585,46 @@ class CarrierTests(unittest.TestCase):
     def test_the_native_seam_hands_back_the_monitor_itself(self):
         qmp = mock.Mock()
         self.assertIs(qemu_module.QemuSession(qmp).native(), qmp)
+
+
+class GlyphBankTests(unittest.TestCase):
+    """QEMU's font is read off the host too, on the same terms.
+
+    This adapter never needs it — it scrapes VGA text memory — but
+    the question is answered identically for both backends rather
+    than only where a wrong font happened to bite.
+    """
+
+    def test_the_bank_is_carved_out_of_the_installed_vgabios(self):
+        own = text_recognize.glyph_bank()
+        with tempfile.TemporaryDirectory() as root, \
+                tempfile.TemporaryDirectory() as cache:
+            share = os.path.join(root, "share", "qemu")
+            os.makedirs(share)
+            with open(os.path.join(share, "vgabios-stdvga.bin"), "wb") as f:
+                f.write(b"\x90" * 64 + own + b"\x90" * 16)
+            with mock.patch.object(
+                    qemu_module, "find_qemu",
+                    return_value=os.path.join(root, "qemu-system-i386")):
+                self.assertEqual(qemu_module.guest_glyph_bank(cache), own)
+            self.assertTrue(os.path.isfile(os.path.join(
+                cache, "support", "qemu", "cp437-8x16.bin")))
+
+    def test_an_installation_with_no_vgabios_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            with mock.patch.object(
+                    qemu_module, "find_qemu",
+                    return_value=os.path.join(root, "qemu-system-i386")):
+                with self.assertRaises(PreflightError) as caught:
+                    qemu_module.guest_glyph_bank()
+        self.assertEqual(caught.exception.rule_id,
+                         "recognize.font-not-found")
+
+    def test_the_session_ignores_the_cache_it_is_offered(self):
+        """QEMU needs no host font, so the argument is accepted and unused."""
+        self.assertIn(
+            "cache",
+            inspect.signature(qemu_module.QemuAdapter.session).parameters)
 
 
 class DiscoveryTests(unittest.TestCase):

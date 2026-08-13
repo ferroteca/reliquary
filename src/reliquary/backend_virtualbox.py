@@ -74,6 +74,36 @@ def find_vboxmanage():
         rule_id="machine.backend-not-found")
 
 
+#: Files shipped with VirtualBox that embed its VGA BIOS, most
+#: likely first. The BIOS is not a standalone ROM in current builds,
+#: so the bank is carved out of the module that carries it.
+_BIOS_CARRIERS = ("VBoxDD2.dll", "VBoxDD.dll", "VBoxDDU.dll",
+                  "VBoxDD2.so", "VBoxDD.so")
+
+
+def guest_glyph_bank(cache=None):
+    """The VGA font this host's VirtualBox paints DOS text with.
+
+    **Read off the host, never shipped.** VirtualBox's BIOS draws a
+    different 8x16 face from QEMU's — 19 glyphs differ, `W` and `m`
+    among them — so reading a VirtualBox screen through Reliquary's
+    own bank turns `Welcome` into `Uelcooe` and misses every wait on
+    the word. The right glyphs are the ones the installed emulator
+    has, and taking them from the installation is also what keeps
+    another project's font out of this tree
+    (:func:`text_recognize.cached_bank`).
+    """
+    def extract():
+        # Resolved inside the extractor, so a cache hit answers
+        # without going near the installation at all.
+        home = os.path.dirname(find_vboxmanage())
+        return text_recognize.bank_from_files(
+            [os.path.join(home, name) for name in _BIOS_CARRIERS],
+            "VirtualBox")
+
+    return text_recognize.cached_bank(cache, "virtualbox", extract)
+
+
 def run_vbox(args, *, action, target=None):
     """Run one ``VBoxManage`` invocation; raise on a non-zero exit.
 
@@ -486,11 +516,12 @@ def scancodes_for(combo):
 class VirtualBoxSession:
     """Identity-verified session with agentless-display carriers (F52)."""
 
-    def __init__(self, vm_uuid, name, drives=None):
+    def __init__(self, vm_uuid, name, drives=None, cache=None):
         self.backend = "virtualbox"
         self._uuid = vm_uuid
         self._name = name
         self._drives = dict(drives or {})
+        self._cache = cache
 
     def native(self):
         """No portable native hatch: VBoxManage is the whole surface."""
@@ -522,13 +553,18 @@ class VirtualBoxSession:
         return png
 
     def text_screen(self):
-        """Screenshot + shared fixed-font recognizer (F51)."""
+        """Screenshot + shared fixed-font recognizer (F51).
+
+        Read through **this host's** VirtualBox font rather than the
+        bundled bank, which is a different emulator's face.
+        """
         with tempfile.NamedTemporaryFile(
                 suffix=".png", delete=False) as handle:
             path = handle.name
         try:
             self.screenshot(path)
-            return text_recognize.recognize(path)
+            return text_recognize.recognize(
+                path, bank=guest_glyph_bank(self._cache))
         finally:
             try:
                 os.remove(path)
@@ -638,7 +674,7 @@ class VirtualBoxAdapter(BackendAdapter):
         return stop(vm)
 
     @contextlib.contextmanager
-    def session(self, vm):
+    def session(self, vm, cache=None):
         expected = vm["backend-id"]
         token = vm["token"]
         try:
@@ -653,4 +689,4 @@ class VirtualBoxAdapter(BackendAdapter):
         endpoint = vm.get("endpoint") or {}
         yield VirtualBoxSession(
             expected, endpoint.get("name") or info.get("name", expected),
-            drives=endpoint.get("drives"))
+            drives=endpoint.get("drives"), cache=cache)

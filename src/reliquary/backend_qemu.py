@@ -30,6 +30,7 @@ from PIL import Image
 from qemu.qmp import ConnectError, ExecuteError, QMPClient
 
 from . import backends
+from . import text_recognize
 from .backends import Availability, BackendAdapter, Capabilities
 from .errors import (PreflightError, ReliquaryError, RunFailure,
                      StaticError)
@@ -132,6 +133,43 @@ def _find_qemu_tool(binary):
 def find_qemu():
     """Locate the QEMU system binary from configuration and common paths."""
     return _find_qemu_tool(_QEMU_BIN)
+
+
+#: Where QEMU keeps the VGA BIOS whose font a guest paints with,
+#: relative to the directory holding the binary. Distributions split
+#: `bin/` from `share/qemu/`; the Windows build keeps both together.
+_VGABIOS_NAMES = ("vgabios-stdvga.bin", "vgabios.bin")
+
+
+def guest_glyph_bank(cache=None):
+    """The VGA font this host's QEMU paints DOS text with.
+
+    **Read off the host, never shipped** — the counterpart of
+    `backend_virtualbox.guest_glyph_bank`, and the same reasoning:
+    the glyphs belong to the installed emulator, not to Reliquary
+    (:func:`text_recognize.cached_bank`).
+
+    QEMU's own control plane never needs this — it scrapes VGA text
+    memory, where the guest has already resolved its characters — so
+    this exists for a caller recognizing a QEMU *screenshot*, and to
+    keep the font question answered the same way for both backends
+    rather than only where it happened to bite.
+    """
+    def extract():
+        # Resolved inside the extractor, so a cache hit answers
+        # without going near the installation at all.
+        home = os.path.dirname(find_qemu())
+        roots = [home,
+                 os.path.join(home, "share"),
+                 os.path.join(home, "share", "qemu"),
+                 os.path.join(os.path.dirname(home), "share", "qemu"),
+                 "/usr/share/qemu", "/usr/share/seabios"]
+        return text_recognize.bank_from_files(
+            [os.path.join(root, name)
+             for root in roots for name in _VGABIOS_NAMES],
+            "QEMU")
+
+    return text_recognize.cached_bank(cache, "qemu", extract)
 
 
 def find_qemu_img():
@@ -750,8 +788,13 @@ class QemuAdapter(BackendAdapter):
         return stop(vm)
 
     @contextlib.contextmanager
-    def session(self, vm):
-        """Yield an identity-verified session over the recorded VM."""
+    def session(self, vm, cache=None):
+        """Yield an identity-verified session over the recorded VM.
+
+        ``cache`` goes unused: this adapter reads VGA text memory,
+        where the guest has already resolved its characters, so it
+        needs no font extracted from the host to recognize glyphs by.
+        """
         port = _endpoint_port(vm)
         name = vm["backend-id"]
         token = vm["token"]

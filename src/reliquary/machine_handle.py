@@ -56,10 +56,17 @@ class Machine:
 
     ``home`` is the machine's own materialization directory — an
     already-resolved plain directory, never a :class:`~home.Context`.
+    ``cache`` is the resolved cache root, on the same terms, and it is
+    **not derivable from** ``home``: `machines` is independently
+    placeable, so a machine directory says nothing about where the
+    cache root sits. A caller that has it passes it; one that does not
+    leaves an adapter re-extracting its host support files each time
+    rather than keeping them.
     """
 
     home: "str | None" = None
     deadline: "float | None" = None
+    cache: "str | None" = None
     _session_wrapper: "object" = None
 
     def _identity(self):
@@ -75,7 +82,7 @@ class Machine:
     def session(self):
         """Yield an identity-verified backend session for this machine."""
         adapter, vm = self._identity()
-        with adapter.session(vm) as open_session:
+        with adapter.session(vm, cache=self.cache) as open_session:
             yield open_session
 
     @contextlib.contextmanager

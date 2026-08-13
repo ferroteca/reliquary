@@ -88,6 +88,10 @@ class FakeAdapter(BackendAdapter):
         self.stops = []
         self.disposed = []
         self.sessions = []
+        #: The cache root each session was opened with, so a test can
+        #: assert an adapter is told where to keep host-extracted
+        #: support files.
+        self.session_caches = []
         self.session_rows = None
         self.native = object()
         self.start_error = None
@@ -149,9 +153,10 @@ class FakeAdapter(BackendAdapter):
         self.stops.append(vm)
 
     @contextlib.contextmanager
-    def session(self, vm):
+    def session(self, vm, cache=None):
         if self.session_error is not None:
             raise self.session_error
+        self.session_caches.append(cache)
         open_session = FakeSession(self, vm, rows=self.session_rows)
         self.sessions.append(open_session)
         yield open_session

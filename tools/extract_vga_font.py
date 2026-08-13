@@ -1,17 +1,18 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Extract the VGA 8×16 CP437 glyph bank from a local QEMU vgabios.
+"""Refresh the *shipped* VGA 8×16 glyph bank from a local QEMU vgabios.
 
-The agentless-display recognizer (F51/F52) must match the glyphs a
-DOS guest actually paints. Those bit patterns live in the VGA BIOS
-the host's QEMU already ships (``vgabios-stdvga.bin``). This tool
-locates the classic 8×16 bank by its well-known ``A`` glyph and
-writes ``src/reliquary/fonts/cp437_8x16.bin``.
+This bank is Reliquary's **default and rendering** font: what
+``text_recognize.render`` draws fixtures with, so the suite needs no
+hypervisor. It is deliberately **not** what reads a live guest — the
+glyphs a guest paints are its own emulated BIOS's, and those differ
+between emulators, so each adapter passes ``bank=`` the font from the
+installation on the host (``backend_virtualbox.guest_glyph_bank``).
+Reading a real screen through this bank is the F52 bug that made
+``Welcome`` recognize as ``Uelcooe``.
 
-The bytes are an interoperability fact of the IBM PC text mode,
-curated into Reliquary so backends without a text-memory scrape can
-read the same screens. Re-run after a QEMU upgrade if the guest
-font drifts.
+The tool locates the classic 8×16 bank by its well-known ``A`` glyph
+and writes ``src/reliquary/fonts/cp437_8x16.bin``.
 
     uv run python tools/extract_vga_font.py
 """

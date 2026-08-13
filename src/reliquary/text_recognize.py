@@ -22,7 +22,7 @@ from functools import lru_cache
 
 from PIL import Image
 
-from .errors import StaticError, UnreadableScreen
+from .errors import PreflightError, StaticError, UnreadableScreen
 
 _COLS = 80
 _ROWS = 25
@@ -40,23 +40,144 @@ def _font_path():
     return os.path.join(os.path.dirname(__file__), "fonts", "cp437_8x16.bin")
 
 
+#: The classic IBM VGA 8×16 capital A. Every VGA BIOS font shares it,
+#: which is what makes it a reliable anchor for locating a 4096-byte
+#: bank inside a larger binary — see :func:`bank_from_binary`.
+CLASSIC_A = bytes([
+    0x00, 0x00, 0x10, 0x38, 0x6c, 0xc6, 0xc6, 0xfe,
+    0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00,
+])
+
+
+def check_bank(data, source):
+    """Return ``data`` if it is a whole bank, else fail closed."""
+    if len(data) != _GLYPHS * _CELL_H:
+        raise StaticError(
+            f"glyph bank {source} is {len(data)} bytes; expected "
+            f"{_GLYPHS * _CELL_H}",
+            rule_id="recognize.font-corrupt")
+    return bytes(data)
+
+
+def bank_from_binary(data, source):
+    """Carve the 8×16 bank out of a binary that embeds a VGA BIOS font.
+
+    **A backend's font is read off the host, never shipped.** The
+    glyphs a guest paints are its emulated BIOS's, so they belong to
+    whatever the host has installed rather than to Reliquary — which
+    is also why no second bank is vendored here: copying another
+    project's font into this tree would be third-party material in a
+    repository whose licensing policy admits none
+    (CONTRIBUTING.md).
+
+    Located by :data:`CLASSIC_A`, since a font that did not share the
+    classic ``A`` would not be the CP437 bank a DOS guest draws from.
+    """
+    index = data.find(CLASSIC_A)
+    if index < 0:
+        raise PreflightError(
+            f"no VGA 8x16 glyph bank found in {source}",
+            rule_id="recognize.font-not-found")
+    base = index - 0x41 * _CELL_H
+    if base < 0 or base + _GLYPHS * _CELL_H > len(data):
+        raise PreflightError(
+            f"the glyph bank in {source} is truncated",
+            rule_id="recognize.font-not-found")
+    return check_bank(data[base:base + _GLYPHS * _CELL_H], source)
+
+
+def bank_from_files(candidates, source):
+    """First of ``candidates`` that yields a bank, else fail closed."""
+    examined = []
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        examined.append(path)
+        with open(path, "rb") as handle:
+            data = handle.read()
+        try:
+            return bank_from_binary(data, path)
+        except PreflightError:
+            continue
+    raise PreflightError(
+        f"no VGA glyph bank found in this {source} installation; the "
+        "agentless display plane cannot read a guest screen without "
+        "the font it is drawn with\n"
+        f"  examined: {', '.join(examined) or 'no candidate files'}",
+        rule_id="recognize.font-not-found")
+
+
+#: Where a backend's host-extracted support files live, under the
+#: cache root: ``cache/support/<backend>/``. Everything here is taken
+#: from an installation on this host and is wholly regenerable, which
+#: is what makes the cache root the right home for it.
+SUPPORT_DIR = "support"
+
+#: The glyph bank's filename inside a backend's support directory.
+BANK_FILE = "cp437-8x16.bin"
+
+
+def support_dir(cache_dir, backend):
+    """The directory holding ``backend``'s host-extracted support files."""
+    return os.path.join(cache_dir, SUPPORT_DIR, backend)
+
+
+def cached_bank(cache_dir, backend, extract):
+    """A backend's bank, extracted once and kept under ``cache_dir``.
+
+    **The font is the host's, so it is cached rather than shipped.**
+    Reliquary vendors no emulator's glyphs: the bytes a guest paints
+    belong to whatever BIOS the host installed, and copying another
+    project's font into this tree would be third-party material the
+    licensing policy does not admit (CONTRIBUTING.md). Extracting on
+    first use and caching the result costs one scan of an installed
+    binary per home.
+
+    It lands in ``cache/support/<backend>/`` because it is **wholly
+    regenerable**, which is the whole contract of that root: delete it
+    and the next read extracts it again. A cache file that is not a
+    whole bank is therefore re-extracted rather than raised on — the
+    file is ours, and a truncated one says the last write was
+    interrupted, not that the caller did anything wrong.
+
+    ``cache_dir`` of ``None`` extracts every time, which is what an
+    embedding caller with no home assigned gets.
+    """
+    path = None
+    if cache_dir:
+        path = os.path.join(support_dir(cache_dir, backend), BANK_FILE)
+        if os.path.isfile(path):
+            with open(path, "rb") as handle:
+                data = handle.read()
+            if len(data) == _GLYPHS * _CELL_H:
+                return bytes(data)
+    bank = extract()
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        pending = f"{path}.{os.getpid()}.tmp"
+        with open(pending, "wb") as handle:
+            handle.write(bank)
+        os.replace(pending, path)
+    return bank
+
+
 @lru_cache(maxsize=1)
 def glyph_bank():
-    """256 glyphs × 16 row bytes (MSB = leftmost pixel)."""
+    """256 glyphs × 16 row bytes (MSB = leftmost pixel).
+
+    Reliquary's own bank: the default, and what :func:`render` draws
+    with so the suite round-trips without a hypervisor. **It is not
+    what reads a live guest** — see :func:`cached_bank`.
+    """
     path = _font_path()
     with open(path, "rb") as handle:
         data = handle.read()
-    if len(data) != _GLYPHS * _CELL_H:
-        raise StaticError(
-            f"glyph bank {path} is {len(data)} bytes; expected "
-            f"{_GLYPHS * _CELL_H}",
-            rule_id="recognize.font-corrupt")
-    return data
+    return check_bank(data, path)
 
 
-def glyph_bitmap(code):
+def glyph_bitmap(code, bank=None):
     """8×16 boolean rows for CP437 code ``code`` (0..255)."""
-    data = glyph_bank()
+    data = glyph_bank() if bank is None else bank
     base = (code & 0xFF) * _CELL_H
     rows = []
     for y in range(_CELL_H):
@@ -111,25 +232,31 @@ def _binarize_as(pixels, fg, bg, width, height):
     return bits
 
 
-def _glyph_bits(code):
+def _glyph_bits(code, bank=None):
     flat = []
-    for row in glyph_bitmap(code):
+    for row in glyph_bitmap(code, bank):
         flat.extend(row)
     return flat
 
 
-@lru_cache(maxsize=1)
-def _all_glyph_bits():
-    return tuple(_glyph_bits(code) for code in range(_GLYPHS))
+@lru_cache(maxsize=4)
+def _all_glyph_bits(bank=None):
+    """Every glyph as flat bits, cached per bank.
+
+    Keyed on the bank's own bytes rather than on nothing, so a host
+    that drives two backends with different BIOS fonts in one process
+    does not read the second through the first one's glyphs.
+    """
+    return tuple(_glyph_bits(code, bank) for code in range(_GLYPHS))
 
 
-def _match_glyph_with_distance(bits):
+def _match_glyph_with_distance(bits, bank=None):
     """Best CP437 code and its Hamming distance for ``bits``."""
     if not any(bits):
         return 0x20, 0
     best_code = 0x20
     best_dist = _CELL_W * _CELL_H + 1
-    for code, glyph in enumerate(_all_glyph_bits()):
+    for code, glyph in enumerate(_all_glyph_bits(bank)):
         dist = sum(a != b for a, b in zip(bits, glyph))
         if dist < best_dist:
             best_dist = dist
@@ -139,7 +266,7 @@ def _match_glyph_with_distance(bits):
     return best_code, best_dist
 
 
-def _match_cell(pixels, width, height):
+def _match_cell(pixels, width, height, bank=None):
     """Return ``(cp437_code, fg, bg)`` for one cell."""
     primary, secondary = _cell_colours(pixels)
     if primary == secondary:
@@ -149,7 +276,7 @@ def _match_cell(pixels, width, height):
     candidates = []
     for fg, bg in ((secondary, primary), (primary, secondary)):
         bits = _binarize_as(pixels, fg, bg, width, height)
-        code, dist = _match_glyph_with_distance(bits)
+        code, dist = _match_glyph_with_distance(bits, bank)
         candidates.append((dist, code, fg, bg))
     candidates.sort(key=lambda item: item[0])
     dist, code, fg, bg = candidates[0]
@@ -194,12 +321,19 @@ def _geometry(width, height, cols, rows):
     return cell_w, cell_h
 
 
-def recognize(source, *, cols=_COLS, rows=_ROWS):
+def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
     """Recognize a text screen from a PNG path or ``PIL.Image``.
 
     Returns ``(text_rows, attribute_rows)`` — text rows right-stripped
     like QEMU's VGA scrape; attribute rows are per-cell opaque tokens
     from :func:`attribute_token`, length ``cols`` each (not stripped).
+
+    ``bank`` is the 4096-byte glyph bank to read through, and a
+    caller reading a live guest must supply **that guest's own**:
+    VGA BIOS fonts differ between emulators, so the shipped default
+    misreads a screen it did not draw. Nineteen glyphs separate the
+    two this project has met, `W` and `m` among them, which is enough
+    to miss every `wait` on a word containing either.
     """
     if isinstance(source, Image.Image):
         image = source.convert("RGB")
@@ -220,7 +354,7 @@ def recognize(source, *, cols=_COLS, rows=_ROWS):
             for y in range(cell_h):
                 base = (y0 + y) * image.width + x0
                 cell.extend(pixels[base:base + cell_w])
-            code, fg, bg = _match_cell(cell, cell_w, cell_h)
+            code, fg, bg = _match_cell(cell, cell_w, cell_h, bank)
             chars.append(_cp437_char(code))
             attrs.append(attribute_token(fg, bg))
         text_rows.append("".join(chars).rstrip())

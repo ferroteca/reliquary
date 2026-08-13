@@ -33,6 +33,7 @@ from .document import load_document
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      RunFailure, StaticError, UnreadableScreen,
                      exit_code, outcome)
+from .home import cache_dir as _resolve_cache_dir
 from .library import locate_blueprint, locate_script
 from .control_display import char_keys
 from .machine_handle import (Machine, screenshot,
@@ -1170,6 +1171,20 @@ class _ScriptEngine:
         self._last_sample = sample
         return sample
 
+    @staticmethod
+    def _cache_root_or_none(context):
+        """The resolved cache root, or None where none can be resolved.
+
+        The adapters keep host-extracted support files there, and a
+        run that cannot name the directory simply does without —
+        re-extracting costs time, never correctness, so this must
+        never be the thing that fails a run.
+        """
+        try:
+            return _resolve_cache_dir(context)
+        except ReliquaryError:
+            return None
+
     @contextlib.contextmanager
     def _console(self):
         """Yield a console over an identity-verified session.
@@ -1178,7 +1193,9 @@ class _ScriptEngine:
         none is ever held while a statement list runs — QEMU's QMP
         server admits one client at a time.
         """
-        machine = Machine(self._machine_home)
+        machine = Machine(
+            self._machine_home,
+            cache=self._cache_root_or_none(self._context))
         if self._recording_writer is not None:
             machine._session_wrapper = (
                 lambda session: _transcript.RecordingSession(

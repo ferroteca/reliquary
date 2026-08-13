@@ -13,7 +13,8 @@ import unittest
 from PIL import Image
 
 from reliquary import text_recognize as recognize
-from reliquary.errors import StaticError, UnreadableScreen, exit_code
+from reliquary.errors import (PreflightError, StaticError, UnreadableScreen,
+                              exit_code)
 
 
 _FIX = os.path.join(os.path.dirname(__file__), "fixtures", "text_recognize")
@@ -129,6 +130,50 @@ class GeometryTests(unittest.TestCase):
         with self.assertRaises(UnreadableScreen) as caught:
             recognize.recognize(image)
         self.assertIn("640x480", str(caught.exception))
+
+
+def _swapped_bank(first, second):
+    """The shipped bank with two glyphs exchanged."""
+    data = bytearray(recognize.glyph_bank())
+    a, b = first * 16, second * 16
+    data[a:a + 16], data[b:b + 16] = data[b:b + 16], data[a:a + 16]
+    return bytes(data)
+
+
+class GlyphBankSourceTests(unittest.TestCase):
+    """A backend's font is read off the host, never vendored here.
+
+    These build their fixtures from the *shipped* bank, so the suite
+    carries no other project's font — which is the same rule the
+    runtime obeys.
+    """
+
+    def test_a_supplied_bank_decides_what_a_glyph_reads_as(self):
+        image = recognize.render(_screen("W"))
+        self.assertEqual(recognize.recognize(image)[0][0], "W")
+        # 0x55 'U' now holds the W bitmap, so that is what matches.
+        swapped = _swapped_bank(0x55, 0x57)
+        self.assertEqual(
+            recognize.recognize(image, bank=swapped)[0][0], "U")
+
+    def test_a_bank_is_carved_out_of_a_binary_by_the_classic_a(self):
+        shipped = recognize.glyph_bank()
+        binary = (b"\x00" * 1234) + shipped + (b"\xa5" * 77)
+        self.assertEqual(
+            recognize.bank_from_binary(binary, "fake.dll"), shipped)
+
+    def test_a_binary_without_the_anchor_fails_closed(self):
+        with self.assertRaises(PreflightError) as caught:
+            recognize.bank_from_binary(b"\x00" * 8192, "fake.dll")
+        self.assertEqual(caught.exception.rule_id,
+                         "recognize.font-not-found")
+
+    def test_a_truncated_bank_fails_closed(self):
+        shipped = recognize.glyph_bank()
+        with self.assertRaises(PreflightError) as caught:
+            recognize.bank_from_binary(shipped[:2048], "fake.dll")
+        self.assertEqual(caught.exception.rule_id,
+                         "recognize.font-not-found")
 
 
 class RenderSaveTests(unittest.TestCase):

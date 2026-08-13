@@ -37,18 +37,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tools/extract_vga_font.py`.
 
   **The FreeDOS parity half of this entry is not yet demonstrated.**
-  Against a live VirtualBox (2026-08-13) the integration now drives
-  the boot menu, the language chooser and the installer's confirmation
-  dialog, and stops at the welcome screen. Two causes remain, both
-  measured:
+  Against a live VirtualBox (2026-08-13) the integration drives the
+  boot menu, the language chooser and the installer's confirmation
+  dialog. One measured cause remains:
 
-  - **The glyph bank is the wrong font.** It is curated from the host
-    *QEMU* vgabios, and VirtualBox's VGA BIOS draws a different 8×16
-    face — its `W` spans seven columns where the bank's spans eight —
-    so once the guest leaves the LiveCD's own font the recognizer
-    reads `Welcome` as `Uelcooe` and `program` as `prograo`. Every
-    `wait` on installer text misses. Recognition is deterministic:
-    two reads of one static screen agree cell for cell.
   - **Decoration cannot be recognized at a screenshot backend's
     cadence.** `screen_stability` masks a cell as decoration after
     three changes within a 1s window; a VirtualBox read costs ~0.83s,
@@ -330,6 +322,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no public surface writes a machine variable.
 
 ### Fixed
+
+- **A guest screen is read through the guest's own font.** The
+  recognizer's only production consumer is VirtualBox, and the bank it
+  read through is curated from the host *QEMU* vgabios — so it was
+  reading one emulator's screen with another's face. Nineteen of 256
+  glyphs differ, `W` and `m` among them: `Welcome to the FreeDOS 1.4
+  installation program.` recognized as `Uelcooe ... prograo.`, and
+  every `wait` on installer text missed. `recognize(bank=)` now takes
+  the bank to read through, and each backend answers for its own —
+  `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu`
+  alike — carving it out of the installation, anchored on the classic
+  `A` every CP437 bank shares and failing closed by name where the
+  install holds none.
+
+  **Extracted on demand and cached, never vendored.** The bank lands
+  in `cache/support/<backend>/cp437-8x16.bin`, regenerable like
+  everything under that root: delete it and the next read extracts it
+  again, and a truncated file is re-extracted rather than raised on. A
+  cache hit never goes near the installation. The cache root reaches
+  the adapter as `Machine(cache=)` → `adapter.session(vm, cache=)`,
+  which is new on the adapter seam and optional — `None` re-extracts,
+  a speed cost and never a correctness one. Not vendoring is the
+  licensing policy as much as the engineering: the glyphs belong to
+  whatever emulator the host installed, and copying another project's
+  font into this tree is third-party material the policy does not
+  admit, whatever its licence. Reliquary's own
+  `fonts/cp437_8x16.bin` stays as `recognize`'s default and as what
+  `render` draws fixtures with, so the suite still needs no
+  hypervisor.
 
 - **The menu highlight is followed on a recognized framebuffer.**
   `select` located the selection bar as the rarest attribute on

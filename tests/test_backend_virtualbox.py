@@ -15,6 +15,7 @@ import uuid
 from unittest import mock
 
 from reliquary import backend_virtualbox as vbox
+from reliquary import text_recognize
 from reliquary.errors import PreflightError, StaticError
 
 
@@ -111,6 +112,78 @@ class AdapterSurfaceTests(unittest.TestCase):
         self.assertEqual(report.controllers, ("ide",))
         self.assertFalse(report.vvfat)
         self.assertFalse(report.at_rest)
+
+    def _install(self, root, payload):
+        """A stand-in VirtualBox install directory carrying ``payload``."""
+        with open(os.path.join(root, "VBoxDD2.dll"), "wb") as handle:
+            handle.write(payload)
+        return mock.patch.object(
+            vbox, "find_vboxmanage",
+            return_value=os.path.join(root, "VBoxManage.exe"))
+
+    def test_the_glyph_bank_is_read_from_the_installation(self):
+        """The font comes off the host; none is vendored here.
+
+        The fixture embeds Reliquary's *own* bank in a stand-in
+        binary, so the suite carries no other project's font while
+        still proving the adapter reads one out of its install.
+        """
+        own = text_recognize.glyph_bank()
+        with tempfile.TemporaryDirectory() as home:
+            with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
+                self.assertEqual(vbox.guest_glyph_bank(), own)
+
+    def test_the_bank_is_cached_under_the_backend_support_dir(self):
+        own = text_recognize.glyph_bank()
+        with tempfile.TemporaryDirectory() as home, \
+                tempfile.TemporaryDirectory() as cache:
+            with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
+                self.assertEqual(vbox.guest_glyph_bank(cache), own)
+            expected = os.path.join(cache, "support", "virtualbox",
+                                    "cp437-8x16.bin")
+            self.assertTrue(os.path.isfile(expected))
+            with open(expected, "rb") as handle:
+                self.assertEqual(handle.read(), own)
+            # Served from the cache now: the install is gone and the
+            # answer is unchanged.
+            with mock.patch.object(
+                    vbox, "find_vboxmanage",
+                    side_effect=AssertionError("must not re-extract")):
+                self.assertEqual(vbox.guest_glyph_bank(cache), own)
+
+    def test_a_truncated_cache_file_is_re_extracted(self):
+        own = text_recognize.glyph_bank()
+        with tempfile.TemporaryDirectory() as home, \
+                tempfile.TemporaryDirectory() as cache:
+            stale = os.path.join(cache, "support", "virtualbox")
+            os.makedirs(stale)
+            with open(os.path.join(stale, "cp437-8x16.bin"), "wb") as handle:
+                handle.write(b"\x00" * 100)
+            with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
+                self.assertEqual(vbox.guest_glyph_bank(cache), own)
+
+    def test_an_installation_with_no_font_fails_closed(self):
+        with tempfile.TemporaryDirectory() as home:
+            with self._install(home, b"\x00" * 9000):
+                with self.assertRaises(PreflightError) as caught:
+                    vbox.guest_glyph_bank()
+        self.assertEqual(caught.exception.rule_id,
+                         "recognize.font-not-found")
+        self.assertIn("cannot read a guest screen", str(caught.exception))
+
+    def test_text_screen_reads_through_the_host_font(self):
+        marker = b"\x5a" * 4096
+        session = vbox.VirtualBoxSession(
+            "uuid-1", "reliquary-plain-0", cache="/tmp/cache")
+        with mock.patch.object(vbox, "guest_glyph_bank",
+                               return_value=marker) as bank, \
+                mock.patch.object(session, "screenshot"), \
+                mock.patch.object(vbox.text_recognize, "recognize",
+                                  return_value=([], [])) as recognize:
+            session.text_screen()
+        self.assertEqual(recognize.call_args.kwargs["bank"], marker)
+        # And the session's cache root is where it is told to keep it.
+        self.assertEqual(bank.call_args.args, ("/tmp/cache",))
 
     def test_discover_reports_a_found_binary(self):
         with mock.patch.object(vbox, "find_vboxmanage",

@@ -286,7 +286,25 @@ workflow:
   table has no entry for `space` or `enter`; the seam is named for the reference backend rather than carrying
   a third vocabulary no backend speaks.
   `text_recognize.py` is the **shared fixed-font recognizer** (F51) backends without VGA text memory
-  use over a screenshot — same contract, one glyph bank (`fonts/cp437_8x16.bin`).
+  use over a screenshot — same contract, one algorithm. **The glyph bank is the guest's, not
+  Reliquary's**: VGA BIOS fonts differ between emulators (19 of 256 glyphs between the two met so
+  far, `W` and `m` among them, which is enough to miss every wait on a word carrying either), so an
+  adapter reading a live screen passes `bank=` its own host's font. Each backend answers that the
+  same way — `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu` alike — carving
+  the bank out of the installation with `bank_from_files` / `bank_from_binary`, anchored on the
+  classic `A` every CP437 bank shares and failing closed by name where the install holds none.
+  QEMU's own plane never needs it (it scrapes text memory, where the guest already resolved its
+  characters); it exists so the question is answered identically for both rather than only where
+  it bit. **The font is extracted on demand and cached, never vendored** —
+  `cache/support/<backend>/cp437-8x16.bin` via `text_recognize.cached_bank`, wholly regenerable
+  like everything under that root, so a truncated cache file is re-extracted rather than raised
+  on. The cache root reaches the adapter as `Machine(cache=)` → `adapter.session(vm, cache=)`, a
+  plain resolved directory and **not derivable from the machine directory** (`machines` is
+  independently placeable); `None` simply re-extracts, since this is a speed concern and never a
+  correctness one. Not vendoring is the licensing policy (CONTRIBUTING.md) as much as the
+  engineering: the glyphs belong to whatever emulator the host installed. The shipped
+  `fonts/cp437_8x16.bin` remains **only** as `recognize`'s default and what `render` draws
+  fixtures with, so the suite needs no hypervisor.
   **Whether a screen has stopped changing
   is not decided here** (F49): `_settled_screen` and `_menu_baseline` are callers of `screen_stability` rather
   than owners of a copy. What stays is what was never about settling — whether a keypress changed anything at
