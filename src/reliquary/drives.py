@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from . import at_rest
 from . import backends
 from .errors import InternalError, PreflightError, ReliquaryError
+from . import platform_dos
 from .machine_state import (load_machine_state, machine_lock,
                             resolve_machine, write_state)
 
@@ -196,7 +197,6 @@ def _compose_drive_report(machine_id, state, recorded):
         entries.append(entry)
     platform_name = state.get("platform") or "dos"
     if platform_name == "dos":
-        from . import platform_dos
         letters = platform_dos.drive_letters(drives, counts)
         undetermined_keys = platform_dos.undetermined_letters(
             drives, counts)
@@ -257,7 +257,6 @@ def _addressing(platform):
             f"in-band file exchange is not implemented for platform "
             f"{platform!r}; DOS is the delivered workflow",
             rule_id="platform.verb-not-implemented")
-    from . import platform_dos
     return platform_dos
 
 

@@ -27,6 +27,7 @@ import os
 
 from .errors import InternalError, PreflightError, StaticError
 from .home import machines_dir
+from .library import locate_blueprint
 
 
 def machine_dir_path(machine_id, context=None):
@@ -303,7 +304,6 @@ def machines_for_blueprint(name, context=None):
     not resolve in this invocation, only such sourceless machines can
     match. Ordered like :func:`list_machines`.
     """
-    from .library import locate_blueprint
     matches = list_machines(context, blueprint=name)
     try:
         resolved = os.path.abspath(locate_blueprint(name, context=context))

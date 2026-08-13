@@ -42,6 +42,7 @@ node type; that keeps the parser free to import it.
 
 import re
 
+from . import facts
 from .script_nodes import KEYWORDS, ScriptParseError
 from .script_timing import parse_duration
 
@@ -119,7 +120,6 @@ def _derivations(script):
     knowable — or knowably unanswerable — before the run, so every
     error it can carry is caught here rather than at binding time.
     """
-    from . import facts
     declared = {prop.key: prop for prop in script.properties}
     for prop in script.properties:
         if not prop.defaults:

@@ -26,6 +26,7 @@ import tempfile
 
 from . import credentials
 from .errors import StaticError
+from .home import Context, home_dir
 
 _SEGMENT = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 _RESERVED = ("rlq", "reliquary")
@@ -62,7 +63,6 @@ def _properties_path(context=None, properties_file=None):
     that slot, honoured in the CLI's own construction step and
     never here: the library reads no environment.
     """
-    from .home import Context, home_dir
     if properties_file is None and isinstance(context, Context):
         properties_file = context.properties_file
     if properties_file is not None:

@@ -30,6 +30,8 @@ import shutil
 from .acquire import fetch_media as _acquire_fetch
 from .errors import PreflightError
 from .home import media_dir
+from .machines import list_machines, load_machine_state
+from .progress import stream_for
 from .resolve import load_namespace, resolve_media
 
 
@@ -45,7 +47,6 @@ def fetch_media(name, context=None, on_mismatch="fail", progress="auto"):
     fetches ride (docs/spec/media-spec.md, "Fetch progress").
     The stream is ephemeral — nothing is written down (D36).
     """
-    from .progress import stream_for
     namespace = load_namespace(context)
     media = resolve_media(name, namespace)
     events = stream_for(progress)
@@ -85,7 +86,6 @@ def _cached_files(context=None):
 
 def _attached_media(context=None):
     """Media names attached to any existing machine, with their phase."""
-    from .machines import list_machines, load_machine_state
     attached = {}
     for machine in list_machines(context):
         try:

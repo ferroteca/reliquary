@@ -29,9 +29,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 from .binding import bind_properties, console_asker, describe_sources
+from .document import load_document
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
-                     RunFailure, StaticError)
-from .library import locate_script
+                     RunFailure, StaticError, exit_code, outcome)
+from .library import locate_blueprint, locate_script
 from .control_display import char_keys
 from .machine_handle import (Machine, screenshot,
                             validate_screenshot_name)
@@ -581,7 +582,6 @@ class _ScriptEngine:
 
     def _terminal(self, error):
         """Emit the stream's last word: what the run came to."""
-        from .errors import exit_code, outcome
         self._emit(
             _events.RUN_END, outcome=outcome(error),
             **{"exit-code": exit_code(error) if error else 0,
@@ -1673,7 +1673,6 @@ def _blueprint_invocation(state, context):
     source = state.get("blueprint-source")
     if not source or not os.path.exists(source):
         return {}, {}
-    from .document import load_document
     try:
         document = load_document(source)
     except (OSError, StaticError, PreflightError):
@@ -1885,9 +1884,7 @@ def _dry_run_script(label, *, blueprint=None, machine=None, context=None,
         state = _machines.load_machine_state(machine_id, context)
         scripts_map, parameters = _blueprint_invocation(state, context)
     elif blueprint is not None:
-        from .library import locate_blueprint
-        from .document import load_document
-        # Read-only: locate resolves the codex file directly in home
+            # Read-only: locate resolves the codex file directly in home
         # mode without seeding, so a dry run never writes.
         doc = load_document(locate_blueprint(blueprint, context=context))
         machine_component = doc.machines.get(blueprint)
