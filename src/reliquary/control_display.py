@@ -332,7 +332,7 @@ class DisplayConsole:
             raise StaticError("menu item text must be non-empty",
                 rule_id="value.not-a-string")
         deadline = time.monotonic() + timeout
-        mask, rows, attributes = self._menu_baseline(deadline)
+        mask, rows, attributes = self._first_look(deadline, item, exclude)
         target_row = _match_menu_row(rows, item, exclude)
         current = None
         highlight = None
@@ -424,6 +424,38 @@ class DisplayConsole:
         selected = rows[target_row].strip()
         self.send_keys([["ret"]])
         return selected
+
+    def _first_look(self, deadline, item, exclude):
+        """One read before any settling, so a countdown is not lost.
+
+        **A menu that boots itself cannot be studied first.** The
+        baseline below spends `_BASELINE_READS` reads learning which
+        cells repaint on their own, and on a screenshot backend at
+        seconds per read that is longer than a boot menu's countdown:
+        the machinery times out the very menu it is preparing to
+        steer. The edge is sharper than slowness alone — a countdown
+        *is* decoration, so those reads are spent learning the timer
+        that is running out.
+
+        Where the item is already on screen — which it is whenever a
+        `wait` has just matched it, the ordinary way a `select` is
+        reached — one read is enough to locate it and press. Any key
+        cancels the countdown on every menu we have met, so the first
+        probe keypress buys the time the baseline would have spent,
+        and the mask is learned afterward on a screen that has
+        stopped counting.
+
+        Falls back to the full baseline when the item is *not* there
+        yet, which is the case that needs settling anyway: the screen
+        is still arriving, and there is nothing to race.
+        """
+        rows, raw = self.screen()
+        try:
+            _match_menu_row(rows, item, exclude)
+        except RunFailure:
+            return self._menu_baseline(deadline)
+        empty = frozenset()
+        return empty, rows, _masked_attributes(raw, empty)
 
     def _menu_baseline(self, deadline, quiet=5.0):
         """Wait for the menu to finish painting, then learn its noise.

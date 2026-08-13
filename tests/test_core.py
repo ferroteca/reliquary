@@ -433,6 +433,42 @@ class _RecognizedLanguageMenu:
             self.cursor -= 1
 
 
+class _CountdownMenu(_FakeMenu):
+    """Boots its default unless a key arrives within `patience` reads.
+
+    The installed FreeDOS boot menu: a ticking countdown that selects
+    option 1 on expiry. Any key cancels it, which is what makes
+    pressing before studying the screen the whole fix — the reads a
+    baseline would spend are spent learning the timer running out.
+    """
+
+    def __init__(self, items, patience=3):
+        super().__init__(items)
+        self._patience = patience
+        self.reads = 0
+        self.booted = False
+        self.tick = 0
+
+    def screen(self):
+        self.reads += 1
+        self.tick += 1
+        if self.reads > self._patience and self.selected is None:
+            self.booted = True
+        rows, attributes = super().screen()
+        if self.booted:
+            rows = ["Starting FreeDOS..."] + [""] * 24
+            return rows, [[0x07] * 80 for _ in range(25)]
+        # the countdown itself, repainting every read
+        rows[24] = "Automatic boot in %d seconds..." % (9 - self.tick % 9)
+        return rows, attributes
+
+    def press(self, key):
+        if self.booted:
+            return
+        self._patience = 10_000       # any key cancels the countdown
+        super().press(key)
+
+
 class _PaintingMenu(_FakeMenu):
     """Still painting its dialog when selection starts.
 
@@ -603,6 +639,45 @@ class CursorMenuTests(unittest.TestCase):
 
         self.assertEqual(display_module._bar_move(before, after),
                          (None, None))
+
+    def test_a_menu_that_boots_itself_is_steered_before_it_expires(self):
+        """T23: press first, study after.
+
+        Learning the animation mask first costs `_BASELINE_READS`,
+        which on a slow reading path outlasts a boot menu's
+        countdown — so the machinery timed out the menu it was
+        preparing to steer.
+        """
+        menu = _CountdownMenu(["Load FreeDOS with JEMM386",
+                               "Load FreeDOS with JEMMEX",
+                               "Load FreeDOS safe mode"], patience=3)
+
+        selected = self._select(menu, "JEMMEX")
+
+        self.assertFalse(menu.booted)
+        self.assertEqual(menu.selected, 1)
+        self.assertEqual(selected, "Load FreeDOS with JEMMEX")
+
+    def test_a_screen_without_the_item_still_settles_first(self):
+        """The fallback: nothing to race when the item is not there.
+
+        A screen still arriving needs the baseline, and its absence
+        is what says so — so the cheap path is taken only where a
+        `wait` has already put the item on screen.
+        """
+        menu = _PaintingMenu(["First item", "Second item"], frames=6)
+        console = display_module.DisplayConsole(None)
+        console.screen = menu.screen
+        clock = _MenuClock()
+        with mock.patch.object(display_module.time, "monotonic",
+                               clock.monotonic), \
+                mock.patch.object(display_module.time, "sleep",
+                                  clock.sleep):
+            mask, rows, _attrs = console._first_look(
+                clock.monotonic() + 30, "not on this screen", ())
+
+        self.assertTrue(any("First item" in row for row in rows))
+        self.assertGreater(menu._painting, -1)
 
     def test_the_bar_is_followed_on_a_recognized_framebuffer(self):
         # F52's live failure: cell tokens recovered from pixels rather
