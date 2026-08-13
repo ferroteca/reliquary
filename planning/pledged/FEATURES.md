@@ -32,6 +32,175 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
+## F60 — The remaining suites are pytest-native
+
+> **Pledged 2026-08-13** (owner), cut straight to this file by
+> **D106**. Demanded by **P11** on D106's reading. Needs **F55**
+> delivered first; no order binds it against F56–F59. Assumes
+> **D105**'s catalogue move has landed, since two of these modules
+> read it.
+
+The tail: twenty small modules and roughly 470 tests — the CLI and
+document surface, the core helpers, the home and asset machinery,
+the media path, and the guards. Nothing here is architecturally
+interesting, and that is the point: it is what stands between a
+mostly-converted suite and an idiom policy with no exceptions.
+
+Work items:
+
+1. Convert the surface modules — `test_cli`, `test_document`,
+   `test_documented_examples`, `test_command_manifest`,
+   `test_old_surface_purge`, `test_errors`.
+2. Convert the core and resource modules — `test_core`,
+   `test_binding`, `test_home`, `test_assets`, `test_resolve`,
+   `test_library`, `test_media`, `test_acquire`,
+   `test_credentials`, `test_json5reader`, `test_transcript`,
+   `test_authoring`, `test_facts`,
+   `test_external_effect_guards`.
+3. The document-globbing tests read the script-example catalogue at
+   its `docs/` home, which is where D105 put it.
+4. Same assertions and the same collected count as the run before
+   the conversion. The suite is pytest-native throughout, and the
+   idiom policy F55 wrote has nothing left to exempt.
+
+## F59 — The machine and backend suites are pytest-native
+
+> **Pledged 2026-08-13** (owner), cut straight to this file by
+> **D106**. Demanded by **P11** on D106's reading. Needs **F55**
+> delivered first; no order binds it against the other sweeps.
+
+Ten modules and roughly 460 tests, `test_machines` alone carrying
+182 of them. This is the cluster that builds things — temp homes,
+stub backends, machine state — so it is where fixtures earn their
+keep rather than merely replacing `setUp`.
+
+Work items:
+
+1. The shared construction becomes fixtures: the temp home, the
+   stub backend, the machine under test — each scoped so an
+   expensive one is built once rather than per method.
+2. Convert `test_machines`, `test_session`, `test_events`,
+   `test_properties`.
+3. Convert `test_backend_qemu`, `test_backend_virtualbox`,
+   `test_backends`, `test_at_rest`, `test_screen_stability`,
+   `test_text_recognize`.
+4. The two backends' shared expectations become **one parametrised
+   contract over the adapter seam** instead of paired near-identical
+   methods, so a seam requirement cannot be honored by one backend's
+   test and quietly missing from the other's (**P25**).
+5. Same assertions and the same collected count as the run before
+   the conversion.
+
+## F58 — The script-language suite is pytest-native
+
+> **Pledged 2026-08-13** (owner), cut straight to this file by
+> **D106**. Demanded by **P11** on D106's reading. Needs **F55**
+> delivered first; no order binds it against the other sweeps.
+
+Eight modules and roughly 360 tests — the largest single cluster,
+and the one where parametrisation pays past the conversion itself.
+The static validation rules are a table pretending to be a method
+list, and the script corpus is a directory pretending to be one.
+
+Work items:
+
+1. Convert `test_script_runner`, `test_script_validation`,
+   `test_script_parser`, `test_script_nodes`, `test_script_timing`,
+   `test_run_script`, `test_dry_run`.
+2. **The V-rules become parametrised over the rule table** rather
+   than a method per rule, so a rule added to the language without a
+   test is visible as a missing case instead of an absence nobody
+   counts.
+3. `test_script_corpus` reads through the parametrisation helper
+   F56 builds, rather than growing a second one.
+4. Same assertions and the same collected count as the run before
+   the conversion.
+
+## F57 — The integration tier is a marker, not a skip
+
+> **Pledged 2026-08-13** (owner), cut straight to this file by
+> **D106**, whose argument about skips this is. Demanded by
+> **P11**. Needs **F55** delivered first.
+
+Two FreeDOS runs are gated by `RELIQUARY_INTEGRATION` and a
+`skipUnless`, and AGENTS.md asserts the suite skips **exactly two**
+tests — a count that exists precisely because a skip cannot say
+whether it was chosen or suffered. A marker says which, and the
+count stops standing in for it.
+
+Work items:
+
+1. `@pytest.mark.integration` on the QEMU and VirtualBox runs,
+   deselected by default and selected by an explicit option.
+2. `RELIQUARY_INTEGRATION` retires as the gate.
+   `RELIQUARY_INTEGRATION_HOME` stays and becomes a fixture input
+   rather than an environment read at module scope.
+3. The AGENTS.md skip rule rewrites against what the marker makes
+   true: **zero** skips in the default run, the tier deselected
+   rather than skipped, and any surviving skip a defect as before.
+4. The integration command blocks in AGENTS.md fold to the marker
+   selection.
+
+## F56 — The conformance corpus is parametrised
+
+> **Pledged 2026-08-13** (owner), cut straight to this file by
+> **D106**, whose whole argument this is. Demanded by **P11**. Needs
+> **F55** delivered first.
+
+The corpus claims the parser and the schema cannot drift. It once
+ran against the parser and **not** the schema and nothing said so,
+because 135 fixtures across two checks inside `subTest` is a run
+whose halved form looks exactly like its whole one. Parametrised,
+the fixtures are collected nodes and the count is the assertion.
+
+Work items:
+
+1. Every fixture becomes a collected node named for its file,
+   across both the parser check and the schema check.
+2. **The collected count is asserted**, so a corpus that stops
+   loading fails rather than passing quietly.
+3. The blueprint, machine-state and script corpora read through
+   **one** parametrisation helper, not three — the helper F58's
+   corpus item also uses.
+4. The corpus READMEs say what a fixture's node is called, since
+   selecting one by name is now how a failing fixture is debugged.
+
+## F55 — pytest is the runner, and the idiom is written down
+
+> **Pledged 2026-08-13** (owner), cut straight to this file by
+> **D106**, which decided the suite is pytest-native. Demanded by
+> **P11** on D106's reading: a check that silently does not run is a
+> capability gap failing open. **F56 through F60 each need this one
+> delivered first**, and bind no order among themselves.
+
+The runner changes and no test body does. pytest collects
+`unittest.TestCase` unchanged, so this lands green — which is the
+whole reason it is separate. The failure mode this migration has to
+avoid is a suite half in each idiom with nothing written down about
+which one new work takes, and that is a documentation act, not a
+conversion.
+
+Work items:
+
+1. `pytest` in `[dependency-groups].dev`, a hard requirement of the
+   suite imported like `jsonschema` — never behind a guard feeding a
+   `skipUnless`.
+2. `[tool.pytest.ini_options]` in `pyproject.toml`: **plugin
+   autoload off**, `testpaths`, and the `addopts` that make a
+   stranger's run collect what this project's run collects. D106
+   took this deliberately — the suite ships in the sdist (D105) and
+   must not collect differently in a packager's environment.
+3. The command blocks fold: AGENTS.md "Required checks" and the
+   integration block, CONTRIBUTING.md's verify block. `python -m
+   unittest tests` stops being the documented entry point.
+4. **The idiom policy**, in AGENTS.md beside the stdlib preference
+   D106 amends: new tests are pytest-native — bare `assert`,
+   fixtures, `parametrize` — and `unittest.mock` stays, being the
+   mocking library rather than the runner. The standing `TestCase`
+   classes convert under F56–F60 and are not touched here.
+5. The floor run and the build still pass — 3.12 and the default
+   interpreter (**D95**), and `uv build` unaffected.
+
 ## F54 — The scoped machine-state change
 
 > **Pledged 2026-08-13** (owner), cut straight to this file in the

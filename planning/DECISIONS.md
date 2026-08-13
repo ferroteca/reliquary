@@ -178,6 +178,82 @@ is waiting on an answer today.
 
 ## Decided
 
+- D106 — THE SUITE IS PYTEST-NATIVE — DECIDED (owner, 2026-08-13).
+  Supports **P11**'s reading, as D95 read it across: a check that
+  silently does not run is a capability gap failing open. Amends
+  AGENTS.md's stdlib-`unittest` preference, whose normative text
+  lands with the migration.
+
+  **The dependency was never the argument, and it was the one being
+  made.** AGENTS.md already holds that a test-only dependency is a
+  hard requirement of the suite — `jsonschema` is one — so a count
+  settles nothing. What settles it is the failure that very rule was
+  written for: the conformance corpus ran against the parser and
+  *not* the schema while claiming the two cannot drift, and 135
+  fixtures across two checks inside `subTest` is a run whose halved
+  form looks exactly like its whole one. Parametrised, every fixture
+  is a collected node and the count is the assertion. The opt-in
+  integration tier is the same shape — a marker states a deliberate
+  tier where `skipUnless` states an accident, which is why that tier
+  needs an exact skip count asserted around it today.
+
+  WEIGHED AND DECLINED: **pytest as the runner only**, keeping the
+  `TestCase` classes. It is nearly free and keeps `python -m unittest
+  tests` working for anyone unpacking the sdist — and buys none of
+  the above, the corpus staying inside `subTest` and the tier staying
+  a skip, which are the two things the change is for. WEIGHED AND
+  DECLINED: **staying on unittest**, the same position with the
+  dependency saved.
+
+  Two costs taken deliberately. `python -m unittest tests` stops
+  working, so verifying an unpacked sdist needs the dev group — in
+  the same round as **D105**, which is what put the suite in the
+  sdist — taken because pytest is packaged everywhere a packager
+  works. And **plugin autoload is turned off in the project's own
+  configuration** rather than left to whoever runs it: a suite
+  shipped to strangers must not collect differently in their
+  environment than in this one.
+
+  Reopens on nothing here. The stdlib preference stands everywhere
+  else: this is one dependency judged compelling, not the bar
+  lowered.
+
+- D105 — THE SDIST CARRIES THE SUITE, NOT THE GOVERNANCE — DECIDED
+  (owner, 2026-08-13). Supports **P11**'s reading: a claim nobody can
+  check is not a claim. Amends **D96**, whose `planning/` half stands
+  and whose wheel half is untouched.
+
+  **D96 read the ecosystem as neutral on the sdist, and it is not.**
+  An sdist is conventionally the artifact a stranger can build *and
+  verify* from, and downstream packagers run the upstream suite at
+  package-build time — the convention runs the other way from the
+  entry that dropped it, which weighed the wheel's settled rule and
+  the file count without weighing that. And the count argued
+  `planning/`, not the suite: 187 of 280 files was governance and
+  fixtures counted together, and governance alone is what has no
+  business in a stranger's hands.
+
+  WEIGHED AND DECLINED: leaving the suite out and resting on `uv
+  build`'s completeness gate, which was D96's answer to what shipping
+  it bought. The gate is kept, and is still how a source archive's
+  completeness is proved — it simply never argued for *withholding*
+  the suite, only that nothing was lost by doing so. What was lost is
+  the packager's run, on a platform this project never tests.
+
+  **The catalogue moves rather than being packaged around.** The
+  `planning/design` graft existed so the documented-example tests
+  could read the script-example catalogue out of an unpacked sdist,
+  and shipping the suite without governance puts that problem back. A
+  corpus the code is checked against is a norm, and norms leave
+  `planning/` permanently: it goes to `docs/`, which ships already.
+  The skip bar AGENTS.md sets — an exact count, every other skip a
+  defect — was justified by the suite running from the repository and
+  nowhere else, which is no longer true; the bar survives on the
+  catalogue moving, not on a guard being reintroduced.
+
+  Reopens if the suite acquires a requirement a packager cannot
+  reasonably meet. **D106**'s pytest is not one.
+
 - D104 — A SCOPED MACHINE-STATE CHANGE IS A BLOCK, AND ITS RESTORE
   OBEYS THE STOPPED-ONLY RULE — DECIDED (owner, 2026-08-13, the U24
   pledge round). Supports **U24** and **U26**; P14, S3. Bounded by
@@ -437,15 +513,18 @@ is waiting on an answer today.
   strikes T8.
 
 - D96 — RELEASED ARTIFACTS CARRY NO TESTS — DECIDED (owner,
-  2026-07-30). Supports P21's instinct applied to what is shipped
-  rather than what is depended on. The wheel already excluded the
-  suite; the sdist grafted it deliberately, and **that half was never
-  adjudicated** — it accreted through `MANIFEST.in`, and AGENTS.md
-  and `check_dist.py` then described it as settled, `check_dist`
-  going as far as to *require* it. Two-thirds of the source
-  distribution was tests: 187 of 280 files.
+  2026-07-30). [Its sdist half is overruled by **D105**: the suite
+  ships in the sdist again, and only the wheel and the `planning/`
+  clauses below still govern.] Supports P21's instinct applied to
+  what is shipped rather than what is depended on. The wheel already
+  excluded the suite; the sdist grafted it deliberately, and **that
+  half was never adjudicated** — it accreted through `MANIFEST.in`,
+  and AGENTS.md and `check_dist.py` then described it as settled,
+  `check_dist` going as far as to *require* it. Two-thirds of the
+  source distribution was tests: 187 of 280 files.
 
-  **The contested call is what replaces the sdist gate.** Shipping
+  [Overruled by D105.] **The contested call is what replaces the
+  sdist gate.** Shipping
   the suite bought one real thing — "unpack the sdist outside the
   tree and run the suite there," the check that the source package
   was complete — and dropping it has to answer for that. It is
@@ -462,6 +541,8 @@ is waiting on an answer today.
   governance shipped to a stranger to serve a test run nobody
   performs. It goes with the suite, and `check_dist` now **forbids**
   both trees in both artifacts rather than requiring them in one.
+  [D105 keeps the `planning/` half of that and drops the other: the
+  suite is required in the sdist and forbidden in the wheel.]
   `docs/` stays: documentation in a source package is conventional
   and is not a test.
 
