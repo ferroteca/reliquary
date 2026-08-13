@@ -1220,7 +1220,7 @@ edit them to remove the reference first, then delete the script
 ```
 rlq run-script <label> (--blueprint <name> | --machine <id>)
     [--property <key>=<value>]... [--properties <path>]
-    [--display] [--detach] [--progress <mode>]
+    [--display] [--progress <mode>]
     [--expect <key>=<value>]... [--record <path>]
 rlq run-script <label-or-name> --dry-run
     [--blueprint <name> | --machine <id>]
