@@ -59,11 +59,17 @@ workflow:
   `drives` — a media name, `null`, `{media, controller, enabled}`, or an inline media (the anonymous blank included) —
   `boot`, `name` (the id-safe identity, not a
   display label), `description`, `scripts`, `control-planes`, `backend-settings`, `parameters`),
-  `blueprint.py` is authoring-only — scaffolds (`new_blueprint`), writes a media declaration for a file already
+  `authoring.py` is **the counterpart of `assets.py`** — `assets` resolves and reads what a user owns, `authoring`
+  writes and removes it — and is authoring-only: it scaffolds (`new_blueprint`), writes a media declaration for a
+  file already
   on disk (`add_media(name, file)`: computes the sha256, writes `blueprints/<name>.rlqb` locating the media at
   that path, copies nothing, refuses to overwrite — the supply seam for pinned-but-unlocated codex media, D41),
-  and removes home blueprint files (`delete_blueprint` —
-  fails closed while any machine of that blueprint exists), `resolve.py` builds the merged `(name, type)` resolution
+  and removes both authored kinds — `delete_blueprint`, which fails closed while any machine of that blueprint
+  exists, and `delete_script`, which fails closed while any blueprint in the source references the script.
+  **Both removals refuse while something still refers to the file, and that shared order is why the two kinds sit
+  together** — who refers to this, does the file exist, remove it — while the answers come from entirely different
+  places (the machine list; every blueprint parsed for its `scripts` map), which is why it is a shape kept aligned
+  by adjacency and not a helper. `resolve.py` builds the merged `(name, type)` resolution
   namespace from every `.rlqb` in the active source (`load_namespace` / `build_namespace`, cross-file collision
   detection), resolves a media by name (`resolve_media`), and lowers it to a nested fetch plan
   (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,

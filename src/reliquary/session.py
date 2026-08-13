@@ -31,8 +31,8 @@ construction reads and writes no module-global state, and the
 pinned record means no later call reads any either.
 """
 
-from . import (binding, blueprint, library, machines, media, properties,
-               resolve, script, script_runner)
+from . import (authoring, binding, library, machines, media,
+               properties, resolve, script_runner)
 from .errors import StaticError
 from .home import _ctx, _pinned
 
@@ -253,17 +253,17 @@ class Session:
 
     def new_blueprint(self, name, *, platform="dos"):
         """Scaffold a minimal composed blueprint; returns its path."""
-        return blueprint.new_blueprint(name, platform=platform,
+        return authoring.new_blueprint(name, platform=platform,
                                        context=self._context)
 
     def add_media(self, name, path):
         """Author a media declaration for a file already on disk."""
-        return blueprint.add_media(name, path, context=self._context)
+        return authoring.add_media(name, path, context=self._context)
 
     def delete_blueprint(self, name):
         """Remove a home blueprint file; fails closed while its
         machines exist."""
-        return blueprint.delete_blueprint(name, context=self._context)
+        return authoring.delete_blueprint(name, context=self._context)
 
     # Script management
 
@@ -274,7 +274,7 @@ class Session:
         Never deletes package codex files — only a file under
         ``scripts/``.
         """
-        return script.delete_script(name, context=self._context)
+        return authoring.delete_script(name, context=self._context)
 
     # Asset resolution.
 

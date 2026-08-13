@@ -68,7 +68,7 @@ def _machine_objects(blueprint_data):
             yield spec
 
 
-def _referenced_scripts(blueprint_data):
+def referenced_scripts(blueprint_data):
     """Yield the script stems a composed blueprint's machines reference."""
     for machine in _machine_objects(blueprint_data):
         scripts = machine.get("scripts")
@@ -294,7 +294,7 @@ def seed_blueprint(name, context=None, *, only=False):
     if not only:
         # Media travel inside the composed blueprint; only the scripts
         # its machines reference are separate files to seed.
-        for stem in _referenced_scripts(data):
+        for stem in referenced_scripts(data):
             seed_script(stem, context=context)
     return True
 

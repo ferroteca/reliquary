@@ -152,13 +152,13 @@ class AddMediaTests(unittest.TestCase):
         return path
 
     def test_it_writes_a_media_spec_pinning_the_computed_hash(self):
-        from reliquary import blueprint
+        from reliquary import authoring
         from reliquary.document import load_document
         ctx = self._ctx()
         payload = self._payload(ctx)
         expected = hashlib.sha256(b"ISO").hexdigest()
 
-        written = blueprint.add_media("win98-cd", payload, context=ctx)
+        written = authoring.add_media("win98-cd", payload, context=ctx)
 
         self.assertTrue(written.endswith("win98-cd.rlqb"))
         declared = load_document(written).media["win98-cd"]
@@ -167,41 +167,41 @@ class AddMediaTests(unittest.TestCase):
         self.assertEqual(declared.location[0].kind, "local")
 
     def test_the_file_stays_put_and_the_cache_is_untouched(self):
-        from reliquary import blueprint
+        from reliquary import authoring
         from reliquary.home import media_dir
         ctx = self._ctx()
         payload = self._payload(ctx)
 
-        blueprint.add_media("win98-cd", payload, context=ctx)
+        authoring.add_media("win98-cd", payload, context=ctx)
 
         self.assertTrue(os.path.exists(payload))
         self.assertFalse(os.path.isdir(media_dir(ctx)))
 
     def test_the_declaration_resolves_and_fetches_in_place(self):
         """The whole point: the media now works, unpinned from a cache."""
-        from reliquary import blueprint
+        from reliquary import authoring
         ctx = self._ctx()
         payload = self._payload(ctx)
-        blueprint.add_media("win98-cd", payload, context=ctx)
+        authoring.add_media("win98-cd", payload, context=ctx)
 
         fetched = media.fetch_media("win98-cd", context=ctx)
         # Forward slashes in the spec, so compare identity, not spelling.
         self.assertTrue(os.path.samefile(fetched, payload))
 
     def test_an_existing_blueprint_is_never_rewritten(self):
-        from reliquary import blueprint
+        from reliquary import authoring
         ctx = self._ctx()
         payload = self._payload(ctx)
-        blueprint.add_media("win98-cd", payload, context=ctx)
+        authoring.add_media("win98-cd", payload, context=ctx)
         with self.assertRaises(PreflightError):
-            blueprint.add_media("win98-cd", payload, context=ctx)
+            authoring.add_media("win98-cd", payload, context=ctx)
 
     def test_a_missing_file_fails_before_writing_anything(self):
-        from reliquary import blueprint
+        from reliquary import authoring
         from reliquary.home import blueprints_dir
         ctx = self._ctx()
         with self.assertRaises(PreflightError):
-            blueprint.add_media("win98-cd", os.path.join(ctx.home_dir, "nope"),
+            authoring.add_media("win98-cd", os.path.join(ctx.home_dir, "nope"),
                                 context=ctx)
         self.assertFalse(os.path.exists(
             os.path.join(blueprints_dir(ctx), "win98-cd.rlqb")))

@@ -80,7 +80,7 @@ def _check_cancelled(cancelled):
             "the run was cancelled during a host transfer")
 
 
-def _sha256(path, cancelled=None):
+def sha256(path, cancelled=None):
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
         for chunk in iter(lambda: handle.read(_CHUNK), b""):
@@ -214,7 +214,7 @@ def _verify(path, expected, describe, name=None, events=None,
     _events.note(events, _events.VERIFY_START, f"verifying {describe}",
                  name=name or describe, algorithm="sha256")
     started = time.monotonic()
-    actual = _sha256(path, cancelled)
+    actual = sha256(path, cancelled)
     if actual != expected:
         raise RunFailure(
             f"{describe} at {path} has SHA-256 {actual}, expected {expected}",
@@ -302,7 +302,7 @@ def _cache_hit(destination, name, expected, on_mismatch, source, context,
     """
     if not os.path.exists(destination):
         return False
-    actual = _sha256(destination, cancelled)
+    actual = sha256(destination, cancelled)
     if expected is None or actual == expected:
         return True
     _approve_refetch(name, actual, expected, on_mismatch, source, context)

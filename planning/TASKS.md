@@ -127,37 +127,6 @@ not keep.
 
 ### Restructures
 
-#### T15 — Merge `blueprint.py` and `script.py` into `authoring.py`
-
-`blueprint.py` authors and removes `.rlqb` files; `script.py` holds
-one verb, `delete_script`, and sits inside the `script_*` language
-family it has nothing to do with. They are the same shape — author
-or remove a user-owned file, failing closed while something still
-refers to it — written apart: `delete_blueprint` refuses while
-machines of the blueprint exist, `delete_script` while blueprints
-reference the script, one rule-id grammar across the two
-(`blueprint.has-machines`, `script.has-blueprints`).
-
-Merge both into **`authoring.py`**, holding `new_blueprint`,
-`add_media`, `delete_blueprint` and `delete_script`. It pairs with
-`assets.py`, which resolves and reads what this writes.
-
-Publish `library._referenced_scripts` as `referenced_scripts` in
-the same change — the package's one cross-module module-private
-access, which `script.py` reaches to walk home blueprints. The
-helper stays where it is: it is the codex seed closure's own
-question, used by `seed_blueprint`, and the authoring path asks
-the same question of a different file.
-
-`tests/test_blueprint.py` and `tests/test_script_authoring.py`
-merge to `tests/test_authoring.py` — the second already imports
-from both modules, which is the merge the test tree had already
-made.
-
-No application surface moves: no CLI command, no `Session` method,
-no exported name, no rule id, so [SURFACES.md](SURFACES.md) does
-not trigger.
-
 #### T16 — Rename `machine.py` to `machine_handle.py`
 
 The package spells its collective engine modules in the plural —
@@ -240,4 +209,4 @@ exit code, so [SURFACES.md](SURFACES.md) does not trigger. The
 oracle is byte-identical output from `rlq --help` and all 48
 `rlq <command> --help`, captured before and diffed after —
 stronger than the suite here, since AGENTS.md already validates
-documented syntax against `--help`. Independent of T15 and T16.
+documented syntax against `--help`. Independent of T16.

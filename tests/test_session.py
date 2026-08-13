@@ -19,9 +19,9 @@ import os
 import tempfile
 import unittest
 
-from reliquary import (binding, blueprint, credentials, library,
+from reliquary import (authoring, binding, credentials, library,
                        machines, media, properties, resolve,
-                       script, script_runner)
+                       script_runner)
 from reliquary.errors import StaticError
 from reliquary.home import Context
 from reliquary.script_parser import parse_script
@@ -303,10 +303,10 @@ _VENEERS = {
     "list_media": media.list_media,
     "clean_media": media.clean_media,
     "prune_media": media.prune_media,
-    "new_blueprint": blueprint.new_blueprint,
-    "add_media": blueprint.add_media,
-    "delete_blueprint": blueprint.delete_blueprint,
-    "delete_script": script.delete_script,
+    "new_blueprint": authoring.new_blueprint,
+    "add_media": authoring.add_media,
+    "delete_blueprint": authoring.delete_blueprint,
+    "delete_script": authoring.delete_script,
     "load_namespace": resolve.load_namespace,
     "list_blueprints": library.list_blueprints,
     "list_scripts": library.list_scripts,
