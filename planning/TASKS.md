@@ -239,13 +239,13 @@ anything. Underneath the length is the reason to touch it: **the
 `test_command_manifest.py` checks `_COMMANDS` against
 `command-manifest.toml` in both directions; the parsers and the
 dispatch arms are held by hand. All three agree today, so this is
-a latent hazard rather than a defect, but the two gaps fail
+a latent hazard rather than a defect, and the two gaps fail
 differently: a missing `_COMMANDS` entry silently stops leading
-flags being reordered, and a missing dispatch arm falls through
-to `return 0` — a command reporting success for work it never
-did.
+flags being reordered, while a missing dispatch arm raises a
+fault — loud, but only for whoever runs the command, which is
+what the test below turns into a static check.
 
-Four parts, one change:
+Three parts, one change:
 
 1. `_build_parser()` plus nine family builders, following the
    comment groups `main()` already carries — machine, script,
@@ -261,11 +261,7 @@ Four parts, one change:
    own so `_prog_name()` reads `sys.argv[0]` when it does today.
    `test_command_manifest.py` keeps reading `cli._COMMANDS`
    unchanged.
-3. `_dispatch`'s fall-through raises `InternalError` rather than
-   returning 0 — an unrouted command is an invariant reliquary
-   caught in its own state, which is exit 1 by the taxonomy (D58),
-   not success.
-4. A test walking the source for the dispatch arms and comparing
+3. A test walking the source for the dispatch arms and comparing
    them to the registered commands, the way `test_errors.py`
    already walks every `raise` in the package. That leaves one
    hand-kept list, mechanically pinned.
@@ -281,7 +277,7 @@ to reduce. **Weighed and declined:** a full
 The 48 commands have heterogeneous argument shapes (`run-script`
 alone carries a 35-line description, an epilog and a formatter
 class), `_dispatch` is not a pure lookup — the nine console
-commands share an `_interaction_target` step — and after the four
+commands share an `_interaction_target` step — and after the three
 parts above what remains is one pinned list.
 
 No application surface moves: no command, flag, help string or
