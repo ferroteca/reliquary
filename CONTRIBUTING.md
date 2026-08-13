@@ -48,8 +48,8 @@ cd reliquary
 uv sync
 ```
 
-Run things with `uv run` (for example `uv run python -m unittest
-tests`), which uses that environment without activating it.
+Run things with `uv run` (for example `uv run pytest`), which uses that
+environment without activating it.
 
 Runtime code is standard-library-only except for `qemu.qmp`. Please discuss a
 new dependency before adding it.
@@ -57,7 +57,9 @@ new dependency before adding it.
 ## Make and verify a change
 
 - Match the existing style and keep lines near 79 columns.
-- Add or update stdlib `unittest` coverage for changed behavior.
+- Add or update test coverage for changed behavior. pytest is the runner
+  and new tests are written pytest-native — bare `assert`, fixtures,
+  `parametrize` — while `unittest.mock` remains the mocking library.
 - Update README.md, CHANGELOG.md, and the affected docs/spec/ specification when public behavior changes.
 - Add SPDX headers to new files as described below.
 
@@ -66,7 +68,7 @@ Run the required checks from the project virtual environment:
 ```powershell
 $pythonFiles = (Get-ChildItem src/reliquary,tests -Filter *.py).FullName
 .venv\Scripts\python.exe -m py_compile $pythonFiles
-.venv\Scripts\python.exe -m unittest -v tests
+.venv\Scripts\pytest.exe
 .venv\Scripts\python.exe -m build
 git diff --check
 ```

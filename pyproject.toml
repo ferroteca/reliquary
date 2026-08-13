@@ -39,11 +39,20 @@ dependencies = [
 Homepage = "https://github.com/ferroteca/reliquary"
 
 [dependency-groups]
-dev = ["jsonschema"]
+dev = ["jsonschema", "pytest>=8.4"]
 
 [project.scripts]
 rlq = "reliquary:main"
 reliquary = "reliquary:main"
+
+[tool.pytest.ini_options]
+# The suite ships in the sdist (D105), so a stranger's run must
+# collect what this project's run collects: no plugin is loaded that
+# this file did not ask for, an unreadable option is an error rather
+# than a silent no-op, and a bare `pytest` finds the suite by itself.
+minversion = "8.4"
+testpaths = ["tests"]
+addopts = "--disable-plugin-autoload --strict-config --strict-markers"
 
 [tool.setuptools.packages.find]
 where = ["src"]

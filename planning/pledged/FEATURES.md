@@ -165,42 +165,6 @@ Work items:
 4. The corpus READMEs say what a fixture's node is called, since
    selecting one by name is now how a failing fixture is debugged.
 
-## F55 — pytest is the runner, and the idiom is written down
-
-> **Pledged 2026-08-13** (owner), cut straight to this file by
-> **D106**, which decided the suite is pytest-native. Demanded by
-> **P11** on D106's reading: a check that silently does not run is a
-> capability gap failing open. **F56 through F60 each need this one
-> delivered first**, and bind no order among themselves.
-
-The runner changes and no test body does. pytest collects
-`unittest.TestCase` unchanged, so this lands green — which is the
-whole reason it is separate. The failure mode this migration has to
-avoid is a suite half in each idiom with nothing written down about
-which one new work takes, and that is a documentation act, not a
-conversion.
-
-Work items:
-
-1. `pytest` in `[dependency-groups].dev`, a hard requirement of the
-   suite imported like `jsonschema` — never behind a guard feeding a
-   `skipUnless`.
-2. `[tool.pytest.ini_options]` in `pyproject.toml`: **plugin
-   autoload off**, `testpaths`, and the `addopts` that make a
-   stranger's run collect what this project's run collects. D106
-   took this deliberately — the suite ships in the sdist (D105) and
-   must not collect differently in a packager's environment.
-3. The command blocks fold: AGENTS.md "Required checks" and the
-   integration block, CONTRIBUTING.md's verify block. `python -m
-   unittest tests` stops being the documented entry point.
-4. **The idiom policy**, in AGENTS.md beside the stdlib preference
-   D106 amends: new tests are pytest-native — bare `assert`,
-   fixtures, `parametrize` — and `unittest.mock` stays, being the
-   mocking library rather than the runner. The standing `TestCase`
-   classes convert under F56–F60 and are not touched here.
-5. The floor run and the build still pass — 3.12 and the default
-   interpreter (**D95**), and `uv build` unaffected.
-
 ## F54 — The scoped machine-state change
 
 > **Pledged 2026-08-13** (owner), cut straight to this file in the

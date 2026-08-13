@@ -7,13 +7,14 @@ effects: no unit test reaches a hypervisor or the network, because
 the names that would are replaced below at import time.
 
 That makes the import itself load-bearing, and it is not guaranteed
-by every way of running the suite. ``unittest tests`` imports the
-package and then discovers through `load_tests`; ``unittest discover
--s tests`` treats this directory as the top level and imports the
-modules under top-level names, reaching this file only if something
-asks for it. `test_external_effect_guards` asks, deliberately and
-with no dependency on `reliquary` importing, and then asserts that
-the arming took (T26).
+by every way of running the suite. pytest, the runner (D106), imports
+each module as ``tests.test_*`` because this file makes the directory
+a package, so the arming runs before any test does; ``unittest
+discover -s tests`` treats this directory as the top level instead and
+imports the modules under top-level names, reaching this file only if
+something asks for it. `test_external_effect_guards` asks,
+deliberately and with no dependency on `reliquary` importing, and then
+asserts that the arming took (T26).
 """
 
 import contextlib

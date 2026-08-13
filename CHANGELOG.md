@@ -118,15 +118,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **pytest is the test runner** (F55; D106). The suite runs under
+  `pytest`, which joins `jsonschema` in the `dev` dependency group as
+  a hard requirement of it, and `python -m unittest tests` stops being
+  the entry point. **No test changed**: pytest collects the standing
+  `unittest.TestCase` classes unchanged, `unittest.mock` remains the
+  mocking library, and the run is the same 1,310 tests with the same
+  two skips as before it.
+
+  The runner is what the stdlib could not say. A conformance corpus of
+  135 fixtures inside `subTest` once ran against the parser and *not*
+  the schema while claiming the two cannot drift, because a run of
+  that shape looks the same halved as whole; parametrised, each
+  fixture is a collected node and the count is the assertion. The
+  conversions themselves are separate work.
+
+  The project's `[tool.pytest.ini_options]` turns **plugin autoload
+  off** and pins `testpaths`, strict config and marker handling, and a
+  pytest floor. The suite ships in the sdist (D105), so it must not
+  collect differently in a packager's environment than it does here.
+
 - **The source distribution carries the test suite again** (D105).
   An sdist is the artifact a stranger builds *and verifies* from,
   and downstream packagers run the upstream suite at package-build
   time — on platforms and interpreters this project never tests,
   which is the whole of what shipping it buys. Unpack
   `reliquary-<version>.tar.gz` outside the tree, put `src` on
-  `PYTHONPATH`, and `python -m unittest tests` runs **1,296 tests
-  with two skips** — the opt-in FreeDOS integration runs, one per
-  backend, exactly as in the repository.
+  `PYTHONPATH`, and `pytest` runs **1,296 tests with two skips** —
+  the opt-in FreeDOS integration runs, one per backend, exactly as in
+  the repository.
 
   The suite is grafted **whole**. Setuptools' own sdist rules take
   top-level `tests/*.py` and none of the fixture trees beneath it,

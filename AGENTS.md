@@ -488,7 +488,8 @@ workflow:
   `docs` and `tests/source_tree`. The suite is grafted whole rather than left to setuptools' default rules, which take
   top-level `tests/*.py` and none of the fixture trees beneath it — `tools/check_dist.py` names those trees one by one
   for that reason, and names the three pruned trees as forbidden.
-- `tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
+- `tests/` is the suite, and **pytest is the runner** (D106) — over `unittest.TestCase` classes it collects
+  unchanged until F56–F60 convert them — covering core helpers, guest program runs, lifecycle ownership,
   media acquisition, blueprints, machines, and scripts. **`tests/source_tree/` is the exception that ships nowhere**:
   the tests that read the *repository* rather than the package — prose documents, the maintainer records, the
   open-problem catalogue. Shipped, a sweep over `docs/` and `AGENTS.md` would find neither and report success on a
@@ -1041,8 +1042,13 @@ deliberately moves it. Do not install development tools globally, and do
 not hand-manage `.venv` — it is uv's.
 
 Runtime dependencies stay under `[project].dependencies`. The `dev` group
-is `jsonschema` alone: the build frontend and the upload tool both left it
-when uv absorbed their jobs.
+is `jsonschema` and `pytest`: the build frontend and the upload tool both
+left it when uv absorbed their jobs, and pytest arrived as the runner
+(D106). Both are hard requirements of the suite in the sense above —
+imported and invoked, never guarded. The `>=8.4` floor on pytest is the
+release that made `--disable-plugin-autoload` a command-line option, which
+is what lets the project's own configuration turn autoload off rather than
+leaving it to whoever runs the suite.
 
 ## Required checks
 
@@ -1051,8 +1057,8 @@ Run checks through uv, which uses the locked environment.
 ```powershell
 $pythonFiles = (Get-ChildItem src/reliquary,tests -Filter *.py).FullName
 uv run python -m py_compile $pythonFiles
-uv run python -m unittest -v tests
-uv run --python 3.12 python -m unittest tests
+uv run pytest
+uv run --python 3.12 pytest
 uv build
 ```
 
@@ -1064,6 +1070,16 @@ than a quiet promise (P11). uv installs the interpreter itself, so the
 check costs one line. It was added when the floor turned out to be wrong:
 `>=3.9` was claimed and unexercised, and 3.9, 3.10 and 3.11 all failed
 (D95).
+
+**The suite's own configuration is `[tool.pytest.ini_options]`, and it is
+written for a stranger's environment rather than this one** (D106): the
+suite ships in the sdist (D105), so `--disable-plugin-autoload` means no
+plugin the project did not ask for can change what a run collects,
+`--strict-config` and `--strict-markers` make an unreadable option or an
+undeclared marker an error instead of a silent no-op, `testpaths` lets a
+bare `pytest` find the suite, and `minversion` refuses a pytest too old to
+honour the first of those. Nothing there is a preference — each line is
+there so that a run somewhere else collects what a run here collects.
 
 `uv build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
 After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, and runtime
@@ -1082,12 +1098,15 @@ which is what a downstream packager does at package-build time on a platform thi
 ```powershell
 tar -xzf dist/reliquary-<version>.tar.gz -C <scratch>
 cd <scratch>/reliquary-<version>
-$env:PYTHONPATH = "src"; python -m unittest tests
+$env:PYTHONPATH = "src"; pytest
 ```
 
-Expect **1,296 tests and the same two skips** as the repository's 1,310 ("Test expectations", above): the difference is
-`tests/source_tree/`, which ships nowhere, and a *skip* there is a defect exactly as it is here. Install the wheel into
-a clean environment and check it by using it — `rlq --version` and an import — since it carries no suite to run.
+That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
+unittest tests` is no longer the entry point, and stops running the suite at all as F56–F60 land. It was taken because
+pytest is packaged everywhere a packager works. Expect **1,296 tests and the same two skips** as the repository's 1,310
+("Test expectations", above): the difference is `tests/source_tree/`, which ships nowhere, and a *skip* there is a
+defect exactly as it is here. Install the wheel into a clean environment and check it by using it — `rlq --version` and
+an import — since it carries no suite to run.
 
 **Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
 no CI (P22) there is no trusted-publishing path, so it takes a token
@@ -1112,8 +1131,8 @@ seeded blueprint and needs ``VBoxManage`` on ``PATH``:
 $env:RELIQUARY_INTEGRATION = "1"
 # optional: reuse a home so cache/media survives reruns
 # $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
-.venv\Scripts\python.exe -m unittest -v tests.test_freedos_install_integration
-.venv\Scripts\python.exe -m unittest -v tests.test_freedos_virtualbox_integration
+uv run pytest tests/test_freedos_install_integration.py
+uv run pytest tests/test_freedos_virtualbox_integration.py
 ```
 
 ## Test expectations
@@ -1159,7 +1178,25 @@ Milestone-9 guarantees needing the same care:
 - a listing's addresses are the ones the file verbs accept, and a missing
   guest directory is an error rather than an empty listing
 
-Use stdlib `unittest` and `unittest.mock` unless a compelling reason justifies another dependency.
+### The test idiom
+
+**New tests are pytest-native** (D106): a bare `assert`, a fixture where
+`setUp` would have been, and `parametrize` where a loop or a `subTest`
+would have been. The last is the point rather than a style note — a
+parametrised case is a collected node whose count is an assertion, and a
+`subTest` is not, which is how the conformance corpus came to run against
+the parser and not the schema while claiming the two cannot drift.
+
+`unittest.mock` **stays**, and is not what changed: it is the mocking
+library, the runner is what pytest replaced, and nothing supersedes it.
+The stdlib preference stands everywhere else — pytest is one dependency
+judged compelling, not the bar lowered.
+
+The standing `TestCase` classes are collected unchanged and convert under
+**F56–F60**, module by module. Until a module's turn comes, extend it in
+the idiom it is written in: a module half in each is worse than a module
+in the older one, and the sweep that converts it is where the count is
+checked against the run before it.
 
 ## Documentation maintenance
 
