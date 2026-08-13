@@ -21,6 +21,25 @@ from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError, WaitExpired)
 from .home import machines_dir
 from .library import codex_blueprint_available
+# The substrate both halves of the machine layer stand on: ids and
+# directories, the locks, machine.json, and selector resolution.
+#
+# **This module stays the machine layer's front door.** `machine_state`
+# is the seam `machines` and `drives` share so neither has to import
+# the other; it is not a second entrance. A consumer above the layer —
+# the session veneer, the script runner, the media family — reaches
+# every one of these through `machines`, which is why the names below
+# that this module does not itself call are imported anyway. The one
+# exception is `machine.py`, which takes `read_vm_state` from the
+# substrate directly because importing this module would put the two
+# back in a cycle.
+from .machine_state import (allocate_machine_id, backend_dir,
+                            blueprint_alloc_lock, list_machines,
+                            load_machine_state, machine_dir_path,
+                            machine_disks_dir, machine_id_for,
+                            machine_lock, machines_for_blueprint,
+                            read_vm_state, resolve_machine,
+                            split_machine_id, write_state)
 from .resolve import (load_namespace, location_property_keys,
                       resolve_media, resolve_media_plan)
 
@@ -164,138 +183,6 @@ def _blueprint_digest(resolved, drives):
         canonical.encode("utf-8")).hexdigest()
 
 
-def machine_dir_path(machine_id, context=None):
-    """Return the machine's cache directory path."""
-    return os.path.join(machines_dir(context), machine_id)
-
-
-def _machine_disks_dir(machine_id, context=None):
-    """Per-machine materialized-image directory, keyed by media item.
-
-    Images are named for the media (``<media-name>.<ext>``), not the
-    slot, so media swapping through one removable slot each keep their
-    own materialization and a re-insert reuses the existing image.
-    """
-    return os.path.join(machine_dir_path(machine_id, context), "disks")
-
-
-def _backend_dir(machine_id, backend, context=None):
-    """The backend's own-artifacts subdirectory (``<backend>/``).
-
-    reliquary quarantines each backend's files in a backend-named
-    subdir so the machine root holds only ``machine.json`` and the
-    ``disks/`` and ``screenshots/`` directories. For QEMU it holds
-    just the captured ``qemu-stderr.log``.
-    """
-    return os.path.join(machine_dir_path(machine_id, context),
-                        backend or "qemu")
-
-
-def _state_path(machine_id, context=None):
-    return os.path.join(machine_dir_path(machine_id, context),
-                        "machine.json")
-
-
-def machine_id_for(blueprint_name, number):
-    """Return the canonical machine id for a blueprint and number."""
-    return f"{blueprint_name}-{number}"
-
-
-def split_machine_id(machine_id):
-    """Return ``(blueprint_name, number)`` for a well-formed id.
-
-    The number is the trailing decimal after the final ``-``.  Returns
-    ``None`` when the id is not ``<blueprint>-<n>``.
-    """
-    if not isinstance(machine_id, str) or "-" not in machine_id:
-        return None
-    blueprint, sep, number = machine_id.rpartition("-")
-    if not sep or not blueprint or not number.isdigit():
-        return None
-    if len(number) > 1 and number.startswith("0"):
-        return None
-    return blueprint, int(number)
-
-
-def _locks_dir(context=None):
-    return os.path.join(machines_dir(context), ".locks")
-
-
-def _lock_file(handle):
-    if os.name == "nt":
-        import msvcrt
-        handle.seek(0, os.SEEK_END)
-        if handle.tell() == 0:
-            handle.write(b"\0")
-            handle.flush()
-        handle.seek(0)
-        while True:
-            try:
-                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-                return
-            except OSError:
-                # LK_LOCK retries ~10s then raises; keep waiting.
-                continue
-    import fcntl
-    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-
-
-def _unlock_file(handle):
-    if os.name == "nt":
-        import msvcrt
-        handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-        return
-    import fcntl
-    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-
-@contextlib.contextmanager
-def _blueprint_alloc_lock(blueprint_name, context=None):
-    """Serialize machine-number allocation for one blueprint."""
-    lock_root = _locks_dir(context)
-    os.makedirs(lock_root, exist_ok=True)
-    lock_path = os.path.join(lock_root, f"{blueprint_name}.lock")
-    with open(lock_path, "a+b") as handle:
-        _lock_file(handle)
-        try:
-            yield
-        finally:
-            _unlock_file(handle)
-
-
-@contextlib.contextmanager
-def _machine_lock(machine_id, context=None):
-    """Hold the exclusive per-machine operation lock.
-
-    Every mutating operation on one machine (create materialization,
-    start, stop, destroy, media/boot changes) takes this before
-    inspecting or changing backend state, so operations on one
-    machine never interleave. The lock file lives beside the
-    allocation locks; its ``.op.lock`` suffix keeps it distinct from
-    any blueprint's allocation lock.
-    """
-    lock_root = _locks_dir(context)
-    os.makedirs(lock_root, exist_ok=True)
-    lock_path = os.path.join(lock_root, f"{machine_id}.op.lock")
-    with open(lock_path, "a+b") as handle:
-        _lock_file(handle)
-        try:
-            yield
-        finally:
-            _unlock_file(handle)
-
-
-def _allocate_machine_id(blueprint_name, context=None):
-    """Return the lowest free ``<blueprint>-<n>`` id (directories count)."""
-    number = 0
-    while True:
-        machine_id = machine_id_for(blueprint_name, number)
-        if not os.path.exists(machine_dir_path(machine_id, context)):
-            return machine_id
-        number += 1
-
-
 def _drive_common(key, drive):
     """The medium/slot/controller fields common to every drive entry.
 
@@ -382,20 +269,20 @@ def create(machine, namespace, *, context=None, blueprint_name="",
             rule_id="value.not-a-string")
 
     created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    with _blueprint_alloc_lock(blueprint_name, context):
+    with blueprint_alloc_lock(blueprint_name, context):
         if number is None:
-            machine_id = _allocate_machine_id(blueprint_name, context)
+            machine_id = allocate_machine_id(blueprint_name, context)
         else:
             machine_id = machine_id_for(blueprint_name, number)
             if os.path.exists(machine_dir_path(machine_id, context)):
                 raise PreflightError(
                     f"machine {machine_id} already exists",
                     rule_id="machine.already-exists")
-        disks_root = _machine_disks_dir(machine_id, context)
+        disks_root = machine_disks_dir(machine_id, context)
         os.makedirs(disks_root)
         # Mark the machine `creating` before materialization begins, so
         # an interrupted create is detectable and recoverable.
-        _write_state(machine_id, {
+        write_state(machine_id, {
             "id": machine_id,
             "blueprint": blueprint_name,
             "created": created,
@@ -403,7 +290,7 @@ def create(machine, namespace, *, context=None, blueprint_name="",
             "generation": 0,
         }, context)
 
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         try:
             return _materialize_machine(
                 machine, namespace, machine_id, blueprint_name, created,
@@ -476,7 +363,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
     if source is not None:
         state["blueprint-source"] = os.path.abspath(os.fspath(source))
 
-    _write_state(machine_id, state, context)
+    write_state(machine_id, state, context)
     return machine_id
 
 
@@ -721,7 +608,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         # The directory is read; the allocation lock is not taken,
         # because taking it would create `.locks/` — state left
         # behind — and a predicted number is a prediction either way.
-        machine_id = _allocate_machine_id(blueprint_name, context)
+        machine_id = allocate_machine_id(blueprint_name, context)
         numbering = "lowest free"
     else:
         machine_id = machine_id_for(blueprint_name, number)
@@ -736,7 +623,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
     # too, and in the same place — the settings are authored input,
     # judged identically whether or not the backend is on this host.
     adapter.validate_settings(machine.backend_settings.get(assigned))
-    disks_root = _machine_disks_dir(machine_id, context)
+    disks_root = machine_disks_dir(machine_id, context)
     entries = []
     drives = [
         _dry_drive(key, drive, adapter, disks_root, namespace, context,
@@ -1003,7 +890,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase != "ready":
@@ -1047,7 +934,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         bound = _bind_location_properties(
             parsed, namespace, explicit=properties,
             properties_file=properties_file, context=context)
-        disks_root = _machine_disks_dir(machine_id, context)
+        disks_root = machine_disks_dir(machine_id, context)
         new_drives = _reconcile_drives(
             parsed, namespace, state.get("drives", {}), adapter, disks_root,
             context, bound, events)
@@ -1074,185 +961,8 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
         if path is not None:
             state["blueprint-source"] = os.path.abspath(path)
         state["generation"] = state.get("generation", 0) + 1
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
     return machine_id
-
-
-def _write_state(machine_id, state, context=None):
-    path = _state_path(machine_id, context)
-    part = path + ".part"
-    with open(part, "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(state, handle, indent=2)
-        handle.write("\n")
-    os.replace(part, path)
-
-
-def read_vm_state(machine_dir):
-    """Return a machine's recorded live-VM identity, or ``None``.
-
-    The identity lives in the ``vm`` section of the machine's own
-    ``machine.json``, written atomically with the ``phase``. Its
-    generic core is the backend, that backend's own machine
-    identifier, the per-start token and the endpoint; what the
-    endpoint *is* belongs to the adapter, which validates it when it
-    opens a session. A state file with no ``vm`` section (a stopped
-    machine) reads as ``None``; a malformed section fails closed.
-    """
-    path = os.path.join(machine_dir, "machine.json")
-    try:
-        with open(path, encoding="utf-8") as state_file:
-            document = json.load(state_file)
-    except FileNotFoundError:
-        return None
-    except (ValueError, json.JSONDecodeError) as error:
-        raise InternalError(
-            f"invalid reliquary machine state file: {path}: {error}"
-        ) from error
-    vm = document.get("vm") if isinstance(document, dict) else None
-    if vm is None:
-        return None
-    fields = (vm.get("backend"), vm.get("backend-id"), vm.get("token"))
-    if (not isinstance(vm, dict)
-            or not all(isinstance(value, str) and value
-                       for value in fields)
-            or not isinstance(vm.get("endpoint"), dict)):
-        raise InternalError(
-            f"invalid reliquary VM state in {path}: a recorded VM names "
-            "its backend, that backend's machine id, a per-start token "
-            "and an endpoint")
-    return vm
-
-
-def load_machine_state(machine_id, context=None):
-    """Read and return the machine's ``machine.json``."""
-    path = _state_path(machine_id, context)
-    if not os.path.exists(path):
-        raise PreflightError(
-            f"machine state not found: {path}",
-            rule_id="machine.state-missing")
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def _machine_sort_key(state):
-    """Sort by blueprint name, then machine number, then id."""
-    machine_id = state.get("id") or ""
-    parsed = split_machine_id(machine_id)
-    if parsed is not None:
-        return (parsed[0], parsed[1], machine_id)
-    return (state.get("blueprint") or "", -1, machine_id)
-
-
-def list_machines(context=None, blueprint=None):
-    """Return state dicts for machines under the cache.
-
-    Ordered by blueprint name, then ascending machine number.  When
-    ``blueprint`` is set, only machines of that blueprint are returned.
-    """
-    root = machines_dir(context)
-    if not os.path.isdir(root):
-        return []
-    machines = []
-    for entry in os.listdir(root):
-        path = os.path.join(root, entry, "machine.json")
-        if not os.path.isfile(path):
-            continue
-        with open(path, encoding="utf-8") as handle:
-            state = json.load(handle)
-        if state.get("id") != entry:
-            raise InternalError(
-                f"machine id mismatch: directory {entry!r} "
-                f"contains id {state.get('id')!r}")
-        if blueprint is not None and state.get("blueprint") != blueprint:
-            continue
-        machines.append(state)
-    machines.sort(key=_machine_sort_key)
-    return machines
-
-
-def resolve_machine(*, machine=None, blueprint=None, context=None):
-    """Resolve a ``--machine`` / ``--blueprint`` selector to one id.
-
-    Selectors are mutually exclusive:
-
-    - ``--blueprint NAME``: the sole machine of that blueprint
-    - ``--machine NAME-N``: the full machine id, exactly
-    """
-    if machine is None and blueprint is None:
-        raise StaticError(
-            "select a machine with --blueprint or --machine",
-            rule_id="machine.no-selector")
-    if machine is not None and blueprint is not None:
-        raise StaticError(
-            "--blueprint and --machine are mutually exclusive; "
-            "pass --machine <id> or --blueprint <name>",
-            rule_id="machine.selectors-conflict")
-    if machine is not None:
-        return _resolve_by_id(machine, context)
-    return _resolve_by_blueprint(blueprint, context)
-
-
-def _resolve_by_id(selector, context):
-    """Resolve a full machine id — exact match only."""
-    if not isinstance(selector, str) or not selector:
-        raise StaticError(
-            f"machine id must be a non-empty string, got: {selector!r}",
-            rule_id="machine.id-malformed")
-    if selector.isdigit():
-        raise StaticError(
-            f"machine id must be the full <blueprint>-<n> form, "
-            f"got: {selector!r}", rule_id="machine.id-malformed")
-    for state in list_machines(context):
-        if state["id"] == selector:
-            return selector
-    raise PreflightError(f"no machine {selector!r}", rule_id="machine.unknown")
-
-
-def machines_for_blueprint(name, context=None):
-    """Machines of blueprint ``name`` scoped to this invocation's source.
-
-    Selection scoping (instance model): a machine matches when its
-    recorded ``blueprint-source`` equals the invocation's own
-    resolution of ``name``, so same-named blueprints in different
-    projects never select each other's machines — and ``apply`` never
-    adopts them. A machine with no recorded source matches by name
-    alone (there is nothing to scope it against); when ``name`` does
-    not resolve in this invocation, only such sourceless machines can
-    match. Ordered like :func:`list_machines`.
-    """
-    from .library import locate_blueprint
-    matches = list_machines(context, blueprint=name)
-    try:
-        resolved = os.path.abspath(locate_blueprint(name, context=context))
-    except PreflightError:
-        resolved = None
-    scoped = []
-    for state in matches:
-        source = state.get("blueprint-source")
-        if source is None:
-            scoped.append(state)
-        elif resolved is not None and os.path.abspath(source) == resolved:
-            scoped.append(state)
-    return scoped
-
-
-def _resolve_by_blueprint(name, context):
-    matches = machines_for_blueprint(name, context)
-    if not matches:
-        raise PreflightError(
-            f"no machine exists for blueprint {name!r}\n"
-            f"create one: rlq create-machine --blueprint {name}",
-            rule_id="machine.none-for-blueprint")
-    if len(matches) > 1:
-        lines = [
-            f"blueprint {name!r} has {len(matches)} machines; "
-            "pick one with --machine <id>:",
-        ]
-        for state in matches:
-            lines.append(f"  {state['id']}  ({state.get('phase', '?')})")
-        raise PreflightError("\n".join(lines),
-            rule_id="machine.ambiguous-selector")
-    return matches[0]["id"]
 
 
 def _write_phase(machine_id, phase, context=None, *, bump=False):
@@ -1267,7 +977,7 @@ def _write_phase(machine_id, phase, context=None, *, bump=False):
     state["phase"] = phase
     if bump:
         state["generation"] = state.get("generation", 0) + 1
-    _write_state(machine_id, state, context)
+    write_state(machine_id, state, context)
     return state
 
 
@@ -1281,7 +991,7 @@ def _clear_vm(machine_id, phase, context=None):
     state = load_machine_state(machine_id, context)
     state.pop("vm", None)
     state["phase"] = phase
-    _write_state(machine_id, state, context)
+    write_state(machine_id, state, context)
 
 
 def _complete_stop(machine_id, context=None):
@@ -1353,7 +1063,7 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
     variables are cleared here: a variable reports what *this* boot
     produced, never what a previous one left behind.
     """
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase == "running":
@@ -1406,7 +1116,7 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
         # A machine variable belongs to one boot: a script `set` it
         # while the guest ran, so the next start starts empty.
         state.pop("variables", None)
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
 
         if state.get("memory") is None:
             state["memory"] = _PLATFORM_MEMORY.get(state.get("platform"), 16)
@@ -1429,17 +1139,17 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
         # verified VM identity and machines.py persists it into
         # machine.json atomically with the running phase, so the two
         # never disagree.
-        backend_dir = _backend_dir(machine_id, backend, context)
+        artifacts_dir = backend_dir(machine_id, backend, context)
         vm = adapter.start(
             state, machine_dir=machine_dir_path(machine_id, context),
-            backend_dir=backend_dir, display=display,
+            backend_dir=artifacts_dir, display=display,
             current=state.get("vm"))
         try:
             fresh = load_machine_state(machine_id, context)
             fresh["vm"] = vm
             fresh["phase"] = "running"
             fresh["generation"] = fresh.get("generation", 0) + 1
-            _write_state(machine_id, fresh, context)
+            write_state(machine_id, fresh, context)
         except BaseException:
             # The VM came up but its identity could not be recorded;
             # stop it rather than orphan an unrecorded process.
@@ -1456,7 +1166,7 @@ def stop_machine(machine_id, context=None):
     (an already-completed stop returns quietly), records the
     transitional ``stopping`` phase, then powers off the owned VM.
     """
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase == "ready":
@@ -1591,7 +1301,7 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
         raise StaticError(
             "insert-media takes a media name or --file <path>, "
             "not both and not neither", rule_id="media.name-or-file")
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         _removable_drive(state, slot)
         path = (_anonymous_local(file) if file is not None
@@ -1605,7 +1315,7 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
         drive["media"] = media
         drive["materialize"] = "use"
         state["generation"] = state.get("generation", 0) + 1
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
 
 
 def eject_media(machine_id, slot, *, context=None):
@@ -1616,7 +1326,7 @@ def eject_media(machine_id, slot, *, context=None):
     running machine the medium is ejected live over QMP; on a stopped
     machine the next ``start`` presents it without a medium.
     """
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         _removable_drive(state, slot)
         if state.get("phase") == "running":
@@ -1626,7 +1336,7 @@ def eject_media(machine_id, slot, *, context=None):
         drive["materialize"] = None
         drive["path"] = None
         state["generation"] = state.get("generation", 0) + 1
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
 
 
 def set_boot_order(machine_id, boot_keys, *, context=None):
@@ -1638,7 +1348,7 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
     blueprint until ``apply`` (or another ``set_boot_order``) restores
     it.
     """
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = _reconcile_phase(machine_id, context)
         phase = state.get("phase")
         if phase != "ready":
@@ -1668,7 +1378,7 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
             normalized.append(key)
         state["boot"] = normalized
         state["generation"] = state.get("generation", 0) + 1
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
 
 
 def mark_stopped(machine_id, context=None):
@@ -1679,14 +1389,14 @@ def mark_stopped(machine_id, context=None):
     section is cleared, written together.  A machine not in phase
     ``running`` is left untouched.
     """
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = load_machine_state(machine_id, context)
         if state.get("phase") != "running":
             return
         state.pop("vm", None)
         state["phase"] = "ready"
         state["generation"] = state.get("generation", 0) + 1
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
 
 
 # -- machine variables -------------------------------------------
@@ -1735,12 +1445,12 @@ def set_machine_var(machine_id, key, value, *, context=None):
         raise StaticError(
             f"a machine variable holds text; {key!r} got "
             f"{type(value).__name__}", rule_id="value.not-a-string")
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = load_machine_state(machine_id, context)
         variables = dict(state.get("variables") or {})
         variables[key] = value
         state["variables"] = variables
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
 
 
 #: How often :func:`wait_machine_var` re-reads, and how long it waits
@@ -1859,7 +1569,7 @@ def describe_drives(*, machine=None, blueprint=None, context=None):
                 if count is not None:
                     drive["volumes"] = count
             state["drives"] = drives
-            _write_state(machine_id, state, context)
+            write_state(machine_id, state, context)
             return _compose_drive_report(machine_id, state,
                                          recorded=False)
     return _compose_drive_report(machine_id, state, recorded=True)
@@ -2228,7 +1938,7 @@ def _disk_volumes(machine_id, state, drives, context):
         # Written back so the next verb in a batch does not reopen
         # every disk. Losing this costs a reread and never an answer.
         state["drives"] = drives
-        _write_state(machine_id, state, context)
+        write_state(machine_id, state, context)
     return found, reasons
 
 
@@ -2590,7 +2300,7 @@ def put_file(source, destination, *, machine=None, blueprint=None,
     if not os.path.isfile(origin):
         raise PreflightError(f"no such file: {origin}",
             rule_id="media.file-missing")
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         drive, _letter, segments, _platform = _resolve_address(
             machine_id, destination, context)
         _writable(drive, destination, "put-file")
@@ -2614,7 +2324,7 @@ def get_file(source, destination, *, machine=None, blueprint=None,
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
     target = os.path.abspath(os.fspath(destination))
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         drive, _letter, segments, _platform = _resolve_address(
             machine_id, source, context)
         try:
@@ -2670,7 +2380,7 @@ def list_files(address, *, recursive=False, machine=None, blueprint=None,
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         drive, letter, segments, platform = _guest_directory(
             machine_id, address, context)
         try:
@@ -2700,7 +2410,7 @@ def put_files(source, destination, *, machine=None, blueprint=None,
             f"no such directory: {origin}",
             rule_id="drive.host-directory-missing")
     written = []
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         drive, letter, segments, platform = _guest_directory(
             machine_id, destination, context, must_exist=False)
         _writable(drive, destination, "put-files")
@@ -2741,7 +2451,7 @@ def get_files(source, destination, *, machine=None, blueprint=None,
             f"{target} is a file; get-files writes a directory tree",
             rule_id="drive.host-destination-not-a-directory")
     written = []
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         drive, _letter, segments, _platform = _guest_directory(
             machine_id, source, context)
         try:
@@ -2771,7 +2481,7 @@ def destroy_machine(machine_id, context=None):
     retried — a failure from ``ready`` restores ``ready`` so it does
     not strand the machine in ``destroying``.
     """
-    with _machine_lock(machine_id, context):
+    with machine_lock(machine_id, context):
         state = load_machine_state(machine_id, context)
         phase = state.get("phase")
         if phase == "running":

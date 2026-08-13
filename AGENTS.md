@@ -168,10 +168,8 @@ workflow:
   is down and no record exists yet, and `refresh_drives` is the
   explicit stopped-only re-read for a layout changed behind the
   record;
-  ids are `<blueprint_name>-<machine_number>` with
-  lowest-free reuse; a per-blueprint allocation lock serializes
-  numbering and an exclusive per-machine operation lock
-  (`.locks/<id>.op.lock`) serializes every mutating op; each carries an
+  where a machine lives, what serializes it and how one is named is
+  `machine_state.py`'s (below); each mutating op carries an
   operation generation and writes the transitional phases
   `creating` / `stopping` / `destroying`, so an interrupted operation is
   reconciled at the next op — `stopping` completes, `creating` /
@@ -187,6 +185,25 @@ workflow:
   or stopped (persisted for the next start); `set_boot_order` is
   stopped-only (a launch-time firmware order); boot-order keys may name
   any declared drive; all three persist and survive stop/start),
+  `machine_state.py` is **the substrate the machine layer stands on** —
+  where a machine lives (`machine_dir_path`, `machine_disks_dir`,
+  `backend_dir`), how one is named (`machine_id_for` /
+  `split_machine_id`, ids `<blueprint_name>-<machine_number>` with
+  lowest-free reuse, `allocate_machine_id`), what serializes work
+  against it (`blueprint_alloc_lock` for numbering, and the exclusive
+  per-machine operation lock `machine_lock`, `.locks/<id>.op.lock`,
+  taken by every mutating op), its `machine.json`
+  (`write_state` / `load_machine_state` / `read_vm_state`), and the
+  selector resolution `--blueprint` / `--machine` reach it by
+  (`resolve_machine` / `list_machines` / `machines_for_blueprint`).
+  It knows nothing of what a machine *is*: no backend, no adapter, no
+  drive, no media. **Only what both halves need lives there** — phase
+  transitions have one consumer and stay with the lifecycle above —
+  and `machines.py` remains the layer's **front door**, re-exporting
+  these names so a consumer above it reaches them in one place. The
+  one module taking them from the substrate directly is `machine.py`,
+  which needs `read_vm_state` alone and would otherwise be back in a
+  cycle with the lifecycle,
   `backends.py` is **the backend adapter seam** — the provider contract behind the semantic surface
   (design: `planning/design/backend-adapter.md`), deliberately *not* one of the application surfaces:
   the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the

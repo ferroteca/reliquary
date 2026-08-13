@@ -17,7 +17,10 @@ import sys
 import time
 
 from . import backends
-from . import machines as _machines
+# Only the recorded VM identity is wanted here, and it lives in the
+# substrate — so this module no longer imports the lifecycle, and the
+# two stop importing each other.
+from .machine_state import read_vm_state
 from .control_display import DisplayConsole
 from .errors import PreflightError, RunFailure, StaticError
 from .home import effective_home
@@ -61,7 +64,7 @@ class Machine:
 
     def _identity(self):
         """The recorded VM identity and the adapter that owns it."""
-        vm = _machines.read_vm_state(self.home)
+        vm = read_vm_state(self.home)
         if vm is None:
             raise PreflightError(
                 "no active reliquary VM is recorded for this machine; "

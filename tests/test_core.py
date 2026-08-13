@@ -76,7 +76,7 @@ class HomeTests(unittest.TestCase):
             self.tempdir.name, "screenshots", "release-smoke.png")
 
         with fake_backend.installed() as adapter, \
-                mock.patch.object(machines_module, "read_vm_state",
+                mock.patch.object(machine_module, "read_vm_state",
                                   return_value=vm):
             written = reliquary.screenshot("release-smoke",
                                            home=self.tempdir.name)
@@ -628,7 +628,7 @@ class InteractionAdapterTests(unittest.TestCase):
               "token": "0" * 32, "endpoint": {"port": 54321}}
         adapter = fake_backend.FakeAdapter()
         with fake_backend.installed(adapter), \
-                mock.patch.object(machines_module, "read_vm_state",
+                mock.patch.object(machine_module, "read_vm_state",
                                   return_value=vm) as recorded:
             with machine_module.Machine("run-home").session() as session:
                 self.assertIs(session, adapter.sessions[-1])
@@ -642,7 +642,7 @@ class InteractionAdapterTests(unittest.TestCase):
         vm = {"backend": "virtualbox", "backend-id": "vbox-uuid",
               "token": "0" * 32, "endpoint": {}}
         with fake_backend.installed(name="virtualbox"), \
-                mock.patch.object(machines_module, "read_vm_state",
+                mock.patch.object(machine_module, "read_vm_state",
                                   return_value=vm):
             with self.assertRaisesRegex(PreflightError, "no QMP monitor"):
                 with machine_module.Machine("run-home").qmp():
