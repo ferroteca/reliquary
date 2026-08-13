@@ -227,3 +227,67 @@ AGENTS.md. The six module-level free functions are exported at the
 root and are **not** touched — respelling those would be a surface
 change and is a separate question. Nothing else moves: no CLI
 command, no `Session` method, no rule id.
+
+#### T17 — Split `cli.py`'s `main()` and derive the command list
+
+`main()` is 466 lines that build 48 subparsers before doing
+anything. Underneath the length is the reason to touch it: **the
+48 command names are written three times in this file** — the
+`_COMMANDS` frozenset that drives `_reorder_argv`, the
+`add_parser` calls, and the `if arguments.command ==` arms in
+`_dispatch` — and only the first is pinned to anything.
+`test_command_manifest.py` checks `_COMMANDS` against
+`command-manifest.toml` in both directions; the parsers and the
+dispatch arms are held by hand. All three agree today, so this is
+a latent hazard rather than a defect, but the two gaps fail
+differently: a missing `_COMMANDS` entry silently stops leading
+flags being reordered, and a missing dispatch arm falls through
+to `return 0` — a command reporting success for work it never
+did.
+
+Four parts, one change:
+
+1. `_build_parser()` plus nine family builders, following the
+   comment groups `main()` already carries — machine, script,
+   authoring, media, property, listing, state, file, console.
+   Registration order is `--help` order, so the call order is
+   load-bearing. `main()` keeps argv handling, parse, context,
+   session, `_dispatch` and the five exception arms.
+2. **Derive `_COMMANDS`** from the built parser's subcommand
+   choices and delete the hand-written frozenset. Measured: the
+   whole of `main(["--version"])`, parser construction included,
+   is 10ms against a 423ms `import reliquary` — so a throwaway
+   parser at import costs under 3%, and `main()` still builds its
+   own so `_prog_name()` reads `sys.argv[0]` when it does today.
+   `test_command_manifest.py` keeps reading `cli._COMMANDS`
+   unchanged.
+3. `_dispatch`'s fall-through raises `InternalError` rather than
+   returning 0 — an unrouted command is an invariant reliquary
+   caught in its own state, which is exit 1 by the taxonomy (D58),
+   not success.
+4. A test walking the source for the dispatch arms and comparing
+   them to the registered commands, the way `test_errors.py`
+   already walks every `raise` in the package. That leaves one
+   hand-kept list, mechanically pinned.
+
+**The split is what makes any of this checkable**: nothing can
+enumerate the registered commands today, because `main()` builds
+the parser inline and never hands it back.
+
+`_dispatch` itself is not split — 145 lines reading as one routing
+table, and splitting it would create the fourth list this exists
+to reduce. **Weighed and declined:** a full
+`(name, configure, handle)` table deleting every duplicate list.
+The 48 commands have heterogeneous argument shapes (`run-script`
+alone carries a 35-line description, an epilog and a formatter
+class), `_dispatch` is not a pure lookup — the nine console
+commands share an `_interaction_target` step — and after the four
+parts above what remains is one pinned list.
+
+No application surface moves: no command, flag, help string or
+exit code, so [SURFACES.md](SURFACES.md) does not trigger. The
+oracle is byte-identical output from `rlq --help` and all 48
+`rlq <command> --help`, captured before and diffed after —
+stronger than the suite here, since AGENTS.md already validates
+documented syntax against `--help`. Independent of T14, T15 and
+T16.
