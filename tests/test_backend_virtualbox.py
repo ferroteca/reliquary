@@ -16,7 +16,7 @@ from unittest import mock
 
 from reliquary import backend_virtualbox as vbox
 from reliquary import text_recognize
-from reliquary.errors import PreflightError, StaticError
+from reliquary.errors import PreflightError, RunFailure, StaticError
 
 
 def _completed(stdout="", stderr="", returncode=0):
@@ -437,6 +437,100 @@ class OwnershipTests(unittest.TestCase):
         self.assertEqual(len(attaches), 2)
         self.assertTrue(any(iso in a for a in attaches[0]))
         self.assertTrue(any("emptydrive" in a for a in attaches[1]))
+
+    def _vm(self, drives=None):
+        return {
+            "backend": "virtualbox", "backend-id": self.vm_uuid,
+            "token": self.vm_uuid,
+            "endpoint": {"name": "reliquary-demo-0",
+                         "drives": drives or {}},
+        }
+
+    def test_stop_is_satisfied_by_an_already_stopped_vm(self):
+        """A guest that powered itself off leaves stop nothing to do."""
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(list(args))
+            if args[1] == "showvminfo":
+                return _completed(stdout=self._info(state="poweroff"))
+            return _completed(returncode=1,
+                              stderr="Machine is not currently running.")
+
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+             mock.patch("subprocess.run", side_effect=run):
+            vbox.stop(self._vm())
+        self.assertEqual([c[1] for c in calls], ["showvminfo"])
+
+    def test_a_session_refuses_a_vm_that_is_not_running(self):
+        """The runner reads this rule id as the stopped observation."""
+        def run(args, **kwargs):
+            if args[1] == "showvminfo":
+                return _completed(stdout=self._info(state="poweroff"))
+            return _completed()
+
+        adapter = vbox.VirtualBoxAdapter()
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+             mock.patch("subprocess.run", side_effect=run):
+            with self.assertRaises(PreflightError) as caught:
+                with adapter.session(self._vm()):
+                    pass
+        self.assertEqual(caught.exception.rule_id, "machine.vm-unreachable")
+        self.assertIn("poweroff", str(caught.exception))
+
+    def test_a_guest_that_powers_off_mid_session_reads_as_stopped(self):
+        """The state query, not the message, tells the two apart."""
+        states = ["running", "poweroff"]
+
+        def run(args, **kwargs):
+            if args[1] == "showvminfo":
+                return _completed(stdout=self._info(
+                    state=states.pop(0) if states else "poweroff"))
+            return _completed(returncode=1,
+                              stderr="Machine is not currently running.")
+
+        adapter = vbox.VirtualBoxAdapter()
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+             mock.patch("subprocess.run", side_effect=run):
+            with adapter.session(self._vm()) as session:
+                with self.assertRaises(PreflightError) as caught:
+                    session.screenshot(
+                        os.path.join(self.tempdir.name, "shot.png"))
+        self.assertEqual(caught.exception.rule_id, "machine.vm-unreachable")
+
+    def test_a_carrier_failure_on_a_live_vm_stays_a_run_failure(self):
+        """Only a stopped VM is reclassified; a broken command is not."""
+        def run(args, **kwargs):
+            if args[1] == "showvminfo":
+                return _completed(stdout=self._info(state="running"))
+            return _completed(returncode=1, stderr="something else broke")
+
+        adapter = vbox.VirtualBoxAdapter()
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+             mock.patch("subprocess.run", side_effect=run):
+            with adapter.session(self._vm()) as session:
+                with self.assertRaises(RunFailure) as caught:
+                    session.screenshot(
+                        os.path.join(self.tempdir.name, "shot.png"))
+        self.assertEqual(caught.exception.rule_id, "machine.backend-failed")
+
+    def test_a_transitional_state_is_not_read_as_stopped(self):
+        """A slow power-on must never look like a power-off."""
+        def run(args, **kwargs):
+            if args[1] == "showvminfo":
+                return _completed(stdout=self._info(state="starting"))
+            return _completed()
+
+        adapter = vbox.VirtualBoxAdapter()
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+             mock.patch("subprocess.run", side_effect=run):
+            with adapter.session(self._vm()) as session:
+                self.assertTrue(session.recognizes_text)
 
     def test_scancodes_for_shift_chord(self):
         codes = vbox.scancodes_for(["shift", "a"])

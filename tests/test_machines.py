@@ -581,6 +581,48 @@ class LifecycleTests(_HomeCase):
             stop_machine(machine_id, context=self.home)
         self.assertEqual(self._state(machine_id)["phase"], "ready")
 
+    def test_stop_is_satisfied_by_an_unreachable_vm(self):
+        """A VM that is already gone is the state stop was asked for.
+
+        The machine keeps its recorded ``vm`` section — a guest that
+        halted itself between runs leaves one behind — so the phase
+        can only be reconciled by reading the rule id (T19).
+        """
+        machine_id = self._ready()
+        self._force(machine_id, "running", vm=True)
+        self.backend.stop_error = PreflightError(
+            "the recorded reliquary VM is no longer reachable",
+            rule_id="machine.vm-unreachable")
+        stop_machine(machine_id, context=self.home)
+        state = self._state(machine_id)
+        self.assertEqual(state["phase"], "ready")
+        self.assertNotIn("vm", state)
+
+    def test_a_machine_whose_vm_died_can_still_be_destroyed(self):
+        """The whole T19 cascade: stop was the door destroy needed."""
+        machine_id = self._ready()
+        self._force(machine_id, "running", vm=True)
+        self.backend.stop_error = PreflightError(
+            "the recorded reliquary VM is no longer reachable",
+            rule_id="machine.vm-unreachable")
+        root = machine_dir_path(machine_id, self.home)
+        stop_machine(machine_id, context=self.home)
+        destroy_machine(machine_id, context=self.home)
+        self.assertFalse(os.path.exists(root))
+
+    def test_stop_still_fails_closed_on_an_unrelated_refusal(self):
+        """The rule id is the whole test; a wrong port is not a stop."""
+        machine_id = self._ready()
+        self._force(machine_id, "running", vm=True)
+        self.backend.stop_error = PreflightError(
+            "QMP identity mismatch",
+            rule_id="machine.vm-identity-mismatch")
+        with self.assertRaises(PreflightError):
+            stop_machine(machine_id, context=self.home)
+        state = self._state(machine_id)
+        self.assertEqual(state["phase"], "running")
+        self.assertIn("vm", state)
+
     def test_destroy_removes_directory(self):
         machine_id = self._ready()
         root = machine_dir_path(machine_id, self.home)

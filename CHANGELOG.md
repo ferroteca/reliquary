@@ -36,20 +36,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   glyph bank is curated from the host QEMU vgabios by
   `tools/extract_vga_font.py`.
 
-  **The FreeDOS parity half of this entry is not yet demonstrated.**
-  Against a live VirtualBox (2026-08-13) the integration drives the
-  boot menu, the language chooser and the installer's confirmation
-  dialog. One measured cause remains:
-
-  - **Decoration cannot be recognized at a screenshot backend's
-    cadence.** `screen_stability` masks a cell as decoration after
-    three changes within a 1s window; a VirtualBox read costs ~0.83s,
-    so two samples fit in that window and three changes never
-    accumulate. A blinking element therefore never enters the mask
-    and holds stability under the 0.99 gate permanently — measured at
-    0.98 on a synthetic blink, 0.944 on the live installer. This is
-    the sample-count dependence the wall-clock window exists to
-    refuse, surviving in the repeat count.
+  **Demonstrated against a live VirtualBox on 2026-08-13**: the
+  unmodified codex script installs FreeDOS 1.4 from the LiveCD,
+  partitions, reboots, formats, installs, boots the installed
+  system to `C:\>`, and powers the guest off — then the verify and
+  ready scripts reboot it and hand it over. Six defects were found
+  and fixed in the sitting that got there, each listed in this
+  release's Fixed section.
 
 - **Fixed-font text-screen recognition** (F51, cut from F3 with
   F50/F52). `text_recognize` turns a PNG framebuffer into the
@@ -322,6 +315,54 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no public surface writes a machine variable.
 
 ### Fixed
+
+- **VirtualBox is asked whether a VM is running, not told by a
+  failure.** `showvminfo --machinereadable` reports `VMState`, and
+  the session fetched that map for its identity check and discarded
+  the state — so a powered-off VM, which stays registered and answers
+  as readily as a live one, opened a session whose every carrier then
+  failed as `machine.backend-failed`. `wait machine=stopped` could
+  therefore never be satisfied on VirtualBox: the runner reads
+  `machine.vm-unreachable` as the stopped observation and nothing
+  ever raised it. A script's ordinary ending — power the guest off,
+  wait for the machine — aborted the run instead of completing it.
+
+  A session now refuses to open for a VM VirtualBox reports as no
+  longer executing, and each carrier re-asks the state when it fails,
+  which closes the window where a guest powers off between the
+  identity check and the command. The test is which states mean
+  *stopped* (`poweroff`, `aborted`, `aborted-saved`, `saved`,
+  `teleported`) rather than which mean running: a transitional state
+  like `starting` must never be mistaken for a power-off, since that
+  would mark a booting machine stopped mid-run.
+
+- **A machine whose VM died out of band can be stopped, and so
+  destroyed.** `stop-machine` failed on a guest that had halted
+  itself, `destroy-machine` then refused because the phase still said
+  `running`, and with no `--force` the only way out was deleting the
+  machine directory by hand. An unreachable VM is now an accomplished
+  stop rather than a failed one — the adapter went looking for the
+  VM and there is none, which is the state stop was asked to
+  produce — reconciled once at the seam so it holds for every
+  backend, QEMU's dead QMP port included. The rule id is the whole
+  test: an identity mismatch or a port answering wrongly is a
+  different condition and still fails closed.
+
+- **A menu with a countdown is pressed before it is studied.**
+  `cursor_menu_select` opened by spending `_BASELINE_READS` learning
+  which cells repaint on their own and only then sent its first key.
+  On a screenshot backend at ~2s a read, that is longer than a boot
+  menu's timer, so the machinery timed out the very menu it was
+  preparing to steer — the installed FreeDOS menu booted its default
+  while `select` was still looking, surfacing as "menu item is not on
+  screen" with a fully booted system in the failure screenshot. The
+  edge is sharper than slowness: `_BASELINE_READS` is
+  `DEFAULT_ANIMATION_REPEATS + 1` precisely because a ticking cell
+  cannot be recognized as furniture in fewer reads, so those reads
+  are spent learning the countdown that is running out. When the
+  wanted item is already on the first screen, `select` now presses
+  immediately and classifies afterwards; it falls back to the full
+  baseline only when the item is not yet there.
 
 - **The FreeDOS codex blueprint boots the installer medium first.**
   `boot` becomes `["cdrom0", "hdd0"]`, and the install script ejects

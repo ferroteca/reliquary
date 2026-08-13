@@ -241,6 +241,43 @@ def _machinereadable(vm_id):
     return info
 
 
+#: ``VMState`` values that mean the guest is no longer executing. The
+#: VM object survives a power-off, so `showvminfo` keeps answering and
+#: only the state tells a live machine from a dead one. Membership is
+#: the safe polarity: every other state — including transitional ones
+#: like ``starting`` and ``restoring`` — counts as live, so a slow
+#: power-on is never mistaken for a power-off.
+_STOPPED_STATES = frozenset({
+    "poweroff", "aborted", "aborted-saved", "saved", "teleported",
+})
+
+
+def _not_running(vm_id, state=None):
+    """The stopped observation, in the shape the runner reads.
+
+    A VM that is registered but not executing is a condition of the
+    world rather than a failure of the work, and `script_runner._read`
+    turns exactly this rule id into `wait machine=stopped`.
+    """
+    detail = f"\n  state: {state}" if state else ""
+    return PreflightError(
+        f"the reliquary VM is not running\n  uuid:  {vm_id}{detail}",
+        rule_id="machine.vm-unreachable")
+
+
+def vm_stopped(vm_id):
+    """Whether VirtualBox reports ``vm_id`` as no longer executing.
+
+    Unregistered or unanswerable is not stopped: that is a different
+    condition, and the caller's own failure describes it better.
+    """
+    try:
+        info = _machinereadable(vm_id)
+    except RunFailure:
+        return False
+    return info.get("VMState") in _STOPPED_STATES
+
+
 def verify_vm(vm_id, expected_uuid):
     """Fail closed unless ``vm_id`` resolves to ``expected_uuid``."""
     try:
@@ -458,7 +495,13 @@ def stop(vm):
             rule_id="machine.no-active-vm")
     expected = vm["backend-id"]
     token = vm["token"]
-    verify_vm(expected, token)
+    info = verify_vm(expected, token)
+    if info.get("VMState") in _STOPPED_STATES:
+        # A guest that powered itself off leaves the VM registered and
+        # idle. Stop asks for a machine that is off, and this one is:
+        # `controlvm poweroff` would refuse, and refusing here would
+        # strand the machine as un-stoppable and so un-destroyable.
+        return
     run_vbox(
         ["controlvm", expected, "poweroff"],
         action="stopping", target=expected)
@@ -557,15 +600,32 @@ class VirtualBoxSession:
             "drive the machine through the portable carriers",
             rule_id="machine.backend-no-native")
 
+    def _carry(self, args, *, action, target=None):
+        """Run one carrier command, reading a vanished guest as stopped.
+
+        The guest can power itself off at any moment — ``fdapm
+        poweroff`` is how a DOS script normally ends — and every
+        carrier fails once it has. VirtualBox can say which of the two
+        happened, so ask it rather than reading VBoxManage's message:
+        a stopped VM is a condition of the world, not a failed command.
+        """
+        try:
+            return run_vbox(args, action=action,
+                            target=target or self._uuid)
+        except RunFailure as failure:
+            if not vm_stopped(self._uuid):
+                raise
+            raise _not_running(self._uuid) from failure
+
     def send_keys(self, combos, delay=0.06):
         """Inject key combinations via ``keyboardputscancode``."""
         for combo in combos:
             codes = scancodes_for(combo)
             hex_args = [f"{byte:02x}" for byte in codes]
-            run_vbox(
+            self._carry(
                 ["controlvm", self._uuid, "keyboardputscancode",
                  *hex_args],
-                action="sending keys", target=self._uuid)
+                action="sending keys")
             time.sleep(delay)
 
     def screenshot(self, path):
@@ -574,9 +634,9 @@ class VirtualBoxSession:
         parent = os.path.dirname(png)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        run_vbox(
+        self._carry(
             ["controlvm", self._uuid, "screenshotpng", png],
-            action="screenshot", target=self._uuid)
+            action="screenshot")
         return png
 
     def text_screen(self):
@@ -606,7 +666,7 @@ class VirtualBoxSession:
                 f"drive {drive_key!r} has no recorded VirtualBox "
                 "attachment on this VM",
                 rule_id="machine.slot-not-declared")
-        run_vbox(
+        self._carry(
             _attach_args(self._name, attach["storagectl"],
                          attach["port"], attach["device"],
                          attach["type"], path),
@@ -713,6 +773,14 @@ class VirtualBoxAdapter(BackendAdapter):
                 "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {expected}",
                 rule_id="machine.vm-unreachable") from error
+        state = info.get("VMState")
+        if state in _STOPPED_STATES:
+            # `showvminfo` answers for a powered-off VM as readily as
+            # for a running one, so identity alone proves nothing about
+            # whether there is a guest to drive. There is no session to
+            # be had here, and saying so is what lets a script wait for
+            # the machine to stop.
+            raise _not_running(expected, state)
         endpoint = vm.get("endpoint") or {}
         yield VirtualBoxSession(
             expected, endpoint.get("name") or info.get("name", expected),

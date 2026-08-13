@@ -1011,13 +1011,28 @@ def _complete_stop(machine_id, context=None):
     section is already gone becomes ``ready``, while one still recorded
     (our VM may yet be running — a stuck port or an identity mismatch)
     restores ``running``; either way the error propagates.
+
+    An **unreachable** VM is the exception, and it is an accomplished
+    stop rather than a failed one: the adapter went looking for this
+    machine's VM and there is none to power off, which is the state
+    stop was asked to produce. `script_runner._read` already reads
+    that rule id as the stopped observation mid-run, so a run
+    self-heals; without the same reading here, a guest that halted
+    itself between runs left the machine un-stoppable and therefore
+    un-destroyable, with no door but deleting its directory by hand
+    (T19). The rule id is the whole test — an identity mismatch or a
+    port that answers wrongly is a different condition and still
+    fails closed.
     """
     state = load_machine_state(machine_id, context)
     vm = state.get("vm")
     backend = (vm or {}).get("backend") or state.get("backend") or "qemu"
     try:
         backends.adapter(backend).stop(vm)
-    except ReliquaryError:
+    except ReliquaryError as error:
+        if error.rule_id == "machine.vm-unreachable":
+            _clear_vm(machine_id, "ready", context)
+            return
         if load_machine_state(machine_id, context).get("vm") is None:
             _write_phase(machine_id, "ready", context)
         else:
