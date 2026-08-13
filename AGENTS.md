@@ -789,10 +789,13 @@ Doctrine to preserve:
   simpler than it was**: the suite runs from the repository and
   nowhere else (D96), so every document a docs-reading test consumes
   is always present and a guard on one fires nowhere the suite is
-  supposed to run. The suite skips exactly **one** test — the opt-in
-  FreeDOS integration run; any other skip is a defect to fix, not a
-  configuration to tolerate. A guard that survives is one whose
-  resource is genuinely optional, and it says which.
+  supposed to run. The suite skips exactly **two** tests — the
+  opt-in FreeDOS integration runs, one per backend (QEMU and
+  VirtualBox), both gated on `RELIQUARY_INTEGRATION`; any other skip
+  is a defect to fix, not a configuration to tolerate. **The count
+  is the assertion**, so it moves only when an integration run is
+  added or retired. A guard that survives is one whose resource is
+  genuinely optional, and it says which.
 - Pillow is the image library: screenshot conversion uses it, and the
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.
