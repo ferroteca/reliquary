@@ -16,7 +16,7 @@ from unittest import mock
 
 from reliquary import backend_virtualbox as vbox
 from reliquary import text_recognize
-from vga_bank import vga_bank
+from tests.vga_bank import vga_bank
 from reliquary.errors import PreflightError, RunFailure, StaticError
 
 

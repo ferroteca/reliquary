@@ -1,6 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Tests for reliquary."""
+"""Tests for reliquary.
+
+Importing this package **arms the guard** against live external
+effects: no unit test reaches a hypervisor or the network, because
+the names that would are replaced below at import time.
+
+That makes the import itself load-bearing, and it is not guaranteed
+by every way of running the suite. ``unittest tests`` imports the
+package and then discovers through `load_tests`; ``unittest discover
+-s tests`` treats this directory as the top level and imports the
+modules under top-level names, reaching this file only if something
+asks for it. `test_external_effect_guards` asks, deliberately and
+with no dependency on `reliquary` importing, and then asserts that
+the arming took (T26).
+"""
 
 import contextlib
 import os

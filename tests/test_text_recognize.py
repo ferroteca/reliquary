@@ -13,7 +13,7 @@ import unittest
 from PIL import Image
 
 from reliquary import text_recognize as recognize
-from vga_bank import vga_bank
+from tests.vga_bank import vga_bank
 from reliquary.errors import (PreflightError, StaticError, UnreadableScreen,
                               exit_code)
 

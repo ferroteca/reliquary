@@ -33,7 +33,7 @@ except ModuleNotFoundError:
 import reliquary
 from reliquary import backend_qemu as qemu_module
 from reliquary import text_recognize
-from vga_bank import vga_bank
+from tests.vga_bank import vga_bank
 from reliquary.errors import PreflightError, RunFailure, StaticError
 
 
