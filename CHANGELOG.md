@@ -50,6 +50,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   start/stop with UUID identity verification. The VMware and
   Hyper-V stubs remain.
 
+- **`delete-script`, the script removal command.**
+  Removes a home script file under ``scripts/`` and
+  fails closed while any blueprint refers to the script,
+  naming each referencing blueprint. Error ids
+  ``script.unknown`` / ``script.has-blueprints`` mirror
+  ``blueprint.unknown`` / ``blueprint.has-machines``.
+
+- **The command manifest.** The package ships
+  `schemas/command-manifest.toml`, the normative inventory of the
+  command surfaces (P6): every capability declared once, the CLI
+  word and the session twin derived from the one name, the
+  families and the reasoned parity exceptions as data, every
+  public name classified. The suite holds both surfaces to it in
+  both directions (`tests/test_command_manifest.py`), and the
+  prose specs defer to it for what exists — cli.md and api.md
+  stay normative for behavior and design.
+
+- **`stability=`, the quiescence gate on observations** (F48, over
+  F47's measure). A condition can hold perfectly on a screen that
+  is still painting, and that is exactly the screen a wait must not
+  act on — `stable=` guards how long a *match* holds, and nothing
+  guarded the *frame* the compare ran on. A sample below the gate
+  is now not one any condition is judged on; in a branching `wait`
+  an unsettled frame evaluates none of the handlers. It is a
+  proportion rather than a duration, and it scopes like `timeout`
+  — `statement > branching wait > phase > header > built-in 0.99`
+  — so it is **written nowhere in an ordinary script**. The
+  default follows the geometry: one row of an 80×25 screen is 4%
+  of it, so anything looser than 0.96 calls a screen settled while
+  a line is being drawn, while furniture (a cursor 1 cell, a clock
+  8) costs an order of magnitude less. `stability=0` turns the
+  guard off for one observation and costs nothing.
+
+  **This changes when existing waits fire, deliberately** (P8):
+  every wait gains a clause its author did not write. Two rules
+  bound that. The gate **never causes a failure on its own** —
+  where it could not measure at all, the condition is judged on
+  what is there, so a short bound still works and "a timeout means
+  samples were taken, never that nobody looked" still holds. And
+  where it measured a moving screen, the expiry **says so**,
+  naming the proportion reached rather than leaving the two ways a
+  wait can now expire indistinguishable. It does not retire
+  `stable=`: the two answer different questions, and only `stable`
+  catches a quiet screen showing text about to be overwritten.
+
 ### Changed
 
 - **The machine layer and the CLI entry point are restructured, and
@@ -137,75 +182,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whether the blueprint would work *there*, so absence is reported
   rather than raised. The old `machine.backend-outside-dry-run`
   guard is deleted.
-
-### Fixed
-
-- **`--record` and `run_script(record=)` are specified.** D98 ruled
-  the `.rlqt` transcript format deliberately outside the application
-  surfaces and the *invocation* squarely inside them (S1, S2) — and
-  then the invocation was described in neither
-  [the CLI spec](docs/spec/cli.md) nor
-  [the API spec](docs/spec/api.md). Both now carry it, including the
-  rule that a bound secret reaching the guest stops the recording.
-  The behaviour is unchanged; it was simply undocumented.
-
-- **`--detach` no longer appears in the `run-script` synopsis.** The
-  flag has never existed: detach and the follow surface are
-  asynchronous-runs backlog (D35/D36), and a normative synopsis
-  offering an invocation `argparse` rejects reads as a promise. Where
-  the naming for that capability is settled it stays recorded, in the
-  passages scoped to the backlog.
-
-### Added
-
-- **`delete-script`, the script removal command.**
-  Removes a home script file under ``scripts/`` and
-  fails closed while any blueprint refers to the script,
-  naming each referencing blueprint. Error ids
-  ``script.unknown`` / ``script.has-blueprints`` mirror
-  ``blueprint.unknown`` / ``blueprint.has-machines``.
-
-- **The command manifest.** The package ships
-  `schemas/command-manifest.toml`, the normative inventory of the
-  command surfaces (P6): every capability declared once, the CLI
-  word and the session twin derived from the one name, the
-  families and the reasoned parity exceptions as data, every
-  public name classified. The suite holds both surfaces to it in
-  both directions (`tests/test_command_manifest.py`), and the
-  prose specs defer to it for what exists — cli.md and api.md
-  stay normative for behavior and design.
-
-### Added
-
-- **`stability=`, the quiescence gate on observations** (F48, over
-  F47's measure). A condition can hold perfectly on a screen that
-  is still painting, and that is exactly the screen a wait must not
-  act on — `stable=` guards how long a *match* holds, and nothing
-  guarded the *frame* the compare ran on. A sample below the gate
-  is now not one any condition is judged on; in a branching `wait`
-  an unsettled frame evaluates none of the handlers. It is a
-  proportion rather than a duration, and it scopes like `timeout`
-  — `statement > branching wait > phase > header > built-in 0.99`
-  — so it is **written nowhere in an ordinary script**. The
-  default follows the geometry: one row of an 80×25 screen is 4%
-  of it, so anything looser than 0.96 calls a screen settled while
-  a line is being drawn, while furniture (a cursor 1 cell, a clock
-  8) costs an order of magnitude less. `stability=0` turns the
-  guard off for one observation and costs nothing.
-
-  **This changes when existing waits fire, deliberately** (P8):
-  every wait gains a clause its author did not write. Two rules
-  bound that. The gate **never causes a failure on its own** —
-  where it could not measure at all, the condition is judged on
-  what is there, so a short bound still works and "a timeout means
-  samples were taken, never that nobody looked" still holds. And
-  where it measured a moving screen, the expiry **says so**,
-  naming the proportion reached rather than leaving the two ways a
-  wait can now expire indistinguishable. It does not retire
-  `stable=`: the two answer different questions, and only `stable`
-  catches a quiet screen showing text about to be overwritten.
-
-### Changed
 
 - **A blueprint's `scripts` map is read at invocation, not recorded
   in machine state** (D101), which is what `docs/spec/cli.md` always
@@ -329,6 +305,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and no script can observe a variable, so it could trigger
   nothing. The engine keeps its internal writer for the runner;
   no public surface writes a machine variable.
+
+### Fixed
+
+- **`--record` and `run_script(record=)` are specified.** D98 ruled
+  the `.rlqt` transcript format deliberately outside the application
+  surfaces and the *invocation* squarely inside them (S1, S2) — and
+  then the invocation was described in neither
+  [the CLI spec](docs/spec/cli.md) nor
+  [the API spec](docs/spec/api.md). Both now carry it, including the
+  rule that a bound secret reaching the guest stops the recording.
+  The behaviour is unchanged; it was simply undocumented.
+
+- **`--detach` no longer appears in the `run-script` synopsis.** The
+  flag has never existed: detach and the follow surface are
+  asynchronous-runs backlog (D35/D36), and a normative synopsis
+  offering an invocation `argparse` rejects reads as a promise. Where
+  the naming for that capability is settled it stays recorded, in the
+  passages scoped to the backlog.
 
 ## 0.1.0a1 - 2026-07-31
 
