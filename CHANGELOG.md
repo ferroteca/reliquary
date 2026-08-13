@@ -118,12 +118,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The script-language suite is pytest-native** (F58, over F55;
+  D106). Its seven modules — the runner, the parser, the node layer,
+  validation, timing, labeled wiring, and the dry run — are bare
+  `assert`s, fixtures where `setUp` was, and `parametrize` where a
+  loop or a `subTest` was. **No assertion changed**, and the suite
+  now reports **1,901 tests where it reported 1,825**: every one of
+  the 76 is a case that was already being checked inside something
+  that reported one pass for all of them.
+
+  **The static rules are one case table** rather than a method per
+  rule. Each case names the rule it drives and is a collected node
+  named for it — `pytest -k V10-goto-undeclared` selects one while it
+  is being fixed — and a parametrised check walks the id-to-rule
+  map's whole range, so a rule the language gains with no case
+  fails as a named missing rule rather than passing as an absence
+  nobody counts. That is the same guarantee the conformance corpora
+  make over fixtures, made over unit cases.
+
 - **The integration tier is a marker, not a skip** (F57, over F55;
   D106). The two opt-in FreeDOS runs carry
   `@pytest.mark.integration` and are **deselected** unless `pytest
   --integration` asks for the tier, so the default suite reports
-  **1,825 tests and no skips at all** where it reported 1,825 and
-  two. `RELIQUARY_INTEGRATION` retires as the gate;
+  **no skips at all** where it reported two.
+  `RELIQUARY_INTEGRATION` retires as the gate;
   `RELIQUARY_INTEGRATION_HOME` stays and is read by the
   `integration_home` fixture rather than at import.
 
@@ -174,8 +192,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Both corpora read through one helper, `tests/corpus.py`, rather than
   a glob apiece — the guarantee belongs to the harness, not to a
   document format, and a third corpus inherits it by calling the same
-  two functions. The suite collects **1,827 tests where it collected
-  1,310**: the checks are the ones it was
+  two functions. The suite collected **1,827 tests where it had
+  collected 1,310**: the checks are the ones it was
   already making, and what changed is how many of them a run can prove
   it made.
 
@@ -185,7 +203,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   time — on platforms and interpreters this project never tests,
   which is the whole of what shipping it buys. Unpack
   `reliquary-<version>.tar.gz` outside the tree, put `src` on
-  `PYTHONPATH`, and `pytest` runs **1,811 tests and deselects two** —
+  `PYTHONPATH`, and `pytest` runs **1,887 tests and deselects two** —
   the opt-in FreeDOS integration runs, one per backend, exactly as in
   the repository.
 

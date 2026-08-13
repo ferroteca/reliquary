@@ -36,7 +36,7 @@ to this file on pledge.
 
 > **Pledged 2026-08-13** (owner), cut straight to this file by
 > **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first; no order binds it against F58 or F59. Two of these
+> delivered first; no order binds it against F59. Two of these
 > modules read the repository rather than the package and live in
 > `tests/source_tree/`, which is **D105**'s isolation — the clause
 > that would have moved what they read was struck, so they assume
@@ -96,31 +96,6 @@ Work items:
    methods, so a seam requirement cannot be honored by one backend's
    test and quietly missing from the other's (**P25**).
 5. Same assertions and the same collected count as the run before
-   the conversion.
-
-## F58 — The script-language suite is pytest-native
-
-> **Pledged 2026-08-13** (owner), cut straight to this file by
-> **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first; no order binds it against the other sweeps.
-
-Seven modules and roughly 350 tests — the largest single cluster,
-and the one where parametrisation pays past the conversion itself.
-The static validation rules are a table pretending to be a method
-list.
-
-Work items:
-
-1. Convert `test_script_runner`, `test_script_validation`,
-   `test_script_parser`, `test_script_nodes`, `test_script_timing`,
-   `test_run_script`, `test_dry_run`.
-2. **The V-rules become parametrised over the rule table** rather
-   than a method per rule, so a rule added to the language without a
-   test is visible as a missing case instead of an absence nobody
-   counts.
-3. A corpus of fixture files reads through `tests/corpus.py`, the
-   shared helper, rather than growing a second one.
-4. Same assertions and the same collected count as the run before
    the conversion.
 
 ## F54 — The scoped machine-state change
