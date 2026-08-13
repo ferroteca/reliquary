@@ -2,10 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Assert the built artifacts carry what they must.
 
-The suite ships in neither artifact (D96), so nothing inside a
-released artifact checks it. That job lives here, and it is a better
-fit: this *names* what has to be present rather than inferring it
-from a suite that happened to pass.
+The wheel carries no suite, so nothing inside it checks itself. That
+job lives here, and it is a better fit either way: this *names* what
+has to be present rather than inferring it from a suite that happened
+to pass.
+
+The sdist does carry the suite (D105), and it is asserted in both
+directions — present, because an sdist that cannot be verified is the
+thing D105 refused, and whole, because setuptools' default sdist
+rules ship top-level `tests/*.py` without the subdirectories under
+them. A corpus that silently stopped shipping would leave a suite
+that still passes.
 
 What it guards is package data — the files setuptools ships only
 because `[tool.setuptools.package-data]` says so, and which therefore
@@ -42,15 +49,31 @@ WHEEL_REQUIRED_TREES = (
 # The wheel is the runtime: the suite is not in it.
 WHEEL_FORBIDDEN_TREES = ("tests/",)
 
-# The sdist is the source package: runtime and documentation, and no
-# suite (D96). Asserted in both directions — `docs/spec/` present
-# because the specifications are what make it a *source* package worth
-# reading, and the suite absent because it is developed and run from
-# the repository, not shipped.
-SDIST_REQUIRED_TREES = ("docs/spec/",)
+# The sdist is the source package — the runtime and the suite that
+# verifies it (D105). The suite's subdirectories are named one by one
+# because that is the half a manifest drops silently: setuptools'
+# default rules ship `tests/*.py` and none of the trees below, which
+# leaves an archive whose suite passes while checking nothing it was
+# written to check.
+SDIST_REQUIRED_TREES = (
+    "tests/",
+    "tests/fixtures/conformance/blueprint/valid/",
+    "tests/fixtures/conformance/blueprint/invalid/",
+    "tests/fixtures/conformance/blueprint/invalid-at-resolution/",
+    "tests/fixtures/conformance/script/valid/",
+    "tests/fixtures/conformance/script/invalid/",
+    "tests/fixtures/conformance/script/invalid-at-preflight/",
+    "tests/fixtures/text_recognize/",
+)
 
-# Neither artifact carries the suite, so this is checked on both.
-SDIST_FORBIDDEN_TREES = ("tests/", "planning/")
+# What the source package does not carry, each for its own reason.
+# `planning/` is maintainer governance (D96). `docs/` is the
+# repository's prose, and README.md reaches a consumer through the
+# distribution metadata without it. `tests/source_tree/` is the part
+# of the suite that reads those two: shipped, it would sweep an
+# absent tree and report success, so it is kept out where it cannot
+# run at all rather than left to run hollow.
+SDIST_FORBIDDEN_TREES = ("planning/", "docs/", "tests/source_tree/")
 
 
 def _wheel_names(path):

@@ -5,17 +5,35 @@ include src/reliquary/codex/codex.json
 include src/reliquary/codex/blueprints/*.rlqb
 include src/reliquary/codex/scripts/*.rlqs
 
-# Documentation ships with the source package, as it conventionally
-# does. `planning/` does not: it is maintainer governance, and the
-# `planning/design` graft that used to sit here existed only so the
-# suite could parse the script-example catalogue out of an unpacked
-# sdist — which nothing does now that the suite is not shipped.
-graft docs
+# The suite ships in the sdist and not in the wheel (D105). An sdist
+# is the artifact a stranger builds *and verifies* from, and a
+# downstream packager runs it at package-build time on a platform this
+# project never tests — which is the whole of what shipping it buys.
+#
+# `graft`, not the default discovery: setuptools' own sdist rules pick
+# up top-level `tests/*.py` and *not* the subdirectories, so the
+# default ships a suite that looks runnable and proves nothing — no
+# fixtures, no corpora. Ship it whole or not at all.
+graft tests
 
-# The suite ships in NEITHER artifact (D96): it is developed and run
-# from the repository, which is the only place it is complete.
-# Package discovery is confined to src/ for the wheel; setuptools'
-# sdist file discovery recognizes a root tests/ directory, so prune
-# it explicitly there.
-prune tests
+# Except the tests that read the repository rather than the package.
+# A prose sweep run where the prose is absent checks a fraction of
+# what it was written to check and still reports success, so these
+# are made unable to run outside the tree rather than left to do less
+# in silence. `tests/source_tree/__init__.py` states the rule.
+prune tests/source_tree
+
+# `docs/` does not ship. The prose is the repository's, and what a
+# consumer needs to *use* the package — README.md — is carried in the
+# distribution metadata already. Excluding it is unremarkable as
+# packaging goes, unlike excluding the suite: nobody builds against a
+# docs tree.
+#
+# Maintainer governance ships nowhere either (D96, whose planning half
+# D105 left standing): open design problems and the decision record
+# are not a stranger's business, and grafting them to satisfy a test
+# is how the last arrangement went wrong.
+prune planning
+prune docs
+
 global-exclude __pycache__/* *.py[co]

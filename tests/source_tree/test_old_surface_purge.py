@@ -20,7 +20,8 @@ from reliquary.script_nodes import ScriptParseError
 from reliquary.script_parser import parse_script
 
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
 
 # Superseded CLI command words (exact argv tokens).
 _OLD_CLI_COMMANDS = frozenset({
@@ -136,7 +137,7 @@ _ALLOW_PATH_SUFFIXES = (
     os.path.join("tests", "test_home.py"),
     os.path.join("tests", "test_library.py"),
     # This module names the forbidden spellings.
-    os.path.join("tests", "test_old_surface_purge.py"),
+    os.path.join("tests", "source_tree", "test_old_surface_purge.py"),
     # The API spec's realignment section records a completed rename
     # and names the spellings it replaced. Historical prose, not a
     # surface anyone can reach: the names it quotes are exactly the
@@ -269,6 +270,15 @@ def _fenced_only(text):
 def _iter_sweep_files():
     for root in _SWEEP_ROOTS:
         path = os.path.join(_REPO_ROOT, root)
+        if not os.path.exists(path):
+            # `os.walk` on a missing directory yields nothing, so a
+            # root that stopped existing would shrink the sweep and
+            # still report success. This module runs from the
+            # repository alone (`tests/source_tree`), where every
+            # root below is present.
+            raise AssertionError(
+                "sweep root %s does not exist; this module runs from "
+                "the repository only" % root)
         if os.path.isfile(path):
             yield path
             continue

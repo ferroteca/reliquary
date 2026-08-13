@@ -26,7 +26,8 @@ import jsonschema
 from reliquary import document, json5reader, script_parser
 from reliquary.errors import StaticError
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
 
 # The documents that teach the authored blueprint format. README.md
 # joined them when it grew worked examples: it is the document most
@@ -87,24 +88,13 @@ def _schema():
     return json.loads(text)
 
 
-@unittest.skipUnless(
-    all(os.path.isfile(os.path.join(_REPO_ROOT, path))
-        for path in _DOCUMENTS),
-    "the documented blueprint examples are source-tree only")
 class DocumentedExampleTests(unittest.TestCase):
     """Every blueprint example in the docs parses and validates.
 
-    Source-tree only: `docs/` and `README.md` are not packaged, so an
-    installed wheel has no documents to read. The guard is the
-    sanctioned one (AGENTS.md, "Dependencies and style") — a resource
-    genuinely absent in a supported configuration, which is exactly
-    the case a downstream packager running the suite against the
-    installed artifact hits.
-
-    It guards the whole class rather than each method, because
-    `test_documents_are_present` is the one that would otherwise turn
-    "not packaged" into "listed here but does not exist" — an
-    absence the guard's own condition has already accounted for.
+    No guard: this module ships nowhere (`tests/source_tree`), so
+    every document below is present wherever it can run, and
+    `test_documents_are_present` is free to treat a missing one as
+    the failure it is rather than a configuration to tolerate.
     """
 
     def test_documents_are_present(self):
@@ -139,10 +129,12 @@ _SCRIPT_EXAMPLES = os.path.join(
     _REPO_ROOT, "planning", "design", "script-examples")
 
 
-@unittest.skipUnless(os.path.isdir(_SCRIPT_EXAMPLES),
-                     "the script-example catalogue is source-tree only")
 class ScriptExampleTests(unittest.TestCase):
     """Every open script example parses.
+
+    No guard, for the reason above: the catalogue is maintainer
+    governance and ships nowhere, and neither does this module, so
+    the two are only ever present together.
 
     The catalogue holds *unresolved* design problems, demonstrated
     in real script text; lines that are deliberately illegal are
@@ -157,6 +149,9 @@ class ScriptExampleTests(unittest.TestCase):
 
     def test_every_example_parses(self):
         paths = sorted(glob.glob(os.path.join(_SCRIPT_EXAMPLES, "*.rlqs")))
+        self.assertTrue(paths,
+                        f"no examples found under {_SCRIPT_EXAMPLES}; an "
+                        "empty catalogue passes this vacuously")
         for path in paths:
             with self.subTest(example=os.path.basename(path)):
                 with open(path, encoding="utf-8") as handle:

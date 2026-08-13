@@ -118,6 +118,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The source distribution carries the test suite again** (D105).
+  An sdist is the artifact a stranger builds *and verifies* from,
+  and downstream packagers run the upstream suite at package-build
+  time — on platforms and interpreters this project never tests,
+  which is the whole of what shipping it buys. Unpack
+  `reliquary-<version>.tar.gz` outside the tree, put `src` on
+  `PYTHONPATH`, and `python -m unittest tests` runs **1,296 tests
+  with two skips** — the opt-in FreeDOS integration runs, one per
+  backend, exactly as in the repository.
+
+  The suite is grafted **whole**. Setuptools' own sdist rules take
+  top-level `tests/*.py` and none of the fixture trees beneath it,
+  which would ship a suite that looks runnable and proves nothing,
+  so `tools/check_dist.py` now names every fixture tree it must
+  carry and fails the release if one stops shipping.
+
+- **The tests that read the repository are separated from the ones
+  that test the package**, and only the second kind ships. The new
+  `tests/source_tree/` holds the documented-example checks and the
+  old-surface sweep: what they read is prose, maintainer records
+  and the open-problem catalogue, none of it in a released
+  artifact. Shipped, the sweep would have found no `docs/` and no
+  `AGENTS.md`, checked a fraction of what it was written to check,
+  and reported success — so it is kept where it cannot run rather
+  than left to run hollow. Two `skipUnless` guards go with it, and
+  the skip count is now the same two wherever the suite runs.
+
+- **`docs/` no longer ships in the source distribution.** The prose
+  is the repository's, and what a consumer needs to use the package
+  travels in the distribution metadata already. The sdist is 257
+  files against the previous release's 280, and carries a suite
+  that runs rather than documents nobody builds against.
+
+  Unchanged in both directions: the **wheel** carries no tests —
+  59 files, the runtime and its package data — and **`planning/`
+  ships in neither artifact**, being maintainer governance rather
+  than anything a consumer runs.
+
 - **The machine layer and the CLI entry point are restructured, and
   nothing you use moved.** `machines.py` was two modules and a
   substrate: the drive layer — the drive report and the five in-band

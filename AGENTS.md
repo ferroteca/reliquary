@@ -482,12 +482,18 @@ workflow:
   every command driven through session methods, the codex and
   locate seam taking the record directly (D87) — and
   `__main__.py` preserves `python -m reliquary` execution.
-- `pyproject.toml` packages `reliquary` as the `reliquary` command. **Released artifacts are the runtime alone**:
-  `tests` ships in neither the wheel nor the sdist (D96). The src-only package search keeps the repository-root suite
-  out of the wheel, and `MANIFEST.in` does not graft it into the sdist. `docs/` ships; `planning/` does not, being
-  maintainer governance.
+- `pyproject.toml` packages `reliquary` as the `reliquary` command. **The two artifacts carry different things**: the
+  wheel is the runtime alone, the sdist is the runtime plus what verifies it. The src-only package search keeps the
+  repository-root suite out of the wheel; `MANIFEST.in` grafts `tests` into the sdist (D105) and prunes `planning`,
+  `docs` and `tests/source_tree`. The suite is grafted whole rather than left to setuptools' default rules, which take
+  top-level `tests/*.py` and none of the fixture trees beneath it — `tools/check_dist.py` names those trees one by one
+  for that reason, and names the three pruned trees as forbidden.
 - `tests/` contains stdlib `unittest` coverage for core helpers, guest program runs, lifecycle ownership,
-  media acquisition, blueprints, machines, and scripts.
+  media acquisition, blueprints, machines, and scripts. **`tests/source_tree/` is the exception that ships nowhere**:
+  the tests that read the *repository* rather than the package — prose documents, the maintainer records, the
+  open-problem catalogue. Shipped, a sweep over `docs/` and `AGENTS.md` would find neither and report success on a
+  fraction of its job, so it is kept where it cannot run at all instead. Nothing there needs a `skipUnless`, and a new
+  test belongs there exactly when it reads something a released artifact does not carry.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
 - `planning/README.md` is the map of the maintainer-facing planning machinery, and the place to start. The
@@ -890,17 +896,22 @@ Doctrine to preserve:
   the parser and *not* the schema while claiming the two cannot drift.
   A missing dev dependency should stop the suite and name itself.
   `skipUnless` is for a resource that genuinely may be absent in a
-  supported configuration. **The bar is high, and the reason is
-  simpler than it was**: the suite runs from the repository and
-  nowhere else (D96), so every document a docs-reading test consumes
-  is always present and a guard on one fires nowhere the suite is
-  supposed to run. The suite skips exactly **two** tests — the
-  opt-in FreeDOS integration runs, one per backend (QEMU and
-  VirtualBox), both gated on `RELIQUARY_INTEGRATION`; any other skip
-  is a defect to fix, not a configuration to tolerate. **The count
-  is the assertion**, so it moves only when an integration run is
-  added or retired. A guard that survives is one whose resource is
-  genuinely optional, and it says which.
+  supported configuration, and **the bar is high**. The suite runs
+  from two places — the repository, and an unpacked sdist (D105) —
+  and **a missing document is not one of the cases**: a test that
+  reads what a released artifact does not carry goes in
+  `tests/source_tree/` and ships nowhere, rather than carrying a
+  guard that turns "cannot do its job here" into a quiet pass.
+
+  **The count is the assertion, and it is the same in both
+  places**: exactly **two** skips, the opt-in FreeDOS integration
+  runs, one per backend (QEMU and VirtualBox), both gated on
+  `RELIQUARY_INTEGRATION`. Any other skip is a defect to fix, not a
+  configuration to tolerate, and the two move only when an
+  integration run is added or retired. That the two runs differ —
+  1,310 tests from the repository, 1,296 from an sdist — is the
+  isolation working; the skips do not differ. A guard that survives
+  is one whose resource is genuinely optional, and it says which.
 - Pillow is the image library: screenshot conversion uses it, and the
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.
@@ -1057,16 +1068,26 @@ check costs one line. It was added when the floor turned out to be wrong:
 `uv build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
 After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, and runtime
 dependencies in both built artifacts, then run `uv run python tools/check_dist.py`, which asserts what each artifact must
-carry — the grammar, the schemas and the codex in the wheel; the suite, its fixtures, `docs/spec/` and the
-script-example catalogue in the sdist — and that the wheel carries no tests. It exists because the suite no longer
-ships in the wheel, so nothing running inside the wheel inspects it: package data is what disappears silently, and a
+carry — the grammar, the schemas and the codex in the wheel; the suite and each of its fixture trees in the sdist —
+that the wheel carries no tests, and that the sdist carries none of `planning/`, `docs/` or `tests/source_tree/`. It
+exists because nothing inside a released artifact inspects the artifact: package data is what disappears silently, and a
 missing `.lark` grammar breaks an installed Reliquary while every source-tree test still passes.
 
-For release-facing packaging changes, **the sdist's completeness is proved by the build itself**: `uv build` builds the
-wheel *from* the sdist, so a source archive missing anything the build needs fails there rather than silently. That is
-what replaced unpacking the sdist and running the suite inside it — impossible since D96, because neither artifact
-carries the suite. Install the wheel into a clean environment and check it by using it — `rlq --version` and an
-import — since it carries no suite to run.
+For release-facing packaging changes, **two checks, and they answer different questions.** The archive's *completeness*
+is proved by the build itself: `uv build` builds the wheel *from* the sdist, so a source archive missing anything the
+build needs fails there rather than silently — and that holds whether or not the suite ships. What the shipped suite
+buys is the other question, the one only a stranger can ask: **unpack the sdist outside the tree and run it there**,
+which is what a downstream packager does at package-build time on a platform this project never tests.
+
+```powershell
+tar -xzf dist/reliquary-<version>.tar.gz -C <scratch>
+cd <scratch>/reliquary-<version>
+$env:PYTHONPATH = "src"; python -m unittest tests
+```
+
+Expect **1,296 tests and the same two skips** as the repository's 1,310 ("Test expectations", above): the difference is
+`tests/source_tree/`, which ships nowhere, and a *skip* there is a defect exactly as it is here. Install the wheel into
+a clean environment and check it by using it — `rlq --version` and an import — since it carries no suite to run.
 
 **Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
 no CI (P22) there is no trusted-publishing path, so it takes a token
