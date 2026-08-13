@@ -32,44 +32,6 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
-## F60 — The remaining suites are pytest-native
-
-> **Pledged 2026-08-13** (owner), cut straight to this file by
-> **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first, and it is the last of the sweeps. Two of these
-> modules read the repository rather than the package and live in
-> `tests/source_tree/`, which is **D105**'s isolation — the clause
-> that would have moved what they read was struck, so they assume
-> nothing.
-
-The tail: twenty small modules and roughly 470 tests — the CLI and
-document surface, the core helpers, the home and asset machinery,
-the media path, and the guards. Nothing here is architecturally
-interesting, and that is the point: it is what stands between a
-mostly-converted suite and an idiom policy with no exceptions.
-
-Work items:
-
-1. Convert the surface modules — `test_cli`, `test_document`,
-   `test_command_manifest`, `test_errors`, and the two that sit
-   under `tests/source_tree/`, `test_documented_examples` and
-   `test_old_surface_purge`.
-2. Convert the core and resource modules — `test_core`,
-   `test_binding`, `test_home`, `test_assets`, `test_resolve`,
-   `test_library`, `test_media`, `test_acquire`,
-   `test_credentials`, `test_json5reader`, `test_transcript`,
-   `test_authoring`, `test_facts`,
-   `test_external_effect_guards`.
-3. The two repository-reading modules convert **in place**. The
-   script-example catalogue stayed at
-   `planning/design/script-examples/` — D105 moved the tests instead
-   of the catalogue — so what they read does not move either, and
-   neither carries a guard: a module that ships nowhere is only ever
-   run where what it reads exists.
-4. Same assertions and the same collected count as the run before
-   the conversion. The suite is pytest-native throughout, and the
-   idiom policy F55 wrote has nothing left to exempt.
-
 ## F54 — The scoped machine-state change
 
 > **Pledged 2026-08-13** (owner), cut straight to this file in the

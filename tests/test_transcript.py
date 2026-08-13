@@ -9,10 +9,9 @@ session, which is what makes the fixtures worth having (F42).
 
 import io
 import os
-import sys
-import tempfile
 import time
-import unittest
+
+import pytest
 
 from reliquary import transcript
 from reliquary.control_display import DisplayConsole
@@ -75,245 +74,210 @@ class _StringWriter(_TranscriptWriter):
         self._file = None
 
     def _write_json(self, document):
-        self._out.write(transcript.json.dumps(
-            document, default=str) + "\n")
+        self._out.write(transcript.json.dumps(document, default=str) + "\n")
 
 
-class DigestTests(unittest.TestCase):
-
-    def test_digest_is_repeatable(self):
-        rows = ["", "C:\\>", ""]
-        attributes = [[0x07] * 80 for _ in range(3)]
-        first = compute_digest(rows, attributes)
-        second = compute_digest(rows, attributes)
-        self.assertEqual(first, second)
-
-    def test_digest_depends_on_attributes(self):
-        rows = ["hello"]
-        attr_a = [[0x07] * 80]
-        attr_b = [[0x70] * 80]
-        self.assertNotEqual(
-            compute_digest(rows, attr_a),
-            compute_digest(rows, attr_b))
-
-    def test_deltas(self):
-        before = ["one", "two", "three"]
-        after = ["one", "TWO", "three"]
-        self.assertEqual(compute_deltas(before, after), {"1": "TWO"})
-
-    def test_deltas_empty(self):
-        before = ["a", "b"]
-        after = ["a", "b"]
-        self.assertEqual(compute_deltas(before, after), {})
+@pytest.fixture
+def target(tmp_path):
+    """A path for a transcript file the test writes and reads back."""
+    return str(tmp_path / "run.rlqt")
 
 
-class RecordingTests(unittest.TestCase):
+def _lines(stream):
+    return [line.strip() for line in stream.getvalue().splitlines()
+            if line.strip()]
 
-    def test_write_and_read_full_round_trip(self):
-        stream = io.StringIO()
-        writer = _StringWriter(stream, pace=0.1)
-        writer.open()
 
-        inner = _FakeInnerSession(rows=["", "", "C:\\>"])
-        rec = RecordingSession(inner, writer)
+# The frame digest, and what a delta carries.
 
-        # First read — a keyframe.
-        rows, attrs = rec.text_screen()
-        self.assertEqual(rows[-1], "C:\\>")
+def test_digest_is_repeatable():
+    rows = ["", "C:\\>", ""]
+    attributes = [[0x07] * 80 for _ in range(3)]
+    assert compute_digest(rows, attributes) == compute_digest(
+        rows, attributes)
 
-        # Second identical read — absorbed.
-        rows2, attrs2 = rec.text_screen()
-        self.assertEqual(rows2, rows)
 
-        # Send keys — a call, then the next frame is a keyframe.
-        rec.send_keys([["ret"]], delay=0.06)
-        self.assertEqual(len(inner.keys), 1)
+def test_digest_depends_on_attributes():
+    rows = ["hello"]
+    assert compute_digest(rows, [[0x07] * 80]) != compute_digest(
+        rows, [[0x70] * 80])
 
-        # Change the screen.
-        inner.rows = ["", "", "", "A:\\>"]
 
-        # Next read after call — keyframe.
-        rec.text_screen()
+def test_deltas():
+    assert compute_deltas(["one", "two", "three"],
+                          ["one", "TWO", "three"]) == {"1": "TWO"}
 
-        writer.close()
 
-        # Parse and verify the transcript.
-        content = stream.getvalue()
-        lines = [line.strip() for line in content.splitlines() if line.strip()]
-        self.assertTrue(len(lines) >= 3,
-                        f"expected at least header + frame + call, got "
-                        f"{len(lines)} lines")
+def test_deltas_empty():
+    assert compute_deltas(["a", "b"], ["a", "b"]) == {}
 
-        header = transcript.json.loads(lines[0])
-        self.assertEqual(header["format"], "rlqt-1")
-        self.assertEqual(header["pace"], 0.1)
-        self.assertFalse(header["secret-recorded"])
 
-        # First entry is a keyframe.
-        frame1 = transcript.json.loads(lines[1])
-        self.assertEqual(frame1["type"], "frame")
-        self.assertTrue(frame1.get("keyframe"))
-        self.assertEqual(frame1["rows"], ["", "", "C:\\>"])
+# Recording through the carrier seam, and reading it back.
 
-    def test_secret_stops_writing(self):
-        stream = io.StringIO()
-        writer = _StringWriter(stream, pace=0.1)
-        writer.open()
+def test_write_and_read_full_round_trip():
+    stream = io.StringIO()
+    writer = _StringWriter(stream, pace=0.1)
+    writer.open()
 
-        inner = _FakeInnerSession()
-        rec = RecordingSession(inner, writer)
-        rec.text_screen()
+    inner = _FakeInnerSession(rows=["", "", "C:\\>"])
+    rec = RecordingSession(inner, writer)
 
-        writer.stop("secret entered")
-        self.assertTrue(writer.stopped)
+    # First read — a keyframe.
+    rows, _attrs = rec.text_screen()
+    assert rows[-1] == "C:\\>"
 
-        # Further writes are suppressed.
-        rec.text_screen()
-        rec.send_keys([["a"]])
+    # Second identical read — absorbed.
+    rows2, _attrs2 = rec.text_screen()
+    assert rows2 == rows
 
-        content = stream.getvalue()
-        lines = [line.strip() for line in content.splitlines() if line.strip()]
-        # header + frame + secret-stopped. No more.
-        self.assertEqual(len(lines), 3,
-                         f"expected 3 lines, got {len(lines)}: {lines}")
-        last = transcript.json.loads(lines[-1])
-        self.assertEqual(last["type"], "secret-stopped")
+    # Send keys — a call, then the next frame is a keyframe.
+    rec.send_keys([["ret"]], delay=0.06)
+    assert len(inner.keys) == 1
 
-    def test_replay_verifies_digests(self):
-        # Write a minimal valid transcript to disk.
-        with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".rlqt", delete=False) as handle:
-            path = handle.name
+    # Change the screen.
+    inner.rows = ["", "", "", "A:\\>"]
 
-        try:
-            writer = _TranscriptWriter(path, pace=0.1)
-            writer.open()
-            inner = _FakeInnerSession(rows=["", "PROMPT>"])
-            rec = RecordingSession(inner, writer)
-            rec.text_screen()
-            writer.close()
+    # Next read after call — keyframe.
+    rec.text_screen()
 
-            # Read it back — should pass digest check.
-            reader = transcript._TranscriptReader(path)
-            entries = reader.read()
-            self.assertTrue(len(entries) >= 1)
-            self.assertEqual(entries[0].kind, "frame")
+    writer.close()
 
-            # Replay through the ReplaySession.
-            replay = ReplaySession(entries)
-            rows, attrs = replay.text_screen()
-            self.assertEqual(rows[-1], "PROMPT>")
-        finally:
-            os.unlink(path)
+    # Parse and verify the transcript.
+    lines = _lines(stream)
+    assert len(lines) >= 3, (
+        f"expected at least header + frame + call, got {len(lines)} lines")
 
-    def test_replay_detects_wrong_call(self):
-        with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".rlqt", delete=False) as handle:
-            path = handle.name
+    header = transcript.json.loads(lines[0])
+    assert header["format"] == "rlqt-1"
+    assert header["pace"] == 0.1
+    assert not header["secret-recorded"]
 
-        try:
-            writer = _TranscriptWriter(path, pace=0.1)
-            writer.open()
-            inner = _FakeInnerSession()
-            rec = RecordingSession(inner, writer)
-            rec.text_screen()
-            rec.send_keys([["ret"]])
-            writer.close()
+    # First entry is a keyframe.
+    frame1 = transcript.json.loads(lines[1])
+    assert frame1["type"] == "frame"
+    assert frame1.get("keyframe")
+    assert frame1["rows"] == ["", "", "C:\\>"]
 
-            reader = transcript._TranscriptReader(path)
-            entries = reader.read()
-            replay = ReplaySession(entries)
-            replay.text_screen()  # consume the frame
-            # Wrong combo
-            with self.assertRaises(TranscriptError) as ctx:
-                replay.send_keys([["esc"]])
-            self.assertIn("send_keys mismatch", str(ctx.exception))
-        finally:
-            os.unlink(path)
 
-    def test_display_console_over_recording(self):
-        """The interpretation layer runs on top of the recording."""
-        stream = io.StringIO()
-        writer = _StringWriter(stream, pace=0.1)
-        writer.open()
-        inner = _FakeInnerSession(rows=["", "", "", "A:\\>"])
-        rec = RecordingSession(inner, writer)
+def test_secret_stops_writing():
+    stream = io.StringIO()
+    writer = _StringWriter(stream, pace=0.1)
+    writer.open()
 
-        # DisplayConsole builds on the session like normal.
-        console = DisplayConsole(rec)
-        text_rows = console.screen_text()
-        self.assertEqual(text_rows[-1], "A:\\>")
+    inner = _FakeInnerSession()
+    rec = RecordingSession(inner, writer)
+    rec.text_screen()
 
-        # The transcript recorded the frame through the recording
-        # wrapper even though the console went through DisplayConsole.
-        content = stream.getvalue()
-        lines = [l for l in content.splitlines() if l.strip()]
-        # header + at least one frame
-        self.assertTrue(len(lines) >= 2,
-                        f"expected header + frame, got {len(lines)} lines")
+    writer.stop("secret entered")
+    assert writer.stopped
 
-    def test_empty_transcript_is_error(self):
-        with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".rlqt", delete=False) as handle:
-            path = handle.name
-        try:
-            reader = transcript._TranscriptReader(path)
-            with self.assertRaises(TranscriptError) as ctx:
-                reader.read()
-            self.assertIn("empty transcript", str(ctx.exception))
-        finally:
-            os.unlink(path)
+    # Further writes are suppressed.
+    rec.text_screen()
+    rec.send_keys([["a"]])
 
-    def test_bad_digest_is_detected(self):
-        with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".rlqt", delete=False) as handle:
-            path = handle.name
+    lines = _lines(stream)
+    # header + frame + secret-stopped. No more.
+    assert len(lines) == 3, f"expected 3 lines, got {len(lines)}: {lines}"
+    assert transcript.json.loads(lines[-1])["type"] == "secret-stopped"
 
-        try:
-            writer = _TranscriptWriter(path, pace=0.1)
-            writer.open()
-            inner = _FakeInnerSession(rows=["HELLO"])
-            rec = RecordingSession(inner, writer)
-            rec.text_screen()
-            writer.close()
 
-            # Tamper with the digest in the file.
-            with open(path) as fh:
-                content = fh.read()
-            content = content.replace(
-                '"digest": "', '"digest": "0000')
-            with open(path, "w") as fh:
-                fh.write(content)
+def test_replay_verifies_digests(target):
+    writer = _TranscriptWriter(target, pace=0.1)
+    writer.open()
+    inner = _FakeInnerSession(rows=["", "PROMPT>"])
+    rec = RecordingSession(inner, writer)
+    rec.text_screen()
+    writer.close()
 
-            reader = transcript._TranscriptReader(path)
-            with self.assertRaises(TranscriptError) as ctx:
-                reader.read()
-            self.assertIn("digest mismatch", str(ctx.exception))
-        finally:
-            os.unlink(path)
+    # Read it back — should pass digest check.
+    entries = transcript._TranscriptReader(target).read()
+    assert len(entries) >= 1
+    assert entries[0].kind == "frame"
 
-    def test_change_medium_recorded_and_replayed(self):
-        with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".rlqt", delete=False) as handle:
-            path = handle.name
+    # Replay through the ReplaySession.
+    rows, _attrs = ReplaySession(entries).text_screen()
+    assert rows[-1] == "PROMPT>"
 
-        try:
-            writer = _TranscriptWriter(path, pace=0.1)
-            writer.open()
-            inner = _FakeInnerSession()
-            rec = RecordingSession(inner, writer)
-            rec.text_screen()
-            rec.change_medium("fd0", None)
-            writer.close()
 
-            reader = transcript._TranscriptReader(path)
-            entries = reader.read()
-            calls = [e for e in entries if e.kind == "call"]
-            self.assertEqual(len(calls), 1)
-            self.assertEqual(calls[0].data["carrier"], "change_medium")
+def test_replay_detects_wrong_call(target):
+    writer = _TranscriptWriter(target, pace=0.1)
+    writer.open()
+    inner = _FakeInnerSession()
+    rec = RecordingSession(inner, writer)
+    rec.text_screen()
+    rec.send_keys([["ret"]])
+    writer.close()
 
-            replay = ReplaySession(entries)
-            replay.text_screen()
-            replay.change_medium("fd0", None)
-        finally:
-            os.unlink(path)
+    entries = transcript._TranscriptReader(target).read()
+    replay = ReplaySession(entries)
+    replay.text_screen()  # consume the frame
+    # Wrong combo
+    with pytest.raises(TranscriptError) as caught:
+        replay.send_keys([["esc"]])
+    assert "send_keys mismatch" in str(caught.value)
+
+
+def test_display_console_over_recording():
+    """The interpretation layer runs on top of the recording."""
+    stream = io.StringIO()
+    writer = _StringWriter(stream, pace=0.1)
+    writer.open()
+    inner = _FakeInnerSession(rows=["", "", "", "A:\\>"])
+    rec = RecordingSession(inner, writer)
+
+    # DisplayConsole builds on the session like normal.
+    console = DisplayConsole(rec)
+    assert console.screen_text()[-1] == "A:\\>"
+
+    # The transcript recorded the frame through the recording
+    # wrapper even though the console went through DisplayConsole.
+    lines = _lines(stream)
+    # header + at least one frame
+    assert len(lines) >= 2, (
+        f"expected header + frame, got {len(lines)} lines")
+
+
+def test_empty_transcript_is_error(target):
+    with open(target, "w", encoding="utf-8"):
+        pass
+    with pytest.raises(TranscriptError) as caught:
+        transcript._TranscriptReader(target).read()
+    assert "empty transcript" in str(caught.value)
+
+
+def test_bad_digest_is_detected(target):
+    writer = _TranscriptWriter(target, pace=0.1)
+    writer.open()
+    inner = _FakeInnerSession(rows=["HELLO"])
+    rec = RecordingSession(inner, writer)
+    rec.text_screen()
+    writer.close()
+
+    # Tamper with the digest in the file.
+    with open(target) as handle:
+        content = handle.read()
+    with open(target, "w") as handle:
+        handle.write(content.replace('"digest": "', '"digest": "0000'))
+
+    with pytest.raises(TranscriptError) as caught:
+        transcript._TranscriptReader(target).read()
+    assert "digest mismatch" in str(caught.value)
+
+
+def test_change_medium_recorded_and_replayed(target):
+    writer = _TranscriptWriter(target, pace=0.1)
+    writer.open()
+    inner = _FakeInnerSession()
+    rec = RecordingSession(inner, writer)
+    rec.text_screen()
+    rec.change_medium("fd0", None)
+    writer.close()
+
+    entries = transcript._TranscriptReader(target).read()
+    calls = [entry for entry in entries if entry.kind == "call"]
+    assert len(calls) == 1
+    assert calls[0].data["carrier"] == "change_medium"
+
+    replay = ReplaySession(entries)
+    replay.text_screen()
+    replay.change_medium("fd0", None)

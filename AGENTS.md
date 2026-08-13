@@ -488,13 +488,13 @@ workflow:
   `docs` and `tests/source_tree`. The suite is grafted whole rather than left to setuptools' default rules, which take
   top-level `tests/*.py` and none of the fixture trees beneath it — `tools/check_dist.py` names those trees one by one
   for that reason, and names the three pruned trees as forbidden.
-- `tests/` is the suite, and **pytest is the runner** (D106) — pytest-native where a sweep has converted a module
-  (the two conformance corpora, through `tests/corpus.py`; the two integration runs, through `tests/conftest.py`;
-  the whole script-language cluster, whose static rules are now one parametrised case table; the machine and backend
-  cluster, whose two adapters answer one parametrised seam contract),
-  over `unittest.TestCase` classes it collects
-  unchanged until F60 converts the rest — covering core helpers, guest program runs, lifecycle ownership,
-  media acquisition, blueprints, machines, and scripts. `tests/conftest.py` is the suite-wide configuration: the
+- `tests/` is the suite, and **pytest is the runner** (D106) — **pytest-native throughout** now that the sweeps have
+  finished (F56–F60), covering core helpers, guest program runs, lifecycle ownership,
+  media acquisition, blueprints, machines, and scripts. Its shared machinery is named where it is used: the two
+  conformance corpora and the recognizer's golden PNGs read through `tests/corpus.py`; the script language's static
+  rules are one parametrised case table; the two backend adapters answer one parametrised seam contract; and the
+  command manifest, the session veneer and the documented examples each report a node per declared item.
+  `tests/conftest.py` is the suite-wide configuration: the
   `integration` marker's `--integration` option, the deselection that keeps the tier out of a default run, and the
   home those runs work in. **`tests/source_tree/` is the exception that ships nowhere**:
   the tests that read the *repository* rather than the package — prose documents, the maintainer records, the
@@ -932,8 +932,8 @@ Doctrine to preserve:
   `pytest --integration` asks for the tier: a marker says the tier
   was chosen, where a skip could not say whether it was chosen or
   suffered. So **any** skip is a defect to fix, not a configuration
-  to tolerate. That the two runs differ — 2,016 tests from the
-  repository, 2,002 from an sdist, two deselected in each — is the
+  to tolerate. That the two runs differ — 2,140 tests from the
+  repository, 2,086 from an sdist, two deselected in each — is the
   isolation working; neither skips. Selecting the tier on a host
   without the backend is a **failure naming the gap** (P11) and not a
   skip either: the run was asked for.
@@ -1129,9 +1129,10 @@ $env:PYTHONPATH = "src"; pytest
 ```
 
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
-unittest tests` is no longer the entry point, and already misses the converted modules — the rest follow as F60 lands.
-It was taken because pytest is packaged everywhere a packager works. Expect **2,002 tests, two deselected and none
-skipped**, against the repository's 2,016 ("Test expectations", above): the difference is `tests/source_tree/`, which
+unittest tests` is no longer the entry point, and with the conversion finished (F60) it collects nothing at all —
+the hook that made it work is gone. It was taken because pytest is packaged everywhere a packager works. Expect
+**2,086 tests, two deselected and none
+skipped**, against the repository's 2,140 ("Test expectations", above): the difference is `tests/source_tree/`, which
 ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
 integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
 `rlq --version` and an import — since it carries no suite to run.
@@ -1222,28 +1223,30 @@ Milestone-9 guarantees needing the same care:
 
 ### The test idiom
 
-**New tests are pytest-native** (D106): a bare `assert`, a fixture where
-`setUp` would have been, and `parametrize` where a loop or a `subTest`
-would have been. The last is the point rather than a style note — a
-parametrised case is a collected node whose count is an assertion, and a
-`subTest` is not, which is how the conformance corpus came to run against
-the parser and not the schema while claiming the two cannot drift.
+**Every test is pytest-native** (D106), and the policy now has nothing
+to exempt: a bare `assert`, a fixture where `setUp` would have been, and
+`parametrize` where a loop or a `subTest` would have been. The last is
+the point rather than a style note — a parametrised case is a collected
+node whose count is an assertion, and a `subTest` is not, which is how
+the conformance corpus came to run against the parser and not the schema
+while claiming the two cannot drift. **No `unittest.TestCase` and no
+`subTest` survives anywhere in the suite**; either arriving in a new test
+is a regression, not a style preference.
 
 `unittest.mock` **stays**, and is not what changed: it is the mocking
 library, the runner is what pytest replaced, and nothing supersedes it.
 The stdlib preference stands everywhere else — pytest is one dependency
 judged compelling, not the bar lowered.
 
-The remaining `TestCase` classes are collected unchanged and convert
-under **F60**, module by module — F56 took the two conformance
+The conversion ran as five sweeps — F56 took the two conformance
 corpora, which is where the shared parametrisation helper
-(`tests/corpus.py`) lives, F57 the two integration runs, which
-needed a fixture the older idiom cannot be given, F58 the seven
-script-language modules, and F59 the ten machine and backend ones.
-Until a module's turn comes, extend it in
-the idiom it is written in: a module half in each is worse than a module
-in the older one, and the sweep that converts it is where the count is
-checked against the run before it.
+(`tests/corpus.py`) lives; F57 the two integration runs, which needed a
+fixture the older idiom cannot be given; F58 the seven script-language
+modules; F59 the ten machine and backend ones; F60 the remaining twenty.
+`python -m unittest tests` went with the last of them: with nothing left
+for it to collect it would report success over an empty run, so
+`tests/__init__.py` no longer carries the `load_tests` hook that made it
+work.
 
 **A sweep keeps the count except where it deliberately raises it**, and
 the exceptions are the reason for converting: a `subTest` loop becomes
@@ -1253,7 +1256,9 @@ every one of the 76 either the V-rule table or a `subTest` loop that
 stopped hiding its cases, with no assertion added or dropped; F59's
 460 became 575 the same way, the veneer roster and the fixture
 directory among the tables that stopped reporting one pass for all
-their rows. A count that moved for any *other* reason is a lost test.
+their rows; F60's 470 became 594, mostly the command manifest, whose
+thirty-seven declared capabilities each report for themselves now. A
+count that moved for any *other* reason is a lost test.
 
 **A flattened module's function names are its collision surface.** Two
 `TestCase` classes may each hold a `test_a_running_machine_is_refused`;

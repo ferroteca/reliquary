@@ -8,14 +8,11 @@ separate media definition to copy out, and no ``seed_media`` verb
 (DECISIONS.md D30).
 """
 
-import contextlib
 import json
 import os
-import re
 import shutil
-import tempfile
-import unittest
-from unittest import mock
+
+import pytest
 
 import reliquary
 from reliquary import document, json5reader
@@ -37,8 +34,35 @@ OPENBSD_MEDIA = "openbsd-installer"
 OPENBSD_SCRIPT = "openbsd-install"
 EXT = ".rlqb"
 
+_CODEX = os.path.join(os.path.dirname(reliquary.__file__), "codex")
 
-class _HomeTest(unittest.TestCase):
+
+def _codex_files(kind, extension):
+    """Every shipped artifact of one kind, sorted."""
+    root = os.path.join(_CODEX, kind)
+    return sorted(os.path.join(root, name) for name in os.listdir(root)
+                  if name.endswith(extension))
+
+
+def _codex_doc(name):
+    return document.load_document(
+        os.path.join(_CODEX, "blueprints", f"{name}{EXT}"))
+
+
+def _index():
+    with open(os.path.join(_CODEX, "codex.json"), encoding="utf-8") as h:
+        return json5reader.loads(h.read())
+
+
+#: The shipped artifacts, gathered at collection so a codex that stops
+#: shipping is a collection-time count of zero rather than a green run
+#: over nothing.
+CODEX_BLUEPRINTS = _codex_files("blueprints", EXT)
+CODEX_SCRIPTS = _codex_files("scripts", ".rlqs")
+
+
+@pytest.fixture
+def home(tmp_path):
     """A scratch home the codex can be seeded into.
 
     These are the codex's own tests — seeding, the closure, the
@@ -46,352 +70,319 @@ class _HomeTest(unittest.TestCase):
     wants by name, seeding being the only way the library reaches a
     tree (D88).
     """
-
-    def setUp(self):
-        self._temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._temp.cleanup)
-        self.home = self._temp.name
-        stack = contextlib.ExitStack()
-        self.addCleanup(stack.close)
-        self.backend = stack.enter_context(fake_backend.installed())
-
-    def _path(self, *parts):
-        return os.path.join(self.home, *parts)
+    with fake_backend.installed():
+        yield str(tmp_path)
 
 
-class SeedingTest(_HomeTest):
-    def test_seed_blueprint_copies_closure(self):
-        """Seeding a blueprint brings its scripts along; media ride the
-        blueprint file itself."""
-        self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home))
-        blueprint_path = self._path("blueprints", f"{BLUEPRINT}{EXT}")
-        self.assertTrue(os.path.isfile(blueprint_path))
-        for stem in SCRIPTS:
-            self.assertTrue(os.path.isfile(self._path("scripts", f"{stem}.rlqs")))
-        # The media travels inside the seeded blueprint.
-        doc = document.load_document(blueprint_path)
-        self.assertIn(MEDIA, doc.media)
-
-    def test_seed_blueprint_only_skips_closure(self):
-        self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home, only=True))
-        self.assertTrue(os.path.isfile(self._path("blueprints", f"{BLUEPRINT}{EXT}")))
-        self.assertFalse(os.path.isdir(self._path("scripts")))
-
-    def test_second_seed_leaves_user_files_alone(self):
-        seed_blueprint(BLUEPRINT, context=self.home)
-        # Remove the blueprint so re-seeding runs the closure again; the
-        # user-edited script it references must not be overwritten.
-        os.remove(self._path("blueprints", f"{BLUEPRINT}{EXT}"))
-        script_path = self._path("scripts", f"{SCRIPTS[0]}.rlqs")
-        with open(script_path, "w", encoding="utf-8") as handle:
-            handle.write("user edit")
-        self.assertTrue(seed_blueprint(BLUEPRINT, context=self.home))
-        with open(script_path, encoding="utf-8") as handle:
-            self.assertEqual(handle.read(), "user edit")
-
-    def test_existing_home_blueprint_is_untouched(self):
-        for ext in (".json", EXT):
-            with self.subTest(ext=ext):
-                shutil.rmtree(self.home)
-                os.makedirs(self.home)
-                blueprint_path = self._path("blueprints", f"{BLUEPRINT}{ext}")
-                os.makedirs(os.path.dirname(blueprint_path))
-                with open(blueprint_path, "w", encoding="utf-8") as handle:
-                    handle.write("mine")
-                self.assertFalse(seed_blueprint(BLUEPRINT, context=self.home))
-                with open(blueprint_path, encoding="utf-8") as handle:
-                    self.assertEqual(handle.read(), "mine")
-                self.assertFalse(os.path.exists(self._path("scripts")))
-
-    def test_unknown_names_seed_nothing(self):
-        self.assertFalse(seed_blueprint("no-such", context=self.home))
-        self.assertFalse(seed_script("no-such", context=self.home))
-        self.assertFalse(os.path.exists(self._path("blueprints")))
-        self.assertFalse(os.path.exists(self._path("scripts")))
-
-    def test_seed_script_copies_once(self):
-        self.assertTrue(seed_script(SCRIPTS[0], context=self.home))
-        self.assertFalse(seed_script(SCRIPTS[0], context=self.home))
+def _path(home, *parts):
+    return os.path.join(home, *parts)
 
 
-class ListCodexTest(_HomeTest):
-    """The library's own listing, and the only verb that reads it."""
+# Seeding, and the closure it brings.
 
-    def test_it_lists_the_shipped_blueprints_with_descriptions(self):
-        rows = list_codex()
-        row = next(r for r in rows if r["name"] == BLUEPRINT)
-        self.assertIn("FreeDOS", row["description"])
-        self.assertEqual([r["name"] for r in rows],
-                         sorted(r["name"] for r in rows))
-
-    def test_it_reports_nothing_of_yours(self):
-        """No provenance, no tiers: the command *is* the provenance."""
-        bp_dir = os.path.join(self.home, "blueprints")
-        os.makedirs(bp_dir)
-        with open(os.path.join(bp_dir, "mine.rlqb"), "w",
-                  encoding="utf-8") as handle:
-            json.dump([{"type": "machine", "name": "custom-rig",
-                        "platform": "dos",
-                        "description": "bespoke widget rig",
-                        "drives": {"cdrom0": None}}], handle)
-        names = [row["name"] for row in list_codex()]
-        self.assertNotIn("custom-rig", names)
-        self.assertIn(BLUEPRINT, names)
-
-    def test_seeding_does_not_change_what_it_reports(self):
-        before = list_codex()
-        seed_blueprint(BLUEPRINT, context=self.home, only=True)
-        self.assertEqual(before, list_codex())
-
-    def test_availability_is_a_question_that_reads_nothing(self):
-        self.assertTrue(codex_blueprint_available(BLUEPRINT))
-        self.assertFalse(codex_blueprint_available("zzzznomatch"))
-        self.assertFalse(os.path.exists(self._path("blueprints")))
+def test_seed_blueprint_copies_closure(home):
+    """Seeding a blueprint brings its scripts along; media ride the
+    blueprint file itself."""
+    assert seed_blueprint(BLUEPRINT, context=home)
+    blueprint_path = _path(home, "blueprints", f"{BLUEPRINT}{EXT}")
+    assert os.path.isfile(blueprint_path)
+    for stem in SCRIPTS:
+        assert os.path.isfile(_path(home, "scripts", f"{stem}.rlqs"))
+    # The media travels inside the seeded blueprint.
+    assert MEDIA in document.load_document(blueprint_path).media
 
 
-class FirstReferenceTest(_HomeTest):
-    def test_media_travels_with_a_seeded_blueprint(self):
-        seed_blueprint(BLUEPRINT, context=self.home)
-        self.assertIn(MEDIA, load_namespace(self.home).media)
-
-    def test_resolve_media_unknown_name_errors(self):
-        with self.assertRaises(PreflightError):
-            resolve_media("no-such-media", load_namespace(self.home))
-
-    def test_create_machine_honors_edits_to_the_seeded_copy(self):
-        """The copy is yours, and a create reads it rather than the codex.
-
-        This used to assert that `create_machine` seeded on first
-        reference. It does not (D88): the seed is the user's own step,
-        and what survives — the point the test was always making — is
-        that an edit to the copy reaches the next machine while the one
-        already built keeps what it was built from.
-        """
-        seed_blueprint(BLUEPRINT, context=self.home)
-        machine_id = create_machine(BLUEPRINT, context=self.home)
-        blueprint_path = os.path.join(
-            self.home, "blueprints", f"{BLUEPRINT}{EXT}")
-        self.assertTrue(os.path.isfile(blueprint_path))
-        with open(blueprint_path, encoding="utf-8") as handle:
-            data = json5reader.load(handle)
-        machine = next(spec for spec in data
-                       if spec.get("type") == "machine")
-        machine["memory"] = 64
-        with open(blueprint_path, "w", encoding="utf-8") as handle:
-            json.dump(data, handle)
-        second_id = create_machine(BLUEPRINT, context=self.home)
-        self.assertEqual(
-            load_machine_state(machine_id, context=self.home)["memory"], 32)
-        self.assertEqual(
-            load_machine_state(second_id, context=self.home)["memory"], 64)
-
-    def test_create_machine_unknown_name_errors(self):
-        with self.assertRaises(PreflightError):
-            create_machine("no-such-blueprint", context=self.home)
-
-    def test_an_unseeded_codex_name_is_refused_with_the_fix(self):
-        """A name the library holds and your tree does not.
-
-        The interesting refusal, and the one a first-time user meets:
-        it must name the command that resolves it, or the deleted
-        fallback reads as the tool not knowing about `freedos` at all.
-        """
-        with self.assertRaises(PreflightError) as caught:
-            create_machine(BLUEPRINT, context=self.home)
-        self.assertIn(f"rlq seed-blueprint {BLUEPRINT}",
-                      str(caught.exception))
+def test_seed_blueprint_only_skips_closure(home):
+    assert seed_blueprint(BLUEPRINT, context=home, only=True)
+    assert os.path.isfile(_path(home, "blueprints", f"{BLUEPRINT}{EXT}"))
+    assert not os.path.isdir(_path(home, "scripts"))
 
 
-class CodexReadinessExampleTests(_HomeTest):
-    """The readiness example, and the property that makes it one (T9).
+def test_second_seed_leaves_user_files_alone(home):
+    seed_blueprint(BLUEPRINT, context=home)
+    # Remove the blueprint so re-seeding runs the closure again; the
+    # user-edited script it references must not be overwritten.
+    os.remove(_path(home, "blueprints", f"{BLUEPRINT}{EXT}"))
+    script_path = _path(home, "scripts", f"{SCRIPTS[0]}.rlqs")
+    with open(script_path, "w", encoding="utf-8") as handle:
+        handle.write("user edit")
+    assert seed_blueprint(BLUEPRINT, context=home)
+    with open(script_path, encoding="utf-8") as handle:
+        assert handle.read() == "user edit"
 
-    Every other codex script ends with the guest powered off, because
-    each has finished with it. A readiness example has the opposite
-    job — it hands a *live* machine to whatever comes next — and that
-    is the whole reason it exists, so it is what these guard. A
-    plausible example that quietly powered the machine off would
-    demonstrate nothing the other two do not.
 
-    Whether it *works* is the integration test's to prove (P18: a
-    codex example that does not is a defect). These are its shape.
+@pytest.mark.parametrize("ext", [".json", EXT], ids=["json", "rlqb"])
+def test_existing_home_blueprint_is_untouched(home, ext):
+    shutil.rmtree(home)
+    os.makedirs(home)
+    blueprint_path = _path(home, "blueprints", f"{BLUEPRINT}{ext}")
+    os.makedirs(os.path.dirname(blueprint_path))
+    with open(blueprint_path, "w", encoding="utf-8") as handle:
+        handle.write("mine")
+    assert not seed_blueprint(BLUEPRINT, context=home)
+    with open(blueprint_path, encoding="utf-8") as handle:
+        assert handle.read() == "mine"
+    assert not os.path.exists(_path(home, "scripts"))
+
+
+def test_unknown_names_seed_nothing(home):
+    assert not seed_blueprint("no-such", context=home)
+    assert not seed_script("no-such", context=home)
+    assert not os.path.exists(_path(home, "blueprints"))
+    assert not os.path.exists(_path(home, "scripts"))
+
+
+def test_seed_script_copies_once(home):
+    assert seed_script(SCRIPTS[0], context=home)
+    assert not seed_script(SCRIPTS[0], context=home)
+
+
+# The library's own listing, and the only verb that reads it.
+
+def test_it_lists_the_shipped_blueprints_with_descriptions():
+    rows = list_codex()
+    row = next(r for r in rows if r["name"] == BLUEPRINT)
+    assert "FreeDOS" in row["description"]
+    assert [r["name"] for r in rows] == sorted(r["name"] for r in rows)
+
+
+def test_it_reports_nothing_of_yours(home):
+    """No provenance, no tiers: the command *is* the provenance."""
+    bp_dir = os.path.join(home, "blueprints")
+    os.makedirs(bp_dir)
+    with open(os.path.join(bp_dir, "mine.rlqb"), "w",
+              encoding="utf-8") as handle:
+        json.dump([{"type": "machine", "name": "custom-rig",
+                    "platform": "dos",
+                    "description": "bespoke widget rig",
+                    "drives": {"cdrom0": None}}], handle)
+    names = [row["name"] for row in list_codex()]
+    assert "custom-rig" not in names
+    assert BLUEPRINT in names
+
+
+def test_seeding_does_not_change_what_it_reports(home):
+    before = list_codex()
+    seed_blueprint(BLUEPRINT, context=home, only=True)
+    assert before == list_codex()
+
+
+def test_availability_is_a_question_that_reads_nothing(home):
+    assert codex_blueprint_available(BLUEPRINT)
+    assert not codex_blueprint_available("zzzznomatch")
+    assert not os.path.exists(_path(home, "blueprints"))
+
+
+# What a seeded copy is, once it is yours.
+
+def test_media_travels_with_a_seeded_blueprint(home):
+    seed_blueprint(BLUEPRINT, context=home)
+    assert MEDIA in load_namespace(home).media
+
+
+def test_resolve_media_unknown_name_errors(home):
+    with pytest.raises(PreflightError):
+        resolve_media("no-such-media", load_namespace(home))
+
+
+def test_create_machine_honors_edits_to_the_seeded_copy(home):
+    """The copy is yours, and a create reads it rather than the codex.
+
+    This used to assert that `create_machine` seeded on first
+    reference. It does not (D88): the seed is the user's own step,
+    and what survives — the point the test was always making — is
+    that an edit to the copy reaches the next machine while the one
+    already built keeps what it was built from.
     """
-
-    LABEL = "ready"
-    STEM = "freedos-ready"
-
-    def _path(self):
-        seed_blueprint(BLUEPRINT, context=self.home)
-        return os.path.join(self.home, "scripts", f"{self.STEM}.rlqs")
-
-    def _script(self):
-        return load_script(self._path())
-
-    def _text(self):
-        with open(self._path(), encoding="utf-8") as handle:
-            return handle.read()
-
-    def test_the_blueprint_names_it_and_seeding_brings_it(self):
-        """Wired, not merely shipped: a file nothing names is inert."""
-        seed_blueprint(BLUEPRINT, context=self.home)
-        component = load_namespace(self.home).machines[BLUEPRINT]
-        self.assertEqual(component.scripts[self.LABEL], self.STEM)
-        self.assertTrue(os.path.isfile(os.path.join(
-            self.home, "scripts", f"{self.STEM}.rlqs")))
-
-    def test_it_leaves_the_machine_running(self):
-        script = self._script()
-        verbs = [statement.verb for statement in script.statements]
-        self.assertIn("start", verbs)
-        self.assertNotIn("stop", verbs)
-        # The codex's own idiom for "and now it is off" — waiting the
-        # machine down after a poweroff — is what this example must
-        # not do, and what `freedos-verify` does.
-        self.assertNotIn("machine=stopped", self._text())
-
-    def test_the_promise_is_the_last_step(self):
-        """Set only once everything it promises has held."""
-        last = self._script().statements[-1]
-        self.assertEqual(last.verb, "set")
-        self.assertEqual(last.arguments[0], self.LABEL)
-
-    def test_the_variable_is_outside_the_reserved_namespaces(self):
-        """`rlq.ready` would be a static error, not a nicer spelling.
-
-        The reserved namespaces are reliquary's own (V5), which is why
-        the example's key is plain — and why a reader copying it gets
-        something that parses.
-        """
-        check_variable_key(self._script().statements[-1].arguments[0])
-        with self.assertRaises(StaticError):
-            check_variable_key("rlq.ready")
+    seed_blueprint(BLUEPRINT, context=home)
+    machine_id = create_machine(BLUEPRINT, context=home)
+    blueprint_path = os.path.join(home, "blueprints", f"{BLUEPRINT}{EXT}")
+    assert os.path.isfile(blueprint_path)
+    with open(blueprint_path, encoding="utf-8") as handle:
+        data = json5reader.load(handle)
+    machine = next(spec for spec in data if spec.get("type") == "machine")
+    machine["memory"] = 64
+    with open(blueprint_path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle)
+    second_id = create_machine(BLUEPRINT, context=home)
+    assert load_machine_state(machine_id, context=home)["memory"] == 32
+    assert load_machine_state(second_id, context=home)["memory"] == 64
 
 
-class CodexMediaTests(unittest.TestCase):
-    """The shipped codex blueprints carry the pinned media hashes."""
-
-    @classmethod
-    def _codex_doc(cls, name):
-        path = os.path.join(os.path.dirname(reliquary.__file__),
-                            "codex", "blueprints", f"{name}.rlqb")
-        return document.load_document(path)
-
-    def test_freedos_livecd_media_pins_the_iso_hash(self):
-        media = self._codex_doc(BLUEPRINT).media[MEDIA]
-        self.assertEqual(
-            media.sha256,
-            "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e"
-            "6ef2deb0477f81fb")
-
-    def test_openbsd_install_media_pins_the_iso(self):
-        media = self._codex_doc(OPENBSD_BLUEPRINT).media[OPENBSD_MEDIA]
-        self.assertEqual(media.location[0].kind, "url")
-        self.assertEqual(
-            media.sha256,
-            "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102"
-            "cf8a5130449f")
+def test_create_machine_unknown_name_errors(home):
+    with pytest.raises(PreflightError):
+        create_machine("no-such-blueprint", context=home)
 
 
-class CodexParsesTests(unittest.TestCase):
-    """Every shipped codex artifact parses, or the suite fails.
+def test_an_unseeded_codex_name_is_refused_with_the_fix(home):
+    """A name the library holds and your tree does not.
 
-    The codex is the worked example users seed and copy from. A
-    blueprint or script that does not parse is a defect the default
-    suite must catch — not something left to an opt-in integration
-    run or a single named reference script.
+    The interesting refusal, and the one a first-time user meets:
+    it must name the command that resolves it, or the deleted
+    fallback reads as the tool not knowing about `freedos` at all.
     """
-
-    @staticmethod
-    def _codex_root():
-        return os.path.join(os.path.dirname(reliquary.__file__), "codex")
-
-    @classmethod
-    def _files(cls, kind, extension):
-        root = os.path.join(cls._codex_root(), kind)
-        return sorted(
-            os.path.join(root, name) for name in os.listdir(root)
-            if name.endswith(extension))
-
-    def test_every_codex_blueprint_parses(self):
-        paths = self._files("blueprints", EXT)
-        self.assertTrue(paths, "no codex blueprints shipped")
-        for path in paths:
-            with self.subTest(blueprint=os.path.basename(path)):
-                document.load_document(path)
-
-    def test_every_codex_script_parses(self):
-        paths = self._files("scripts", ".rlqs")
-        self.assertTrue(paths, "no codex scripts shipped")
-        for path in paths:
-            with self.subTest(script=os.path.basename(path)):
-                load_script(path)
+    with pytest.raises(PreflightError) as caught:
+        create_machine(BLUEPRINT, context=home)
+    assert f"rlq seed-blueprint {BLUEPRINT}" in str(caught.value)
 
 
-class CodexIndexTests(_HomeTest):
-    """The shipped codex against its own index.
+# The readiness example, and the property that makes it one (T9).
+#
+# Every other codex script ends with the guest powered off, because
+# each has finished with it. A readiness example has the opposite job —
+# it hands a *live* machine to whatever comes next — and that is the
+# whole reason it exists, so it is what these guard. A plausible
+# example that quietly powered the machine off would demonstrate
+# nothing the other two do not.
+#
+# Whether it *works* is the integration test's to prove (P18: a codex
+# example that does not is a defect). These are its shape.
 
-    Machine against machine: `codex.json` is the index the listing
-    reads, and the tree beside it is what actually ships. Whether
-    docs/spec/codex.md describes both truthfully is R9's audit
-    (planning/RECURRING.md).
+READY_LABEL = "ready"
+READY_STEM = "freedos-ready"
+
+
+@pytest.fixture
+def ready_script(home):
+    """The seeded readiness example: its path, text and parsed tree."""
+    seed_blueprint(BLUEPRINT, context=home)
+    path = os.path.join(home, "scripts", f"{READY_STEM}.rlqs")
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    return load_script(path), text
+
+
+def test_the_blueprint_names_it_and_seeding_brings_it(home):
+    """Wired, not merely shipped: a file nothing names is inert."""
+    seed_blueprint(BLUEPRINT, context=home)
+    component = load_namespace(home).machines[BLUEPRINT]
+    assert component.scripts[READY_LABEL] == READY_STEM
+    assert os.path.isfile(
+        os.path.join(home, "scripts", f"{READY_STEM}.rlqs"))
+
+
+def test_it_leaves_the_machine_running(ready_script):
+    script, text = ready_script
+    verbs = [statement.verb for statement in script.statements]
+    assert "start" in verbs
+    assert "stop" not in verbs
+    # The codex's own idiom for "and now it is off" — waiting the
+    # machine down after a poweroff — is what this example must
+    # not do, and what `freedos-verify` does.
+    assert "machine=stopped" not in text
+
+
+def test_the_promise_is_the_last_step(ready_script):
+    """Set only once everything it promises has held."""
+    script, _text = ready_script
+    last = script.statements[-1]
+    assert last.verb == "set"
+    assert last.arguments[0] == READY_LABEL
+
+
+def test_the_variable_is_outside_the_reserved_namespaces(ready_script):
+    """`rlq.ready` would be a static error, not a nicer spelling.
+
+    The reserved namespaces are reliquary's own (V5), which is why
+    the example's key is plain — and why a reader copying it gets
+    something that parses.
     """
-
-    @staticmethod
-    def _codex_root():
-        return os.path.join(os.path.dirname(reliquary.__file__), "codex")
-
-    @classmethod
-    def _index(cls):
-        with open(os.path.join(cls._codex_root(), "codex.json"),
-                  encoding="utf-8") as handle:
-            return json5reader.loads(handle.read())
-
-    def test_every_codex_blueprint_is_indexed(self):
-        # The reverse of test_builtin_blueprint_index_names_existing_files:
-        # that one catches an index entry with no file, this one a file
-        # with no entry, which `list-codex` would skip silently.
-        root = os.path.join(self._codex_root(), "blueprints")
-        shipped = {name[:-len(EXT)] for name in os.listdir(root)
-                   if name.endswith(EXT)}
-        self.assertEqual(
-            sorted(shipped - set(self._index()["blueprints"])), [],
-            "these codex blueprints ship with no codex.json entry; "
-            "list_builtin_blueprints reads that index, so an unindexed "
-            "blueprint is invisible wherever the fallback scan is not "
-            "reached.")
-
-    def test_the_index_carries_only_the_blocks_that_ship(self):
-        # Trimmed 2026-07-27: a `media` block listing 2 of the 4 media
-        # the codex blueprints declare, read by nothing. Media are
-        # components inside a blueprint (D30) and are derived from it.
-        self.assertEqual(
-            sorted(self._index()), ["blueprints", "version"],
-            "codex.json carries a block the code does not read. The "
-            "banner scopes the index to blueprint names and "
-            "descriptions; widening it means widening that first.")
-
-    def test_list_codex_emits_names_and_descriptions_only(self):
-        emitted = set(list_codex()[0])
-        self.assertEqual(
-            emitted, {"name", "description"},
-            "list_codex grew a field; the record is the --json "
-            "contract, and widening it is a surface change.")
+    script, _text = ready_script
+    check_variable_key(script.statements[-1].arguments[0])
+    with pytest.raises(StaticError):
+        check_variable_key("rlq.ready")
 
 
-class BuiltinCodexTests(unittest.TestCase):
-    def test_builtin_blueprint_index_names_existing_files(self):
-        root = os.path.join(os.path.dirname(reliquary.__file__), "codex")
-        for name in list_builtin_blueprints():
-            self.assertTrue(os.path.isfile(
-                os.path.join(root, "blueprints", f"{name}{EXT}")))
+# The shipped codex blueprints carry the pinned media hashes.
 
-    def test_openbsd_blueprint_seed_copies_closure(self):
-        with tempfile.TemporaryDirectory() as home:
-            self.assertTrue(seed_blueprint(OPENBSD_BLUEPRINT, context=home))
-            self.assertTrue(os.path.isfile(os.path.join(
-                home, "blueprints", f"{OPENBSD_BLUEPRINT}{EXT}")))
-            self.assertTrue(os.path.isfile(os.path.join(
-                home, "scripts", f"{OPENBSD_SCRIPT}.rlqs")))
+def test_freedos_livecd_media_pins_the_iso_hash():
+    media = _codex_doc(BLUEPRINT).media[MEDIA]
+    assert media.sha256 == (
+        "c48a9dcf4b8e22f44e268a9879745f0bd88c061195ac584e"
+        "6ef2deb0477f81fb")
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_openbsd_install_media_pins_the_iso():
+    media = _codex_doc(OPENBSD_BLUEPRINT).media[OPENBSD_MEDIA]
+    assert media.location[0].kind == "url"
+    assert media.sha256 == (
+        "7a4a92e953618035097c796a90b54424a0f3ae775552e1e7d102"
+        "cf8a5130449f")
+
+
+# Every shipped codex artifact parses, or the suite fails.
+#
+# The codex is the worked example users seed and copy from. A
+# blueprint or script that does not parse is a defect the default
+# suite must catch — not something left to an opt-in integration run
+# or a single named reference script. One node per artifact, named for
+# its file.
+
+@pytest.mark.parametrize("path", CODEX_BLUEPRINTS,
+                         ids=[os.path.basename(p)
+                              for p in CODEX_BLUEPRINTS])
+def test_a_codex_blueprint_parses(path):
+    document.load_document(path)
+
+
+@pytest.mark.parametrize("path", CODEX_SCRIPTS,
+                         ids=[os.path.basename(p) for p in CODEX_SCRIPTS])
+def test_a_codex_script_parses(path):
+    load_script(path)
+
+
+def test_the_codex_ships_artifacts_of_both_kinds():
+    """The parametrisations above are empty if this ever stops holding."""
+    assert CODEX_BLUEPRINTS, "no codex blueprints shipped"
+    assert CODEX_SCRIPTS, "no codex scripts shipped"
+
+
+# The shipped codex against its own index.
+#
+# Machine against machine: `codex.json` is the index the listing
+# reads, and the tree beside it is what actually ships. Whether
+# docs/spec/codex.md describes both truthfully is R9's audit
+# (planning/RECURRING.md).
+
+def test_every_codex_blueprint_is_indexed():
+    # The reverse of test_builtin_blueprint_index_names_existing_files:
+    # that one catches an index entry with no file, this one a file
+    # with no entry, which `list-codex` would skip silently.
+    shipped = {os.path.basename(path)[:-len(EXT)]
+               for path in CODEX_BLUEPRINTS}
+    assert sorted(shipped - set(_index()["blueprints"])) == [], (
+        "these codex blueprints ship with no codex.json entry; "
+        "list_builtin_blueprints reads that index, so an unindexed "
+        "blueprint is invisible wherever the fallback scan is not "
+        "reached.")
+
+
+def test_the_index_carries_only_the_blocks_that_ship():
+    # Trimmed 2026-07-27: a `media` block listing 2 of the 4 media
+    # the codex blueprints declare, read by nothing. Media are
+    # components inside a blueprint (D30) and are derived from it.
+    assert sorted(_index()) == ["blueprints", "version"], (
+        "codex.json carries a block the code does not read. The "
+        "banner scopes the index to blueprint names and "
+        "descriptions; widening it means widening that first.")
+
+
+def test_list_codex_emits_names_and_descriptions_only():
+    assert set(list_codex()[0]) == {"name", "description"}, (
+        "list_codex grew a field; the record is the --json contract, "
+        "and widening it is a surface change.")
+
+
+def test_builtin_blueprint_index_names_existing_files():
+    for name in list_builtin_blueprints():
+        assert os.path.isfile(
+            os.path.join(_CODEX, "blueprints", f"{name}{EXT}"))
+
+
+def test_openbsd_blueprint_seed_copies_closure(tmp_path):
+    home = str(tmp_path)
+    assert seed_blueprint(OPENBSD_BLUEPRINT, context=home)
+    assert os.path.isfile(
+        os.path.join(home, "blueprints", f"{OPENBSD_BLUEPRINT}{EXT}"))
+    assert os.path.isfile(
+        os.path.join(home, "scripts", f"{OPENBSD_SCRIPT}.rlqs"))

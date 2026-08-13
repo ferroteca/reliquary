@@ -118,6 +118,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The suite is pytest-native throughout** (F60, the last of the
+  sweeps; D106). The remaining twenty modules convert — the CLI and
+  document surface, the core helpers, the home and asset machinery,
+  the media path, the guards, and the two that read the repository
+  rather than the package. **No `unittest.TestCase` and no `subTest`
+  survives anywhere**, so the idiom policy has nothing left to
+  exempt, and `python -m unittest tests` loses the hook that made it
+  work: with nothing for it to collect it would have reported success
+  over an empty run.
+
+  **No assertion changed**, and the suite reports **2,140 tests where
+  it reported 2,016**. Most of the difference is the command
+  manifest: its thirty-seven declared capabilities, six family
+  members and six exceptions each report for themselves now, where
+  one method reported for all of them — and every example the
+  documents teach from is a node named for its document and
+  position.
+
 - **The machine and backend suites are pytest-native** (F59, over
   F55; D106). Ten modules — machines, the session veneer, events,
   properties, both backend adapters, the seam, at-rest, screen
@@ -225,7 +243,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   time — on platforms and interpreters this project never tests,
   which is the whole of what shipping it buys. Unpack
   `reliquary-<version>.tar.gz` outside the tree, put `src` on
-  `PYTHONPATH`, and `pytest` runs **2,002 tests and deselects two** —
+  `PYTHONPATH`, and `pytest` runs **2,086 tests and deselects two** —
   the opt-in FreeDOS integration runs, one per backend, exactly as in
   the repository.
 

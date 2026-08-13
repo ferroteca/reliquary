@@ -9,8 +9,8 @@ a resolved reference.
 """
 
 import os
-import tempfile
-import unittest
+
+import pytest
 
 from reliquary import resolve
 from reliquary.errors import PreflightError
@@ -21,273 +21,271 @@ SHA = "a" * 64
 SHB = "b" * 64
 
 
-class BuildNamespaceTests(unittest.TestCase):
-    def _write(self, root, name, text):
-        path = os.path.join(root, name)
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        return path
-
-    def test_merges_specs_across_files(self):
-        with tempfile.TemporaryDirectory() as root:
-            a = self._write(
-                root, "machine.rlqb",
-                '[{"type": "machine", "name": "m", "platform": "dos"}]')
-            b = self._write(
-                root, "media.rlqb",
-                '[{"name": "blank", "materialize": "new", "size": "1M"}]')
-            ns = resolve.build_namespace([a, b])
-            self.assertEqual(set(ns.machines), {"m"})
-            self.assertEqual(set(ns.media), {"blank"})
-
-    def test_identical_specs_across_files_dedup(self):
-        """What lets a self-contained blueprint be pasted around."""
-        spec = ('[{"name": "iso", "location": "https://x.test/p.iso",'
-                ' "sha256": "%s"}]' % SHA)
-        with tempfile.TemporaryDirectory() as root:
-            a = self._write(root, "a.rlqb", spec)
-            b = self._write(root, "b.rlqb", spec)
-            ns = resolve.build_namespace([a, b])
-            self.assertEqual(set(ns.media), {"iso"})
-
-    def test_differing_specs_of_one_name_collide_naming_both_files(self):
-        with tempfile.TemporaryDirectory() as root:
-            a = self._write(
-                root, "a.rlqb",
-                '[{"name": "x", "materialize": "new", "size": "1M"}]')
-            b = self._write(
-                root, "b.rlqb",
-                '[{"name": "x", "materialize": "new", "size": "2M"}]')
-            with self.assertRaises(PreflightError) as caught:
-                resolve.build_namespace([a, b])
-            message = str(caught.exception)
-            self.assertIn("x", message)
-            self.assertIn("a.rlqb", message)
-            self.assertIn("b.rlqb", message)
-
-    def test_names_collide_case_insensitively_across_files(self):
-        with tempfile.TemporaryDirectory() as root:
-            a = self._write(root, "a.rlqb", '[{"name": "FDBOOT",'
-                                            ' "location": "a.img"}]')
-            b = self._write(root, "b.rlqb", '[{"name": "fdboot",'
-                                            ' "location": "b.img"}]')
-            with self.assertRaises(PreflightError) as caught:
-                resolve.build_namespace([a, b])
-            self.assertIn("case", str(caught.exception))
+def _write(root, name, text):
+    path = os.path.join(root, name)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+    return path
 
 
-class LocalAnchorResolutionTests(unittest.TestCase):
-    """Local media resolve against the referencing file, never the CWD."""
-
-    def _write(self, root, name, text):
-        path = os.path.join(root, name)
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        return path
-
-    def test_the_plan_is_cwd_independent(self):
-        with tempfile.TemporaryDirectory() as root, \
-                tempfile.TemporaryDirectory() as elsewhere:
-            blueprint = self._write(
-                root, "b.rlqb", '[{"name": "iso", "location": "x.iso"}]')
-            saved = os.getcwd()
-            os.chdir(elsewhere)
-            try:
-                ns = resolve.build_namespace([blueprint])
-                plan = resolve.resolve_media_plan(
-                    resolve.resolve_media("iso", ns), ns)
-            finally:
-                os.chdir(saved)
-            self.assertIsInstance(plan, LocalFile)
-            self.assertEqual(plan.path, os.path.join(root, "x.iso"))
-
-    def test_one_relative_spelling_in_two_directories_collides(self):
-        """Anchored, the two specs name different bytes: different
-        media, so they collide rather than silently resolving through
-        whichever file was read first."""
-        spec = '[{"name": "iso", "location": "x.iso"}]'
-        with tempfile.TemporaryDirectory() as root:
-            os.mkdir(os.path.join(root, "a"))
-            os.mkdir(os.path.join(root, "b"))
-            a = self._write(os.path.join(root, "a"), "a.rlqb", spec)
-            b = self._write(os.path.join(root, "b"), "b.rlqb", spec)
-            with self.assertRaises(PreflightError) as caught:
-                resolve.build_namespace([a, b])
-            message = str(caught.exception)
-            self.assertIn("a.rlqb", message)
-            self.assertIn("b.rlqb", message)
-
-    def test_one_relative_spelling_in_one_directory_still_dedups(self):
-        spec = '[{"name": "iso", "location": "x.iso"}]'
-        with tempfile.TemporaryDirectory() as root:
-            a = self._write(root, "a.rlqb", spec)
-            b = self._write(root, "b.rlqb", spec)
-            ns = resolve.build_namespace([a, b])
-            self.assertEqual(set(ns.media), {"iso"})
-            rung = ns.media["iso"].location[0]
-            self.assertEqual(rung.local, os.path.join(root, "x.iso"))
+def _namespace(value):
+    return resolve.namespace_of(parse_document(value))
 
 
-class FetchPlanTests(unittest.TestCase):
-    def _ns(self, value):
-        return resolve.namespace_of(parse_document(value))
-
-    def test_nested_containment_plan(self):
-        ns = self._ns([{
-            "name": "PaulsFreedos",
-            "location": "https://paul.com/PaulsFreedos.zip", "sha256": SHA,
-            "children": [{"path": "FD14-FloppyEdition.zip",
-                          "children": ["144m/FDBOOT.img"]}]}])
-        plan = resolve.resolve_media_plan(ns.media["FDBOOT"], ns)
-        # outermost extract: FDBOOT.img out of the floppy edition
-        self.assertIsInstance(plan, Extract)
-        self.assertEqual(plan.parent, "FD14-FloppyEdition")
-        self.assertEqual(plan.member, "144m/FDBOOT.img")
-        # next: the floppy edition out of the outer download
-        self.assertIsInstance(plan.inner, Extract)
-        self.assertEqual(plan.inner.parent, "PaulsFreedos")
-        self.assertEqual(plan.inner.member, "FD14-FloppyEdition.zip")
-        # root: the download itself
-        self.assertIsInstance(plan.inner.inner, Download)
-        self.assertEqual(plan.inner.inner.url,
-                         "https://paul.com/PaulsFreedos.zip")
-        self.assertEqual(plan.inner.inner.sha256, SHA)
-
-    def test_bare_parent_reference_is_the_parents_own_bytes(self):
-        """How a difference overlay names what it sits on."""
-        ns = self._ns([
-            {"name": "golden", "location": "golden.qcow2"},
-            {"name": "scratch", "materialize": "difference",
-             "location": "${media:golden}"}])
-        plan = resolve.resolve_media_plan(ns.media["scratch"], ns)
-        self.assertIsInstance(plan, LocalFile)
-        self.assertEqual(plan.path, "golden.qcow2")
-
-    def test_mirror_list_becomes_alternatives(self):
-        ns = self._ns([{"name": "iso", "sha256": SHA,
-                        "location": ["https://a.test/p.iso",
-                                     "vendor/p.iso"]}])
-        plan = resolve.resolve_media_plan(ns.media["iso"], ns)
-        self.assertIsInstance(plan, Alternatives)
-        self.assertIsInstance(plan.options[0], Download)
-        self.assertIsInstance(plan.options[1], LocalFile)
-
-    def test_blank_has_no_plan(self):
-        ns = self._ns([{"name": "blank", "materialize": "new", "size": "1M"}])
-        self.assertIsNone(resolve.resolve_media_plan(ns.media["blank"], ns))
-
-    def test_missing_parent_names_both_media(self):
-        ns = self._ns([{"name": "x", "location": "${media:gone/a.img}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(ns.media["x"], ns)
-        self.assertIn("gone", str(caught.exception))
-
-    def test_containment_cycle_is_named(self):
-        ns = self._ns([{"name": "loop", "location": "${media:loop/p.img}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(ns.media["loop"], ns)
-        self.assertIn("cycle", str(caught.exception))
-
-    def test_remote_without_a_hash_fails_at_resolution(self):
-        """Parse cannot know: a referenced rung may resolve to a URL."""
-        ns = self._ns([{"name": "iso", "location": "https://x.test/p.iso"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(ns.media["iso"], ns)
-        self.assertIn("sha256", str(caught.exception))
-
-    def test_unsupported_container_names_its_format(self):
-        ns = self._ns([
-            {"name": "disk", "location": "disk.img"},
-            {"name": "inside", "location": "${media:disk/p.txt}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(ns.media["inside"], ns)
-        message = str(caught.exception)
-        self.assertIn("img", message)
-        self.assertIn("zip", message)
-
-    def test_property_location_fails_closed_naming_properties(self):
-        """Never a milestone number: name the channel it waits on."""
-        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(ns.media["win"], ns)
-        message = str(caught.exception)
-        self.assertIn("propert", message)
-        self.assertNotIn("milestone", message)
+@pytest.fixture
+def root(tmp_path):
+    return str(tmp_path)
 
 
-class LocationBindingTests(unittest.TestCase):
-    """`${key}` in a location binds through a supplied properties map (T5)."""
+# One namespace out of many files.
 
-    def _ns(self, value):
-        return resolve.namespace_of(parse_document(value))
-
-    def test_a_property_location_binds_to_a_url(self):
-        ns = self._ns([{"name": "win", "location": "${windows.iso}",
-                        "sha256": SHA}])
-        plan = resolve.resolve_media_plan(
-            ns.media["win"], ns,
-            {"windows.iso": "https://vendor.test/win.iso"})
-        self.assertIsInstance(plan, Download)
-        self.assertEqual(plan.url, "https://vendor.test/win.iso")
-        self.assertEqual(plan.sha256, SHA)
-
-    def test_a_property_location_binds_to_a_local_path(self):
-        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        plan = resolve.resolve_media_plan(
-            ns.media["win"], ns, {"windows.iso": "C:/isos/win.iso"})
-        self.assertIsInstance(plan, LocalFile)
-        self.assertEqual(plan.path, "C:/isos/win.iso")
-
-    def test_a_deferred_string_interpolates_bound_values(self):
-        ns = self._ns([{
-            "name": "win",
-            "location": "https://vendor.test/${edition}/win.iso",
-            "sha256": SHA}])
-        plan = resolve.resolve_media_plan(
-            ns.media["win"], ns, {"edition": "pro"})
-        self.assertIsInstance(plan, Download)
-        self.assertEqual(plan.url, "https://vendor.test/pro/win.iso")
-
-    def test_an_unbound_key_names_the_media_and_the_key(self):
-        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(ns.media["win"], ns, {})
-        message = str(caught.exception)
-        self.assertIn("win", message)
-        self.assertIn("windows.iso", message)
-
-    def test_a_value_that_is_itself_a_reference_fails_closed(self):
-        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(
-                ns.media["win"], ns, {"windows.iso": "${other}"})
-        self.assertIn("chain", str(caught.exception))
-
-    def test_a_value_naming_another_media_is_refused(self):
-        ns = self._ns([{"name": "win", "location": "${windows.iso}"}])
-        with self.assertRaises(PreflightError) as caught:
-            resolve.resolve_media_plan(
-                ns.media["win"], ns, {"windows.iso": "${media:other}"})
-        self.assertIn("chain", str(caught.exception))
-
-    def test_a_deferred_sha256_binds(self):
-        ns = self._ns([{"name": "win",
-                        "location": "https://vendor.test/win.iso",
-                        "sha256": "${win.hash}"}])
-        plan = resolve.resolve_media_plan(
-            ns.media["win"], ns, {"win.hash": SHA})
-        self.assertEqual(plan.sha256, SHA)
-
-    def test_location_property_keys_walks_the_closure(self):
-        # A child inherits its parent's location keys: to extract inner,
-        # the outer download's ${outer.zip} must bind first.
-        ns = self._ns([{
-            "name": "outer", "location": "${outer.zip}", "sha256": SHA,
-            "children": ["inner.img"]}])
-        inner = next(m for name, m in ns.media.items() if name != "outer")
-        keys = resolve.location_property_keys(inner, ns)
-        self.assertEqual(keys, {"outer.zip"})
+def test_merges_specs_across_files(root):
+    a = _write(root, "machine.rlqb",
+               '[{"type": "machine", "name": "m", "platform": "dos"}]')
+    b = _write(root, "media.rlqb",
+               '[{"name": "blank", "materialize": "new", "size": "1M"}]')
+    ns = resolve.build_namespace([a, b])
+    assert set(ns.machines) == {"m"}
+    assert set(ns.media) == {"blank"}
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_identical_specs_across_files_dedup(root):
+    """What lets a self-contained blueprint be pasted around."""
+    spec = ('[{"name": "iso", "location": "https://x.test/p.iso",'
+            ' "sha256": "%s"}]' % SHA)
+    a = _write(root, "a.rlqb", spec)
+    b = _write(root, "b.rlqb", spec)
+    ns = resolve.build_namespace([a, b])
+    assert set(ns.media) == {"iso"}
+
+
+def test_differing_specs_of_one_name_collide_naming_both_files(root):
+    a = _write(root, "a.rlqb",
+               '[{"name": "x", "materialize": "new", "size": "1M"}]')
+    b = _write(root, "b.rlqb",
+               '[{"name": "x", "materialize": "new", "size": "2M"}]')
+    with pytest.raises(PreflightError) as caught:
+        resolve.build_namespace([a, b])
+    message = str(caught.value)
+    assert "x" in message
+    assert "a.rlqb" in message
+    assert "b.rlqb" in message
+
+
+def test_names_collide_case_insensitively_across_files(root):
+    a = _write(root, "a.rlqb",
+               '[{"name": "FDBOOT", "location": "a.img"}]')
+    b = _write(root, "b.rlqb",
+               '[{"name": "fdboot", "location": "b.img"}]')
+    with pytest.raises(PreflightError) as caught:
+        resolve.build_namespace([a, b])
+    assert "case" in str(caught.value)
+
+
+# Local media resolve against the referencing file, never the CWD.
+
+def test_the_plan_is_cwd_independent(root, tmp_path, monkeypatch):
+    blueprint = _write(root, "b.rlqb",
+                       '[{"name": "iso", "location": "x.iso"}]')
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    ns = resolve.build_namespace([blueprint])
+    plan = resolve.resolve_media_plan(resolve.resolve_media("iso", ns), ns)
+    assert isinstance(plan, LocalFile)
+    assert plan.path == os.path.join(root, "x.iso")
+
+
+def test_one_relative_spelling_in_two_directories_collides(root):
+    """Anchored, the two specs name different bytes: different
+    media, so they collide rather than silently resolving through
+    whichever file was read first."""
+    spec = '[{"name": "iso", "location": "x.iso"}]'
+    os.mkdir(os.path.join(root, "a"))
+    os.mkdir(os.path.join(root, "b"))
+    a = _write(os.path.join(root, "a"), "a.rlqb", spec)
+    b = _write(os.path.join(root, "b"), "b.rlqb", spec)
+    with pytest.raises(PreflightError) as caught:
+        resolve.build_namespace([a, b])
+    message = str(caught.value)
+    assert "a.rlqb" in message
+    assert "b.rlqb" in message
+
+
+def test_one_relative_spelling_in_one_directory_still_dedups(root):
+    spec = '[{"name": "iso", "location": "x.iso"}]'
+    a = _write(root, "a.rlqb", spec)
+    b = _write(root, "b.rlqb", spec)
+    ns = resolve.build_namespace([a, b])
+    assert set(ns.media) == {"iso"}
+    rung = ns.media["iso"].location[0]
+    assert rung.local == os.path.join(root, "x.iso")
+
+
+# Lowering a media to its fetch plan.
+
+def test_nested_containment_plan():
+    ns = _namespace([{
+        "name": "PaulsFreedos",
+        "location": "https://paul.com/PaulsFreedos.zip", "sha256": SHA,
+        "children": [{"path": "FD14-FloppyEdition.zip",
+                      "children": ["144m/FDBOOT.img"]}]}])
+    plan = resolve.resolve_media_plan(ns.media["FDBOOT"], ns)
+    # outermost extract: FDBOOT.img out of the floppy edition
+    assert isinstance(plan, Extract)
+    assert plan.parent == "FD14-FloppyEdition"
+    assert plan.member == "144m/FDBOOT.img"
+    # next: the floppy edition out of the outer download
+    assert isinstance(plan.inner, Extract)
+    assert plan.inner.parent == "PaulsFreedos"
+    assert plan.inner.member == "FD14-FloppyEdition.zip"
+    # root: the download itself
+    assert isinstance(plan.inner.inner, Download)
+    assert plan.inner.inner.url == "https://paul.com/PaulsFreedos.zip"
+    assert plan.inner.inner.sha256 == SHA
+
+
+def test_bare_parent_reference_is_the_parents_own_bytes():
+    """How a difference overlay names what it sits on."""
+    ns = _namespace([
+        {"name": "golden", "location": "golden.qcow2"},
+        {"name": "scratch", "materialize": "difference",
+         "location": "${media:golden}"}])
+    plan = resolve.resolve_media_plan(ns.media["scratch"], ns)
+    assert isinstance(plan, LocalFile)
+    assert plan.path == "golden.qcow2"
+
+
+def test_mirror_list_becomes_alternatives():
+    ns = _namespace([{"name": "iso", "sha256": SHA,
+                      "location": ["https://a.test/p.iso",
+                                   "vendor/p.iso"]}])
+    plan = resolve.resolve_media_plan(ns.media["iso"], ns)
+    assert isinstance(plan, Alternatives)
+    assert isinstance(plan.options[0], Download)
+    assert isinstance(plan.options[1], LocalFile)
+
+
+def test_blank_has_no_plan():
+    ns = _namespace([{"name": "blank", "materialize": "new",
+                      "size": "1M"}])
+    assert resolve.resolve_media_plan(ns.media["blank"], ns) is None
+
+
+def test_missing_parent_names_both_media():
+    ns = _namespace([{"name": "x", "location": "${media:gone/a.img}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["x"], ns)
+    assert "gone" in str(caught.value)
+
+
+def test_containment_cycle_is_named():
+    ns = _namespace([{"name": "loop", "location": "${media:loop/p.img}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["loop"], ns)
+    assert "cycle" in str(caught.value)
+
+
+def test_remote_without_a_hash_fails_at_resolution():
+    """Parse cannot know: a referenced rung may resolve to a URL."""
+    ns = _namespace([{"name": "iso",
+                      "location": "https://x.test/p.iso"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["iso"], ns)
+    assert "sha256" in str(caught.value)
+
+
+def test_unsupported_container_names_its_format():
+    ns = _namespace([
+        {"name": "disk", "location": "disk.img"},
+        {"name": "inside", "location": "${media:disk/p.txt}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["inside"], ns)
+    message = str(caught.value)
+    assert "img" in message
+    assert "zip" in message
+
+
+def test_property_location_fails_closed_naming_properties():
+    """Never a milestone number: name the channel it waits on."""
+    ns = _namespace([{"name": "win", "location": "${windows.iso}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["win"], ns)
+    message = str(caught.value)
+    assert "propert" in message
+    assert "milestone" not in message
+
+
+# `${key}` in a location binds through a supplied properties map (T5).
+
+def test_a_property_location_binds_to_a_url():
+    ns = _namespace([{"name": "win", "location": "${windows.iso}",
+                      "sha256": SHA}])
+    plan = resolve.resolve_media_plan(
+        ns.media["win"], ns, {"windows.iso": "https://vendor.test/win.iso"})
+    assert isinstance(plan, Download)
+    assert plan.url == "https://vendor.test/win.iso"
+    assert plan.sha256 == SHA
+
+
+def test_a_property_location_binds_to_a_local_path():
+    ns = _namespace([{"name": "win", "location": "${windows.iso}"}])
+    plan = resolve.resolve_media_plan(
+        ns.media["win"], ns, {"windows.iso": "C:/isos/win.iso"})
+    assert isinstance(plan, LocalFile)
+    assert plan.path == "C:/isos/win.iso"
+
+
+def test_a_deferred_string_interpolates_bound_values():
+    ns = _namespace([{
+        "name": "win",
+        "location": "https://vendor.test/${edition}/win.iso",
+        "sha256": SHA}])
+    plan = resolve.resolve_media_plan(ns.media["win"], ns,
+                                      {"edition": "pro"})
+    assert isinstance(plan, Download)
+    assert plan.url == "https://vendor.test/pro/win.iso"
+
+
+def test_an_unbound_key_names_the_media_and_the_key():
+    ns = _namespace([{"name": "win", "location": "${windows.iso}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["win"], ns, {})
+    message = str(caught.value)
+    assert "win" in message
+    assert "windows.iso" in message
+
+
+def test_a_value_that_is_itself_a_reference_fails_closed():
+    ns = _namespace([{"name": "win", "location": "${windows.iso}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["win"], ns,
+                                   {"windows.iso": "${other}"})
+    assert "chain" in str(caught.value)
+
+
+def test_a_value_naming_another_media_is_refused():
+    ns = _namespace([{"name": "win", "location": "${windows.iso}"}])
+    with pytest.raises(PreflightError) as caught:
+        resolve.resolve_media_plan(ns.media["win"], ns,
+                                   {"windows.iso": "${media:other}"})
+    assert "chain" in str(caught.value)
+
+
+def test_a_deferred_sha256_binds():
+    ns = _namespace([{"name": "win",
+                      "location": "https://vendor.test/win.iso",
+                      "sha256": "${win.hash}"}])
+    plan = resolve.resolve_media_plan(ns.media["win"], ns,
+                                      {"win.hash": SHA})
+    assert plan.sha256 == SHA
+
+
+def test_location_property_keys_walks_the_closure():
+    # A child inherits its parent's location keys: to extract inner,
+    # the outer download's ${outer.zip} must bind first.
+    ns = _namespace([{
+        "name": "outer", "location": "${outer.zip}", "sha256": SHA,
+        "children": ["inner.img"]}])
+    inner = next(m for name, m in ns.media.items() if name != "outer")
+    assert resolve.location_property_keys(inner, ns) == {"outer.zip"}

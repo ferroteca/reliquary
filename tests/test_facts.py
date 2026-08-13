@@ -3,53 +3,54 @@
 """The rlq.* run facts (milestone 8, T4)."""
 
 import os
-import re
-import unittest
 from unittest import mock
+
+import pytest
+
 from reliquary import facts
 from reliquary.errors import InternalError
 
-class FactCatalogTests(unittest.TestCase):
-    def test_is_fact_recognizes_the_namespace(self):
-        self.assertTrue(facts.is_fact("rlq.host.username"))
-        self.assertTrue(facts.is_fact("rlq.host.full-name"))
-        self.assertTrue(facts.is_fact("rlq.env.ANYTHING"))
-        self.assertFalse(facts.is_fact("owner"))
-        self.assertFalse(facts.is_fact("rlqhost"))
 
-    def test_an_unknown_rlq_key_raises(self):
-        with self.assertRaises(InternalError):
-            facts.resolve("rlq.host.nonesuch")
-
-    def test_username_is_login_normalized(self):
-        with mock.patch("reliquary.facts.getpass.getuser",
-                        return_value="Ada Lovelace!"):
-            self.assertEqual(facts.resolve("rlq.host.username"), "ada-lovelace")
-
-    def test_username_that_normalizes_to_nothing_is_unanswerable(self):
-        with mock.patch("reliquary.facts.getpass.getuser",
-                        return_value="!!!"):
-            self.assertIsNone(facts.resolve("rlq.host.username"))
-
-    def test_an_unresolvable_login_is_unanswerable(self):
-        with mock.patch("reliquary.facts.getpass.getuser",
-                        side_effect=OSError):
-            self.assertIsNone(facts.resolve("rlq.host.username"))
-
-    def test_env_fact_reads_verbatim(self):
-        with mock.patch.dict(os.environ, {"MY_FACT": "  spaced value  "}):
-            self.assertEqual(
-                facts.resolve("rlq.env.MY_FACT"), "  spaced value  ")
-
-    def test_an_unset_or_empty_env_fact_is_unanswerable(self):
-        with mock.patch.dict(os.environ, {"EMPTY_FACT": ""}):
-            self.assertIsNone(facts.resolve("rlq.env.EMPTY_FACT"))
-        os.environ.pop("MISSING_FACT", None)
-        self.assertIsNone(facts.resolve("rlq.env.MISSING_FACT"))
-
-    def test_an_empty_env_name_is_unanswerable(self):
-        self.assertIsNone(facts.resolve("rlq.env."))
+def test_is_fact_recognizes_the_namespace():
+    assert facts.is_fact("rlq.host.username")
+    assert facts.is_fact("rlq.host.full-name")
+    assert facts.is_fact("rlq.env.ANYTHING")
+    assert not facts.is_fact("owner")
+    assert not facts.is_fact("rlqhost")
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_an_unknown_rlq_key_raises():
+    with pytest.raises(InternalError):
+        facts.resolve("rlq.host.nonesuch")
+
+
+def test_username_is_login_normalized():
+    with mock.patch("reliquary.facts.getpass.getuser",
+                    return_value="Ada Lovelace!"):
+        assert facts.resolve("rlq.host.username") == "ada-lovelace"
+
+
+def test_username_that_normalizes_to_nothing_is_unanswerable():
+    with mock.patch("reliquary.facts.getpass.getuser", return_value="!!!"):
+        assert facts.resolve("rlq.host.username") is None
+
+
+def test_an_unresolvable_login_is_unanswerable():
+    with mock.patch("reliquary.facts.getpass.getuser", side_effect=OSError):
+        assert facts.resolve("rlq.host.username") is None
+
+
+def test_env_fact_reads_verbatim():
+    with mock.patch.dict(os.environ, {"MY_FACT": "  spaced value  "}):
+        assert facts.resolve("rlq.env.MY_FACT") == "  spaced value  "
+
+
+def test_an_unset_or_empty_env_fact_is_unanswerable(monkeypatch):
+    monkeypatch.setenv("EMPTY_FACT", "")
+    assert facts.resolve("rlq.env.EMPTY_FACT") is None
+    monkeypatch.delenv("MISSING_FACT", raising=False)
+    assert facts.resolve("rlq.env.MISSING_FACT") is None
+
+
+def test_an_empty_env_name_is_unanswerable():
+    assert facts.resolve("rlq.env.") is None

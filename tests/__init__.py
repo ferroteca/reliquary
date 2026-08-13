@@ -6,19 +6,15 @@ Importing this package **arms the guard** against live external
 effects: no unit test reaches a hypervisor or the network, because
 the names that would are replaced below at import time.
 
-That makes the import itself load-bearing, and it is not guaranteed
-by every way of running the suite. pytest, the runner (D106), imports
-each module as ``tests.test_*`` because this file makes the directory
-a package, so the arming runs before any test does; ``unittest
-discover -s tests`` treats this directory as the top level instead and
-imports the modules under top-level names, reaching this file only if
-something asks for it. `test_external_effect_guards` asks,
-deliberately and with no dependency on `reliquary` importing, and then
-asserts that the arming took (T26).
+That makes the import itself load-bearing. pytest, the runner
+(D106), imports each module as ``tests.test_*`` because this file
+makes the directory a package, so the arming runs before any test
+does. `test_external_effect_guards` asks for the package by name
+anyway — deliberately, and with no dependency on `reliquary`
+importing — and then asserts that the arming took (T26).
 """
 
 import contextlib
-import os
 import subprocess
 import urllib.request
 
@@ -76,10 +72,7 @@ def live_external_effects():
         subprocess.run = previous_run
 
 
-def load_tests(loader, standard_tests, pattern):
-    """Discover the package's test modules for `unittest tests`."""
-    this_dir = os.path.dirname(__file__)
-    standard_tests.addTests(loader.discover(
-        start_dir=this_dir, pattern=pattern or "test_*.py",
-        top_level_dir=os.path.dirname(this_dir)))
-    return standard_tests
+# `load_tests` lived here for `python -m unittest tests`, and went
+# with the last `TestCase` (F60): with every module pytest-native
+# that entry point collects nothing at all and reports success —
+# the green-run-over-nothing failure this whole conversion was for.

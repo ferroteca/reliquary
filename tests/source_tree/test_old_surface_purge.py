@@ -11,10 +11,13 @@ forms; live code, tests, user docs, and shipped scripts must not.
 import io
 import os
 import re
-import unittest
+import warnings
 from contextlib import redirect_stderr, redirect_stdout
 
+import pytest
+
 import reliquary
+from reliquary import document, json5reader
 from reliquary import cli
 from reliquary.script_nodes import ScriptParseError
 from reliquary.script_parser import parse_script
@@ -300,187 +303,164 @@ def _iter_sweep_files():
                     yield os.path.join(dirpath, name)
 
 
-class RetiredMediaDefinitionTests(unittest.TestCase):
-    """The `.rlqm` media-definition file kind is retired tree-wide.
+# The `.rlqm` media-definition file kind is retired tree-wide.
+#
+# Media folded into the composed `.rlqb` blueprint (the 2026-07-23
+# media/composition round); no `.rlqm` file survives anywhere in the
+# package, the shipped codex, the examples, or the fixtures. The
+# string may still appear in historical records (CHANGELOG, DECISIONS,
+# completed milestone notes) and design prose that names the retired
+# format — this guards the *files*, not the spelling.
 
-    Media folded into the composed `.rlqb` blueprint (the 2026-07-23
-    media/composition round); no `.rlqm` file survives anywhere in the
-    package, the shipped codex, the examples, or the fixtures. The
-    string may still appear in historical records (CHANGELOG,
-    DECISIONS, completed milestone notes) and design prose that names the
-    retired format — this guards the *files*, not the spelling.
+_SKIP_DIRS = {".venv", ".git", "__pycache__", "build", "dist"}
+
+
+def test_no_rlqm_files_survive():
+    survivors = []
+    for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for name in filenames:
+            if name.endswith(".rlqm"):
+                survivors.append(
+                    os.path.relpath(os.path.join(dirpath, name),
+                                    _REPO_ROOT))
+    assert survivors == [], (
+        "the .rlqm media-definition file kind is retired; "
+        "these files must be removed:\n" + "\n".join(survivors))
+
+
+def test_no_authored_document_uses_the_retired_shape():
+    """The first-round four-component model leaves no authored file.
+
+    The plural root sections and the `source` / `archive` spec
+    types were superseded by D22 before any of them shipped in an
+    authored document. Every `.rlqb` the repository carries — the
+    codex, the examples, the conformance corpus — speaks the
+    revised model, and the parser is what proves it: a survivor
+    would fail to parse rather than quietly mean something else.
     """
-
-    def test_no_rlqm_files_survive(self):
-        survivors = []
-        skip_dirs = {".venv", ".git", "__pycache__", "build", "dist"}
-        for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
-            dirnames[:] = [d for d in dirnames if d not in skip_dirs]
-            for name in filenames:
-                if name.endswith(".rlqm"):
-                    survivors.append(
-                        os.path.relpath(os.path.join(dirpath, name),
-                                        _REPO_ROOT))
-        self.assertEqual(
-            survivors, [],
-            "the .rlqm media-definition file kind is retired; "
-            "these files must be removed:\n" + "\n".join(survivors))
-
-    def test_no_authored_document_uses_the_retired_shape(self):
-        """The first-round four-component model leaves no authored file.
-
-        The plural root sections and the `source` / `archive` spec
-        types were superseded by D22 before any of them shipped in an
-        authored document. Every `.rlqb` the repository carries — the
-        codex, the examples, the conformance corpus — speaks the
-        revised model, and the parser is what proves it: a survivor
-        would fail to parse rather than quietly mean something else.
-        """
-        import warnings
-
-        from reliquary import document, json5reader
-
-        skip_dirs = {".venv", ".git", "__pycache__", "build", "dist"}
-        stale = []
-        for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
-            dirnames[:] = [d for d in dirnames if d not in skip_dirs]
-            if os.path.basename(dirpath) == "invalid":
-                continue  # fixtures that must fail, by design
-            for name in filenames:
-                if not name.endswith(".rlqb"):
-                    continue
-                path = os.path.join(dirpath, name)
-                with open(path, encoding="utf-8") as handle:
-                    raw = json5reader.load(handle)
-                if isinstance(raw, dict) and (
-                        {"machines", "sources", "archives"} & set(raw)):
-                    stale.append(os.path.relpath(path, _REPO_ROOT))
-                    continue
-                with warnings.catch_warnings():
-                    warnings.simplefilter(
-                        "ignore", document.BlueprintWarning)
-                    document.parse_document(raw)
-        self.assertEqual(
-            stale, [],
-            "these authored blueprints still use the retired "
-            "four-component shape:\n" + "\n".join(stale))
-
-
-class OldApiNamesAbsentTests(unittest.TestCase):
-    """Superseded package exports are gone, not aliased."""
-
-    def test_old_api_names_absent(self):
-        for name in _OLD_API_NAMES:
-            self.assertFalse(
-                hasattr(reliquary, name),
-                f"reliquary still exports superseded name {name!r}")
-            self.assertNotIn(name, reliquary.__all__)
-
-
-class OldCliCommandsAbsentTests(unittest.TestCase):
-    """Superseded CLI command words are not registered."""
-
-    def _commands(self):
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            try:
-                cli.main(["--help"])
-            except SystemExit:
-                pass
-        help_text = stdout.getvalue() + stderr.getvalue()
-        match = re.search(r"\{([^}]+)\}", help_text)
-        self.assertIsNotNone(match, "cli --help lists no commands")
-        return {part.strip() for part in match.group(1).split(",")}
-
-    def test_old_cli_commands_absent(self):
-        survivors = sorted(_OLD_CLI_COMMANDS & self._commands())
-        self.assertEqual(
-            survivors, [],
-            f"superseded CLI commands still registered: {survivors}")
-
-    def test_the_record_management_family_is_absent(self):
-        # D36: persistence went to the asynchronous-runs backlog, and
-        # the verbs that managed it went with it. No shims.
-        backlogged = {"list-runs", "run", "begin-run", "end-run"}
-        survivors = sorted(backlogged & self._commands())
-        self.assertEqual(
-            survivors, [],
-            f"backlogged record commands still registered: {survivors}")
-
-
-class RunPersistenceAbsentTests(unittest.TestCase):
-    """The run returns its output and stores nothing (D36)."""
-
-    def test_the_run_directory_helpers_are_gone(self):
-        from reliquary import script_runner
-        for name in ("_create_run_dir", "_start_transcript"):
-            self.assertFalse(
-                hasattr(script_runner, name),
-                f"script_runner still carries {name!r}")
-
-    def test_the_run_result_carries_no_stored_location(self):
-        self.assertNotIn(
-            "run_dir",
-            {field.name for field
-             in reliquary.ScriptRun.__dataclass_fields__.values()})
-        self.assertIn(
-            "events",
-            {field.name for field
-             in reliquary.ScriptRun.__dataclass_fields__.values()})
-
-
-class OldScriptSurfaceRejectedTests(unittest.TestCase):
-    """Old-surface documents fail closed — no bridge."""
-
-    def test_old_surface_samples_do_not_parse(self):
-        samples = (
-            "platform dos\nstate ready {\n done\n}\n",
-            "platform dos\nentry a\nphase a {\n    -> b\n}\n",
-            "platform dos\nentry a\nphase a {\n    done\n}\n",
-            'platform dos\nexpect "x" {\n}\n',
-            'platform dos\nwait regex "x"\n',
-            "platform dos\nwait stopped\n",
-            "platform dos\nboot hdd0\n",
-            'platform dos\ntype "A:" <enter>\n',
-        )
-        for source in samples:
-            with self.subTest(source=source.splitlines()[1]):
-                with self.assertRaises(ScriptParseError):
-                    parse_script(source)
-
-
-class LiveTreePurgeTests(unittest.TestCase):
-    """No live path keeps a superseded spelling."""
-
-    def test_live_tree_has_no_superseded_spellings(self):
-        hits = []
-        for path in _iter_sweep_files():
-            if _allowed(path):
+    stale = []
+    for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        if os.path.basename(dirpath) == "invalid":
+            continue  # fixtures that must fail, by design
+        for name in filenames:
+            if not name.endswith(".rlqb"):
                 continue
-            try:
-                with open(path, encoding="utf-8") as handle:
-                    text = handle.read()
-            except UnicodeDecodeError:
+            path = os.path.join(dirpath, name)
+            with open(path, encoding="utf-8") as handle:
+                raw = json5reader.load(handle)
+            if isinstance(raw, dict) and (
+                    {"machines", "sources", "archives"} & set(raw)):
+                stale.append(os.path.relpath(path, _REPO_ROOT))
                 continue
-            # Skip Python string/comment bodies that only appear in
-            # AST-string form inside allowlisted negative tests —
-            # already handled by path allowlist.
-            relative = os.path.relpath(path, _REPO_ROOT)
-            fenced = _fenced_only(text) if path.endswith(".md") else text
-            for label, pattern in _FORBIDDEN:
-                haystack = (fenced if label in _SCRIPT_STATEMENT_LABELS
-                            else text)
-                for match in pattern.finditer(haystack):
-                    line = text.count("\n", 0, match.start()) + 1
-                    hits.append(
-                        f"{relative}:{line}: {label}: "
-                        f"{match.group(0)!r}")
-        self.assertEqual(
-            hits, [],
-            "superseded spellings survive in the live tree:\n"
-            + "\n".join(hits))
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", document.BlueprintWarning)
+                document.parse_document(raw)
+    assert stale == [], (
+        "these authored blueprints still use the retired "
+        "four-component shape:\n" + "\n".join(stale))
 
 
-if __name__ == "__main__":
-    unittest.main()
+# Superseded package exports are gone, not aliased.
+
+def test_old_api_names_absent():
+    for name in _OLD_API_NAMES:
+        assert not hasattr(reliquary, name), (
+            f"reliquary still exports superseded name {name!r}")
+        assert name not in reliquary.__all__
+
+
+# Superseded CLI command words are not registered.
+
+def _registered_commands():
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        try:
+            cli.main(["--help"])
+        except SystemExit:
+            pass
+    help_text = stdout.getvalue() + stderr.getvalue()
+    match = re.search(r"\{([^}]+)\}", help_text)
+    assert match is not None, "cli --help lists no commands"
+    return {part.strip() for part in match.group(1).split(",")}
+
+
+def test_old_cli_commands_absent():
+    survivors = sorted(_OLD_CLI_COMMANDS & _registered_commands())
+    assert survivors == [], (
+        f"superseded CLI commands still registered: {survivors}")
+
+
+def test_the_record_management_family_is_absent():
+    # D36: persistence went to the asynchronous-runs backlog, and
+    # the verbs that managed it went with it. No shims.
+    backlogged = {"list-runs", "run", "begin-run", "end-run"}
+    survivors = sorted(backlogged & _registered_commands())
+    assert survivors == [], (
+        f"backlogged record commands still registered: {survivors}")
+
+
+# The run returns its output and stores nothing (D36).
+
+def test_the_run_directory_helpers_are_gone():
+    from reliquary import script_runner
+    for name in ("_create_run_dir", "_start_transcript"):
+        assert not hasattr(script_runner, name), (
+            f"script_runner still carries {name!r}")
+
+
+def test_the_run_result_carries_no_stored_location():
+    fields = {field.name for field
+              in reliquary.ScriptRun.__dataclass_fields__.values()}
+    assert "run_dir" not in fields
+    assert "events" in fields
+
+
+# Old-surface documents fail closed — no bridge. One node per
+# spelling, so a sample that stops being refused names itself.
+
+@pytest.mark.parametrize("source", [
+    "platform dos\nstate ready {\n done\n}\n",
+    "platform dos\nentry a\nphase a {\n    -> b\n}\n",
+    "platform dos\nentry a\nphase a {\n    done\n}\n",
+    'platform dos\nexpect "x" {\n}\n',
+    'platform dos\nwait regex "x"\n',
+    "platform dos\nwait stopped\n",
+    "platform dos\nboot hdd0\n",
+    'platform dos\ntype "A:" <enter>\n',
+], ids=["state", "arrow", "done", "expect", "regex-keyword",
+        "bare-stopped", "boot-verb", "key-token"])
+def test_an_old_surface_sample_does_not_parse(source):
+    with pytest.raises(ScriptParseError):
+        parse_script(source)
+
+
+# No live path keeps a superseded spelling.
+
+def test_live_tree_has_no_superseded_spellings():
+    hits = []
+    for path in _iter_sweep_files():
+        if _allowed(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read()
+        except UnicodeDecodeError:
+            continue
+        # Skip Python string/comment bodies that only appear in
+        # AST-string form inside allowlisted negative tests —
+        # already handled by path allowlist.
+        relative = os.path.relpath(path, _REPO_ROOT)
+        fenced = _fenced_only(text) if path.endswith(".md") else text
+        for label, pattern in _FORBIDDEN:
+            haystack = (fenced if label in _SCRIPT_STATEMENT_LABELS
+                        else text)
+            for match in pattern.finditer(haystack):
+                line = text.count("\n", 0, match.start()) + 1
+                hits.append(
+                    f"{relative}:{line}: {label}: {match.group(0)!r}")
+    assert hits == [], (
+        "superseded spellings survive in the live tree:\n"
+        + "\n".join(hits))

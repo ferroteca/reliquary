@@ -8,6 +8,11 @@ the examples are executed: every fenced JSON block in the documents
 that teach the blueprint format is run through the real parser, and
 through the published schema where it applies.
 
+**Every example is a collected node named for its document and
+position** — `README.md#0` — so a block that stops being checked is a
+missing node rather than a loop nobody counts, and a failing one is
+selected by name (F60).
+
 Machine-state documents (`machine.json`) appear in the same prose and
 are a different document type with their own schema; they are
 identified by their state-only fields and skipped here.
@@ -17,11 +22,11 @@ import glob
 import json
 import os
 import re
-import unittest
 import warnings
 from importlib import resources
 
 import jsonschema
+import pytest
 
 from reliquary import document, json5reader, script_parser
 from reliquary.errors import StaticError
@@ -88,111 +93,103 @@ def _schema():
     return json.loads(text)
 
 
-class DocumentedExampleTests(unittest.TestCase):
-    """Every blueprint example in the docs parses and validates.
-
-    No guard: this module ships nowhere (`tests/source_tree`), so
-    every document below is present wherever it can run, and
-    `test_documents_are_present` is free to treat a missing one as
-    the failure it is rather than a configuration to tolerate.
-    """
-
-    def test_documents_are_present(self):
-        for path in _DOCUMENTS:
-            with self.subTest(document=path):
-                self.assertTrue(
-                    os.path.isfile(os.path.join(_REPO_ROOT, path)),
-                    f"{path} is listed here but does not exist")
-
-    def test_every_example_parses(self):
-        checked = 0
-        for path in _DOCUMENTS:
-            for label, value in _blocks(path):
-                with self.subTest(example=label):
-                    with warnings.catch_warnings():
-                        warnings.simplefilter(
-                            "ignore", document.BlueprintWarning)
-                        document.parse_document(value)
-                    checked += 1
-        self.assertGreater(checked, 10,
-                           "expected the docs to carry real examples")
-
-    def test_every_example_validates_against_the_schema(self):
-        schema = _schema()
-        for path in _DOCUMENTS:
-            for label, value in _blocks(path):
-                with self.subTest(example=label):
-                    jsonschema.validate(value, schema)
+#: Every example the documents carry, gathered at collection.
+EXAMPLES = [(label, value)
+            for path in _DOCUMENTS
+            for label, value in _blocks(path)]
+SCRIPT_EXAMPLES = sorted(glob.glob(
+    os.path.join(_REPO_ROOT, "planning", "design", "script-examples",
+                 "*.rlqs")))
+SCHEMA = _schema()
 
 
-_SCRIPT_EXAMPLES = os.path.join(
-    _REPO_ROOT, "planning", "design", "script-examples")
+# No guard anywhere below: this module ships nowhere
+# (`tests/source_tree`), so every document is present wherever it can
+# run, and a missing one is the failure it is rather than a
+# configuration to tolerate.
+
+@pytest.mark.parametrize("path", _DOCUMENTS)
+def test_a_listed_document_is_present(path):
+    assert os.path.isfile(os.path.join(_REPO_ROOT, path)), (
+        f"{path} is listed here but does not exist")
 
 
-class ScriptExampleTests(unittest.TestCase):
-    """Every open script example parses.
-
-    No guard, for the reason above: the catalogue is maintainer
-    governance and ships nowhere, and neither does this module, so
-    the two are only ever present together.
-
-    The catalogue holds *unresolved* design problems, demonstrated
-    in real script text; lines that are deliberately illegal are
-    commented out and marked. So an example that will not parse is
-    drift, not intent — and drift is what happened: the five
-    resolved examples were deleted in 2026-07-26 partly because one
-    had rotted into syntax the language no longer accepts with
-    nobody noticing, the README concluding that "a note that cannot
-    fail is not a guard". This is that guard. Without it the
-    catalogue is prose claiming to be code.
-    """
-
-    def test_every_example_parses(self):
-        paths = sorted(glob.glob(os.path.join(_SCRIPT_EXAMPLES, "*.rlqs")))
-        self.assertTrue(paths,
-                        f"no examples found under {_SCRIPT_EXAMPLES}; an "
-                        "empty catalogue passes this vacuously")
-        for path in paths:
-            with self.subTest(example=os.path.basename(path)):
-                with open(path, encoding="utf-8") as handle:
-                    text = handle.read()
-                script_parser.parse_script(text)
+def test_the_docs_carry_real_examples():
+    """The pin behind the parametrisations: an empty sweep passes."""
+    assert len(EXAMPLES) > 10, "expected the docs to carry real examples"
 
 
-class RetiredVocabularyTests(unittest.TestCase):
-    """The retired four-component shape leaves no live instruction.
-
-    Historical records keep their spellings — DECISIONS entries and
-    released CHANGELOG sections are the record of their own moment.
-    Everything a reader might act on speaks the revised model.
-    """
-
-    # The JSON keys only. Prose naming `.rlqm` as *retired* is
-    # correct, and the file kind's absence is guarded separately
-    # (test_old_surface_purge).
-    RETIRED = ('"sources"', '"archives"', '"members"')
-    EXEMPT = {"planning/DECISIONS.md", "CHANGELOG.md",
-              "planning/USE-CASE-PROPOSALS.md",
-              "planning/PRINCIPLE-PROPOSALS.md"}
-
-    def test_no_live_document_teaches_the_retired_shape(self):
-        offenders = []
-        for path in glob.glob(os.path.join(_REPO_ROOT, "docs", "*.md")) + \
-                glob.glob(os.path.join(_REPO_ROOT, "planning", "design",
-                                       "*.md")):
-            relative = os.path.relpath(path, _REPO_ROOT).replace("\\", "/")
-            if relative in self.EXEMPT:
-                continue
-            with open(path, encoding="utf-8") as handle:
-                text = handle.read()
-            for token in self.RETIRED:
-                if token in text:
-                    offenders.append(f"{relative}: {token}")
-        self.assertEqual(
-            offenders, [],
-            "these documents still teach the retired component shape:\n"
-            + "\n".join(offenders))
+@pytest.mark.parametrize("value", [value for _label, value in EXAMPLES],
+                         ids=[label for label, _value in EXAMPLES])
+def test_an_example_parses(value):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", document.BlueprintWarning)
+        document.parse_document(value)
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize("value", [value for _label, value in EXAMPLES],
+                         ids=[label for label, _value in EXAMPLES])
+def test_an_example_validates_against_the_schema(value):
+    jsonschema.validate(value, SCHEMA)
+
+
+# Every open script example parses.
+#
+# No guard, for the reason above: the catalogue is maintainer
+# governance and ships nowhere, and neither does this module, so the
+# two are only ever present together.
+#
+# The catalogue holds *unresolved* design problems, demonstrated in
+# real script text; lines that are deliberately illegal are commented
+# out and marked. So an example that will not parse is drift, not
+# intent — and drift is what happened: the five resolved examples were
+# deleted in 2026-07-26 partly because one had rotted into syntax the
+# language no longer accepts with nobody noticing, the README
+# concluding that "a note that cannot fail is not a guard". This is
+# that guard. Without it the catalogue is prose claiming to be code.
+
+def test_the_catalogue_holds_examples():
+    assert SCRIPT_EXAMPLES, (
+        "no examples found under planning/design/script-examples; an "
+        "empty catalogue passes the check below vacuously")
+
+
+@pytest.mark.parametrize("path", SCRIPT_EXAMPLES,
+                         ids=[os.path.basename(p) for p in SCRIPT_EXAMPLES])
+def test_a_script_example_parses(path):
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    script_parser.parse_script(text)
+
+
+# The retired four-component shape leaves no live instruction.
+#
+# Historical records keep their spellings — DECISIONS entries and
+# released CHANGELOG sections are the record of their own moment.
+# Everything a reader might act on speaks the revised model.
+
+# The JSON keys only. Prose naming `.rlqm` as *retired* is correct,
+# and the file kind's absence is guarded separately
+# (test_old_surface_purge).
+RETIRED = ('"sources"', '"archives"', '"members"')
+EXEMPT = {"planning/DECISIONS.md", "CHANGELOG.md",
+          "planning/USE-CASE-PROPOSALS.md",
+          "planning/PRINCIPLE-PROPOSALS.md"}
+
+
+def test_no_live_document_teaches_the_retired_shape():
+    offenders = []
+    for path in (glob.glob(os.path.join(_REPO_ROOT, "docs", "*.md"))
+                 + glob.glob(os.path.join(_REPO_ROOT, "planning", "design",
+                                          "*.md"))):
+        relative = os.path.relpath(path, _REPO_ROOT).replace("\\", "/")
+        if relative in EXEMPT:
+            continue
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+        for token in RETIRED:
+            if token in text:
+                offenders.append(f"{relative}: {token}")
+    assert offenders == [], (
+        "these documents still teach the retired component shape:\n"
+        + "\n".join(offenders))
