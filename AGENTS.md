@@ -489,9 +489,12 @@ workflow:
   top-level `tests/*.py` and none of the fixture trees beneath it — `tools/check_dist.py` names those trees one by one
   for that reason, and names the three pruned trees as forbidden.
 - `tests/` is the suite, and **pytest is the runner** (D106) — pytest-native where a sweep has converted a module
-  (the two conformance corpora, through `tests/corpus.py`), over `unittest.TestCase` classes it collects
-  unchanged until F57–F60 convert the rest — covering core helpers, guest program runs, lifecycle ownership,
-  media acquisition, blueprints, machines, and scripts. **`tests/source_tree/` is the exception that ships nowhere**:
+  (the two conformance corpora, through `tests/corpus.py`; the two integration runs, through `tests/conftest.py`),
+  over `unittest.TestCase` classes it collects
+  unchanged until F58–F60 convert the rest — covering core helpers, guest program runs, lifecycle ownership,
+  media acquisition, blueprints, machines, and scripts. `tests/conftest.py` is the suite-wide configuration: the
+  `integration` marker's `--integration` option, the deselection that keeps the tier out of a default run, and the
+  home those runs work in. **`tests/source_tree/` is the exception that ships nowhere**:
   the tests that read the *repository* rather than the package — prose documents, the maintainer records, the
   open-problem catalogue. Shipped, a sweep over `docs/` and `AGENTS.md` would find neither and report success on a
   fraction of its job, so it is kept where it cannot run at all instead. Nothing there needs a `skipUnless`, and a new
@@ -920,15 +923,18 @@ Doctrine to preserve:
   `tests/source_tree/` and ships nowhere, rather than carrying a
   guard that turns "cannot do its job here" into a quiet pass.
 
-  **The count is the assertion, and it is the same in both
-  places**: exactly **two** skips, the opt-in FreeDOS integration
-  runs, one per backend (QEMU and VirtualBox), both gated on
-  `RELIQUARY_INTEGRATION`. Any other skip is a defect to fix, not a
-  configuration to tolerate, and the two move only when an
-  integration run is added or retired. That the two runs differ —
-  1,827 tests from the repository, 1,813 from an sdist — is the
-  isolation working; the skips do not differ. A guard that survives
-  is one whose resource is genuinely optional, and it says which.
+  **The default run skips nothing, in both places**, and that is the
+  assertion — no count stands in for it any more (F57). The opt-in
+  FreeDOS integration runs, one per backend (QEMU and VirtualBox),
+  carry `@pytest.mark.integration` and are **deselected** unless
+  `pytest --integration` asks for the tier: a marker says the tier
+  was chosen, where a skip could not say whether it was chosen or
+  suffered. So **any** skip is a defect to fix, not a configuration
+  to tolerate. That the two runs differ — 1,825 tests from the
+  repository, 1,811 from an sdist, two deselected in each — is the
+  isolation working; neither skips. Selecting the tier on a host
+  without the backend is a **failure naming the gap** (P11) and not a
+  skip either: the run was asked for.
 - Pillow is the image library: screenshot conversion uses it, and the
   planned landmark assets (decode normalization, pixel comparison, PNG
   text chunks) build on it rather than on hand-written encoders.
@@ -1095,7 +1101,10 @@ plugin the project did not ask for can change what a run collects,
 undeclared marker an error instead of a silent no-op, `testpaths` lets a
 bare `pytest` find the suite, and `minversion` refuses a pytest too old to
 honour the first of those. Nothing there is a preference — each line is
-there so that a run somewhere else collects what a run here collects.
+there so that a run somewhere else collects what a run here collects. The
+one declared marker is `integration`, the opt-in tier; `tests/conftest.py`
+owns the `--integration` option that selects it, the deselection that is
+its default, and the `integration_home` fixture the runs work in.
 
 `uv build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
 After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, and runtime
@@ -1118,10 +1127,11 @@ $env:PYTHONPATH = "src"; pytest
 ```
 
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
-unittest tests` is no longer the entry point, and already misses the converted modules — the rest follow as F57–F60 land.
-It was taken because pytest is packaged everywhere a packager works. Expect **1,813 tests and the same two skips** as the
-repository's 1,827 ("Test expectations", above): the difference is `tests/source_tree/`, which ships nowhere, and a
-*skip* there is a defect exactly as it is here. Install the wheel into a clean environment and check it by using it —
+unittest tests` is no longer the entry point, and already misses the converted modules — the rest follow as F58–F60 land.
+It was taken because pytest is packaged everywhere a packager works. Expect **1,811 tests, two deselected and none
+skipped**, against the repository's 1,825 ("Test expectations", above): the difference is `tests/source_tree/`, which
+ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
+integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
 `rlq --version` and an import — since it carries no suite to run.
 
 **Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
@@ -1138,17 +1148,19 @@ Run `git diff --check` before handing work back.
 Hands-on tests require QEMU. Use `--home-dir` with a scratch or deliberately reused test home rather than polluting the
 default per-user home.
 
-The FreeDOS install+verify integration tests are opt-in (skipped in the
-default suite; need network for the LiveCD on a cold home). QEMU is the
-default backend; VirtualBox (F52) pins ``backend: virtualbox`` on the
-seeded blueprint and needs ``VBoxManage`` on ``PATH``:
+The FreeDOS install+verify integration tests are opt-in (deselected in
+the default suite; need network for the LiveCD on a cold home). `--integration`
+selects the tier, and it is the whole gate — naming the module without it
+deselects it just the same. QEMU is the default backend; VirtualBox (F52) pins
+``backend: virtualbox`` on the seeded blueprint and needs ``VBoxManage`` on
+``PATH``. Give the two runs *separate* reuse homes — the same machine id cannot
+span backends:
 
 ```powershell
-$env:RELIQUARY_INTEGRATION = "1"
 # optional: reuse a home so cache/media survives reruns
 # $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
-uv run pytest tests/test_freedos_install_integration.py
-uv run pytest tests/test_freedos_virtualbox_integration.py
+uv run pytest --integration tests/test_freedos_install_integration.py
+uv run pytest --integration tests/test_freedos_virtualbox_integration.py
 ```
 
 ## Test expectations
@@ -1209,9 +1221,10 @@ The stdlib preference stands everywhere else — pytest is one dependency
 judged compelling, not the bar lowered.
 
 The remaining `TestCase` classes are collected unchanged and convert
-under **F57–F60**, module by module — F56 took the two conformance
+under **F58–F60**, module by module — F56 took the two conformance
 corpora, which is where the shared parametrisation helper
-(`tests/corpus.py`) lives. Until a module's turn comes, extend it in
+(`tests/corpus.py`) lives, and F57 the two integration runs, which
+needed a fixture the older idiom cannot be given. Until a module's turn comes, extend it in
 the idiom it is written in: a module half in each is worse than a module
 in the older one, and the sweep that converts it is where the count is
 checked against the run before it.

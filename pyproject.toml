@@ -53,6 +53,12 @@ reliquary = "reliquary:main"
 minversion = "8.4"
 testpaths = ["tests"]
 addopts = "--disable-plugin-autoload --strict-config --strict-markers"
+# The one marker, and it is a tier rather than a label: `tests/conftest.py`
+# deselects it unless `--integration` asks for it, so the default run has
+# nothing to skip.
+markers = [
+    "integration: a run against a live hypervisor, deselected unless --integration",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

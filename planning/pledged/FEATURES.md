@@ -36,7 +36,7 @@ to this file on pledge.
 
 > **Pledged 2026-08-13** (owner), cut straight to this file by
 > **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first; no order binds it against F57–F59. Two of these
+> delivered first; no order binds it against F58 or F59. Two of these
 > modules read the repository rather than the package and live in
 > `tests/source_tree/`, which is **D105**'s isolation — the clause
 > that would have moved what they read was struck, so they assume
@@ -122,31 +122,6 @@ Work items:
    shared helper, rather than growing a second one.
 4. Same assertions and the same collected count as the run before
    the conversion.
-
-## F57 — The integration tier is a marker, not a skip
-
-> **Pledged 2026-08-13** (owner), cut straight to this file by
-> **D106**, whose argument about skips this is. Demanded by
-> **P11**. Needs **F55** delivered first.
-
-Two FreeDOS runs are gated by `RELIQUARY_INTEGRATION` and a
-`skipUnless`, and AGENTS.md asserts the suite skips **exactly two**
-tests — a count that exists precisely because a skip cannot say
-whether it was chosen or suffered. A marker says which, and the
-count stops standing in for it.
-
-Work items:
-
-1. `@pytest.mark.integration` on the QEMU and VirtualBox runs,
-   deselected by default and selected by an explicit option.
-2. `RELIQUARY_INTEGRATION` retires as the gate.
-   `RELIQUARY_INTEGRATION_HOME` stays and becomes a fixture input
-   rather than an environment read at module scope.
-3. The AGENTS.md skip rule rewrites against what the marker makes
-   true: **zero** skips in the default run, the tier deselected
-   rather than skipped, and any surviving skip a defect as before.
-4. The integration command blocks in AGENTS.md fold to the marker
-   selection.
 
 ## F54 — The scoped machine-state change
 
