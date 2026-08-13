@@ -204,6 +204,15 @@ def _failure_report(fields):
         value = fields.get(key)
         if value:
             lines.append(f"  {label}: {value}")
+    unclear = fields.get("unreadable-cells")
+    if unclear:
+        # Beside the nearest miss rather than instead of it: the miss
+        # is measured against rows that may never have been read, and
+        # this says how far to trust them.
+        lines.append(
+            f"  unreadable: {unclear} cells matched no glyph and were "
+            "read as spaces; the screen may use a font this host "
+            "does not have")
     route = fields.get("route")
     if route:
         lines.append("  route: " + " -> ".join(route))

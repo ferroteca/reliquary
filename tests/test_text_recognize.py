@@ -210,12 +210,24 @@ class SeveralFontsTests(unittest.TestCase):
     project's font.
     """
 
-    #: A shape no CP437 glyph has, so that a cell drawn with it is
-    #: unambiguous. An override table gives a code a *different
-    #: drawing of the same character* — never another code's shape —
-    #: so a fixture that merely exchanged two glyphs would make one
-    #: bitmap legitimately mean two codes and prove nothing.
-    DISTINCT = bytes([0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01] * 2)
+    #: A coarse checkerboard: the shape measured **furthest** from
+    #: every glyph in the bank — 56 of 128 pixels from its nearest,
+    #: where 24 is the most that is still believed — so a cell drawn
+    #: with it is unmistakably unread rather than merely mismatched.
+    #:
+    #: Distance matters more than novelty here, and both polarities
+    #: count, because `_match_cell` tries the cell inverted too. A
+    #: diagonal is novel and sits 14 away from something; alternating
+    #: single columns is novel and its *complement* is 1 away from a
+    #: constructed glyph. Either would come back as a wrong character
+    #: rather than an unreadable one, which is the opposite of what
+    #: this fixture is for.
+    #:
+    #: An override table gives a code a *different drawing of the
+    #: same character* — never another code's shape — so a fixture
+    #: that merely exchanged two glyphs would make one bitmap
+    #: legitimately mean two codes and prove nothing.
+    DISTINCT = bytes([0xCC, 0xCC, 0x33, 0x33] * 4)
 
     def _two_fonts(self):
         stored = recognize.glyph_bank()
@@ -289,6 +301,46 @@ class SeveralFontsTests(unittest.TestCase):
         binary = b"\x00" * 64 + stored + noise + b"\x00"
         self.assertEqual(recognize.banks_from_binary(binary, "fake.dll"),
                          (stored,))
+
+    def test_a_cell_that_matches_nothing_says_so(self):
+        """A substituted space must not pass for a read one.
+
+        Past the distance threshold a space is written, because a
+        wrong character is worse for a `wait` than a blank — but a
+        screen drawn in a font this host lacks then arrives looking
+        merely sparse, and a wait on a word in it expires with
+        nothing to show. The cells are reported so the difference is
+        visible.
+        """
+        stored, installed = self._two_fonts()
+        image = recognize.render(_screen("W"), bank=installed)
+
+        blind = recognize.recognize(image, bank=stored)
+        self.assertEqual(recognize.unreadable_cells(blind), ((0, 0),))
+
+        seeing = recognize.recognize(image, bank=(stored, installed))
+        self.assertEqual(recognize.unreadable_cells(seeing), ())
+        self.assertEqual(seeing[0][0], "W")
+
+    def test_a_blank_cell_is_read_rather_than_unread(self):
+        """Nothing to recognize is not the same as failing to."""
+        image = recognize.render(_screen(""))
+        screen = recognize.recognize(image)
+        self.assertEqual(recognize.unreadable_cells(screen), ())
+
+    def test_a_screen_is_still_the_pair_the_seam_promises(self):
+        """The report rides along; it does not widen the contract."""
+        screen = recognize.recognize(recognize.render(_screen("ok")))
+        text, attributes = screen
+        self.assertEqual(len(screen), 2)
+        self.assertEqual(text[0], "ok")
+        self.assertEqual(len(attributes[0]), 80)
+        self.assertEqual(screen[0], text)
+
+    def test_a_scraped_screen_reports_nothing_unread(self):
+        """A backend reading resolved characters cannot misread one."""
+        self.assertEqual(
+            recognize.unreadable_cells((["ready"], [[0x07] * 80])), ())
 
     def test_a_single_bank_may_be_given_as_bytes_or_a_sequence(self):
         stored = recognize.glyph_bank()

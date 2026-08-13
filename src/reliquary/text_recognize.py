@@ -444,10 +444,17 @@ def _match_glyph_with_distance(bits, banks):
 
 
 def _match_cell(pixels, width, height, banks):
-    """Return ``(cp437_code, fg, bg)`` for one cell."""
+    """``(cp437_code, fg, bg, matched)`` for one cell.
+
+    ``matched`` is False where the nearest glyph was too far to be
+    believed and a space was substituted. That is not the same fact
+    as "this cell is blank", and conflating the two is how a screen
+    drawn in an unknown font reads as ordinary text (see
+    :func:`recognize`).
+    """
     primary, secondary = _cell_colours(pixels)
     if primary == secondary:
-        return 0x20, primary, primary
+        return 0x20, primary, primary, True
     # Try both polarities: glyph ink may be the minority colour
     # (normal text) or the majority (an inverted highlight bar).
     candidates = []
@@ -458,8 +465,8 @@ def _match_cell(pixels, width, height, banks):
     candidates.sort(key=lambda item: item[0])
     dist, code, fg, bg = candidates[0]
     if dist > _MAX_DISTANCE:
-        return 0x20, secondary, primary
-    return code, fg, bg
+        return 0x20, secondary, primary, False
+    return code, fg, bg, True
 
 
 def _cp437_char(code):
@@ -471,6 +478,37 @@ def _cp437_char(code):
     # High CP437: expose as Latin-1 so fixtures can round-trip box
     # drawing as the same code points the bank uses.
     return chr(code)
+
+
+class Screen(tuple):
+    """``(text_rows, attribute_rows)`` — and how well it was read.
+
+    A plain 2-tuple to every caller that unpacks or indexes it, which
+    is the seam's contract and stays untouched, carrying one extra
+    fact for anyone who asks: ``unreadable``, the ``(row, col)`` of
+    every cell whose nearest glyph was too far away to be believed.
+
+    It rides on the reading rather than being returned beside it
+    because the question is asked far from where it can be answered —
+    a script's failure report and `rlq screen` both want it, and
+    neither is anywhere near the pixels.
+    """
+
+    def __new__(cls, text_rows, attribute_rows, unreadable=()):
+        screen = super().__new__(cls, (text_rows, attribute_rows))
+        screen.unreadable = tuple(unreadable)
+        return screen
+
+
+def unreadable_cells(screen):
+    """The cells a screen could not read, for any screen.
+
+    A backend that scrapes resolved characters out of text memory has
+    nothing to report and returns a plain tuple, so asking it this
+    yields none — correctly, since a scrape recognizes nothing and
+    cannot misrecognize anything.
+    """
+    return getattr(screen, "unreadable", ())
 
 
 def _geometry(width, height, cols, rows):
@@ -501,9 +539,21 @@ def _geometry(width, height, cols, rows):
 def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
     """Recognize a text screen from a PNG path or ``PIL.Image``.
 
-    Returns ``(text_rows, attribute_rows)`` — text rows right-stripped
-    like QEMU's VGA scrape; attribute rows are per-cell opaque tokens
-    from :func:`attribute_token`, length ``cols`` each (not stripped).
+    Returns a :class:`Screen` — ``(text_rows, attribute_rows)`` to
+    anyone unpacking it, text rows right-stripped like QEMU's VGA
+    scrape, attribute rows per-cell opaque tokens from
+    :func:`attribute_token`, length ``cols`` each (not stripped).
+
+    **A cell that matches nothing is a space, and says so.** The
+    nearest glyph is taken only when it is near enough to believe;
+    past `_MAX_DISTANCE` a space is substituted, because a wrong
+    character is worse for a script's `wait` than a blank. That
+    substitution used to be silent, which made a screen drawn in a
+    font this host does not have read as ordinary text — plausible,
+    wrong, and indistinguishable from a screen that was simply
+    blank there. Those cells are now on the returned screen as
+    ``unreadable``, so a caller can say how much of what it is
+    holding was actually read.
 
     ``bank`` is the font to read through — one 4096-byte bank, or
     **any number of them**, and a caller reading a live guest should
@@ -526,6 +576,7 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
     pixels = list(image.get_flattened_data())
     text_rows = []
     attr_rows = []
+    unreadable = []
     for row in range(rows):
         chars = []
         attrs = []
@@ -536,12 +587,15 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
             for y in range(cell_h):
                 base = (y0 + y) * image.width + x0
                 cell.extend(pixels[base:base + cell_w])
-            code, fg, bg = _match_cell(cell, cell_w, cell_h, banks)
+            code, fg, bg, matched = _match_cell(
+                cell, cell_w, cell_h, banks)
+            if not matched:
+                unreadable.append((row, col))
             chars.append(_cp437_char(code))
             attrs.append(attribute_token(fg, bg))
         text_rows.append("".join(chars).rstrip())
         attr_rows.append(attrs)
-    return text_rows, attr_rows
+    return Screen(text_rows, attr_rows, unreadable)
 
 
 def render(text_rows, attribute_rows=None, *,

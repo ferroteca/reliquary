@@ -28,6 +28,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
+from . import text_recognize
 from .binding import bind_properties, console_asker, describe_sources
 from .document import load_document
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
@@ -365,6 +366,12 @@ class _Sample:
     stopped: bool = False
     frame: tuple = ()
     unreadable: str = None
+    #: How many cells of this screen matched no glyph well enough to
+    #: be believed and were read as spaces. A screen can be perfectly
+    #: readable *as a shape* and still be mostly unrecognized, which
+    #: `unreadable` above cannot express: that one says no screen
+    #: arrived, this one says one did and part of it is a guess.
+    unclear: int = 0
 
 
 class _Observation:
@@ -626,6 +633,7 @@ class _ScriptEngine:
                       in self._revisits.items() if count > 1} or None,
             **{"nearest-miss": self._nearest_miss(),
                "unreadable-screen": self._unreadable_screen(),
+               "unreadable-cells": self._unreadable_cells(),
                "screenshot": self._failure_screenshot(),
                "next-command": self._next_command()})
         self._terminal(error)
@@ -660,6 +668,26 @@ class _ScriptEngine:
         if not self._last_sample:
             return None
         return self._last_sample.unreadable
+
+    def _unreadable_cells(self):
+        """How much of the last screen was a guess, when any of it was.
+
+        The nearest miss compares the target against rows that may
+        never have been read: a cell matching no glyph becomes a
+        space, so a screen drawn in a font this host does not have
+        arrives looking merely sparse and a `wait` on a word in it
+        expires with nothing to show for itself. Saying how many
+        cells were substituted turns "it never appeared" into "it may
+        have been there and unreadable", which are different problems
+        with different fixes.
+
+        Silent at zero, and silent for a backend that scrapes
+        resolved characters — it recognizes nothing, so it can
+        misrecognize nothing.
+        """
+        if not self._last_sample or not self._last_sample.unclear:
+            return None
+        return self._last_sample.unclear
 
     def _failure_screenshot(self):
         """Capture the failing screen, unless a secret has been typed.
@@ -1214,7 +1242,8 @@ class _ScriptEngine:
             return self._sampled(_Sample((), False, (), str(error)))
         return self._sampled(
             _Sample(tuple(_normalize_row(row) for row in rows), False,
-                    frame))
+                    frame,
+                    unclear=len(text_recognize.unreadable_cells(frame))))
 
     def _sampled(self, sample):
         """Keep the latest reading, which the failure report needs."""

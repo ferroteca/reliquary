@@ -315,6 +315,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A cell that matched nothing no longer passes for one that was
+  read.** The recognizer takes the nearest glyph only when it is
+  near enough to believe and substitutes a space otherwise, since a
+  wrong character is worse for a `wait` than a blank — but the
+  substitution was silent, so a screen drawn in a font this host
+  does not have arrived looking merely *sparse*. A wait on a word in
+  it expired with nothing to show, and the failure report's
+  nearest-miss row was measured against text that had never been
+  read. That silence is what let the font defect below hide for as
+  long as it did.
+
+  `recognize` now returns a `Screen` carrying `unreadable`, the
+  `(row, col)` of every substituted cell. It is still the
+  `(text_rows, attribute_rows)` pair to everything that unpacks or
+  indexes it, so the seam is unchanged and the fact rides to callers
+  far from the pixels: `rlq screen` narrates when part of a screen
+  could not be read, and a script's failure report says how many
+  cells were guesses — turning "it never appeared" into "it may have
+  been there and unreadable", which are different problems with
+  different fixes. Both are silent at zero, and silent for a backend
+  that scrapes resolved characters out of text memory: it recognizes
+  nothing, so it can misrecognize nothing. Reading a guest screen is
+  a measurement, and one that reports no confidence cannot be told
+  from a good one — but it stays a signal and never a verdict, since
+  a BIOS splash is unreadable by nature and already a sample the
+  waits look past.
+
 - **A screen is read through every font it could have been drawn
   with.** The recognizer read through one bank chosen in advance,
   and there is no right choice: more than one font is painted during

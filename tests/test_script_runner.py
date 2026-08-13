@@ -15,6 +15,7 @@ from unittest import mock
 
 
 from reliquary import events as _events
+from reliquary import text_recognize
 from reliquary.binding import BoundProperties
 from reliquary.errors import (PreflightError, RunCancelled, StaticError,
                               UnreadableScreen)
@@ -968,6 +969,39 @@ class FailureReportTests(_RuntimeCase):
             [["Welcome to FreeDO"]])
         self.assertEqual(by_kind["failure"]["nearest-miss"],
                          "Welcome to FreeDO")
+
+    def test_the_report_says_how_much_of_the_screen_was_a_guess(self):
+        """The nearest miss measures rows that may never have been read.
+
+        A cell matching no glyph becomes a space, so a screen drawn in
+        an unknown font arrives looking sparse and the wait expires
+        with nothing to show. Saying how many cells were substituted
+        turns "it never appeared" into "it may have been there and
+        unreadable" — different problems, different fixes.
+        """
+        engine = self.engine('timeout 10s\nwait "ready"\n')
+        rows = ["nothing here"]
+        attributes = [[0x07] * 80 for _ in rows]
+
+        def screen():
+            self.console.reads += 1
+            return text_recognize.Screen(
+                rows, attributes, unreadable=((0, 4), (0, 5), (3, 9)))
+
+        with mock.patch.object(self.console, "screen", screen), \
+                self.whole_run(), \
+                mock.patch("reliquary.script_runner.screenshot"):
+            with self.assertRaises(ScriptRuntimeError):
+                engine.run()
+        failure = {event["kind"]: event
+                   for event in engine.events.events}["failure"]
+        self.assertEqual(failure["unreadable-cells"], 3)
+
+    def test_a_fully_read_screen_reports_no_unreadable_cells(self):
+        """Silent at zero: a clean read must not carry a confidence line."""
+        _engine, by_kind = self._failed_run(
+            'timeout 10s\nwait "never"\n', [["nothing here"]])
+        self.assertIsNone(by_kind["failure"].get("unreadable-cells"))
 
     def test_the_report_names_a_screen_that_could_never_be_read(self):
         # The case the nearest miss cannot answer: with no rows at any

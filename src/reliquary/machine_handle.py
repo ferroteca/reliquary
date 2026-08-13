@@ -17,6 +17,7 @@ import sys
 import time
 
 from . import backends
+from . import text_recognize
 # Only the recorded VM identity is wanted here, and it lives in the
 # substrate — so this module no longer imports the lifecycle, and the
 # two stop importing each other.
@@ -141,9 +142,19 @@ class Machine:
             return console.cursor_menu_select(item, timeout, exclude)
 
     def screen_text(self):
-        """Return the guest's text screen as character rows."""
+        """Return the guest's text screen as character rows.
+
+        Narrates on stderr when part of the screen could not be read.
+        A recognized screen is a *measurement*, and one that reports
+        no confidence cannot be told from a good one: cells matching
+        no known glyph come back as spaces, so a screen drawn in a
+        font this host does not have looks merely sparse. The rows
+        returned are unchanged — this says how much to trust them.
+        """
         with self.console() as console:
-            return console.screen_text()
+            screen = console.screen()
+            _narrate_unreadable(screen)
+            return screen[0]
 
     def wait_text(self, pattern, timeout=60):
         """Wait until the guest text screen matches a regular expression.
@@ -160,6 +171,25 @@ class Machine:
         raise RunFailure(
             f"timed out after {timeout}s waiting for screen to match: "
             f"{pattern}", rule_id="screen.no-match")
+
+
+def _narrate_unreadable(screen):
+    """Say how much of a screen matched no glyph, when any did not.
+
+    Silent on a clean read, and silent for a backend that scrapes
+    resolved characters — it recognizes nothing, so it can
+    misrecognize nothing either.
+    """
+    cells = text_recognize.unreadable_cells(screen)
+    if not cells:
+        return
+    lines = sorted({row for row, _col in cells})
+    where = ", ".join(str(line) for line in lines[:6])
+    if len(lines) > 6:
+        where += ", ..."
+    print(f"rlq: {len(cells)} cells on this screen matched no glyph in "
+          f"any known font (rows {where}); it may be drawn in a font "
+          "this host does not have", file=sys.stderr)
 
 
 def send_keys(combos, delay=0.06, home=None):

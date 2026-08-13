@@ -125,44 +125,6 @@ violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
 
-### Defects
-
-Found by running the opt-in FreeDOS VirtualBox integration against
-a live hypervisor for the first time (2026-08-13), which now
-passes. What was fixed in that sitting is not here — as a queue
-holds only what waits — leaving the one the integration cannot
-catch, because it is a misreading that succeeds.
-
-#### T24 — A cell that matches nothing is reported as though it were read
-
-`text_recognize` picks the nearest glyph by Hamming distance and,
-past `_MAX_DISTANCE`, returns a space. Both outcomes are silent. A
-screen drawn in a font the host does not hold therefore comes back
-as ordinary rows — blanks where the distance was large, the wrong
-letter where it was merely large enough — and a script waiting on
-a word in it simply times out. Nothing anywhere says the screen
-was unreadable rather than absent.
-
-That silence is what let the font defect hide: the screens *looked*
-plausible, `Welcome` read as `Uelcooe`, and the run failed as a
-timeout on a wait. Reading a guest screen is a measurement, and a
-measurement that reports no confidence cannot be told from a good
-one.
-
-The distance is already computed per cell, so what is missing is
-only that it reaches anybody: how many cells matched nothing well,
-where they were, and — for a caller with a screenshot in hand —
-which glyphs. `rlq screen` is the natural place to say it, the
-failure report the other. Whether it should ever *fail* a run is
-the open question and probably not: a BIOS splash is unreadable by
-nature and already a sample the waits look past
-(`UnreadableScreen`), so this is a confidence signal rather than a
-verdict.
-
-It is also the precursor to **U25** (a guest dumping its own font):
-an author cannot know a capture is needed while the misreading is
-invisible.
-
 ### Surface decisions
 
 #### T25 — Stopping and starting one machine takes two commands and lets go in between

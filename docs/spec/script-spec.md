@@ -1303,13 +1303,21 @@ activation (the phase deadline's scope), a span per observation
 - on failure: the pending condition or action, the expired clock
   and its source scope, the route taken with phase revisit
   counts, the nearest-miss screen row, the reason the last screen
-  could not be read where it could not be, the automatic
-  screenshot reference, and the suggested next command. The last
-  two answer disjoint cases: a screen with rows has a nearest
-  miss, and a screen with none — a guest painting in a video mode
-  the display plane cannot describe — has the captured shape
-  instead, so an expiry never reports silence where it had a
-  reason;
+  could not be read where it could not be, **how many of its cells
+  matched no glyph** where any did not, the automatic
+  screenshot reference, and the suggested next command. The first
+  three answer different cases and are not alternatives: a screen
+  with rows has a nearest miss; a screen with none — a guest
+  painting in a video mode the display plane cannot describe — has
+  the captured shape instead; and a screen that *arrived* but was
+  drawn in a font the host does not hold has rows that were partly
+  substituted, so its nearest miss is measured against text that
+  was never read. A recognized screen is a measurement, and one
+  reporting no confidence cannot be told from a good one; an
+  expiry therefore never reports silence where it had a reason,
+  nor certainty it does not have. A backend that scrapes resolved
+  characters out of text memory recognizes nothing and so reports
+  no unread cells;
 - reserved, designed but not emitted: `screen`'s CLI-only read
   kind, which waits on the guest-console commands carrying a
   stream at all (only `run-script` and `fetch-media` do today);
