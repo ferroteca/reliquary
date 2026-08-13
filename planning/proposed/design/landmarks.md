@@ -43,7 +43,11 @@ matching to declared rectangles are deferred as additive growth
 (G7). Failure reporting stays per-variant: the nearest miss names
 the closest variant.
 
-**Catalog form.** The declaration is `<name>.rlql`, a JSON5
+**Catalog form**, and the shape below is no longer landmarks' alone:
+it is the project's rule for authored binary assets generally
+([design/authored-binary-assets.md](../../design/authored-binary-assets.md)),
+stated once when U25's fonts became its second instance. What
+follows is where it was settled. The declaration is `<name>.rlql`, a JSON5
 authored document — the third authored extension beside
 `.rlqb` / `.rlqs`, resolved under exactly the same
 rules (docs/spec/asset-resolution.md: home mode

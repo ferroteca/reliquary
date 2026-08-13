@@ -283,13 +283,24 @@ mode included. Text verbatim as adopted:
 
 ### Drafted
 
-- **U25 — A guest tells the host which glyphs it is painting.** An
+- **U25 — A screen is read through the font that painted it.** An
   agentless-display script reads a screen by matching pixels against
   glyph bitmaps, so it can only read text drawn in a font it holds.
-  Every font it holds comes off the *host*: the banks a hypervisor's
-  binaries carry, plus the variants their override tables install. A
-  guest that loads its own font paints glyphs no host binary has, and
-  the screen becomes unreadable to every script that waits on it.
+  Every font it holds comes off the *host* — the banks a hypervisor's
+  binaries carry, plus the variants their override tables install —
+  and nothing in a framebuffer says which of them painted it. A guest
+  that loads a face of its own paints glyphs no host binary has, and
+  the screen goes unreadable to every script waiting on it.
+
+  **What is missing is not a matching strategy.** A screen is already
+  read through every font the host offers, and one more bank costs
+  only where it differs. What is missing is a way for the *right*
+  font to be among them, and to be tried first. Three things carry
+  that, and the first two are the sources P10 already names: a guest
+  **reports** its own font where there is a moment to ask it; a font
+  is **declared** where there is not; and a script says **from
+  where** a declared font takes precedence, because the authority
+  painting the screen changes during a boot.
 
   Drafted 2026-08-13, while fixing the fonts a FreeDOS install is
   read through. **The gap is already load-bearing, and closed only by
@@ -297,39 +308,67 @@ mode included. Text verbatim as adopted:
   override table on every text mode set, so a guest that merely set a
   mode would paint the patched glyphs, and FreeDOS paints the
   unpatched ones. It is read correctly because the font it installs
-  happens to be byte-identical to the bank VirtualBox stores. Nothing
+  happens to be byte-identical to a bank VirtualBox stores. Nothing
   guarantees that for the next guest: a prepared codepage, a
   localized installer, or any guest that loads a face of its own
   leaves the host with no way to read the screens its scripts wait on.
 
-  **The guest is the only party that knows.** On DOS the live table
-  is reachable natively — `INT 10h AH=11h AL=30h` returns a pointer
-  to it — which yields all 256 glyphs exactly, whatever was loaded.
-  That is guest-specific by nature: another platform has its own call
-  and its own dumper, so the dumper belongs to a blueprint's
-  **platform** rather than to any one script. **Getting the bytes out
-  is the real question**, and the material is already named: both
-  reference backends can point a UART at a host file (VirtualBox's
-  serial redirection is recorded in this file's backend ranking), and
-  `serial-console` is in the control-plane vocabulary
-  (`document.py`) with nothing implementing it. On DOS nothing need
-  be copied into the guest at all — a DEBUG script typed over the
-  keystroke plane that already exists assembles the dump.
+  **The guest is the only party that knows what it loaded.** On DOS
+  the live table is reachable natively — `INT 10h AH=11h AL=30h`
+  returns a pointer to it — which yields all 256 glyphs exactly,
+  whatever was loaded. That is guest-specific by nature: another
+  platform has its own call and its own dumper, so the dumper is
+  Reliquary's DOS workflow rather than any one script's business.
+
+  **But asking needs a moment when asking is safe**, and that is what
+  bounds the native door. A dump is assembled by typing at a prompt,
+  and an installer's screens are painted before any prompt exists in
+  that boot — so the door serves the guest a script can reach, which
+  is most of the working life of a machine, and cannot serve the
+  screens that drafted this. **A font the author supplies is the
+  second door**, and it is the one the motivating case needs. Where
+  such a font lives is the binary-asset question landmarks already
+  answered for renderings — a declaration resolved by the ordinary
+  asset rules with its binary beside it, referenced out of the
+  collision-checked `@` pool, never embedded in a script — and
+  making this its second instance is what moved that shape into a
+  rule of its own
+  ([design/authored-binary-assets.md](../design/authored-binary-assets.md)).
+  The shape is the precedent to follow; what a font's declaration
+  must *say* is this use case's own work.
+
+  **The painting authority changes mid-boot, and only the script
+  knows when.** The BIOS paints with the bank it patched at the mode
+  set; then the guest takes control and paints with its own. So a
+  supplied font is stated **positionally** — from here forward, try
+  this first, the rest behind it — and the shape is the one U24's
+  `boot` settled for drive order: name what comes first and let the
+  remainder follow, rather than restating a whole list. Saying it
+  also **narrows**, which is the part that is easy to miss: every
+  additional bank is one more chance for a near-match to beat the
+  true glyph, so naming the font in force is a correction of
+  priority and not merely an addition to the pile.
 
   **WEIGHED AND DECLINED: learning the font from pixels.** Render a
   screen whose text the author states, cut it into cells, and record
   each bitmap against its character. It needs no new channel and no
-  guest cooperation, and the union recognizer would take the result
-  as one more bank — partial is enough, since unmatched glyphs fall
-  through to the host's. But it yields only the glyphs that appeared
-  on one screen, it asks the author to transcribe a framebuffer by
-  eye, and the artifact is worse for more work. It stays recorded
-  because a guest with no native door would leave it the only way.
+  guest cooperation, and the recognizer would take the result as one
+  more bank — partial is enough, since unmatched glyphs fall through
+  to the host's. But it yields only the glyphs that appeared on one
+  screen, it asks the author to transcribe a framebuffer by eye, and
+  the artifact is worse for more work. It stays recorded because a
+  guest with no native door would leave it the only way — and note
+  what it is: a worse **capture route** to the same declared asset,
+  not a rival place to put one.
 
-  What is missing is not a matching strategy — a screen is already
-  read through every font the host offers, and one more bank costs
-  only where it differs. What is missing is a way for the guest's
-  own font to become one of them.
+  **Open at this draft**, both deliberately: what a font's
+  declaration states, the shape around it being settled; and how the
+  bytes leave the guest. The material for the second is named and none of
+  it is chosen — both reference backends can point a UART at a host
+  file, `serial-console` sits in the control-plane vocabulary
+  (`document.py`) with nothing implementing it, and a dump written
+  to a drive is readable by the at-rest reader that already exists,
+  at the price of arriving after the machine stops.
 
 Two 2026-07-23 sweeps. The mapping sweep (U7–U10) closes
 named coverage gaps — roadmap work standing on demand no use
