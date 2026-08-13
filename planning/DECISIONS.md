@@ -240,16 +240,17 @@ is waiting on an answer today.
   the suite, only that nothing was lost by doing so. What was lost is
   the packager's run, on a platform this project never tests.
 
-  **The catalogue moves rather than being packaged around.** The
-  `planning/design` graft existed so the documented-example tests
-  could read the script-example catalogue out of an unpacked sdist,
-  and shipping the suite without governance puts that problem back. A
-  corpus the code is checked against is a norm, and norms leave
-  `planning/` permanently: it goes to `docs/`, which ships already.
-  The skip bar AGENTS.md sets — an exact count, every other skip a
-  defect — was justified by the suite running from the repository and
-  nowhere else, which is no longer true; the bar survives on the
-  catalogue moving, not on a guard being reintroduced.
+  WEIGHED AND DECLINED: **moving the script-example catalogue to
+  `docs/`** so the documented-example tests could still read it —
+  taken at first on the reading that a corpus the code is checked
+  against is a norm, and abandoned on reading the catalogue, which
+  holds *unresolved* design problems and deletes them on resolution.
+  That is governance, and shipping it is what this entry's other half
+  refuses. **The test moved instead**, to `tests/source_tree/`, which
+  ships nowhere: a test that reads what no artifact carries should be
+  unable to run outside the repository rather than guarded into a
+  quiet pass. The rule that leaves is AGENTS.md's, where it governs
+  every such test rather than this one catalogue.
 
   Reopens if the suite acquires a requirement a packager cannot
   reasonably meet. **D106**'s pytest is not one.
