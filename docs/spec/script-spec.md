@@ -1973,11 +1973,16 @@ blueprint until a later `set-boot`, or
 [`apply`](../blueprint-guide.md#applying-blueprint-edits), restores
 it.
 
-Most install scripts never need this: a blueprint that boots
-`["hdd0", "cdrom0"]` with a blank hard disk falls through to an
-attached installer CD, then boots the installed disk once it is
-populated. The verb exists for scripts that genuinely need a
-different order than the blueprint's default.
+Most install scripts never need this: an installer-carrying
+blueprint boots its optical drive ahead of the disk, and the script
+ejects the medium once the disk is bootable, so the disk takes its
+turn without any boot depending on firmware falling *past* a
+device. Falling through is not something to rely on — firmware is
+reliably willing to skip an **empty** drive and nothing more, and a
+disk partitioned without an active partition, which is the state an
+installer leaves behind before its reboot, is where the two
+reference backends part company. The verb exists for scripts that
+genuinely need a different order than the blueprint's default.
 
 ### `set`
 
@@ -2438,7 +2443,9 @@ phase cd-boot {
     wait   "What is your preferred language"
     select "English"
     wait   "Welcome to the FreeDOS 1.4 installation program"
-    press  enter
+    select "Yes"                    # feedback-driven: a bare `press
+                                    # enter` here is drawn before the
+                                    # installer reads the keyboard
 
     wait {
         on "Drive C: does not appear to be partitioned." {
@@ -2468,13 +2475,17 @@ phase formatting timeout=5m deadline=20m {
     wait   "We are now ready to install FreeDOS 1.4."
     select "Yes"
     wait   "Installation of FreeDOS 1.4 is now complete."
+    eject  cdrom0                   # before the reboot, not after:
+                                    # the machine boots cdrom0 first,
+                                    # so the disk is only reached once
+                                    # the drive is empty
     select "Yes"
     goto hd-boot
 }
 
 phase hd-boot {
     wait   "Load FreeDOS"
-    select "Load FreeDOS with JEMMEX (more compatible)"
+    select "Load FreeDOS with JEMM386 (Expanded Memory)"
     wait   "C:\>"
     screenshot installed
     goto shutdown
@@ -2483,31 +2494,36 @@ phase hd-boot {
 phase shutdown {
     enter "fdapm poweroff"
     wait  machine=stopped timeout=2m
-    eject cdrom0
-    finish
+    finish                          # cdrom0 was ejected in
+                                    # formatting, so the machine is
+                                    # already as it was found
 }
 ```
 
 The blueprint declares `cdrom0` empty and boots
-`["hdd0", "cdrom0"]`; the script supplies the installer medium. A
-blank hard disk fails to boot, so the opening `insert` makes the
-machine fall through to the LiveCD, and the closing `eject`
-returns the machine to its default shape — the same boot order
-thereafter boots the installed hard disk. No `set-boot` verb is
-needed.
+`["cdrom0", "hdd0"]`; the script supplies the installer medium.
+**The eject is what hands the disk its turn**: the machine boots
+its optical drive first, so the disk is reached only once that
+drive is empty, and no boot in the run depends on firmware moving
+past a partitioned disk. Ejecting in `formatting` rather than after
+the reboot selection keeps it off that reboot's critical path, and
+returns the machine to its blueprint shape as a side effect. No
+`set-boot` verb is needed.
 The second visit to `cd-boot` reaches the other branch of its
 closing `wait` because the disk has been partitioned. The
 guest-driven reboot is expressed by the installer selection and the
-resulting screen, not by a Reliquary reboot command.
+resulting screen, not by a Reliquary reboot command — and it is the
+guest's alone: the machine never stops, so the boot order it was
+launched with is the one that firmware reads again.
 
 Verification is a separate script needing no machine
-reconfiguration at all: after the install script's final `eject`,
-the machine is back in its blueprint shape and simply boots the
-installed hard disk. The verify script declares
+reconfiguration at all: after the install script's `eject`, the
+machine is back in its blueprint shape and boots the installed hard
+disk past an empty optical drive. The verify script declares
 `machine stopped` too and issues a plain `start`. If an
 interrupted install run left the CD attached, `apply` restores the
-blueprint shape (or the HD-first order boots the installed disk
-anyway while the CD remains attached).
+blueprint shape — without it, the CD-first order boots the
+installer again rather than the installed disk.
 
 ## Sharing
 

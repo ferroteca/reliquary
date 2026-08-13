@@ -457,7 +457,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   into a home keeps the old order**, since `seed-blueprint` never
   overwrites: delete `blueprints/freedos.rlqb` and re-seed to pick
   this up. [The blueprint reference](docs/blueprint-reference.md)
-  carries the measured behaviour under `boot`.
+  carries the measured behaviour under `boot`, and the four other
+  documents that taught the order it replaced now follow it: the
+  script spec's FreeDOS example and its `set-boot` guidance, the
+  blueprint model's `boot` rule, the CLI spec's installation-machine
+  example, and the blueprint cookbook's install recipe.
 
 - **The quiescence guard sizes itself to the cadence it measures.**
   Decoration is recognized by recurrence — three changes to a cell

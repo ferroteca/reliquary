@@ -644,9 +644,11 @@ order.
 Every entry must reference a declared, enabled drive, and entries
 are unique by slot: naming the same slot twice — in either
 spelling — fails validation. An empty or non-bootable drive is a
-valid entry, and firmware is *expected* to fall through it to the
-next entry. Scripts may still reorder boot devices with the
-[`boot`](spec/script-spec.md#boot) verb while the machine is stopped.
+valid entry, though whether firmware falls through it to the next
+entry is the firmware's own behaviour — see below. Scripts may
+still reorder boot devices with the
+[`set-boot`](spec/script-spec.md#set-boot) verb while the machine is
+stopped.
 When omitted, the default order is: the slot-0 floppy image if
 declared, else the slot-0 hard disk, else the first CD-ROM; the
 resolved order appears in the state.

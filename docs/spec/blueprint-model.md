@@ -147,10 +147,15 @@ cannot carry.
 - **`boot`** entries must each name a drive the machine
   **declares and has not disabled**, and are unique by slot: the
   same slot twice, in either spelling, fails validation. An empty
-  or non-bootable drive is a **valid** entry — firmware falls
-  through it — which is what makes `["hdd0", "cdrom0"]` with a
-  blank disk the standard install order, needing no boot change
-  after the install. Omitted, the order is the slot-0 floppy,
+  or non-bootable drive is a **valid** entry: whether firmware
+  moves past one is the firmware's business rather than this
+  model's, and it is not uniform — an empty optical drive is
+  skipped everywhere, a disk partitioned without an active
+  partition is not. So an installer-carrying blueprint states the
+  medium **first** and its script ejects when the disk is ready
+  (the measured table is in the blueprint reference); an order
+  written to be fallen through is a bet on the host's firmware.
+  Omitted, the order is the slot-0 floppy,
   else the slot-0 hard disk, else the first cdrom; the resolved
   order is recorded.
 - **`control-planes`** entries are unique — one listed twice

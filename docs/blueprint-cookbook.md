@@ -92,11 +92,13 @@ defaults became explicit values, and the state-only fields appeared.
 ## 2. An OS installation machine
 
 A machine to install FreeDOS onto: a blank hard disk, an empty CD
-slot the install script will fill, and boot order hard-disk then
-CD. A blank disk fails to boot, so firmware falls through to the
-attached installer — no boot-order change is needed before or after
-install. The extra memory avoids the FreeDOS LiveCD's low-RAM
-warning:
+slot the install script will fill, and boot order CD then hard
+disk. **The installer medium goes first**, and the install script
+ejects it once the disk is bootable — firmware is reliably willing
+to skip an *empty* drive and nothing more, so an order written to
+fall past a disk is a bet on the host's firmware
+([the measured table](blueprint-reference.md#boot)). The extra
+memory avoids the FreeDOS LiveCD's low-RAM warning:
 
 ```json
 [
@@ -110,8 +112,8 @@ warning:
       "cdrom": null
     },
     "boot": [
-      "hdd",
-      "cdrom"
+      "cdrom",
+      "hdd"
     ]
   },
   {
@@ -130,11 +132,11 @@ media-keyed path (`disks/blank-20m.qcow2` on QEMU — the
 are Reliquary's choice, not yours). Installation itself is an
 install script's job (`insert` the LiveCD, drive the installer,
 `eject`); its outcome lands in the machine's run records — the
-blueprint and state make no claim about the guest's contents. After
-install, the same boot order boots the hard disk. Scripts that need
-a different order can use the
-[`set-boot`](spec/script-spec.md#set-boot) verb while the machine is
-stopped.
+blueprint and state make no claim about the guest's contents. Once
+the script has ejected the CD, the same boot order boots the hard
+disk past an empty optical drive. Scripts that need a different
+order can use the [`set-boot`](spec/script-spec.md#set-boot) verb
+while the machine is stopped.
 
 > **Media note:** the installer medium never appears on a drive
 > here — the empty `cdrom` slot is the convention. The install

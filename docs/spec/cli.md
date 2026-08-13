@@ -171,7 +171,7 @@ Writes `blueprints/test-rig.rlqb`:
 
 ```powershell
 rlq new-blueprint freedos --platform dos --memory 32M `
-    --hdd 20M --boot hdd,cdrom
+    --hdd 20M --boot cdrom,hdd
 ```
 
 Then edit the blueprint to declare the empty CD slot the install
@@ -185,7 +185,7 @@ script will fill (`"cdrom": null`). Resulting shape:
       "platform": "dos",
       "memory": "32M",
       "drives": {"hdd": "blank-20m", "cdrom": null},
-      "boot": ["hdd", "cdrom"]
+      "boot": ["cdrom", "hdd"]
     }
   ],
   "media": [
@@ -194,8 +194,9 @@ script will fill (`"cdrom": null`). Resulting shape:
 }
 ```
 
-(A blank hard disk falls through to an attached LiveCD; no
-boot-order change is needed after install.)
+(The installer medium boots first and the install script ejects it
+once the disk is bootable; firmware skips an empty optical drive
+everywhere, so no boot-order change is needed after install.)
 
 **Pin to a backend, with a specific machine type:**
 
