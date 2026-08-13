@@ -36,7 +36,7 @@ to this file on pledge.
 
 > **Pledged 2026-08-13** (owner), cut straight to this file by
 > **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first; no order binds it against F59. Two of these
+> delivered first, and it is the last of the sweeps. Two of these
 > modules read the repository rather than the package and live in
 > `tests/source_tree/`, which is **D105**'s isolation — the clause
 > that would have moved what they read was struck, so they assume
@@ -69,34 +69,6 @@ Work items:
 4. Same assertions and the same collected count as the run before
    the conversion. The suite is pytest-native throughout, and the
    idiom policy F55 wrote has nothing left to exempt.
-
-## F59 — The machine and backend suites are pytest-native
-
-> **Pledged 2026-08-13** (owner), cut straight to this file by
-> **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first; no order binds it against the other sweeps.
-
-Ten modules and roughly 460 tests, `test_machines` alone carrying
-182 of them. This is the cluster that builds things — temp homes,
-stub backends, machine state — so it is where fixtures earn their
-keep rather than merely replacing `setUp`.
-
-Work items:
-
-1. The shared construction becomes fixtures: the temp home, the
-   stub backend, the machine under test — each scoped so an
-   expensive one is built once rather than per method.
-2. Convert `test_machines`, `test_session`, `test_events`,
-   `test_properties`.
-3. Convert `test_backend_qemu`, `test_backend_virtualbox`,
-   `test_backends`, `test_at_rest`, `test_screen_stability`,
-   `test_text_recognize`.
-4. The two backends' shared expectations become **one parametrised
-   contract over the adapter seam** instead of paired near-identical
-   methods, so a seam requirement cannot be honored by one backend's
-   test and quietly missing from the other's (**P25**).
-5. Same assertions and the same collected count as the run before
-   the conversion.
 
 ## F54 — The scoped machine-state change
 

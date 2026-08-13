@@ -490,9 +490,10 @@ workflow:
   for that reason, and names the three pruned trees as forbidden.
 - `tests/` is the suite, and **pytest is the runner** (D106) — pytest-native where a sweep has converted a module
   (the two conformance corpora, through `tests/corpus.py`; the two integration runs, through `tests/conftest.py`;
-  the whole script-language cluster, whose static rules are now one parametrised case table),
+  the whole script-language cluster, whose static rules are now one parametrised case table; the machine and backend
+  cluster, whose two adapters answer one parametrised seam contract),
   over `unittest.TestCase` classes it collects
-  unchanged until F59 and F60 convert the rest — covering core helpers, guest program runs, lifecycle ownership,
+  unchanged until F60 converts the rest — covering core helpers, guest program runs, lifecycle ownership,
   media acquisition, blueprints, machines, and scripts. `tests/conftest.py` is the suite-wide configuration: the
   `integration` marker's `--integration` option, the deselection that keeps the tier out of a default run, and the
   home those runs work in. **`tests/source_tree/` is the exception that ships nowhere**:
@@ -931,8 +932,8 @@ Doctrine to preserve:
   `pytest --integration` asks for the tier: a marker says the tier
   was chosen, where a skip could not say whether it was chosen or
   suffered. So **any** skip is a defect to fix, not a configuration
-  to tolerate. That the two runs differ — 1,901 tests from the
-  repository, 1,887 from an sdist, two deselected in each — is the
+  to tolerate. That the two runs differ — 2,016 tests from the
+  repository, 2,002 from an sdist, two deselected in each — is the
   isolation working; neither skips. Selecting the tier on a host
   without the backend is a **failure naming the gap** (P11) and not a
   skip either: the run was asked for.
@@ -1128,9 +1129,9 @@ $env:PYTHONPATH = "src"; pytest
 ```
 
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
-unittest tests` is no longer the entry point, and already misses the converted modules — the rest follow as F59 and F60
-land. It was taken because pytest is packaged everywhere a packager works. Expect **1,887 tests, two deselected and none
-skipped**, against the repository's 1,901 ("Test expectations", above): the difference is `tests/source_tree/`, which
+unittest tests` is no longer the entry point, and already misses the converted modules — the rest follow as F60 lands.
+It was taken because pytest is packaged everywhere a packager works. Expect **2,002 tests, two deselected and none
+skipped**, against the repository's 2,016 ("Test expectations", above): the difference is `tests/source_tree/`, which
 ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
 integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
 `rlq --version` and an import — since it carries no suite to run.
@@ -1193,6 +1194,18 @@ no unit test may probe or launch a real backend:
 - the machine model hands the adapter a resolved state and gets an identity back: no
   backend argument is composed above the seam, and no port is read there
 
+**What every *built* adapter owes the seam is one parametrised contract**
+(`tests/test_backend_contract.py`, F59) rather than a near-identical method in each
+backend's own module: the name it answers to everywhere, the capability report, its
+image extension, discovery found and absent, the host font it reads and caches, and the
+refusal to command a VM whose recorded identity does not match. Each check is a node per
+backend, so a requirement cannot be honored by QEMU's tests and quietly missing from
+VirtualBox's (**P25**). A **driver** is all a backend contributes — where its executable
+is found, where its font lives, how a mismatched stop is aimed — so a third adapter
+inherits the contract by adding one rather than by copying a file. What stays in
+`test_backend_qemu` / `test_backend_virtualbox` is what only that backend knows: qcow2
+against VDI, argv against `VBoxManage` verbs, QMP against scancodes.
+
 Milestone-9 guarantees needing the same care:
 
 - every deliberate error subclasses `ReliquaryError`, and the four run-surface classes exit 2/3/4/5
@@ -1222,22 +1235,32 @@ The stdlib preference stands everywhere else — pytest is one dependency
 judged compelling, not the bar lowered.
 
 The remaining `TestCase` classes are collected unchanged and convert
-under **F59 and F60**, module by module — F56 took the two conformance
+under **F60**, module by module — F56 took the two conformance
 corpora, which is where the shared parametrisation helper
 (`tests/corpus.py`) lives, F57 the two integration runs, which
-needed a fixture the older idiom cannot be given, and F58 the seven
-script-language modules. Until a module's turn comes, extend it in
+needed a fixture the older idiom cannot be given, F58 the seven
+script-language modules, and F59 the ten machine and backend ones.
+Until a module's turn comes, extend it in
 the idiom it is written in: a module half in each is worse than a module
 in the older one, and the sweep that converts it is where the count is
 checked against the run before it.
 
 **A sweep keeps the count except where it deliberately raises it**, and
 the exceptions are the reason for converting: a `subTest` loop becomes
-one node per case, and a rule table becomes one node per rule. F58 is
-the worked example — the script-language cluster's 350 tests became
-426, every one of the 76 either the V-rule table or a `subTest` loop
-that stopped hiding its cases, with no assertion added or dropped. A
-count that moved for any *other* reason is a lost test.
+one node per case, and a table becomes one node per row. F58 is the
+worked example — the script-language cluster's 350 tests became 426,
+every one of the 76 either the V-rule table or a `subTest` loop that
+stopped hiding its cases, with no assertion added or dropped; F59's
+460 became 575 the same way, the veneer roster and the fixture
+directory among the tables that stopped reporting one pass for all
+their rows. A count that moved for any *other* reason is a lost test.
+
+**A flattened module's function names are its collision surface.** Two
+`TestCase` classes may each hold a `test_a_running_machine_is_refused`;
+at module level the second silently replaces the first and the count
+drops by one. A sweep checks the count per module for exactly this,
+and a name that has to differ says what it is about rather than
+gaining a suffix.
 
 **A static rule is exercised from a case table, not a method per rule**
 (`test_script_validation.py`): each case names the rule it drives and is

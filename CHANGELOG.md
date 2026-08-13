@@ -118,6 +118,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The machine and backend suites are pytest-native** (F59, over
+  F55; D106). Ten modules — machines, the session veneer, events,
+  properties, both backend adapters, the seam, at-rest, screen
+  stability, and the recognizer. The shared construction is fixtures
+  now: one `rig` builds the temp home, the adapter double and the
+  blueprint writers the machine layer needs, so a test says what it
+  is about rather than how its home was built. **No assertion
+  changed**, and the suite reports **2,016 tests where it reported
+  1,901**.
+
+  **The two backends answer one contract** rather than paired
+  near-identical methods (**P25**). What every built adapter owes the
+  seam — the name it answers to everywhere, the capability report,
+  the image extension, discovery found and absent, the host font it
+  reads and caches, and the refusal to command a VM whose recorded
+  identity does not match — is written once and run against each
+  backend, so a requirement cannot be honored by QEMU's tests and
+  quietly missing from VirtualBox's. A backend contributes a
+  **driver** — where its executable is found, where its font lives,
+  how a mismatched stop is aimed — and a third adapter inherits the
+  whole contract by adding one.
+
 - **The script-language suite is pytest-native** (F58, over F55;
   D106). Its seven modules — the runner, the parser, the node layer,
   validation, timing, labeled wiring, and the dry run — are bare
@@ -203,7 +225,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   time — on platforms and interpreters this project never tests,
   which is the whole of what shipping it buys. Unpack
   `reliquary-<version>.tar.gz` outside the tree, put `src` on
-  `PYTHONPATH`, and `pytest` runs **1,887 tests and deselects two** —
+  `PYTHONPATH`, and `pytest` runs **2,002 tests and deselects two** —
   the opt-in FreeDOS integration runs, one per backend, exactly as in
   the repository.
 
