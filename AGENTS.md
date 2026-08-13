@@ -488,8 +488,9 @@ workflow:
   `docs` and `tests/source_tree`. The suite is grafted whole rather than left to setuptools' default rules, which take
   top-level `tests/*.py` and none of the fixture trees beneath it — `tools/check_dist.py` names those trees one by one
   for that reason, and names the three pruned trees as forbidden.
-- `tests/` is the suite, and **pytest is the runner** (D106) — over `unittest.TestCase` classes it collects
-  unchanged until F56–F60 convert them — covering core helpers, guest program runs, lifecycle ownership,
+- `tests/` is the suite, and **pytest is the runner** (D106) — pytest-native where a sweep has converted a module
+  (the two conformance corpora, through `tests/corpus.py`), over `unittest.TestCase` classes it collects
+  unchanged until F57–F60 convert the rest — covering core helpers, guest program runs, lifecycle ownership,
   media acquisition, blueprints, machines, and scripts. **`tests/source_tree/` is the exception that ships nowhere**:
   the tests that read the *repository* rather than the package — prose documents, the maintainer records, the
   open-problem catalogue. Shipped, a sweep over `docs/` and `AGENTS.md` would find neither and report success on a
@@ -603,6 +604,21 @@ workflow:
   directions so it retires itself when the id lands; that count is
   the live measurement behind D55. Each corpus has its own README,
   which is where its findings live.
+- **A corpus is worth what its harness can prove ran**, which is why
+  both read through one helper — `tests/corpus.py` (F56). Every
+  fixture is a **collected node named for its file**, in every check
+  that judges it, and each bucket's count is **pinned where the
+  fixtures are gathered**, so a bucket that stops loading is a
+  collection error rather than a green run over nothing. That is the
+  defect D106 was decided on: the blueprint corpus ran against the
+  parser and *not* the schema while claiming the two cannot drift,
+  because a loop of fixtures inside one `subTest` test reports the
+  same single pass whether it checked all of them or half. A check
+  that partitions a bucket by a marker is the same failure in
+  miniature, so `// warns:` and `// schema: rejects` are each asserted
+  in both directions by **one** check over the whole bucket rather
+  than by two over its halves. A third corpus inherits all of it by
+  calling the same two functions.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no
@@ -910,7 +926,7 @@ Doctrine to preserve:
   `RELIQUARY_INTEGRATION`. Any other skip is a defect to fix, not a
   configuration to tolerate, and the two move only when an
   integration run is added or retired. That the two runs differ —
-  1,310 tests from the repository, 1,296 from an sdist — is the
+  1,827 tests from the repository, 1,813 from an sdist — is the
   isolation working; the skips do not differ. A guard that survives
   is one whose resource is genuinely optional, and it says which.
 - Pillow is the image library: screenshot conversion uses it, and the
@@ -1102,11 +1118,11 @@ $env:PYTHONPATH = "src"; pytest
 ```
 
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
-unittest tests` is no longer the entry point, and stops running the suite at all as F56–F60 land. It was taken because
-pytest is packaged everywhere a packager works. Expect **1,296 tests and the same two skips** as the repository's 1,310
-("Test expectations", above): the difference is `tests/source_tree/`, which ships nowhere, and a *skip* there is a
-defect exactly as it is here. Install the wheel into a clean environment and check it by using it — `rlq --version` and
-an import — since it carries no suite to run.
+unittest tests` is no longer the entry point, and already misses the converted modules — the rest follow as F57–F60 land.
+It was taken because pytest is packaged everywhere a packager works. Expect **1,813 tests and the same two skips** as the
+repository's 1,827 ("Test expectations", above): the difference is `tests/source_tree/`, which ships nowhere, and a
+*skip* there is a defect exactly as it is here. Install the wheel into a clean environment and check it by using it —
+`rlq --version` and an import — since it carries no suite to run.
 
 **Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
 no CI (P22) there is no trusted-publishing path, so it takes a token
@@ -1192,11 +1208,19 @@ library, the runner is what pytest replaced, and nothing supersedes it.
 The stdlib preference stands everywhere else — pytest is one dependency
 judged compelling, not the bar lowered.
 
-The standing `TestCase` classes are collected unchanged and convert under
-**F56–F60**, module by module. Until a module's turn comes, extend it in
+The remaining `TestCase` classes are collected unchanged and convert
+under **F57–F60**, module by module — F56 took the two conformance
+corpora, which is where the shared parametrisation helper
+(`tests/corpus.py`) lives. Until a module's turn comes, extend it in
 the idiom it is written in: a module half in each is worse than a module
 in the older one, and the sweep that converts it is where the count is
 checked against the run before it.
+
+**A corpus of fixture files reads through `tests/corpus.py`** rather
+than growing its own glob: `fixtures` pins the bucket's count at
+collection and `parametrize` names each node for its file. A check over
+a vocabulary the *package* declares — a schema's phase enum — is not a
+corpus and parametrises directly.
 
 ## Documentation maintenance
 

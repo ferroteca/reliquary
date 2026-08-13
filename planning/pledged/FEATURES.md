@@ -36,7 +36,7 @@ to this file on pledge.
 
 > **Pledged 2026-08-13** (owner), cut straight to this file by
 > **D106**. Demanded by **P11** on D106's reading. Needs **F55**
-> delivered first; no order binds it against F56–F59. Assumes
+> delivered first; no order binds it against F57–F59. Assumes
 > **D105**'s catalogue move has landed, since two of these modules
 > read it.
 
@@ -97,10 +97,10 @@ Work items:
 > **D106**. Demanded by **P11** on D106's reading. Needs **F55**
 > delivered first; no order binds it against the other sweeps.
 
-Eight modules and roughly 360 tests — the largest single cluster,
+Seven modules and roughly 350 tests — the largest single cluster,
 and the one where parametrisation pays past the conversion itself.
 The static validation rules are a table pretending to be a method
-list, and the script corpus is a directory pretending to be one.
+list.
 
 Work items:
 
@@ -111,8 +111,8 @@ Work items:
    than a method per rule, so a rule added to the language without a
    test is visible as a missing case instead of an absence nobody
    counts.
-3. `test_script_corpus` reads through the parametrisation helper
-   F56 builds, rather than growing a second one.
+3. A corpus of fixture files reads through `tests/corpus.py`, the
+   shared helper, rather than growing a second one.
 4. Same assertions and the same collected count as the run before
    the conversion.
 
@@ -140,30 +140,6 @@ Work items:
    rather than skipped, and any surviving skip a defect as before.
 4. The integration command blocks in AGENTS.md fold to the marker
    selection.
-
-## F56 — The conformance corpus is parametrised
-
-> **Pledged 2026-08-13** (owner), cut straight to this file by
-> **D106**, whose whole argument this is. Demanded by **P11**. Needs
-> **F55** delivered first.
-
-The corpus claims the parser and the schema cannot drift. It once
-ran against the parser and **not** the schema and nothing said so,
-because 135 fixtures across two checks inside `subTest` is a run
-whose halved form looks exactly like its whole one. Parametrised,
-the fixtures are collected nodes and the count is the assertion.
-
-Work items:
-
-1. Every fixture becomes a collected node named for its file,
-   across both the parser check and the schema check.
-2. **The collected count is asserted**, so a corpus that stops
-   loading fails rather than passing quietly.
-3. The blueprint, machine-state and script corpora read through
-   **one** parametrisation helper, not three — the helper F58's
-   corpus item also uses.
-4. The corpus READMEs say what a fixture's node is called, since
-   selecting one by name is now how a failing fixture is debugged.
 
 ## F54 — The scoped machine-state change
 

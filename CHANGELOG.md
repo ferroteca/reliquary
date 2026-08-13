@@ -123,8 +123,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a hard requirement of it, and `python -m unittest tests` stops being
   the entry point. **No test changed**: pytest collects the standing
   `unittest.TestCase` classes unchanged, `unittest.mock` remains the
-  mocking library, and the run is the same 1,310 tests with the same
-  two skips as before it.
+  mocking library, and the run was the same tests with the same two
+  skips as before it.
 
   The runner is what the stdlib could not say. A conformance corpus of
   135 fixtures inside `subTest` once ran against the parser and *not*
@@ -138,13 +138,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pytest floor. The suite ships in the sdist (D105), so it must not
   collect differently in a packager's environment than it does here.
 
+- **The conformance corpora are parametrised** (F56, over F55; D106).
+  Every fixture under `tests/fixtures/conformance/` is a collected
+  node **named for its file**, in each check that judges it, and each
+  bucket's count is **pinned where the fixtures are gathered**. A
+  corpus that stops loading is now a collection error rather than a
+  green run over nothing, and a fixture being fixed is run on its own
+  by name — `pytest tests/test_script_corpus.py -k v7-no-condition`.
+
+  This is the defect the runner was changed for. The blueprint corpus
+  ran against the parser and *not* the schema while claiming the two
+  cannot drift, because a loop of fixtures inside one `subTest` test
+  reports the same single pass whether it checked all of them or half.
+  A check that **partitions** a bucket by a marker is the same failure
+  in miniature, so `// warns:` and `// schema: rejects` are each
+  asserted in both directions by one check over the whole bucket
+  rather than by two over its halves.
+
+  Both corpora read through one helper, `tests/corpus.py`, rather than
+  a glob apiece — the guarantee belongs to the harness, not to a
+  document format, and a third corpus inherits it by calling the same
+  two functions. The suite reports **1,827 tests where it reported
+  1,310**, with the same two skips: the checks are the ones it was
+  already making, and what changed is how many of them a run can prove
+  it made.
+
 - **The source distribution carries the test suite again** (D105).
   An sdist is the artifact a stranger builds *and verifies* from,
   and downstream packagers run the upstream suite at package-build
   time — on platforms and interpreters this project never tests,
   which is the whole of what shipping it buys. Unpack
   `reliquary-<version>.tar.gz` outside the tree, put `src` on
-  `PYTHONPATH`, and `pytest` runs **1,296 tests with two skips** —
+  `PYTHONPATH`, and `pytest` runs **1,813 tests with two skips** —
   the opt-in FreeDOS integration runs, one per backend, exactly as in
   the repository.
 

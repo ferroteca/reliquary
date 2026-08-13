@@ -28,6 +28,29 @@ exactly its reason: a rule needing a resolved value would fail a
 parse-time assertion for the wrong reason, and separating it is
 honester than weakening it.
 
+## One fixture, one node
+
+Every fixture is a collected pytest node **named for its file**, in
+each check that judges it —
+`test_a_rejection_carries_the_id_the_fixture_declares[v7-two-conditions.rlqs]`.
+So a fixture is run on its own while it is being fixed, in every
+check at once:
+
+```powershell
+uv run pytest tests/test_script_corpus.py -k v7-two-conditions
+```
+
+The naming is the assertion rather than presentation: a loop of
+fixtures inside one `subTest` test reports the same single pass
+whether it checked all of them or half, which is how the blueprint
+corpus came to run against the parser and not the schema
+([D106](../../../../planning/DECISIONS.md)). Both corpora gather
+their fixtures through one helper, `tests/corpus.py`, which is also
+where the bucket counts are pinned — 17, 46 and 4 — so a bucket that
+stops loading is a collection error rather than a green run over
+nothing. Adding or retiring a fixture updates the pin and the tallies
+here together.
+
 ## What generalized, and what got stronger
 
 The shape transferred without argument — buckets, headers naming
@@ -68,7 +91,7 @@ defect left open, answered by trying the coarse version first.
 ## What the corpus measured on the way
 
 It opened with four fixtures that could not name their rule and
-now has none: all 39 name the diagnostic that rejects them. The
+now has none: all 46 name the diagnostic that rejects them. The
 corpus was written first and the ids followed, which is the order
 that made them right — see below.
 

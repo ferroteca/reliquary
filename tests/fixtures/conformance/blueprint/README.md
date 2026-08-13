@@ -35,6 +35,31 @@ fail a parse-time assertion for the wrong reason, so it is separated
 rather than quietly weakened. It needs the resolve harness, not the
 parse harness, and the published schema cannot judge it at all.
 
+## One fixture, one node
+
+Every fixture is a collected pytest node **named for its file**, in
+each check that judges it —
+`test_a_valid_fixture_parses[children-batch.rlqb]`,
+`test_the_schema_rejects_exactly_what_the_fixture_declares[ref-in-platform.rlqb]`.
+So a fixture is run on its own while it is being fixed, in every check
+at once:
+
+```powershell
+uv run pytest tests/test_conformance_corpus.py -k children-batch
+```
+
+That naming is not presentation. This corpus once ran against the
+parser and **not** the schema while claiming the two cannot drift,
+because a loop of fixtures inside one `subTest` test reports the same
+single pass whether it checked all of them or half ([D106](../../../../planning/DECISIONS.md)).
+A node per fixture per check is what makes the count the assertion.
+
+The bucket counts are pinned where the fixtures are gathered
+(`tests/corpus.py`, the helper both corpora read through) — 23, 47 and
+2 — so a bucket that stops loading is a collection error rather than a
+green run over nothing. Adding or retiring a fixture updates the pin
+and the tallies in this README together.
+
 ## Fixture headers
 
 Every fixture opens with comment lines naming what it exercises and
@@ -48,9 +73,10 @@ where the rule lives:
 ```
 
 A `// warns:` line marks a fixture that is **valid but must emit a
-warning** — currently the one name-repair case. There is no warning
-assertion yet; adding one is part of that third stage, and the header
-is the record of what it must say.
+warning** — currently the one name-repair case. It is asserted in both
+directions by one check over the whole bucket: a fixture declaring it
+must warn, and every other valid fixture must parse silently. What the
+warning *says* is still the header's record rather than an assertion.
 
 **The headers are assertions now.** They were documentation, and this
 README said so, because an invalid fixture failing for the *wrong*
