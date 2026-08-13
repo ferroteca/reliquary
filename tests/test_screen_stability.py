@@ -249,6 +249,125 @@ class ScreenStabilityTests(unittest.TestCase):
 
         self.assertFalse(reading.stable)
         self.assertIsNone(reading.stability)
+        # Young, not blind: two more samples fix this one.
+        self.assertFalse(reading.blind)
+
+
+class CadenceBlindnessTests(unittest.TestCase):
+    """Decoration needs samples the caller may not be able to take.
+
+    Recurrence is `animation_repeats` changes inside
+    `animation_window`, and a change is only recorded at a sample —
+    so a caller polling more slowly than that can never accumulate
+    them. A screenshot backend costs ~0.83s a read, which is the
+    cadence these use.
+    """
+
+    def _blinking(self):
+        """Frames of a screen whose only motion is a blinking bar."""
+        frames = []
+        for step in range(10):
+            screen = _Screen().write(0, 0, "Do you want to proceed?")
+            screen.write(10, 0, "Yes - Continue with the installation")
+            if step % 2:
+                screen.highlight(10)
+            frames.append(screen.frame())
+        return frames
+
+    def test_the_minimum_viable_cadence_is_stated_not_assumed(self):
+        # repeats samples must fit the window, with the margin's room
+        # to spare, so the defaults demand a read every ~0.17s.
+        self.assertAlmostEqual(screen_stability.viable_cadence(), 1.0 / 6)
+        # And the inverse: what a 0.83s reader needs to keep the guard.
+        self.assertAlmostEqual(screen_stability.viable_window(0.83), 4.98)
+
+    def test_a_dense_poll_keeps_the_default_window(self):
+        monitor = screen_stability.ScreenStability()
+
+        reading = _observe(monitor, self._blinking(), cadence=0.1)
+
+        self.assertEqual(monitor.animation_window(),
+                         screen_stability.DEFAULT_ANIMATION_WINDOW)
+        self.assertTrue(reading.stable)
+        self.assertFalse(reading.blind)
+        self.assertTrue(reading.animated)
+
+    def test_a_sparse_poll_widens_the_window_and_keeps_the_guard(self):
+        # The same screen at a screenshot backend's cost. Recurrence
+        # is measured over the span this caller can observe, so the
+        # blink is still recognized as decoration rather than scored
+        # as content forever.
+        monitor = screen_stability.ScreenStability()
+
+        reading = _observe(monitor, self._blinking(), cadence=0.83)
+
+        self.assertGreater(monitor.animation_window(), 4.0)
+        self.assertTrue(reading.stable)
+        self.assertFalse(reading.blind)
+        self.assertTrue(reading.animated)
+
+    def test_the_window_never_grows_past_its_cap(self):
+        monitor = screen_stability.ScreenStability()
+
+        _observe(monitor, self._blinking(), cadence=3.0)
+
+        self.assertEqual(monitor.animation_window(),
+                         screen_stability.MAX_ANIMATION_WINDOW)
+
+    def test_a_cadence_past_the_cap_is_answered_as_blind(self):
+        # Widening is tried first; blindness is what is left when even
+        # the capped window cannot hold `repeats` samples.
+        reading = _observe(screen_stability.ScreenStability(),
+                           self._blinking(), cadence=3.0)
+
+        self.assertTrue(reading.blind)
+        self.assertIsNone(reading.stability)
+
+    def test_blindness_is_never_claimed_before_a_cadence_is_known(self):
+        # One sample is a young monitor, not a slow caller, and
+        # calling it blind would stand the guard down on every run's
+        # opening read. Two samples is the whole evidence needed:
+        # nothing later can make a hopeless cadence workable.
+        monitor = screen_stability.ScreenStability()
+        frames = self._blinking()
+
+        first = monitor.observe(frames[0], now=0.0)
+        self.assertIsNone(monitor.cadence())
+        self.assertFalse(first.blind)
+
+        second = monitor.observe(frames[1], now=3.0)
+        self.assertEqual(monitor.cadence(), 3.0)
+        self.assertTrue(second.blind)
+
+    def test_an_idle_backoff_is_not_mistaken_for_a_slow_caller(self):
+        """The regression the capability rule exists to prevent.
+
+        The script runtime polls densely while a screen moves and
+        backs off to 2s once it settles. Counting samples in the last
+        window would read that backoff as blindness and stand the
+        guard down exactly when the next redraw arrives.
+        """
+        screen = _Screen().write(0, 0, "C:\\>")
+        monitor = screen_stability.ScreenStability()
+        for step in range(5):
+            monitor.observe(screen.frame(), now=0.1 * step)
+
+        backed_off = monitor.observe(screen.frame(), now=2.4)
+
+        self.assertFalse(backed_off.blind)
+        self.assertEqual(monitor.cadence(), 0.1)
+
+    def test_a_static_screen_still_settles_at_a_sparse_poll(self):
+        # Blindness is about decoration alone: with nothing moving
+        # there is nothing to mask, and the verdict stands.
+        screen = _Screen().write(0, 0, "C:\\>")
+
+        reading = _observe(screen_stability.ScreenStability(),
+                           [screen.frame()] * 6, cadence=0.83)
+
+        self.assertTrue(reading.stable)
+        self.assertEqual(reading.stability, 1.0)
+        self.assertFalse(reading.blind)
 
 
 if __name__ == "__main__":

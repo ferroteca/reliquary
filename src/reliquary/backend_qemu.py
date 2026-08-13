@@ -611,6 +611,12 @@ class QemuSession:
 
     backend = "qemu"
 
+    #: `text_screen` here reads characters the guest already resolved
+    #: out of VGA text memory — no interpretation, and cheap enough
+    #: that a caller may quantize its cadence finely
+    #: (`screen_stability.TEXT_CADENCE_STEP`).
+    recognizes_text = False
+
     def __init__(self, qmp):
         self._qmp = qmp
 

@@ -48,6 +48,13 @@ TRANSFER_PROGRESS = "transfer.progress"
 TRANSFER_END = "transfer.end"
 VERIFY_START = "verify.start"
 VERIFY_END = "verify.end"
+#: The quiescence guard reporting the cadence it measured and the
+#: window that cadence earned — emitted once, the first time a run
+#: knows them. It is the one thing about the guard a reader cannot
+#: infer: `stability=` is authored, but whether the host can *honor*
+#: it is discovered, and a guard that quietly stood down would
+#: otherwise look identical to one that passed.
+GUARD_CADENCE = "guard.cadence"
 FAILURE = "failure"
 
 #: Every kind above, so a test can compare what is declared with
@@ -60,7 +67,7 @@ KINDS = (
     OBSERVATION_ARM, OBSERVATION_MATCH, OBSERVATION_TIMEOUT,
     HANDLER_FIRE, ACTION_START, ACTION_END,
     TRANSFER_START, TRANSFER_PROGRESS, TRANSFER_END,
-    VERIFY_START, VERIFY_END, FAILURE,
+    VERIFY_START, VERIFY_END, GUARD_CADENCE, FAILURE,
 )
 
 _TIMESTAMP = "%Y-%m-%dT%H:%M:%S"

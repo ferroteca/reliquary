@@ -323,6 +323,46 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The quiescence guard sizes itself to the cadence it measures.**
+  Decoration is recognized by recurrence — three changes to a cell
+  inside a one-second window — which was a sample count wearing a
+  clock's clothes: a caller reading once per 0.83s fits two samples
+  in that window and can never reach three, so the mask stayed
+  empty, a blinking bar scored as content, and the screen never read
+  settled however long anyone waited. Measured at 0.98 on a
+  synthetic blink against a 0.99 gate, and 0.944 / 0.917 on a live
+  guest.
+
+  The **minimum viable cadence** is now stated rather than assumed
+  (`viable_cadence`, `viable_window`): with the built-in window and
+  a 100% safety margin, one read every ~0.17s. Measured against it,
+  a VGA text scrape costs 16ms or less and a screenshot interpreted
+  through a glyph bank ~0.83s — an order of magnitude apart, and
+  five times the requirement. So the window **widens** to what the
+  observed cadence can see, after rounding that cadence *up* to the
+  grid its noise justifies (1s where screens are interpreted, 0.1s
+  where they are scraped, since a window resized on jitter would
+  judge two identical runs differently). Cadence is the *fastest*
+  gap seen, not the average: the runtime backs off to a 2s idle poll
+  once a screen settles, and averaging that in would widen the
+  window and mask the very redraw the next dense pass exists to
+  catch.
+
+  Past `MAX_ANIMATION_WINDOW` the widening stops, because "changed
+  three times recently" would stop describing decoration and start
+  describing a screen painted in stages. A cadence that cannot be
+  accommodated there reports `Reading.blind` and the gate **stands
+  down** — every sample is judged, as before the gate existed —
+  because a guard with no verdict must not refuse, and blocking
+  would be a deadlock rather than caution. "The gate never causes a
+  failure on its own" now holds at every cadence.
+
+  Reported once per run on the stream (`guard.cadence`): the cadence
+  measured, the window it earned, and whether the gate stood down. A
+  guard that quietly went inactive would otherwise be
+  indistinguishable from one that passed. Normative in
+  [the script spec](docs/spec/script-spec.md) under `stability`.
+
 - **A guest screen is read through the guest's own font.** The
   recognizer's only production consumer is VirtualBox, and the bank it
   read through is curated from the host *QEMU* vgabios. Nineteen of

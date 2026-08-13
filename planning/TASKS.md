@@ -127,59 +127,34 @@ not keep.
 
 ### Defects
 
-All four were found by running the opt-in FreeDOS VirtualBox
-integration against a live hypervisor for the first time
-(2026-08-13). Two of the four were fixed in that sitting and are
-therefore not here — the unreadable-framebuffer abort and the menu
-bar located by rarity — as a queue holds only what waits.
+Found by running the opt-in FreeDOS VirtualBox integration against
+a live hypervisor for the first time (2026-08-13). What was fixed
+in that sitting is not here — the unreadable-framebuffer abort, the
+menu bar located by rarity, the wrong glyph bank, and the
+quiescence guard's cadence dependence — as a queue holds only what
+waits.
 
-#### T18 — Decoration is unrecognizable at a screenshot backend's cadence
+#### T22 — A VirtualBox guest never reaches its second boot device
 
-`screen_stability` masks a cell as decoration after
-`DEFAULT_ANIMATION_REPEATS` (3) changes within
-`DEFAULT_ANIMATION_WINDOW` (1.0s). A VirtualBox screen read costs
-**~0.83s** — a `screenshotpng` round trip plus full-frame
-recognition, measured through the real seam — so two samples fit
-in that window and a third change never accumulates. A blinking
-element therefore never enters the mask, and it holds stability
-under the 0.99 gate **permanently**: the wait can never proceed,
-however long its timeout.
+After FreeDOS repartitions and reboots, the guest stops at the
+BIOS's `No active partition. Trying next boot device...` and stays
+there — confirmed still on that line minutes after the run gave up,
+so it is hung rather than slow. The freshly partitioned disk has no
+active partition yet, which is expected; what does not happen is
+the fallthrough to the CD that the same script gets on QEMU.
 
-Measured both ways rather than argued. A synthetic 40-cell blink
-at a 0.1s poll masks 40 cells and reads `stability=1.0, stable`;
-the same blink at 0.83s masks **0** and reads `0.98, not stable`,
-forever. On the live guest it expired at `0.944` on the installer
-welcome screen and `0.917` on the post-reboot boot.
+**Now the last blocker on the FreeDOS VirtualBox integration**, and
+the first one that is not about reading the screen: the run drives
+the boot menu, the language chooser, the installer welcome, the
+partition prompt, partitioning and the reboot, and dies at the
+BIOS. Suspicion is the boot order the adapter renders — `_boot_order`
+maps Reliquary's keys onto `--bootN` and a create resolves a
+best-guess order — or the CD attachment not surviving the restart.
+Neither is confirmed; the screen is the only evidence so far.
 
-**This is the sample-count dependence the wall-clock window
-exists to refuse**, surviving in the repeat count. The module's
-own docstring states the intent — a denser run "would reach any
-sample count sooner, which is the cadence dependence the window
-definition exists to refuse" — and then requires three samples
-inside the window, which is a cadence requirement in disguise. The
-threshold half was made cadence-free; the recurrence half was not.
-
-Two shapes, and the second is the one the module's philosophy
-points at. **Scale the horizon** to the observed cadence, so
-recurrence is still measured over the clock but over one a sparse
-caller can actually observe — cheap, and it risks masking a slow
-*content* change as decoration. Or **report that decoration could
-not be assessed** and let the gate stand down, which is P11's
-answer and matches "a window never observed answers
-`stability=None` rather than a verdict the cadence produced". The
-second needs `script_runner._settled` to stop reading "could not
-measure" as "refuse", and that collides with the pinned tests
-pricing quiescence at one window — so the young-monitor case has
-to be told apart from the sparse-cadence one, which is the whole
-design problem.
-
-**F52's remaining claim rides on this.** With it fixed the FreeDOS
-VirtualBox integration is the thing that says whether
-`capabilities().agentless_display` and `pledged/USE-CASES.md`'s
-"delivered" are earned; until then the CHANGELOG's F52 entry
-carries the gap. The run currently reaches the installer's
-partitioning reboot, so what remains untested is the second half
-of the install, not the plane.
+Worth ruling out first, cheaply, by reading the VM's own
+`showvminfo` boot order and storage attachments after the reboot
+and comparing them against what the machine state records.
 
 #### T19 — A machine whose VM died out of band can be neither stopped nor destroyed
 

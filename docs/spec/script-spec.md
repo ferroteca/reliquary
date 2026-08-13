@@ -1295,6 +1295,11 @@ activation (the phase deadline's scope), a span per observation
   fetch bytes, `select` traversal
   steps — never invented denominators: renderers show phases and
   observations as "elapsed / limit" pairs, not progress bars;
+- once, when a run first knows them: the **quiescence guard's**
+  measured cadence, the decoration window that cadence earned, and
+  whether the gate stood down for want of one it could observe
+  (`guard.cadence`, above under `stability`) — measured rather than
+  configured, so it cannot be reported before a screen is read;
 - on failure: the pending condition or action, the expired clock
   and its source scope, the route taken with phase revisit
   counts, the nearest-miss screen row, the reason the last screen
@@ -1611,6 +1616,51 @@ The four families scope differently, and placement is the law:
   observation that carries it, which is the escape for a screen the
   default refuses; it is legal precisely because it costs nothing,
   not even the window establishing quiescence would take.
+
+  **A slower cadence may be imposed, and the host decides — not the
+  script.** The gate has a second, unwritten requirement: telling
+  decoration from content is *recurrence*, a cell changing three
+  times inside the decoration window, and a change is only ever
+  recorded at a sample. So the guard needs a **minimum viable
+  cadence** — with the built-in one-second window and its safety
+  margin, one screen read every ~0.17s. A script cannot ask for
+  this and cannot waive it; it is a property of how the machine's
+  backend reads a screen.
+
+  Two reading paths, and they are an order of magnitude apart.
+  Where the backend has VGA text memory the guest has already
+  resolved its characters and a read is effectively free — measured
+  at **16ms or less**, comfortably inside the requirement. Where
+  the screen must be **interpreted from a framebuffer** — the
+  GUI-only case, a screenshot decoded and matched against a glyph
+  bank — a read costs the better part of a second, measured at
+  **~0.83s**, roughly five times the minimum. Such a run therefore
+  has a slower cadence imposed on it by the host, and the runtime
+  adapts rather than pretending otherwise:
+
+  - the measured cadence is rounded **up** — to the nearest second
+    where screens are interpreted, to 0.1s where they are scraped,
+    since the two paths' jitter differs by that much and a window
+    resized on noise would judge two identical runs differently;
+  - the decoration window **widens** to what that cadence can
+    observe, so the guard keeps working instead of switching off,
+    and inside the wider window a slow reader recognizes exactly
+    the decoration a fast one does;
+  - past a cap the window stops widening, because "changed three
+    times recently" would stop describing decoration and start
+    describing a screen painted in stages. A cadence that cannot be
+    accommodated inside the cap **stands the gate down** for the
+    run: every sample is judged, as it was before the gate existed.
+    The gate never causes a failure on its own, and that holds at
+    every cadence.
+
+  **The run says which happened**, once, on the event stream
+  (`guard.cadence`; [the stream's vocabulary](#the-run-stream)) —
+  naming the cadence measured, the window it earned, and whether
+  the gate stood down. A guard that quietly went inactive would
+  otherwise be indistinguishable from one that passed, and an
+  author who wrote `stability=` would have no way to learn the host
+  could not honor it.
 
 Where each word may appear, and what it means there — any other
 placement is a parse error:

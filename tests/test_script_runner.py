@@ -992,6 +992,23 @@ class FailureReportTests(_RuntimeCase):
         self.assertIn("640x480", failure["unreadable-screen"])
         self.assertNotIn("nearest-miss", failure)
 
+    def test_the_guard_reports_its_cadence_once(self):
+        """A guard that stood down must not look like one that passed."""
+        engine = self.engine('timeout 10s\nwait "never"\n',
+                             screens=[["nothing"]])
+        with self.whole_run(), \
+                mock.patch("reliquary.script_runner.screenshot"):
+            with self.assertRaises(ScriptRuntimeError):
+                engine.run()
+        guards = [event for event in engine.events.events
+                  if event["kind"] == "guard.cadence"]
+
+        self.assertEqual(len(guards), 1)
+        self.assertIn("cadence", guards[0])
+        self.assertIn("window", guards[0])
+        self.assertFalse(guards[0]["blind"])
+        self.assertFalse(guards[0]["recognized"])
+
     def test_the_report_suggests_a_next_command(self):
         _engine, by_kind = self._failed_run(
             'timeout 10s\nwait "never"\n', [["nothing"]])

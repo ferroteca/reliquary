@@ -163,11 +163,33 @@ def describe(event):
             return (f"{fields.get('name')}: {_bytes(moved)} / "
                     f"{_bytes(total)}")
         return f"{fields.get('name')}: {_bytes(moved)}"
+    if kind == _events.GUARD_CADENCE:
+        return _guard_report(fields)
     if kind == _events.FAILURE:
         return _failure_report(fields)
     if kind == _events.RUN_END:
         return _terminal_report(fields)
     return None
+
+
+def _guard_report(fields):
+    """One line naming the cadence measured and what it bought.
+
+    Said plainly because the alternative is silence: a run whose
+    guard stood down looks exactly like one whose guard passed, and
+    the author who wrote `stability=` has no other way to learn the
+    host could not honor it.
+    """
+    cadence = fields.get("cadence")
+    window = fields.get("window")
+    reading = "interpreted" if fields.get("recognized") else "scraped"
+    if fields.get("blind"):
+        return (f"quiescence guard inactive: screens {reading} every "
+                f"{cadence}s, too slow to tell decoration from content "
+                f"(needs one every {fields.get('viable')}s); "
+                "waits judge every sample")
+    return (f"quiescence guard: screens {reading} every {cadence}s, "
+            f"decoration measured over {window}s")
 
 
 def _failure_report(fields):

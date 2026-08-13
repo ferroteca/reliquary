@@ -516,6 +516,12 @@ def scancodes_for(combo):
 class VirtualBoxSession:
     """Identity-verified session with agentless-display carriers (F52)."""
 
+    #: This session's `text_screen` interprets a framebuffer rather
+    #: than reading resolved characters, which costs the better part
+    #: of a second and sets how coarsely a caller may quantize its
+    #: cadence (`screen_stability.GUI_CADENCE_STEP`).
+    recognizes_text = True
+
     def __init__(self, vm_uuid, name, drives=None, cache=None):
         self.backend = "virtualbox"
         self._uuid = vm_uuid

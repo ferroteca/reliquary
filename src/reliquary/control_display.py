@@ -285,6 +285,13 @@ class DisplayConsole:
 
     def __init__(self, session):
         self._session = session
+        #: Whether this console's screens are interpreted from pixels
+        #: rather than read as resolved characters. Carried through
+        #: from the adapter's session because it decides how coarsely
+        #: a quiescence caller may quantize its cadence, and a
+        #: transcript wrapper must not lose it.
+        self.recognizes_text = getattr(
+            session, "recognizes_text", False)
 
     def send_keys(self, combos, delay=0.06):
         """Send a list of key-name combinations to the guest."""

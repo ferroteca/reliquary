@@ -463,6 +463,12 @@ class _ScriptEngine:
         self._route = []
         self._revisits = collections.Counter()
         self._last_sample = None
+        #: Learned from the first console opened, since only the
+        #: adapter's session knows whether its screens are interpreted
+        #: from pixels. Assuming the cheap path until then costs
+        #: nothing: a cadence needs two samples before it exists.
+        self._recognized_screens = False
+        self._guard_reported = False
         self._cancelled = threading.Event()
         self.events = (events if events is not None
                        else _events.EventStream(redact=self._redact))
@@ -1048,7 +1054,15 @@ class _ScriptEngine:
         """
         if gate is None or sample.stopped or not sample.frame:
             return True
+        # Quantize to the grid this reading path's noise justifies:
+        # a text scrape varies by milliseconds, an interpreted
+        # framebuffer by hundreds of them, and a window resized on
+        # that noise would judge two identical runs differently.
+        monitor.cadence_step = (
+            _stability.GUI_CADENCE_STEP if self._recognized_screens
+            else _stability.TEXT_CADENCE_STEP)
         reading = monitor.observe(sample.frame, now=now)
+        self._report_guard(monitor, reading)
         if reading.stability is not None:
             # The window was observed, so there is a verdict here
             # rather than merely an absence of evidence. Which of
@@ -1056,8 +1070,42 @@ class _ScriptEngine:
             self._measured = True
         if reading.stable:
             return True
+        if reading.blind:
+            # The cadence cannot see decoration, so the guard has no
+            # verdict to give — and a guard with no verdict must not
+            # refuse. Blocking here is not caution but a deadlock: no
+            # later sample can improve what the poll rate forbids, so
+            # the wait would spend its whole clock skipping frames it
+            # was never able to judge. Standing down returns this
+            # observation to what it was before the gate existed,
+            # which is the honest fallback and keeps "the gate never
+            # causes a failure on its own" true at every cadence.
+            return True
         self._gated = reading
         return False
+
+    def _report_guard(self, monitor, reading):
+        """Say once what cadence was measured and what it bought.
+
+        Emitted at the first sample that has a cadence at all — two
+        reads in — rather than at preflight, because nothing before
+        the run has read a screen and the answer is measured, never
+        configured. Once per run: it is a property of the host and
+        the reading path, not of the statement being judged.
+        """
+        if self._guard_reported:
+            return
+        cadence = monitor.cadence()
+        if cadence is None:
+            return
+        self._guard_reported = True
+        self._emit(
+            _events.GUARD_CADENCE,
+            cadence=round(cadence, 3),
+            window=round(monitor.animation_window(), 2),
+            viable=round(_stability.viable_cadence(), 3),
+            blind=reading.blind,
+            recognized=self._recognized_screens)
 
     def _gate_note(self):
         """What to add to an expiry that skipped unsettled samples.
@@ -1138,6 +1186,8 @@ class _ScriptEngine:
             return self._sampled(_Sample((), True))
         try:
             with self._console() as console:
+                self._recognized_screens = getattr(
+                    console, "recognizes_text", False)
                 frame = console.screen()
             rows = frame[0]
         except (OSError, ConnectionError):
