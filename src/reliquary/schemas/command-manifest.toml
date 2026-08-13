@@ -50,6 +50,7 @@ twins = [
     "put-files",
     "recreate-machine",
     "refresh-drives",
+    "restart-machine",
     "run-script",
     "set-boot-order",
     "set-property",

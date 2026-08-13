@@ -18,6 +18,7 @@ from unittest import mock
 
 from reliquary import platform_dos
 from reliquary import machines as machines_module
+from reliquary import machines
 from reliquary.errors import (PreflightError, RunFailure, StaticError,
                               WaitExpired, exit_code)
 from reliquary.interaction_agentless import (AgentlessGuestExec,
@@ -31,6 +32,7 @@ from reliquary.machines import (apply_blueprint, create_machine,
                                 load_machine_state, machine_dir_path,
                                 mark_stopped, put_file, put_files,
                                 recreate_machine, refresh_drives,
+                                restart_machine,
                                 resolve_machine,
                                 set_boot_order, set_machine_var,
                                 start_machine, stop_machine,
@@ -562,6 +564,60 @@ class LifecycleTests(_HomeCase):
         state = self._state(machine_id)
         self.assertEqual(state["phase"], "ready")
         self.assertNotIn("vm", state)
+
+    def test_restart_stops_then_starts_a_running_machine(self):
+        machine_id = self._ready()
+        self._force(machine_id, "running", vm=True)
+        restart_machine(machine_id, context=self.home)
+        self.assertEqual(len(self.backend.stops), 1)
+        self.assertEqual(len(self.backend.starts), 1)
+        self.assertEqual(self._state(machine_id)["phase"], "running")
+
+    def test_restart_starts_a_machine_that_is_already_stopped(self):
+        """The end state asked for is *running*, not "the other one".
+
+        Refusing would make the command's answer depend on a phase
+        the caller usually neither knows nor cares about — and stop
+        is already satisfied by a machine that is off.
+        """
+        machine_id = self._ready()
+        restart_machine(machine_id, context=self.home)
+        self.assertEqual(self.backend.stops, [])
+        self.assertEqual(len(self.backend.starts), 1)
+        self.assertEqual(self._state(machine_id)["phase"], "running")
+
+    def test_restart_completes_an_interrupted_stop_first(self):
+        """A machine caught mid-`stopping` is reconciled, as either
+        command alone would reconcile it."""
+        machine_id = self._ready()
+        self._force(machine_id, "stopping", vm=True)
+        restart_machine(machine_id, context=self.home)
+        self.assertEqual(len(self.backend.stops), 1)
+        self.assertEqual(self._state(machine_id)["phase"], "running")
+
+    def test_restart_never_lets_go_of_the_machine_lock(self):
+        """The whole difference from typing the two commands.
+
+        A restart that released the lock could come back to a machine
+        someone else had started and fail as `already-running` — a
+        race the caller never asked to run. The lock is a file lock
+        and not re-entrant, so holding it across both halves is also
+        why the two bodies had to be split from their wrappers.
+        """
+        machine_id = self._ready()
+        self._force(machine_id, "running", vm=True)
+        taken = []
+        real_lock = machines.machine_lock
+
+        @contextlib.contextmanager
+        def counting_lock(*args, **kwargs):
+            taken.append(args[0])
+            with real_lock(*args, **kwargs):
+                yield
+
+        with mock.patch.object(machines, "machine_lock", counting_lock):
+            restart_machine(machine_id, context=self.home)
+        self.assertEqual(taken, [machine_id])
 
     def test_stop_keeps_running_on_identity_mismatch(self):
         machine_id = self._ready()

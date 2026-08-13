@@ -98,6 +98,19 @@ class Session:
         """Stop a running machine."""
         return machines.stop_machine(machine_id, self._context)
 
+    def restart_machine(self, machine_id, *, display=False, events=None,
+                        cancelled=None):
+        """Stop a machine if it is running, then start it.
+
+        One act rather than two: the per-machine lock is held across
+        both halves, so nothing can start the machine or change its
+        media in between. A machine that is already stopped is simply
+        started.
+        """
+        return machines.restart_machine(
+            machine_id, display=display, context=self._context,
+            events=events, cancelled=cancelled)
+
     def destroy_machine(self, machine_id):
         """Remove a machine's materialization directory."""
         return machines.destroy_machine(machine_id, self._context)

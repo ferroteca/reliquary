@@ -407,6 +407,15 @@ def _add_machine_commands(subcommands):
     _add_selectors(command)
     command.add_argument("--display", action="store_true")
 
+    # restart-machine
+    command = subcommands.add_parser(
+        "restart-machine", help="stop a machine if running, then start it")
+    _add_selectors(command)
+    command.add_argument("--display", action="store_true")
+    command.add_argument(
+        "machine_id", nargs="?", default=None,
+        help="machine id for 'restart-machine <id>' (short for --machine)")
+
     # stop-machine
     command = subcommands.add_parser(
         "stop-machine", help="stop a machine")
@@ -1635,6 +1644,15 @@ def _dispatch(arguments, session, context):
     if arguments.command == "start-machine":
         machine_id = _require_machine_selector(arguments, session)
         started = session.start_machine(
+            machine_id, display=getattr(arguments, "display", False))
+        return _emit(arguments, started, lambda: print(started))
+    if arguments.command == "restart-machine":
+        pos_id = getattr(arguments, "machine_id", None)
+        if pos_id:
+            machine_id = session.resolve_machine(machine=pos_id)
+        else:
+            machine_id = _require_machine_selector(arguments, session)
+        started = session.restart_machine(
             machine_id, display=getattr(arguments, "display", False))
         return _emit(arguments, started, lambda: print(started))
     if arguments.command == "stop-machine":

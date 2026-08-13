@@ -500,6 +500,7 @@ is exactly what its twin returns.
 ```
 rlq start-machine (--blueprint <name> | --machine <id>) [--display]
 rlq stop-machine [<id>] (--blueprint <name> | --machine <id>)
+rlq restart-machine [<id>] (--blueprint <name> | --machine <id>) [--display]
 ```
 
 ```powershell
@@ -523,6 +524,19 @@ verifying backend identity and re-verifying every media hash,
 including media a script attached. Machines stay running until
 explicitly stopped — by `stop-machine`, by a script step, or by
 guest shutdown.
+
+`restart-machine` is **one act, not two commands typed together**:
+it holds the per-machine operation lock across both halves, so
+nothing can start the machine, change its media or apply a
+blueprint in between. That is not a new kind of guarantee — it is
+the same lock every mutating operation already takes, simply not
+released in the middle — and it is what stops a restart from
+returning to a machine someone else has already started and failing
+as `machine.already-running`. A machine that is **already stopped
+is started** rather than refused: the end state asked for is
+*running*, so the command's answer does not depend on a phase the
+caller need not know. One caught mid-`stopping` is reconciled
+first, exactly as either command alone would reconcile it.
 
 ### Applying blueprint edits
 

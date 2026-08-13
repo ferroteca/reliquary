@@ -165,6 +165,15 @@ Stop a running machine. The machine id may be given as a positional
 argument (`rlq stop-machine freedos-0` is a short alias for
 `rlq stop-machine --machine freedos-0`).
 
+### `rlq restart-machine [ID] (--blueprint NAME | --machine ID) [--display]`
+
+Stop a machine if it is running, then start it — one act rather
+than two, holding the per-machine lock across both halves so
+nothing can start it or change its media in between. A machine that
+is already stopped is simply started. The machine id may be given
+as a positional argument (`rlq restart-machine freedos-0` is a short
+alias for `rlq restart-machine --machine freedos-0`).
+
 ### `rlq destroy-machine [ID] (--blueprint NAME | --machine ID)`
 
 Destroy a machine. The machine id may be given as a positional argument

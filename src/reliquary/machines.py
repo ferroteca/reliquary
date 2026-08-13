@@ -1087,99 +1087,112 @@ def start_machine(machine_id, *, display=False, context=None, events=None,
     produced, never what a previous one left behind.
     """
     with machine_lock(machine_id, context):
-        state = _reconcile_phase(machine_id, context)
-        phase = state.get("phase")
-        if phase == "running":
-            raise PreflightError(
-                f"machine {machine_id} is already running",
-                rule_id="machine.already-running")
-        if phase != "ready":
-            raise PreflightError(
-                f"machine {machine_id} cannot start "
-                f"(phase: {phase})", rule_id="machine.phase-cannot-start")
+        return _start_locked(machine_id, display=display, context=context,
+                             events=events, cancelled=cancelled)
 
-        drives = state.get("drives", {})
-        namespace = load_namespace(context)
-        for drive in drives.values():
-            media_name = drive.get("media")
-            # Re-resolve attached (`use`) payloads and re-verify their
-            # hashes; per-machine images (new/difference/copy) keep their
-            # recorded path.
-            if media_name is not None and drive.get("materialize") == "use":
-                drive["path"] = _fetch(
-                    media_name, context, namespace=namespace, events=events,
-                    cancelled=cancelled)
-        # The backend fixes a floppy drive's geometry from whatever
-        # medium is attached at launch, so record it: a later live
-        # swap must match, and this is the only moment the fact is
-        # knowable.
-        for drive in drives.values():
-            if drive.get("medium") == "floppy":
-                drive["launch-size"] = _medium_size(drive.get("path"))
-        # The drive record is refreshed here, as the first step of a
-        # start and before the backend is engaged (D83): what the
-        # guest is about to boot from is read off each disk, so the
-        # record a running machine's `describe-drives` answers from
-        # is this boot's own starting state. An unreadable disk
-        # records the refusal rather than failing the start — the
-        # machine may boot it fine; only at-rest access refuses.
-        for key, drive in sorted(drives.items()):
-            if drive.get("medium") == "hdd":
-                drive["geometry"] = read_drive_record(
-                    state.get("backend") or "qemu", drive, key)[0]
-        # A recorded volume count belongs to one boot, and is dropped
-        # even though the record above was just read: a guest can
-        # repartition its disk and can only do it while running, so
-        # addressing after this boot must re-read — which refreshes
-        # the record with it (D78). Dropped here rather than at stop,
-        # so an interrupted run cannot leave a stale one behind.
-        for drive in drives.values():
-            drive.pop("volumes", None)
-        state["drives"] = drives
-        # A machine variable belongs to one boot: a script `set` it
-        # while the guest ran, so the next start starts empty.
-        state.pop("variables", None)
-        write_state(machine_id, state, context)
 
-        if state.get("memory") is None:
-            state["memory"] = _PLATFORM_MEMORY.get(state.get("platform"), 16)
-        backend = state.get("backend") or "qemu"
-        adapter = backends.adapter(backend)
-        probe = adapter.discover()
-        if not probe.available:
-            raise PreflightError(
-                f"machine {machine_id} was materialized on backend "
-                f"{backend!r}, which is not available on this host: "
-                f"{probe.detail}", rule_id="machine.backend-unavailable")
-        _events.note(events, _events.RUN_PREFLIGHT,
-                     f"using {backend}: {probe.executable}",
-                     backend=backend,
-                     executable=probe.executable,
-                     **{"control-planes": state.get("control-planes") or []})
+def _start_locked(machine_id, *, display=False, context=None, events=None,
+                  cancelled=None):
+    """`start_machine`'s body, with the machine lock already held.
 
-        # The backend's own artifacts (QEMU's captured stderr log) live
-        # in the machine's backend subdirectory; the adapter returns the
-        # verified VM identity and machines.py persists it into
-        # machine.json atomically with the running phase, so the two
-        # never disagree.
-        artifacts_dir = backend_dir(machine_id, backend, context)
-        vm = adapter.start(
-            state, machine_dir=machine_dir_path(machine_id, context),
-            backend_dir=artifacts_dir, display=display,
-            current=state.get("vm"))
-        try:
-            fresh = load_machine_state(machine_id, context)
-            fresh["vm"] = vm
-            fresh["phase"] = "running"
-            fresh["generation"] = fresh.get("generation", 0) + 1
-            write_state(machine_id, fresh, context)
-        except BaseException:
-            # The VM came up but its identity could not be recorded;
-            # stop it rather than orphan an unrecorded process.
-            with contextlib.suppress(Exception):
-                adapter.stop(vm)
-            raise
-        return machine_id
+    Split out for `restart_machine`, which must not let go between
+    stopping and starting. The lock is a file lock and not
+    re-entrant, so a caller already holding it cannot simply call the
+    public function.
+    """
+    state = _reconcile_phase(machine_id, context)
+    phase = state.get("phase")
+    if phase == "running":
+        raise PreflightError(
+            f"machine {machine_id} is already running",
+            rule_id="machine.already-running")
+    if phase != "ready":
+        raise PreflightError(
+            f"machine {machine_id} cannot start "
+            f"(phase: {phase})", rule_id="machine.phase-cannot-start")
+
+    drives = state.get("drives", {})
+    namespace = load_namespace(context)
+    for drive in drives.values():
+        media_name = drive.get("media")
+        # Re-resolve attached (`use`) payloads and re-verify their
+        # hashes; per-machine images (new/difference/copy) keep their
+        # recorded path.
+        if media_name is not None and drive.get("materialize") == "use":
+            drive["path"] = _fetch(
+                media_name, context, namespace=namespace, events=events,
+                cancelled=cancelled)
+    # The backend fixes a floppy drive's geometry from whatever
+    # medium is attached at launch, so record it: a later live
+    # swap must match, and this is the only moment the fact is
+    # knowable.
+    for drive in drives.values():
+        if drive.get("medium") == "floppy":
+            drive["launch-size"] = _medium_size(drive.get("path"))
+    # The drive record is refreshed here, as the first step of a
+    # start and before the backend is engaged (D83): what the
+    # guest is about to boot from is read off each disk, so the
+    # record a running machine's `describe-drives` answers from
+    # is this boot's own starting state. An unreadable disk
+    # records the refusal rather than failing the start — the
+    # machine may boot it fine; only at-rest access refuses.
+    for key, drive in sorted(drives.items()):
+        if drive.get("medium") == "hdd":
+            drive["geometry"] = read_drive_record(
+                state.get("backend") or "qemu", drive, key)[0]
+    # A recorded volume count belongs to one boot, and is dropped
+    # even though the record above was just read: a guest can
+    # repartition its disk and can only do it while running, so
+    # addressing after this boot must re-read — which refreshes
+    # the record with it (D78). Dropped here rather than at stop,
+    # so an interrupted run cannot leave a stale one behind.
+    for drive in drives.values():
+        drive.pop("volumes", None)
+    state["drives"] = drives
+    # A machine variable belongs to one boot: a script `set` it
+    # while the guest ran, so the next start starts empty.
+    state.pop("variables", None)
+    write_state(machine_id, state, context)
+
+    if state.get("memory") is None:
+        state["memory"] = _PLATFORM_MEMORY.get(state.get("platform"), 16)
+    backend = state.get("backend") or "qemu"
+    adapter = backends.adapter(backend)
+    probe = adapter.discover()
+    if not probe.available:
+        raise PreflightError(
+            f"machine {machine_id} was materialized on backend "
+            f"{backend!r}, which is not available on this host: "
+            f"{probe.detail}", rule_id="machine.backend-unavailable")
+    _events.note(events, _events.RUN_PREFLIGHT,
+                 f"using {backend}: {probe.executable}",
+                 backend=backend,
+                 executable=probe.executable,
+                 **{"control-planes": state.get("control-planes") or []})
+
+    # The backend's own artifacts (QEMU's captured stderr log) live
+    # in the machine's backend subdirectory; the adapter returns the
+    # verified VM identity and machines.py persists it into
+    # machine.json atomically with the running phase, so the two
+    # never disagree.
+    artifacts_dir = backend_dir(machine_id, backend, context)
+    vm = adapter.start(
+        state, machine_dir=machine_dir_path(machine_id, context),
+        backend_dir=artifacts_dir, display=display,
+        current=state.get("vm"))
+    try:
+        fresh = load_machine_state(machine_id, context)
+        fresh["vm"] = vm
+        fresh["phase"] = "running"
+        fresh["generation"] = fresh.get("generation", 0) + 1
+        write_state(machine_id, fresh, context)
+    except BaseException:
+        # The VM came up but its identity could not be recorded;
+        # stop it rather than orphan an unrecorded process.
+        with contextlib.suppress(Exception):
+            adapter.stop(vm)
+        raise
+    return machine_id
 
 
 def stop_machine(machine_id, context=None):
@@ -1190,18 +1203,54 @@ def stop_machine(machine_id, context=None):
     transitional ``stopping`` phase, then powers off the owned VM.
     """
     with machine_lock(machine_id, context):
-        state = _reconcile_phase(machine_id, context)
-        phase = state.get("phase")
-        if phase == "ready":
-            # A reconciled interrupted stop already returned it here.
-            return
-        if phase != "running":
-            raise PreflightError(
-                f"machine {machine_id} is not running "
-                f"(phase: {phase})",
-                rule_id="machine.not-running")
-        _write_phase(machine_id, "stopping", context, bump=True)
-        _complete_stop(machine_id, context)
+        _stop_locked(machine_id, context)
+
+
+def _stop_locked(machine_id, context=None):
+    """`stop_machine`'s body, with the machine lock already held.
+
+    The counterpart of `_start_locked`, and split out for the same
+    reason: `restart_machine` holds the lock across both halves.
+    """
+    state = _reconcile_phase(machine_id, context)
+    phase = state.get("phase")
+    if phase == "ready":
+        # A reconciled interrupted stop already returned it here.
+        return
+    if phase != "running":
+        raise PreflightError(
+            f"machine {machine_id} is not running "
+            f"(phase: {phase})",
+            rule_id="machine.not-running")
+    _write_phase(machine_id, "stopping", context, bump=True)
+    _complete_stop(machine_id, context)
+
+
+def restart_machine(machine_id, *, display=False, context=None, events=None,
+                    cancelled=None):
+    """Stop a machine if it is running, then start it. Returns its id.
+
+    **The lock is held across both halves**, which is the whole
+    difference from typing the two commands. That is not a new kind
+    of claim — it is the same per-machine lock every mutating
+    operation already takes, simply not let go of in the middle. What
+    it buys is that nothing can start the machine, swap its media or
+    apply a blueprint in the gap: a restart that released the lock
+    could come back to a machine someone else had already started and
+    fail with `machine.already-running`, which is a race the caller
+    never asked to run.
+
+    **A stopped machine is started rather than refused.** The end
+    state asked for is *running*, and stop is already satisfied by a
+    machine that is off; refusing here would make the command's
+    answer depend on a phase the caller usually neither knows nor
+    cares about. A machine caught mid-``stopping`` is reconciled by
+    `_reconcile_phase` first, exactly as the two commands would.
+    """
+    with machine_lock(machine_id, context):
+        _stop_locked(machine_id, context)
+        return _start_locked(machine_id, display=display, context=context,
+                             events=events, cancelled=cancelled)
 
 
 _REMOVABLE_MEDIA = {"floppy", "cdrom"}

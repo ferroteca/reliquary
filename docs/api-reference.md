@@ -106,6 +106,12 @@ read-only vocabulary.
   CLI twin: `start-machine`.
 - `stop_machine(machine_id)` - Stop a running machine;
   identity mismatches fail closed. CLI twin: `stop-machine`.
+- `restart_machine(machine_id, *, display=False, events=None,
+  cancelled=None)` - Stop a machine if it is running, then start it,
+  returning its id. One act rather than two: the per-machine lock is
+  held across both halves, so nothing can start the machine or change
+  its media in between. A machine that is already stopped is simply
+  started. CLI twin: `restart-machine`.
 - `destroy_machine(machine_id)` - Delete the machine
   entirely; frees its number for reuse. CLI twin:
   `destroy-machine`.

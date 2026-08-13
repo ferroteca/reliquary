@@ -22,6 +22,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   retained. Machine-written files stay strict JSON. The reader lives
   in `json5reader` (Apache-2.0 `json5` package underneath).
 
+- **`restart-machine`** stops a machine if it is running and starts
+  it — the ordinary move while a script is being written, which
+  until now took two commands. It is **one act rather than two**:
+  the per-machine operation lock is held across both halves, so
+  nothing can start the machine, change its media or apply a
+  blueprint in between. That is not a new kind of guarantee — it is
+  the same lock every mutating operation already takes, simply not
+  released in the middle — and it is what stops a restart from
+  returning to a machine someone else has started and failing as
+  `machine.already-running`. A machine that is **already stopped is
+  started** rather than refused: the end state asked for is
+  *running*, so the answer does not depend on a phase the caller
+  need not know, and one caught mid-`stopping` is reconciled first.
+  Takes `--display` and a positional id like its siblings; the twin
+  is `restart_machine`.
+
 - **`list-backends`** reports the backends discovered on the host and
   their installation home directories. It is CLI-only; `--json`
   returns the same `{backend, home}` records for automation.

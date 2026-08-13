@@ -278,6 +278,7 @@ _VENEERS = {
     "recreate_machine": machines.recreate_machine,
     "start_machine": machines.start_machine,
     "stop_machine": machines.stop_machine,
+    "restart_machine": machines.restart_machine,
     "destroy_machine": machines.destroy_machine,
     "apply_blueprint": machines.apply_blueprint,
     "get_machine_dir": machines.get_machine_dir,
