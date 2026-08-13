@@ -32,6 +32,115 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
+## F54 — The scoped machine-state change
+
+> **Pledged 2026-08-13** (owner), cut straight to this file in the
+> act that pledged **U24**, whose whole delivery it is — the
+> promotion to root [USE-CASES.md](../../USE-CASES.md) rides with
+> it (D34). Serves **U24**; weighed against **P14**, which is what
+> makes a new construct expensive, and **P25**, which both backends
+> already satisfy since the vocabulary is Reliquary's own state and
+> not a backend's. The spelling and the restore rule, with the
+> alternatives they beat: **D104**. Reads better after **T27**,
+> whose reachability analysis the exit check below reuses.
+
+A script's `insert`, `eject` and `set-boot` change the machine
+durably and leave it changed; the author writes the undo by hand, in
+a place no failure path reaches. This gives the change a scope, and
+the scope undoes it.
+
+**The construct.** A `with` block whose head names the change:
+
+```rlqs
+with boot cdrom0 {
+    phase startup { ... }
+    phase cd-boot { ... }
+}
+```
+
+- **The head vocabulary is `boot`, `insert` and `eject`.** The last
+  two are the existing verbs written exactly as they are written
+  today. The first is **not** `set-boot`, and the difference is the
+  point: `set-boot` *replaces* the order, while what a stage wants
+  to say is "boot the CD first" — the real shape of the demand, and
+  the author should not have to restate an order they are not
+  changing. **`boot` states a prefix**: the drives named come first
+  in the order given, and the machine's own order follows for
+  everything else, so `with boot cdrom0` over a machine ordered
+  `["hdd0", "cdrom0"]` boots `["cdrom0", "hdd0"]`. Naming more than
+  one pins a longer prefix, for the author who wants it. Every key
+  must name a declared drive, as `set-boot`'s do, and `set-boot`
+  itself is untouched — replacement is still what that verb means,
+  and giving one spelling two meanings was the alternative (D104).
+- **It wraps the enclosing shape's own units** — phases in a phased
+  script, statements in a linear one. That is what gives the
+  language a word for a *stage*: a group of phases. It is also the
+  only form in which an install is expressible, since its stage
+  spans phases and every phase body ends in a transition.
+- **The scope is where control is, not where the text is.** It holds
+  while control is inside the group, is entered by reaching any
+  phase in it — including by `goto` from outside — and is left by
+  reaching a phase outside it or by the run ending. Re-entry
+  re-applies. A purely lexical reading was declined (D104): every
+  phase body ends in `goto`, so it would revert at the first
+  transition and express nothing.
+- **On exit the target returns to the value it held on entry**, on
+  every outcome the runner reaches: `finish`, a failure, and a
+  cancellation at a boundary. A host crash restores nothing and
+  `apply` remains its recovery, exactly as today.
+- **A boot restore requires a stopped machine** (D104). An exit
+  reached with the machine running fails the run, naming the change
+  it could not undo; where a static pass can promise that exit is
+  reached running, it is an authoring refusal instead (T27). Media
+  restores carry no such rule — `insert`/`eject` are
+  running-or-stopped, so the restore is live where the machine is up.
+- **One scope per target.** Two scopes on the same target, nested or
+  overlapping, are refused; scopes on different targets nest freely.
+
+Work items:
+
+1. The grammar and the typed tree: the `with` block in
+   `script_grammar.lark` and `script_parser.py`, both shapes, the
+   `insert` / `eject` heads reusing those actions' signatures rather
+   than restating them, and `boot` as a head-only node taking one
+   slot key or more.
+2. Validation and preflight: the head vocabulary (closed at three
+   names, V14's kind), which units a block may wrap in each shape
+   (V2's kind), the doubled-scope refusal, and `boot` keys — unique
+   by slot, canonical or alias — checked against the machine's
+   declared drives where `set-boot`'s already are. New ids where the existing rules do not stretch; no new
+   V-number is expected, and one is issued against
+   [SEQUENCES.md](../SEQUENCES.md) if that turns out wrong.
+3. The runtime: scope entry and exit in `script_runner.py`'s
+   dispatch — capture on entry, restore on every exit and every
+   terminal outcome, with the stopped-machine rule on boot restores
+   and its run failure.
+4. The run's output: entry and restore are reported on the event
+   stream (P5), and the failure report names a restore it performed.
+   What the author gave up by scoping is the state a diagnostician
+   would have found, so the run has to say what it took back.
+5. The spec: `docs/spec/script-spec.md` — the grammar, a section
+   beside `insert`/`eject`/`set-boot`, the "persists for diagnosis"
+   paragraph amended to say what a scope changes, and a line in "How
+   the vocabulary grows" recording that this is a construct and was
+   argued as one.
+6. The corpus: valid fixtures for each verb under both shapes;
+   invalid fixtures for a foreign head, a doubled scope, and a boot
+   restore provably reached running — each declaring the id that
+   must reject it.
+7. The codex and the example: `freedos.rlqb` returns to
+   `["hdd0", "cdrom0"]`, `freedos-install.rlqs` wraps its phases in
+   `with boot cdrom0` and keeps its mid-install `eject`,
+   and the spec's FreeDOS example follows the codex as it must.
+8. The references: `docs/cli-reference.md` is untouched — a scope is
+   syntax and not a capability, so P6 parity has nothing to add —
+   and the script guide and reference gain the construct.
+
+**The sprint bound** (D42) is tight here and was weighed at the
+pledge rather than discovered. If it breaks, the cut is the linear
+form: no shipped script needs a statement-level scope, and U24 names
+no script shape, so the phased form alone still delivers it.
+
 ## F43 — The interpretation-layer corpus
 
 > **Pledged 2026-08-01** (owner), cut from F13 with F42, that

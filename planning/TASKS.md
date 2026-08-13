@@ -124,3 +124,37 @@ is mechanical, a defect needs no pledge because the norm it
 violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
+
+### Defects
+
+#### T27 — A stopped-only verb reached with the machine running is refused five minutes late
+
+`set-boot` against a running machine fails closed and by name —
+`machine.must-be-stopped`, a `PreflightError` at exit `3`, so
+nothing is silently ignored. But it fails at **run** time, and for
+the shape that provokes it — flip the boot device, start, install,
+stop, flip back — run time means after five minutes of installing.
+
+**The script text already decides it.** The header declares the
+starting state (`machine stopped`, or the default `running`), and
+the language knows exactly which verbs start and stop the machine.
+A statement provably reached with the machine running is therefore
+decidable before anything reaches a guest, which is what the
+V-numbered rules do with every other authoring mistake of this
+kind.
+
+Bounded by the reachability limit the rest of the static pass
+already accepts — a handler body is the guest's decision, not the
+plan's, and `script_validation.reach` is where that boundary is
+already drawn. So this is a rule about the statements a static pass
+can **promise** will run, and silence everywhere else: a false
+refusal would be far worse than the late failure it replaces.
+
+The rule takes a V-number issued against
+[SEQUENCES.md](SEQUENCES.md), and its fixtures go in the script
+corpus declaring that id, as that corpus requires.
+
+Recorded 2026-08-13, from the same live FreeDOS install that drafted
+U24; it was deliberately left out of that use case, because
+`set-boot` does not go away if U24 is delivered. **F54** reuses this
+analysis for its own exit check.

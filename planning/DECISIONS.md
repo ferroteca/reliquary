@@ -178,6 +178,80 @@ is waiting on an answer today.
 
 ## Decided
 
+- D104 — A SCOPED MACHINE-STATE CHANGE IS A BLOCK, AND ITS RESTORE
+  OBEYS THE STOPPED-ONLY RULE — DECIDED (owner, 2026-08-13, the U24
+  pledge round). Supports **U24**; P14, S3. Bounded by **D15**'s Q1,
+  which it does not reopen.
+
+  Two contested calls, both made against the recommendation, and the
+  arguments they beat are recorded because each was strong enough to
+  be raised again.
+
+  **The spelling is a `with` block** wrapping phases in a phased
+  script and statements in a linear one, its head one of `insert` /
+  `eject` / `set-boot` written as it is written today. WEIGHED AND
+  DECLINED: a **`scope=run` modifier** on those three verbs, which
+  costs P14 nothing at all — a `key=value` modifier is the shape
+  `exclude=` and `stability=` already have, so no construct is added
+  and V2/V14 carry it with no new id. It was declined because it can
+  only ever scope to the *run*, and the thing U24 names is a stage;
+  a mechanism that cannot express the unit the demand is written in
+  is cheap for the wrong reason. Also declined: a **header
+  declaration** (`boot cdrom0 hdd0`), which covers the boot order
+  alone — leaving media, half of U24's class, needing a second
+  mechanism — and puts durable-state policy in the one place
+  script-spec.md deliberately keeps it out of.
+
+  **The scoped boot head is `boot` and states a prefix**, not
+  `set-boot` and not a whole order: what a stage has to say is
+  "boot the CD first", and an author should not restate an order
+  they are not changing (owner, same day). The drives named come
+  first in the order given and the machine's own order follows.
+  WEIGHED AND DECLINED: reusing `set-boot` as the head. That verb
+  *replaces* the order, so the scoped form would carry different
+  semantics under an identical spelling — the one thing a closed
+  grammar cannot afford, since a reader has no way to tell which
+  meaning is in front of them. A distinct word costs one name in a
+  vocabulary that has room for it, and `set-boot` keeps its
+  meaning unchanged.
+
+  WEIGHED AND DECLINED, having been raised and withdrawn in the
+  same round: **promoting a whole drive kind**, so that one word
+  moved every CD-ROM at once. The head takes slot keys, and a
+  machine with two optical drives names both. It was withdrawn as
+  more than the demand needs, and the collision it would have had
+  to route around is worth recording — a bare `cdrom` is already
+  the blueprint's alias for `cdrom0`, so the kind could not have
+  taken the obvious spelling, and every remaining one bought a
+  third way to say a drive.
+
+  **The scope is dynamic, not lexical**: it holds while control is
+  inside the group, whichever way control arrived. A lexical reading
+  was declined on mechanics rather than taste — every phase body ends
+  in a transition, so a scope that closed at the end of its text
+  would revert at the first `goto` and express nothing an install
+  could use.
+
+  **A boot restore requires a stopped machine**, and an exit reached
+  with the machine running fails the run naming what it could not
+  undo. WEIGHED AND DECLINED: letting the runtime's own restore write
+  the state document behind a running machine, on the argument that a
+  restore claims no live effect and only sets what the next start
+  reads. Declined because D15's Q1 made the boot order stopped-only
+  as a property of the machine rather than as a courtesy to the
+  author, and a second writer operating under a different rule is
+  exactly how such a guarantee erodes — the next exception argues
+  from this one. The accepted cost is real and named: a run that
+  otherwise succeeded can fail at its last act, and the remedy for an
+  author handing back a live machine is to say so in the script's own
+  shape. **T27 defangs most of it** by moving the same verdict to
+  parse time, which is why F54 depends on that analysis.
+
+  **What reopens the restore rule** is D15's Q1 itself: if the boot
+  order ever gains a live effect, or the stopped-only guard is
+  revisited for its own reasons, this clause is decided again with
+  it and not before.
+
 - D103 — THE ADAPTER SEAM'S KEY VOCABULARY IS QEMU'S QCODE SET —
   DECIDED (owner, 2026-08-13). Supports P11. Leaves P25 untouched:
   that governs the blueprint's portable vocabulary, and the script

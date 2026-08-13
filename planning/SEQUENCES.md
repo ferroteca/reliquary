@@ -36,9 +36,9 @@ nothing is ever reissued.
 
 ## The marks
 
-- **The next D-number to issue is D104** — decisions, recorded in
+- **The next D-number to issue is D105** — decisions, recorded in
   [DECISIONS.md](DECISIONS.md).
-- **The next F-number to issue is F54** — features, drafted in
+- **The next F-number to issue is F55** — features, drafted in
   [proposed/FEATURES.md](proposed/FEATURES.md) or cut straight to
   [pledged/FEATURES.md](pledged/FEATURES.md) on pledge.
 - **The next G-number to issue is G8** — the authored language's
@@ -52,7 +52,7 @@ nothing is ever reissued.
 - **The next S-number to issue is S9** — application surfaces
   (root [ARCHITECTURE.md](../ARCHITECTURE.md), "The application
   surfaces").
-- **The next T-number to issue is T27** — tasks, entering
+- **The next T-number to issue is T28** — tasks, entering
   [TASKS.md](TASKS.md), entry being the pledge (D43). The sequence
   started at **T8** because T0–T7 were spent by an earlier
   per-list numbering that ran three separate times, surviving in

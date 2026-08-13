@@ -45,6 +45,71 @@ SPDX-License-Identifier: GPL-3.0-only
 > [proposed/USE-CASES.md](../proposed/USE-CASES.md); its U-number is
 > the search key.
 
+**U24 — A script says what a stage boots, and hands the machine back
+as it found it** — pledged 2026-08-13 (owner), drafted the same day
+from a live FreeDOS install on VirtualBox. The pledge cuts **F54**
+straight to [pledged/FEATURES.md](FEATURES.md) in the same act; F54
+is this use case's whole delivery, so the promotion to root
+[USE-CASES.md](../../USE-CASES.md) rides with it (D34) rather than
+waiting on a second judgement. The settlements the round made — the
+construct's shape, and the rule its restore obeys — are **D104**.
+
+**Two findings made it a demand rather than a preference.** *Firmware
+fallthrough is not portable*: both backends skip an empty optical
+drive, but only SeaBIOS moves past a disk partitioned without an
+active partition — VirtualBox stops there, which is precisely the
+state every installer leaves behind before its reboot. And *a script
+cannot restore what it changes*: `set-boot` is stopped-only (D15's
+Q1, a launch-time firmware order with no live effect — cited, not
+reopened), so the flip precedes `start` and the restore follows the
+machine stopping, with no `finally` in the language to hold the two
+together. Any failure in between — most runs, while a script is being
+written — leaves the boot order silently disagreeing with the
+blueprint until someone runs `apply-blueprint`.
+
+**A third finding is deliberately not part of this use case.** The
+run-time refusal of a `set-boot` against a running machine arrives
+after five minutes of installing, where the declared `machine
+stopped` header and the start/stop verbs make it decidable at parse
+time. That stands whether or not U24 is ever built — `set-boot` does
+not go away — so it is queued on its own as **T27** rather than
+folded in here, and F54's exit check reuses its analysis.
+
+**What the pledge does not claim, found while working F54.** A
+guest-driven reboot is not Reliquary's `stop`/`start`: the VM never
+stops, the firmware simply runs again under the order it was launched
+with, and nothing Reliquary offers can reach in between. So the
+device cannot change *within* one boot, and the codex install
+script's mid-install `eject` — how the disk is reached across the
+installer's own reboot — stays exactly where it is. What U24 buys is
+the other half: the machine returns to its declared shape, so the
+blueprint stops permanently expressing a condition that is true only
+while one install runs. The workaround shipped in `df37b0a` — a
+CD-first blueprint — is what that describes, and it is a workaround
+for exactly that reason, one that does not generalize to a guest
+needing a third order later. Text as pledged:
+
+> - **U24 — A script says what a stage boots, and hands the machine
+>   back as it found it.** An install is not one boot: the installer
+>   medium boots first, the disk boots once it is bootable, and which
+>   of them the firmware chooses is not the same question on two
+>   backends — both skip an empty optical drive, only one moves past
+>   a disk partitioned without an active partition, and that is
+>   exactly the state an installer leaves behind before its own
+>   reboot. So a script states the boot device for a stage of its run
+>   rather than arranging for the firmware to fall past the wrong
+>   one, and states it once: what a stage changes about the
+>   machine — which device it boots first, the medium in a
+>   removable slot — is
+>   undone when the stage ends, whether it ended by finishing, by
+>   failing, or by being cancelled. The machine handed back is the
+>   machine that was picked up, so a blueprint never has to
+>   permanently express a condition that holds only while one install
+>   runs. What the author did not scope still stands: an installer's
+>   writes to a disk are the machine's own history and no script
+>   undoes them, and `apply` remains the recovery for a machine that
+>   diverged some other way.
+
 **U7 — Materialize on the hypervisor the host provides** — pledged
 2026-07-28 (owner). Drafted 2026-07-23 by the mapping sweep, which
 found the multi-backend pillar demand-free: no use case in force
