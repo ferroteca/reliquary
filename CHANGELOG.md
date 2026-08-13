@@ -37,13 +37,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tools/extract_vga_font.py`.
 
   **The FreeDOS parity half of this entry is not yet demonstrated.**
-  On its first run against a live VirtualBox (2026-08-13) the
-  integration reached the installer's second menu and stopped:
-  `select` cannot follow a highlight on a menu that repaints every
-  cell per keypress when a sample costs ~0.83s, where QEMU's
-  text-memory scrape costs a fraction of that. Lifecycle, VDI, input,
-  capture, recognition and the first `select` are confirmed working
-  on real hardware. Resolve before release.
+  Against a live VirtualBox (2026-08-13) the integration now drives
+  the boot menu, the language chooser and the installer's confirmation
+  dialog, and stops at the welcome screen. Two causes remain, both
+  measured:
+
+  - **The glyph bank is the wrong font.** It is curated from the host
+    *QEMU* vgabios, and VirtualBox's VGA BIOS draws a different 8×16
+    face — its `W` spans seven columns where the bank's spans eight —
+    so once the guest leaves the LiveCD's own font the recognizer
+    reads `Welcome` as `Uelcooe` and `program` as `prograo`. Every
+    `wait` on installer text misses. Recognition is deterministic:
+    two reads of one static screen agree cell for cell.
+  - **Decoration cannot be recognized at a screenshot backend's
+    cadence.** `screen_stability` masks a cell as decoration after
+    three changes within a 1s window; a VirtualBox read costs ~0.83s,
+    so two samples fit in that window and three changes never
+    accumulate. A blinking element therefore never enters the mask
+    and holds stability under the 0.99 gate permanently — measured at
+    0.98 on a synthetic blink, 0.944 on the live installer. This is
+    the sample-count dependence the wall-clock window exists to
+    refuse, surviving in the repeat count.
 
 - **Fixed-font text-screen recognition** (F51, cut from F3 with
   F50/F52). `text_recognize` turns a PNG framebuffer into the
@@ -316,6 +330,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no public surface writes a machine variable.
 
 ### Fixed
+
+- **The menu highlight is followed on a recognized framebuffer.**
+  `select` located the selection bar as the rarest attribute on
+  screen, which assumes a row wears one attribute — true of VGA bytes
+  scraped from text memory, false of tokens recovered from pixels. A
+  blank cell shows one colour, so nothing can tell its foreground from
+  its background and it cannot carry a lettered cell's token; a bar
+  painted across a dialog therefore reads as two tokens whose blank
+  half *is* the backdrop's, the most common on screen. Rarity picked
+  the wrong row and its own guard then rejected the answer, so every
+  `select` on VirtualBox failed with "no menu highlight responded to
+  cursor keys". The bar is now found as what a bar is — the attribute
+  confined to one row that moved to another — which is also immune to
+  the FreeDOS language chooser rewriting every row per keypress. Where
+  a menu has exactly two items both candidates are confined and the
+  cursor key's direction settles it; anything still ambiguous falls
+  back to the frequency reading, which continues to serve text-memory
+  screens. Confirmed against a live VirtualBox guest.
 
 - **A guest's video mode no longer ends the run.** The fixed-font
   recognizer refused any framebuffer that was not an even 80×25 grid

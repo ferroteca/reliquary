@@ -373,6 +373,66 @@ class _PausingLanguageMenu:
                             2 + self.cursor)
 
 
+class _RecognizedLanguageMenu:
+    """The FreeDOS language chooser as a *recognizer* reports it.
+
+    The other fakes here render VGA attribute bytes, where a row wears
+    one attribute and the selection bar is that row's alone. A
+    screenshot backend has no such bytes: tokens come from each cell's
+    foreground/background pixels, and a blank cell shows only one
+    colour — so nothing can tell its foreground from its background
+    and it cannot carry a lettered cell's token. The bar is painted
+    across the dialog, so its own padding reads as the *backdrop*
+    token, the most common on screen.
+
+    That is the screen the frequency reading cannot classify: the
+    dominant token among the newly highlighted row's changed cells is
+    the backdrop's. Every row is also retranslated per keypress, which
+    is what the real chooser does.
+    """
+
+    BACKDROP = 0xB10CC     # blue on blue: the bar's padding, and the
+    DIALOG = 0xD1A106      # whole screen outside the dialog
+    NORMAL_TEXT = 0x7E77
+    BAR_TEXT = 0xBA12
+
+    _LEFT, _RIGHT = 10, 51
+
+    def __init__(self, rendered):
+        self._rendered = rendered
+        self.cursor = 0
+        self.selected = None
+
+    def screen(self):
+        items = self._rendered[self.cursor]
+        rows = ["Welcome menu", ""] + list(items)
+        rows += [""] * (25 - len(rows))
+        attributes = [[self.BACKDROP] * 80 for _ in range(25)]
+        for number in range(2, 2 + len(items)):
+            highlighted = number == 2 + self.cursor
+            text = rows[number]
+            for column in range(self._LEFT, self._RIGHT):
+                lettered = (column - self._LEFT) < len(text.strip())
+                if lettered:
+                    attributes[number][column] = (
+                        self.BAR_TEXT if highlighted
+                        else self.NORMAL_TEXT)
+                else:
+                    # The pathology: a blank cell inside the bar is
+                    # indistinguishable from the backdrop outside it.
+                    attributes[number][column] = (
+                        self.BACKDROP if highlighted else self.DIALOG)
+        return rows, attributes
+
+    def press(self, key):
+        if key == "ret":
+            self.selected = self.cursor
+        elif key == "down" and self.cursor + 1 < len(self._rendered):
+            self.cursor += 1
+        elif key == "up" and self.cursor > 0:
+            self.cursor -= 1
+
+
 class _PaintingMenu(_FakeMenu):
     """Still painting its dialog when selection starts.
 
@@ -541,7 +601,77 @@ class CursorMenuTests(unittest.TestCase):
         before[2] = [0x70] * 80
         after = [[0x1B] * 80 for _ in range(25)]
 
-        self.assertIsNone(display_module._cursor_row(before, after))
+        self.assertEqual(display_module._bar_move(before, after),
+                         (None, None))
+
+    def test_the_bar_is_followed_on_a_recognized_framebuffer(self):
+        # F52's live failure: cell tokens recovered from pixels rather
+        # than VGA bytes, on a menu that retranslates every row.
+        menu = _RecognizedLanguageMenu([
+            ["English", "German", "Esperanto"],
+            ["Englisch", "Deutsch", "Esperanto"],
+            ["angla", "germana", "esperanto"],
+        ])
+
+        selected = self._select(menu, "German")
+
+        self.assertEqual(menu.selected, 1)
+        self.assertEqual(selected, "Deutsch")
+
+    def test_the_frequency_reading_alone_cannot_place_that_bar(self):
+        """Why the rule is confinement and not rarity.
+
+        The dominant token among the newly highlighted row's changed
+        cells is the backdrop's — the most common on screen — so the
+        frequency reading discards it, and the bar has to be found as
+        the row-unique attribute that moved.
+        """
+        menu = _RecognizedLanguageMenu([
+            ["English", "German", "Esperanto"],
+            ["Englisch", "Deutsch", "Esperanto"],
+            ["angla", "germana", "esperanto"],
+        ])
+        _rows, before = menu.screen()
+        menu.press("down")
+        _rows, after = menu.screen()
+
+        dominant = display_module._changed_attribute(before, after, 3)
+        self.assertEqual(dominant, _RecognizedLanguageMenu.BACKDROP)
+        occurrences = sum(row.count(dominant) for row in after)
+        self.assertGreater(occurrences, 160)
+
+        row, attribute = display_module._bar_move(before, after)
+        self.assertEqual(row, 3)
+        self.assertEqual(attribute, _RecognizedLanguageMenu.BAR_TEXT)
+
+    def test_a_two_item_menu_is_settled_by_the_key_direction(self):
+        """Confinement ties; the bar is the one that went down.
+
+        With exactly one unhighlighted row, its token is row-unique
+        too, so two attributes make an equally good move. They move in
+        opposite directions, and the key just pressed says which one
+        the bar is.
+        """
+        menu = _RecognizedLanguageMenu([
+            ["English", "German"], ["Englisch", "Deutsch"]])
+        _rows, before = menu.screen()
+        menu.press("down")
+        _rows, after = menu.screen()
+
+        self.assertEqual(
+            display_module._relocated_bar(before, after), (None, None))
+        self.assertEqual(
+            display_module._relocated_bar(before, after, direction=1),
+            (3, _RecognizedLanguageMenu.BAR_TEXT))
+
+    def test_a_two_item_recognized_menu_selects_end_to_end(self):
+        menu = _RecognizedLanguageMenu([
+            ["English", "German"], ["Englisch", "Deutsch"]])
+
+        selected = self._select(menu, "German")
+
+        self.assertEqual(menu.selected, 1)
+        self.assertEqual(selected, "Deutsch")
 
     def test_a_neighbor_rewritten_by_the_probe_is_still_selected(self):
         # moving off "English" rewrites the list in French, and the

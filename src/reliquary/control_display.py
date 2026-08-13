@@ -54,6 +54,10 @@ _SETTLE_POLL = 0.1
 #: measured against.
 _BASELINE_READS = screen_stability.DEFAULT_ANIMATION_REPEATS + 1
 
+#: Which way each cursor key moves a selection bar. Used only to break
+#: a tie between equally good candidate moves, never to require one.
+_DIRECTIONS = {"down": 1, "up": -1}
+
 
 _SHIFTED = {
     ":": "semicolon", "_": "minus", "?": "slash", '"': "apostrophe",
@@ -168,23 +172,94 @@ def _changed_attribute(before, attributes, row):
     return max(counts, key=counts.get) if counts else None
 
 
-def _cursor_row(before, attributes):
+def _rows_by_attribute(frame):
+    """Which rows each attribute token appears on."""
+    index = {}
+    for number, row in enumerate(frame):
+        for attribute in set(row):
+            if attribute is not None:
+                index.setdefault(attribute, set()).add(number)
+    return index
+
+
+def _relocated_bar(before, attributes, direction=None):
+    """The bar found as the row-unique attribute that changed rows.
+
+    **This is what a selection bar *is*** — an attribute confined to
+    one row that moves to another — and saying it that way rather
+    than as "the rarest attribute on screen" is what makes tracking
+    survive a real framebuffer. Counting cells assumes a row wears one
+    attribute, which holds for VGA bytes scraped out of text memory
+    and fails for tokens recovered from pixels: a blank cell shows
+    only one colour, so nothing can tell its foreground from its
+    background, and it can never carry the same token as a lettered
+    cell beside it. A bar therefore reads as *two* tokens, and the
+    blank one is the backdrop's — the most common token on screen,
+    which is the opposite of what rarity looks for.
+
+    Confinement is immune to all of that. It also survives the menu
+    that rewrites every row per keypress, because retranslating text
+    changes which cells carry a token, never the fact that the bar's
+    lettered cells are the only ones wearing theirs.
+
+    Confinement alone is decisive only above two items. With exactly
+    one unhighlighted row that row's token is confined too, so two
+    attributes make an equally good move — in *opposite directions*,
+    which is what ``direction`` then settles: a selection bar travels
+    the way the cursor key points. It is a tie-break rather than a
+    filter, so a menu that wraps its bar from bottom to top is left
+    to the reading below instead of being classified wrongly.
+
+    Returns (row, that row's bar attribute), or (None, None) when no
+    single attribute made an unambiguous move.
+    """
+    was = _rows_by_attribute(before)
+    now = _rows_by_attribute(attributes)
+    moved = []
+    for attribute, rows in now.items():
+        if len(rows) != 1:
+            continue
+        previously = was.get(attribute)
+        if previously is None or len(previously) != 1:
+            continue
+        if previously != rows:
+            moved.append(
+                (next(iter(previously)), next(iter(rows)), attribute))
+    if len(moved) != 1 and direction:
+        moved = [entry for entry in moved
+                 if (entry[1] - entry[0] > 0) == (direction > 0)]
+    if len(moved) == 1:
+        _from, row, attribute = moved[0]
+        return row, attribute
+    return None, None
+
+
+def _bar_move(before, attributes, direction=None):
     """Locate the menu highlight from an observed attribute change.
 
-    The rows whose attributes changed after a cursor keypress are the
-    old and new cursor positions. Of those, the newly highlighted row
-    is the one whose changed cells now carry the rarest attribute on
-    screen: the normal menu color covers many rows, the selection bar
-    exactly one. Returns None when nothing changed, or when no
-    changed row gained a bar-like attribute — the bar covers at most
-    a couple of rows' worth of cells, so a row whose changed cells
-    took on a widespread attribute is a bar being erased or a
-    partial repaint, not the new position.
+    Prefers :func:`_relocated_bar`. Where no attribute made an
+    unambiguous move — the bar was erased rather than moved, or the
+    screen repainted too broadly to tell — it falls back to the
+    frequency reading below, which is what tracked the bar before and
+    still answers the uniform-attribute screens a text-memory scrape
+    produces.
+
+    The fallback: the rows whose attributes changed after a cursor
+    keypress are the old and new cursor positions, and of those the
+    newly highlighted row is the one whose changed cells now carry
+    the rarest attribute on screen — the normal menu color covers
+    many rows, the selection bar exactly one. It answers None when
+    nothing changed, or when no changed row gained a bar-like
+    attribute, a row whose changed cells took on a widespread
+    attribute being a bar erased or a partial repaint.
     """
+    row, attribute = _relocated_bar(before, attributes, direction)
+    if row is not None:
+        return row, attribute
     changed = [row for row in range(len(attributes))
                if attributes[row] != before[row]]
     if not changed:
-        return None
+        return None, None
     frequency = {}
     for row_attributes in attributes:
         for attribute in row_attributes:
@@ -196,8 +271,8 @@ def _cursor_row(before, attributes):
 
     best = min(changed, key=rarity)
     if rarity(best) > 160:
-        return None
-    return best
+        return None, None
+    return best, _changed_attribute(before, attributes, best)
 
 
 class DisplayConsole:
@@ -257,7 +332,7 @@ class DisplayConsole:
         for key in ("down", "up"):
             self.send_keys([[key]])
             responded, moved_rows, attributes, current, attribute = (
-                self._follow_keypress(attributes, deadline, mask))
+                self._follow_keypress(attributes, deadline, mask, key))
             if moved_rows is not None:
                 rows = moved_rows
             if current is not None:
@@ -278,7 +353,7 @@ class DisplayConsole:
                 key = "down" if current < target_row else "up"
                 self.send_keys([[key]])
                 responded, moved_rows, attributes, moved, attribute = (
-                    self._follow_keypress(attributes, deadline, mask))
+                    self._follow_keypress(attributes, deadline, mask, key))
                 if moved is not None:
                     stalled = 0
                     current = moved
@@ -380,8 +455,12 @@ class DisplayConsole:
         rows, raw = screen
         return mask, rows, _masked_attributes(raw, mask)
 
-    def _follow_keypress(self, attributes, deadline, mask):
+    def _follow_keypress(self, attributes, deadline, mask, key=None):
         """Track where a keypress moved the menu highlight.
+
+        ``key`` is the cursor key just sent, which settles the
+        two-item menus where confinement alone cannot tell the bar
+        from the row it left (:func:`_relocated_bar`).
 
         Waits out the repaint the keypress caused and classifies the
         change. An unclassifiable difference (a half-drawn screen —
@@ -397,10 +476,14 @@ class DisplayConsole:
             return False, None, attributes, None, None
         while True:
             rows, changed = observed
-            moved = _cursor_row(attributes, changed)
+            moved, attribute = _bar_move(
+                attributes, changed, _DIRECTIONS.get(key))
             if moved is not None:
-                attribute = _changed_attribute(
-                    attributes, changed, moved)
+                # The bar's own token, not the dominant one among the
+                # row's changed cells: on a recognized framebuffer the
+                # latter is the bar's *blank* cells, whose token is the
+                # backdrop's, and every later relocation by `highlight`
+                # would match every row on screen.
                 return True, rows, changed, moved, attribute
             attributes = changed
             observed = self._settled_screen(attributes, deadline, mask)
