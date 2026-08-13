@@ -1390,9 +1390,13 @@ stay, and nothing after that point is captured. It is the same
 rule that suppresses a failure's automatic screenshot, applied to
 the other artifact a run can leave behind.
 
-`--dry-run` records nothing — it starts no machine and reads no
-screen — and accepts the flag rather than refusing it, unlike
-`--display`, `--expect` and a non-default `--progress`.
+**`--dry-run` refuses it** (exit `2`,
+`progress.record-on-a-dry-run`): a dry run starts no machine and
+reads no screen, so there would be nothing to write. It is the
+fourth refusal on that ground, beside `--display`, `--expect` and
+a non-default `--progress` — a plan has no window to show, no run
+whose outcome could be contracted, no stream to render, and no
+screens to capture.
 
 ---
 

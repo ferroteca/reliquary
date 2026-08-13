@@ -52,6 +52,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`--record` is refused under `--dry-run`** (S1, S2; P11), exit
+  `2` with `progress.record-on-a-dry-run`. It was accepted and did
+  nothing: a dry run starts no machine and reads no screen, so the
+  capture had nothing to write and said so to nobody. It now joins
+  `--display`, `--expect` and a non-default `--progress`, which a
+  dry run has always refused on that same ground — a flag accepted
+  to no effect is exactly the dishonesty P11 exists to forbid. The
+  refusal lives in `run_script`, so the CLI flag and the API's
+  `record=` get it from one place.
+
 - **The `remanence` pin moves to `0.0.1a3`** (P27), and `at_rest.py`
   is rewritten onto that release's surface — the dependency makes no
   compatibility promise before 1.0, and `Disk` is gone. An image is

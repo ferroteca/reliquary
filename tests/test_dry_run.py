@@ -735,6 +735,24 @@ class ScriptDryRunTests(unittest.TestCase):
             self.assertEqual("progress.stream-on-a-document",
                              caught.exception.rule_id)
 
+    def test_record_is_refused(self):
+        """The fourth refusal, on the same ground as the other three.
+
+        A dry run reads no screen, so a capture would be an empty
+        file — and a flag accepted to no effect is the dishonesty
+        P11 exists to refuse.
+        """
+        with tempfile.TemporaryDirectory() as home:
+            context = self._codex_context(home)
+            target = os.path.join(home, "run.rlqt")
+            with self.assertRaises(StaticError) as caught:
+                self._dry("freedos-install", context=context,
+                          record=target)
+            self.assertEqual("progress.record-on-a-dry-run",
+                             caught.exception.rule_id)
+            self.assertFalse(os.path.exists(target),
+                             "the refusal wrote a transcript anyway")
+
 
 class ScriptDryRunCliTests(unittest.TestCase):
     """The surface collisions the respelling had to settle."""

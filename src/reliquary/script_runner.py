@@ -1725,9 +1725,10 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
     instead — a document, not a stream — having started no machine
     and delivered no guest input. It is the only mode in which the
     selector is optional, because its presence chooses which tier is
-    checked; ``display``, a non-default ``progress`` and ``expect``
-    are refused with it — a plan has no window to show, no stream to
-    render, and no run whose outcome could be contracted.
+    checked; ``display``, a non-default ``progress``, ``expect`` and
+    ``record`` are refused with it — a plan has no window to show, no
+    stream to render, no run whose outcome could be contracted, and
+    no screens to capture.
     """
     if dry_run:
         if expect:
@@ -1745,6 +1746,12 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
                 "--dry-run returns a document, not a stream, so there "
                 "is no progress to render; read it with --json",
                 rule_id="progress.stream-on-a-document")
+        if record is not None:
+            raise StaticError(
+                "--record captures the screens a run reads, and "
+                "--dry-run starts no machine and reads none; there "
+                "would be nothing to write",
+                rule_id="progress.record-on-a-dry-run")
         return _dry_run_script(
             label, blueprint=blueprint, machine=machine, context=context,
             properties=properties, properties_file=properties_file)
