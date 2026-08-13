@@ -9,12 +9,13 @@ plus opaque, equality-comparable per-cell attribute tokens — so
 ``DisplayConsole`` and the script language need no backend branch
 (planning/design/backend-adapter.md "The text-screen contract").
 
-The glyph bank is the standard VGA 8×16 CP437 bit pattern, curated
-into ``fonts/cp437_8x16.bin`` by ``tools/extract_vga_font.py``. It is
-the default and what fixtures are rendered with, so the suite
-round-trips without a hypervisor — **it is not what reads a live
-guest**, which is drawn with the host's own fonts and read through
-them (:func:`banks_from_binary`, :func:`cached_banks`).
+The built-in bank is **drawn, not dumped** — ``fonts/cp437_8x16.bin``,
+authored by ``tools/gen_cp437_font.py``, so the project ships no
+glyphs it did not write. It is the default and what fixtures are
+rendered with, so the suite round-trips without a hypervisor —
+**it is not what reads a live guest**, which is drawn with the
+host's own fonts and read through them (:func:`banks_from_binary`,
+:func:`cached_banks`).
 
 *Fonts*, plural, is the point. A run paints in more than one: a VGA
 BIOS installs its bank with an override table applied and draws its
@@ -294,9 +295,20 @@ def cached_banks(cache_dir, backend, extract):
 def glyph_bank():
     """256 glyphs × 16 row bytes (MSB = leftmost pixel).
 
-    Reliquary's own bank: the default, and what :func:`render` draws
-    with so the suite round-trips without a hypervisor. **It is not
-    what reads a live guest** — see :func:`cached_banks`.
+    **Reliquary's own bank, drawn rather than dumped** — produced by
+    ``tools/gen_cp437_font.py``, which authors the ASCII and
+    box-drawing shapes outright and computes a well-separated glyph
+    for every code nobody drew. It is the default and what
+    :func:`render` draws with, so the suite round-trips without a
+    hypervisor, and **it is not what reads a live guest** — that is
+    drawn in the host's own fonts and read through those
+    (:func:`cached_banks`).
+
+    Its one hard requirement is that all 256 codes be **distinct**,
+    which a bank of drawn glyphs alone did not manage: a code with no
+    shape came out blank, collided with the space, and could never be
+    recognized. It is not a VGA face and does not have to be — the
+    faces a guest paints with come off the host.
     """
     path = _font_path()
     with open(path, "rb") as handle:

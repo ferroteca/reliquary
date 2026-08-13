@@ -33,6 +33,7 @@ except ModuleNotFoundError:
 import reliquary
 from reliquary import backend_qemu as qemu_module
 from reliquary import text_recognize
+from vga_bank import vga_bank
 from reliquary.errors import PreflightError, RunFailure, StaticError
 
 
@@ -596,7 +597,7 @@ class GlyphBankTests(unittest.TestCase):
     """
 
     def test_the_bank_is_carved_out_of_the_installed_vgabios(self):
-        own = text_recognize.glyph_bank()
+        own = vga_bank()
         with tempfile.TemporaryDirectory() as root, \
                 tempfile.TemporaryDirectory() as cache:
             share = os.path.join(root, "share", "qemu")

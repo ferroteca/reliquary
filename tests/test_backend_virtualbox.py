@@ -16,6 +16,7 @@ from unittest import mock
 
 from reliquary import backend_virtualbox as vbox
 from reliquary import text_recognize
+from vga_bank import vga_bank
 from reliquary.errors import PreflightError, RunFailure, StaticError
 
 
@@ -128,7 +129,7 @@ class AdapterSurfaceTests(unittest.TestCase):
         binary, so the suite carries no other project's font while
         still proving the adapter reads one out of its install.
         """
-        own = text_recognize.glyph_bank()
+        own = vga_bank()
         with tempfile.TemporaryDirectory() as home:
             with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
                 self.assertEqual(vbox.guest_glyph_banks(), (own,))
@@ -141,7 +142,7 @@ class AdapterSurfaceTests(unittest.TestCase):
         the BIOS draws its own messages with. Both are the host's, and
         a screenshot does not say which painted it.
         """
-        own = bytearray(text_recognize.glyph_bank())
+        own = bytearray(vga_bank())
         patch = bytes([0x57]) + b"\x5a" * 16     # 'W' drawn differently
         payload = (b"\x11" * 500 + bytes(own) + patch + b"\x00"
                    + b"\x22" * 30)
@@ -154,7 +155,7 @@ class AdapterSurfaceTests(unittest.TestCase):
         self.assertEqual(banks[1], bytes(own))
 
     def test_the_bank_is_cached_under_the_backend_support_dir(self):
-        own = text_recognize.glyph_bank()
+        own = vga_bank()
         with tempfile.TemporaryDirectory() as home, \
                 tempfile.TemporaryDirectory() as cache:
             with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
@@ -172,7 +173,7 @@ class AdapterSurfaceTests(unittest.TestCase):
                 self.assertEqual(vbox.guest_glyph_banks(cache), (own,))
 
     def test_several_banks_round_trip_through_one_cache_file(self):
-        own = text_recognize.glyph_bank()
+        own = vga_bank()
         other = bytes(own[:0x57 * 16]) + b"\x5a" * 16 + bytes(
             own[0x58 * 16:])
         with tempfile.TemporaryDirectory() as cache:
@@ -188,7 +189,7 @@ class AdapterSurfaceTests(unittest.TestCase):
                 self.assertEqual(vbox.guest_glyph_banks(cache), (own, other))
 
     def test_a_truncated_cache_file_is_re_extracted(self):
-        own = text_recognize.glyph_bank()
+        own = vga_bank()
         with tempfile.TemporaryDirectory() as home, \
                 tempfile.TemporaryDirectory() as cache:
             stale = os.path.join(cache, "support", "virtualbox")

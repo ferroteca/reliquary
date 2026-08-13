@@ -322,7 +322,14 @@ workflow:
   correctness one. Not vendoring is the licensing policy (CONTRIBUTING.md) as much as the
   engineering: the glyphs belong to whatever emulator the host installed. The shipped
   `fonts/cp437_8x16.bin` remains **only** as `recognize`'s default and what `render` draws
-  fixtures with, so the suite needs no hypervisor.
+  fixtures with, so the suite needs no hypervisor — and it is **drawn rather than dumped**
+  (`tools/gen_cp437_font.py`, D82: the incoming test is *could this ship inside a proprietary
+  product?*). Its ASCII and box-drawing shapes are authored; every code nobody drew gets a
+  computed Reed–Muller codeword, 64 of 128 pixels from any other, because the one thing the bank
+  must be is **all 256 codes distinct** — an undrawn code came out blank, collided with the
+  space, and could never be recognized. It is not a VGA face and does not have to be, which is
+  why `CLASSIC_A` — the anchor `bank_from_binary` locates a *real* bank by — is deliberately
+  **not** in it; a test wanting a findable bank says so via `tests/vga_bank.py`.
   **Whether a screen has stopped changing
   is not decided here** (F49): `_settled_screen` and `_menu_baseline` are callers of `screen_stability` rather
   than owners of a copy. What stays is what was never about settling — whether a keypress changed anything at

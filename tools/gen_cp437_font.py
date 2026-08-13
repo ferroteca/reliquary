@@ -278,7 +278,11 @@ def _box_drawing(code):
     }
     which = arms.get(code)
     if which is None:
-        return rows
+        # The double-line set (0xB5-0xBE, 0xC6-0xD8) was never drawn.
+        # Saying so lets the caller construct one rather than emit a
+        # blank, which would collide with the space and make the code
+        # unrecognizable.
+        return None
     if "N" in which:
         _vline(rows, cx, 0, cy)
         _vline(rows, cx + 1, 0, cy)
@@ -294,21 +298,56 @@ def _box_drawing(code):
     return rows
 
 
+def _constructed(code):
+    """A drawn-for-nobody glyph, computed from its own code.
+
+    Codes outside the drawn ranges still have to be *recognizable* —
+    a bank where several codes share a bitmap cannot round-trip, and
+    the recognizer would answer whichever collided code it met first.
+    The earlier single-pixel placeholder failed both ways: 128 codes
+    apart it repeated, and one lit pixel sits a distance of 1 from a
+    blank cell where 24 is the threshold for a match at all.
+
+    So these are a first-order Reed–Muller codeword over the cell's
+    128 pixels: pixel ``p`` is the parity of ``a & p``, optionally
+    inverted, with ``a`` and the inversion carrying the code. Any two
+    differ in 64 of 128 pixels — the widest separation 128 pixels can
+    give 256 symbols. They look like noise, which is honest: nobody
+    drew a glyph for these codes, and a dense block is easy to tell
+    from a letter at a glance.
+
+    The code is offset so the all-blank codeword would land on the
+    space, and the first pixel is forced clear so its opposite is not
+    solidly inked — a uniform cell has no foreground to tell from its
+    background and reads as a space either way.
+    """
+    offset = code ^ 0x20
+    seed = offset & 0x7F
+    invert = (offset >> 7) & 1
+    bits = [(bin(seed & p).count("1") & 1) ^ invert for p in range(W * H)]
+    bits[0] = 0
+    rows = _blank()
+    for y in range(H):
+        for x in range(W):
+            if bits[y * W + x]:
+                _set(rows, x, y)
+    return rows
+
+
 def build_font():
     """Return 4096 bytes: 256 glyphs × 16 row bytes."""
     _define_ascii()
     out = bytearray(N * H)
     for code in range(N):
-        if 0x20 <= code <= 0x7E and code in _ASCII:
+        if code == 0x20:
+            rows = _blank()             # the space, and only the space
+        elif 0x20 <= code <= 0x7E and code in _ASCII:
             rows = _blank()
             _plot_points(rows, _ASCII[code])
-        elif 0xB0 <= code <= 0xDF:
-            rows = _box_drawing(code)
         else:
-            # Distinct placeholder so unknown codes don't collapse to space
-            rows = _blank()
-            if code != 0:
-                _set(rows, code % 8, (code // 8) % 16)
+            rows = (_box_drawing(code) if 0xB0 <= code <= 0xDF else None)
+            if rows is None:
+                rows = _constructed(code)
         for y, byte in enumerate(rows):
             out[code * H + y] = byte & 0xFF
     return bytes(out)

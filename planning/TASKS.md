@@ -130,9 +130,8 @@ not keep.
 Found by running the opt-in FreeDOS VirtualBox integration against
 a live hypervisor for the first time (2026-08-13), which now
 passes. What was fixed in that sitting is not here — as a queue
-holds only what waits — leaving the two the integration cannot
-catch: one about provenance rather than behaviour, one about a
-misreading that succeeds.
+holds only what waits — leaving the one the integration cannot
+catch, because it is a misreading that succeeds.
 
 #### T24 — A cell that matches nothing is reported as though it were read
 
@@ -163,30 +162,3 @@ verdict.
 It is also the precursor to **U25** (a guest dumping its own font):
 an author cannot know a capture is needed while the misreading is
 invisible.
-
-#### T21 — The shipped glyph bank is another project's font, recorded as ours
-
-`src/reliquary/fonts/cp437_8x16.bin` is 4096 bytes carved out of
-the host's **QEMU** vgabios by `tools/extract_vga_font.py` — the
-font a VGA BIOS installs, overrides already applied — and
-`REUSE.toml` sweeps `reliquary/fonts/*.bin` into
-`SPDX-FileCopyrightText = "2026 Paul Galbraith"`,
-`GPL-3.0-only` — a record of ownership over bytes the project did
-not author.
-
-D82 is what makes this worth an entry rather than a shrug: the
-incoming test is *could this ship inside a proprietary product?*,
-never *is this GPL-compatible?*. It also **supports how the live
-path was fixed** — every font a backend's installation offers is
-now extracted from the host and cached under
-`cache/support/<backend>/`, so nothing is vendored and the glyphs
-belong to whatever emulator the host has.
-
-What remains is this one file, now used *only* as `recognize`'s
-default and as the font `text_recognize.render` draws fixtures
-with. Deleting it is not free: the suite would need a synthetic
-bank to render against, and the three golden PNGs under
-`tests/fixtures/text_recognize/` encode real FreeDOS screens whose
-value is exactly that they are real. Un-vendor and regenerate, or
-keep it and correct the REUSE record to say what it is — the
-choice is the owner's, and either closes the entry.

@@ -316,6 +316,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The shipped glyph bank is the project's own font again.**
+  `fonts/cp437_8x16.bin` had become 4096 bytes carved out of a host's
+  **QEMU** vgabios, while `REUSE.toml` recorded it as Paul
+  Galbraith's, `GPL-3.0-only` — a claim of ownership over bytes the
+  project did not author, and material that fails D82's incoming test
+  (*could this ship inside a proprietary product?*). It is once more
+  produced by `tools/gen_cp437_font.py`, which draws its shapes; the
+  extractor that overwrote it with an emulator's is deleted.
+
+  The authored font had a real defect, which is presumably why it was
+  overwritten: 62 codes were never drawn and came out **blank**, so
+  they collided with the space and could never be recognized — 194
+  distinct glyphs where a bank needs 256. Codes nobody drew now get a
+  computed first-order Reed–Muller codeword, any two differing in 64
+  of 128 pixels. The bank is **256 of 256 distinct**, better than the
+  254 of the dump it replaces, with only the space blank.
+
+  Nothing about this reaches a live guest — those are read through
+  fonts extracted from the host, and have been since the fix above.
+  The shipped bank is `recognize`'s default and what `render` draws
+  fixtures with, so the suite still needs no hypervisor. It is not a
+  VGA face and no longer pretends to be: `CLASSIC_A`, the anchor
+  `bank_from_binary` locates a *real* bank by, is deliberately absent
+  from it, and a test wanting a findable bank now says so
+  (`tests/vga_bank.py`). The three golden fixtures are regenerated —
+  their `.txt` rows, which are the real FreeDOS screens worth
+  pinning, are unchanged.
+
 - **A screen is read through every font it could have been drawn
   with, not one chosen in advance.** More than one font is painted
   during a single run and nothing in a framebuffer says which was in

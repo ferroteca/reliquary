@@ -13,6 +13,7 @@ import unittest
 from PIL import Image
 
 from reliquary import text_recognize as recognize
+from vga_bank import vga_bank
 from reliquary.errors import (PreflightError, StaticError, UnreadableScreen,
                               exit_code)
 
@@ -157,10 +158,21 @@ class GlyphBankSourceTests(unittest.TestCase):
             recognize.recognize(image, bank=swapped)[0][0], "U")
 
     def test_a_bank_is_carved_out_of_a_binary_by_the_classic_a(self):
-        shipped = recognize.glyph_bank()
-        binary = (b"\x00" * 1234) + shipped + (b"\xa5" * 77)
+        embedded = vga_bank()
+        binary = (b"\x00" * 1234) + embedded + (b"\xa5" * 77)
         self.assertEqual(
-            recognize.bank_from_binary(binary, "fake.dll"), shipped)
+            recognize.bank_from_binary(binary, "fake.dll"), embedded)
+
+    def test_reliquarys_own_bank_carries_no_borrowed_anchor(self):
+        """The locator's anchor is a real BIOS's, and ours is not one.
+
+        `CLASSIC_A` is in the source because a bank cannot be found in
+        a binary without knowing what to look for. Reliquary's own
+        bank is drawn rather than dumped, so its `A` is its own — and
+        a test that wanted a *findable* bank had to say so, which is
+        what `vga_bank` is for.
+        """
+        self.assertNotIn(recognize.CLASSIC_A, recognize.glyph_bank())
 
     def test_a_binary_without_the_anchor_fails_closed(self):
         with self.assertRaises(PreflightError) as caught:
@@ -169,7 +181,7 @@ class GlyphBankSourceTests(unittest.TestCase):
                          "recognize.font-not-found")
 
     def test_a_truncated_bank_fails_closed(self):
-        shipped = recognize.glyph_bank()
+        shipped = vga_bank()
         with self.assertRaises(PreflightError) as caught:
             recognize.bank_from_binary(shipped[:2048], "fake.dll")
         self.assertEqual(caught.exception.rule_id,
@@ -243,7 +255,7 @@ class SeveralFontsTests(unittest.TestCase):
         self.assertEqual(len(both), 256 + 1)
 
     def test_an_override_table_behind_a_bank_yields_a_second_font(self):
-        stored = recognize.glyph_bank()
+        stored = vga_bank()
         binary = (b"\x00" * 64 + stored
                   + _patch_table([(0x57, 0x5a)]) + b"\xa5" * 40)
         banks = recognize.banks_from_binary(binary, "fake.dll")
@@ -253,7 +265,7 @@ class SeveralFontsTests(unittest.TestCase):
 
     def test_a_table_for_another_glyph_height_is_stepped_over(self):
         """A BIOS carries a table per size; only 8x16 is this reader's."""
-        stored = recognize.glyph_bank()
+        stored = vga_bank()
         binary = (b"\x00" * 64 + stored
                   + _patch_table([(0x1d, 0x11), (0x22, 0x11)], height=14)
                   + _patch_table([(0x57, 0x5a)])
@@ -264,14 +276,14 @@ class SeveralFontsTests(unittest.TestCase):
 
     def test_identical_fonts_collapse_to_one(self):
         """Three copies of a BIOS image are not three fonts."""
-        stored = recognize.glyph_bank()
+        stored = vga_bank()
         binary = b"".join([b"\x00" * 8 + stored] * 3)
         self.assertEqual(recognize.banks_from_binary(binary, "fake.dll"),
                          (stored,))
 
     def test_bytes_that_are_not_a_table_add_no_font(self):
         """Arbitrary bytes behind a bank must not become glyph shapes."""
-        stored = recognize.glyph_bank()
+        stored = vga_bank()
         # Descending codes: a real override table ascends.
         noise = bytes([0x90]) + b"\x11" * 16 + bytes([0x10]) + b"\x11" * 16
         binary = b"\x00" * 64 + stored + noise + b"\x00"
