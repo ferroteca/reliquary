@@ -73,8 +73,16 @@ _PLAIN = {
 def char_keys(character):
     """Map one character to a simultaneous key-name combination.
 
-    The names are the seam's portable key vocabulary, which the
-    adapter translates into its backend's own input events.
+    The names are **the seam's key vocabulary, which is QEMU's qcode
+    set** (D103) — which is why the tables above spell `spc` and
+    `ret` rather than `space` and `enter`. The adapter translates
+    them into its backend's own input events; on QEMU that is the
+    identity, and on VirtualBox a scancode lookup.
+
+    This is the character half of key mapping. The *language's*
+    `press` names are a separate, genuinely portable vocabulary
+    (`script_validation.PORTABLE_KEY_NAMES`), resolved onto this set
+    by `script_runner.resolve_key` before anything reaches the seam.
     """
     if character in _PLAIN:
         return [_PLAIN[character]]

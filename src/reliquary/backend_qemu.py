@@ -586,13 +586,18 @@ class QemuSession:
         return self._qmp
 
     def send_keys(self, combos, delay=0.06):
-        """Inject key combinations, each a list of portable key names.
+        """Inject key combinations, each a list of seam key names.
 
-        The seam's key vocabulary is the portable name set the display
-        console speaks; QEMU's qcode names are that set today, so the
-        mapping here is the identity — a backend whose input API names
-        keys differently translates in its own adapter, never in the
-        control plane.
+        **The seam's key vocabulary is QEMU's qcode set** (D103), so
+        the mapping here is the identity — not by coincidence but
+        because this backend's names *are* the set. Naming the seam
+        after the reference backend is the cost of not inventing a
+        third vocabulary that no backend speaks natively.
+
+        A backend whose input API names keys differently translates in
+        its own adapter, never in the control plane; VirtualBox's
+        `scancodes_for` is that translation, and it is keyed by these
+        names rather than by the language's.
         """
         for combo in combos:
             self._qmp.cmd(

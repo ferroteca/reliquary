@@ -458,7 +458,14 @@ def _make_break(make_bytes):
 
 
 def scancodes_for(combo):
-    """Expand one simultaneous key combo into make then break bytes."""
+    """Expand one simultaneous key combo into make then break bytes.
+
+    ``combo`` carries **the seam's key names, which are QEMU's qcode
+    set** (D103) — so `_SCANCODES` is keyed by `ret`, `spc`, `pgup`
+    and `pgdn`, and has no entry for `enter` or `space`. That is the
+    contract rather than an accident: the seam is named for the
+    reference backend, and this adapter translates from it.
+    """
     makes = []
     for name in combo:
         codes = _SCANCODES.get(name)

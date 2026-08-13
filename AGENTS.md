@@ -275,9 +275,16 @@ workflow:
   capability**, so assignment passes over them even where the
   backend is installed, and a pinned one fails preflight naming the
   gap.
-  `control_display.py` is the **agentless-display control plane** — key mapping, text-screen composition and
+  `control_display.py` is the **agentless-display control plane** — character-to-key mapping (`char_keys`),
+  text-screen composition and
   the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
-  equality-comparable per-cell attribute tokens) and never per adapter.
+  equality-comparable per-cell attribute tokens) and never per adapter. **Key mapping is three layers, not
+  one, and only the middle one is here** (D103): the language's portable `press` names are
+  `script_validation.PORTABLE_KEY_NAMES`, `script_runner.resolve_key` maps those onto **the seam's key
+  vocabulary — which is QEMU's qcode set**, and each adapter translates that into its own input events
+  (identity on QEMU, `scancodes_for` on VirtualBox). So `char_keys` spells `spc` and `ret`, and VirtualBox's
+  table has no entry for `space` or `enter`; the seam is named for the reference backend rather than carrying
+  a third vocabulary no backend speaks.
   `text_recognize.py` is the **shared fixed-font recognizer** (F51) backends without VGA text memory
   use over a screenshot — same contract, one glyph bank (`fonts/cp437_8x16.bin`).
   **Whether a screen has stopped changing

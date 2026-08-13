@@ -361,10 +361,19 @@ session.change_medium(drive_key, path=None)
 session.native()                            -> the backend-scoped hatch
 ```
 
-The key vocabulary crossing this seam is the portable key-name set
-the display console speaks; QEMU's qcode names *are* that set
-today, so its mapping is the identity, and a backend naming keys
-differently translates in its own adapter.
+The key vocabulary crossing this seam is **QEMU's qcode set**
+(D103). Its own mapping is therefore the identity — because the
+names *are* its own, not because the two happen to agree — and a
+backend naming keys differently translates in its own adapter,
+keyed by these names. The seam is named for the reference backend
+deliberately: the alternative was a third vocabulary no backend
+speaks natively, invented only so the seam could avoid saying so.
+
+This is not the *language's* key vocabulary, which is portable and
+stays that way (`script_validation.PORTABLE_KEY_NAMES`, resolved
+onto the seam's names before a run reaches an adapter). P25 governs
+what a blueprint may say, and is untouched by how the seam spells
+`enter`.
 
 **Two things the extraction deliberately left out.** Raw
 interchange is in the inventory above but has no caller: it lands

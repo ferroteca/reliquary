@@ -178,6 +178,38 @@ is waiting on an answer today.
 
 ## Decided
 
+- D103 — THE ADAPTER SEAM'S KEY VOCABULARY IS QEMU'S QCODE SET —
+  DECIDED (owner, 2026-08-13). Supports P11. Leaves P25 untouched:
+  that governs the blueprint's portable vocabulary, and the script
+  language's `press` names stay portable.
+
+  **The seam was already QEMU's and said it was portable.** Three
+  docstrings and the seam's own design note claimed the vocabulary
+  crossing it was a portable set QEMU happened to match. It was
+  not: `control_display._PLAIN` emits `spc` and `ret`,
+  `script_runner.resolve_key` translates the language's names into
+  QEMU's above the seam, and the VirtualBox adapter's scancode
+  table is keyed by `ret`, `spc`, `pgup` and `pgdn` with no entry
+  for `enter` or `space`. **That table is the evidence**: the one
+  adapter the contract was written for was built against what
+  arrives rather than what was declared, so the claim had already
+  failed its only test.
+
+  WEIGHED AND DECLINED: making the seam genuinely portable —
+  respelling the control plane's tables, moving the QEMU map into
+  its adapter, rekeying VirtualBox. It needs a vocabulary that does
+  not exist: `PORTABLE_KEY_NAMES` covers 31 named keys while the
+  seam also carries punctuation, letters and digits, so the honest
+  version invents a third naming scheme no backend speaks natively,
+  for no behavioural gain on either backend. Naming the seam after
+  the reference backend is the cost paid instead, and it is paid
+  once.
+
+  REOPENS on a backend whose input API cannot express a qcode name,
+  or a second adapter author who needs spellings this set does not
+  reach — at which point the third vocabulary earns its keep and
+  this is the entry to overrule.
+
 - D102 — BLUEPRINTS USE JSON5, NOT JSONC — DECIDED (owner,
   2026-08-05). Supports U4, U5; G2. Amends D18's input-format
   choice; its computational-growth rule remains in force.

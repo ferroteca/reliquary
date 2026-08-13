@@ -66,9 +66,15 @@ _POLL_INTERVAL = 2.0
 #: reads are spent only there, never for the whole of a long wait.
 _SETTLE_POLL = 0.1
 
-# QEMU translations for every portable language key. Membership in
-# the closed vocabulary is owned by static validation; keeping the
-# backend map explicit makes an unsupported key fail closed.
+# The language's portable `press` names, mapped onto the seam's key
+# vocabulary — which is QEMU's qcode set (D103), so most entries are
+# the identity and the handful that are not (`enter`, `space`,
+# `pageup`, `pagedown`) are why this table exists at all. Every
+# backend receives these names, QEMU and VirtualBox alike.
+#
+# Membership in the language's closed vocabulary is owned by static
+# validation; keeping this map explicit makes an unsupported key fail
+# closed.
 _QEMU_KEY_NAMES = {
     "enter": "ret",
     "esc": "esc",
