@@ -124,3 +124,175 @@ is mechanical, a defect needs no pledge because the norm it
 violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
+
+### Defects
+
+All four were found by running the opt-in FreeDOS VirtualBox
+integration against a live hypervisor for the first time
+(2026-08-13). Two of the four were fixed in that sitting and are
+therefore not here — the unreadable-framebuffer abort and the menu
+bar located by rarity — as a queue holds only what waits.
+
+#### T18 — Decoration is unrecognizable at a screenshot backend's cadence
+
+`screen_stability` masks a cell as decoration after
+`DEFAULT_ANIMATION_REPEATS` (3) changes within
+`DEFAULT_ANIMATION_WINDOW` (1.0s). A VirtualBox screen read costs
+**~0.83s** — a `screenshotpng` round trip plus full-frame
+recognition, measured through the real seam — so two samples fit
+in that window and a third change never accumulates. A blinking
+element therefore never enters the mask, and it holds stability
+under the 0.99 gate **permanently**: the wait can never proceed,
+however long its timeout.
+
+Measured both ways rather than argued. A synthetic 40-cell blink
+at a 0.1s poll masks 40 cells and reads `stability=1.0, stable`;
+the same blink at 0.83s masks **0** and reads `0.98, not stable`,
+forever. On the live guest it expired at `0.944` on the installer
+welcome screen and `0.917` on the post-reboot boot.
+
+**This is the sample-count dependence the wall-clock window
+exists to refuse**, surviving in the repeat count. The module's
+own docstring states the intent — a denser run "would reach any
+sample count sooner, which is the cadence dependence the window
+definition exists to refuse" — and then requires three samples
+inside the window, which is a cadence requirement in disguise. The
+threshold half was made cadence-free; the recurrence half was not.
+
+Two shapes, and the second is the one the module's philosophy
+points at. **Scale the horizon** to the observed cadence, so
+recurrence is still measured over the clock but over one a sparse
+caller can actually observe — cheap, and it risks masking a slow
+*content* change as decoration. Or **report that decoration could
+not be assessed** and let the gate stand down, which is P11's
+answer and matches "a window never observed answers
+`stability=None` rather than a verdict the cadence produced". The
+second needs `script_runner._settled` to stop reading "could not
+measure" as "refuse", and that collides with the pinned tests
+pricing quiescence at one window — so the young-monitor case has
+to be told apart from the sparse-cadence one, which is the whole
+design problem.
+
+**F52's remaining claim rides on this.** With it fixed the FreeDOS
+VirtualBox integration is the thing that says whether
+`capabilities().agentless_display` and `pledged/USE-CASES.md`'s
+"delivered" are earned; until then the CHANGELOG's F52 entry
+carries the gap. The run currently reaches the installer's
+partitioning reboot, so what remains untested is the second half
+of the install, not the plane.
+
+#### T19 — A machine whose VM died out of band can be neither stopped nor destroyed
+
+`stop-machine` on a machine whose VM is already gone fails, and
+`destroy-machine` then refuses because the phase says `running`,
+with no `--force` and no other door: the only way out is deleting
+the machine directory by hand. Hit while clearing up after a
+failed integration run.
+
+Backend-neutral and pre-existing, though the two arrive
+differently. On VirtualBox a powered-off VM is still *registered*,
+so `showvminfo` answers, `verify_vm` passes, and `controlvm
+poweroff` fails as `RunFailure(machine.backend-failed)`. On QEMU
+the dead QMP port raises `PreflightError(machine.vm-unreachable)`.
+Either way `machines._complete_stop` sees a `vm` section still
+recorded, restores `phase: running`, and re-raises.
+
+Only reachable **outside** a run: `script_runner._read` converts
+an unreachable VM into the stopped observation and calls
+`mark_stopped`, so a run self-heals and only a guest that halts
+itself between runs strands the machine. Whether the fix is
+`stop-machine` treating an already-dead VM as an accomplished stop
+— it is, on any reading of what stop means — or a separate
+reconciliation door is the open question.
+
+#### T20 — Two fonts are in play per run, and the choice is not the emulator's
+
+With the host font in use (`guest_glyph_bank`) the FreeDOS
+installer recognizes perfectly and the BIOS's own boot message
+reads `Trying next boot device` as `Irying`. Before the fix it was
+the other way round. **Both readings are correct**, which is the
+finding: two different fonts are painted during one run, and no
+run-long bank can be right for all of it.
+
+Verified against the shipped binaries *and* the published source,
+because the first reading of this — "the emulators draw different
+faces" — was wrong and is worth not repeating.
+
+**What the binaries hold.** `VBoxDD2.dll` carries three complete
+VGA BIOS images, each with 8x8, 8x14 and 8x16 banks plus a
+19-entry `vgafont16alt` override table. The three 8x16 banks are
+byte-identical, so the classic-`A` anchor `bank_from_binary` uses
+is unambiguous — worth recording, since a second distinct bank
+would have made the extraction a coin toss. QEMU's `vgabios-*.bin`
+carry **no alt table at all**: their 8x16 bank already has those
+19 glyphs merged in.
+
+**What the source says.** VirtualBox's `vgafonts.h` declares
+`vgafont16alt[19*17+1]` — 19 entries of a code byte plus 16 rows,
+then a terminator — and its codes are exactly the 19 parsed out of
+the DLL. `vgabios.c` applies it *automatically on every text mode
+set*, not on request:
+
+    biosfn_load_text_user_pat(0, 0xC000, vgafont16, 256, ...);
+    load_text_patch(0xC000, vgafont16alt, 0, 16);
+
+So both emulators install **the same** font after a mode set. One
+stores it merged, the other patches at runtime; VirtualBox's raw
+bank plus its patch equals QEMU's shipped bank byte for byte.
+**There is no emulator font difference.**
+
+**The real axis is BIOS-drawn versus guest-drawn.** The merged set
+is what the BIOS paints its own messages with. The FreeDOS boot
+path leaves a stock CP437 font in the VGA that matches the
+*unpatched* design, and that is what the installer draws with —
+which is why extracting VirtualBox's raw `vgafont16` fixed the
+screens scripts wait on. That axis is emulator-independent: a
+FreeDOS guest on QEMU paints the same unmerged glyphs, and QEMU
+escapes the bug only because it scrapes text memory instead of
+recognizing pixels.
+
+**A latent consequence to fix with this.**
+`backend_qemu.guest_glyph_bank` returns QEMU's pre-merged bank —
+the BIOS font, and the *wrong* one for guest-drawn screens. It has
+no consumer today, so nothing is broken; it would be wrong the
+moment anything recognizes a QEMU screenshot, and the symmetry it
+was written for is machinery aimed at the wrong target.
+
+**The fix fits the recognizer's existing shape.** `_match_cell`
+already scores two polarities and keeps the lower Hamming
+distance, so scoring **both** banks per cell and keeping the best
+costs one more pass over a 19-glyph ambiguity surface and reads
+both screens — no state, no guessing which font is loaded. The
+alternative, tracking the guest's font through its mode sets,
+needs state no screenshot carries. Only BIOS-drawn screens are
+wrong today and no script waits on one, so this is correctness
+owed rather than a live blocker; it is queued because a
+systematically misread screen is precisely what hid the original
+font bug for as long as it did.
+
+#### T21 — The shipped glyph bank is another project's font, recorded as ours
+
+`src/reliquary/fonts/cp437_8x16.bin` is 4096 bytes carved out of
+the host's **QEMU** vgabios by `tools/extract_vga_font.py` — the
+pre-merged BIOS font, per T20 — and
+`REUSE.toml` sweeps `reliquary/fonts/*.bin` into
+`SPDX-FileCopyrightText = "2026 Paul Galbraith"`,
+`GPL-3.0-only` — a record of ownership over bytes the project did
+not author.
+
+D82 is what makes this worth an entry rather than a shrug: the
+incoming test is *could this ship inside a proprietary product?*,
+never *is this GPL-compatible?*. It also **supports how the live
+path was fixed** — each backend's font is now extracted from the
+installation on the host and cached under
+`cache/support/<backend>/`, so nothing is vendored and the glyphs
+belong to whatever emulator the host has.
+
+What remains is this one file, now used *only* as `recognize`'s
+default and as the font `text_recognize.render` draws fixtures
+with. Deleting it is not free: the suite would need a synthetic
+bank to render against, and the three golden PNGs under
+`tests/fixtures/text_recognize/` encode real FreeDOS screens whose
+value is exactly that they are real. Un-vendor and regenerate, or
+keep it and correct the REUSE record to say what it is — the
+choice is the owner's, and either closes the entry.

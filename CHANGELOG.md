@@ -325,11 +325,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **A guest screen is read through the guest's own font.** The
   recognizer's only production consumer is VirtualBox, and the bank it
-  read through is curated from the host *QEMU* vgabios — so it was
-  reading one emulator's screen with another's face. Nineteen of 256
-  glyphs differ, `W` and `m` among them: `Welcome to the FreeDOS 1.4
-  installation program.` recognized as `Uelcooe ... prograo.`, and
-  every `wait` on installer text missed. `recognize(bank=)` now takes
+  read through is curated from the host *QEMU* vgabios. Nineteen of
+  256 glyphs read wrong, `W` and `m` among them: `Welcome to the
+  FreeDOS 1.4 installation program.` recognized as `Uelcooe ...
+  prograo.`, and every `wait` on installer text missed. Those 19 are
+  **not** an emulator difference: they are `vgafont16alt`, which
+  QEMU's vgabios merges into the bank it ships and VirtualBox applies
+  at runtime on every text mode set, the merged VirtualBox bank
+  equalling QEMU's byte for byte. Both emulators install the same
+  font. What differs is who painted the screen — the BIOS uses that
+  merged set, a DOS guest loading its own CP437 font paints the
+  unpatched one — so the fix is really "read a guest-drawn screen
+  with the guest's font", and it would bite QEMU identically if
+  anything recognized a QEMU screenshot. T20 carries the rest. `recognize(bank=)` now takes
   the bank to read through, and each backend answers for its own —
   `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu`
   alike — carving it out of the installation, anchored on the classic

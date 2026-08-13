@@ -287,10 +287,17 @@ workflow:
   a third vocabulary no backend speaks.
   `text_recognize.py` is the **shared fixed-font recognizer** (F51) backends without VGA text memory
   use over a screenshot — same contract, one algorithm. **The glyph bank is the guest's, not
-  Reliquary's**: VGA BIOS fonts differ between emulators (19 of 256 glyphs between the two met so
-  far, `W` and `m` among them, which is enough to miss every wait on a word carrying either), so an
-  adapter reading a live screen passes `bank=` its own host's font. Each backend answers that the
-  same way — `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu` alike — carving
+  Reliquary's**, and an adapter reading a live screen passes `bank=` its own host's font.
+  **The axis is BIOS-drawn versus guest-drawn, and not which emulator** (T20). Both emulators
+  install the *same* font on a text mode set — QEMU's vgabios merges its 19-glyph
+  `vgafont16alt` into the bank it ships, VirtualBox ships the raw bank and applies the same 19
+  at runtime from `vgabios.c`'s `load_text_patch`, and merged-VirtualBox equals QEMU's bank byte
+  for byte. What differs is *who painted the screen*: the BIOS uses that merged set, while a DOS
+  guest that loads its own CP437 font (FreeDOS does) paints the **unpatched** design, `W`, `m`
+  and `T` among the 19 — enough to miss a wait on any word carrying one. So no run-long bank
+  reads a whole run, the unpatched set is right for the screens scripts wait on, and this would
+  bite QEMU identically if anything ever recognized a QEMU screenshot rather than scraping its
+  text memory. Each backend answers the bank question the same way — `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu` alike — carving
   the bank out of the installation with `bank_from_files` / `bank_from_binary`, anchored on the
   classic `A` every CP437 bank shares and failing closed by name where the install holds none.
   QEMU's own plane never needs it (it scrapes text memory, where the guest already resolved its
