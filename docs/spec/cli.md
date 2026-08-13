@@ -1221,6 +1221,7 @@ edit them to remove the reference first, then delete the script
 rlq run-script <label> (--blueprint <name> | --machine <id>)
     [--property <key>=<value>]... [--properties <path>]
     [--display] [--detach] [--progress <mode>]
+    [--expect <key>=<value>]... [--record <path>]
 rlq run-script <label-or-name> --dry-run
     [--blueprint <name> | --machine <id>]
     [--property <key>=<value>]... [--properties <path>]
@@ -1360,6 +1361,38 @@ a disk image swapped out — kept and organized on the caller's own
 side of the seam (P4, P18). The whole `run` family and the
 detach/follow surface return only if the async work schedules
 (drafted as U19).
+
+### Recording a screen transcript
+
+```
+rlq run-script <label> (--blueprint <name> | --machine <id>)
+    --record <path>
+```
+
+`--record <path>` writes a screen transcript to `<path>`: every
+frame the run reads and every carrier call it makes, for debugging
+a script and for capturing a corpus. `run_script(record=<path>)`
+is the API twin.
+
+It is a **maintainer's tool, and the file it writes is not an
+application surface** (D98): the `.rlqt` format carries no
+specification of its own, no stability guarantee and no
+compatibility obligation, so a change to it is housekeeping. What
+*is* surface is the invocation alone — this flag and `record=` —
+and the two land together (S1, S2). A reader who finds `.rlqt`
+files and goes looking for their norm should learn here that none
+was written.
+
+**A bound secret stops the recording.** The moment a secret
+property's value reaches the guest, capture stops for the rest of
+the run and the transcript records why; the frames already written
+stay, and nothing after that point is captured. It is the same
+rule that suppresses a failure's automatic screenshot, applied to
+the other artifact a run can leave behind.
+
+`--dry-run` records nothing — it starts no machine and reads no
+screen — and accepts the flag rather than refusing it, unlike
+`--display`, `--expect` and a non-default `--progress`.
 
 ---
 
