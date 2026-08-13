@@ -162,3 +162,43 @@ verdict.
 It is also the precursor to **U25** (a guest dumping its own font):
 an author cannot know a capture is needed while the misreading is
 invisible.
+
+### Surface decisions
+
+#### T25 — Stopping and starting one machine takes two commands and lets go in between
+
+`start-machine` and `stop-machine` exist; nothing says "this
+machine again". Re-running a guest — the ordinary move while a
+script is being written, and how the live VirtualBox integration
+was driven by hand on 2026-08-13 — is `stop-machine` then
+`start-machine`, which is not merely two words instead of one.
+
+**The machine lock is released and retaken between them.** A
+restart holding it across both is a different guarantee, not a
+shorthand for the pair: nothing else can start the machine, insert
+media, or apply a blueprint in the gap. Whether that guarantee is
+the point or an over-reach is the design question this carries —
+the same question, in a smaller frame, that U24 asks about scoping
+a change to a stage. A restart that simply calls the two in
+sequence is honest and cheap; one that holds the lock is a claim
+about atomicity that no other command makes.
+
+Two behaviours to settle rather than discover: what a restart does
+to a machine that is **already stopped** — start it, since the
+asked-for end state is *running* and stop is already idempotent
+about an absent VM, or refuse because there was nothing to
+restart — and what it does to one caught mid-`stopping`, where
+`_reconcile_phase` already has an answer that a new verb must not
+contradict.
+
+Surface work, not just a function: the manifest
+(`schemas/command-manifest.toml`) derives the dash-separated CLI
+word and the underscored `Session` twin from one declared name, so
+a command that ships one face fails its own tests. Add the spec
+entry ([cli.md](../docs/spec/cli.md)), the twin, and the
+reference-doc lines with it.
+
+Vetted as the easy tier under [SURFACES.md](SURFACES.md): a gap
+filled where one surface lags what the model already does, with no
+use case or principle disturbed — the capability is present, only
+its spelling is missing.
