@@ -283,6 +283,56 @@ mode included. Text verbatim as adopted:
 
 ### Drafted
 
+- **U24 — A script drives a machine whose boot device must change
+  mid-install, and leaves it as it found it.** An install is not one
+  boot: the installer medium boots first, the disk boots once it is
+  bootable, and on real firmware the changeover is not automatic.
+  A script must be able to say which device the machine boots for a
+  given stage, deterministically and on every backend, **and be
+  certain the machine is left as it was found even when the script
+  fails.**
+
+  Drafted 2026-08-13 from a live FreeDOS install on VirtualBox. Two
+  findings make it a demand rather than a preference. **Firmware
+  fallthrough is not portable**: both backends skip an empty optical
+  drive, but only SeaBIOS moves past a disk that has been
+  partitioned without an active partition — VirtualBox stops there,
+  which is precisely the state every installer leaves behind before
+  its reboot. And **a script cannot restore what it changes**:
+  `set-boot` is deliberately stopped-only (a launch-time firmware
+  order with no live effect — DECISIONS.md's running-machine
+  reconfiguration ruling, which this does not reopen), so the flip
+  must happen before `start` and the restore after the machine
+  stops. The language has no `finally`, so any failure in between —
+  most runs, while a script is being written — leaves the boot order
+  silently disagreeing with the blueprint until someone runs
+  `apply-blueprint`.
+
+  **And the refusal arrives too late to help.** `set-boot` against a
+  running machine already fails closed and by name —
+  `machine.must-be-stopped`, a `PreflightError` at exit `3`, so
+  nothing is silently ignored — but it fails at *run* time, which
+  for this shape means after five minutes of installing rather than
+  at parse time. The script language knows the declared starting
+  state (`machine stopped`) and knows which verbs start and stop the
+  machine, so a statement provably reached with the machine running
+  is decidable before anything reaches a guest, the way the
+  V-numbered rules decide other authoring mistakes. Bounded by the
+  same reachability limit the check family met — a handler body is
+  the guest's decision, not the plan's — so it is a rule about the
+  statements a static pass can promise will run, and silence
+  elsewhere.
+
+  The workaround shipped instead is a blueprint that boots the
+  installer medium first, with the script ejecting it when the disk
+  is ready, so no boot depends on falling past a disk and no state
+  is juggled. That works, and it is why this is a use case rather
+  than a defect: it makes the *machine* permanently express a
+  condition that is only true during one install, and it does not
+  generalize to a guest needing a third order later. What is missing
+  is the ability to scope a machine-state change to a stage and have
+  it revert whichever way the stage ends.
+
 Two 2026-07-23 sweeps. The mapping sweep (U7–U10) closes
 named coverage gaps — roadmap work standing on demand no use
 case writes down. The decomposition sweep (U11–U17) executes
