@@ -81,27 +81,33 @@ _BIOS_CARRIERS = ("VBoxDD2.dll", "VBoxDD.dll", "VBoxDDU.dll",
                   "VBoxDD2.so", "VBoxDD.so")
 
 
-def guest_glyph_bank(cache=None):
-    """The VGA font this host's VirtualBox paints DOS text with.
+def guest_glyph_banks(cache=None):
+    """Every VGA font this host's VirtualBox paints DOS text with.
 
-    **Read off the host, never shipped.** VirtualBox's BIOS draws a
-    different 8x16 face from QEMU's — 19 glyphs differ, `W` and `m`
-    among them — so reading a VirtualBox screen through Reliquary's
-    own bank turns `Welcome` into `Uelcooe` and misses every wait on
-    the word. The right glyphs are the ones the installed emulator
-    has, and taking them from the installation is also what keeps
-    another project's font out of this tree
-    (:func:`text_recognize.cached_bank`).
+    **Read off the host, never shipped.** Reading a VirtualBox screen
+    through Reliquary's own bank turns `Welcome` into `Uelcooe` and
+    misses every wait on the word; the right glyphs are the installed
+    emulator's, and taking them from the installation is also what
+    keeps another project's font out of this tree
+    (:func:`text_recognize.cached_banks`).
+
+    **Plural, because one run paints in more than one.** A stock
+    install offers two 8x16 fonts — the bank as stored, which is what
+    a DOS guest ends up drawing with, and the same bank with the
+    BIOS's override table applied, which is what the BIOS draws its
+    own boot messages with. They differ in 19 glyphs, `W` and `m`
+    among them, and no screenshot says which one painted it. Both go
+    to the recognizer.
     """
     def extract():
         # Resolved inside the extractor, so a cache hit answers
         # without going near the installation at all.
         home = os.path.dirname(find_vboxmanage())
-        return text_recognize.bank_from_files(
+        return text_recognize.banks_from_files(
             [os.path.join(home, name) for name in _BIOS_CARRIERS],
             "VirtualBox")
 
-    return text_recognize.cached_bank(cache, "virtualbox", extract)
+    return text_recognize.cached_banks(cache, "virtualbox", extract)
 
 
 def run_vbox(args, *, action, target=None):
@@ -642,8 +648,9 @@ class VirtualBoxSession:
     def text_screen(self):
         """Screenshot + shared fixed-font recognizer (F51).
 
-        Read through **this host's** VirtualBox font rather than the
-        bundled bank, which is a different emulator's face.
+        Read through **this host's** VirtualBox fonts rather than the
+        bundled bank, which is not what drew the screen — and through
+        all of them, since a run paints in more than one.
         """
         with tempfile.NamedTemporaryFile(
                 suffix=".png", delete=False) as handle:
@@ -651,7 +658,7 @@ class VirtualBoxSession:
         try:
             self.screenshot(path)
             return text_recognize.recognize(
-                path, bank=guest_glyph_bank(self._cache))
+                path, bank=guest_glyph_banks(self._cache))
         finally:
             try:
                 os.remove(path)

@@ -5,11 +5,11 @@
 This bank is Reliquary's **default and rendering** font: what
 ``text_recognize.render`` draws fixtures with, so the suite needs no
 hypervisor. It is deliberately **not** what reads a live guest — the
-glyphs a guest paints are its own emulated BIOS's, and those differ
-between emulators, so each adapter passes ``bank=`` the font from the
-installation on the host (``backend_virtualbox.guest_glyph_bank``).
-Reading a real screen through this bank is the F52 bug that made
-``Welcome`` recognize as ``Uelcooe``.
+glyphs a guest paints are its own emulated BIOS's, and a run paints
+in more than one font, so each adapter passes ``bank=`` every font on
+the host (``backend_virtualbox.guest_glyph_banks``). Reading a real
+screen through this bank alone is the F52 bug that made ``Welcome``
+recognize as ``Uelcooe``.
 
 The tool locates the classic 8×16 bank by its well-known ``A`` glyph
 and writes ``src/reliquary/fonts/cp437_8x16.bin``.

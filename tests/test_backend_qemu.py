@@ -606,9 +606,13 @@ class GlyphBankTests(unittest.TestCase):
             with mock.patch.object(
                     qemu_module, "find_qemu",
                     return_value=os.path.join(root, "qemu-system-i386")):
-                self.assertEqual(qemu_module.guest_glyph_bank(cache), own)
+                # QEMU ships its bank with the BIOS overrides already
+                # merged and carries no override table, so a stock
+                # install offers exactly one font.
+                self.assertEqual(qemu_module.guest_glyph_banks(cache),
+                                 (own,))
             self.assertTrue(os.path.isfile(os.path.join(
-                cache, "support", "qemu", "cp437-8x16.bin")))
+                cache, "support", "qemu", "cp437-8x16-banks.bin")))
 
     def test_an_installation_with_no_vgabios_fails_closed(self):
         with tempfile.TemporaryDirectory() as root:
@@ -616,7 +620,7 @@ class GlyphBankTests(unittest.TestCase):
                     qemu_module, "find_qemu",
                     return_value=os.path.join(root, "qemu-system-i386")):
                 with self.assertRaises(PreflightError) as caught:
-                    qemu_module.guest_glyph_bank()
+                    qemu_module.guest_glyph_banks()
         self.assertEqual(caught.exception.rule_id,
                          "recognize.font-not-found")
 

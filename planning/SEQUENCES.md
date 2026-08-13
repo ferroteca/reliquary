@@ -52,14 +52,14 @@ nothing is ever reissued.
 - **The next S-number to issue is S9** — application surfaces
   (root [ARCHITECTURE.md](../ARCHITECTURE.md), "The application
   surfaces").
-- **The next T-number to issue is T24** — tasks, entering
+- **The next T-number to issue is T25** — tasks, entering
   [TASKS.md](TASKS.md), entry being the pledge (D43). The sequence
   started at **T8** because T0–T7 were spent by an earlier
   per-list numbering that ran three separate times, surviving in
   [DECISIONS.md](DECISIONS.md) under the entries that landed them;
   beginning above them is what keeps every T-number in the record
   resolving to exactly one thing.
-- **The next U-number to issue is U25** — use cases, one namespace
+- **The next U-number to issue is U26** — use cases, one namespace
   across proposed, pledged, and the root list.
 - **The next V-number to issue is V17** — the script language's
   static validation rules

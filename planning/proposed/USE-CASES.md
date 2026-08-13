@@ -333,6 +333,54 @@ mode included. Text verbatim as adopted:
   is the ability to scope a machine-state change to a stage and have
   it revert whichever way the stage ends.
 
+- **U25 — A guest tells the host which glyphs it is painting.** An
+  agentless-display script reads a screen by matching pixels against
+  glyph bitmaps, so it can only read text drawn in a font it holds.
+  Every font it holds comes off the *host*: the banks a hypervisor's
+  binaries carry, plus the variants their override tables install. A
+  guest that loads its own font paints glyphs no host binary has, and
+  the screen becomes unreadable to every script that waits on it.
+
+  Drafted 2026-08-13, while fixing the fonts a FreeDOS install is
+  read through. **The gap is already load-bearing, and closed only by
+  luck.** FreeDOS does install a font — VirtualBox's BIOS applies its
+  override table on every text mode set, so a guest that merely set a
+  mode would paint the patched glyphs, and FreeDOS paints the
+  unpatched ones. It is read correctly because the font it installs
+  happens to be byte-identical to the bank VirtualBox stores. Nothing
+  guarantees that for the next guest: a prepared codepage, a
+  localized installer, or any guest that loads a face of its own
+  leaves the host with no way to read the screens its scripts wait on.
+
+  **The guest is the only party that knows.** On DOS the live table
+  is reachable natively — `INT 10h AH=11h AL=30h` returns a pointer
+  to it — which yields all 256 glyphs exactly, whatever was loaded.
+  That is guest-specific by nature: another platform has its own call
+  and its own dumper, so the dumper belongs to a blueprint's
+  **platform** rather than to any one script. **Getting the bytes out
+  is the real question**, and the material is already named: both
+  reference backends can point a UART at a host file (VirtualBox's
+  serial redirection is recorded in this file's backend ranking), and
+  `serial-console` is in the control-plane vocabulary
+  (`document.py`) with nothing implementing it. On DOS nothing need
+  be copied into the guest at all — a DEBUG script typed over the
+  keystroke plane that already exists assembles the dump.
+
+  **WEIGHED AND DECLINED: learning the font from pixels.** Render a
+  screen whose text the author states, cut it into cells, and record
+  each bitmap against its character. It needs no new channel and no
+  guest cooperation, and the union recognizer would take the result
+  as one more bank — partial is enough, since unmatched glyphs fall
+  through to the host's. But it yields only the glyphs that appeared
+  on one screen, it asks the author to transcribe a framebuffer by
+  eye, and the artifact is worse for more work. It stays recorded
+  because a guest with no native door would leave it the only way.
+
+  What is missing is not a matching strategy — a screen is already
+  read through every font the host offers, and one more bank costs
+  only where it differs. What is missing is a way for the guest's
+  own font to become one of them.
+
 Two 2026-07-23 sweeps. The mapping sweep (U7–U10) closes
 named coverage gaps — roadmap work standing on demand no use
 case writes down. The decomposition sweep (U11–U17) executes

@@ -286,7 +286,7 @@ class BackendAdapter:
         ``cache`` is the resolved cache root — a plain directory, not
         a :class:`~home.Context` — under which an adapter may keep
         what it extracts from its own installation on this host
-        (``cache/support/<backend>/``, `text_recognize.cached_bank`).
+        (``cache/support/<backend>/``, `text_recognize.cached_banks`).
         Optional because it is a *speed* concern and never a
         correctness one: an adapter given ``None`` does the same work
         without keeping the result.

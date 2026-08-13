@@ -294,16 +294,27 @@ workflow:
   at runtime from `vgabios.c`'s `load_text_patch`, and merged-VirtualBox equals QEMU's bank byte
   for byte. What differs is *who painted the screen*: the BIOS uses that merged set, while a DOS
   guest that loads its own CP437 font (FreeDOS does) paints the **unpatched** design, `W`, `m`
-  and `T` among the 19 — enough to miss a wait on any word carrying one. So no run-long bank
-  reads a whole run, the unpatched set is right for the screens scripts wait on, and this would
-  bite QEMU identically if anything ever recognized a QEMU screenshot rather than scraping its
-  text memory. Each backend answers the bank question the same way — `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu` alike — carving
-  the bank out of the installation with `bank_from_files` / `bank_from_binary`, anchored on the
-  classic `A` every CP437 bank shares and failing closed by name where the install holds none.
-  QEMU's own plane never needs it (it scrapes text memory, where the guest already resolved its
-  characters); it exists so the question is answered identically for both rather than only where
-  it bit. **The font is extracted on demand and cached, never vendored** —
-  `cache/support/<backend>/cp437-8x16.bin` via `text_recognize.cached_bank`, wholly regenerable
+  and `T` among the 19 — enough to miss a wait on any word carrying one. So **no single bank
+  reads a whole run, and nothing in a framebuffer says which font painted it** — which is why
+  the recognizer takes *every* font a host offers and matches each cell against all of them,
+  rather than choosing. `bank=` accepts one bank or many (`as_banks`); `_all_glyph_bits` unions
+  them per code, so shapes the fonts agree on are scored once and the cost is proportional to
+  how much they actually differ — 275 entries against 256 for a stock VirtualBox, about 5% on a
+  read. Ties go to the first bank, which keeps two runs on one host agreeing. This would bite
+  QEMU identically if anything ever recognized a QEMU screenshot rather than scraping its text
+  memory. Each backend answers the font question the same way — `guest_glyph_banks(cache)` on
+  `backend_virtualbox` and `backend_qemu` alike — with `banks_from_files` / `banks_from_binary`
+  collecting every bank in the installation's binaries **plus every variant an override table
+  behind one would install**, anchored on the classic `A` every CP437 bank shares and failing
+  closed by name where the install holds none. That extraction is structural, not a table
+  Reliquary knows by name: a run of `(code, rows...)` entries whose codes ascend, closed by a
+  zero code byte, with runs for other glyph heights stepped over — so a build carrying a
+  different set is read on its own terms. QEMU's own plane never needs any of this (it scrapes
+  text memory, where the guest already resolved its characters); it exists so the question is
+  answered identically for both rather than only where it bit, and a stock QEMU yields one font
+  because its bank ships already merged. **The fonts are extracted on demand and cached, never
+  vendored** — `cache/support/<backend>/cp437-8x16-banks.bin` via `text_recognize.cached_banks`,
+  every bank concatenated so the count stays the backend's business, wholly regenerable
   like everything under that root, so a truncated cache file is re-extracted rather than raised
   on. The cache root reaches the adapter as `Machine(cache=)` → `adapter.session(vm, cache=)`, a
   plain resolved directory and **not derivable from the machine directory** (`machines` is

@@ -176,6 +176,115 @@ class GlyphBankSourceTests(unittest.TestCase):
                          "recognize.font-not-found")
 
 
+def _patch_table(entries, height=16):
+    """An override table: ``(code, rows...)`` runs closed by a zero."""
+    out = bytearray()
+    for code, fill in entries:
+        out.append(code)
+        out.extend(bytes([fill]) * height)
+    out.append(0x00)
+    return bytes(out)
+
+
+class SeveralFontsTests(unittest.TestCase):
+    """More than one font is painted per run, and pixels do not say which.
+
+    A VGA BIOS installs its bank with an override table applied and
+    draws its own messages that way; a DOS guest loads its own font
+    and draws with that. The recognizer is given every font a host
+    offers and matches against all of them, which is why a screen
+    drawn in *one* of them reads correctly either way. Fixtures are
+    built from the shipped bank, so the suite still vendors no other
+    project's font.
+    """
+
+    #: A shape no CP437 glyph has, so that a cell drawn with it is
+    #: unambiguous. An override table gives a code a *different
+    #: drawing of the same character* — never another code's shape —
+    #: so a fixture that merely exchanged two glyphs would make one
+    #: bitmap legitimately mean two codes and prove nothing.
+    DISTINCT = bytes([0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01] * 2)
+
+    def _two_fonts(self):
+        stored = recognize.glyph_bank()
+        installed = (stored[:0x57 * 16] + self.DISTINCT
+                     + stored[0x58 * 16:])
+        return stored, installed
+
+    def test_a_screen_reads_through_whichever_font_drew_it(self):
+        stored, installed = self._two_fonts()
+        for drawn_with, name in ((stored, "stored"),
+                                 (installed, "installed")):
+            image = recognize.render(_screen("W"), bank=drawn_with)
+            rows, _ = recognize.recognize(image, bank=(stored, installed))
+            self.assertEqual(rows[0][0], "W", f"drawn with the {name} font")
+
+    def test_one_font_alone_misreads_a_screen_the_other_drew(self):
+        """The defect being fixed, stated as the reason for the above.
+
+        *How* it fails depends on the shape: a glyph far from anything
+        in the font read through falls past the distance threshold and
+        blanks, while the real 19 sit close enough to other letters to
+        come back as the wrong one — `Welcome` as `Uelcooe`. Either
+        way the word a script waits for is not there, which is the
+        only part worth pinning.
+        """
+        stored, installed = self._two_fonts()
+        image = recognize.render(_screen("W"), bank=installed)
+        rows, _ = recognize.recognize(image, bank=stored)
+        self.assertNotIn("W", rows[0])
+
+    def test_shared_glyphs_are_scored_once(self):
+        """Supporting several fonts costs only where they disagree."""
+        stored, installed = self._two_fonts()
+        one = recognize._all_glyph_bits((stored,))
+        both = recognize._all_glyph_bits((stored, installed))
+        self.assertEqual(len(one), 256)
+        self.assertEqual(len(both), 256 + 1)
+
+    def test_an_override_table_behind_a_bank_yields_a_second_font(self):
+        stored = recognize.glyph_bank()
+        binary = (b"\x00" * 64 + stored
+                  + _patch_table([(0x57, 0x5a)]) + b"\xa5" * 40)
+        banks = recognize.banks_from_binary(binary, "fake.dll")
+        self.assertEqual(len(banks), 2)
+        self.assertEqual(banks[0], stored)
+        self.assertEqual(banks[1][0x57 * 16:0x58 * 16], b"\x5a" * 16)
+
+    def test_a_table_for_another_glyph_height_is_stepped_over(self):
+        """A BIOS carries a table per size; only 8x16 is this reader's."""
+        stored = recognize.glyph_bank()
+        binary = (b"\x00" * 64 + stored
+                  + _patch_table([(0x1d, 0x11), (0x22, 0x11)], height=14)
+                  + _patch_table([(0x57, 0x5a)])
+                  + b"\xa5" * 40)
+        banks = recognize.banks_from_binary(binary, "fake.dll")
+        self.assertEqual(len(banks), 2)
+        self.assertEqual(banks[1][0x57 * 16:0x58 * 16], b"\x5a" * 16)
+
+    def test_identical_fonts_collapse_to_one(self):
+        """Three copies of a BIOS image are not three fonts."""
+        stored = recognize.glyph_bank()
+        binary = b"".join([b"\x00" * 8 + stored] * 3)
+        self.assertEqual(recognize.banks_from_binary(binary, "fake.dll"),
+                         (stored,))
+
+    def test_bytes_that_are_not_a_table_add_no_font(self):
+        """Arbitrary bytes behind a bank must not become glyph shapes."""
+        stored = recognize.glyph_bank()
+        # Descending codes: a real override table ascends.
+        noise = bytes([0x90]) + b"\x11" * 16 + bytes([0x10]) + b"\x11" * 16
+        binary = b"\x00" * 64 + stored + noise + b"\x00"
+        self.assertEqual(recognize.banks_from_binary(binary, "fake.dll"),
+                         (stored,))
+
+    def test_a_single_bank_may_be_given_as_bytes_or_a_sequence(self):
+        stored = recognize.glyph_bank()
+        self.assertEqual(recognize.as_banks(stored), (stored,))
+        self.assertEqual(recognize.as_banks([stored]), (stored,))
+        self.assertEqual(recognize.as_banks(None), (stored,))
+
+
 class RenderSaveTests(unittest.TestCase):
     def test_save_screen_writes_a_png(self):
         with tempfile.TemporaryDirectory() as tmp:

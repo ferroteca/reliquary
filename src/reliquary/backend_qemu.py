@@ -141,19 +141,28 @@ def find_qemu():
 _VGABIOS_NAMES = ("vgabios-stdvga.bin", "vgabios.bin")
 
 
-def guest_glyph_bank(cache=None):
-    """The VGA font this host's QEMU paints DOS text with.
+def guest_glyph_banks(cache=None):
+    """Every VGA font this host's QEMU paints DOS text with.
 
     **Read off the host, never shipped** — the counterpart of
-    `backend_virtualbox.guest_glyph_bank`, and the same reasoning:
+    `backend_virtualbox.guest_glyph_banks`, and the same reasoning:
     the glyphs belong to the installed emulator, not to Reliquary
-    (:func:`text_recognize.cached_bank`).
+    (:func:`text_recognize.cached_banks`).
 
     QEMU's own control plane never needs this — it scrapes VGA text
     memory, where the guest has already resolved its characters — so
     this exists for a caller recognizing a QEMU *screenshot*, and to
     keep the font question answered the same way for both backends
     rather than only where it happened to bite.
+
+    **What this host can offer is the limit.** QEMU ships its bank
+    with the BIOS's overrides already merged in and carries no
+    override table, so a stock install yields exactly one font — the
+    one the BIOS draws with. The font a DOS guest loads afterwards
+    differs in 19 glyphs and is not recoverable from these binaries,
+    so a QEMU screenshot of a guest-drawn screen would misread them.
+    Every font the installation actually holds is returned, which is
+    the best available answer rather than a complete one.
     """
     def extract():
         # Resolved inside the extractor, so a cache hit answers
@@ -164,12 +173,12 @@ def guest_glyph_bank(cache=None):
                  os.path.join(home, "share", "qemu"),
                  os.path.join(os.path.dirname(home), "share", "qemu"),
                  "/usr/share/qemu", "/usr/share/seabios"]
-        return text_recognize.bank_from_files(
+        return text_recognize.banks_from_files(
             [os.path.join(root, name)
              for root in roots for name in _VGABIOS_NAMES],
             "QEMU")
 
-    return text_recognize.cached_bank(cache, "qemu", extract)
+    return text_recognize.cached_banks(cache, "qemu", extract)
 
 
 def find_qemu_img():

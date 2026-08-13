@@ -131,16 +131,36 @@ class AdapterSurfaceTests(unittest.TestCase):
         own = text_recognize.glyph_bank()
         with tempfile.TemporaryDirectory() as home:
             with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
-                self.assertEqual(vbox.guest_glyph_bank(), own)
+                self.assertEqual(vbox.guest_glyph_banks(), (own,))
+
+    def test_an_override_table_yields_a_second_font(self):
+        """A stock install offers two 8x16 fonts, not one.
+
+        The bank as stored is what a DOS guest ends up drawing with;
+        the same bank with the BIOS's override table applied is what
+        the BIOS draws its own messages with. Both are the host's, and
+        a screenshot does not say which painted it.
+        """
+        own = bytearray(text_recognize.glyph_bank())
+        patch = bytes([0x57]) + b"\x5a" * 16     # 'W' drawn differently
+        payload = (b"\x11" * 500 + bytes(own) + patch + b"\x00"
+                   + b"\x22" * 30)
+        with tempfile.TemporaryDirectory() as home:
+            with self._install(home, payload):
+                banks = vbox.guest_glyph_banks()
+        self.assertEqual(len(banks), 2)
+        self.assertEqual(banks[0], bytes(own))
+        own[0x57 * 16:0x58 * 16] = b"\x5a" * 16
+        self.assertEqual(banks[1], bytes(own))
 
     def test_the_bank_is_cached_under_the_backend_support_dir(self):
         own = text_recognize.glyph_bank()
         with tempfile.TemporaryDirectory() as home, \
                 tempfile.TemporaryDirectory() as cache:
             with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
-                self.assertEqual(vbox.guest_glyph_bank(cache), own)
+                self.assertEqual(vbox.guest_glyph_banks(cache), (own,))
             expected = os.path.join(cache, "support", "virtualbox",
-                                    "cp437-8x16.bin")
+                                    "cp437-8x16-banks.bin")
             self.assertTrue(os.path.isfile(expected))
             with open(expected, "rb") as handle:
                 self.assertEqual(handle.read(), own)
@@ -149,7 +169,23 @@ class AdapterSurfaceTests(unittest.TestCase):
             with mock.patch.object(
                     vbox, "find_vboxmanage",
                     side_effect=AssertionError("must not re-extract")):
-                self.assertEqual(vbox.guest_glyph_bank(cache), own)
+                self.assertEqual(vbox.guest_glyph_banks(cache), (own,))
+
+    def test_several_banks_round_trip_through_one_cache_file(self):
+        own = text_recognize.glyph_bank()
+        other = bytes(own[:0x57 * 16]) + b"\x5a" * 16 + bytes(
+            own[0x58 * 16:])
+        with tempfile.TemporaryDirectory() as cache:
+            with mock.patch.object(
+                    vbox.text_recognize, "banks_from_files",
+                    return_value=(own, other)):
+                first = vbox.guest_glyph_banks(cache)
+            self.assertEqual(first, (own, other))
+            # The second read never touches the install.
+            with mock.patch.object(
+                    vbox, "find_vboxmanage",
+                    side_effect=AssertionError("must not re-extract")):
+                self.assertEqual(vbox.guest_glyph_banks(cache), (own, other))
 
     def test_a_truncated_cache_file_is_re_extracted(self):
         own = text_recognize.glyph_bank()
@@ -157,25 +193,26 @@ class AdapterSurfaceTests(unittest.TestCase):
                 tempfile.TemporaryDirectory() as cache:
             stale = os.path.join(cache, "support", "virtualbox")
             os.makedirs(stale)
-            with open(os.path.join(stale, "cp437-8x16.bin"), "wb") as handle:
+            with open(os.path.join(stale, "cp437-8x16-banks.bin"),
+                      "wb") as handle:
                 handle.write(b"\x00" * 100)
             with self._install(home, b"\x11" * 500 + own + b"\x22" * 30):
-                self.assertEqual(vbox.guest_glyph_bank(cache), own)
+                self.assertEqual(vbox.guest_glyph_banks(cache), (own,))
 
     def test_an_installation_with_no_font_fails_closed(self):
         with tempfile.TemporaryDirectory() as home:
             with self._install(home, b"\x00" * 9000):
                 with self.assertRaises(PreflightError) as caught:
-                    vbox.guest_glyph_bank()
+                    vbox.guest_glyph_banks()
         self.assertEqual(caught.exception.rule_id,
                          "recognize.font-not-found")
         self.assertIn("cannot read a guest screen", str(caught.exception))
 
-    def test_text_screen_reads_through_the_host_font(self):
-        marker = b"\x5a" * 4096
+    def test_text_screen_reads_through_the_host_fonts(self):
+        marker = (b"\x5a" * 4096, b"\x33" * 4096)
         session = vbox.VirtualBoxSession(
             "uuid-1", "reliquary-plain-0", cache="/tmp/cache")
-        with mock.patch.object(vbox, "guest_glyph_bank",
+        with mock.patch.object(vbox, "guest_glyph_banks",
                                return_value=marker) as bank, \
                 mock.patch.object(session, "screenshot"), \
                 mock.patch.object(vbox.text_recognize, "recognize",

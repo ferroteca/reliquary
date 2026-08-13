@@ -316,6 +316,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A screen is read through every font it could have been drawn
+  with, not one chosen in advance.** More than one font is painted
+  during a single run and nothing in a framebuffer says which was in
+  the VGA: a VGA BIOS installs its bank with an override table
+  applied and draws its own messages that way, while a DOS guest
+  loads its own font and draws with that. The two a stock VirtualBox
+  offers differ in 19 glyphs — `W`, `m` and `T` among them — so
+  whichever bank was picked, half the run was misread. Reading a
+  guest-drawn screen through the installed font turned `Welcome` into
+  `Uelcooe`; reading a BIOS-drawn one through the stored font turned
+  `Trying next boot device` into `Irying`.
+
+  `bank=` now accepts one font or many (`as_banks`), and a cell is
+  scored against all of them. An override table changes a glyph's
+  *shape*, never its meaning, so the nearest match yields the same
+  character whichever font drew it — no state, and no guessing which
+  is loaded. The glyphs the fonts agree on are unioned rather than
+  concatenated, so the cost is proportional to how much they actually
+  differ: 275 candidate shapes against 256 for a stock VirtualBox,
+  about 5% on a read. Ties go to the first font, which keeps two runs
+  on one host agreeing.
+
+  Extraction is structural rather than a table known by name.
+  `banks_from_binary` collects every bank a backend's binaries hold
+  **plus every variant an override table behind one would install**,
+  recognizing a table by shape alone — a run of `(code, rows...)`
+  entries whose codes ascend, closed by a zero code byte, with tables
+  for other glyph heights stepped over — so a build carrying a
+  different set is read on its own terms. Identical banks collapse;
+  arbitrary bytes are refused rather than admitted as glyphs.
+  `guest_glyph_bank` becomes `guest_glyph_banks` on both adapters,
+  and the cache file becomes
+  `cache/support/<backend>/cp437-8x16-banks.bin`, holding however
+  many fonts that installation offers. A stock QEMU yields one, since
+  its bank ships with the overrides already merged — its guest-drawn
+  font is not recoverable from those binaries, which its docstring
+  now says rather than implying parity it does not have.
+
 - **VirtualBox is asked whether a VM is running, not told by a
   failure.** `showvminfo --machinereadable` reports `VMState`, and
   the session fetched that map for its identity check and discarded

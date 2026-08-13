@@ -131,78 +131,44 @@ Found by running the opt-in FreeDOS VirtualBox integration against
 a live hypervisor for the first time (2026-08-13), which now
 passes. What was fixed in that sitting is not here — as a queue
 holds only what waits — leaving the two the integration cannot
-catch, both about which glyphs a screen is read through.
+catch: one about provenance rather than behaviour, one about a
+misreading that succeeds.
 
-#### T20 — Two fonts are in play per run, and the choice is not the emulator's
+#### T24 — A cell that matches nothing is reported as though it were read
 
-With the host font in use (`guest_glyph_bank`) the FreeDOS
-installer recognizes perfectly and the BIOS's own boot message
-reads `Trying next boot device` as `Irying`. Before the fix it was
-the other way round. **Both readings are correct**, which is the
-finding: two different fonts are painted during one run, and no
-run-long bank can be right for all of it.
+`text_recognize` picks the nearest glyph by Hamming distance and,
+past `_MAX_DISTANCE`, returns a space. Both outcomes are silent. A
+screen drawn in a font the host does not hold therefore comes back
+as ordinary rows — blanks where the distance was large, the wrong
+letter where it was merely large enough — and a script waiting on
+a word in it simply times out. Nothing anywhere says the screen
+was unreadable rather than absent.
 
-Verified against the shipped binaries *and* the published source,
-because the first reading of this — "the emulators draw different
-faces" — was wrong and is worth not repeating.
+That silence is what let the font defect hide: the screens *looked*
+plausible, `Welcome` read as `Uelcooe`, and the run failed as a
+timeout on a wait. Reading a guest screen is a measurement, and a
+measurement that reports no confidence cannot be told from a good
+one.
 
-**What the binaries hold.** `VBoxDD2.dll` carries three complete
-VGA BIOS images, each with 8x8, 8x14 and 8x16 banks plus a
-19-entry `vgafont16alt` override table. The three 8x16 banks are
-byte-identical, so the classic-`A` anchor `bank_from_binary` uses
-is unambiguous — worth recording, since a second distinct bank
-would have made the extraction a coin toss. QEMU's `vgabios-*.bin`
-carry **no alt table at all**: their 8x16 bank already has those
-19 glyphs merged in.
+The distance is already computed per cell, so what is missing is
+only that it reaches anybody: how many cells matched nothing well,
+where they were, and — for a caller with a screenshot in hand —
+which glyphs. `rlq screen` is the natural place to say it, the
+failure report the other. Whether it should ever *fail* a run is
+the open question and probably not: a BIOS splash is unreadable by
+nature and already a sample the waits look past
+(`UnreadableScreen`), so this is a confidence signal rather than a
+verdict.
 
-**What the source says.** VirtualBox's `vgafonts.h` declares
-`vgafont16alt[19*17+1]` — 19 entries of a code byte plus 16 rows,
-then a terminator — and its codes are exactly the 19 parsed out of
-the DLL. `vgabios.c` applies it *automatically on every text mode
-set*, not on request:
-
-    biosfn_load_text_user_pat(0, 0xC000, vgafont16, 256, ...);
-    load_text_patch(0xC000, vgafont16alt, 0, 16);
-
-So both emulators install **the same** font after a mode set. One
-stores it merged, the other patches at runtime; VirtualBox's raw
-bank plus its patch equals QEMU's shipped bank byte for byte.
-**There is no emulator font difference.**
-
-**The real axis is BIOS-drawn versus guest-drawn.** The merged set
-is what the BIOS paints its own messages with. The FreeDOS boot
-path leaves a stock CP437 font in the VGA that matches the
-*unpatched* design, and that is what the installer draws with —
-which is why extracting VirtualBox's raw `vgafont16` fixed the
-screens scripts wait on. That axis is emulator-independent: a
-FreeDOS guest on QEMU paints the same unmerged glyphs, and QEMU
-escapes the bug only because it scrapes text memory instead of
-recognizing pixels.
-
-**A latent consequence to fix with this.**
-`backend_qemu.guest_glyph_bank` returns QEMU's pre-merged bank —
-the BIOS font, and the *wrong* one for guest-drawn screens. It has
-no consumer today, so nothing is broken; it would be wrong the
-moment anything recognizes a QEMU screenshot, and the symmetry it
-was written for is machinery aimed at the wrong target.
-
-**The fix fits the recognizer's existing shape.** `_match_cell`
-already scores two polarities and keeps the lower Hamming
-distance, so scoring **both** banks per cell and keeping the best
-costs one more pass over a 19-glyph ambiguity surface and reads
-both screens — no state, no guessing which font is loaded. The
-alternative, tracking the guest's font through its mode sets,
-needs state no screenshot carries. Only BIOS-drawn screens are
-wrong today and no script waits on one, so this is correctness
-owed rather than a live blocker; it is queued because a
-systematically misread screen is precisely what hid the original
-font bug for as long as it did.
+It is also the precursor to **U25** (a guest dumping its own font):
+an author cannot know a capture is needed while the misreading is
+invisible.
 
 #### T21 — The shipped glyph bank is another project's font, recorded as ours
 
 `src/reliquary/fonts/cp437_8x16.bin` is 4096 bytes carved out of
 the host's **QEMU** vgabios by `tools/extract_vga_font.py` — the
-pre-merged BIOS font, per T20 — and
+font a VGA BIOS installs, overrides already applied — and
 `REUSE.toml` sweeps `reliquary/fonts/*.bin` into
 `SPDX-FileCopyrightText = "2026 Paul Galbraith"`,
 `GPL-3.0-only` — a record of ownership over bytes the project did
@@ -211,8 +177,8 @@ not author.
 D82 is what makes this worth an entry rather than a shrug: the
 incoming test is *could this ship inside a proprietary product?*,
 never *is this GPL-compatible?*. It also **supports how the live
-path was fixed** — each backend's font is now extracted from the
-installation on the host and cached under
+path was fixed** — every font a backend's installation offers is
+now extracted from the host and cached under
 `cache/support/<backend>/`, so nothing is vendored and the glyphs
 belong to whatever emulator the host has.
 

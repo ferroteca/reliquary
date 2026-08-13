@@ -10,9 +10,18 @@ plus opaque, equality-comparable per-cell attribute tokens — so
 (planning/design/backend-adapter.md "The text-screen contract").
 
 The glyph bank is the standard VGA 8×16 CP437 bit pattern, curated
-into ``fonts/cp437_8x16.bin`` by ``tools/extract_vga_font.py`` from
-the host's QEMU ``vgabios-stdvga.bin`` so recognition matches what a
-DOS guest paints. Fixtures are rendered with the same bank.
+into ``fonts/cp437_8x16.bin`` by ``tools/extract_vga_font.py``. It is
+the default and what fixtures are rendered with, so the suite
+round-trips without a hypervisor — **it is not what reads a live
+guest**, which is drawn with the host's own fonts and read through
+them (:func:`banks_from_binary`, :func:`cached_banks`).
+
+*Fonts*, plural, is the point. A run paints in more than one: a VGA
+BIOS installs its bank with an override table applied and draws its
+own messages that way, while a DOS guest loads its own font and
+draws with that. A framebuffer records only pixels, so nothing in a
+screenshot says which was in the VGA — every font a host offers is
+therefore collected, and a cell is matched against all of them.
 """
 
 from __future__ import annotations
@@ -59,35 +68,145 @@ def check_bank(data, source):
     return bytes(data)
 
 
-def bank_from_binary(data, source):
-    """Carve the 8×16 bank out of a binary that embeds a VGA BIOS font.
+#: Glyph heights whose **override tables** a VGA BIOS may carry. A
+#: table is a run of ``(code, rows...)`` entries closed by a zero code
+#: byte, and the BIOS applies the one matching the mode it is setting.
+#: Sizes other than 8×16 are here only so a table for one of them can
+#: be stepped over to reach the next: their heights are not this
+#: recognizer's, and their entries are read for length alone.
+_ALT_HEIGHTS = (_CELL_H, 14, 8)
 
-    **A backend's font is read off the host, never shipped.** The
-    glyphs a guest paints are its emulated BIOS's, so they belong to
-    whatever the host has installed rather than to Reliquary — which
-    is also why no second bank is vendored here: copying another
-    project's font into this tree would be third-party material in a
-    repository whose licensing policy admits none
-    (CONTRIBUTING.md).
+#: Ceilings on what will be believed to be an override table. A real
+#: one patches a handful of glyphs and sits immediately behind its
+#: bank; without bounds, arbitrary bytes far downstream could parse as
+#: a table and contribute glyph shapes that were never a font.
+_MAX_OVERRIDES = 64
+_MAX_OVERRIDE_TABLES = 4
+
+
+def _bank_bases(data):
+    """Offsets of every 8×16 bank in ``data``, in the order found.
 
     Located by :data:`CLASSIC_A`, since a font that did not share the
     classic ``A`` would not be the CP437 bank a DOS guest draws from.
     """
+    bases = []
     index = data.find(CLASSIC_A)
-    if index < 0:
+    while index >= 0:
+        base = index - 0x41 * _CELL_H
+        if base >= 0 and base + _GLYPHS * _CELL_H <= len(data):
+            bases.append(base)
+        index = data.find(CLASSIC_A, index + 1)
+    return bases
+
+
+def _override_run(data, start, height):
+    """One override table at ``start``, as ``(entries, end)`` or None.
+
+    Structural only — nothing here knows a table's name or how many
+    entries any particular BIOS ships. A run qualifies when its codes
+    **ascend**, none of its glyphs is blank, and it is closed by a zero
+    code byte; that is what tells a real table from the same bytes read
+    at the wrong stride, which is how tables of different heights are
+    told apart when several follow one bank.
+    """
+    stride = 1 + height
+    entries = []
+    off = start
+    while off < len(data) and data[off] != 0x00:
+        if off + stride > len(data):
+            return None
+        code = data[off]
+        if entries and code <= entries[-1][0]:
+            return None
+        rows = bytes(data[off + 1:off + stride])
+        if not any(rows):
+            return None
+        entries.append((code, rows))
+        if len(entries) > _MAX_OVERRIDES:
+            return None
+        off += stride
+    if not entries or off >= len(data):
+        return None
+    return entries, off + 1
+
+
+def _patched_variants(data, bank, start):
+    """Banks the override tables behind ``bank`` would install.
+
+    A stored bank and the bank a BIOS actually installs are different
+    fonts, and nothing in a screenshot says which one painted it — so
+    both are collected and the recognizer is left to match against
+    each. Tables for other glyph heights are stepped over rather than
+    interpreted.
+    """
+    variants = []
+    off = start
+    for _ in range(_MAX_OVERRIDE_TABLES):
+        for height in _ALT_HEIGHTS:
+            parsed = _override_run(data, off, height)
+            if parsed is None:
+                continue
+            entries, off = parsed
+            if height == _CELL_H:
+                patched = bytearray(bank)
+                for code, rows in entries:
+                    patched[code * _CELL_H:(code + 1) * _CELL_H] = rows
+                variants.append(bytes(patched))
+            break
+        else:
+            break
+    return variants
+
+
+def banks_from_binary(data, source):
+    """Every distinct 8×16 font a binary embedding a VGA BIOS offers.
+
+    **A backend's fonts are read off the host, never shipped.** The
+    glyphs a guest paints are its emulated BIOS's, so they belong to
+    whatever the host has installed rather than to Reliquary — which
+    is also why no bank is vendored here for the purpose: copying
+    another project's font into this tree would be third-party
+    material in a repository whose licensing policy admits none
+    (CONTRIBUTING.md).
+
+    **More than one font is painted during a single run**, and which
+    one is in the VGA at any moment is not knowable from a
+    framebuffer: a BIOS installs its bank with an override table
+    applied, its own messages are drawn that way, and a guest that
+    loads its own font afterwards paints with something else again.
+    So this returns *all* of them — every bank found, plus every
+    variant an override table behind one would install — and
+    :func:`recognize` matches a cell against the union rather than
+    guessing. Duplicates collapse, which is what keeps the cost of
+    the extra fonts proportional to how much they actually differ.
+    """
+    banks = []
+    for base in _bank_bases(data):
+        bank = check_bank(data[base:base + _GLYPHS * _CELL_H], source)
+        end = base + _GLYPHS * _CELL_H
+        for candidate in [bank, *_patched_variants(data, bank, end)]:
+            if candidate not in banks:
+                banks.append(candidate)
+    if not banks:
         raise PreflightError(
             f"no VGA 8x16 glyph bank found in {source}",
             rule_id="recognize.font-not-found")
-    base = index - 0x41 * _CELL_H
-    if base < 0 or base + _GLYPHS * _CELL_H > len(data):
-        raise PreflightError(
-            f"the glyph bank in {source} is truncated",
-            rule_id="recognize.font-not-found")
-    return check_bank(data[base:base + _GLYPHS * _CELL_H], source)
+    return tuple(banks)
 
 
-def bank_from_files(candidates, source):
-    """First of ``candidates`` that yields a bank, else fail closed."""
+def bank_from_binary(data, source):
+    """The first 8×16 bank in ``data``, as stored.
+
+    The single-font view of :func:`banks_from_binary`, kept for
+    callers that want the bank a binary ships rather than every font
+    it can install.
+    """
+    return banks_from_binary(data, source)[0]
+
+
+def banks_from_files(candidates, source):
+    """Every font from the first of ``candidates`` that holds any."""
     examined = []
     for path in candidates:
         if not os.path.isfile(path):
@@ -96,7 +215,7 @@ def bank_from_files(candidates, source):
         with open(path, "rb") as handle:
             data = handle.read()
         try:
-            return bank_from_binary(data, path)
+            return banks_from_binary(data, path)
         except PreflightError:
             continue
     raise PreflightError(
@@ -107,14 +226,22 @@ def bank_from_files(candidates, source):
         rule_id="recognize.font-not-found")
 
 
+def bank_from_files(candidates, source):
+    """First of ``candidates`` that yields a bank, else fail closed."""
+    return banks_from_files(candidates, source)[0]
+
+
 #: Where a backend's host-extracted support files live, under the
 #: cache root: ``cache/support/<backend>/``. Everything here is taken
 #: from an installation on this host and is wholly regenerable, which
 #: is what makes the cache root the right home for it.
 SUPPORT_DIR = "support"
 
-#: The glyph bank's filename inside a backend's support directory.
-BANK_FILE = "cp437-8x16.bin"
+#: The glyph banks' filename inside a backend's support directory —
+#: every font that installation offers, concatenated. The name says
+#: *banks* because the count is the backend's business and not fixed:
+#: a file holding one is as valid as a file holding four.
+BANK_FILE = "cp437-8x16-banks.bin"
 
 
 def support_dir(cache_dir, backend):
@@ -122,8 +249,8 @@ def support_dir(cache_dir, backend):
     return os.path.join(cache_dir, SUPPORT_DIR, backend)
 
 
-def cached_bank(cache_dir, backend, extract):
-    """A backend's bank, extracted once and kept under ``cache_dir``.
+def cached_banks(cache_dir, backend, extract):
+    """A backend's banks, extracted once and kept under ``cache_dir``.
 
     **The font is the host's, so it is cached rather than shipped.**
     Reliquary vendors no emulator's glyphs: the bytes a guest paints
@@ -143,22 +270,24 @@ def cached_bank(cache_dir, backend, extract):
     ``cache_dir`` of ``None`` extracts every time, which is what an
     embedding caller with no home assigned gets.
     """
+    size = _GLYPHS * _CELL_H
     path = None
     if cache_dir:
         path = os.path.join(support_dir(cache_dir, backend), BANK_FILE)
         if os.path.isfile(path):
             with open(path, "rb") as handle:
                 data = handle.read()
-            if len(data) == _GLYPHS * _CELL_H:
-                return bytes(data)
-    bank = extract()
+            if data and len(data) % size == 0:
+                return tuple(bytes(data[at:at + size])
+                             for at in range(0, len(data), size))
+    banks = tuple(extract())
     if path:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         pending = f"{path}.{os.getpid()}.tmp"
         with open(pending, "wb") as handle:
-            handle.write(bank)
+            handle.write(b"".join(banks))
         os.replace(pending, path)
-    return bank
+    return banks
 
 
 @lru_cache(maxsize=1)
@@ -167,7 +296,7 @@ def glyph_bank():
 
     Reliquary's own bank: the default, and what :func:`render` draws
     with so the suite round-trips without a hypervisor. **It is not
-    what reads a live guest** — see :func:`cached_bank`.
+    what reads a live guest** — see :func:`cached_banks`.
     """
     path = _font_path()
     with open(path, "rb") as handle:
@@ -239,24 +368,60 @@ def _glyph_bits(code, bank=None):
     return flat
 
 
-@lru_cache(maxsize=4)
-def _all_glyph_bits(bank=None):
-    """Every glyph as flat bits, cached per bank.
+def as_banks(bank):
+    """Normalize a ``bank`` argument to a tuple of whole banks.
 
-    Keyed on the bank's own bytes rather than on nothing, so a host
+    A caller may name one font or several, and passing ``None`` means
+    Reliquary's own. Several is the honest case for a live guest: a
+    run paints in more than one font and a framebuffer does not say
+    which (see :func:`banks_from_binary`).
+    """
+    if bank is None:
+        return (glyph_bank(),)
+    if isinstance(bank, (bytes, bytearray)):
+        return (bytes(bank),)
+    return tuple(bytes(one) for one in bank)
+
+
+@lru_cache(maxsize=4)
+def _all_glyph_bits(banks):
+    """Every glyph of every bank as flat bits, as ``(code, bits)`` pairs.
+
+    The union, not a concatenation: a code whose shape is the same in
+    two banks appears once. That is what makes supporting several
+    fonts nearly free — the shapes they share cost nothing, and only
+    the glyphs they actually disagree about are scored twice.
+
+    Cached on the banks' own bytes rather than on nothing, so a host
     that drives two backends with different BIOS fonts in one process
     does not read the second through the first one's glyphs.
     """
-    return tuple(_glyph_bits(code, bank) for code in range(_GLYPHS))
+    entries = []
+    seen = set()
+    for bank in banks:
+        for code in range(_GLYPHS):
+            bits = tuple(_glyph_bits(code, bank))
+            if (code, bits) in seen:
+                continue
+            seen.add((code, bits))
+            entries.append((code, bits))
+    return tuple(entries)
 
 
-def _match_glyph_with_distance(bits, bank=None):
-    """Best CP437 code and its Hamming distance for ``bits``."""
+def _match_glyph_with_distance(bits, banks):
+    """Best CP437 code and its Hamming distance for ``bits``.
+
+    Whichever font drew the cell, the code is the same — an override
+    table gives a glyph a different shape, not a different meaning —
+    so scoring every shape and keeping the nearest reads a screen
+    without knowing which font is loaded. Ties go to the first bank,
+    which keeps two runs on the same host agreeing.
+    """
     if not any(bits):
         return 0x20, 0
     best_code = 0x20
     best_dist = _CELL_W * _CELL_H + 1
-    for code, glyph in enumerate(_all_glyph_bits(bank)):
+    for code, glyph in _all_glyph_bits(banks):
         dist = sum(a != b for a, b in zip(bits, glyph))
         if dist < best_dist:
             best_dist = dist
@@ -266,7 +431,7 @@ def _match_glyph_with_distance(bits, bank=None):
     return best_code, best_dist
 
 
-def _match_cell(pixels, width, height, bank=None):
+def _match_cell(pixels, width, height, banks):
     """Return ``(cp437_code, fg, bg)`` for one cell."""
     primary, secondary = _cell_colours(pixels)
     if primary == secondary:
@@ -276,7 +441,7 @@ def _match_cell(pixels, width, height, bank=None):
     candidates = []
     for fg, bg in ((secondary, primary), (primary, secondary)):
         bits = _binarize_as(pixels, fg, bg, width, height)
-        code, dist = _match_glyph_with_distance(bits, bank)
+        code, dist = _match_glyph_with_distance(bits, banks)
         candidates.append((dist, code, fg, bg))
     candidates.sort(key=lambda item: item[0])
     dist, code, fg, bg = candidates[0]
@@ -328,12 +493,16 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
     like QEMU's VGA scrape; attribute rows are per-cell opaque tokens
     from :func:`attribute_token`, length ``cols`` each (not stripped).
 
-    ``bank`` is the 4096-byte glyph bank to read through, and a
-    caller reading a live guest must supply **that guest's own**:
-    VGA BIOS fonts differ between emulators, so the shipped default
-    misreads a screen it did not draw. Nineteen glyphs separate the
-    two this project has met, `W` and `m` among them, which is enough
-    to miss every `wait` on a word containing either.
+    ``bank`` is the font to read through — one 4096-byte bank, or
+    **any number of them**, and a caller reading a live guest should
+    supply every font that guest could be painting with
+    (:func:`banks_from_binary`). One is rarely enough: a BIOS draws
+    its own messages with its bank as installed, a DOS guest draws
+    with what it loaded afterwards, and a framebuffer records the
+    pixels without saying which was in the VGA. Nineteen glyphs
+    separate the two fonts a stock VirtualBox install offers, `W`
+    and `m` among them — enough to miss every `wait` on a word
+    containing either.
     """
     if isinstance(source, Image.Image):
         image = source.convert("RGB")
@@ -341,6 +510,7 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
         with Image.open(source) as opened:
             image = opened.convert("RGB")
     cell_w, cell_h = _geometry(image.width, image.height, cols, rows)
+    banks = as_banks(bank)
     pixels = list(image.get_flattened_data())
     text_rows = []
     attr_rows = []
@@ -354,7 +524,7 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
             for y in range(cell_h):
                 base = (y0 + y) * image.width + x0
                 cell.extend(pixels[base:base + cell_w])
-            code, fg, bg = _match_cell(cell, cell_w, cell_h, bank)
+            code, fg, bg = _match_cell(cell, cell_w, cell_h, banks)
             chars.append(_cp437_char(code))
             attrs.append(attribute_token(fg, bg))
         text_rows.append("".join(chars).rstrip())
@@ -364,7 +534,7 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
 
 def render(text_rows, attribute_rows=None, *,
            cols=_COLS, rows=_ROWS, cell_w=_CELL_W, cell_h=_CELL_H,
-           fg=(170, 170, 170), bg=(0, 0, 0)):
+           fg=(170, 170, 170), bg=(0, 0, 0), bank=None):
     """Render character rows into a RGB ``PIL.Image`` using the glyph bank.
 
     The test twin of :func:`recognize`: fixtures are produced here so
@@ -372,6 +542,12 @@ def render(text_rows, attribute_rows=None, *,
     given, supplies per-cell ``(fg, bg)`` RGB pairs; otherwise every
     cell uses ``fg`` / ``bg``. Cells wider than 8 leave the extra
     columns blank (9-dot VGA); taller cells pad with background.
+
+    ``bank`` draws with a font other than the default — exactly one,
+    since something drawing a screen has a font loaded and it is the
+    *reader* that cannot know which. That asymmetry is what makes a
+    screen painted in one font and read through several testable
+    without a hypervisor.
     """
     if cell_w < _CELL_W or cell_h < _CELL_H:
         raise StaticError(
@@ -380,7 +556,7 @@ def render(text_rows, attribute_rows=None, *,
             rule_id="recognize.geometry")
     image = Image.new("RGB", (cols * cell_w, rows * cell_h), bg)
     pixels = image.load()
-    bank = glyph_bank()
+    bank = glyph_bank() if bank is None else check_bank(bank, "render")
     for row in range(rows):
         line = text_rows[row] if row < len(text_rows) else ""
         for col in range(cols):
