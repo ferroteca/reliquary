@@ -134,6 +134,50 @@ menu bar located by rarity, the wrong glyph bank, and the
 quiescence guard's cadence dependence — as a queue holds only what
 waits.
 
+#### T23 — `select` loses a race with a menu that boots itself
+
+The installed FreeDOS boot menu auto-boots before `select` can
+steer it. The run reaches `hd-boot`, `wait "Load FreeDOS"` matches
+after 9s on `1 - Load FreeDOS with JEMM386 (no EMS, max RAM free)`,
+and the following `select "Load FreeDOS with JEMMEX (more
+compatible)"` fails as *not on screen* — because by then the
+countdown has expired and the guest has booted option 1. The
+failure screenshot shows a fully booted system with `Jemm386 v5.85`
+loaded, not a menu.
+
+**Now the live blocker on the FreeDOS VirtualBox integration**,
+which otherwise installs to disk and boots it.
+
+Two things it is not, both checked. Not the glyph bank: `JEMM386`
+recognized correctly at the wait a moment earlier, so the menu text
+was readable. Not the boot order: the disk booted, which is the
+whole point of the change that got the run this far.
+
+**It is the cadence problem one layer up** — in the interaction
+machinery rather than the quiescence measure that was just fixed.
+`cursor_menu_select` spends `_BASELINE_READS` reads learning the
+screen before it presses anything, then a read per keypress to
+follow the highlight. At ~2s a read on a screenshot backend that is
+tens of seconds before the first key is even sent. The LiveCD menu
+survives it because its countdown is 13s and generous; the
+installed system's is not.
+
+**The sharp edge is that the baseline exists to learn decoration,
+and the countdown *is* decoration.** `_BASELINE_READS` is
+`DEFAULT_ANIMATION_REPEATS + 1` precisely because a ticking cell
+cannot be recognized as furniture in fewer reads — so the machinery
+spends its time learning the very timer that is running out. A menu
+with a countdown is the case where looking before acting costs the
+most and is worth the least.
+
+Directions, none obviously right: press first and classify after,
+so the first keypress does not wait on a baseline; take the
+baseline from the reads a preceding `wait` already spent rather
+than starting fresh; or let a `select` say it is racing a timer and
+skip the mask. Note that `screen_stability` now reports the
+measured cadence (`guard.cadence`), so the machinery can know it is
+on a slow reading path rather than assuming.
+
 #### T22 — A VirtualBox guest never reaches its second boot device
 
 After FreeDOS repartitions and reboots, the guest stops at the
