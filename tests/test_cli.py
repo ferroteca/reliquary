@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Tests for the reliquary command-line interface."""
 
+import argparse
 import contextlib
 import io
 import json
@@ -18,6 +19,7 @@ from rich.cells import cell_len
 from reliquary import cli
 from reliquary import backends
 from reliquary.backends import Availability
+from reliquary.errors import InternalError, exit_code
 from tests import fake_backend
 
 class CliEmptyListingTests(unittest.TestCase):
@@ -1232,6 +1234,28 @@ class CliProgressTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli.main(["--home-dir", self.home, "fetch-media", "x",
                           "--progress", "fancy"])
+
+
+class CliUnroutedCommandTests(unittest.TestCase):
+    """A registered command with no dispatch arm is loud, not silent.
+
+    The routing is a chain of literal command names, kept in step
+    with the registered parsers by hand. A command that lost its arm
+    used to fall through to ``return 0`` — success reported for work
+    that never happened, which is worse than any refusal.
+    """
+
+    def test_an_unrouted_command_is_an_internal_error(self):
+        arguments = argparse.Namespace(command="not-a-command")
+        with mock.patch.object(cli, "_interaction_target",
+                               return_value="unused"):
+            with self.assertRaises(InternalError) as caught:
+                cli._dispatch(arguments, session=None, context=None)
+        self.assertIn("not-a-command", str(caught.exception))
+
+    def test_the_fault_exits_one(self):
+        """It is a fault, so it takes the code faults take."""
+        self.assertEqual(exit_code(InternalError("x")), 1)
 
 
 if __name__ == "__main__":

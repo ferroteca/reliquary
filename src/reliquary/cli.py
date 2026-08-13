@@ -31,8 +31,8 @@ from .home import (Context, DIRECTORIES, default_home_dir,
 from .library import (list_codex, locate_script, seed_blueprint,
                       seed_script)
 from . import backends
-from .errors import (PreflightError, ReliquaryError, StaticError,
-                     UNEXPECTED, exit_code)
+from .errors import (InternalError, PreflightError, ReliquaryError,
+                     StaticError, UNEXPECTED, exit_code)
 from .machines import read_vm_state
 from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
@@ -1654,4 +1654,13 @@ def _dispatch(arguments, session, context):
         with Machine(machine_home).qmp() as qmp:
             output = qmp.hmp(arguments.line)
         return _emit(arguments, output, lambda: print(output))
-    return 0
+    # A registered command with no arm above lands here. Returning 0
+    # reported success for work that never happened, which is the one
+    # failure shape in this file that produces a wrong answer rather
+    # than an inconvenient one. The command list is kept in three
+    # places and only one of them is pinned to the manifest, so the
+    # gap this closes is a real one until it is (T17).
+    raise InternalError(
+        f"the CLI registers {arguments.command!r} and routes it "
+        "nowhere: a registered command with no dispatch arm would "
+        "otherwise report success for work it never did")
