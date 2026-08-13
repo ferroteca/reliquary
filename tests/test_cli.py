@@ -4,6 +4,7 @@
 
 import argparse
 import contextlib
+import inspect
 import io
 import json
 import os
@@ -1256,6 +1257,40 @@ class CliUnroutedCommandTests(unittest.TestCase):
     def test_the_fault_exits_one(self):
         """It is a fault, so it takes the code faults take."""
         self.assertEqual(exit_code(InternalError("x")), 1)
+
+
+class CliDispatchCoverageTests(unittest.TestCase):
+    """The registered commands and the routed ones are one list.
+
+    Two lists of the same 48 words survive in this module, and only
+    one of them is derived: ``_COMMANDS`` is read off the built
+    parser, while ``_dispatch`` routes on literal comparisons that
+    nothing else checks. A command registered without an arm reaches
+    the fall-through, which is a fault rather than the silent success
+    it once was — but a fault whoever runs the command discovers,
+    where this is the suite discovering it.
+
+    Walking the source for the arms follows ``test_errors.py``, which
+    walks every ``raise`` in the package for the same kind of reason.
+    """
+
+    def _routed(self):
+        source = inspect.getsource(cli._dispatch)
+        return set(re.findall(r'arguments\.command == "([a-z-]+)"', source))
+
+    def test_every_registered_command_is_routed(self):
+        unrouted = sorted(set(cli._COMMANDS) - self._routed())
+        self.assertEqual(
+            [], unrouted,
+            f"{unrouted} are registered commands _dispatch does not "
+            "route; each would reach the fall-through and raise.")
+
+    def test_every_routed_command_is_registered(self):
+        unregistered = sorted(self._routed() - set(cli._COMMANDS))
+        self.assertEqual(
+            [], unregistered,
+            f"{unregistered} are routed by _dispatch and registered by "
+            "no parser — dead arms, or a command word that moved.")
 
 
 if __name__ == "__main__":

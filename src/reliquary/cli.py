@@ -43,29 +43,6 @@ from .script_parser import load_script
 from .session import Session
 
 
-# Command words recognised when rewriting leading flags so that
-# ``rlq --home-dir X list-machines`` and ``rlq list-machines --home-dir X``
-# are identical without a parent-parser SUPPRESS twin.
-_COMMANDS = frozenset({
-    "create-machine", "start-machine", "stop-machine",
-    "destroy-machine", "recreate-machine", "apply-blueprint",
-    "get-machine-dir",
-    "run-script", "fetch-media",
-    "seed-blueprint", "seed-script", "new-blueprint",
-    "delete-blueprint", "delete-script",
-    "get-property", "set-property", "unset-property",
-    "list-properties", "list-blueprints", "list-codex",
-    "list-backends", "list-machines", "list-scripts", "list-media",
-    "clean-media", "prune-media", "add-media",
-    "insert-media", "eject-media", "set-boot-order",
-    "get-machine-var", "wait-machine-var",
-    "describe-drives", "refresh-drives",
-    "put-file", "get-file",
-    "list-files", "put-files", "get-files",
-    "type", "enter", "press", "exec", "select", "screen", "wait",
-    "screenshot", "hmp",
-})
-
 # Arity of every flag that may appear before the command word.
 # Unknown leading tokens are left in place for argparse to reject.
 _FLAG_ARITY = {
@@ -400,21 +377,8 @@ def _prog_name():
     return stem if stem in _PROG_NAMES else "rlq"
 
 
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv[1:]
-    argv = _reorder_argv(list(argv))
-
-    parser = argparse.ArgumentParser(
-        prog=_prog_name(),
-        description="OS installation scripting over QEMU guest "
-                    "automation (DOS by default)")
-    parser.add_argument(
-        "--version", action="version",
-        version="%(prog)s " + _version)
-
-    subcommands = parser.add_subparsers(dest="command", required=True)
-
+def _add_machine_commands(subcommands):
+    """Register the machine lifecycle."""
     # create-machine
     command = subcommands.add_parser(
         "create-machine",
@@ -479,6 +443,9 @@ def main(argv=None):
         help="print a machine's cache directory (out-of-band door)")
     _add_selectors(command)
 
+
+def _add_script_commands(subcommands):
+    """Register running a script."""
     # run-script
     command = subcommands.add_parser(
         "run-script",
@@ -549,6 +516,9 @@ def main(argv=None):
              "and carrier call, for debugging and corpus capture. "
              "Stops once a bound secret reaches the guest")
 
+
+def _add_media_commands(subcommands):
+    """Register fetching media."""
     # fetch-media
     command = subcommands.add_parser(
         "fetch-media", help="fetch media")
@@ -556,6 +526,9 @@ def main(argv=None):
     _add_progress(command)
     command.add_argument("name", help="media name")
 
+
+def _add_authoring_commands(subcommands):
+    """Register seeding and authoring the files a user owns."""
     # seed-*
     for kind in ("blueprint", "script"):
         command = subcommands.add_parser(
@@ -587,6 +560,9 @@ def main(argv=None):
     _add_home(command)
     command.add_argument("name", help="script name")
 
+
+def _add_property_commands(subcommands):
+    """Register the property family."""
     # property family
     command = subcommands.add_parser(
         "get-property", help="get a property")
@@ -622,6 +598,9 @@ def main(argv=None):
         "prefix", nargs="?",
         help="limit to this key and its dotted descendants")
 
+
+def _add_listing_commands(subcommands):
+    """Register the list family."""
     # list-*
     command = subcommands.add_parser(
         "list-backends", help="list discovered backend installations")
@@ -650,6 +629,9 @@ def main(argv=None):
         "list-media", help="list your media item names")
     _add_home(command)
 
+
+def _add_cache_commands(subcommands):
+    """Register cache reclamation, and declaring a local media."""
     # cache reclamation
     command = subcommands.add_parser(
         "clean-media", help="reclaim cached media payloads")
@@ -671,6 +653,9 @@ def main(argv=None):
     command.add_argument("name", help="the media name to declare")
     command.add_argument("file", help="the file it is located at")
 
+
+def _add_state_commands(subcommands):
+    """Register persistent machine-state operations."""
     # state ops
     command = subcommands.add_parser(
         "insert-media", help="insert media into a drive slot")
@@ -723,6 +708,9 @@ def main(argv=None):
         help="re-read a stopped machine's disks into the drive record")
     _add_selectors(command)
 
+
+def _add_file_commands(subcommands):
+    """Register in-band file exchange."""
     command = subcommands.add_parser(
         "put-file",
         help="copy a host file into a stopped machine's guest")
@@ -768,6 +756,9 @@ def main(argv=None):
     command.add_argument(
         "destination", help="the host directory its contents land in")
 
+
+def _add_console_commands(subcommands):
+    """Register the guest-console family (script-language identity)."""
     # guest-console family (script-language identity)
     command = subcommands.add_parser(
         "type", help="type text with no trailing Enter")
@@ -821,6 +812,62 @@ def main(argv=None):
     _add_selectors(command)
     command.add_argument("line")
 
+
+def _build_parser():
+    """The whole CLI: the root parser, and the commands it registers.
+
+    Returns ``(parser, commands)`` — the parser to drive an
+    invocation with, and the set of command words it knows. **The
+    command set is read off the parser rather than restated**, which
+    is what keeps `_COMMANDS` from being a second list to maintain
+    beside the registrations.
+
+    **Call order is `--help` order.** The families below are
+    registered in the sequence a reader meets them in the help
+    output, so moving a call moves the listing; the groups follow the
+    blocks this module has always carried rather than a fresh
+    taxonomy, which is why `fetch-media` sits alone between the
+    script and the authoring families and `add-media` sits with cache
+    reclamation.
+    """
+    parser = argparse.ArgumentParser(
+        prog=_prog_name(),
+        description="OS installation scripting over QEMU guest "
+                    "automation (DOS by default)")
+    parser.add_argument(
+        "--version", action="version",
+        version="%(prog)s " + _version)
+
+    subcommands = parser.add_subparsers(dest="command", required=True)
+    _add_machine_commands(subcommands)
+    _add_script_commands(subcommands)
+    _add_media_commands(subcommands)
+    _add_authoring_commands(subcommands)
+    _add_property_commands(subcommands)
+    _add_listing_commands(subcommands)
+    _add_cache_commands(subcommands)
+    _add_state_commands(subcommands)
+    _add_file_commands(subcommands)
+    _add_console_commands(subcommands)
+    return parser, frozenset(subcommands.choices)
+
+
+# Command words recognised when rewriting leading flags so that
+# ``rlq --home-dir X list-machines`` and ``rlq list-machines --home-dir X``
+# are identical without a parent-parser SUPPRESS twin. **Derived, not
+# declared**: a throwaway parser is built once at import so this set
+# cannot drift from what is actually registered. `main()` builds its
+# own, so `_prog_name()` still reads `sys.argv[0]` when the command
+# runs rather than when the module loads.
+_COMMANDS = _build_parser()[1]
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    argv = _reorder_argv(list(argv))
+
+    parser, _commands = _build_parser()
     arguments = parser.parse_args(argv)
     context = _invocation_context(arguments)
     session = Session(context)

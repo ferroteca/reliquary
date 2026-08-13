@@ -413,7 +413,20 @@ workflow:
   screenshot above, applied to the other artifact a run can leave
   behind. `cli.py` owns command parsing, exit codes
   (`errors.exit_code` over one `ReliquaryError` arm), and the
-  output discipline; it is the session layer's first
+  output discipline. `_build_parser()` registers the 48 commands
+  through ten family builders and returns `(parser, commands)`, and
+  **`_COMMANDS` is derived from that rather than declared** — it was
+  a hand-kept frozenset, which is one more list of the same words to
+  keep in step; do not restore it. **Builder call order is `--help`
+  order**, so the groups follow the blocks this module has always
+  carried rather than a tidier taxonomy: `fetch-media` sits alone
+  between the script and authoring families, and `add-media` sits
+  with cache reclamation. `_dispatch` routes on literal command
+  words and is the one list still kept by hand; `test_cli.py` walks
+  its source and pins it to the registered set in both directions,
+  and an unrouted command reaching the fall-through is an
+  `InternalError` (exit 1) rather than the silent `0` it once
+  returned. It is the session layer's first
   consumer — one `Context` built per invocation (flags, then
   environment, then the default home), one `Session` opened on it,
   every command driven through session methods, the codex and
