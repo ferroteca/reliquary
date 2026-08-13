@@ -298,17 +298,32 @@ def drive_attachments(state):
 
     Mirrors :func:`configure_vm`'s placement so a live
     ``change_medium`` can retarget the same port the guest sees.
+
+    **Hard disks take the IDE slots before cdroms**, which is the
+    layout the QEMU renderer already documents — floppies, then hard
+    disks, then cdroms after them. Ordering the two kinds together by
+    key instead made slot assignment fall out of the *alphabet*: with
+    the usual `cdrom0` and `hdd0` names, `cdrom0` sorts first and
+    takes the primary master, leaving the boot disk on the slave. A
+    PC BIOS told to boot `disk` does not reliably find one there, so
+    a machine whose disk had become bootable would still stop at
+    `No active partition` — and nothing about the blueprint said to
+    put them in that order.
     """
     drives = state.get("drives") or {}
     attachments = {}
     floppies = []
-    disks = []
+    hdds = []
+    cdroms = []
     for key, drive in sorted(drives.items()):
         medium = drive.get("medium")
         if medium == "floppy":
             floppies.append(key)
-        elif medium in ("hdd", "cdrom"):
-            disks.append((key, drive))
+        elif medium == "hdd":
+            hdds.append((key, drive))
+        elif medium == "cdrom":
+            cdroms.append((key, drive))
+    disks = hdds + cdroms
     for index, key in enumerate(floppies[:2]):
         attachments[key] = {
             "storagectl": _FLOPPY, "port": index, "device": 0,

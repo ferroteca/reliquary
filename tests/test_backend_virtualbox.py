@@ -185,6 +185,50 @@ class AdapterSurfaceTests(unittest.TestCase):
         # And the session's cache root is where it is told to keep it.
         self.assertEqual(bank.call_args.args, ("/tmp/cache",))
 
+    def test_hard_disks_take_the_ide_slots_before_cdroms(self):
+        """The boot disk must be the primary master, not the slave.
+
+        Ordering the two kinds together by key made the slot fall out
+        of the alphabet: `cdrom0` sorts before `hdd0` and took the
+        master, stranding the boot disk on the slave, where a PC BIOS
+        told to boot `disk` stops at `No active partition`.
+        """
+        state = {"drives": {
+            "cdrom0": {"medium": "cdrom"},
+            "hdd0": {"medium": "hdd"},
+        }}
+
+        attachments = vbox.drive_attachments(state)
+
+        self.assertEqual(
+            (attachments["hdd0"]["port"], attachments["hdd0"]["device"]),
+            (0, 0))
+        self.assertEqual(
+            (attachments["cdrom0"]["port"],
+             attachments["cdrom0"]["device"]),
+            (0, 1))
+        self.assertEqual(attachments["hdd0"]["type"], "hdd")
+        self.assertEqual(attachments["cdrom0"]["type"], "dvddrive")
+
+    def test_several_disks_keep_key_order_within_their_kind(self):
+        state = {"drives": {
+            "cdrom0": {"medium": "cdrom"},
+            "hdd0": {"medium": "hdd"},
+            "hdd1": {"medium": "hdd"},
+            "floppy0": {"medium": "floppy"},
+        }}
+
+        attachments = vbox.drive_attachments(state)
+
+        self.assertEqual(attachments["hdd0"]["port"], 0)
+        self.assertEqual(attachments["hdd0"]["device"], 0)
+        self.assertEqual(attachments["hdd1"]["port"], 0)
+        self.assertEqual(attachments["hdd1"]["device"], 1)
+        self.assertEqual(attachments["cdrom0"]["port"], 1)
+        self.assertEqual(attachments["cdrom0"]["device"], 0)
+        self.assertEqual(attachments["floppy0"]["storagectl"],
+                         vbox._FLOPPY)
+
     def test_discover_reports_a_found_binary(self):
         with mock.patch.object(vbox, "find_vboxmanage",
                                return_value="C:/VBoxManage.exe"):

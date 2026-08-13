@@ -147,14 +147,32 @@ the fallthrough to the CD that the same script gets on QEMU.
 the first one that is not about reading the screen: the run drives
 the boot menu, the language chooser, the installer welcome, the
 partition prompt, partitioning and the reboot, and dies at the
-BIOS. Suspicion is the boot order the adapter renders — `_boot_order`
-maps Reliquary's keys onto `--bootN` and a create resolves a
-best-guess order — or the CD attachment not surviving the restart.
-Neither is confirmed; the screen is the only evidence so far.
+BIOS.
 
-Worth ruling out first, cheaply, by reading the VM's own
-`showvminfo` boot order and storage attachments after the reboot
-and comparing them against what the machine state records.
+**Two candidates have been ruled out by reading the live VM.** The
+boot order is right — `boot1="disk" boot2="dvd"`, matching the
+recorded `['hdd0', 'cdrom0']` — and the CD is still attached and not
+ejected after the reboot. A third, the adapter assigning IDE slots
+in *alphabetical* key order so `cdrom0` took the primary master and
+the boot disk sat on the slave, was real and is fixed; the hang
+survived it, with `hdd0.vdi` confirmed on 0-0 and the ISO on 0-1.
+
+**What is left is a BIOS behavioural difference.** The same machine
+boots the LiveCD from that slot happily while the disk is *blank*:
+the first boot of every run does exactly that. Once FreeDOS writes a
+partition table with no active partition, VirtualBox's BIOS prints
+`No active partition. Trying next boot device...` and stops there
+rather than falling through to the DVD, where QEMU's SeaBIOS
+proceeds and the same script passes. So the fallthrough the script
+depends on is QEMU's, and it is not portable.
+
+That makes the remaining question a design one rather than a bug
+hunt: whether the codex blueprint's boot order should put the cdrom
+first, whether the install script should `set-boot` before the
+reboot it asks for, or whether a machine should express "boot the
+installer medium until the disk is bootable" at all. Whichever it
+is, it touches an authored surface and needs the argument, not a
+patch.
 
 #### T19 — A machine whose VM died out of band can be neither stopped nor destroyed
 
