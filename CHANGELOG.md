@@ -52,6 +52,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The machine layer and the CLI entry point are restructured, and
+  nothing you use moved.** `machines.py` was two modules and a
+  substrate: the drive layer — the drive report and the five in-band
+  file verbs — is now `drives.py`, and the ids, directories, locks,
+  `machine.json` and selector resolution both halves stand on are
+  `machine_state.py`. `blueprint.py` and `script.py` merge into
+  `authoring.py`, the counterpart of `assets.py`. `machine.py`
+  becomes `machine_handle.py`, the package spelling its collective
+  engine modules in the plural. `cli.py`'s `main()` builds its 48
+  commands through ten family builders, and the command set it
+  recognises is derived from the parser rather than restated beside
+  it.
+
+  **Every documented surface is untouched**, and deliberately
+  checked rather than assumed: the same 50 root exports, the same
+  `Session` methods, the same commands, flags and exit codes, and
+  `rlq --help` plus all 48 subcommand helps byte-identical. Machine
+  state, rule ids and the working-directory layout are unchanged, so
+  no home, blueprint or machine needs recreating. An embedder
+  reaching *past* the root — importing `reliquary.machine`,
+  `reliquary.blueprint` or `reliquary.script` by module path — is
+  the one caller affected; those paths are gone, and the names they
+  held are where they always were, on the package root and the
+  session (P26).
+
 - **`--record` is refused under `--dry-run`** (S1, S2; P11), exit
   `2` with `progress.record-on-a-dry-run`. It was accepted and did
   nothing: a dry run starts no machine and reads no screen, so the
@@ -112,6 +137,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whether the blueprint would work *there*, so absence is reported
   rather than raised. The old `machine.backend-outside-dry-run`
   guard is deleted.
+
+### Fixed
+
+- **`--record` and `run_script(record=)` are specified.** D98 ruled
+  the `.rlqt` transcript format deliberately outside the application
+  surfaces and the *invocation* squarely inside them (S1, S2) — and
+  then the invocation was described in neither
+  [the CLI spec](docs/spec/cli.md) nor
+  [the API spec](docs/spec/api.md). Both now carry it, including the
+  rule that a bound secret reaching the guest stops the recording.
+  The behaviour is unchanged; it was simply undocumented.
+
+- **`--detach` no longer appears in the `run-script` synopsis.** The
+  flag has never existed: detach and the follow surface are
+  asynchronous-runs backlog (D35/D36), and a normative synopsis
+  offering an invocation `argparse` rejects reads as a promise. Where
+  the naming for that capability is settled it stays recorded, in the
+  passages scoped to the backlog.
 
 ### Added
 
