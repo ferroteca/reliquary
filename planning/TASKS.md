@@ -171,3 +171,59 @@ D65's — the whole suite plus the opt-in FreeDOS install run
 passing, with no test rewritten except for its imports.
 AGENTS.md's layout paragraph folds with the code, not ahead of
 it.
+
+#### T15 — Merge `blueprint.py` and `script.py` into `authoring.py`
+
+`blueprint.py` authors and removes `.rlqb` files; `script.py` holds
+one verb, `delete_script`, and sits inside the `script_*` language
+family it has nothing to do with. They are the same shape — author
+or remove a user-owned file, failing closed while something still
+refers to it — written apart: `delete_blueprint` refuses while
+machines of the blueprint exist, `delete_script` while blueprints
+reference the script, one rule-id grammar across the two
+(`blueprint.has-machines`, `script.has-blueprints`).
+
+Merge both into **`authoring.py`**, holding `new_blueprint`,
+`add_media`, `delete_blueprint` and `delete_script`. It pairs with
+`assets.py`, which resolves and reads what this writes.
+
+Publish `library._referenced_scripts` as `referenced_scripts` in
+the same change — the package's one cross-module module-private
+access, which `script.py` reaches to walk home blueprints. The
+helper stays where it is: it is the codex seed closure's own
+question, used by `seed_blueprint`, and the authoring path asks
+the same question of a different file.
+
+`tests/test_blueprint.py` and `tests/test_script_authoring.py`
+merge to `tests/test_authoring.py` — the second already imports
+from both modules, which is the merge the test tree had already
+made.
+
+No application surface moves: no CLI command, no `Session` method,
+no exported name, no rule id, so [SURFACES.md](SURFACES.md) does
+not trigger. Independent of T14.
+
+#### T16 — Rename `machine.py` to `machine_handle.py`
+
+**After T14.** The package spells its collective engine modules in
+the plural — `media.py`, `properties.py`, `backends.py`,
+`machines.py` — and `machine.py` is the sole singular, holding the
+`Machine` handle and its console verbs rather than a family
+engine. T14 adds `machine_state.py`, which both sharpens the
+problem (three `machine*` modules to read past) and supplies the
+pairing: where a machine lives at rest, and how one is spoken to
+while it runs.
+
+T14 also removes the other reason, which is why this waits rather
+than landing twice. `machine.py` needs exactly one name from
+`machines.py` — `read_vm_state` — and T14 moves it down, so the
+two stop importing each other. Turn the deferred `from .machine
+import Machine` imports in `machines.py` into ordinary ones in
+this change; what remains afterwards is readability, and the
+rename stands on that alone.
+
+Five import sites, one test line (`tests/test_core.py`), and
+AGENTS.md. The six module-level free functions are exported at the
+root and are **not** touched — respelling those would be a surface
+change and is a separate question. Nothing else moves: no CLI
+command, no `Session` method, no rule id.
