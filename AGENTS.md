@@ -350,9 +350,28 @@ workflow:
   the boundary checks read (`_check_clocks`, at statement starts and
   dispatch samples), so a cancellation ends the run at a boundary
   with an input delivery already in flight completed — never
-  wherever the interrupt happened to land. `cli.py` owns command
-  parsing, exit codes (`errors.exit_code` over one `ReliquaryError`
-  arm), and the output discipline; it is the session layer's first
+  wherever the interrupt happened to land.
+  `transcript.py` is screen-transcript capture and reconstruction,
+  and **the module is not an application surface** (D98): the
+  `.rlqt` format carries no stability guarantee and no `docs/spec/`
+  entry, so changing it is housekeeping — while the *invocation* is
+  surface and lands on S1/S2 in the same change (`--record <path>`
+  on `run-script`, `run_script(record=)` on the session). The
+  capture wraps the **carrier seam** — the adapter session's
+  `text_screen` / `send_keys` / `screenshot` / `change_medium` —
+  so it is backend-neutral by construction: `RecordingSession` is
+  that wrapper, and `ReplaySession` stands a fake session at the
+  same seam, which is what lets the whole interpretation layer
+  above run unmodified over a recording. Every frame carries a
+  sha256 of its canonical `(rows, attributes)` pair, checked at
+  reconstruction, so a bug or a hand-edited fixture fails loudly
+  rather than yielding a screen that never existed. **A bound
+  secret reaching the guest stops the recording** for the rest of
+  the run — the same rule that suppresses the automatic failure
+  screenshot above, applied to the other artifact a run can leave
+  behind. `cli.py` owns command parsing, exit codes
+  (`errors.exit_code` over one `ReliquaryError` arm), and the
+  output discipline; it is the session layer's first
   consumer — one `Context` built per invocation (flags, then
   environment, then the default home), one `Session` opened on it,
   every command driven through session methods, the codex and
