@@ -180,8 +180,21 @@ is waiting on an answer today.
 
 - D104 — A SCOPED MACHINE-STATE CHANGE IS A BLOCK, AND ITS RESTORE
   OBEYS THE STOPPED-ONLY RULE — DECIDED (owner, 2026-08-13, the U24
-  pledge round). Supports **U24**; P14, S3. Bounded by **D15**'s Q1,
-  which it does not reopen.
+  pledge round). Supports **U24** and **U26**; P14, S3. Bounded by
+  **D15**'s Q1, which it does not reopen.
+
+  **The demand is two use cases, not one with a failure clause.**
+  U24 as drafted carried the run-ends-as-it-began guarantee inside
+  its own path, which the happy-path rule forbids: a use case is one
+  simple path, and a deviation is never a clause in one. Of that
+  rule's two homes the guarantee went to a **use case of its own**
+  (U26), not to a principle. WEIGHED AND DECLINED: P28. The rule
+  genuinely holds on every outcome and every surface — the revert
+  after a *successful* run is the same rule running where nobody
+  looks — but the half a user meets is a goal they pursue, and a
+  principle would have stated the mechanism when what was missing
+  was the demand. Neither half changed in substance, and F54
+  delivers both.
 
   Two contested calls, both made against the recommendation, and the
   arguments they beat are recorded because each was strong enough to

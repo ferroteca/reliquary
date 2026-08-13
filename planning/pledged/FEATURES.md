@@ -35,9 +35,12 @@ to this file on pledge.
 ## F54 — The scoped machine-state change
 
 > **Pledged 2026-08-13** (owner), cut straight to this file in the
-> act that pledged **U24**, whose whole delivery it is — the
-> promotion to root [USE-CASES.md](../../USE-CASES.md) rides with
-> it (D34). Serves **U24**; weighed against **P14**, which is what
+> act that pledged **U24** and **U26**, whose whole delivery it is —
+> the promotion of both to root [USE-CASES.md](../../USE-CASES.md)
+> rides with it (D34), neither being met until it lands. U24 asks
+> that a stage state what it boots; U26 asks that what a run
+> arranged come off when the run ends, which is the same mechanism
+> seen from the retry. Weighed against **P14**, which is what
 > makes a new construct expensive, and **P25**, which both backends
 > already satisfy since the vocabulary is Reliquary's own state and
 > not a backend's. The spelling and the restore rule, with the
