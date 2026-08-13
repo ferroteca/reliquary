@@ -48,9 +48,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recognizer — then `agentless-display` claimed. Opt-in FreeDOS
   integration: `RELIQUARY_INTEGRATION=1` with
   `tests.test_freedos_virtualbox_integration` (pins
-  `backend: virtualbox` on the seeded blueprint). Screens are read
-  through the fonts the host's own VirtualBox paints with, extracted
-  on demand and cached rather than vendored.
+  `backend: virtualbox` on the seeded blueprint).
 
   **Demonstrated against a live VirtualBox on 2026-08-13**: the
   unmodified codex script installs FreeDOS 1.4 from the LiveCD,
@@ -155,32 +153,49 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   refusal lives in `run_script`, so the CLI flag and the API's
   `record=` get it from one place.
 
-- **The `remanence` pin moves to `0.0.1a3`** (P27), and `at_rest.py`
-  is rewritten onto that release's surface — the dependency makes no
-  compatibility promise before 1.0, and `Disk` is gone. An image is
-  now identified, then loaded into a session as one medium under a
-  declared device type (`mbr-sector-hd`: an MBR-partitioned drive
-  addressed by cylinder, head and sector, which is what a DOS
-  workflow's disks are), and its content is reached through the
-  partitions that medium bears rather than through disk-plus-volume-id
-  calls. Releasing the medium ends the claim.
+- **Remanence owns at-rest disk access** (P27; D77). The `remanence`
+  dependency, pinned `==0.0.1a3`, is now the one deep module for
+  reading and writing a stopped machine's disks: a raw or qcow2 image
+  is opened where it lies, a qcow2 backing chain composes with every
+  backing file claimed immutable, a blank disk is an answer rather
+  than an error, and every write stands on a durable undo journal —
+  an interrupted commit is reconciled at the image's next open,
+  wholly the old image or wholly the new one. An image is identified,
+  then loaded into a session as one medium under a declared device
+  type (`mbr-sector-hd`: an MBR-partitioned drive addressed by
+  cylinder, head and sector, which is what a DOS workflow's disks
+  are), and its content is reached through the partitions that medium
+  bears; releasing the medium ends the claim.
 
-  The policy this layer keeps is unchanged and so is every surface
-  above it: the recognition claim and its refusal wording, the
-  whole-disk-or-none rule, guest-address validation, the drive
-  report's shape, and the `UnreadableImage` / `ImageLocked` mapping
-  onto `drive.image-unreadable` and `image.locked`. What changed
-  inside it: sector 0's classification is the dependency's answer
-  now rather than a local derivation from `blank`, `partitions` and
-  `volumes`; a declared FAT row composing no readable volume refuses
-  the disk by name, where the old shape could have passed it by; and
-  a volume's stable id is the inspection report's own value, so it is
-  opaque where it used to be a spelling.
+  **Reliquary keeps its policy and every surface above it**: the
+  DOS-only recognition claim and its refusal wording, the
+  whole-disk-or-none rule, guest-address (8.3) validation, the
+  recorded drive report's shape, the rule ids, and the
+  `UnreadableImage` / `ImageLocked` mapping onto
+  `drive.image-unreadable` and `image.locked`.
 
-- **A volume's label falls back to the boot record's copy** where the
-  root directory carries no label entry — the residue root P27 named,
-  now closed upstream and read whole at the filesystem seam, "NO
-  NAME" included. Nothing here restates the rule any more.
+  On the host, **`qemu-nbd` is no longer used**: the NBD client, the
+  at-rest qcow2 snapshot and the staged raw copy left with the
+  transport they served. A drive image something else holds is still
+  refused by name (`image.locked`), and two readers may now share a
+  disk where each used to exclude the other.
+
+  Four recorded facts moved in the details. The drive record's
+  `cylinders` is the BPB's own answer, present only where the stated
+  track geometry divides the volume's sector count exactly, where it
+  used to be derived by dividing the disk size. Sector 0's
+  classification is the dependency's answer rather than a local
+  derivation from `blank`, `partitions` and `volumes`. A declared FAT
+  row composing no readable volume refuses the disk by name, where
+  the old shape could have passed it by. And a volume's stable id is
+  the inspection report's own value, so it is opaque where it used to
+  be a spelling. A volume's label still falls back to the boot
+  record's copy where the root directory carries no label entry —
+  read whole at the filesystem seam, "NO NAME" included — and nothing
+  here restates that rule any more. An image in a format that is
+  neither raw nor qcow2 now reads as raw bytes and is refused as
+  unreadable (`drive.image-unreadable`) rather than by the retired
+  `image.format-not-at-rest` probe.
 
 - **CLI list tables use Rich** for consistent terminal-cell alignment and
   wrapping. Long paths, addresses, property values, and other wide data fold
@@ -264,33 +279,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   carry `description` and `platform` in `--json`, so the record
   holds what the human view shows. U11's "read a description" is
   met at the keyboard again, not only through `--json`.
-
-- **Remanence owns at-rest disk access** (P27, armed with this
-  change). The `remanence` dependency, pinned at `==0.0.1a2`, is
-  now the one deep module for reading and writing a stopped
-  machine's disks: a raw or qcow2 image is opened where it lies,
-  a qcow2 backing chain composes with every backing file claimed
-  immutable, a blank disk is an answer rather than an error, and
-  every write stands on a durable undo journal — an interrupted
-  commit is reconciled at the image's next open, wholly the old
-  image or wholly the new one (D77). Reliquary keeps its policy:
-  the DOS-only recognition claim and its refusal wording, the
-  whole-disk-or-none rule, guest-address (8.3) validation, the
-  recorded drive report's shape, and the rule ids. On the host,
-  **`qemu-nbd` is no longer used**: the NBD client, the at-rest
-  qcow2 snapshot, and the staged raw copy left with the transport
-  they served. A drive image something else holds is still
-  refused by name (`image.locked`), and two readers may now share
-  a disk where each used to exclude the other. Three recorded
-  facts moved in the details: the drive record's `cylinders` is
-  now the BPB's own answer, present only where the stated track
-  geometry divides the volume's sector count exactly (previously
-  derived by dividing the disk size); a volume's label no longer
-  falls back to the BPB's copy when the root directory carries no
-  label entry; and an image in a format that is neither raw nor
-  qcow2 now reads as raw bytes and is refused as unreadable
-  (`drive.image-unreadable`) rather than by the retired
-  `image.format-not-at-rest` probe.
 
 - **The session is the only door** (P26). All embedding-API
   interaction now passes through `reliquary.Session`, opened on a
