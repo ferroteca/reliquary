@@ -80,7 +80,8 @@ Work items:
 > fresh verification, never a substitution.
 
 **What Reliquary still holds today**, each with its current home —
-the complete inventory this feature would retire:
+the complete inventory this feature would retire, two of them
+struck already where the `0.0.1a3` pin retired them on its own:
 
 1. **The recognition claim's enforcement.** `at_rest.py` pins the
    partition-type vocabulary value by value — `_FAT_TYPES`,
@@ -94,9 +95,12 @@ the complete inventory this feature would retire:
    pledged **F38** dissolves outright ("an unreadable region retains
    its identity and position, so a failure cannot renumber objects
    which follow it").
-3. **Sector-0 classification.** The `partitioned` flag is derived
-   locally — `bool(partitions) or (not blank and not volumes)` — a
-   policy reconstruction of outcomes the disk itself distinguishes.
+3. ~~**Sector-0 classification.**~~ Retired at the `0.0.1a3` pin:
+   the `partitioned` flag was derived locally — `bool(partitions)
+   or (not blank and not volumes)` — and is now the scheme the
+   dependency classified, read rather than reconstructed. Which
+   outcomes reliquary accepts stays here, as "what stays
+   regardless" below has it.
 4. **Disk-level `cylinders` selection.** The record's value is the
    first volume's BPB answer, chosen by reliquary rather than
    stated by the report.
@@ -104,10 +108,10 @@ the complete inventory this feature would retire:
    store volume *indexes*; the index is resolved to Remanence's id
    at open, and the volume-vanished guard compares counts rather
    than identities.
-6. **Label policy.** The "NO NAME"-reads-as-unlabeled rule is
-   applied here, and the BPB-label fallback is the residue named
-   in root P27 — lost because the dependency's report does not
-   carry the boot record's label field.
+6. ~~**Label policy.**~~ Retired at the `0.0.1a3` pin: the "NO
+   NAME"-reads-as-unlabeled rule was applied here and the
+   BPB-label fallback was root P27's residue. The dependency reads
+   both now, and `volume_label()` passes its answer on.
 7. **Guest-name policy.** `_validated_short_name` and `_ILLEGAL`
    enforce 8.3 validity with named reasons, and segments are
    uppercased here because Remanence's matching is exact.
@@ -115,16 +119,27 @@ the complete inventory this feature would retire:
    A:/B: by floppy slot and C: onward one letter per volume across
    disks — DOS's own assignment, reimplemented host-side.
 
-**The missing upstream contract.** None of the capabilities below
-is available to Reliquary from the pinned Remanence `0.0.1a2`.
-Five are named by Remanence's pledged **F38** / **F39** (cut from
-proposed F20 on pledge), but a planning entry is not a consumable
-capability; the remaining three are still only proposed upstream
-(**F24**, **F25**, **F26**). **All eight are blocking.**
-P27's no-hybrid rule permits no local fallback for a capability a
-partial upstream delivery omits.
+**The upstream contract, and where the pin leaves it.** The
+inventory below was written against the pinned Remanence
+`0.0.1a2`, from which none of the eight capabilities was
+available; five were named by Remanence's pledged **F38** / **F39**
+(cut from proposed F20 on pledge) and three were only proposed
+(**F24**, **F25**, **F26**). **All eight are blocking**, and P27's
+no-hybrid rule permits no local fallback for a capability a partial
+upstream delivery omits.
 
-Named by Remanence's pledged F38 / F39, but not delivered:
+The pin moved to **`0.0.1a3`** on 2026-08-12, and each of the eight
+was exercised against that release on the delivered Windows host
+while the at-rest layer was rewritten onto it. Every one answers —
+the notes under each say what was observed. **That is an API
+observation and not this feature's gate**: the gate asks for a
+release verified against P27's guarantees, and delivery is a
+surface change (S1, S7 — the drive record and the letter map) that
+triages under the surface rule before any of the inventory above
+leaves. Both remain the owner's, and the eight stand as written
+until they land.
+
+Named by Remanence's pledged F38 / F39:
 
 1. **Stable region and volume identities, end to end.** Every
    discovered region and readable volume carries an identity which
@@ -136,22 +151,42 @@ Named by Remanence's pledged F38 / F39, but not delivered:
    the premise on which partial reads are safe. (F38 issues the
    identities; F39 makes the file verbs select by them and retires
    `DiskGeometry` / `geometry()`.)
+
+   *Observed in `0.0.1a3`:* regions, volumes and filesystems each
+   carry an id, the inspection report is keyed by them, and content
+   is reached through the partition holding the identity rather than
+   by position. `DiskGeometry` / `geometry()` are gone.
 2. **Sector 0 classified by the disk seam.** The report distinguishes
    four outcomes directly: blank; a partition schema containing no
    volumes; a direct, unpartitioned volume; and unknown nonblank
    content. Reliquary must not reconstruct those states from
    `partitions`, `blank`, and `volumes` combinations. (F38.)
+
+   *Observed in `0.0.1a3`:* `DiskReport.content` answers exactly
+   those four — `"blank"`, `"schema"`, `"direct-volume"`,
+   `"unknown-nonblank"` — with `content_evidence` on the last.
+   `at_rest.py` reads it directly and derives nothing.
 3. **Filesystem-declared geometry kept at the filesystem seam.** A
    volume reports the geometry its filesystem declares, unanswered
    where it declares none. The disk report must leave Reliquary no
    reason to select the first volume's BPB answer as a synthesized
    disk-level `cylinders` value. (F38.)
+
+   *Observed in `0.0.1a3`:* the BPB's words are the filesystem's
+   (`FilesystemInfo.cylinders` / `.heads` / `.sectors_per_track`),
+   and the medium answers its own discovered `Geometry` with the
+   readings behind it. The disk-level selection is still made here,
+   which is this feature's work rather than a gap upstream.
 4. **A partial-read report.** Failure to interpret one region is an
    issue on that region, not failure of the disk report. Regions and
    volumes which can be read remain present with their stable
    identities, including those after the issue, so the consumer can
    place and use everything whose identity and position are known.
    (F38.)
+
+   *Observed in `0.0.1a3`:* a disk whose first row is `0x83` reports
+   that row with its issue and its category, and row 2 keeps its
+   ordinal, its identity and its readable content.
 5. **Declared-type readings fit for a user-facing refusal.** Every
    partition or region reports both its raw declaration and a
    description Reliquary can quote without maintaining its own type
@@ -160,13 +195,26 @@ Named by Remanence's pledged F38 / F39, but not delivered:
    partition — this disk is GPT, not MBR". (F38 commits to readings
    fit to quote in a user-facing refusal.)
 
-Still proposed upstream (F24 / F25 / F26):
+   *Observed in `0.0.1a3`:* `Partition.type_byte` beside
+   `type_reading`, which answers "NTFS or exFAT" for `0x07` and
+   "that the whole disk is GPT rather than MBR, this entry being the
+   protective placeholder GPT writes" for `0xEE` — the sense asked
+   for, in the dependency's own wording, and `0x3C` reads as "no
+   type this release has a reading for" rather than as nothing.
+
+Proposed upstream when this was written (F24 / F25 / F26):
 
 6. **FAT label semantics owned at the filesystem seam.** The FAT
    answer treats `NO NAME` as the format's spelling of unlabeled and
    therefore absent. It carries the boot-record label as evidence
    beside the root-directory label, so Reliquary neither reads a
    sector nor recreates the fallback policy.
+
+   *Observed in `0.0.1a3`:* `VolumeLabel` answers the name whole
+   with both readings — root-directory entry and boot-record field —
+   and `answered_by` naming which one spoke; `NO NAME` is stored
+   evidence and an absent name. Taken as the answer here already:
+   the local rule is gone.
 7. **DOS short-name semantics owned at the file-access seam.** Reads
    match case-insensitively and return the stored short name; writes
    validate and normalize at that same seam. A name outside DOS 8.3
@@ -175,6 +223,11 @@ Still proposed upstream (F24 / F25 / F26):
    uppercasing. Reliquary keeps only guest-address parsing
    (`A:\OUT\X.TXT` into a letter and segments) and rule-id
    restatement.
+
+   *Observed in `0.0.1a3`:* a write names the rule it broke —
+   separators, base length, extension length, excluded character —
+   and `lower.txt` lands as `LOWER.TXT`; reads match case
+   insensitively and answer with the stored short name.
 8. **A DOS namespace composer which produces the mapping.** Given
    the machine facts Reliquary owns — medium, slot, and authoritative
    attachment order — plus the composed volumes and their stable
@@ -188,15 +241,23 @@ Still proposed upstream (F24 / F25 / F26):
    producing one; which image occupies each slot remains the
    machine model's fact. (Needs Remanence F38 delivered.)
 
+   *Observed in `0.0.1a3`:* `Machine.compose_dos_letters()` returns
+   a `DriveMap` over the machine's own device set — mappings naming
+   volume identities, an `undetermined` outcome carrying the reason,
+   and provenance stating the rules applied. It goes further than
+   the ask: the assignment rules are per DOS variant (`ms-dos-4`,
+   `ms-dos-5`), and where an unstated variant leaves them
+   disagreeing the letter is undetermined rather than chosen.
+
 The upstream API's spelling is Remanence's design choice. The gate
 is observable: a released API must make each answer above available
 without Reliquary reading disk structures, reproducing filesystem
 or DOS policy, or translating through a second local model.
 
 **What leaves on delivery**: the type tables and `_describe`; the
-whole-disk refusal loop; the `partitioned` and `cylinders`
-derivations; `_validated_short_name`, `_ILLEGAL`, and the
-uppercasing; the "NO NAME" rule; the letter algorithm; positional
+whole-disk refusal loop; the `cylinders` derivation;
+`_validated_short_name`, `_ILLEGAL`, and the
+uppercasing; the letter algorithm; positional
 identity everywhere — the letter map and drive record store
 Remanence's identities, and the volume-vanished guard becomes an
 identity miss answered by name.

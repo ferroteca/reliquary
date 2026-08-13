@@ -126,19 +126,30 @@ class VolumeDiscoveryTests(_ImageCase):
             fat_image.volume(TREE, bits=16, sectors=60000, per_cluster=1))
         self.assertEqual(larger.volumes[0].filesystem, "FAT16")
 
-    def test_the_volume_id_is_the_geometry_reports_own(self):
+    def test_the_volume_id_is_the_inspection_reports_own(self):
         """One identity shared by the report and every file verb
         (P27): the id is Remanence's stable name for the volume, not a
-        position that renumbers."""
-        floppy = self._image(fat_image.volume(TREE))
-        self.assertEqual(floppy.volumes[0].id, "superfloppy:0")
+        position that renumbers.
+
+        Its spelling is Remanence's and opaque here, so what is
+        asserted is that it identifies rather than counts -- distinct
+        per volume, the same on a second open of the same disk, and
+        not the position the volume happens to sit at.
+        """
+        path = self._write(fat_image.volume(TREE))
+        with opened(path) as floppy:
+            floppy_id = floppy.volumes[0].id
+        with opened(path) as reopened:
+            self.assertEqual(reopened.volumes[0].id, floppy_id)
         disk = self._image(fat_image.partitioned([
             fat_image.volume({"ONE.TXT": b"1"}, bits=16, sectors=20000,
                              per_cluster=4),
             fat_image.volume({"TWO.TXT": b"2"}, bits=16, sectors=20000,
                              per_cluster=4)]))
-        self.assertEqual([volume.id for volume in disk.volumes],
-                         ["partition:1", "partition:2"])
+        identities = [volume.id for volume in disk.volumes]
+        self.assertEqual(len(set(identities)), 2)
+        self.assertNotIn(floppy_id, identities)
+        self.assertNotEqual(identities, [0, 1])
 
     def test_an_image_that_is_neither_says_so(self):
         """Something is written where a table would be, and it is not
@@ -490,9 +501,11 @@ class VolumeLabelTests(_ImageCase):
     """The label as DOS maintains it, unanswered when there is none.
 
     The root directory's label entry is what ``LABEL`` writes and
-    ``DIR`` shows; "NO NAME" is the format's own spelling of
-    unlabeled and never reads as a name — that reading is
-    reliquary's, applied to whatever Remanence reports.
+    ``DIR`` shows, and the boot record's copy answers where the root
+    directory carries none; "NO NAME" is the format's own spelling of
+    unlabeled and never reads as a name. Remanence reads all of that
+    at the filesystem seam now and this layer restates none of it, so
+    what is pinned here is the answer reliquary passes on.
     """
 
     def test_an_unlabeled_volume_answers_none(self):
@@ -518,6 +531,18 @@ class VolumeLabelTests(_ImageCase):
         payload[root_at + 11] = 0x08
         volume = self._image(bytes(payload)).volumes[0]
         self.assertIsNone(volume.volume_label())
+
+    def test_the_boot_records_copy_answers_where_the_root_has_none(self):
+        """The fallback DOS itself keeps: a volume whose root
+        directory carries no label entry still answers with the boot
+        record's own copy, where the extended boot record states one.
+        It was the residue P27 named until the dependency's report
+        carried the field."""
+        payload = bytearray(fat_image.volume({}))
+        payload[38] = 0x29                      # extended boot record
+        payload[43:54] = b"BOOTCOPY   "
+        volume = self._image(bytes(payload)).volumes[0]
+        self.assertEqual(volume.volume_label(), "BOOTCOPY")
 
 
 class WritingTests(_ImageCase):

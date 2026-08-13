@@ -696,7 +696,7 @@ differently under the new wording — is mere documentation work.
   deferral's record.)
 - **P27 — Remanence owns at-rest disk access.** Direct disk-image
   access belongs to Remanence, not to Reliquary: the `remanence`
-  dependency — pinned to one exact release, `0.0.1a2` today — is
+  dependency — pinned to one exact release, `0.0.1a3` today — is
   the one deep module for opening raw and qcow2 drive images at
   rest. An image is opened where it lies, a backing chain is
   composed with every backing file claimed immutable, complete
@@ -721,14 +721,22 @@ differently under the new wording — is mere documentation work.
   licence tiers is first-party ownership (D82; AGENTS.md
   "Dependency licence tiers"). A different Remanence release is a
   fresh verification against this principle's guarantees on the
-  delivered host (P11), never a substitution. **Two known
-  residues, named rather than hidden (D48):** a volume's label no
-  longer falls back to the BPB's copy when the root directory
-  carries no label entry, because the dependency's report does
-  not yet carry the BPB label — closable upstream; and an image
-  in a format neither raw nor qcow2 is refused as unreadable raw
-  bytes rather than by the retired format probe, an accurate
-  refusal that no longer names the format or the remedy.
+  delivered host (P11), never a substitution. The image is loaded
+  as one medium under a **declared device type** —
+  `mbr-sector-hd`, an MBR-partitioned drive addressed by cylinder,
+  head and sector, which is what a DOS workflow's disks are —
+  because a raw or qcow2 image carries nothing that says which
+  drive recorded it, and the block-addressed sibling would read
+  the same table under an addressing story nothing here observed.
+  **One known residue, named rather than hidden (D48):** an image
+  in a format the dependency does not recognize is refused as
+  unreadable raw bytes rather than by the retired format probe —
+  an accurate refusal that names neither the format nor the
+  remedy. The `0.0.1a3` pin narrowed it: every format the release
+  *does* recognize is now refused by name at the load, and the
+  BPB-label residue the `0.0.1a2` pin carried is closed — the
+  dependency reads the boot record's label copy where the root
+  directory carries no entry.
   (`at_rest.py` is the translation layer; `test_at_rest.py`
   pins the policy; delivered as F40.)
 

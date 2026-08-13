@@ -16,6 +16,13 @@ write -- an interrupted commit is reconciled at the image's next
 open, wholly the old bytes or wholly the new ones (D77). Nothing
 here reads a sector.
 
+The dependency's own shape is a session holding media: an image is
+identified, loaded into a session as one medium, and its content is
+reached through the partitions the medium bears -- the table's own
+rows on a partitioned disk, and the single direct partition where
+the volume fills the whole of it. Releasing the medium ends the
+claim.
+
 What this module keeps is the policy Remanence cannot own:
 
 - **The recognition claim** (D83): FAT12, FAT16 and FAT16B over
@@ -45,6 +52,23 @@ import os
 from typing import Optional, Tuple
 
 import remanence
+
+#: What this build declares recorded a drive image. A raw or qcow2
+#: image says nothing about the drive behind it, so Remanence takes
+#: the caller's declaration and reads the layout under that device's
+#: own discipline. Reliquary's drives are DOS's: MBR-partitioned,
+#: addressed by cylinder, head and sector -- which is what
+#: ``mbr-sector-hd`` names. The block-addressed sibling reads the
+#: same table under a different addressing story, and declaring it
+#: would state something about the disk that nothing here observed.
+_DEVICE = "mbr-sector-hd"
+
+#: The filesystem reading declared over a volume that fills its own
+#: disk. A partition's type byte determines the reading; the direct
+#: partition an unpartitioned image bears has no type byte to
+#: determine one, so the FAT claim is stated here instead -- the same
+#: claim ``_FAT_TYPES`` makes for a typed row.
+_FAT_READING = "fat"
 
 #: The FAT partition types a DOS guest makes and this build reads.
 #: The type byte is what a partition declares itself to be, and the
@@ -159,6 +183,32 @@ def _describe(kind, number, path):
         "extended containers only")
 
 
+def _names(partition, description):
+    """What to call the volume a refusal is about.
+
+    A partitioned disk names the row, because that is what a user
+    looks at; an unpartitioned one has no row to name.
+    """
+    if partition.is_direct:
+        return "the volume filling the disk"
+    return f"partition {partition.ordinal} ({description})"
+
+
+def _issue(report, partition, facts):
+    """Why Remanence could not read the volume, in its own words.
+
+    The filesystem seam answers first, because a volume that composed
+    and did not recognize is the ordinary case; the volume's own
+    issues answer where nothing was recognized at all.
+    """
+    if facts is not None and facts.issues:
+        return facts.issues[0]
+    volume = report.volume(partition.volume_id)
+    if volume is not None and volume.issues:
+        return volume.issues[0]
+    return "no filesystem was recognized in it"
+
+
 def _refuse(path, error):
     """Raise a Remanence error as the refusal reliquary's callers
     catch.
@@ -179,72 +229,103 @@ def _refuse(path, error):
 class Image:
     """A drive image opened where it lies, and the volumes in it.
 
-    One Remanence session over the image's whole path -- raw or
-    qcow2 decided by the bytes, a backing chain composed and claimed
-    immutable, the image locked for the length of the access, and an
-    interrupted commit from an earlier life reconciled before
-    anything is exposed. ``writable=True`` takes the exclusive
-    claim; a busy image is refused by name rather than waited for.
+    One Remanence session holding one medium -- raw or qcow2 decided
+    by the bytes, a backing chain composed and claimed immutable, the
+    image locked for the length of the access, and an interrupted
+    commit from an earlier life reconciled before anything is
+    exposed. ``writable=True`` takes the exclusive claim; a busy
+    image is refused by name rather than waited for.
     """
 
     def __init__(self, path, *, writable=False):
         self.path = os.path.abspath(os.fspath(path))
         self.writable = writable
+        self._session = remanence.Session()
+        self._medium = None
         try:
-            self._disk = remanence.Disk(self.path, writable=writable)
+            discovery = remanence.discover_media(self.path,
+                                                 writable=writable)
+            self._medium = self._session.load_discovery_as(discovery,
+                                                           _DEVICE)
         except remanence.RemanenceError as error:
             _refuse(self.path, error)
         try:
             #: ``"raw"`` or ``"qcow2"`` -- the recorded ``backing``
             #: fact the drive report carries (D83).
-            self.format = self._disk.format
-            self.size = self._disk.size
-            self._geometry, found = self._read_geometry()
-            self.volumes = [Volume(self._disk, info, writable)
-                            for info in found]
+            self.format = self._medium.format
+            self.size = self._medium.size
+            self._geometry, self.volumes = self._read()
         except remanence.RemanenceError as error:
-            self._disk.close()
+            self.close()
             _refuse(self.path, error)
         except Exception:
-            self._disk.close()
+            self.close()
             raise
 
-    def _read_geometry(self):
-        """The disk's shape under the recognition claim (D83).
+    def _read(self):
+        """The disk's shape and its volumes, under the recognition
+        claim (D83).
 
-        Remanence answers with everything the disk holds -- blank as
-        an answer, every declared partition row, an unreadable row
-        carrying its issue. The claim is enforced here: a row whose
-        type is outside the pinned set, or one Remanence could not
-        read, refuses the whole disk, because a partial answer would
-        vouch for an ordering nothing verified.
+        Remanence answers with everything the disk holds -- what
+        sector 0 was, every declared partition row, a row it could
+        not read carrying its issue, and the filesystem it recognized
+        on each composed volume. The claim is enforced here: a row
+        whose type is outside the pinned set, one Remanence could not
+        read, and a declared FAT that yielded no readable volume each
+        refuse the whole disk, because a partial answer would vouch
+        for an ordering nothing verified.
         """
-        report = self._disk.geometry()
+        report = self._medium.inspect()
+        if report.content == "unknown-nonblank":
+            raise UnreadableImage(
+                f"{self.path}: {report.content_evidence}")
         partitions = []
-        for entry in report.partitions:
-            description = _describe(entry.type_byte, entry.number,
-                                    self.path)
-            if entry.issue is not None:
+        volumes = []
+        for entry in self._medium.partitions():
+            description = None
+            if not entry.is_direct:
+                description = _describe(entry.type_byte, entry.ordinal,
+                                        self.path)
+                if entry.issue is not None:
+                    raise UnreadableImage(
+                        f"{self.path}: partition {entry.ordinal} "
+                        f"({description}) could not be read — "
+                        f"{entry.issue}")
+                partitions.append(Partition(
+                    number=entry.ordinal, kind=entry.type_byte,
+                    description=description, offset=entry.start_bytes,
+                    length=entry.length_bytes,
+                    logical=entry.placement == "logical"))
+            if entry.volume_id is None:
+                # A blank disk holds no volume, and an extended
+                # container holds a chain rather than one. A row
+                # declaring a filesystem this build reads and
+                # composing nothing is the third case, and it is a
+                # gap in the ordering rather than an empty disk.
+                if entry.is_direct or entry.type_byte in _EXTENDED:
+                    continue
                 raise UnreadableImage(
-                    f"{self.path}: partition {entry.number} "
-                    f"({description}) could not be read — {entry.issue}")
-            partitions.append(Partition(
-                number=entry.number, kind=entry.type_byte,
-                description=description, offset=entry.start_bytes,
-                length=entry.length_bytes,
-                logical=entry.kind == "logical"))
-        # ``partitioned`` is what sector 0 held: a partition table,
-        # even one declaring nothing, and neither a blank disk nor a
-        # bare volume's boot record.
-        partitioned = bool(partitions) or (not report.blank
-                                           and not report.volumes)
-        cylinders = next(
-            (info.cylinders for info in report.volumes
-             if info.cylinders is not None), None)
+                    f"{self.path}: partition {entry.ordinal} "
+                    f"({description}) declares a filesystem this "
+                    "build reads, and no volume was composed from it")
+            names = _names(entry, description)
+            facts = report.filesystem_on(entry.volume_id)
+            if facts is None or facts.issues:
+                raise UnreadableImage(
+                    f"{self.path}: {names} could not be read — "
+                    f"{_issue(report, entry, facts)}")
+            volumes.append(Volume(self.path, names, entry, facts,
+                                  self.writable))
+        # ``partitioned`` is what sector 0 held, as Remanence
+        # classified it: a partition scheme, even one declaring
+        # nothing, and neither a blank disk nor a bare volume's boot
+        # record.
+        cylinders = next((volume.cylinders for volume in volumes
+                          if volume.cylinders is not None), None)
         return Geometry(
-            partitioned=partitioned, partitions=tuple(partitions),
-            volumes=len(report.volumes),
-            cylinders=cylinders), report.volumes
+            partitioned=self._medium.partition_scheme is not None,
+            partitions=tuple(partitions), volumes=len(volumes),
+            cylinders=cylinders), volumes
 
     def geometry(self):
         """The drive's shape, for a caller that must know it.
@@ -263,13 +344,19 @@ class Image:
         third.
         """
         try:
-            self._disk.commit()
+            self._medium.commit()
         except remanence.RemanenceError as error:
             _refuse(self.path, error)
 
     def close(self):
-        """Release the image, undoing a write that never committed."""
-        self._disk.close()
+        """Release the image, undoing a write that never committed.
+
+        Releasing the medium is Remanence's one state-ending verb and
+        never a commit, so whatever was buffered goes with it.
+        """
+        if self._medium is not None:
+            self._session.release_media(self._medium.id)
+            self._medium = None
 
     def __enter__(self):
         return self
@@ -284,34 +371,43 @@ class Volume:
     Addressing is by path segments, the same list the guest address
     split into, so nothing here composes or parses a guest path: the
     caller hands over what the guest wrote and gets back what is
-    there. The volume is named to Remanence by its stable id, the
-    identity every file verb shares with the geometry report.
+    there. The volume carries the stable id the inspection report
+    issued for it, and its file verbs stand on the namespace the
+    partition composing it opens -- one seam, named once at the open
+    rather than looked up per call.
 
     Writing needs the image opened writable; a read-only one refuses
     by name rather than failing somewhere further in.
     """
 
-    def __init__(self, disk, info, writable):
-        self._disk = disk
-        self.id = info.id
+    def __init__(self, path, names, partition, facts, writable):
+        self._path_of_image = path
+        self.id = partition.volume_id
+        #: Which volume this is, in words a refusal can carry: the
+        #: id is stable but says nothing a reader would recognize.
+        self.where = names
+        # A typed row determines its own reading; the direct
+        # partition has no type byte, so the FAT claim is declared.
+        self._space = (partition.filesystem() if partition.bears_namespace
+                       else partition.filesystem_as(_FAT_READING))
         #: ``"FAT12"`` or ``"FAT16"`` -- what the volume declares
         #: itself to be, the cluster count deciding the width.
-        self.filesystem = info.kind
-        self._label = info.label
-        self.length = info.length_bytes
+        self.filesystem = facts.kind
+        self._label = facts.label
+        self.length = self._space.length_bytes
         # The BPB's own geometry words, where DOS itself looks. None
         # means the formatter stated none, which is reported as
         # unanswered rather than filled in with a plausible number.
-        self.heads = info.heads
-        self.sectors_per_track = info.sectors_per_track
-        self.cylinders = info.cylinders
+        self.heads = facts.heads
+        self.sectors_per_track = facts.sectors_per_track
+        self.cylinders = facts.cylinders
         self.writable = writable
 
     def _call(self, verb, *arguments):
         try:
             return verb(*arguments)
         except remanence.RemanenceError as error:
-            _refuse(self.id, error)
+            _refuse(self._path_of_image, error)
 
     @staticmethod
     def _path(segments, *, validated):
@@ -333,13 +429,13 @@ class Volume:
         """The volume's label, or ``None`` when it has none.
 
         The root directory's own label entry is what DOS's ``LABEL``
-        command maintains and ``DIR`` shows. Unlabeled is ``None`` --
-        "NO NAME" is the format's own spelling of it, so it reads as
-        no label rather than as a name.
+        command maintains and ``DIR`` shows, and the boot record's
+        copy answers where the root directory carries none.
+        Remanence reads the label whole -- both readings, and "NO
+        NAME" as the format's own spelling of unlabeled rather than
+        as a name -- so what arrives here is already the answer.
         """
-        if self._label and self._label.upper() != "NO NAME":
-            return self._label
-        return None
+        return self._label.name if self._label is not None else None
 
     def kind(self, segments):
         """``"directory"``, ``"file"``, or ``None`` when nothing is
@@ -347,7 +443,7 @@ class Volume:
         segments = list(segments)
         if not segments:
             return "directory"
-        entry = self._call(self._disk.stat, self.id,
+        entry = self._call(self._space.stat,
                            self._path(segments, validated=False))
         return None if entry is None else entry.kind
 
@@ -356,7 +452,7 @@ class Volume:
         segments = list(segments)
         if segments and self.kind(segments) != "directory":
             raise UnreadableImage("no such directory in this volume")
-        listed = self._call(self._disk.entries, self.id,
+        listed = self._call(self._space.entries,
                             self._path(segments, validated=False))
         return sorted(
             (entry.name, entry.kind == "directory",
@@ -368,7 +464,7 @@ class Volume:
         segments = list(segments)
         if self.kind(segments) != "file":
             raise UnreadableImage("no such file in this volume")
-        payload = self._call(self._disk.read_file, self.id,
+        payload = self._call(self._space.read_file,
                              self._path(segments, validated=False))
         with open(destination, "wb") as handle:
             handle.write(bytes(payload))
@@ -387,10 +483,10 @@ class Volume:
             raise UnreadableImage("a file address needs a name")
         if not self.writable:
             raise UnreadableImage(
-                f"volume {self.id}: opened for reading only")
+                f"{self.where}: opened for reading only")
         with open(source, "rb") as handle:
             payload = handle.read()
-        self._call(self._disk.write_file, self.id,
+        self._call(self._space.write_file,
                    self._path(segments, validated=True), payload)
         return len(payload)
 
@@ -398,8 +494,8 @@ class Volume:
         """Create the addressed directory and any missing parent."""
         if not self.writable:
             raise UnreadableImage(
-                f"volume {self.id}: opened for reading only")
-        self._call(self._disk.make_directory, self.id,
+                f"{self.where}: opened for reading only")
+        self._call(self._space.make_directory,
                    self._path(list(segments), validated=True))
 
 

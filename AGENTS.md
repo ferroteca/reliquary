@@ -212,9 +212,13 @@ workflow:
   `at_rest.py` is **the at-rest translation layer** over the `remanence` dependency (P27), which is the one
   deep module for direct disk access: Remanence opens a raw or qcow2 image where it lies (the format decided
   by the bytes), claims it for the length of the access under its declared intent, composes and claims a
-  backing chain immutable, discovers geometry, reads and writes FAT volumes by a stable volume id shared
-  with its geometry report, and stands a durable undo journal beneath `commit()` so an interrupted commit is
-  reconciled at the image's next open (D77). What `at_rest.py` keeps is reliquary's policy: **the
+  backing chain immutable, discovers geometry, reads and writes FAT volumes reached through the partitions
+  the loaded medium bears — each carrying the stable volume id its inspection report issued — and stands a
+  durable undo journal beneath `commit()` so an interrupted commit is
+  reconciled at the image's next open (D77). The image is loaded into a session as one medium under a
+  declared device type (`mbr-sector-hd`: reliquary's drives are DOS's, MBR-partitioned and CHS-addressed),
+  because a raw or qcow2 image says nothing about the drive that recorded it; releasing the medium ends the
+  claim. What `at_rest.py` keeps is reliquary's policy: **the
   recognition claim** (D83) — FAT12, FAT16 and FAT16B over standard MBR primary/extended partitioning,
   everything else, FAT32 included, a named refusal in reliquary's own vocabulary, **partition types pinned
   value by value**; **the whole-disk rule** — a partition Remanence reports as unreadable refuses the disk,

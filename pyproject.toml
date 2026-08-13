@@ -31,7 +31,7 @@ dependencies = [
     "lark",
     "pillow",
     "qemu.qmp",
-    "remanence==0.0.1a2",
+    "remanence==0.0.1a3",
     "rich",
 ]
 

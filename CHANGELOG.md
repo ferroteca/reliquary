@@ -52,6 +52,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The `remanence` pin moves to `0.0.1a3`** (P27), and `at_rest.py`
+  is rewritten onto that release's surface — the dependency makes no
+  compatibility promise before 1.0, and `Disk` is gone. An image is
+  now identified, then loaded into a session as one medium under a
+  declared device type (`mbr-sector-hd`: an MBR-partitioned drive
+  addressed by cylinder, head and sector, which is what a DOS
+  workflow's disks are), and its content is reached through the
+  partitions that medium bears rather than through disk-plus-volume-id
+  calls. Releasing the medium ends the claim.
+
+  The policy this layer keeps is unchanged and so is every surface
+  above it: the recognition claim and its refusal wording, the
+  whole-disk-or-none rule, guest-address validation, the drive
+  report's shape, and the `UnreadableImage` / `ImageLocked` mapping
+  onto `drive.image-unreadable` and `image.locked`. What changed
+  inside it: sector 0's classification is the dependency's answer
+  now rather than a local derivation from `blank`, `partitions` and
+  `volumes`; a declared FAT row composing no readable volume refuses
+  the disk by name, where the old shape could have passed it by; and
+  a volume's stable id is the inspection report's own value, so it is
+  opaque where it used to be a spelling.
+
+- **A volume's label falls back to the boot record's copy** where the
+  root directory carries no label entry — the residue root P27 named,
+  now closed upstream and read whole at the filesystem seam, "NO
+  NAME" included. Nothing here restates the rule any more.
+
 - **CLI list tables use Rich** for consistent terminal-cell alignment and
   wrapping. Long paths, addresses, property values, and other wide data fold
   across lines instead of being truncated. Machine listings lead with machine
