@@ -365,7 +365,13 @@ def configure_vm(state, vm_name):
         if key.startswith("storagecontrollername") and value in (
                 _IDE, _FLOPPY):
             run_vbox(
-                ["storagectl", vm_name, f"--name={value}", "--remove"],
+                # `--name` is passed as two tokens here and joined by
+                # `=` everywhere else, which is not a style choice:
+                # VBoxManage 7.2 rejects `--name=X --remove` with
+                # "Too few parameters" and accepts `--name X --remove`.
+                # The joined form works alongside `--add`, so only the
+                # removal is spelled this way.
+                ["storagectl", vm_name, "--name", value, "--remove"],
                 action="removing controller", target=value)
 
     attachments = drive_attachments(state)

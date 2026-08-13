@@ -185,6 +185,37 @@ class AdapterSurfaceTests(unittest.TestCase):
         # And the session's cache root is where it is told to keep it.
         self.assertEqual(bank.call_args.args, ("/tmp/cache",))
 
+    def test_removing_a_controller_passes_the_name_as_two_tokens(self):
+        """VBoxManage 7.2 refuses `--name=X --remove`.
+
+        It answers "Too few parameters" and exits 2, which broke every
+        restart of an existing VM — `configure_vm` drops the
+        controllers it owns before rebuilding them from state. The
+        joined form still works alongside `--add`, so only the removal
+        is spelled apart.
+        """
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            if command[1] == "showvminfo":
+                return _completed(
+                    stdout='storagecontrollername0="reliquary-ide"\n')
+            return _completed()
+
+        with mock.patch.object(vbox, "find_vboxmanage",
+                               return_value="VBoxManage"), \
+                mock.patch("subprocess.run", side_effect=run):
+            vbox.configure_vm({"drives": {"hdd0": {"medium": "hdd"}}},
+                              "reliquary-plain-0")
+
+        removal = next(c for c in calls
+                       if c[1] == "storagectl" and "--remove" in c)
+        self.assertEqual(
+            removal[2:],
+            ["reliquary-plain-0", "--name", "reliquary-ide", "--remove"])
+        self.assertNotIn("--name=reliquary-ide", removal)
+
     def test_hard_disks_take_the_ide_slots_before_cdroms(self):
         """The boot disk must be the primary master, not the slave.
 
