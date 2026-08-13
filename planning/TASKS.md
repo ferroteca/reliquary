@@ -125,6 +125,52 @@ violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
 
+### Defects
+
+#### T26 — The guard against live external effects installs by side effect, and its own test is the hazard
+
+`tests/__init__.py` blocks `subprocess.Popen`, `subprocess.run` and
+`urllib.request.urlopen`, so no unit test reaches a hypervisor or
+the network. But `unittest discover -s tests` imports the test
+modules as **top-level**, not as a package, and never imports
+`tests/__init__.py` on its own — verified: discovering that
+directory with a pattern matching one module leaves `tests`
+unimported and both `subprocess` names unpatched.
+
+**What installs the guard today is an accident.**
+`test_freedos_install_integration.py` says `from tests import
+live_external_effects`, and importing `tests` for that name is what
+runs the blocking assignments. So the whole suite's isolation rests
+on one unrelated module's import succeeding — and that line sits
+*after* its `from reliquary ...` imports, so anything that breaks
+the package removes the guard.
+
+**The failure mode is the worst available**, because
+`test_external_effect_guards.py` imports nothing from `reliquary`
+and therefore still runs:
+
+    with self.assertRaisesRegex(AssertionError, "backend"):
+        subprocess.Popen(["qemu-system-i386"])
+
+With the guard absent that line **launches a real hypervisor**. The
+test written to prove no unit test starts a VM is the one that
+starts it. Observed on 2026-08-13 against a branch that briefly did
+not import: a `qemu-system-i386` window with no arguments, left
+running after the suite, orphaned when the run was killed.
+
+It also **hangs the run rather than failing it**: the child
+inherits the pipeline's stdout, so a `... | grep | sort` never sees
+EOF and the command never returns. A suite that cannot import looks
+like a suite that will not finish, which is a bad first symptom to
+hand anyone.
+
+Two changes, both small. Install the guard where discovery cannot
+miss it rather than relying on a name someone happens to import.
+And have the guard test **assert the guard is installed** before
+exercising it, so a missing guard fails loudly instead of doing the
+thing the guard exists to prevent — a safety check that is unsafe
+when unarmed is worse than none, since it also reports success.
+
 ### Surface decisions
 
 #### T25 — Stopping and starting one machine takes two commands and lets go in between
